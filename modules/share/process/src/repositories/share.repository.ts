@@ -1,10 +1,10 @@
-import type { Instant } from "@langwatch/time";
 import type {
   ShareLink,
   ShareResourceType,
   ShareVisibility,
   ShareWithProject,
 } from "@langwatch/share-contract";
+import type { Instant } from "@langwatch/time";
 
 export interface CreateShareLinkParams {
   token: string;

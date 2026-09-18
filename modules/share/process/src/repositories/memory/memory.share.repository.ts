@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   SHARE_KSUID_RESOURCE,
   shareLinkSchema,
@@ -6,8 +7,8 @@ import {
   type ShareResourceType,
   type ShareWithProject,
 } from "@langwatch/share-contract";
-import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
+
 import type {
   ConsumeShareViewParams,
   CreateShareLinkParams,

@@ -25,14 +25,11 @@ describe("given a browser that installs share", () => {
   });
 
   describe("when a surface the declaration publishes is asked for", () => {
-    it.each([["share-link-views"], ["share-links"]] as const)(
-      "resolves %s",
-      async (surface) => {
-        const publication = shareWeb.installation.publications[surface];
-        const loaded = await publication?.load();
+    it.each([["share-link-views"], ["share-links"]] as const)("resolves %s", async (surface) => {
+      const publication = shareWeb.installation.publications[surface];
+      const loaded = await publication?.load();
 
-        expect(loaded).toBeDefined();
-      },
-    );
+      expect(loaded).toBeDefined();
+    });
   });
 });

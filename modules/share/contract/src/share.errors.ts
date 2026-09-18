@@ -1,7 +1,15 @@
 import { HandledError } from "@langwatch/handled-error";
 
-export class PinnedToActiveShareError extends Error {
-  readonly name = "PinnedToActiveShareError" as const;
+export class PinnedToActiveShareError extends HandledError {
+  declare readonly code: "share_trace_pinned";
+
+  constructor(message = "This trace is currently shared. Disable the share before unpinning.") {
+    super("share_trace_pinned", message, {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "PinnedToActiveShareError";
+  }
 }
 
 export class ShareLinkNotFoundError extends HandledError {

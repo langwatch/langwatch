@@ -1,6 +1,7 @@
 import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { ShareLinkView } from "./share-link-status.ts";
+
 import { ShareLinkRow } from "./share-link-row.tsx";
+import type { ShareLinkView } from "./share-link-status.ts";
 
 /** The list of existing links, with loading / error / empty states. */
 export function ShareLinksList({

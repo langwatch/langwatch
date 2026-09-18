@@ -4,9 +4,9 @@ import {
   type PinnedTrace,
   type PinTraceInput,
 } from "@langwatch/data-retention-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   ShareApi,
   type ShareApi as ShareApiContract,
@@ -20,6 +20,7 @@ import {
   type ShareWithProject,
   type TracePinInput,
 } from "@langwatch/share-contract";
+
 import { LedgerShareRepository } from "../repositories/ledger/ledger.share.repository.ts";
 import { RedisShareCacheRepository } from "../repositories/redis/redis.share-cache.repository.ts";
 import type { ShareRepositories } from "../repositories/share.repositories.ts";

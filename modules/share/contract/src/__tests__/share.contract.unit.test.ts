@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { createShareInputSchema, resolveShareInputSchema, shareLinkSchema } from "../index.ts";
+
+import {
+  createShareInputSchema,
+  PinnedToActiveShareError,
+  resolveShareInputSchema,
+  shareLinkSchema,
+} from "../index.ts";
 
 describe("Share contract", () => {
   it("accepts the existing share-link response shape", () => {
@@ -40,5 +46,15 @@ describe("Share contract", () => {
         viewer: { type: "user" },
       }),
     ).toThrow(ZodError);
+  });
+
+  it("describes an active share refusal as a handled conflict", () => {
+    const error = new PinnedToActiveShareError();
+
+    expect(error).toMatchObject({
+      code: "share_trace_pinned",
+      httpStatus: 409,
+      message: "This trace is currently shared. Disable the share before unpinning.",
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import { describeShareLink, isShareLinkSpent, type ShareLinkView } from "../share-link-status.ts";
 
 const NOW = Temporal.Instant.from("2026-08-27T12:00:00.000Z");

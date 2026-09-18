@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { PrismaShareGrantRepository } from "../prisma.share-grant.repository.ts";
 
 /**

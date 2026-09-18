@@ -1,6 +1,13 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
-import { shareLinkSchema, shareWithProjectSchema, type ShareLink,type ShareResourceType,type ShareWithProject } from "@langwatch/share-contract";
+import {
+  shareLinkSchema,
+  shareWithProjectSchema,
+  type ShareLink,
+  type ShareResourceType,
+  type ShareWithProject,
+} from "@langwatch/share-contract";
 import { toDate } from "@langwatch/time";
+
 import type {
   ConsumeShareViewParams,
   CreateShareLinkParams,

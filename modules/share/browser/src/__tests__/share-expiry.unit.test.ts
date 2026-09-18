@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
 import { expiryToInstant, isShareExpiryOption, SHARE_EXPIRY_OPTIONS } from "../share-expiry.ts";
 
 const NOW = Temporal.Instant.from("2026-08-27T12:00:00.000Z");

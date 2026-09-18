@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { PrismaShareRepository } from "../prisma.share.repository.ts";
 
 type ShareDatabase = Parameters<typeof PrismaShareRepository.create>[0]["prisma"];

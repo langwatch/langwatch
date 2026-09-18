@@ -10,8 +10,9 @@ import {
   authzShareAudience,
 } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { nanoid } from "nanoid";
 import type { ShareLink, ShareResourceType, ShareWithProject } from "@langwatch/share-contract";
+import { nanoid } from "nanoid";
+
 import type { ShareGrantRepository } from "../share-grant.repository.ts";
 import type {
   ConsumeShareViewParams,

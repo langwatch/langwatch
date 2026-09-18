@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+
 import { ShareService } from "../share.service.ts";
 
-const buildSharedTraceCacheKey = (
-  ...args: Parameters<typeof ShareService.buildPayloadCacheKey>
-) => ShareService.buildPayloadCacheKey(...args);
+const buildSharedTraceCacheKey = (...args: Parameters<typeof ShareService.buildPayloadCacheKey>) =>
+  ShareService.buildPayloadCacheKey(...args);
 
 /**
  * The cache key is the only thing keeping two viewers of the same link apart.

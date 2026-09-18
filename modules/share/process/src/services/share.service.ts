@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createLogger } from "@langwatch/observability";
@@ -28,8 +30,8 @@ import {
   type TracePinInput,
 } from "@langwatch/share-contract";
 import { fromDate, type Instant, nowInstant, toEpochMs } from "@langwatch/time";
-import { createHash } from "node:crypto";
 import { customAlphabet } from "nanoid";
+
 import type { ShareCacheRepository } from "../repositories/share-cache.repository.ts";
 import type { ShareRepository } from "../repositories/share.repository.ts";
 
@@ -340,9 +342,7 @@ export class ShareService {
     });
 
     if (activeShares > 0) {
-      throw new PinnedToActiveShareError(
-        "This trace is currently shared. Disable the share before unpinning.",
-      );
+      throw new PinnedToActiveShareError();
     }
 
     await this.#options.dataRetention.unpin(parsed);

@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { copyShareLink } from "../share-links.ts";
 
 function stubClipboard(writeText: () => Promise<void>) {

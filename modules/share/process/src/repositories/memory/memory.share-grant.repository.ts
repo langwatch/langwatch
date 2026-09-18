@@ -1,4 +1,5 @@
 import { nowInstant } from "@langwatch/time";
+
 import type {
   ConsumeShareUsageParams,
   ShareGrantRepository,

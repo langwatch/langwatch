@@ -5,8 +5,7 @@
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { PinnedToActiveShareError, pinnedTraceTrpc, ShareApi } from "@langwatch/share-contract";
-import { TRPCError } from "@trpc/server";
+import { pinnedTraceTrpc, ShareApi } from "@langwatch/share-contract";
 
 export const pinnedTraceTrpcTransport = defineTrpcRouter(ShareApi, pinnedTraceTrpc)
   .procedure("pin")
@@ -22,19 +21,9 @@ export const pinnedTraceTrpcTransport = defineTrpcRouter(ShareApi, pinnedTraceTr
 
   .procedure("unpin")
   .withPermission("project:update")
-  .handle(async ({ app, input }) => {
-    try {
-      await app.unpinTrace({ projectId: input.projectId, traceId: input.traceId });
-    } catch (error) {
-      // Surfaces as a non-toast inline error in the UI (the PinButton also
-      // disables itself when source=share and the share is active, but the
-      // client is never trusted; this is the gate).
-      if (error instanceof PinnedToActiveShareError) {
-        throw new TRPCError({ code: "CONFLICT", message: error.message });
-      }
-      throw error;
-    }
-  })
+  .handle(async ({ app, input }) =>
+    app.unpinTrace({ projectId: input.projectId, traceId: input.traceId }),
+  )
 
   .procedure("getPin")
   .withPermission("traces:view")

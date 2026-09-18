@@ -50,7 +50,7 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../authz/server/tsconfig.build.json"
+      "path": "../../authz/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
