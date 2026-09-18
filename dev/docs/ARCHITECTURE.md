@@ -229,15 +229,18 @@ exported at `./declaration`; the generated `browserModules` list installs it.
 
 ```
 apps/api/src/
-├── main.ts       # everything below, ~40 lines
-├── hosting/      # HttpMux · ApiForward · BrowserBundle — tiny classes
-└── policy/       # SecurityHeaders · ContentSecurityPolicy · ClientAddress · RequestPreamble
+├── main.ts           # everything below, ~40 lines
+└── transport/        # HttpMux · BrowserBundle — tiny classes ("transport" for consistency)
+    └── policy/       # SecurityHeaders · ContentSecurityPolicy · ClientAddress · RequestPreamble
 ```
 
-**The hosting composition lives in the api app, not in `@langwatch/api`**
+**The transport composition lives in the api app, not in `@langwatch/api`**
 (ruled 2026-09-18): the dependency points the other way — these classes USE
-the api package (`ApiForward` forwards into its mounted surface); the api
-package never contains its own front door.
+the api package; the api package never contains its own front door. **There
+is no ApiForward** (ruled 2026-09-18, superseding the noun): the /api
+composition rides `composeProcess().expose()` — trpc and rest allowed iff
+declared, then the security middleware, then the bundle route after them —
+so the front door is the expose chain's product, not a class of its own.
 
 There is no app config file (ruled 2026-09-18): config comes from the
 installed server modules' own declared schemas, composed by the generated
@@ -320,18 +323,18 @@ const bundle = BrowserBundle.create({
   sessionReader,                       // Caller | null, document requests only
   security: SecurityHeaders.strict().withContentSecurityPolicy(csp),
 });
-const api = ApiForward.create({ api: mountedApi, fallback: bundle });
 const handler = RequestPreamble.create({
   clientAddress: ClientAddress.fromTrustedProxies(trustedProxyConfig),
   security: SecurityHeaders.strict(),
-  next: api,
+  next,
 });
 ```
 
-`ApiForward` IS the /api front (tRPC/REST split inside it, bundle as its
-fallback); `BrowserBundle` serves the bundle side; `RequestPreamble` is the
-unconditional preamble as a class. The fluent mux above and these
-constructor sites are one design — the mux composes them. **The mux is backed by
+`BrowserBundle` serves the bundle side; `RequestPreamble` is the
+unconditional preamble as a class. The /api front has no noun of its own —
+`expose()` composes it (trpc/rest iff declared, then security, then the
+bundle route last). The fluent mux above and these constructor sites are
+one design — the mux composes them. **The mux is backed by
 Hono internally** (ruled 2026-09-18): the framework's `/api` surface is
 already a Hono app, so the mount is a native sub-app and one router tree
 serves the request end to end, with Hono owning the HTTP edge cases a
@@ -349,12 +352,12 @@ a re-attempt of the SPA shell, because the bundle machinery may be what
 failed. Inside `/api` the framework's canonical-error middleware remains
 the handler for everything it reaches; the mux boundary catches only what
 escapes or precedes it, answering in the same envelope shape. **The code's
-physical shape matches**: concept-named directories — `hosting/` (HttpMux,
-ApiForward, BrowserBundle), `policy/` (SecurityHeaders,
-ContentSecurityPolicy, ClientAddress, RequestPreamble) — tiny classes, tens
-of lines each, composition by constructor, helpers inside the class file
-they serve; a directory growing past a few classes means the concept is
-wrongly cut. **Each expose member sets up only the base**: headers and
+physical shape matches**: concept-named directories in the api app —
+`transport/` (HttpMux, BrowserBundle) with `transport/policy/` inside it
+(SecurityHeaders, ContentSecurityPolicy, ClientAddress, RequestPreamble) —
+tiny classes, tens of lines each, composition by constructor, helpers
+inside the class file they serve; a directory growing past a few classes
+means the concept is wrongly cut. **Each expose member sets up only the base**: headers and
 general security, as named CLASSES from `@langwatch/api`, never inline
 data — `SecurityHeaders.strict()` (the floor no surface drops below; `.with`/
 `.merge` overlay, `.without` is the loud exception), `ContentSecurityPolicy
