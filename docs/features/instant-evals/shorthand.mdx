@@ -55,7 +55,7 @@ SELECT
   argMax(m.TraceId, m.OccurredAt) AS TraceId,
   m.ConversationId AS ThreadId,
   max(m.OccurredAt) AS OccurredAt,
-  eval(conversation_bounded(m.ConversationId, 8000, ''), 'the customer sounds annoyed') AS q1
+  eval(conversation(m.ConversationId), 'the customer sounds annoyed') AS q1
 FROM analytics.trace_metrics AS m
 WHERE m.OccurredAt >= {start_at:DateTime}
   AND m.OccurredAt < {end_at:DateTime}
@@ -67,6 +67,10 @@ ORDER BY ThreadId
 One row per conversation, addressed by the conversation's last trace. A trace
 carrying no conversation id is left out, so a project that does not set one
 should ask for `traces` instead.
+
+`conversation` carries no budget of its own, so an ordinary conversation reaches
+the judge whole. See [The token budget](#the-token-budget) for what happens to
+one that does not fit, and for how to put a budget back.
 
 ### llm-spans
 
@@ -85,15 +89,31 @@ ORDER BY TraceId, SpanId
 
 ## The token budget
 
-The bounded extraction functions are called with a budget of 8,000 tokens,
-which is the default the function catalog documents. A typical product trace
-renders to well under it; a coding session renders to many times it, and the
-difference in price between cutting there and cutting at the classifier's own
-ceiling is about four times, on exactly the rows least worth reading in full.
+`traces` and `llm-spans` are written with a budget of 8,000 tokens, which is
+the default the function catalog documents. A typical product trace renders to
+well under it; a coding session renders to many times it.
 
-A long list of questions leaves less room, and the budget written into the
-statement is then whatever the questions leave. To read a whole trace however
-long it is, write the statement yourself and pass the budget you want.
+`threads` is written without one. A conversation is the thing people most often
+want read end to end, and cutting it at 8,000 tokens to save a fraction of a
+cent is the wrong trade, so the only ceiling it meets is the judge's own state:
+about 31,000 tokens once your questions are in.
+
+Expect a long conversation to cost more than a bounded one would, up to roughly
+four times on the longest threads. Read the estimate before the run: it prices
+the rows as they actually are.
+
+A conversation past that ceiling is still judged. It is cut to fit, the row
+comes back marked truncated, and the cut keeps the opening. If what you are
+asking about is how a conversation *ended*, write the statement yourself with
+`conversation_bounded`, which keeps both ends and writes a marker naming how
+many turns it dropped from the middle:
+
+```sql
+eval(conversation_bounded(m.ConversationId, 8000, ''), 'the customer left angry') AS q1
+```
+
+A long list of questions leaves less room, and a budget written into a
+statement is then capped at whatever the questions leave.
 
 ## What a shorthand filter can ask for
 

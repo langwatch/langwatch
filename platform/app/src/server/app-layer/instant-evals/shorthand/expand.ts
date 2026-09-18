@@ -18,7 +18,7 @@
  * | Target | One row is | Text from | Addressed by |
  * |---|---|---|---|
  * | `traces` | one trace | `llm_readable_trace` | the trace |
- * | `threads` | one conversation | `conversation_bounded` | its last trace |
+ * | `threads` | one conversation | `conversation` | its last trace |
  * | `llm_spans` | one model call | `llm_messages_span` | the trace and span |
  *
  * ## Where the filter goes
@@ -188,8 +188,12 @@ const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
     // own column. The run's own wrapper is what orders pages, and it reads the
     // projected TraceId.
     orderBy: "ThreadId",
-    text: (budget) =>
-      `conversation_bounded(m.ConversationId, ${sqlInteger(budget)}, '')`,
+    // Unbounded: the eval function cuts to whatever the classifier's state
+    // leaves once the questions are in, which is about four times the shipped
+    // eight thousand token default, so an ordinary conversation reaches the
+    // judge whole. Ask for `conversation_bounded` in a statement of your own
+    // to trade fidelity for price on long threads.
+    text: () => "conversation(m.ConversationId)",
     filterPlacement: "trace-subquery",
     filterTraceColumn: "m.TraceId",
   },

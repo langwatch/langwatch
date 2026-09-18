@@ -69,9 +69,11 @@ describe("expandInstantEvalShorthand, given a target and some questions", () => 
       expect(sql).toContain("max(m.OccurredAt) AS OccurredAt");
       expect(sql).toContain("GROUP BY m.ConversationId");
       expect(sql).toContain("m.ConversationId != ''");
-      expect(sql).toContain(
-        `conversation_bounded(m.ConversationId, ${INSTANT_EVAL_SHORTHAND_TEXT_BUDGET}, '')`,
-      );
+      // Unbounded on purpose: the classifier cuts to whatever its state
+      // leaves, which is several times the shipped default, so an ordinary
+      // conversation reaches the judge whole.
+      expect(sql).toContain("conversation(m.ConversationId)");
+      expect(sql).not.toContain("conversation_bounded");
     });
   });
 
