@@ -333,8 +333,36 @@ export interface LangWatchQLPostgresMapping {
    * Named separately from the exposed `TenantId` because the application's
    * schema calls it something else on every table, and the approved view is
    * what reconciles the two.
+   *
+   * Read on the last alias of {@link tenantPath} — the base relation itself
+   * when the path is empty or absent.
    */
   readonly tenantSourceColumn: string;
+  /**
+   * The join chain from {@link baseRelation} to the relation that carries the
+   * owning project, one hop per entry.
+   *
+   * Postgres tables are scoped at three levels and a table carrying no project
+   * column reaches one by joining upward. The org path is
+   * Organization -> Team -> Project rather than a direct hop because `Project`
+   * carries `teamId`, not `organizationId`: there is no column to join an
+   * org-scoped table straight onto a project, so it goes through the
+   * organization's teams' projects. Absent (or empty) means the base relation
+   * carries the project column itself, and the approved view reads
+   * {@link tenantSourceColumn} straight off it.
+   */
+  readonly tenantPath?: readonly {
+    /** Relation joined (application table name, e.g. "Team"). */
+    readonly relation: string;
+    /** Alias this hop's relation gets in the view body. */
+    readonly alias: string;
+    /**
+     * The equijoin: `<previous alias>.<from> = <alias>.<to>`. `from` is a
+     * column of the previous alias (the base relation for the first hop, the
+     * prior hop's relation afterwards); `to` is a column of this hop's relation.
+     */
+    readonly on: { readonly from: string; readonly to: string };
+  }[];
 }
 
 /**

@@ -72,6 +72,7 @@ import {
 } from "./accessModel";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+  POSTGRES_BASE_ALIAS,
   postgresApprovedViewStatement,
   postgresEngineTableStatement,
 } from "./postgresMapping";
@@ -817,11 +818,17 @@ export function lwqlPostgresApprovedViewStatements({
   schema: string;
   views?: readonly LangWatchQLViewDefinition[];
 }): string[] {
-  return lwqlPostgresViews(views).map((view) =>
-    postgresApprovedViewStatement({
+  return lwqlPostgresViews(views).map((view) => {
+    const joins = view.postgres.tenantPath ?? [];
+    // The project column lives on the last hop's relation (the base itself when
+    // the path is empty), so the tenant column is read on that alias while every
+    // other column reads off the base.
+    const tenantAlias = joins[joins.length - 1]?.alias ?? POSTGRES_BASE_ALIAS;
+    return postgresApprovedViewStatement({
       schema,
       view: view.postgres.approvedView,
       baseRelation: view.postgres.baseRelation,
+      joins,
       columns: view.columns.map((column) => ({
         exposed: column.name,
         // The tenant column is the one rename every mapping performs; the rest
@@ -830,9 +837,10 @@ export function lwqlPostgresApprovedViewStatements({
           column.name === TENANT_COLUMN
             ? view.postgres.tenantSourceColumn
             : singleSourceColumn(view, column.name),
+        ...(column.name === TENANT_COLUMN ? { alias: tenantAlias } : {}),
       })),
-    }),
-  );
+    });
+  });
 }
 
 /**

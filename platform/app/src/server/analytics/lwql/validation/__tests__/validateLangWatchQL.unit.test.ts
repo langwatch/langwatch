@@ -8,6 +8,9 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { Protections } from "../../../../traces/protections";
+import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
+import { lwqlAllowedTables, lwqlGatedColumns } from "../../catalog/types";
 import { type LangWatchQLValidation, validateLangWatchQL } from "../validate";
 import {
   type LangWatchQLViolationCode,
@@ -1203,6 +1206,57 @@ describe("validateLangWatchQL", () => {
           "UNION ALL SELECT TraceId FROM spans LIMIT 5",
       );
       expect(codesOf(result)).toEqual([]);
+    });
+  });
+
+  /**
+   * Gated means refused, not dropped: the shipped catalog's `annotations`
+   * view carries `Comment` (`Annotation.comment`, gated `output` by the
+   * derivation) rather than omitting it, so a caller without content access
+   * learns the column exists and why it was refused instead of the query
+   * silently returning fewer columns than it asked for.
+   */
+  describe("given the shipped catalog's content gates", () => {
+    const database = "analytics";
+
+    function policyFor(protections: Protections) {
+      return {
+        allowedTables: lwqlAllowedTables({
+          database,
+          views: LWQL_VIEW_CATALOG,
+        }),
+        gatedColumns: lwqlGatedColumns({
+          protections,
+          views: LWQL_VIEW_CATALOG,
+        }),
+        defaultDatabase: database,
+      };
+    }
+
+    /** @scenario "A content column is gated, not dropped" */
+    it("refuses Comment on annotations without content access, and allows it with", () => {
+      const withoutContentAccess: Protections = {
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+        canSeeCosts: true,
+      };
+      const withContentAccess: Protections = {
+        canSeeCapturedInput: true,
+        canSeeCapturedOutput: true,
+        canSeeCosts: true,
+      };
+
+      const refused = validateLangWatchQL({
+        sql: `SELECT Comment FROM ${database}.annotations`,
+        ...policyFor(withoutContentAccess),
+      });
+      expect(codesOf(refused)).toContain("GATED_COLUMN");
+
+      const permitted = validateLangWatchQL({
+        sql: `SELECT Comment FROM ${database}.annotations`,
+        ...policyFor(withContentAccess),
+      });
+      expect(codesOf(permitted)).toEqual([]);
     });
   });
 });

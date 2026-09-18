@@ -68,12 +68,13 @@ type lwqlCatalog struct {
 }
 
 // lwqlSourceTables is the fixed set of tables the langwatch_lwql user may read,
-// each behind the tenant row filter — eight ClickHouse-native sources followed
-// by the six *_pg PostgreSQL-engine bridge tables. A catalog addition needs a
-// matching entry in lwql_catalog.json and fails closed without one (the new
-// view's source has no grant, so queries on it are refused rather than
-// unbounded). The manifest is the source of truth here; the SaaS
-// render-config.sh is a third list in the langwatch-saas repo and cannot be
+// each behind the tenant row filter — the ClickHouse-native sources followed by
+// the *_pg PostgreSQL-engine bridge tables, one per Postgres-resident view
+// derived from the Prisma schema (platform/app/src/server/analytics/lwql/catalog/postgresViews.ts).
+// A catalog addition needs a matching entry in lwql_catalog.json and fails
+// closed without one (the new view's source has no grant, so queries on it are
+// refused rather than unbounded). The manifest is the source of truth here; the
+// SaaS render-config.sh is a third list in the langwatch-saas repo and cannot be
 // checked from this repo.
 //
 // lwqlViewNames are the caller-facing views over those sources. They are NOT

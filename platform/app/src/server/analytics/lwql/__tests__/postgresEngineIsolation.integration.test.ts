@@ -190,6 +190,79 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     });
   });
 
+  describe("when a caller queries an organization-scoped view", () => {
+    /**
+     * `virtual_keys` derives its TenantId by walking
+     * Organization -> Team -> Project, so it fans out to one row per project
+     * in the organization rather than filtering a single owning column. Two
+     * organizations, each with its own project and one VirtualKey, is what
+     * makes this a meaningful negative test rather than a vacuous one.
+     */
+    /** @scenario "An organization-scoped view never shows another organization's rows" */
+    it("returns only the caller's own organization's virtual keys", async () => {
+      const rowsA = await selectRows<{
+        TenantId: string;
+        VirtualKeyId: string;
+        Name: string;
+      }>(
+        tenantA,
+        `SELECT TenantId, VirtualKeyId, Name FROM ${database}.virtual_keys ORDER BY VirtualKeyId`,
+      );
+      expect(rowsA).toHaveLength(1);
+      expect(rowsA[0]?.TenantId).toBe(harness.tenantA.tenantId);
+      expect(rowsA[0]?.Name).toBe(`VK ${harness.tenantA.tenantId}`);
+
+      const tenantB = await harness.restrictedClient({
+        keyHash: harness.tenantB.keyHash,
+      });
+      const rowsB = await selectRows<{
+        TenantId: string;
+        VirtualKeyId: string;
+        Name: string;
+      }>(
+        tenantB,
+        `SELECT TenantId, VirtualKeyId, Name FROM ${database}.virtual_keys ORDER BY VirtualKeyId`,
+      );
+      expect(rowsB).toHaveLength(1);
+      expect(rowsB[0]?.TenantId).toBe(harness.tenantB.tenantId);
+      expect(rowsB[0]?.Name).toBe(`VK ${harness.tenantB.tenantId}`);
+    });
+  });
+
+  describe("when a caller asks for traffic by topic name", () => {
+    /**
+     * The fixture `traces` table this suite provisions (`FACT_TABLE_DDL` in
+     * `lwqlClickHouseHarness.ts`, since this file starts the harness with no
+     * `facts` option and so gets the `"fixture"` default) carries no TopicId
+     * column, so the JOIN the scenario names cannot be exercised against it —
+     * only the shipped, migrated `trace_summaries` table carries `TopicId`.
+     * Falling back to asserting the `topics` view alone still proves the
+     * property this file owns: only the caller's own project's topics are
+     * ever reachable.
+     */
+    /** @scenario "Traffic by topic name" */
+    it("lists only the caller's own project's topics", async () => {
+      const rows = await selectRows<{
+        TopicId: string;
+        TopicName: string;
+        ParentTopicId: string | null;
+      }>(
+        tenantA,
+        `SELECT TopicId, TopicName, ParentTopicId FROM ${database}.topics ORDER BY TopicId`,
+      );
+
+      expect(rows.map((row) => row.TopicId)).toEqual([
+        `${harness.tenantA.tenantId}-topic-1`,
+        `${harness.tenantA.tenantId}-topic-2`,
+      ]);
+      for (const row of rows) {
+        expect(
+          row.TopicName.startsWith(`Topic ${harness.tenantA.tenantId}`),
+        ).toBe(true);
+      }
+    });
+  });
+
   describe("when the key-hash context matches no key-map entry", () => {
     /** @scenario "Garbage key context yields zero rows from a PG-engine mapped table" */
     it("returns zero rows from the mapped table", async () => {
