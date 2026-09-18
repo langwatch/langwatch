@@ -168,7 +168,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   { path: "/auth/join", page: "pages/auth/join" },
 
   // Top-level pages
-  { path: "/", page: "pages/index" },
   { path: "/authorize", page: "pages/authorize" },
   {
     // The admin CRUD UI became the Backoffice module inside Ops (#3247,
@@ -223,6 +222,11 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   {
     layout: "chrome",
     children: [
+      // `/` resolves which home this reader belongs in, which is a reading only
+      // the navigation host answers — and the host is mounted by this layout.
+      // Outside it the landing screen threw for want of a host, which is how a
+      // signed-in reader met an error page at the front door.
+      { path: "/", page: "pages/index" },
       // Settings, wrapped in the same Langy layout as the project routes
       // (keyed by the AMBIENT project), so the panel survives hopping between
       // a project page and settings instead of vanishing.
