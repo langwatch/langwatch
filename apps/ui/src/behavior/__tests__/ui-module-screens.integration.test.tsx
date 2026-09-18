@@ -1,0 +1,90 @@
+/** @vitest-environment jsdom */
+
+import { webModules } from "@langwatch/installed-modules/web";
+import { createUi } from "@langwatch/ui-kernel";
+import { render, screen } from "@testing-library/react";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import { describe, expect, it, vi } from "vitest";
+
+import { createUiRouteObjects, UiRouteOutlet } from "../../shell/ui-route-objects";
+import type { UiRouteDescriptor } from "../../model/ui-route-table";
+import { installedModuleScreens } from "../ui-module-screens";
+
+// The screen has its own suites; here it only has to report the view its
+// declared route bound to it, which is the whole subject of this file.
+vi.mock("../../../../../modules/annotation/browser/src/ui/sections/annotations-screen.tsx", () => ({
+  AnnotationsScreen: ({ view }: { view: string }) => <div data-testid="annotation-view">{view}</div>,
+}));
+
+const injectedConfig = {
+  appBaseUrl: "https://app.example.test",
+  gatewayBaseUrl: "https://gateway.example.test",
+  deployment: "self-hosted",
+  mode: "test",
+  telemetry: { browserTracing: false, sampleRatio: 0 },
+  capabilities: { email: true, nlp: true, langevals: false },
+  passkeys: false,
+  identityFrontDoor: false,
+} as const;
+
+/** The one anchor a project-scoped declaration mounts below. */
+const anchorTable: readonly UiRouteDescriptor[] = [
+  { page: "test/project-anchor", webRouteParent: "project", children: [] },
+];
+
+async function installModules() {
+  const mount = document.createElement("div");
+  mount.id = "root";
+  document.body.append(mount);
+
+  return createUi({ document, mount: "root" })
+    .withModules(webModules)
+    .withTransport({ query: () => Promise.resolve(null) })
+    .withInjectedConfig(() => injectedConfig)
+    .render();
+}
+
+describe("given the installed web modules", () => {
+  describe("when the browser routes to a screen a module declared", () => {
+    it("mounts the screen the declaration names, on the view its route bound", async () => {
+      const installed = await installModules();
+      const screens = installedModuleScreens(installed.modules);
+
+      const router = createMemoryRouter(
+        createUiRouteObjects({
+          table: anchorTable,
+          loaders: {
+            ...screens.loaders,
+            "test/project-anchor": () => Promise.resolve({ default: UiRouteOutlet }),
+          },
+          installedRoutes: screens.routes,
+        }),
+        { initialEntries: ["/acme/annotations/all"] },
+      );
+      render(<RouterProvider router={router} />);
+
+      expect((await screen.findByTestId("annotation-view")).textContent).toBe("all");
+    });
+
+    it("serves every address the module declared and no address it did not", async () => {
+      const installed = await installModules();
+      const screens = installedModuleScreens(installed.modules);
+
+      expect(screens.routes.project.map((route) => route.path)).toEqual([
+        "/:project/annotations",
+        "/:project/annotations/all",
+        "/:project/annotations/me",
+        "/:project/annotations/:slug",
+      ]);
+      expect(Object.keys(screens.loaders)).toContain("pages/settings/annotation-scores");
+    });
+  });
+
+  describe("when the shell injects its public configuration", () => {
+    it("hands each module the slice its declaration projected", async () => {
+      const installed = await installModules();
+
+      expect(installed.config).toEqual({ annotation: { mode: "test" } });
+    });
+  });
+});

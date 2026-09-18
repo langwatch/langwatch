@@ -10,6 +10,11 @@
   "main": "./src/annotations.ts",
   "types": "./dist/annotations.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/annotation.web.ts",
+      "types": "./dist/annotation.web.d.ts",
+      "default": "./src/annotation.web.ts"
+    },
     "./annotations": {
       "langwatch-declaration-source": "./src/annotations.ts",
       "types": "./dist/annotations.d.ts",
@@ -55,6 +60,7 @@
     "@langwatch/organization-browser": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "diff": "catalog:",
     "lucide-react": "catalog:",

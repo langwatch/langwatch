@@ -1,14 +1,17 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
-
-import type { ReactNode } from "react";
-
 import { configureDocsRuntime } from "@langwatch/config/docs-url";
 import { webModules } from "@langwatch/installed-modules/web";
 import { createUi } from "@langwatch/ui-kernel";
+import type { ReactNode } from "react";
 
 import { registerChunkReloadListener } from "./behavior/chunk-reload";
 import { readPublicAppConfig } from "./behavior/public-config";
+import {
+  createUiFeatureApiClient,
+  type UiFeatureApiTransport,
+} from "./behavior/ui-feature-transport";
+import { installedModuleScreens, type UiModuleScreens } from "./behavior/ui-module-screens";
 import { toPublicEnvironment } from "./behavior/public-environment";
 import { UiShell } from "./behavior/ui-shell";
 import { UiRuntime } from "./behavior/ui.runtime";
@@ -49,9 +52,15 @@ function UiBootPageError() {
 }
 
 class BrowserUiShell extends UiShell {
-  static create(environment: PublicEnvironment, isDevelopment: boolean): BrowserUiShell {
+  static create(
+    environment: PublicEnvironment,
+    isDevelopment: boolean,
+    screens: UiModuleScreens,
+    transport: UiFeatureApiTransport,
+  ): BrowserUiShell {
     return new BrowserUiShell(
       createUiApplication({
+        features: { loaders: screens.loaders, routes: screens.routes, transport },
         providers: {
           attribution: UiPendingProvider,
           session: UiPendingProvider,
@@ -99,8 +108,12 @@ class BrowserUiShell extends UiShell {
  */
 export async function startUi(): Promise<void> {
   const config = readPublicAppConfig(document);
-  await createUi({ document, mount: "root" })
+  // One client, declared to the supply and handed to the shell: a module that
+  // declares a screen declares that it reads the platform, and this answers it.
+  const transport = createUiFeatureApiClient();
+  const installed = await createUi({ document, mount: "root" })
     .withModules(webModules)
+    .withTransport(transport)
     .withInjectedConfig(() => config)
     .render();
 
@@ -108,7 +121,12 @@ export async function startUi(): Promise<void> {
   const environment = toPublicEnvironment(config);
   UiRuntime.create({
     document,
-    shell: BrowserUiShell.create(environment, config.mode === "development"),
+    shell: BrowserUiShell.create(
+      environment,
+      config.mode === "development",
+      installedModuleScreens(installed.modules),
+      transport,
+    ),
   }).start();
 }
 

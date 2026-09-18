@@ -5,8 +5,12 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { webModules } from "@langwatch/installed-modules/web";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
+
+import { installedModuleScreens } from "../../behavior/ui-module-screens";
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 const CATCH_ALL = "*";
@@ -36,9 +40,11 @@ function featureMapUiAddresses(): string[] {
   return addresses;
 }
 
-const patterns = uiRouteDescriptors(uiRouteTable)
-  .map((descriptor) => descriptor.path)
-  .filter((path): path is string => typeof path === "string");
+/** Both halves of the surface: the application's table, and what modules declare. */
+const patterns = [
+  ...uiRouteDescriptors(uiRouteTable).map((descriptor) => descriptor.path),
+  ...installedModuleScreens(webModules).routes.project.map((route) => route.path),
+].filter((path): path is string => typeof path === "string");
 
 /**
  * Whether `resolved` is a wildcard route that deliberately owns `declared`'s

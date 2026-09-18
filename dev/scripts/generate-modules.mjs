@@ -120,7 +120,7 @@ function sourceFor({ declarations, constant, half }) {
   ];
   const entries = declarations.map((declaration) =>
     half === "web"
-      ? `  ${declaration.symbol} satisfies { readonly id: "${declaration.id}" },`
+      ? `  ${declaration.symbol} satisfies { readonly name: "${declaration.id}" },`
       : `  ${declaration.symbol},`,
   );
   const isEnterprise = (declaration) => declaration.specifier.startsWith("@langwatch/enterprise-");
@@ -313,7 +313,7 @@ function pairingSource({ root, catalogue }) {
     'import type { serverModules } from "./server-modules.generated";',
     `export const webModulePackages = ${JSON.stringify(packages, null, 2)} as const;`,
     `type PairedOnDisk = ${paired.map((entry) => JSON.stringify(entry.id)).join(" | ") || "never"};`,
-    'type MissingWeb = Exclude<PairedOnDisk, (typeof webModules)[number]["id"]>;',
+    'type MissingWeb = Exclude<PairedOnDisk, (typeof webModules)[number]["name"]>;',
     'type MissingServer = Exclude<PairedOnDisk, (typeof serverModules)[number]["name"]>;',
     "export const webModulePairing = {} satisfies {",
     '  [Id in `missing web half "${MissingWeb}"` | `missing server half "${MissingServer}"`]: never;',

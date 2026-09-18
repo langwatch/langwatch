@@ -3067,6 +3067,9 @@ importers:
       '@langwatch/analytics-process':
         specifier: workspace:*
         version: link:analytics/process
+      '@langwatch/annotation-browser':
+        specifier: workspace:*
+        version: link:annotation/browser
       '@langwatch/annotation-process':
         specifier: workspace:*
         version: link:annotation/process
@@ -3819,6 +3822,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       diff:
         specifier: 'catalog:'
         version: 9.0.0

@@ -21,6 +21,7 @@
   "dependencies": {
     "@langwatch/agent-process": "workspace:*",
     "@langwatch/analytics-process": "workspace:*",
+    "@langwatch/annotation-browser": "workspace:*",
     "@langwatch/annotation-process": "workspace:*",
     "@langwatch/api-key-process": "workspace:*",
     "@langwatch/auth-process": "workspace:*",

@@ -14,7 +14,7 @@ const CLI_STARTUP = /^sdks\/typescript\/src\/cli\//;
 // walks the static graph and fails if a handler moves onto the boot path.
 const MCP_SERVER_STARTUP = /^mcp\/typescript\/src\//;
 const CLI_TSUP_CONFIG = /^sdks\/typescript\/tsup\.config\.ts$/;
-const WEB_PACKAGE_ENTRY = /^(?:enterprise\/)?modules\/[^/]+\/web\/src\/[^/]+\.ts$/;
+const WEB_PACKAGE_ENTRY = /^(?:enterprise\/)?modules\/[^/]+\/browser\/src\/[^/]+\.ts$/;
 const UI_APPLICATION = /^apps\/ui\/src\//;
 
 function isExempt(workspacePath) {

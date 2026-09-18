@@ -54,7 +54,7 @@ export const serverModuleMembers = {
   workflow: ["encryption", "prisma"],
   billing: [],
   governance: ["prisma"],
-  licensing: ["authProviderIsMounted", "checkLimit", "configuredAuthProvider", "notifyLimitReached", "platformSsoAllowed", "reportError", "reportSigningFailure", "repository", "retention", "usage"],
+  licensing: ["logger", "prisma"],
   "managed-provider": [],
   scim: ["prisma"],
   sso: ["logger"],
