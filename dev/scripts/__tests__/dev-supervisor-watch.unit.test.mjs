@@ -105,6 +105,18 @@ void describe("shouldIgnoreWatchPath", () => {
     assert.equal(shouldIgnoreWatchPath("../../packages/ksuid/tsup.config.ts"), false);
   });
 
+  /** @scenario "An agent's import-graph probe leaves the backend lane alone" */
+  void it("ignores an agent's import-graph probe written into a source directory", () => {
+    assert.equal(shouldIgnoreWatchPath("../../modules/__probe_lw_full.ts"), true);
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/process/src/__probe__.ts"), true);
+    assert.equal(
+      shouldIgnoreWatchPath("../../modules/trace/process/src/__escape_probe__.ts"),
+      true,
+    );
+    // A real file that merely mentions the word is still a restart.
+    assert.equal(shouldIgnoreWatchPath("../../packages/kernel/src/probe.ts"), false);
+  });
+
   void it("ignores dist and generated churn", () => {
     assert.equal(shouldIgnoreWatchPath("../../modules/trace/process/dist/index.js"), true);
     assert.equal(shouldIgnoreWatchPath("src/generated/types.ts"), true);

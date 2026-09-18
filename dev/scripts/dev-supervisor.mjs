@@ -53,6 +53,11 @@ const WATCH_IGNORE_PATTERNS = [
   // api. specs/setup/dev-process-topology.feature.
   /(^|\/)[^/]*\.config\.bundled_[^/]*\.mjs$/,
   /(^|\/)[^/]*\.config\.[cm]?[jt]s\.timestamp-[^/]*\.mjs$/,
+  // An agent probing the import graph writes `__probe__.ts` into a watched
+  // source directory and deletes it seconds later. Boot is slower than the gap
+  // between probes, so a stack under a probing session never finished starting.
+  // No tracked file is named this way. specs/setup/dev-process-topology.feature.
+  /(^|\/)__[a-z0-9_]*probe[a-z0-9_]*\.[cm]?[jt]sx?$/,
   // A module's browser half, which no api/worker code may import (the
   // enforcer's frontend/server separation). Reloading for it is pure churn,
   // and on a shared checkout it lets one session's screen work bounce

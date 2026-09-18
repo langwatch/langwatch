@@ -144,6 +144,14 @@ Feature: The local development process topology
     When a build tool writes its bundled config beside the package
     Then the change is not worth a restart
 
+  @unit
+  Scenario: An agent's import-graph probe leaves the backend lane alone
+    Given the backend lane running under a debounced watch
+    When an agent writes a probe file into a watched source directory
+    Then the change is not worth a restart
+    # Probes are written and deleted seconds apart. Boot is slower than that
+    # gap, so a stack shared with a probing session never finished starting.
+
   # --- The worker drains before a restart takes it down ---
 
   # A restart is a takedown-and-respawn: SIGTERM, then SIGKILL only after a
