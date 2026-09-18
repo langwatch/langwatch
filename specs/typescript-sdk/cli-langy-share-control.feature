@@ -20,6 +20,16 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And the CLI runs the device login right away
       And continues to the request list with the new login's key
 
+    # The sign-in is a step of sharing the folder. The AI tools, the model
+    # providers and the budgets belong to `langwatch login`.
+    @unit
+    Scenario: The sign-in inside the command prints only what signing in needs
+      Given no device session on this machine
+      When I run "langwatch langy --share-control" and approve the login in the browser
+      Then the CLI prints the address to open and the code to enter
+      And the CLI prints who I am logged in as
+      And the CLI prints no login header, no AI tools, no model providers, no budgets and no dashboard line
+
     # Langy writes the project's key into the folder's .env during the setup.
     # That key carries no person, so it can never list or approve a request
     # addressed to me; the login on this machine is who I am.

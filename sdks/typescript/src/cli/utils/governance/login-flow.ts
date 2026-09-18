@@ -59,6 +59,13 @@ export interface RunUnifiedLoginOptions {
 	browser?: string;
 	/** Pre-loaded config to mutate; defaults to `loadConfig()`. */
 	cfg?: GovernanceConfig;
+	/**
+	 * The login runs as a step of another command, which words the sign-in
+	 * itself. Prints the address to open, the code and who signed in, plus any
+	 * change to the machine's tool wiring. The header, the AI tools, the model
+	 * providers, the budgets and the dashboard line are left to `langwatch login`.
+	 */
+	quiet?: boolean;
 }
 
 export type RunDeviceFlowLoginOptions = Omit<RunUnifiedLoginOptions, "kind">;
@@ -75,16 +82,19 @@ export async function runUnifiedLoginFlow(
 	const kind: CredentialType = opts.kind ?? "device_session";
 	const cfg = opts.cfg ?? loadConfig();
 	const baseUrl = cfg.control_plane_url;
+	const quiet = opts.quiet === true;
 
-	console.log(chalk.blue("🔐 LangWatch login"));
-	console.log(chalk.gray(`Control plane: ${baseUrl}`));
-	console.log(
-		chalk.gray(
-			kind === "project_api_key"
-				? "Mode: project SDK API key (will write .env)"
-				: `Mode: device session (will write ${displayConfigPath()})`,
-		),
-	);
+	if (!quiet) {
+		console.log(chalk.blue("🔐 LangWatch login"));
+		console.log(chalk.gray(`Control plane: ${baseUrl}`));
+		console.log(
+			chalk.gray(
+				kind === "project_api_key"
+					? "Mode: project SDK API key (will write .env)"
+					: `Mode: device session (will write ${displayConfigPath()})`,
+			),
+		);
+	}
 
 	const dc = await startDeviceCode({ baseUrl }, { credentialType: kind });
 	const verifyURL =
@@ -220,6 +230,8 @@ export async function runUnifiedLoginFlow(
 			} catch {
 				// Wiring refresh is best-effort; the session itself is already saved.
 			}
+
+			if (quiet) return cfg;
 
 			// Per-budget epilogue data. Every budget that binds this key,
 			// labelled with its scope, so the ceremony never presents the
