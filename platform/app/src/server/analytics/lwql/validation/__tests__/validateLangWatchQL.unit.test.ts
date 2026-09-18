@@ -488,7 +488,7 @@ describe("validateLangWatchQL", () => {
         [
           "a UNION ALL branch",
           (m) =>
-            `SELECT TraceId FROM traces UNION ALL SELECT ${m} FROM spans AS t`,
+            `SELECT TraceId FROM traces LIMIT 10 UNION ALL SELECT ${m} FROM spans AS t LIMIT 10`,
         ],
       ];
     const regexMatchers = ["COLUMNS('^Trace')", "t.COLUMNS('^Trace')"];
