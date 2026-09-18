@@ -13,16 +13,19 @@ Feature: ON_MESSAGE evaluations only re-run on real, recent messages
   Background:
     Given a project with an enabled ON_MESSAGE monitor
 
+  @unit
   Scenario: a topic assignment does not re-run evaluations
     Given a trace that already has spans
     When the topic-clustering pass assigns a topic to that trace
     Then no evaluation is dispatched
 
+  @unit
   Scenario: evaluations do not re-run for a trace older than the cutoff
     Given a trace whose first span is older than the evaluation cutoff
     When a new span arrives on that trace
     Then no evaluation is dispatched
 
+  @unit
   Scenario: a new span on a recent trace re-runs evaluations
     Given a recent trace
     When a new span arrives on that trace
@@ -38,11 +41,13 @@ Feature: ON_MESSAGE evaluations only re-run on real, recent messages
     # "no start time": a recent span without valid timing also leaves the
     # start time unknown, and that trace must still be evaluated.
 
+    @unit
     Scenario: a late origin resolution on a trace with no recorded spans does not re-run evaluations
       Given a trace whose fold state holds no spans
       When the trace's origin is resolved
       Then no evaluation is dispatched
 
+    @unit
     Scenario: a late origin resolution on a recent trace whose span has no valid timing still re-runs evaluations
       Given a recent trace with one recorded span whose first-span time is unknown
       When the trace's origin is resolved

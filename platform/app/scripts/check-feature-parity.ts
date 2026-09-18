@@ -495,7 +495,6 @@ const LEGACY_INERT: string[] = [
   "specs/model-providers/custom-model-max-tokens.feature",
   "specs/model-providers/default-provider.feature",
   "specs/model-providers/provider-list.feature",
-  "specs/monitors/evaluation-trigger-skips-derived-and-stale-traces.feature",
   "specs/monitors/guardrails-api-compatibility.feature",
   "specs/monitors/monitor-execution-backend.feature",
   "specs/monitors/monitor-trace-mappings.feature",

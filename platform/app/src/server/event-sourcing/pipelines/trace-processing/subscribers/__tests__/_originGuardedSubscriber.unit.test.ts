@@ -49,6 +49,7 @@ describe("passesTraceOriginGuards", () => {
   });
 
   describe("given a recent message event on a recent resolved trace", () => {
+    /** @scenario "a new span on a recent trace re-runs evaluations" */
     it("admits span and origin-resolution events", () => {
       expect(passesTraceOriginGuards(event(), fold())).toBe(true);
       expect(
@@ -72,6 +73,7 @@ describe("passesTraceOriginGuards", () => {
   });
 
   describe("given a derived trace event", () => {
+    /** @scenario "a topic assignment does not re-run evaluations" */
     it("rejects it", () => {
       expect(
         passesTraceOriginGuards(
@@ -83,6 +85,7 @@ describe("passesTraceOriginGuards", () => {
   });
 
   describe("given a trace older than the 24-hour trace-age cap", () => {
+    /** @scenario "evaluations do not re-run for a trace older than the cutoff" */
     it("rejects a fresh span while admitting a trace just inside the cap", () => {
       expect(
         passesTraceOriginGuards(
@@ -103,6 +106,7 @@ describe("passesTraceOriginGuards", () => {
     // A trace summary outside the fold's read window rehydrates empty:
     // spanCount 0, occurredAt 0. The trace-age cap cannot fire on a zero
     // start time, so a late origin resolution must be rejected on its own.
+    /** @scenario "a late origin resolution on a trace with no recorded spans does not re-run evaluations" */
     it("rejects a late origin resolution even though the origin is set", () => {
       expect(
         passesTraceOriginGuards(
@@ -112,6 +116,7 @@ describe("passesTraceOriginGuards", () => {
       ).toBe(false);
     });
 
+    /** @scenario "a late origin resolution on a recent trace whose span has no valid timing still re-runs evaluations" */
     it("still admits a recent trace whose only span left the start time unknown", () => {
       expect(
         passesTraceOriginGuards(
