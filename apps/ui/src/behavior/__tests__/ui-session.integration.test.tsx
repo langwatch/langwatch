@@ -2,11 +2,14 @@
  * Tests session with real UI but mocked transport and auth.
  */
 
+import type { UiAuthClient } from "@langwatch/auth-browser/session";
 import {
   UiCapabilityUnavailableError,
   UiFeedback,
+  UiScope,
   UiSession,
   useUiCapabilities,
+  useUiScope,
 } from "@langwatch/browser-host/capabilities";
 import { useActiveScope, usePermissions, useSession } from "@langwatch/browser-host/session";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -20,7 +23,6 @@ import { createUiFeatureShell } from "../../shell/ui-feature-shell";
 import type { UiFeatureApiTransport } from "../ui-feature-transport";
 import { UI_SELECTED_PROJECT_SLUG_KEY, UI_SELECTED_TEAM_ID_KEY } from "../ui-scope-storage";
 import { useBrowserUiSession } from "../ui-session";
-import type { UiAuthClient } from "../ui-session-client";
 import {
   UI_EFFECTIVE_PERMISSIONS_PROCEDURE,
   UI_FEATURE_FLAG_PROCEDURE,
@@ -94,10 +96,6 @@ class StubSession extends UiSession {
     return { id: "installed-user", name: null, email: null, image: null };
   }
 
-  activeScope() {
-    return { organizationId: "installed-org", projectId: "installed-project" };
-  }
-
   hasPermission(): boolean {
     return true;
   }
@@ -108,6 +106,12 @@ class StubSession extends UiSession {
 
   featureFlag(): boolean | undefined {
     return true;
+  }
+}
+
+class StubScope extends UiScope {
+  activeScope() {
+    return { organizationId: "installed-org", projectId: "installed-project" };
   }
 }
 
@@ -148,14 +152,14 @@ function renderSession({
   transport: UiFeatureApiTransport;
   authClient?: UiAuthClient;
   page: ReactNode;
-  installed?: UiSession;
+  installed?: { session: UiSession; scope: UiScope };
   feedback?: UiFeedback;
   live?: boolean;
 }) {
   const Shell = createUiFeatureShell({
     apis: [],
     capabilities: {
-      ...(installed ? { session: installed } : {}),
+      ...(installed ? { session: installed.session, scope: installed.scope } : {}),
       ...(feedback ? { feedback } : {}),
     },
     transport,
@@ -188,7 +192,7 @@ function renderSession({
 /** A screen that renders what the session answers, and nothing else. */
 function ScopeProbe() {
   const { session } = useUiCapabilities();
-  const scope = session.activeScope();
+  const scope = useUiScope().activeScope();
   return (
     <div>
       <span data-testid="user">{session.currentUser()?.id ?? "nobody"}</span>
@@ -584,7 +588,7 @@ describe("given a composition that installs a session of its own", () => {
         path: "/acme-app/traces",
         transport,
         page: <ScopeProbe />,
-        installed: new StubSession(),
+        installed: { session: new StubSession(), scope: new StubScope() },
       });
 
       await waitFor(() => expect(view.getByTestId("user").textContent).toBe("installed-user"));

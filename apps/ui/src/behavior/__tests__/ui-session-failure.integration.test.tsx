@@ -21,6 +21,7 @@ vi.mock("../ui-departure", () => ({
   },
 }));
 
+import type { UiAuthClient } from "@langwatch/auth-browser/session";
 import {
   UiFeedback,
   useUiCapabilities,
@@ -32,7 +33,6 @@ import { createUiFeatureShell } from "../../shell/ui-feature-shell";
 import type { UiFeatureApiTransport } from "../ui-feature-transport";
 import { resolveUiFailureCopy } from "../ui-feedback";
 import { useBrowserUiSession } from "../ui-session";
-import type { UiAuthClient } from "../ui-session-client";
 import { UI_ORGANIZATIONS_PROCEDURE } from "../ui-session-queries";
 import { JANE, organizationWith, PERSONAL_TEAM, SHARED_TEAM } from "./ui-scope-graph";
 

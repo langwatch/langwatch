@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { BrowserUiSession, UiFeatureFlagRequests } from "../ui-session";
+import { BrowserUiScope, BrowserUiSession, UiFeatureFlagRequests } from "../ui-session";
 
 /** A granted set that says whether the port consulted it, or a copy of it. */
 class CountingSet extends Set<string> {
@@ -29,22 +29,29 @@ function sessionWith({
 }) {
   return BrowserUiSession.create({
     actor: { id: "user-jane", name: "Jane", email: null, image: null },
-    scope: SOMEWHERE,
     permissions,
     settled: permissions !== void 0,
     flags,
     askFlag,
-    scopeHost: void 0,
   });
 }
 
+describe("given the scope port over a resolved scope", () => {
+  describe("when a screen asks where it is standing", () => {
+    it("answers with the scope it was built for", () => {
+      const scope = BrowserUiScope.create({ scope: SOMEWHERE, scopeHost: void 0 });
+
+      expect(scope.activeScope()).toEqual(SOMEWHERE);
+    });
+  });
+});
+
 describe("given the session port over a resolved scope", () => {
-  describe("when a screen asks who is here and where", () => {
-    it("answers with the reader and the scope it was built for", () => {
+  describe("when a screen asks who is here", () => {
+    it("answers with the reader it was built for", () => {
       const session = sessionWith({ permissions: new Set() });
 
       expect(session.currentUser()?.id).toBe("user-jane");
-      expect(session.activeScope()).toEqual(SOMEWHERE);
     });
   });
 

@@ -8,6 +8,10 @@
   ],
   "type": "module",
   "exports": {
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "default": "./src/session.ts"
+    },
     "./declaration": {
       "langwatch-declaration-source": "./src/auth.web.ts",
       "types": "./dist/auth.web.d.ts",
@@ -24,6 +28,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@tanstack/react-query": "catalog:",
     "@better-auth/passkey": "catalog:",
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
@@ -32,6 +39,7 @@
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/user-browser": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",

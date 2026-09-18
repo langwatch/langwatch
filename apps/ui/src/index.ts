@@ -103,7 +103,7 @@ export {
   UI_SESSION_QUERY_KEY,
   type UiAuthClient,
   type UiSessionReading,
-} from "./behavior/ui-session-client";
+} from "@langwatch/auth-browser/session";
 export {
   UI_EFFECTIVE_PERMISSIONS_PROCEDURE,
   UI_FEATURE_FLAG_PROCEDURE,

@@ -8,8 +8,6 @@ import type { UiActor } from "@langwatch/browser-host/capabilities";
 import { HandledError } from "@langwatch/handled-error";
 import { createAuthClient } from "better-auth/react";
 
-import { isUiApiUnreachable } from "./ui-api-reachability";
-
 /** The session endpoint, relative to the auth client's own base URL. */
 export const UI_SESSION_PATH = "/session";
 
@@ -84,9 +82,9 @@ export async function signOutUi(client: UiAuthClient = uiAuthClient()): Promise<
 }
 
 /**
- * The read failed, so who is here is not known. Named rather than thrown as
- * a plain Error because the reader is about to be treated as signed out and
- * is owed the reason — `session_read_failed` carries the words they read.
+ * Named rather than thrown as a plain Error because the reader is about to
+ * be treated as signed out and is owed the reason — `session_read_failed`
+ * carries the words they read.
  */
 export class SessionReadFailedError extends HandledError {
   declare readonly code: "session_read_failed";
@@ -100,6 +98,33 @@ export class SessionReadFailedError extends HandledError {
     });
     this.name = "SessionReadFailedError";
   }
+}
+
+/** The statuses a proxy answers with when it could not reach what it fronts. */
+const GATEWAY_STATUSES: ReadonlySet<number> = new Set([500, 502, 503, 504]);
+
+type ReadRefusal = {
+  status?: unknown;
+  code?: unknown;
+};
+
+/**
+ * Whether this failed read means nothing answered, not a refusal — a scoped
+ * copy of the app's own `isUiApiUnreachable`: a module may not import an
+ * application's private behavior.
+ */
+function isUiSessionUnreachable(error: unknown): boolean {
+  if (error === null || error === void 0) return false;
+  if (!(typeof error === "object")) return false;
+
+  const refusal = error as ReadRefusal;
+  if (typeof refusal.code === "string" && refusal.code.length > 0) return false;
+
+  const status = refusal.status;
+  if (status === void 0 || status === null) return true;
+  if (typeof status !== "number") return false;
+  if (status === 0) return true;
+  return GATEWAY_STATUSES.has(status);
 }
 
 /**
@@ -122,7 +147,7 @@ export type UiSessionReading = {
 const UNREACHABLE: UiSessionReading = { actor: null, failure: null, unreachable: true };
 
 function refused(cause: unknown): UiSessionReading {
-  if (isUiApiUnreachable(cause)) return UNREACHABLE;
+  if (isUiSessionUnreachable(cause)) return UNREACHABLE;
   return { actor: null, failure: new SessionReadFailedError(cause), unreachable: false };
 }
 

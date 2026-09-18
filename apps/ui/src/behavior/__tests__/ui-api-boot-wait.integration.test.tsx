@@ -30,7 +30,7 @@ import { createUiFeatureShell } from "../../shell/ui-feature-shell";
 import { useUiApiWait, UI_API_WAIT_HINT_AFTER_MS } from "../ui-api-reachability";
 import type { UiFeatureApiTransport } from "../ui-feature-transport";
 import { useBrowserUiSession } from "../ui-session";
-import type { UiAuthClient } from "../ui-session-client";
+import type { UiAuthClient } from "@langwatch/auth-browser/session";
 import { UI_ORGANIZATIONS_PROCEDURE } from "../ui-session-queries";
 import { JANE, organizationWith, PERSONAL_TEAM, SHARED_TEAM } from "./ui-scope-graph";
 

@@ -33,7 +33,13 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../identity/contract/tsconfig.build.json"
@@ -43,6 +49,9 @@
     },
     {
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/browser/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

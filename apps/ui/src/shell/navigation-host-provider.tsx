@@ -37,7 +37,7 @@ import { useUiRpc } from "../behavior/ui-rpc";
 import { organizationRoleOf } from "../behavior/ui-scope-resolution";
 import { useUiRouteReading } from "../behavior/ui-scope-route";
 import { rememberUiScopeSelection, useUiScopeMemory } from "../behavior/ui-scope-storage";
-import { signOutUi } from "../behavior/ui-session-client";
+import { signOutUi } from "@langwatch/auth-browser/session";
 import { BrowserNavigationHost } from "./navigation-host";
 import { readNavigationDeployment } from "./navigation-host-deployment";
 import { offersLangyAsk, offersPresenceMenuItem, opsAccessOf } from "./navigation-host-gates";

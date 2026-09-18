@@ -1,4 +1,5 @@
 import { trpcQueryKey } from "@langwatch/api/web";
+import { UI_SESSION_QUERY_KEY, type UiAuthClient } from "@langwatch/auth-browser/session";
 import { UiFeedback, useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { useActiveScope, usePermissions, useSession } from "@langwatch/browser-host/session";
 /** @vitest-environment jsdom */
@@ -10,7 +11,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createUiFeatureShell } from "../../shell/ui-feature-shell";
 import { createUiFeatureApiClient } from "../ui-feature-transport";
 import { useBrowserUiSession } from "../ui-session";
-import { UI_SESSION_QUERY_KEY, type UiAuthClient } from "../ui-session-client";
 import { JANE, organizationWith, PERSONAL_TEAM, SHARED_TEAM } from "./ui-scope-graph";
 
 type Deferred<T> = {
