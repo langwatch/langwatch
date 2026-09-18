@@ -43,7 +43,7 @@ describe("given a hosted deployment", () => {
   afterEach(() => cleanup());
 
   describe("when the front door renders", () => {
-    /** @scenario The hosted front door makes its case beside the card, never inside it */
+    /** @scenario The auth screens make their case beside the card, never inside it */
     it("puts the case in its own panel, with the card beside it", () => {
       renderShell();
 
@@ -59,7 +59,7 @@ describe("given a hosted deployment", () => {
       expect(screen.getByTestId("front-door-ambient")).toBeTruthy();
     });
 
-    /** @scenario The hosted front door makes its case beside the card, never inside it */
+    /** @scenario The auth screens make their case beside the card, never inside it */
     it("carries the gradient on one word and the tagline under it", () => {
       renderShell();
 
@@ -107,13 +107,12 @@ describe("given a company's own installation", () => {
   afterEach(() => cleanup());
 
   describe("when the front door renders", () => {
-    /** @scenario The hosted front door makes its case beside the card, never inside it */
-    it("shows the card alone, with nothing sold beside it", () => {
+    /** @scenario The auth screens make their case beside the card, never inside it */
+    it("makes the same case a hosted deployment does", () => {
       renderShell();
 
-      expect(screen.queryByTestId("front-door-value-panel")).toBeNull();
-      expect(screen.queryByTestId("front-door-headline")).toBeNull();
-      expect(screen.queryByTestId("front-door-ambient")).toBeNull();
+      expect(screen.getByTestId("front-door-value-panel")).toBeTruthy();
+      expect(screen.getByTestId("front-door-headline")).toBeTruthy();
       expect(screen.getByText("the card")).toBeTruthy();
     });
   });

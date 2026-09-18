@@ -2,8 +2,6 @@ import "../../model/ambient.d.ts";
 import { Box, Flex } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import { usePublicEnv } from "../../behavior/use-public-env.ts";
-
 import "../elements/auth-front-door.css";
 import { CastleSnake } from "../elements/castle-snake.tsx";
 import { FrontDoorValuePanel } from "../elements/front-door-value-panel.tsx";
@@ -11,7 +9,8 @@ import { FrontDoorGround } from "./front-door-ground.tsx";
 import { LogoHandoff } from "./logo-handoff.tsx";
 
 /**
- * Front door layout ground; hosted vs self-hosted compose different surroundings around same card
+ * Front door layout ground; a headline composes the split surroundings around
+ * the card, and its absence the plain one. The deployment does not decide.
  */
 export function FrontDoorShell({
   headline,
@@ -20,26 +19,23 @@ export function FrontDoorShell({
   trustStrip,
   children,
 }: {
-  /** Shown beside (or above) the card on hosted surfaces. */
+  /** Shown beside (or above) the card. Its presence is what splits the layout. */
   headline?: string;
   /** The one word of the headline that carries the gradient. */
   headlineAccent?: string;
   /** A short line under the headline, in the mono face. Desktop only. */
   tagline?: string;
-  /** Shown under the panel on hosted desktops. Empty until there is something
-   *  true to put in it: an invented customer logo is worse than a gap. */
+  /** Shown under the panel on desktop. Empty until there is something true to
+   *  put in it: an invented customer logo is worse than a gap. */
   trustStrip?: ReactNode;
   children: ReactNode;
 }) {
-  const publicEnv = usePublicEnv();
-  const isHosted = publicEnv.data?.IS_SAAS === true;
-
   return (
     <Box
       // The modifier says the value panel is on screen, which is the one thing
       // the card needs to know without being told: it drops its own wordmark
       // so the page says it once, above the headline.
-      className={isHosted && headline ? "lw-front-door lw-front-door--split" : "lw-front-door"}
+      className={headline ? "lw-front-door lw-front-door--split" : "lw-front-door"}
       position="relative"
       backgroundColor="frontDoor.ground"
       minHeight="100vh"
@@ -51,8 +47,8 @@ export function FrontDoorShell({
           so it exists exactly where the front door exists — same flag, same
           screens — and nowhere else. */}
       <CastleSnake />
-      {isHosted ? <FrontDoorGround protect={headline ? "left" : "center"} /> : null}
-      {isHosted && headline ? (
+      <FrontDoorGround protect={headline ? "left" : "center"} />
+      {headline ? (
         // Capped at the site's content width and centred, so a big monitor
         // widens the field around the conversation rather than flinging the
         // headline and the card to opposite edges of it. Both doors keep the
