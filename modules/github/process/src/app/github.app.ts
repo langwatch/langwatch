@@ -222,7 +222,7 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
 
 /** The process-owned GitHub capability; provider and persistence stay private. */
 export class GithubApp implements GithubApiContract {
-  static readonly reads = ["redis", "signingKey"] as const;
+  static readonly reads = ["redis"] as const;
   static readonly contract = GithubApi;
   static readonly dependencies = { organizations: OrganizationApi, projects: ProjectApi };
   static readonly configSchema = githubServerConfigSchema;
@@ -372,7 +372,7 @@ export class GithubApp implements GithubApiContract {
           privateKey: config.privateKey ?? "",
           appSlug: config.appSlug ?? "",
           webhookSecret: config.webhookSecret ?? "",
-          signingKey: members.signingKey,
+          signingKey: config.signingKey ?? "",
         },
         ...(config.host === undefined ? {} : { hostConfig: { host: config.host } }),
       }),

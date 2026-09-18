@@ -1,4 +1,10 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import {
+  Config,
+  compileRuntimeConfig,
+  deploymentCredentialsSecret,
+  RuntimeConfig,
+  type ConfigValue,
+} from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -13,6 +19,8 @@ export const githubServerConfigDefinition = RuntimeConfig.define({
   privateKey: Config.optionalSecret({ env: "GITHUB_LANGY_PRIVATE_KEY" }),
   appSlug: Config.value(z.string().optional(), { env: "GITHUB_LANGY_APP_SLUG" }),
   webhookSecret: Config.value(z.string().optional(), { env: "GITHUB_LANGY_WEBHOOK_SECRET" }),
+  /** Signs install-state nonces; the deployment's one credentials secret, shared by design. */
+  signingKey: deploymentCredentialsSecret,
 });
 
 export type GithubServerConfig = ConfigValue<typeof githubServerConfigDefinition>;

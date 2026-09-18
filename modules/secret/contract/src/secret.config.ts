@@ -1,12 +1,16 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
-import { z } from "zod";
+import {
+  compileRuntimeConfig,
+  deploymentCredentialsSecret,
+  RuntimeConfig,
+  type ConfigValue,
+} from "@langwatch/config";
 
 /**
  * Blank does not block boot: the cipher validates the key only when credentials
  * are read or written, allowing deployments that store none to start.
  */
 export const secretServerConfigDefinition = RuntimeConfig.define({
-  encryptionKey: Config.value(z.string().optional(), { env: "CREDENTIALS_SECRET" }),
+  encryptionKey: deploymentCredentialsSecret,
 });
 
 export type SecretServerConfig = ConfigValue<typeof secretServerConfigDefinition>;

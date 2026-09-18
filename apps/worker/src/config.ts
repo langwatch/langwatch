@@ -631,7 +631,6 @@ export type WorkerConfig = Readonly<{
   automation: WorkerAutomationConfig;
   /** Uses the same persisted API-key hashing secret as the API process. */
   apiKeyPepper: string;
-  githubSigningKey: string;
   authz: WorkerAuthzConfig;
   tracePrivacy: WorkerTracePrivacyConfig;
   /**
@@ -706,7 +705,6 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       value.secret.encryptionKey ?? value.browserSession.sessionSecret,
     ),
     apiKeyPepper: value.secret.encryptionKey ?? value.browserSession.sessionSecret ?? "",
-    githubSigningKey: value.secret.encryptionKey ?? value.browserSession.sessionSecret ?? "",
     authz: value.authz,
     tracePrivacy: resolveWorkerTracePrivacyConfig(
       {
