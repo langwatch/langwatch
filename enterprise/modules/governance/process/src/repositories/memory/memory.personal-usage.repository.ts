@@ -6,6 +6,7 @@ import type {
   PersonalUsageWindow,
 } from "@langwatch/enterprise-governance-contract";
 import { Temporal } from "@langwatch/time";
+
 import type {
   IngestionPrincipalSummaryRow,
   PersonalUsageReader,
@@ -162,10 +163,17 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
       bucket.requests += 1;
       byDay.set(day, bucket);
     }
-    return [...byDay.entries()]
-      .toSorted(([a], [b]) => a.localeCompare(b))
-      // Gateway-ledger spend is real per-token spend: fully billed.
-      .map(([day, bucket]) => ({ day, spentUsd: bucket.spentUsd, billedUsd: bucket.spentUsd, requests: bucket.requests }));
+    return (
+      [...byDay.entries()]
+        .toSorted(([a], [b]) => a.localeCompare(b))
+        // Gateway-ledger spend is real per-token spend: fully billed.
+        .map(([day, bucket]) => ({
+          day,
+          spentUsd: bucket.spentUsd,
+          billedUsd: bucket.spentUsd,
+          requests: bucket.requests,
+        }))
+    );
   }
 
   async findIngestionPrincipalBreakdown(input: {
@@ -182,7 +190,12 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
     }
     return [...byModel.entries()]
       .toSorted(([, a], [, b]) => b.spentUsd - a.spentUsd)
-      .map(([label, entry]) => ({ label, spentUsd: entry.spentUsd, billedUsd: entry.spentUsd, requests: entry.requests }));
+      .map(([label, entry]) => ({
+        label,
+        spentUsd: entry.spentUsd,
+        billedUsd: entry.spentUsd,
+        requests: entry.requests,
+      }));
   }
 
   private traceRowsFor(tenantId: string, window: PersonalUsageWindow): MemoryTraceUsageRow[] {

@@ -11,7 +11,12 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
-import { type PulledUsageRateInput,type GovernanceHttpClient,type GovernanceHttpResponse } from "../../app/governance.members.ts";
+
+import {
+  type PulledUsageRateInput,
+  type GovernanceHttpClient,
+  type GovernanceHttpResponse,
+} from "../../app/governance.members.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
@@ -28,9 +33,10 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 import { OPENAI_ADMIN_ADAPTER_ID } from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
+
 import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
-import { Temporal } from "@langwatch/time";
 
 class StubHttp implements GovernanceHttpClient {
   async fetch(
@@ -57,16 +63,19 @@ function makePuller(): OpenAiAdminPullerAdapter {
 const usageRecords = PulledUsageRecordService.create(
   PulledUsagePricingService.create(new TestRate()),
 );
-const buildPulledUsageRecord = usageRecords.findBuilt.bind(usageRecords);
+const buildPulledUsageRecord = ({
+  governanceProjectId: _governanceProjectId,
+  ...input
+}: Parameters<typeof usageRecords.findBuilt>[0] & { governanceProjectId?: string }) =>
+  usageRecords.findBuilt(input);
 
 const SOURCE = {
   ingestionSourceId: "src_1",
   sourceType: OPENAI_ADMIN_ADAPTER_ID,
   organizationId: "org_acme",
   teamId: "team_platform",
-  createdAt: new Date("2026-07-01T00:00:00.000Z"),
 };
-/** The org's hidden governance project — where the row is stored (ADR-128). */
+/** The record service must not allow callers to choose a storage project. */
 const GOV_PROJECT_ID = "proj_governance_acme";
 
 const OBSERVED_AT = Temporal.Instant.from("2026-08-26T09:00:00.000Z");

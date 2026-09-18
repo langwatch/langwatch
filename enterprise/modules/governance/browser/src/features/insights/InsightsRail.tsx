@@ -34,13 +34,13 @@ export const EMPTY_FOLDER_LINE: Record<Exclude<InsightsFolder, "inbox">, string>
   notifications: "No notifications. Mentions and hand-offs from Langy land here.",
 };
 
-const FOLDERS: Array<{
+const FOLDERS: {
   id: InsightsFolder;
   label: string;
   icon: typeof Inbox;
   /** Streams wear a badge; folders a quiet number. */
   stream: boolean;
-}> = [
+}[] = [
   { id: "inbox", label: "Inbox", icon: Inbox, stream: false },
   { id: "stale", label: "Stale", icon: Clock, stream: false },
   { id: "archived", label: "Archived", icon: Archive, stream: false },

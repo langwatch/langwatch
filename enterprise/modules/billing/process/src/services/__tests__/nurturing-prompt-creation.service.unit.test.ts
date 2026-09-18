@@ -3,6 +3,7 @@
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { NurturingPromptCountRepository } from "../../repositories/nurturing-prompt-count.repository.ts";
 import {
   afterPromptCreated,

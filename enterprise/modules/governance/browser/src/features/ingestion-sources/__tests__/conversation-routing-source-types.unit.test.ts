@@ -20,6 +20,7 @@
  * saying so is better than a docblock implying a guard that is not here.
  */
 import { describe, expect, it } from "vitest";
+
 import { routesConversations, SOURCE_TYPE_OPTIONS } from "../model/ingestion-source-catalog.ts";
 
 describe("given the ingestion-source catalog", () => {

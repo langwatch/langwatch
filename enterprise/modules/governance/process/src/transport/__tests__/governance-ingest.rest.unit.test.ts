@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";
 import { GovernanceIngestAccessService } from "../../services/governance-ingest-access.service.ts";
+import type { GovernanceIngestRateLimiter } from "../../services/governance-ingest-rate-limit.service.ts";
 import {
   GovernanceIngestReceiverService,
   type GovernanceIngestLogCollectionChannel,
@@ -44,7 +45,7 @@ const renderHandled: RestErrorHandler = (_error, c) => c.json({ error: "server_e
 
 type World = {
   source?: Record<string, unknown> | null;
-  rateLimit?: { check: ReturnType<typeof vi.fn> };
+  rateLimit?: GovernanceIngestRateLimiter;
   traceCollection?: GovernanceIngestTraceCollection;
   logCollection?: GovernanceIngestLogCollectionChannel;
   metricCollection?: GovernanceIngestMetricCollectionChannel;
@@ -59,7 +60,9 @@ function mountIngest(world: World = {}) {
     findIngestionSourceByIngestSecret,
     ingestionSourceRecordEventReceived,
   });
-  const traceCollection = world.traceCollection ?? vi.fn().mockResolvedValue({ rejectedSpans: 0 });
+  const traceCollectionMock = vi.fn().mockResolvedValue({ rejectedSpans: 0 });
+  const traceCollection: GovernanceIngestTraceCollection =
+    world.traceCollection ?? traceCollectionMock;
   const directory: GovernanceIngestPrincipalDirectory = {
     findMemberIdByEmail: unreachable<GovernanceIngestPrincipalDirectory["findMemberIdByEmail"]>(),
   };
@@ -95,7 +98,7 @@ function mountIngest(world: World = {}) {
   });
 
   return {
-    traceCollection,
+    traceCollection: traceCollectionMock,
     ingestionSourceRecordEventReceived,
     findIngestionSourceByIngestSecret,
     post: (path: string, body: string, headers: Record<string, string> = {}) =>

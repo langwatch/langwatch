@@ -1,13 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { AiToolEntry, AiToolTileType } from "../../ai-tools/model/ai-tool-tile.ts";
-
-import {
-  TOOL_CARD_ROWS,
-  type ToolCard,
-  type ToolCardBadge,
-  type ToolCardRow,
-} from "./toolCards";
+import { TOOL_CARD_ROWS, type ToolCard, type ToolCardBadge, type ToolCardRow } from "./toolCards";
 
 /**
  * Turning the organization's tool registry into catalog cards.
@@ -151,10 +145,7 @@ const TYPE_ROWS: Record<AiToolTileType, readonly ToolCardRow[]> = {
   external_tool: ["agents", "conversations30Days"],
 };
 
-const CONFIG_STRING = (
-  config: Record<string, unknown>,
-  key: string,
-): string => {
+const CONFIG_STRING = (config: Record<string, unknown>, key: string): string => {
   const value = config[key];
   return typeof value === "string" ? value : "";
 };
@@ -203,9 +194,7 @@ export function billingForTool(tool: RegisteredTool): ToolBilling {
   // An internal tool is built, not bought. There is no contract to read, so no
   // payment row applies — what it costs shows up as the usage it drove.
   if (tool.type === "external_tool") return "unknown";
-  return (
-    ASSISTANT_BILLING[CONFIG_STRING(tool.config, "assistantKind")] ?? "unknown"
-  );
+  return ASSISTANT_BILLING[CONFIG_STRING(tool.config, "assistantKind")] ?? "unknown";
 }
 
 /**
@@ -215,9 +204,7 @@ export function billingForTool(tool: RegisteredTool): ToolBilling {
  * the table read every tool's rows in the same sequence however the sets are
  * composed.
  */
-export function applicableRowsForTool(
-  tool: RegisteredTool,
-): readonly ToolCardRow[] {
+export function applicableRowsForTool(tool: RegisteredTool): readonly ToolCardRow[] {
   const rows = new Set<ToolCardRow>([
     ...BILLING_ROWS[billingForTool(tool)],
     // The admin's explicit override, on top of what the kind implies.
@@ -243,10 +230,7 @@ export function vendorForTool(tool: RegisteredTool): string {
     const key = CONFIG_STRING(tool.config, "providerKey").toLowerCase();
     return PROVIDER_VENDOR[key] ?? VENDOR_UNKNOWN;
   }
-  return (
-    ASSISTANT_VENDOR[CONFIG_STRING(tool.config, "assistantKind")] ??
-    VENDOR_UNKNOWN
-  );
+  return ASSISTANT_VENDOR[CONFIG_STRING(tool.config, "assistantKind")] ?? VENDOR_UNKNOWN;
 }
 
 /**
@@ -273,9 +257,7 @@ export function badgesForTool(tool: RegisteredTool): ToolCardBadge[] {
   })();
   // Deduped rather than appended blindly: a consumption-billed tool already
   // wears this mark, and saying it twice reads as two different facts.
-  return isMeteredPerToken(tool)
-    ? [...new Set<ToolCardBadge>([...contract, "metered"])]
-    : contract;
+  return isMeteredPerToken(tool) ? [...new Set<ToolCardBadge>([...contract, "metered"])] : contract;
 }
 
 /**
@@ -309,9 +291,7 @@ export function buildRegisteredToolCards({
 }
 
 /** The registry rows as this module reads them, from the router's payload. */
-export function asRegisteredTools(
-  entries: readonly AiToolEntry[] | undefined,
-): RegisteredTool[] {
+export function asRegisteredTools(entries: readonly AiToolEntry[] | undefined): RegisteredTool[] {
   return (entries ?? []).map((entry) => ({
     id: entry.id,
     displayName: entry.displayName,

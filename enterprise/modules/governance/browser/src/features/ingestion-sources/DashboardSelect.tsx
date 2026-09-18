@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createListCollection } from "@chakra-ui/react";
-import { useMemo } from "react";
 import { Select } from "@langwatch/design-system/select";
+import { useMemo } from "react";
 
 /**
  * The one choice control the governance dashboard renders.
@@ -69,10 +69,7 @@ export function DashboardSelect({
    */
   invalid?: boolean;
 }) {
-  const collection = useMemo(
-    () => createListCollection({ items: [...options] }),
-    [options],
-  );
+  const collection = useMemo(() => createListCollection({ items: [...options] }), [options]);
 
   return (
     <Select.Root

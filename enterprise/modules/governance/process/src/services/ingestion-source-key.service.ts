@@ -11,11 +11,9 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type {
-  IngestionKeyIssuer,
-  IngestionKeyRepository,
-} from "../app/governance.members.ts";
 import { Temporal } from "@langwatch/time";
+
+import type { IngestionKeyIssuer, IngestionKeyRepository } from "../app/governance.members.ts";
 
 const logger = createLogger("langwatch:governance:ingestion-key");
 
@@ -162,7 +160,9 @@ export class IngestionKeyService {
 
     const lastActivityMs = (key: (typeof live)[number]): number =>
       (key.lastUsedAt ?? key.createdAt ?? EPOCH).epochMilliseconds;
-    const doomed = [...live].toSorted((a, b) => lastActivityMs(a) - lastActivityMs(b)).slice(0, excess);
+    const doomed = [...live]
+      .toSorted((a, b) => lastActivityMs(a) - lastActivityMs(b))
+      .slice(0, excess);
     for (const key of doomed) {
       try {
         await this.issuer.revoke({

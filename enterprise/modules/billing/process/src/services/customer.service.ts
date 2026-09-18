@@ -1,10 +1,10 @@
-import { createLogger } from "@langwatch/observability";
-import type Stripe from "stripe";
-import type { OrganizationService } from "@langwatch/organization-contract";
 import {
   CustomerCreationRaceError,
   UserEmailRequiredError,
 } from "@langwatch/enterprise-billing-contract";
+import { createLogger } from "@langwatch/observability";
+import type { OrganizationService } from "@langwatch/organization-contract";
+import type Stripe from "stripe";
 
 const logger = createLogger("langwatch:billing:customerService");
 

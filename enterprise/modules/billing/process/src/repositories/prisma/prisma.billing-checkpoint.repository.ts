@@ -1,5 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { BillingCheckpointRepository, type BillingCheckpoint } from "../billing-checkpoint.repository.ts";
+
+import {
+  BillingCheckpointRepository,
+  type BillingCheckpoint,
+} from "../billing-checkpoint.repository.ts";
 
 /** Prisma implementation of the two-phase billing meter checkpoint. */
 /**

@@ -1,11 +1,11 @@
 import { useState } from "react";
 
-import type { AiToolEntry } from "../../model/ai-tool-tile.ts";
+import { api } from "../../../../behavior/governance-api.ts";
 import {
   useGovernanceToaster,
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
-import { api } from "../../../../behavior/governance-api.ts";
+import type { AiToolEntry } from "../../model/ai-tool-tile.ts";
 
 /** Shared hook for AI tool registry; used by catalog editor and Inventory pane. */
 export function useAiToolCatalog({
@@ -48,8 +48,7 @@ export function useAiToolCatalog({
 
   const setEnabledMutation = api.aiTools.setEnabled.useMutation({
     onSuccess: invalidate,
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't update the tool" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't update the tool" }),
   });
 
   const removeMutation = api.aiTools.remove.useMutation({
@@ -58,8 +57,7 @@ export function useAiToolCatalog({
       toaster.create({ title: "Tool removed", type: "success" });
       setPendingDelete(null);
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't remove the tool" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't remove the tool" }),
   });
 
   return {
@@ -86,9 +84,7 @@ export function useAiToolCatalog({
     setEnabled: ({ id, enabled }: { id: string; enabled: boolean }) =>
       setEnabledMutation.mutate({ organizationId, id, enabled }),
     /** The tool whose publish state is mid-flight, so its row can say so. */
-    togglePendingId: setEnabledMutation.isPending
-      ? setEnabledMutation.variables?.id
-      : undefined,
+    togglePendingId: setEnabledMutation.isPending ? setEnabledMutation.variables?.id : undefined,
     pendingDelete,
     setPendingDelete,
     confirmDelete: () => {

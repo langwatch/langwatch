@@ -1,3 +1,5 @@
+import { fromDate } from "@langwatch/time";
+
 import {
   IngestionPullLifecycleRepository,
   type IngestionPullLifecycleDatabase,
@@ -33,7 +35,7 @@ export class PrismaIngestionPullLifecycleRepository extends IngestionPullLifecyc
             select: { processKey: true },
           });
 
-    return this.database.ingestionSource.findMany({
+    const sources = await this.database.ingestionSource.findMany({
       where: {
         OR: [
           { pullSchedule: { not: null } },
@@ -41,5 +43,10 @@ export class PrismaIngestionPullLifecycleRepository extends IngestionPullLifecyc
         ],
       },
     });
+    return sources.map((source) => ({
+      ...source,
+      updatedAt: fromDate(source.updatedAt),
+      archivedAt: source.archivedAt ? fromDate(source.archivedAt) : null,
+    }));
   }
 }

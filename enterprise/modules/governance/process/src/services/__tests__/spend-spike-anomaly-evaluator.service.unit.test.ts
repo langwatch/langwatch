@@ -3,14 +3,17 @@ import type {
   AnomalyRule,
   SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
+import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
-import { type AnomalyAlertHttpClient,
+
+import {
+  type AnomalyAlertHttpClient,
   type AnomalySpendReader,
-  type AnomalySpendSourceFilter } from "../../app/governance.members.ts";
+  type AnomalySpendSourceFilter,
+} from "../../app/governance.members.ts";
 import { SpendSpikeAnomalyRepository } from "../../repositories/spend-spike-anomaly.repository.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "../spend-spike-anomaly-evaluator.service.ts";
-import { Temporal, type Instant } from "@langwatch/time";
 
 const NOW = new Date("2026-08-24T12:00:00.000Z");
 const NOW_INSTANT = Temporal.Instant.from("2026-08-24T12:00:00.000Z");

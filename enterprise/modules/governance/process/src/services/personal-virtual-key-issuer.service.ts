@@ -10,6 +10,7 @@ import type {
   GatewayVirtualKeyRecord,
   GatewayVirtualKeyScope,
 } from "@langwatch/gateway-contract";
+
 import type { PersonalVirtualKeyIssuer } from "../app/governance.members.ts";
 
 /** The two gateway operations this service needs, out of `GatewayApi`'s whole surface. */

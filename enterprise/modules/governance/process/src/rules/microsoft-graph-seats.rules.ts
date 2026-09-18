@@ -165,11 +165,7 @@ export interface SubscribedSkuRead {
  * list, and it must not become the run's error count either, because an error
  * here would discard the conversations the run exists to collect.
  */
-export function readSubscribedSkuRows({
-  response,
-}: {
-  response: unknown;
-}): SubscribedSkuRead {
+export function readSubscribedSkuRows({ response }: { response: unknown }): SubscribedSkuRead {
   const parsed = subscribedSkusResponseSchema.safeParse(response);
   if (!parsed.success) {
     return { skus: [], unreadableRows: 0, malformed: true };

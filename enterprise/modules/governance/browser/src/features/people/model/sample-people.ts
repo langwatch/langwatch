@@ -30,12 +30,7 @@ const daysAgo = (days: number, nowMs: number): string =>
   Temporal.Instant.fromEpochMilliseconds(nowMs - days * 86_400_000).toString();
 
 /** Sample departments, for a Departments tab with none of its own. */
-export const SAMPLE_DEPARTMENTS = [
-  "Engineering",
-  "Customer Support",
-  "Finance",
-  "Sales",
-] as const;
+export const SAMPLE_DEPARTMENTS = ["Engineering", "Customer Support", "Finance", "Sales"] as const;
 
 /**
  * A sample person, written down without the one thing we cannot write down.
@@ -180,12 +175,9 @@ const SAMPLE_PEOPLE: readonly SamplePerson[] = [
  * The sample table. `nowMs` is injected so "3 days ago" is stable in a test and
  * true in a browser.
  */
-export function samplePeopleRows(
-  nowMs: number = nowInstant().epochMilliseconds,
-): PeopleRow[] {
+export function samplePeopleRows(nowMs: number = nowInstant().epochMilliseconds): PeopleRow[] {
   return SAMPLE_PEOPLE.map(({ lastActiveDaysAgo, ...person }) => ({
     ...person,
-    lastActiveIso:
-      lastActiveDaysAgo === null ? null : daysAgo(lastActiveDaysAgo, nowMs),
+    lastActiveIso: lastActiveDaysAgo === null ? null : daysAgo(lastActiveDaysAgo, nowMs),
   }));
 }

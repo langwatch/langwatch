@@ -33,14 +33,15 @@ import {
   resolveTraceDepartmentId,
   UNASSIGNED_DEPARTMENT,
 } from "@langwatch/enterprise-governance-contract";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
+
 import {
   type ActivityMonitorRepository,
   type GovernanceClickHouseClient,
   type GovernanceClickHouseResolver,
 } from "../../app/governance.members.ts";
-import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 
 const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
 
@@ -347,6 +348,37 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     clickhouse: GovernanceClickHouseResolver;
   }): PrismaActivityMonitorRepository {
     return new PrismaActivityMonitorRepository(options.prisma, options.clickhouse);
+  }
+
+  async sourceDataCoverage(input: {
+    organizationId: string;
+    sourceId: string;
+    windowDays: number;
+  }): Promise<{
+    health: "healthy" | "unhealthy";
+    consecutiveFailures: number;
+    lastSuccessfulPullIso: string | null;
+    days: { dayStartIso: string; covered: boolean }[];
+  }> {
+    const source = await this.prisma.ingestionSource.findFirstOrThrow({
+      where: { id: input.sourceId, organizationId: input.organizationId },
+      select: { errorCount: true, lastSuccessAt: true },
+    });
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const days = Array.from({ length: input.windowDays }, (_, index) => {
+      const day = new Date(today.getTime() - (input.windowDays - index - 1) * 86_400_000);
+      return {
+        dayStartIso: day.toISOString(),
+        covered: source.lastSuccessAt !== null && day.getTime() <= source.lastSuccessAt.getTime(),
+      };
+    });
+    return {
+      health: source.errorCount >= 3 ? "unhealthy" : "healthy",
+      consecutiveFailures: source.errorCount,
+      lastSuccessfulPullIso: source.lastSuccessAt?.toISOString() ?? null,
+      days,
+    };
   }
 
   /**

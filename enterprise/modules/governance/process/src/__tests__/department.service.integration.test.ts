@@ -1,4 +1,9 @@
-import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
+import { DepartmentAssignmentTargetNotFoundError } from "@langwatch/enterprise-governance-contract";
+import {
+  OrganizationUserRole,
+  Prisma,
+  type PrismaClient,
+} from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/governance/departments.feature
@@ -6,13 +11,7 @@ import { createGovernanceTestConnection } from "../app/__tests__/governance-data
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  OrganizationUserRole,
-  Prisma,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
-
-import { DepartmentAssignmentTargetNotFoundError } from "@langwatch/enterprise-governance-contract";
+import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository.ts";
 import { DepartmentService } from "../services/department.service.ts";
 

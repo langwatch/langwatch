@@ -13,6 +13,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
   agentsListed,
   agentsRefused,
@@ -26,13 +27,33 @@ import {
   readBotRows,
   readCopilotBots,
 } from "../copilot-bots.service";
-import { genieSpacesAsAgents, listGenieAgents } from "../genie-spaces.service";
+import {
+  genieSpacesAsAgents,
+  listGenieAgents as listGenieAgentsWithHttp,
+} from "../genie-spaces.service";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
+
+const genieHttp: GovernanceHttpClient = {
+  async fetch(url, init) {
+    const response = await ssrfSafeFetch(url, init);
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: "",
+      json: () => response.json(),
+      text: () => response.text(),
+    };
+  },
+};
+
+function listGenieAgents(input: Omit<Parameters<typeof listGenieAgentsWithHttp>[0], "http">) {
+  return listGenieAgentsWithHttp({ ...input, http: genieHttp });
+}
 
 const reply = (params: { ok: boolean; status: number; body?: unknown }) =>
   ({
@@ -86,9 +107,7 @@ describe("agent listing outcomes", () => {
     });
 
     it("never carries the provider's own text", () => {
-      const thrown = refusalFromThrown(
-        new Error("token=sk-live-secret leaked in a fetch url"),
-      );
+      const thrown = refusalFromThrown(new Error("token=sk-live-secret leaked in a fetch url"));
       expect(JSON.stringify(thrown)).not.toContain("sk-live-secret");
       expect(thrown).toEqual({ reason: "unreachable", status: null });
     });
@@ -115,9 +134,7 @@ describe("listCopilotAgents", () => {
 
   describe("given the environment answers with no agents", () => {
     it("reports an empty tenant", async () => {
-      fetchMock.mockResolvedValueOnce(
-        reply({ ok: true, status: 200, body: { value: [] } }),
-      );
+      fetchMock.mockResolvedValueOnce(reply({ ok: true, status: 200, body: { value: [] } }));
 
       const listing = await listCopilotAgents({
         environmentUrl,
@@ -208,9 +225,7 @@ describe("readCopilotBots", () => {
 
       // The walk folds the id to join on it; the listing keeps it verbatim.
       expect([...readBotRows(read.rows).keys()]).toEqual(["bot-1"]);
-      expect(
-        copilotBotsAsAgents({ rows: read.rows, environmentUrl })[0]?.rawAgentId,
-      ).toBe("BOT-1");
+      expect(copilotBotsAsAgents({ rows: read.rows, environmentUrl })[0]?.rawAgentId).toBe("BOT-1");
       expect(read.hasMorePages).toBe(true);
     });
   });
@@ -274,9 +289,7 @@ describe("readCopilotBots", () => {
       expect(read.ok).toBe(true);
       if (!read.ok) return;
       expect(
-        copilotBotsAsAgents({ rows: read.rows, environmentUrl }).map(
-          (a) => a.rawAgentId,
-        ),
+        copilotBotsAsAgents({ rows: read.rows, environmentUrl }).map((a) => a.rawAgentId),
       ).toEqual(["BOT-1", "BOT-2"]);
       expect(read.hasMorePages).toBe(false);
       expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -377,9 +390,7 @@ describe("given a tenant holding more agents than one page returns", () => {
       status: 200,
       body: {
         value: params.rows,
-        ...(params.next === undefined
-          ? {}
-          : { "@odata.nextLink": params.next }),
+        ...(params.next === undefined ? {} : { "@odata.nextLink": params.next }),
       },
     });
 
@@ -392,9 +403,7 @@ describe("given a tenant holding more agents than one page returns", () => {
           next: "https://org1.crm.dynamics.com/page-2",
         }),
       )
-      .mockResolvedValueOnce(
-        pageOf({ rows: [{ botid: "BOT-2", name: "Support Copilot" }] }),
-      );
+      .mockResolvedValueOnce(pageOf({ rows: [{ botid: "BOT-2", name: "Support Copilot" }] }));
 
     const listing = await listCopilotAgents({
       environmentUrl,
@@ -404,10 +413,7 @@ describe("given a tenant holding more agents than one page returns", () => {
 
     expect(listing.outcome).toBe("listed");
     if (listing.outcome !== "listed") return;
-    expect(listing.items.map((item) => item.rawAgentId)).toEqual([
-      "BOT-1",
-      "BOT-2",
-    ]);
+    expect(listing.items.map((item) => item.rawAgentId)).toEqual(["BOT-1", "BOT-2"]);
   });
 
   /** @scenario "The agent list follows the provider next-page link" */
@@ -419,9 +425,7 @@ describe("given a tenant holding more agents than one page returns", () => {
           next: "https://org1.crm.dynamics.com/page-2",
         }),
       )
-      .mockResolvedValueOnce(
-        pageOf({ rows: [{ botid: "BOT-2", name: "Support Copilot" }] }),
-      );
+      .mockResolvedValueOnce(pageOf({ rows: [{ botid: "BOT-2", name: "Support Copilot" }] }));
 
     const listing = await listCopilotAgents({
       environmentUrl,
@@ -453,9 +457,7 @@ describe("given a tenant holding more agents than one page returns", () => {
 
     await listCopilotAgents({ environmentUrl, token: "t", signal: undefined });
 
-    expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      "https://org1.crm.dynamics.com/page-2?token=opaque",
-    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://org1.crm.dynamics.com/page-2?token=opaque");
   });
 
   it("stops the whole read when a page mid-walk refuses", async () => {
@@ -528,9 +530,7 @@ describe("listGenieAgents", () => {
 
   describe("given the workspace enumerates no spaces", () => {
     it("reports an empty workspace", async () => {
-      fetchMock.mockResolvedValueOnce(
-        reply({ ok: true, status: 200, body: { spaces: [] } }),
-      );
+      fetchMock.mockResolvedValueOnce(reply({ ok: true, status: 200, body: { spaces: [] } }));
 
       const listing = await listGenieAgents({ workspaceUrl, token: "t" });
 

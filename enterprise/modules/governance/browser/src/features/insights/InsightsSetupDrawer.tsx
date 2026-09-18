@@ -11,14 +11,14 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Select } from "@langwatch/design-system/select";
 import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import {
   allModelOptions,
   ModelSelector,
-} from "@langwatch/model-provider-web/surfaces/model-selector";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+} from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { UserRoundCog } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
@@ -80,7 +80,7 @@ const RUNS_OPTIONS = createListCollection({
     { value: "daily", label: "Daily" },
     { value: "weekdays", label: "Weekdays" },
     { value: "weekly", label: "Weekly" },
-  ] satisfies Array<{ value: InsightsSettings["runs"]; label: string }>,
+  ] satisfies { value: InsightsSettings["runs"]; label: string }[],
 });
 
 const VOLUME_OPTIONS = createListCollection({
@@ -88,7 +88,7 @@ const VOLUME_OPTIONS = createListCollection({
     { value: "langy", label: "Let Langy decide (recommended)" },
     { value: "one", label: "At most one a day" },
     { value: "three", label: "At most three a day" },
-  ] satisfies Array<{ value: InsightsSettings["volume"]; label: string }>,
+  ] satisfies { value: InsightsSettings["volume"]; label: string }[],
 });
 
 /** What steering would have left behind. Illustrative until there is a session. */

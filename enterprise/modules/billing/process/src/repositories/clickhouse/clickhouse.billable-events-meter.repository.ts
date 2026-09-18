@@ -13,11 +13,12 @@
  */
 import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, toDate, toEpochMs } from "@langwatch/time";
+
 import {
   BillableEventsMeter,
   type BillableEventRecord,
 } from "../billable-events-meter.repository.ts";
-import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:billable-events-repository");
 

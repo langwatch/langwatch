@@ -1,16 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { traced } from "@langwatch/observability/node";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   retentionCategories,
 } from "@langwatch/data-retention-contract";
 import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
+import { traced } from "@langwatch/observability/node";
+import { Temporal } from "@langwatch/time";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { type BillingWebhookHost, type SubscriptionWithOrg } from "../../index.ts";
-import { ANNUAL_EVENTS_BILLING_THRESHOLD } from "../annual-events-billing-threshold.service.ts";
-import { EEWebhookService } from "../billing-stripe-webhook.service.ts";
 import { type BillingWebhookOrganization } from "../../repositories/billing-webhook-organization.repository.ts";
 import { type BillingWebhookSubscription } from "../../repositories/billing-webhook-subscription.repository.ts";
-import { Temporal } from "@langwatch/time";
+import { ANNUAL_EVENTS_BILLING_THRESHOLD } from "../annual-events-billing-threshold.service.ts";
+import { EEWebhookService } from "../billing-stripe-webhook.service.ts";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 const mockSendSlackBillingThresholdFailureAlert = vi.fn().mockResolvedValue(undefined);
@@ -29,7 +30,7 @@ const createMockHost = (): {
   setOrganizationRetention: mockSetOrganizationRetention,
 });
 
-const createMockSubscriptionRepository = (): {
+const createMockBillingSubscription = (): {
   [K in keyof BillingWebhookSubscription]: ReturnType<typeof vi.fn>;
 } => ({
   findLastNonCancelled: vi.fn(),
@@ -128,7 +129,7 @@ const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("EEWebhookService", () => {
-  let subRepo: ReturnType<typeof createMockSubscriptionRepository>;
+  let subRepo: ReturnType<typeof createMockBillingSubscription>;
   let orgRepo: ReturnType<typeof createMockOrganizationRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
   let mockStripeInstance: ReturnType<typeof createMockStripe>;
@@ -138,7 +139,7 @@ describe("EEWebhookService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    subRepo = createMockSubscriptionRepository();
+    subRepo = createMockBillingSubscription();
     orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
     mockStripeInstance = createMockStripe();

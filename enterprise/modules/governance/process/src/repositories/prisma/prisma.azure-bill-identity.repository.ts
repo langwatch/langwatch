@@ -2,6 +2,7 @@
 
 import { ValidationError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { readClaimedSubscription } from "./prisma.azure-bill-ownership.repository.ts";
 
 const SOURCE_FIELD = "_azureBillSourceId";
@@ -9,10 +10,7 @@ const SUBSCRIPTION_FIELD = "_azureBillSubscriptionId";
 type Config = Record<string, unknown>;
 
 /** The first source remains the bill's storage identity across replacements. */
-export function azureBillSourceId(source: {
-  id: string;
-  parserConfig?: unknown;
-}): string {
+export function azureBillSourceId(source: { id: string; parserConfig?: unknown }): string {
   const value = (source.parserConfig as Config | null)?.[SOURCE_FIELD];
   return typeof value === "string" && value !== "" ? value : source.id;
 }
@@ -66,9 +64,7 @@ export async function withAzureBillIdentity({
       .filter(
         (row) =>
           row.id !== sourceId &&
-          subscriptionIdentity(
-            row.parserConfig as Config | null,
-          )?.toLowerCase() === claimed,
+          subscriptionIdentity(row.parserConfig as Config | null)?.toLowerCase() === claimed,
       )
       .map(azureBillSourceId),
   );

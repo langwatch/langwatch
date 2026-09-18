@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { SessionPolicyOutOfRangeError } from "@langwatch/enterprise-governance-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   OrganizationSessionPolicyRepository,
   type OrganizationSessionPolicy,

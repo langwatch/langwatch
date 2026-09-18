@@ -1,13 +1,13 @@
 import { Tabs, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
+import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
 import { LoadingScreen } from "../../../../ui/elements/loading-screen.tsx";
-import type { AiToolEntry } from "../../model/ai-tool-tile.ts";
 import { PermissionRequiredNotice } from "../../../../ui/elements/permission-required-notice.tsx";
+import type { AiToolEntry } from "../../model/ai-tool-tile.ts";
 import { AiToolEntryDrawer } from "./ai-tool-entry-drawer.tsx";
 import { IngestionTemplatesEditor } from "./ingestion-templates-editor.tsx";
 import { ToolCatalogEditor } from "./tool-catalog-editor.tsx";
-import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
 /** Two-tab catalog pane: Tool Tiles (editable) and Ingestion Templates (read-only). */
 function CatalogTabs({
   organizationId,

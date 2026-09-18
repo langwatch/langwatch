@@ -1,5 +1,3 @@
-import { createLogger } from "@langwatch/observability";
-import type Stripe from "stripe";
 import {
   Currency,
   InvalidPlanError,
@@ -16,14 +14,17 @@ import {
   SubscriptionStatus,
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
-import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
-import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
+import { createLogger } from "@langwatch/observability";
+import type Stripe from "stripe";
+
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type {
   BillingSubscriptionRecord,
-  SubscriptionRepository,
+  BillingSubscription,
 } from "../repositories/subscription.repository.ts";
 import { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
+import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 import {
   SubscriptionItemCalculatorService,
   type SubscriptionItemUpdate,
@@ -40,7 +41,7 @@ export const RECENT_INVOICES_LIMIT = 4;
  */
 export class BillingSubscriptionService {
   private constructor(
-    private readonly repository: SubscriptionRepository,
+    private readonly repository: BillingSubscription,
     private readonly organizationRepository: BillingAccountFactsRepository,
     private readonly stripe: Stripe,
     private readonly itemCalculator: SubscriptionItemCalculatorService,
@@ -50,7 +51,7 @@ export class BillingSubscriptionService {
   ) {}
 
   static create(options: {
-    repository: SubscriptionRepository;
+    repository: BillingSubscription;
     organizationRepository: BillingAccountFactsRepository;
     stripe: Stripe;
     itemCalculator: SubscriptionItemCalculatorService;

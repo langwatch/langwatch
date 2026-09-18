@@ -4,13 +4,7 @@
  * Tests cost breakdown panels handle real answers and loading states correctly.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -231,9 +225,7 @@ describe("the cost breakdown panels", () => {
           spendUsd: "120.25",
         },
       ];
-      harness.activity.spendByUser = [
-        { actor: "ada@acme.test", spendUsd: "200.00", requests: 90 },
-      ];
+      harness.activity.spendByUser = [{ actor: "ada@acme.test", spendUsd: "200.00", requests: 90 }];
       // The read answers a wrapper around the buckets, not the buckets. A
       // panel that treats this as a list throws here rather than rendering.
       harness.activity.spendOverTime = {
@@ -291,9 +283,7 @@ describe("the cost breakdown panels", () => {
 
       renderScreen();
 
-      const panel = screen
-        .getByText("Cost by model")
-        .closest('[data-testid="cost-panel"]');
+      const panel = screen.getByText("Cost by model").closest('[data-testid="cost-panel"]');
       expect(panel).not.toBeNull();
       const models = within(panel as HTMLElement);
 
@@ -301,12 +291,8 @@ describe("the cost breakdown panels", () => {
       // The line item verbatim: OpenAI bills per token kind and the puller
       // stores that unsplit, so re-cutting it anywhere would invent a
       // grouping the invoice does not make.
-      expect(
-        models.getByText("gpt-5-mini-2025-08-07, output"),
-      ).toBeInTheDocument();
-      expect(
-        models.queryByText("Nothing in this window yet."),
-      ).not.toBeInTheDocument();
+      expect(models.getByText("gpt-5-mini-2025-08-07, output")).toBeInTheDocument();
+      expect(models.queryByText("Nothing in this window yet.")).not.toBeInTheDocument();
     });
   });
 
@@ -331,9 +317,7 @@ describe("the cost breakdown panels", () => {
 
       renderScreen();
 
-      const panel = screen
-        .getByText("Cost by model")
-        .closest('[data-testid="cost-panel"]');
+      const panel = screen.getByText("Cost by model").closest('[data-testid="cost-panel"]');
       expect(panel).not.toBeNull();
       const models = within(panel as HTMLElement);
 
@@ -367,14 +351,10 @@ describe("the cost breakdown panels", () => {
         "Cost by model",
         "Metered spend by person",
       ]) {
-        const panel = screen
-          .getByText(title)
-          .closest('[data-testid="cost-panel"]');
+        const panel = screen.getByText(title).closest('[data-testid="cost-panel"]');
         expect(panel).not.toBeNull();
         expect(
-          within(panel as HTMLElement).queryByText(
-            "Nothing in this window yet.",
-          ),
+          within(panel as HTMLElement).queryByText("Nothing in this window yet."),
         ).not.toBeInTheDocument();
       }
     });
@@ -387,17 +367,11 @@ describe("the cost breakdown panels", () => {
       // nor what would fill it, so a reader's next move on seeing it was to
       // report a bug against a screen working exactly as designed.
       expect(screen.queryByText("Not available.")).not.toBeInTheDocument();
+      expect(screen.getByText("Spend per model, largest first.")).toBeInTheDocument();
       expect(
-        screen.getByText("Spend per model, largest first."),
+        screen.getAllByText("Fills from the bills a connected source reports.")[0],
       ).toBeInTheDocument();
-      expect(
-        screen.getAllByText(
-          "Fills from the bills a connected source reports.",
-        )[0],
-      ).toBeInTheDocument();
-      expect(
-        screen.getAllByRole("link", { name: /Add a source/ }).length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByRole("link", { name: /Add a source/ }).length).toBeGreaterThan(0);
     });
   });
 
@@ -414,9 +388,7 @@ describe("the cost breakdown panels", () => {
 
       renderScreen();
 
-      expect(
-        screen.getAllByText("Nothing in this window yet.").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText("Nothing in this window yet.").length).toBeGreaterThan(0);
     });
   });
 
@@ -447,9 +419,7 @@ describe("the cost breakdown panels", () => {
         .getByText("People using AI tools")
         .closest("[data-testid='cost-panel']");
       expect(adoption).not.toBeNull();
-      expect(
-        within(adoption as HTMLElement).getByText("0"),
-      ).toBeInTheDocument();
+      expect(within(adoption as HTMLElement).getByText("0")).toBeInTheDocument();
       // An organization that already has a source must not be told to add one.
       expect(
         within(adoption as HTMLElement).queryByRole("link", {
@@ -469,18 +439,12 @@ describe("the cost breakdown panels", () => {
         .closest("[data-testid='cost-panel']") as HTMLElement;
       // No headcount, and no label standing over a blank where one was.
       expect(within(adoption).queryByText("0")).not.toBeInTheDocument();
+      expect(within(adoption).queryByText("People using AI tools")).not.toBeInTheDocument();
       expect(
-        within(adoption).queryByText("People using AI tools"),
-      ).not.toBeInTheDocument();
-      expect(
-        within(adoption).getByText(
-          "How many people used an AI tool in this period.",
-        ),
+        within(adoption).getByText("How many people used an AI tool in this period."),
       ).toBeInTheDocument();
       expect(
-        within(adoption).getByText(
-          "Fills from the activity a connected source reports.",
-        ),
+        within(adoption).getByText("Fills from the activity a connected source reports."),
       ).toBeInTheDocument();
     });
   });
@@ -531,12 +495,8 @@ describe("the cost breakdown panels", () => {
     it("labels the returned users without presenting them as API keys", () => {
       renderScreen();
 
-      expect(
-        screen.getByText("Provider-reported spend by user"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText("Billed spend by API key"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByText("Provider-reported spend by user")).toBeInTheDocument();
+      expect(screen.queryByText("Billed spend by API key")).not.toBeInTheDocument();
       expect(screen.getByText("Unattributed spend")).toBeInTheDocument();
       expect(screen.getByText("Metered spend by person")).toBeInTheDocument();
     });
@@ -550,9 +510,7 @@ describe("the cost breakdown panels", () => {
     it("says the read failed instead of vanishing as if nobody spent anything", () => {
       renderScreen();
 
-      expect(
-        screen.getByText("Provider-reported spend by user"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Provider-reported spend by user")).toBeInTheDocument();
       expect(screen.getByTestId("cost-spenders-error")).toBeInTheDocument();
     });
 
@@ -580,9 +538,7 @@ describe("the cost breakdown panels", () => {
           spendUsd: "410.00",
         },
       ];
-      harness.activity.spendByUser = [
-        { actor: "ada@acme.test", spendUsd: "200.00", requests: 90 },
-      ];
+      harness.activity.spendByUser = [{ actor: "ada@acme.test", spendUsd: "200.00", requests: 90 }];
       harness.dailyByProvider = { rows: [] };
 
       renderScreen();
@@ -590,9 +546,7 @@ describe("the cost breakdown panels", () => {
       // Scoped to this panel on purpose. Other panels are empty for their own
       // reasons and print the same sentence, so a page-wide search for it
       // passes whether or not this panel drew bare axes.
-      const panel = screen
-        .getByText("Cost over time")
-        .closest('[data-testid="cost-panel"]');
+      const panel = screen.getByText("Cost over time").closest('[data-testid="cost-panel"]');
 
       expect(panel).not.toBeNull();
       expect(
@@ -650,9 +604,7 @@ describe("the cost breakdown panels", () => {
     it("renders under its own heading beside the lane it splits", () => {
       renderScreen();
 
-      expect(
-        screen.getByLabelText("Cost over time · by provider"),
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Cost over time · by provider")).toBeInTheDocument();
       // Its neighbour still states the window total the bars split up, so a
       // reader has both halves of the comparison on one screen.
       const billed = within(screen.getByTestId("cost-lane-billed"));
@@ -698,12 +650,8 @@ describe("the cost breakdown panels", () => {
       // up rebuilds exactly the partial sum the window total refused to show
       // them. The mark on the bars is what stops the chart from being that
       // sum.
-      const region = within(
-        screen.getByLabelText("Cost over time · by provider"),
-      );
-      expect(
-        region.getByLabelText(/cover only part of what was spent/i),
-      ).toBeInTheDocument();
+      const region = within(screen.getByLabelText("Cost over time · by provider"));
+      expect(region.getByLabelText(/cover only part of what was spent/i)).toBeInTheDocument();
       // And it names WHICH provider is short, because the chart stacks two of
       // them and a bare caveat leaves a reader unable to tell which bar to
       // distrust.
@@ -741,9 +689,7 @@ describe("the cost breakdown panels", () => {
       // Scoped to THIS panel: the provider split beside it carries the same
       // note for the same rows, and a page-wide search would pass on that one
       // while the total chart stayed silent — which is the bug.
-      const panel = screen
-        .getByText("Cost over time")
-        .closest('[data-testid="cost-panel"]');
+      const panel = screen.getByText("Cost over time").closest('[data-testid="cost-panel"]');
       expect(panel).not.toBeNull();
       const region = within(panel as HTMLElement);
       const note = region.getByLabelText(/cover only part of what was spent/i);
@@ -771,9 +717,7 @@ describe("the cost breakdown panels", () => {
      */
     /** @scenario "A provider billed in two currencies says which one its figure leaves out" */
     it("names the currency its figure leaves out", () => {
-      harness.providers = [
-        { provider: "anthropic_admin", amountUsd: 41, cellsWithoutAmount: 0 },
-      ];
+      harness.providers = [{ provider: "anthropic_admin", amountUsd: 41, cellsWithoutAmount: 0 }];
       harness.dailyByProvider = {
         rows: [
           {
@@ -787,9 +731,7 @@ describe("the cost breakdown panels", () => {
       };
       renderScreen();
 
-      const region = within(
-        screen.getByLabelText("Cost over time · by provider"),
-      );
+      const region = within(screen.getByLabelText("Cost over time · by provider"));
       const note = region.getByLabelText(/cover only part of what was spent/i);
       expect(note).toHaveTextContent(/Anthropic/);
       expect(note).toHaveTextContent(/EUR/);

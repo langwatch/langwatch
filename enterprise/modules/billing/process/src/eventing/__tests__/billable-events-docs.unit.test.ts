@@ -6,6 +6,7 @@
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { BillableEventsMeter } from "../../repositories/billable-events-meter.repository.ts";
@@ -14,7 +15,7 @@ import { BillableEventsMeterProjection } from "../billable-events-meter.projecti
 
 // Repo root containing both `packages/` and `docs/`. `process.cwd()` is this
 // package's own dir when vitest runs, and the package sits four levels down
-// at enterprise/modules/billing/server, so four levels up lands on the root.
+// at enterprise/modules/billing/process, so four levels up lands on the root.
 const REPO_ROOT = path.resolve(process.cwd(), "..", "..", "..", "..");
 
 const BILLABLE_EVENTS_DOC = "docs/pricing/billable-events.mdx";

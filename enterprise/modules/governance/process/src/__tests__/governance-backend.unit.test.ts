@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { PostgresGovernanceAdapter } from "../app/governance-policy-composition.build.ts";
 import type { GovernanceEncryptor } from "../app/governance.members.ts";
 import { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";

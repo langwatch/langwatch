@@ -30,6 +30,7 @@
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
+
 import { nextSeatsCursor, seatsReadIsDue } from "../rules/microsoft-graph-seats.rules.ts";
 
 /** The verb these events carry, so a reader can tell them from a conversation. */

@@ -1,6 +1,7 @@
+import { SubscriptionStatus, type StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SubscriptionStatus, type StripePriceMap } from "@langwatch/enterprise-billing-contract";
+
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";

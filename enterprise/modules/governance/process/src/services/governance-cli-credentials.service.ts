@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Every credential `/api/auth/cli` hands back or mints, and the pre-flight
@@ -15,10 +17,9 @@ import {
   type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import { randomBytes } from "node:crypto";
 
-import type { OrganizationSupportContactService } from "./organization-support-contact.service.ts";
 import type { GovernanceCliCaller } from "./governance-cli-access.service.ts";
+import type { OrganizationSupportContactService } from "./organization-support-contact.service.ts";
 
 const logger = createLogger("langwatch:governance-cli");
 

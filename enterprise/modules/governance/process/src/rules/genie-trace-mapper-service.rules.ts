@@ -36,22 +36,23 @@
  * never a false success.
  */
 
+import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
 import type { z } from "zod";
+
+import type {
+  GenieMessageFrame,
+  GenieMessagePayload,
+  GenieRoutingOrigin,
+} from "../rules/genie-message.rules.ts";
 import * as ConversationTraceAssemblyService from "./conversation-trace-assembly-service.rules.ts";
 import type {
   ConversationRoutingProfile,
   ConversationSeeds,
   OtlpJsonSpan,
 } from "./conversation-trace-assembly-service.rules.ts";
-import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import * as GenieSpanAttributesService from "./genie-span-attributes-service.rules.ts";
-import { nowInstant, toEpochMs } from "@langwatch/time";
-import type {
-  GenieMessageFrame,
-  GenieMessagePayload,
-  GenieRoutingOrigin,
-} from "../rules/genie-message.rules.ts";
 
 type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
 

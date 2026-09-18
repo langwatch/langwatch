@@ -1,4 +1,5 @@
-import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
+import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * The admin starter-pack import against real Postgres, no mocks.
@@ -7,9 +8,7 @@ import { createGovernanceTestConnection } from "../../../app/__tests__/governanc
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
+import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
 import { PrismaAiToolCatalogRepository } from "../prisma.ai-tool-catalog.repository.ts";
 
 /** This suite writes the rows it then reads; no project owns any of them. */

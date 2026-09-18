@@ -17,50 +17,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  gatedSourceTypeOptions,
-  isOttlEnabledSourceType,
-  NON_ENTERPRISE_INGESTION_SOURCE_CAP,
-  routesConversations,
-  SOURCE_TYPE_LABEL,
-  SOURCE_TYPE_OPTIONS,
-  type SourceType,
-} from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
-import {
-  composerCadenceError,
-  defaultBackfillStart,
-  PULL_ADAPTER_FOR_SOURCE,
-  PULL_SCHEDULE_DEFAULTS,
-  recommendedPullSchedule,
-} from "../../../features/ingestion-sources/model/pull-cadence.ts";
-import { SOURCE_HEALTH_REFRESH } from "../../../features/ingestion-sources/model/source-health-display.ts";
-import { inventorySummaryItems } from "../../../features/ingestion-sources/model/inventory-summary.ts";
-import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sampleIngestionSources.ts";
-import { AddIngestionSourceMenu } from "../../../features/ingestion-sources/ui/elements/add-ingestion-source-menu.tsx";
-import { PullCadenceField } from "../../../features/ingestion-sources/ui/elements/pull-cadence-field.tsx";
-import { TraceDestinationField } from "../../../features/ingestion-sources/ui/elements/trace-destination-field.tsx";
-import { SourceTypeIconGlyph } from "../../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";
-import { DashboardSelect } from "../../../features/ingestion-sources/DashboardSelect.tsx";
-import { IngestionSourcesTable } from "../../../features/ingestion-sources/IngestionSourcesTable.tsx";
-import {
-  AddEnvironmentDialog,
-  EnvironmentsTab,
-  environmentRows,
-} from "../../../features/ingestion-sources/environments/EnvironmentsTab.tsx";
-import type { EnvironmentRow } from "../../../features/ingestion-sources/environments/discoveredEnvironments.ts";
-import { catalogCards } from "../../../features/ingestion-sources/toolCatalog/ToolCatalogTab.tsx";
-import type { ToolCard } from "../../../features/ingestion-sources/toolCatalog/toolCards.ts";
-import { ToolCatalogPanel } from "../../../features/ai-tools/ui/sections/tool-catalog-panel.tsx";
-import { useAiToolCatalog } from "../../../features/ai-tools/ui/sections/useAiToolCatalog.ts";
-import { ChevronDown, Copy, KeyRound, Plug, Plus } from "lucide-react";
-import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
-import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
-import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
-import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
-import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
-import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
-import { SmallLabel } from "@langwatch/design-system/small-label";
-import {
   DialogBody,
   DialogCloseTrigger,
   DialogContent,
@@ -72,19 +28,64 @@ import {
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Switch } from "@langwatch/design-system/switch";
-import { Link } from "../../../ui/elements/governance-link.tsx";
-import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
-import { EnterpriseOttlEditor as OttlEditor } from "../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
+import { Temporal, nowInstant } from "@langwatch/time";
+import { ChevronDown, Copy, KeyRound, Plug, Plus } from "lucide-react";
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { api } from "../../../behavior/governance-api.ts";
 import {
   type GovernanceToaster,
   useGovernanceToaster,
   useShowErrorToast,
 } from "../../../behavior/governance-feedback.ts";
-import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
+import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
 import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
-import { api } from "../../../behavior/governance-api.ts";
-import { Temporal, nowInstant } from "@langwatch/time";
+import { ToolCatalogPanel } from "../../../features/ai-tools/ui/sections/tool-catalog-panel.tsx";
+import { useAiToolCatalog } from "../../../features/ai-tools/ui/sections/useAiToolCatalog.ts";
+import { DashboardSelect } from "../../../features/ingestion-sources/DashboardSelect.tsx";
+import type { EnvironmentRow } from "../../../features/ingestion-sources/environments/discoveredEnvironments.ts";
+import {
+  AddEnvironmentDialog,
+  EnvironmentsTab,
+  environmentRows,
+} from "../../../features/ingestion-sources/environments/EnvironmentsTab.tsx";
+import { IngestionSourcesTable } from "../../../features/ingestion-sources/IngestionSourcesTable.tsx";
+import {
+  gatedSourceTypeOptions,
+  isOttlEnabledSourceType,
+  NON_ENTERPRISE_INGESTION_SOURCE_CAP,
+  routesConversations,
+  SOURCE_TYPE_LABEL,
+  SOURCE_TYPE_OPTIONS,
+  type SourceType,
+} from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
+import { inventorySummaryItems } from "../../../features/ingestion-sources/model/inventory-summary.ts";
+import {
+  composerCadenceError,
+  defaultBackfillStart,
+  PULL_ADAPTER_FOR_SOURCE,
+  PULL_SCHEDULE_DEFAULTS,
+  recommendedPullSchedule,
+} from "../../../features/ingestion-sources/model/pull-cadence.ts";
+import { SOURCE_HEALTH_REFRESH } from "../../../features/ingestion-sources/model/source-health-display.ts";
+import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sampleIngestionSources.ts";
+import type { ToolCard } from "../../../features/ingestion-sources/toolCatalog/toolCards.ts";
+import { catalogCards } from "../../../features/ingestion-sources/toolCatalog/ToolCatalogTab.tsx";
+import { AddIngestionSourceMenu } from "../../../features/ingestion-sources/ui/elements/add-ingestion-source-menu.tsx";
+import { PullCadenceField } from "../../../features/ingestion-sources/ui/elements/pull-cadence-field.tsx";
+import { SourceTypeIconGlyph } from "../../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";
+import { TraceDestinationField } from "../../../features/ingestion-sources/ui/elements/trace-destination-field.tsx";
+import { EnterpriseOttlEditor as OttlEditor } from "../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
+import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
+import { Link } from "../../../ui/elements/governance-link.tsx";
+import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
+import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
+import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
+import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
+import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 import {
   type DestinationContext,
   type Source,

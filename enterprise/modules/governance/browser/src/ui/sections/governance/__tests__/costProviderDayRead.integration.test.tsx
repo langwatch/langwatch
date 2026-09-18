@@ -93,17 +93,13 @@ vi.mock("~/utils/api", () => ({
               amountUsd: 90,
               cellsWithoutAmount: 0,
               currenciesWithoutUsdAmount: [],
-              currencyTotals: [
-                { currencyCode: "USD", amount: 90, cellsWithoutAmount: 0 },
-              ],
+              currencyTotals: [{ currencyCode: "USD", amount: 90, cellsWithoutAmount: 0 }],
             },
             gateway: {
               amountUsd: 67.89,
               cellsWithoutAmount: 0,
               currenciesWithoutUsdAmount: [],
-              currencyTotals: [
-                { currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 },
-              ],
+              currencyTotals: [{ currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 }],
             },
             seats: { status: "awaiting_data" },
             series: [{ day: "2026-01-15", billedUsd: 90, gatewayUsd: 67.89 }],
@@ -183,14 +179,10 @@ describe("the cost by provider panel", () => {
 
       const panel = providerDayPanel();
 
-      expect(
-        panel.getByText(/could not be brought up to date/i),
-      ).toBeInTheDocument();
+      expect(panel.getByText(/could not be brought up to date/i)).toBeInTheDocument();
       // The whole point of the marker: the panel keeps its place on the
       // screen. Gone, it would read as a window nobody spent anything in.
-      expect(
-        panel.queryByLabelText("Cost over time · by provider"),
-      ).not.toBeInTheDocument();
+      expect(panel.queryByLabelText("Cost over time · by provider")).not.toBeInTheDocument();
       // Its neighbours answered, so this cannot pass against a screen that
       // failed as a whole.
       expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
@@ -208,9 +200,7 @@ describe("the cost by provider panel", () => {
     it("draws the panel and says nothing about a failed refresh", () => {
       renderScreen();
 
-      expect(
-        screen.getByLabelText("Cost over time · by provider"),
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Cost over time · by provider")).toBeInTheDocument();
       expect(
         providerDayPanel().queryByText(/could not be brought up to date/i),
       ).not.toBeInTheDocument();
@@ -231,12 +221,8 @@ describe("the cost by provider panel", () => {
       // The caveat is for a window that has one. Printing it over a window
       // where every day was priced teaches a reader to read past it, which
       // costs them the one window where it mattered.
-      const region = within(
-        screen.getByLabelText("Cost over time · by provider"),
-      );
-      expect(
-        region.queryByLabelText(/cover only part of what was spent/i),
-      ).not.toBeInTheDocument();
+      const region = within(screen.getByLabelText("Cost over time · by provider"));
+      expect(region.queryByLabelText(/cover only part of what was spent/i)).not.toBeInTheDocument();
     });
   });
 
@@ -254,19 +240,13 @@ describe("the cost by provider panel", () => {
 
       const panel = providerDayPanel();
 
-      expect(
-        panel.getByText(/could not be brought up to date/i),
-      ).toBeInTheDocument();
+      expect(panel.getByText(/could not be brought up to date/i)).toBeInTheDocument();
       // Drawing the chart alongside the marker would state two contradictory
       // things at once, and drawing it without the marker would present
       // figures from before the failure as current.
-      expect(
-        screen.queryByLabelText("Cost over time · by provider"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Cost over time · by provider")).not.toBeInTheDocument();
       // One panel under this heading, not the marker and the chart as two.
-      expect(screen.getAllByText("Cost over time · by provider")).toHaveLength(
-        1,
-      );
+      expect(screen.getAllByText("Cost over time · by provider")).toHaveLength(1);
     });
   });
 });

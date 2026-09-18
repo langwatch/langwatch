@@ -47,7 +47,7 @@ function routerFor(permits: (permission: string) => boolean = () => true) {
   return createTrpcRuntime<BillingTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: billingTrpcTestMembers(permits),
+    members: billingTrpcTestMembers(permits),
   }).mount(subscriptionTrpcTransport, () => billing, {
     // The address is the PROCESS's to resolve, off the session it authenticated.
     facts: [bindTrpcFact(billingCallerEmailFact, (ctx) => ctx.email ?? null)],

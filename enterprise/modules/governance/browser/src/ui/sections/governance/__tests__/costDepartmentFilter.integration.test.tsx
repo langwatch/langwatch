@@ -75,22 +75,16 @@ vi.mock("~/utils/api", () => ({
               amountUsd: 123.45,
               cellsWithoutAmount: 0,
               currenciesWithoutUsdAmount: [],
-              currencyTotals: [
-                { currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 },
-              ],
+              currencyTotals: [{ currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 }],
             },
             gateway: {
               amountUsd: 67.89,
               cellsWithoutAmount: 0,
               currenciesWithoutUsdAmount: [],
-              currencyTotals: [
-                { currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 },
-              ],
+              currencyTotals: [{ currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 }],
             },
             seats: { status: "awaiting_data" },
-            series: [
-              { day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 },
-            ],
+            series: [{ day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 }],
             windowDays: 30,
           },
           isLoading: false,
@@ -125,9 +119,7 @@ vi.mock("~/utils/api", () => ({
             buckets: [
               {
                 bucketIso: "2026-08-01",
-                points: [
-                  { key: "team-a", label: "Team A", spendUsd: "310.50" },
-                ],
+                points: [{ key: "team-a", label: "Team A", spendUsd: "310.50" }],
               },
             ],
           },
@@ -149,9 +141,7 @@ const renderScreen = () =>
 /** Opens a filter chip by its label and picks one of its options. */
 const pickFilter = async (chipLabel: string, option: string) => {
   const user = userEvent.setup();
-  const chip = screen
-    .getByText(chipLabel)
-    .closest("button") as HTMLButtonElement;
+  const chip = screen.getByText(chipLabel).closest("button") as HTMLButtonElement;
   await user.click(chip);
   const item = await screen.findByRole("menuitem", { name: option });
   await user.click(item);
@@ -175,9 +165,8 @@ describe("the department filter", () => {
     it("names its panel-only scope and leaves totals and user costs unchanged", async () => {
       renderScreen();
       const userPanel = () =>
-        screen
-          .getByText("Metered spend by person")
-          .closest('[data-testid="cost-panel"]')?.textContent;
+        screen.getByText("Metered spend by person").closest('[data-testid="cost-panel"]')
+          ?.textContent;
       const originalUserPanel = userPanel();
       expect(originalUserPanel).toContain("ada@acme.test");
       expect(screen.getByText("$123.45")).toBeInTheDocument();
@@ -205,9 +194,7 @@ describe("the department filter", () => {
       renderScreen();
 
       await pickFilter("Department", "Engineering");
-      await waitFor(() =>
-        expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0),
-      );
+      await waitFor(() => expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0));
 
       await pickFilter("Time Frame", "Last 3 months");
 
@@ -215,10 +202,8 @@ describe("the department filter", () => {
       // "All departments" and the panel shows no department at all, because
       // the dropped Engineering id is still filtering every row away.
       await waitFor(() => {
-        const saysAllDepartments =
-          screen.queryAllByText("All departments").length > 0;
-        const showsEveryReturnedDepartment =
-          screen.queryAllByText("Support").length > 0;
+        const saysAllDepartments = screen.queryAllByText("All departments").length > 0;
+        const showsEveryReturnedDepartment = screen.queryAllByText("Support").length > 0;
 
         expect({ saysAllDepartments, showsEveryReturnedDepartment }).toEqual({
           saysAllDepartments: true,
@@ -237,9 +222,7 @@ describe("the department filter", () => {
       await pickFilter("Department", "Engineering");
       await pickFilter("Time Frame", "Last 3 months");
 
-      await waitFor(() =>
-        expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0),
-      );
+      await waitFor(() => expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0));
       // The selection survives a window that still contains it: the panel is
       // filtered, so Support is not among the rows.
       const panel = screen
@@ -260,9 +243,7 @@ describe("the department filter", () => {
 
       // An unanswered read is not evidence the department disappeared, so
       // resetting here would throw away the reader's choice on every refetch.
-      await waitFor(() =>
-        expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0),
-      );
+      await waitFor(() => expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0));
     });
   });
 });

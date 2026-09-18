@@ -13,9 +13,9 @@
  * "OpenAI Admin" threw `ReferenceError` before any validation could run.
  */
 
+import { openaiAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { openaiAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import { buildOpenAiAdminPullConfig, type ComposerState } from "../governance-inventory.screen.tsx";
 
 function composer(parserConfig: Record<string, string>, pullSchedule = ""): ComposerState {

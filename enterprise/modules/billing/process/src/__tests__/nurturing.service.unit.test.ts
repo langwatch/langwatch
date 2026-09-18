@@ -1,7 +1,8 @@
+import type { CioBatchCall } from "@langwatch/enterprise-billing-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { BillingErrorReporter } from "../index.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
-import type { CioBatchCall } from "@langwatch/enterprise-billing-contract";
 
 // Suppress logger output and captureException in tests
 vi.mock("@langwatch/observability", () => ({

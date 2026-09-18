@@ -1,6 +1,6 @@
+import { Currency, type Currency as CurrencyType } from "@langwatch/enterprise-billing-contract";
 // @ts-expect-error — no type definitions for geoip-country
 import geoip from "geoip-country";
-import { Currency, type Currency as CurrencyType } from "@langwatch/enterprise-billing-contract";
 
 export type CurrencyRequest = {
   headers?: Record<string, string | string[] | undefined>;

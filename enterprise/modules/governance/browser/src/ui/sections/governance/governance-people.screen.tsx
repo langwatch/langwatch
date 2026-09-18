@@ -15,24 +15,21 @@ import {
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 import { Archive, ChevronDown, ExternalLink, MoreVertical, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
-import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
 import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
+import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { DepartmentEditDrawer } from "../../../features/departments/ui/sections/department-edit-drawer.tsx";
-import { AssignDepartmentDialog } from "../../../features/people/ui/assign-department-dialog.tsx";
-import { CreateDepartmentDrawer } from "../../../features/people/ui/create-department-drawer.tsx";
 import {
   type DepartmentRecord,
   type DepartmentTableRow,
   mergeDepartmentRows,
 } from "../../../features/people/model/department-rows.ts";
 import { groupObservedDepartments } from "../../../features/people/model/observed-departments.ts";
-import { PeopleFilterBar } from "../../../features/people/ui/people-filter-bar.tsx";
 import {
   SPEND_WINDOW_DAYS,
   usePeopleFilters,
@@ -48,6 +45,9 @@ import {
   SAMPLE_DEPARTMENTS,
   samplePeopleRows,
 } from "../../../features/people/model/sample-people.ts";
+import { AssignDepartmentDialog } from "../../../features/people/ui/assign-department-dialog.tsx";
+import { CreateDepartmentDrawer } from "../../../features/people/ui/create-department-drawer.tsx";
+import { PeopleFilterBar } from "../../../features/people/ui/people-filter-bar.tsx";
 import {
   departmentNameForActor,
   EnterpriseLockedLine,
@@ -58,12 +58,12 @@ import {
   UnifiedPeopleTable,
 } from "../../../features/people/ui/unified-people-table.tsx";
 import { readHandledError } from "../../../model/handled-error.ts";
-import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
+import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
-import { Link } from "../../../ui/elements/governance-link.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 
 type Department = RouterOutputs["departments"]["list"][number];

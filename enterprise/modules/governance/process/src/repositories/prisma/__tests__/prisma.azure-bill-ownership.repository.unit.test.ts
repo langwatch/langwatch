@@ -1,5 +1,6 @@
 import { ValidationError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
+
 import {
   type AzureBillReader,
   assertAzureBillHasItsOwnCredential,
@@ -9,9 +10,7 @@ import {
 
 const SUBSCRIPTION = "00000000-0000-4000-8000-000000000001";
 
-const existingReader = (
-  overrides: Partial<AzureBillReader> = {},
-): AzureBillReader => ({
+const existingReader = (overrides: Partial<AzureBillReader> = {}): AzureBillReader => ({
   id: "src_first",
   name: "Copilot Studio, Europe",
   subscriptionId: SUBSCRIPTION,
@@ -102,9 +101,7 @@ describe("given a source that already reads a subscription's bill", () => {
       expect(() =>
         assertAzureBillNotAlreadyClaimed({
           parserConfig: configNaming(SUBSCRIPTION),
-          claimedBy: [
-            existingReader({ subscriptionId: SUBSCRIPTION.toUpperCase() }),
-          ],
+          claimedBy: [existingReader({ subscriptionId: SUBSCRIPTION.toUpperCase() })],
         }),
       ).toThrow(/already reads this Azure subscription's bill/);
     });
@@ -196,10 +193,7 @@ describe("given a save that names a subscription and carries credentials", () =>
     /** @scenario "A subscription cannot be saved without its own billing credential" */
     it.each([
       ["only the billing client id", { billingClientId: "billing-client-id" }],
-      [
-        "only the billing client secret",
-        { billingClientSecret: "billing-client-secret" },
-      ],
+      ["only the billing client secret", { billingClientSecret: "billing-client-secret" }],
       [
         "a blank billing secret",
         { billingClientId: "billing-client-id", billingClientSecret: "  " },
@@ -260,9 +254,9 @@ describe("given a save that names a subscription and carries credentials", () =>
       // reach "subscription named, bill unreadable forever".
       const parserConfig: Record<string, unknown> = configNaming(SUBSCRIPTION);
       if (credentials !== undefined) parserConfig.credentials = credentials;
-      expect(() =>
-        assertAzureBillHasItsOwnCredential({ parserConfig }),
-      ).toThrow(/needs its own app registration/i);
+      expect(() => assertAzureBillHasItsOwnCredential({ parserConfig })).toThrow(
+        /needs its own app registration/i,
+      );
     });
 
     /** @scenario "A subscription cannot be saved without its own billing credential" */
@@ -307,17 +301,14 @@ describe("given a save that names a subscription and carries credentials", () =>
 
 describe("given a config that is not a config at all", () => {
   describe("when the claim is read", () => {
-    it.each([
-      [null],
-      [undefined],
-      [{ azureSubscriptionId: 12345 }],
-    ])("reads no claim from %s", (parserConfig) => {
-      expect(
-        readClaimedSubscription(
-          parserConfig as Record<string, unknown> | null | undefined,
-        ),
-      ).toBe(null);
-    });
+    it.each([[null], [undefined], [{ azureSubscriptionId: 12345 }]])(
+      "reads no claim from %s",
+      (parserConfig) => {
+        expect(
+          readClaimedSubscription(parserConfig as Record<string, unknown> | null | undefined),
+        ).toBe(null);
+      },
+    );
   });
 });
 

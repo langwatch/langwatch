@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+
 import {
   STRIPE_METER_NAMES,
   STRIPE_PRICE_NAMES,
@@ -13,8 +14,8 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
+import { nowInstant, Temporal } from "@langwatch/time";
 import Stripe from "stripe";
-import { nowInstant,Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:task:stripe-prices-sync");
 

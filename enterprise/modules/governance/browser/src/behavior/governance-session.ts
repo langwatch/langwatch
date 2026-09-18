@@ -2,6 +2,7 @@
 // Options object removed (redirects gone).
 
 import { useMemo } from "react";
+
 import { useGovernanceHost, type GovernanceOrganization } from "../model/governance-host.ts";
 
 export type GovernanceScopeReading = {

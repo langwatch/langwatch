@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber.ts";
-import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber.ts";
+
 import type {
   GovernanceKpiContributionWriter,
   GovernanceOcsfEventWriter,
@@ -13,11 +12,10 @@ import type {
   GovernanceOcsfEvent,
   TraceAlertTrigger,
 } from "../../app/governance.members.ts";
+import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber.ts";
+import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber.ts";
 import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
-import {
-  governanceTraceContext,
-  governanceTraceEvent,
-} from "./governance-subscriber.fixtures.ts";
+import { governanceTraceContext, governanceTraceEvent } from "./governance-subscriber.fixtures.ts";
 
 class RecordingKpis implements GovernanceKpiContributionWriter {
   readonly rows: GovernanceKpiContribution[] = [];
@@ -47,8 +45,7 @@ class RecordingDiagnostics implements GovernanceSubscriberDiagnosticsSink {
 }
 
 class FixedTriggers implements TraceAlertTriggerReader {
-  constructor(private readonly triggers: TraceAlertTrigger[]) {
-  }
+  constructor(private readonly triggers: TraceAlertTrigger[]) {}
   activeForProject(): Promise<TraceAlertTrigger[]> {
     return Promise.resolve(this.triggers);
   }

@@ -16,25 +16,33 @@ import {
   pulledUsageObservedEventDataSchema,
   readPulledUsageMoney,
 } from "@langwatch/enterprise-governance-contract";
-import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
 import type {
   NormalizedPullEvent,
   PulledUsageSourceAttribution,
 } from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
-import { buildPulledUsageRecord } from "../pulledUsageRecord";
+import type { PulledUsageRateReader } from "../../app/governance.members.ts";
+import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 
 const SOURCE: PulledUsageSourceAttribution = {
   ingestionSourceId: "src_1",
   sourceType: "copilot_studio_dataverse",
   organizationId: "org_acme",
   teamId: null,
-  createdAt: new Date("2026-07-01T00:00:00.000Z"),
 };
 
-const GOV_PROJECT_ID = "proj_governance_acme";
-const OBSERVED_AT = new Date("2026-08-30T09:00:00.000Z");
+const unusedRates: PulledUsageRateReader = {
+  rate: () => {
+    throw new Error("provider-reported records do not read model rates");
+  },
+};
+const records = PulledUsageRecordService.create(PulledUsagePricingService.create(unusedRates));
+
+const OBSERVED_AT = Temporal.Instant.from("2026-08-30T09:00:00.000Z");
 
 function costEvent(hint: Record<string, unknown>): NormalizedPullEvent {
   return {
@@ -64,10 +72,9 @@ function costEvent(hint: Record<string, unknown>): NormalizedPullEvent {
 }
 
 function record(hint: Record<string, unknown>) {
-  return buildPulledUsageRecord({
+  return records.findBuilt({
     event: costEvent(hint),
     source: SOURCE,
-    governanceProjectId: GOV_PROJECT_ID,
     observedAt: OBSERVED_AT,
   });
 }
@@ -130,14 +137,13 @@ describe("currency on a pulled usage record", () => {
       // dollar figure and says nothing about currency, which means dollars.
       // Reading the amount from one and the currency from the other reports
       // the dollar figure as euros — a wrong number with a straight face.
-      const built = buildPulledUsageRecord({
+      const built = records.findBuilt({
         event: {
           ...costEvent({ costUsd: "2.50" }),
           cost_amount: "2.15",
           cost_currency: "EUR",
         },
         source: SOURCE,
-        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -147,14 +153,13 @@ describe("currency on a pulled usage record", () => {
 
     /** @scenario "A record from a provider that bills in another currency says which" */
     it("takes both halves from the event when the hint holds no amount", () => {
-      const built = buildPulledUsageRecord({
+      const built = records.findBuilt({
         event: {
           ...costEvent({}),
           cost_amount: "2.15",
           cost_currency: "EUR",
         },
         source: SOURCE,
-        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -239,9 +244,7 @@ describe("currency on a pulled usage record", () => {
         costNanoUsd: 1_745_382_480,
       });
       // And the schema still accepts what this build writes.
-      expect(() =>
-        pulledUsageObservedEventDataSchema.parse(written),
-      ).not.toThrow();
+      expect(() => pulledUsageObservedEventDataSchema.parse(written)).not.toThrow();
     });
 
     /** @scenario "Records already on the durable log still read after the change" */

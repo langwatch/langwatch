@@ -3,10 +3,10 @@
  * @see specs/licensing/billing-meter-dispatch.feature
  */
 
+import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks

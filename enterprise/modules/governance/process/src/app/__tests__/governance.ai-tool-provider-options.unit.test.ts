@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 /**
  * Which catalogue `aiToolProviders` answers from: the platform's static
  * provider registry, not the organization's configured providers. The admin
@@ -7,7 +8,7 @@
  * makes that flag constant-true and leaves an admin nothing new to pick.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
+
 import {
   AiToolCatalogRepository,
   type AiToolSlug,

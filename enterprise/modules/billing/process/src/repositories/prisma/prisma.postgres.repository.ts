@@ -1,11 +1,7 @@
-import {
-  PrismaOrganizationPricingRepository,
-  type BillingOrganizationPricingDatabase,
-} from "./prisma.organization-pricing.repository.ts";
-import {
-  PrismaSubscriptionRepository,
-  type BillingSubscriptionDatabase,
-} from "./prisma.subscription.repository.ts";
+import type { BillingAccountFactsRepository } from "../billing-account-facts.repository.ts";
+import type { BillingCheckpointRepository } from "../billing-checkpoint.repository.ts";
+import type { OrganizationPricingRepository } from "../organization-pricing.repository.ts";
+import type { BillingSubscription } from "../subscription.repository.ts";
 import {
   PrismaBillingOrganizationRepository,
   type BillingOrganizationDatabase,
@@ -14,14 +10,18 @@ import {
   PrismaBillingCheckpointRepository,
   type BillingCheckpointDatabase,
 } from "./prisma.billing-checkpoint.repository.ts";
-import type { OrganizationPricingRepository } from "../organization-pricing.repository.ts";
-import type { SubscriptionRepository } from "../subscription.repository.ts";
-import type { BillingAccountFactsRepository } from "../billing-account-facts.repository.ts";
-import type { BillingCheckpointRepository } from "../billing-checkpoint.repository.ts";
+import {
+  PrismaOrganizationPricingRepository,
+  type BillingOrganizationPricingDatabase,
+} from "./prisma.organization-pricing.repository.ts";
+import {
+  PrismaBillingSubscription,
+  type BillingSubscriptionDatabase,
+} from "./prisma.subscription.repository.ts";
 
 export type PostgresBillingPersistence = {
   organizationPricing: OrganizationPricingRepository;
-  subscriptions: SubscriptionRepository;
+  subscriptions: BillingSubscription;
   organization: BillingAccountFactsRepository;
   /** The two-phase meter checkpoint the monthly roll-up reports against. */
   checkpoints: BillingCheckpointRepository;
@@ -48,7 +48,7 @@ export class PrismaPostgresRepository {
   build(): PostgresBillingPersistence {
     return {
       organizationPricing: PrismaOrganizationPricingRepository.create(this.database),
-      subscriptions: PrismaSubscriptionRepository.create(this.database),
+      subscriptions: PrismaBillingSubscription.create(this.database),
       organization: PrismaBillingOrganizationRepository.create(this.database),
       checkpoints: PrismaBillingCheckpointRepository.create(this.database),
     };

@@ -5,18 +5,13 @@ import { Boxes } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
-import type { AiToolEntry } from "../../ai-tools/model/ai-tool-tile.ts";
-import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
-
+import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import type { AiToolEntry } from "../../ai-tools/model/ai-tool-tile.ts";
 import { asRegisteredTools, buildRegisteredToolCards } from "./registeredTools";
 import { SAMPLE_TOOL_CARDS } from "./sampleToolCards";
-import {
-  type ToolCardActions,
-  ToolCatalogCards,
-  type ToolCatalogLayout,
-} from "./ToolCatalogCards";
 import type { ToolCard } from "./toolCards";
+import { type ToolCardActions, ToolCatalogCards, type ToolCatalogLayout } from "./ToolCatalogCards";
 
 /**
  * The Catalog pane: every AI tool the organization has registered.
@@ -119,12 +114,7 @@ export function ToolCatalogTab({
   }
 
   if (!sampleActive && error) {
-    return (
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="Couldn't load the tool catalog"
-      />
-    );
+    return <HandledErrorAlert error={error} fallbackTitle="Couldn't load the tool catalog" />;
   }
 
   const cards = catalogCards({ tools, sampleActive });
@@ -144,11 +134,5 @@ export function ToolCatalogTab({
     );
   }
 
-  return (
-    <ToolCatalogCards
-      cards={cards}
-      layout={layout}
-      renderActions={renderActions}
-    />
-  );
+  return <ToolCatalogCards cards={cards} layout={layout} renderActions={renderActions} />;
 }

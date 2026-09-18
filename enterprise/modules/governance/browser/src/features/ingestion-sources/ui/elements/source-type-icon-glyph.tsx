@@ -1,5 +1,3 @@
-import type { SourceType } from "../../model/ingestion-source-catalog.ts";
-import type { ReactNode } from "react";
 import { Box } from "@chakra-ui/react";
 import {
   AnthropicIcon,
@@ -12,6 +10,9 @@ import {
   OpenTelemetryIcon,
   WorkatoIcon,
 } from "@langwatch/design-system/icons";
+import type { ReactNode } from "react";
+
+import type { SourceType } from "../../model/ingestion-source-catalog.ts";
 
 const MONOCHROME_SOURCE_ICONS = new Set<SourceType>([
   "otel_generic",

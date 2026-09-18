@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { AiToolTileType } from "../../ai-tools/model/ai-tool-tile.ts";
-
 import type { SourceType } from "../model/ingestion-source-catalog.ts";
 
 /**
@@ -67,14 +66,10 @@ export type ToolCardRow = (typeof TOOL_CARD_ROWS)[number];
  * the thing that would have to exist, so an empty row reads as a next step
  * rather than as breakage. Words are spelled out, per the section's copy rule.
  */
-export const TOOL_CARD_ROW_META: Record<
-  ToolCardRow,
-  { label: string; filledBy: string }
-> = {
+export const TOOL_CARD_ROW_META: Record<ToolCardRow, { label: string; filledBy: string }> = {
   seats: {
     label: "Seats",
-    filledBy:
-      "Seat counts arrive from a source that reads the vendor's licence list.",
+    filledBy: "Seat counts arrive from a source that reads the vendor's licence list.",
   },
   licencePerMonth: {
     label: "Licence per month",
@@ -87,8 +82,7 @@ export const TOOL_CARD_ROW_META: Record<
   },
   subscriptions: {
     label: "Subscriptions",
-    filledBy:
-      "Subscription counts arrive from a source that reads the vendor's plan membership.",
+    filledBy: "Subscription counts arrive from a source that reads the vendor's plan membership.",
   },
   eventsLast24Hours: {
     label: "Events · 24 hours",
@@ -96,18 +90,15 @@ export const TOOL_CARD_ROW_META: Record<
   },
   usage30Days: {
     label: "Usage · 30 days",
-    filledBy:
-      "Spend is rolled up for the whole organization today, not per tool.",
+    filledBy: "Spend is rolled up for the whole organization today, not per tool.",
   },
   attributed: {
     label: "Attributed",
-    filledBy:
-      "Attribution needs the People screen to have matched this tool's actors to people.",
+    filledBy: "Attribution needs the People screen to have matched this tool's actors to people.",
   },
   topDepartment: {
     label: "Top department",
-    filledBy:
-      "Department spend is rolled up for the whole organization today, not per tool.",
+    filledBy: "Department spend is rolled up for the whole organization today, not per tool.",
   },
   agents: {
     label: "Agents",
@@ -119,8 +110,7 @@ export const TOOL_CARD_ROW_META: Record<
   },
   conversations30Days: {
     label: "Conversations · 30 days",
-    filledBy:
-      "Conversations arrive from a source that routes them to a trace destination.",
+    filledBy: "Conversations arrive from a source that routes them to a trace destination.",
   },
 };
 
@@ -128,11 +118,7 @@ export const TOOL_CARD_ROW_META: Record<
  * A card's badges. Independent facts rather than one label, because a tool can
  * be more than one at once and a single word would have to pick.
  */
-export type ToolCardBadge =
-  | "seatsAndLicences"
-  | "subscription"
-  | "billed"
-  | "metered";
+export type ToolCardBadge = "seatsAndLicences" | "subscription" | "billed" | "metered";
 
 export const TOOL_CARD_BADGE_LABEL: Record<ToolCardBadge, string> = {
   seatsAndLicences: "seats · licences",
@@ -201,10 +187,7 @@ export function rowAppliesToCard(card: ToolCard, row: ToolCardRow): boolean {
  * about it would promise a read nobody is going to build. A row the tool does
  * have but nothing measures yet gets the sentence naming what would fill it.
  */
-export function toolCardMissingReason(
-  card: ToolCard,
-  row: ToolCardRow,
-): string {
+export function toolCardMissingReason(card: ToolCard, row: ToolCardRow): string {
   if (!rowAppliesToCard(card, row)) {
     return `${TOOL_CARD_ROW_META[row].label} does not apply to ${card.name}.`;
   }
@@ -250,9 +233,7 @@ const GROUPED = new Intl.NumberFormat("en-US");
  * the compact form is never the only place a figure exists.
  */
 export function formatCardCount(value: number): string {
-  return Math.abs(value) >= COMPACT_FROM
-    ? COMPACT.format(value)
-    : GROUPED.format(value);
+  return Math.abs(value) >= COMPACT_FROM ? COMPACT.format(value) : GROUPED.format(value);
 }
 
 /** The same count in full, for the hover and the accessible name. */

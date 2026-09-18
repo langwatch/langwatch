@@ -12,9 +12,9 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-dataverse.feature
  */
 
+import { copilotStudioDataversePullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { copilotStudioDataversePullConfigSchema } from "../../../services/pullers/copilotStudioDataverse.puller";
 import {
   buildCopilotStudioDataversePullConfig,
   buildParserConfig,
@@ -66,9 +66,7 @@ describe("buildCopilotStudioDataversePullConfig", () => {
     it("still produces a config the adapter accepts", () => {
       const config = buildCopilotStudioDataversePullConfig(composer(REQUIRED));
 
-      expect(() =>
-        copilotStudioDataversePullConfigSchema.parse(config),
-      ).not.toThrow();
+      expect(() => copilotStudioDataversePullConfigSchema.parse(config)).not.toThrow();
     });
   });
 
@@ -146,9 +144,7 @@ describe("buildCopilotStudioDataversePullConfig", () => {
 
     /** @scenario "Each licence pool is recorded with bought and assigned counts" */
     it("keeps it out of parserConfig, which wins the server-side merge", () => {
-      const parserConfig = buildParserConfig(
-        composer({ ...REQUIRED, readSeats: "true" }),
-      );
+      const parserConfig = buildParserConfig(composer({ ...REQUIRED, readSeats: "true" }));
 
       // A raw "true" left here would win the merge and reach the adapter as a
       // string where its schema demands a boolean.
@@ -202,9 +198,10 @@ describe("buildCopilotStudioDataversePullConfig", () => {
 
     /** @scenario "The bill is asked for with the billing credential, not the conversation one" */
     it("routes the pair into the encrypted credentials subtree, beside the bot's", () => {
-      const config = buildCopilotStudioDataversePullConfig(
-        composer(WITH_BILLING),
-      ) as Record<string, unknown>;
+      const config = buildCopilotStudioDataversePullConfig(composer(WITH_BILLING)) as Record<
+        string,
+        unknown
+      >;
 
       expect(config.credentials).toMatchObject({
         clientId: "app-client-id",
@@ -222,9 +219,7 @@ describe("buildCopilotStudioDataversePullConfig", () => {
       // would be persisted as plaintext JSONB and returned to the browser.
       expect(parserConfig).not.toHaveProperty("credentialsBillingClientId");
       expect(parserConfig).not.toHaveProperty("credentialsBillingClientSecret");
-      expect(JSON.stringify(parserConfig)).not.toContain(
-        "billing-client-secret",
-      );
+      expect(JSON.stringify(parserConfig)).not.toContain("billing-client-secret");
     });
 
     /** @scenario "A subscription cannot be saved without its own billing credential" */
@@ -268,9 +263,7 @@ describe("buildCopilotStudioDataversePullConfig", () => {
 
     /** @scenario "A tenant that declared nothing is never told it is prepaid" */
     it("defaults to not declared on an untouched form", () => {
-      const config = buildCopilotStudioDataversePullConfig(
-        composer(WITH_BILLING),
-      );
+      const config = buildCopilotStudioDataversePullConfig(composer(WITH_BILLING));
 
       // The default is a claim about the customer's contract, so it must be
       // the one that licenses NO sentence: false, never inferred.
@@ -301,9 +294,7 @@ describe("buildCopilotStudioDataversePullConfig", () => {
   });
 
   describe("given the composer's own field list", () => {
-    const field = PARSER_FIELDS.copilot_studio_dataverse.find(
-      (f) => f.key === "readSeats",
-    );
+    const field = PARSER_FIELDS.copilot_studio_dataverse.find((f) => f.key === "readSeats");
 
     /** @scenario "Licence reading is on unless an admin switches it off" */
     it("offers the licence read as a switch that starts on", () => {
@@ -333,9 +324,7 @@ describe("buildCopilotStudioDataversePullConfig", () => {
   });
 
   describe("when the form resolves a control for it", () => {
-    const field = PARSER_FIELDS.copilot_studio_dataverse.find(
-      (f) => f.key === "readSeats",
-    );
+    const field = PARSER_FIELDS.copilot_studio_dataverse.find((f) => f.key === "readSeats");
 
     /** @scenario "Licence reading is on unless an admin switches it off" */
     it("carries the field's own default, so the render can agree with the builder", () => {
@@ -416,9 +405,10 @@ describe("given the one-app registration switch", () => {
 
     /** @scenario "A source claiming no subscription saves no billing credential" */
     it("saves no billing credential and no record without a subscription", () => {
-      const config = buildCopilotStudioDataversePullConfig(
-        composer(REQUIRED),
-      ) as Record<string, unknown>;
+      const config = buildCopilotStudioDataversePullConfig(composer(REQUIRED)) as Record<
+        string,
+        unknown
+      >;
 
       expect(config.credentials).not.toHaveProperty("billingClientId");
       expect(config.credentials).not.toHaveProperty("billingClientSecret");
@@ -473,9 +463,7 @@ describe("given the one-app registration switch", () => {
 
     /** @scenario "An untouched switch saves the state it was showing" */
     it("keeps it out of parserConfig, which wins the server-side merge", () => {
-      const parserConfig = buildParserConfig(
-        composer({ ...REQUIRED, readDirectory: "true" }),
-      );
+      const parserConfig = buildParserConfig(composer({ ...REQUIRED, readDirectory: "true" }));
 
       expect(parserConfig).not.toHaveProperty("readDirectory");
     });

@@ -36,8 +36,8 @@ vi.mock("~/hooks/useActivePlan", () => ({
 vi.mock("~/components/governance/GovernanceLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
-vi.mock("~/utils/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/utils/api")>()),
+vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../behavior/governance-api.ts")>()),
   api: {
     activityMonitor: {
       spendByUser: {

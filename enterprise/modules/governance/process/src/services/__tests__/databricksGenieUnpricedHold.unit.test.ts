@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 /**
  * @vitest-environment node
  *
@@ -16,11 +17,11 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
-import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
 const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
@@ -64,9 +65,8 @@ let messageCreatedMs: number;
 
 /** Every call the adapter made to run a statement, in order. */
 function statementCalls(): number {
-  return fetchMock.mock.calls.filter(([url]) =>
-    String(url).includes("/api/2.0/sql/statements"),
-  ).length;
+  return fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/2.0/sql/statements"))
+    .length;
 }
 
 beforeEach(() => {
@@ -84,11 +84,7 @@ beforeEach(() => {
         conversations: [{ conversation_id: "conv-1", title: "How many?" }],
       });
     }
-    if (
-      path.startsWith(
-        "/api/2.0/genie/spaces/space-1/conversations/conv-1/messages",
-      )
-    ) {
+    if (path.startsWith("/api/2.0/genie/spaces/space-1/conversations/conv-1/messages")) {
       return reply({
         messages: [
           {
@@ -146,7 +142,13 @@ async function pull({
   warehouseId?: string;
   cursor?: string | null;
 }) {
-  return new DatabricksGeniePullerAdapter().runOnce(
+  const http: GovernanceHttpClient = {
+    fetch: async (url, init) => {
+      const response = await fetchMock(url, init);
+      return { ...response, statusText: "" };
+    },
+  };
+  return DatabricksGeniePullerAdapter.create(http).runOnce(
     { cursor, credentials: { token: "dapi-fixture" } },
     {
       adapter: "databricks_genie",
@@ -194,15 +196,7 @@ describe("given a Genie question whose bill has not answered", () => {
       billing = {
         kind: "rows",
         rows: [
-          [
-            STATEMENT_ID,
-            usageHourOf(messageCreatedMs),
-            "1800000",
-            "3600000",
-            null,
-            null,
-            null,
-          ],
+          [STATEMENT_ID, usageHourOf(messageCreatedMs), "1800000", "3600000", null, null, null],
         ],
       };
 

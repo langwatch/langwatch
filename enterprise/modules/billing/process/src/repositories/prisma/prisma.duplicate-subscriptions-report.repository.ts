@@ -1,9 +1,10 @@
 import type { PrismaClient, SubscriptionStatus } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
+
 import {
   DuplicateSubscriptionsReportRepository,
   type SubscriptionReportRow,
 } from "../duplicate-subscriptions-report.repository.ts";
-import { fromDate } from "@langwatch/time";
 
 const SUBSCRIPTION_SELECT = {
   id: true,

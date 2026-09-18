@@ -61,6 +61,7 @@
  */
 import { parseSummedNanoUsd } from "@langwatch/gateway-contract";
 import { Temporal } from "@langwatch/time";
+
 import { GatewaySpendRepository } from "../gateway-spend.repository.ts";
 import type {
   GovernanceGatewaySpendDayRow,
@@ -173,7 +174,9 @@ export class ClickHouseGatewaySpendRepository extends GatewaySpendRepository {
     super();
   }
 
-  static create(resolveClient: GovernanceClickHouseTenantResolver): ClickHouseGatewaySpendRepository {
+  static create(
+    resolveClient: GovernanceClickHouseTenantResolver,
+  ): ClickHouseGatewaySpendRepository {
     return new ClickHouseGatewaySpendRepository(resolveClient);
   }
 

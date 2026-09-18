@@ -11,16 +11,17 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { EnterpriseOttlEditor as OttlEditor } from "../../../ottl/index.ts";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Link } from "../../../../ui/elements/governance-link.tsx";
+
+import { api } from "../../../../behavior/governance-api.ts";
 import {
   useGovernanceToaster,
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
-import { api } from "../../../../behavior/governance-api.ts";
+import { Link } from "../../../../ui/elements/governance-link.tsx";
+import { EnterpriseOttlEditor as OttlEditor } from "../../../ottl/index.ts";
 /** Admin ingestion templates editor; read/edit states per template-ottl-authoring.feature. */
 type EditorState =
   | { kind: "view"; templateId: string; slug: string }

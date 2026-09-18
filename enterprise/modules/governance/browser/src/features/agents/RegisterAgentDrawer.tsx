@@ -1,8 +1,8 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { useColorMode } from "@langwatch/design-system/color-mode";
-import { Drawer } from "@langwatch/design-system/drawer";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { RenderCode } from "@langwatch/browser-host/markdown";
+import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Drawer } from "@langwatch/design-system/drawer";
 
 /**
  * "Register agent" opens instructions, not a form.

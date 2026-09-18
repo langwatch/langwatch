@@ -20,6 +20,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import type { SourceType } from "../model/ingestion-source-catalog.ts";
 import { TraceDestinationField } from "../ui/elements/trace-destination-field.tsx";
 

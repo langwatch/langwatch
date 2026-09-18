@@ -2,6 +2,7 @@
 // Resource→record merge must preserve admin OTEL_RESOURCE_ATTRIBUTES in ledger.
 
 import { describe, expect, it } from "vitest";
+
 import {
   CanonicalCostExtractorService,
   type OtlpFixed64,

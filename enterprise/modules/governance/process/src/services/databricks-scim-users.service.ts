@@ -40,10 +40,10 @@
 import { z } from "zod";
 
 import type { GovernanceHttpClient } from "../app/governance.members.ts";
-import { GenieHttpError, genieGet } from "./genie-spaces.service.ts";
 import type { DiscoveredPersonRecord, PeopleListing } from "../rules/people-listing.rules.ts";
 import { peopleListed, peopleRefused } from "../rules/people-listing.rules.ts";
 import { refusalFromStatus, refusalFromThrown } from "../rules/provider-listing.rules.ts";
+import { GenieHttpError, genieGet } from "./genie-spaces.service.ts";
 
 export const DATABRICKS_SCIM_USERS_PATH = "/api/2.0/preview/scim/v2/Users";
 
@@ -294,9 +294,7 @@ function walkOutcome({
  */
 function refusalFromPageRead(error: unknown): PeopleListing {
   return peopleRefused(
-    error instanceof GenieHttpError
-      ? refusalFromStatus(error.status)
-      : refusalFromThrown(error),
+    error instanceof GenieHttpError ? refusalFromStatus(error.status) : refusalFromThrown(error),
   );
 }
 

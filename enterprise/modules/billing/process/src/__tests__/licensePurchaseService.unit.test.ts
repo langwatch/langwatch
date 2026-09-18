@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { LicenseGenerator, LicensePurchaseDelivery, LicensePurchaseService } from "../services/license-purchase.service.ts";
+
+import {
+  LicenseGenerator,
+  LicensePurchaseDelivery,
+  LicensePurchaseService,
+} from "../services/license-purchase.service.ts";
 
 class TestLicenseGenerator extends LicenseGenerator {
   readonly generate = vi.fn().mockReturnValue({

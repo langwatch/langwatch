@@ -199,9 +199,7 @@ describe("the events one licence read produces", () => {
       // The identity is the pool and the day and nothing else. Were a count
       // part of it, a corrected count would mint a fresh key and be added
       // beside the count it was meant to replace.
-      expect(first[0]?.source_event_id).toBe(
-        `msgraph_seats:${sku().skuId}:${DAY}`,
-      );
+      expect(first[0]?.source_event_id).toBe(`msgraph_seats:${sku().skuId}:${DAY}`);
     });
 
     /** @scenario "Both reads of a re-read day describe the same pool under the same identity" */
@@ -294,9 +292,7 @@ describe("the events one licence read produces", () => {
   describe("when a live pool has some of its units suspended", () => {
     /** @scenario "Suspended units inside a live pool are not counted as bought" */
     it("leaves the suspended units out of the bought count", () => {
-      const { extra } = factsFor(
-        sku({ prepaidUnits: { enabled: 10, suspended: 5, warning: 0 } }),
-      );
+      const { extra } = factsFor(sku({ prepaidUnits: { enabled: 10, suspended: 5, warning: 0 } }));
 
       // Suspension is per unit, not only per pool: the frozen slice is not
       // being paid for this month.
@@ -321,18 +317,14 @@ describe("whether a run asks about licences at all", () => {
   describe("when a kept position already reported today", () => {
     /** @scenario "A day already reported is not asked about again" */
     it("does not ask again the same day", () => {
-      expect(
-        seatsReadIsDue({ nowMs: NOW_MS, reportedThroughDay: "2026-08-30" }),
-      ).toBe(false);
+      expect(seatsReadIsDue({ nowMs: NOW_MS, reportedThroughDay: "2026-08-30" })).toBe(false);
     });
   });
 
   describe("when the last report was before today", () => {
     /** @scenario "A day already reported is not asked about again" */
     it("asks again once the day has rolled", () => {
-      expect(
-        seatsReadIsDue({ nowMs: NOW_MS, reportedThroughDay: "2026-08-29" }),
-      ).toBe(true);
+      expect(seatsReadIsDue({ nowMs: NOW_MS, reportedThroughDay: "2026-08-29" })).toBe(true);
     });
 
     /** @scenario "A day already reported is not asked about again" */
@@ -340,9 +332,7 @@ describe("whether a run asks about licences at all", () => {
       // A run whose position was thrown away has reported nothing, so the
       // next run asks again — that re-read is what the stable identity above
       // makes safe.
-      expect(seatsReadIsDue({ nowMs: NOW_MS, reportedThroughDay: null })).toBe(
-        true,
-      );
+      expect(seatsReadIsDue({ nowMs: NOW_MS, reportedThroughDay: null })).toBe(true);
     });
   });
 
@@ -361,21 +351,17 @@ describe("whether a run asks about licences at all", () => {
           outcome: "reported",
         }).reportedThroughDay,
       ).toBe(day);
-      expect(
-        microsoftSeatEvents({ skus: [sku()], day })[0]?.event_timestamp,
-      ).toBe(`${day}T00:00:00.000Z`);
+      expect(microsoftSeatEvents({ skus: [sku()], day })[0]?.event_timestamp).toBe(
+        `${day}T00:00:00.000Z`,
+      );
     });
 
     /** @scenario "A day already reported is not asked about again" */
     it("reads the UTC day, not the day where the worker happens to run", () => {
       // Late evening in the Americas is already tomorrow in UTC. A local day
       // here would report one day and stamp watermarks in another.
-      expect(
-        seatsReportDay({ nowMs: Date.parse("2026-08-30T23:30:00Z") }),
-      ).toBe("2026-08-30");
-      expect(
-        seatsReportDay({ nowMs: Date.parse("2026-08-31T00:30:00Z") }),
-      ).toBe("2026-08-31");
+      expect(seatsReportDay({ nowMs: Date.parse("2026-08-30T23:30:00Z") })).toBe("2026-08-30");
+      expect(seatsReportDay({ nowMs: Date.parse("2026-08-31T00:30:00Z") })).toBe("2026-08-31");
     });
   });
 });

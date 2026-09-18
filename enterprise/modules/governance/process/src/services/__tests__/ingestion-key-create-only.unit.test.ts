@@ -4,12 +4,12 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 import type {
   IngestionKeyIssuer,
   IngestionKeyRepository,
   StoredIngestionKey,
 } from "../../app/governance.members.ts";
-import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -47,8 +47,7 @@ class KeyLedger {
 }
 
 class LedgerRepository implements IngestionKeyRepository {
-  constructor(private readonly ledger: KeyLedger) {
-  }
+  constructor(private readonly ledger: KeyLedger) {}
 
   findIngestKey(input: {
     organizationId: string;
@@ -78,8 +77,7 @@ class LedgerRepository implements IngestionKeyRepository {
 }
 
 class LedgerIssuer implements IngestionKeyIssuer {
-  constructor(private readonly ledger: KeyLedger) {
-  }
+  constructor(private readonly ledger: KeyLedger) {}
 
   create(input: {
     ingestSourceType: string;

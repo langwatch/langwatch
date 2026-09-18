@@ -3,6 +3,7 @@
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { fire, resetCache } from "../../rules/nurturing-activity-tracking-service.rules.ts";
 import {
   registerNoNurturingSink,

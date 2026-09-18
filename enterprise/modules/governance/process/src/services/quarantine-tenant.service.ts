@@ -6,6 +6,7 @@
  * governance project, which is `ProjectApi`'s concept, not this module's.
  */
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
+
 import type { QuarantineTenantResolver } from "../app/governance.members.ts";
 
 /** The one project operation this service needs, out of `ProjectApi`'s whole surface. */

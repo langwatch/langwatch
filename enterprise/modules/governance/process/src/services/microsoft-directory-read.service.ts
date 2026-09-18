@@ -20,7 +20,6 @@
  * maps them itself.
  */
 
-import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
 import {
   DIRECTORY_USERS_FIRST_PAGE,
   type DirectoryUser,
@@ -31,6 +30,7 @@ import type { DiscoveredPersonRecord, PeopleListing } from "../rules/people-list
 import { peopleListed, peopleRefused } from "../rules/people-listing.rules.ts";
 import type { ListingRefusal } from "../rules/provider-listing.rules.ts";
 import { refusalFromStatus, refusalFromThrown } from "../rules/provider-listing.rules.ts";
+import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prices = {
   GROWTH_SEAT_EUR_MONTHLY: "price_seat_eur_monthly",
@@ -17,7 +17,11 @@ const prices = {
 } as StripePriceMap;
 
 import type Stripe from "stripe";
-import { ANNUAL_EVENTS_BILLING_THRESHOLD, AnnualEventsBillingThresholdService } from "../services/annual-events-billing-threshold.service.ts";
+
+import {
+  ANNUAL_EVENTS_BILLING_THRESHOLD,
+  AnnualEventsBillingThresholdService,
+} from "../services/annual-events-billing-threshold.service.ts";
 
 const applyThreshold = ({
   stripe,

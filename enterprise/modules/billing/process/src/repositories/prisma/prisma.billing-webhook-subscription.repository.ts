@@ -1,9 +1,9 @@
+import { createLogger } from "@langwatch/observability";
 /**
  * Subscription writes from Stripe webhooks. P2025 (missing row) reports
  * "missing_subscription"; other failures are rethrown so Stripe retries.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createLogger } from "@langwatch/observability";
 
 import {
   BillingWebhookSubscription,
@@ -14,7 +14,7 @@ import {
 } from "../billing-webhook-subscription.repository.ts";
 import type {
   BillingSubscriptionRecord,
-  SubscriptionRepository,
+  BillingSubscription,
   BillingSubscriptionWithOrganization,
 } from "../subscription.repository.ts";
 
@@ -23,19 +23,19 @@ const logger = createLogger("langwatch:billing:webhook-subscription-adapter");
 /** The one organization column the port carries that the repository does not select. */
 export type BillingWebhookTrialLicenseDatabase = Pick<PrismaClient, "organization">;
 
-export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSubscription {
+export class PrismaBillingWebhookBillingSubscription extends BillingWebhookSubscription {
   private constructor(
-    private readonly subscriptions: SubscriptionRepository,
+    private readonly subscriptions: BillingSubscription,
     private readonly database: BillingWebhookTrialLicenseDatabase,
   ) {
     super();
   }
 
   static create(options: {
-    subscriptions: SubscriptionRepository;
+    subscriptions: BillingSubscription;
     database: BillingWebhookTrialLicenseDatabase;
-  }): PrismaBillingWebhookSubscriptionRepository {
-    return new PrismaBillingWebhookSubscriptionRepository(options.subscriptions, options.database);
+  }): PrismaBillingWebhookBillingSubscription {
+    return new PrismaBillingWebhookBillingSubscription(options.subscriptions, options.database);
   }
 
   findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {

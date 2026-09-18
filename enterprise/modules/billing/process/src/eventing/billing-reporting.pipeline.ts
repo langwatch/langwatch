@@ -1,14 +1,15 @@
 import {
+  BILLING_REPORTING_PIPELINE_NAME,
+  type ReportUsageForMonthCommandData,
+} from "@langwatch/enterprise-billing-contract";
+import {
   defineAggregate,
   defineEvents,
   definePipeline,
   type Event,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import {
-  BILLING_REPORTING_PIPELINE_NAME,
-  type ReportUsageForMonthCommandData,
-} from "@langwatch/enterprise-billing-contract";
+
 import {
   ReportUsageForMonthCommandHandler,
   type ReportUsageForMonthCommandDeps,

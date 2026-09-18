@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it } from "vitest";
+
 import { ModelProviderAiToolCatalogService } from "../ai-tool-provider-catalog.service.ts";
 
 describe("ModelProviderAiToolCatalogService", () => {

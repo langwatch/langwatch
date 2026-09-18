@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { Instant } from "@langwatch/time";
+
 import type {
   AnomalySpendReader,
   AnomalySpendSourceFilter,
@@ -67,7 +68,10 @@ export class MemoryAnomalySpendRepository
     for (const row of matching) {
       const key = `${row.sourceId}:${row.hourBucket.epochMilliseconds}:${row.traceId}`;
       const current = latestByKey.get(key);
-      if (!current || row.lastEventOccurredAt.epochMilliseconds > current.lastEventOccurredAt.epochMilliseconds) {
+      if (
+        !current ||
+        row.lastEventOccurredAt.epochMilliseconds > current.lastEventOccurredAt.epochMilliseconds
+      ) {
         latestByKey.set(key, row);
       }
     }

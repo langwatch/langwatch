@@ -7,6 +7,7 @@
  * rather than paging a member listing and taking whoever came back first.
  */
 import { describe, expect, it } from "vitest";
+
 import { OrganizationSupportContactRepository } from "../../repositories/organization-support-contact.repository.ts";
 import { OrganizationSupportContactService } from "../../services/organization-support-contact.service.ts";
 import type { CliAdminContactReader } from "../governance.members.ts";
@@ -25,9 +26,15 @@ class StubSupportContacts extends OrganizationSupportContactRepository {
     return [...this.admins];
   }
 
-  async findEmailsByUserIds({ userIds }: { userIds: string[] }): Promise<Map<string, string | null>> {
+  async findEmailsByUserIds({
+    userIds,
+  }: {
+    userIds: string[];
+  }): Promise<Map<string, string | null>> {
     return new Map(
-      userIds.filter((userId) => this.emails.has(userId)).map((userId) => [userId, this.emails.get(userId) ?? null]),
+      userIds
+        .filter((userId) => this.emails.has(userId))
+        .map((userId) => [userId, this.emails.get(userId) ?? null]),
     );
   }
 
@@ -57,10 +64,16 @@ describe("given an organization that configured its own support contact", () => 
   describe("when the CLI asks who to point a refused caller at", () => {
     it("answers the configured contact, which need not be an address", async () => {
       const contacts = cliContactsOver(
-        new StubSupportContacts(["user_1"], new Map([["user_1", "admin@example.com"]]), "https://acme.example/help"),
+        new StubSupportContacts(
+          ["user_1"],
+          new Map([["user_1", "admin@example.com"]]),
+          "https://acme.example/help",
+        ),
       );
 
-      await expect(contacts.findAdminEmail("organization")).resolves.toBe("https://acme.example/help");
+      await expect(contacts.findAdminEmail("organization")).resolves.toBe(
+        "https://acme.example/help",
+      );
     });
   });
 });

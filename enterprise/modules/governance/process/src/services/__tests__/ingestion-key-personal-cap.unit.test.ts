@@ -13,6 +13,8 @@ import {
   PERSONAL_INGEST_KEYS_PER_TOOL_CAP,
   PersonalSourceTypeNotAllowedError,
 } from "@langwatch/enterprise-governance-contract";
+import type { OrganizationService } from "@langwatch/organization-contract";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -21,9 +23,7 @@ import {
   type StoredIngestionKey,
   type StoredIngestionKeyOwnership,
 } from "../../app/governance.members.ts";
-import type { OrganizationService } from "@langwatch/organization-contract";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";
-import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-personal";
@@ -84,8 +84,7 @@ class KeyLedger {
 }
 
 class LedgerRepository implements IngestionKeyRepository {
-  constructor(private readonly ledger: KeyLedger) {
-  }
+  constructor(private readonly ledger: KeyLedger) {}
 
   findIngestKey(): Promise<StoredIngestionKey | null> {
     return Promise.resolve(null);
@@ -101,8 +100,7 @@ class LedgerRepository implements IngestionKeyRepository {
 }
 
 class LedgerIssuer implements IngestionKeyIssuer {
-  constructor(private readonly ledger: KeyLedger) {
-  }
+  constructor(private readonly ledger: KeyLedger) {}
 
   create(input: { ingestSourceType: string }): Promise<{ token: string; apiKey: { id: string } }> {
     const row = this.ledger.issue({ sourceType: input.ingestSourceType });

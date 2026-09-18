@@ -28,7 +28,12 @@ export type IngestionPullLifecycleDatabase = {
       where: {
         OR: ({ pullSchedule: { not: null } } | { id: { in: string[] } })[];
       };
-    }): Promise<IngestionPullLifecycleSource[]>;
+    }): Promise<
+      (Omit<IngestionPullLifecycleSource, "updatedAt" | "archivedAt"> & {
+        updatedAt: Date;
+        archivedAt: Date | null;
+      })[]
+    >;
   };
 };
 

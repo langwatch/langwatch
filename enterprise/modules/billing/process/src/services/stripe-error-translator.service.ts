@@ -1,5 +1,5 @@
-import Stripe from "stripe";
 import { BillingProviderUnavailableError } from "@langwatch/enterprise-billing-contract";
+import Stripe from "stripe";
 
 export abstract class StripeErrorTranslator {
   abstract translate(error: unknown): unknown;

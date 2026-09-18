@@ -13,6 +13,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { AddIngestionSourceMenu } from "../ui/elements/add-ingestion-source-menu.tsx";
 
 afterEach(cleanup);
@@ -83,9 +84,7 @@ describe("given the Add source menu", () => {
 
       // The retired directory-audit source is filtered out of the picker, so
       // the offer carries one Copilot entry, not two near-identical ones.
-      expect(
-        screen.queryByText("Microsoft Copilot Studio (Purview)"),
-      ).toBeNull();
+      expect(screen.queryByText("Microsoft Copilot Studio (Purview)")).toBeNull();
 
       // The two Enterprise Compliance types are defined but never offered:
       // neither has a finished data path, so picking one buys a source that

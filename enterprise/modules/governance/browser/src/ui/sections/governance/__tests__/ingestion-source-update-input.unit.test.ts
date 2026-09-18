@@ -24,6 +24,7 @@
  * ADR-088 v7, Decision 9.
  */
 import { describe, expect, it } from "vitest";
+
 import { recordingGovernanceToaster } from "../../../../testing.tsx";
 import { buildEditSubmission } from "../governance-inventory.screen.tsx";
 

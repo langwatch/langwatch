@@ -1,4 +1,3 @@
-import { createGovernanceTestConnection } from "../../app/__tests__/governance-database.fixture.ts";
 /**
  * @vitest-environment node
  * Login completion for an org whose admin accounts are gone (a dangling row 500'd it).
@@ -12,13 +11,14 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createGovernanceTestConnection } from "../../app/__tests__/governance-database.fixture.ts";
 import type {
   CliAdminContactReader,
   CliBudgetOverviewReader,
 } from "../../app/governance.members.ts";
+import { PrismaOrganizationSupportContactRepository } from "../../repositories/prisma/prisma.organization-support-contact.repository.ts";
 import { DefaultGovernanceCliBootstrapService } from "../governance-cli-tool-bootstrap.service.ts";
 import { OrganizationSupportContactService } from "../organization-support-contact.service.ts";
-import { PrismaOrganizationSupportContactRepository } from "../../repositories/prisma/prisma.organization-support-contact.repository.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;

@@ -12,6 +12,7 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ReactNode, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import type { SourceType } from "../../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import { ParserConfigFields } from "../governance-inventory.screen.tsx";

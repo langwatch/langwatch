@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import type {
   AppendStore,
   Event,
   MapProjectionDefinition,
   ProjectionStoreContext,
 } from "@langwatch/eventing";
-import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+
 import type {
   BillableEventsMeter,
   BillableEventRecord,
@@ -18,7 +19,7 @@ import type { BillingTenantOrganizationService } from "../services/tenant-organi
 /**
  * The experiment-run event types this meter counts, as literals.
  *
- * `EXPERIMENT_RUN_EVENT_TYPES` lives in `@langwatch/experiment-server`, and a
+ * `EXPERIMENT_RUN_EVENT_TYPES` lives in `@langwatch/experiment-process`, and a
  * feature package may not import another feature's server — so the three
  * strings are stated here and pinned by this package's own test against the
  * shape the App's twin subscribes to. They are wire values on events already

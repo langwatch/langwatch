@@ -1,5 +1,7 @@
 import { createHmac } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
+
 import {
   type AnomalyAlertHttpClient,
   type AnomalyAlertHttpResponse,
@@ -20,8 +22,7 @@ class RecordingHttp implements AnomalyAlertHttpClient {
       call: Call,
       index: number,
     ) => AnomalyAlertHttpResponse | Promise<AnomalyAlertHttpResponse>,
-  ) {
-  }
+  ) {}
 
   async post(input: Call & { signal: AbortSignal }) {
     const call = {

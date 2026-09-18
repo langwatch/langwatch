@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Button, Field, HStack, Input, Spacer, VStack } from "@chakra-ui/react";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { useState } from "react";
 
-import { Drawer } from "@langwatch/design-system/drawer";
-
-import {
-  useGovernanceToaster,
-  useShowErrorToast,
-} from "../../../behavior/governance-feedback.ts";
 import { api } from "../../../behavior/governance-api.ts";
+import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
 
 /**
  * Creating a department from the People page's header button.
@@ -83,7 +79,6 @@ export function CreateDepartmentDrawer({
                   }
                 }}
                 placeholder="e.g. Engineering, Marketing"
-                
               />
             </Field.Root>
           </VStack>

@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Button, HStack, Text } from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
 import { ArrowUpDown, ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
-
-import { Menu } from "@langwatch/design-system/menu";
 
 /**
  * The one shape a choice takes on a governance page: a pill that names the
@@ -84,12 +83,7 @@ export function SortChip({
   disabled?: boolean;
 }) {
   return (
-    <FilterChip
-      icon={<ArrowUpDown size={12} />}
-      label="Sort"
-      value={value}
-      disabled={disabled}
-    >
+    <FilterChip icon={<ArrowUpDown size={12} />} label="Sort" value={value} disabled={disabled}>
       {children}
     </FilterChip>
   );

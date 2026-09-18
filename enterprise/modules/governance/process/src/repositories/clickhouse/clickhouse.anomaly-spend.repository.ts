@@ -2,6 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { type Instant, toDate } from "@langwatch/time";
+
 import type {
   AnomalySpendReader,
   AnomalySpendSourceFilter,
@@ -39,7 +40,9 @@ export class ClickHouseAnomalySpendRepository
 {
   private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {}
 
-  static create(resolveClient: GovernanceClickHouseTenantResolver): ClickHouseAnomalySpendRepository {
+  static create(
+    resolveClient: GovernanceClickHouseTenantResolver,
+  ): ClickHouseAnomalySpendRepository {
     return new ClickHouseAnomalySpendRepository(resolveClient);
   }
 

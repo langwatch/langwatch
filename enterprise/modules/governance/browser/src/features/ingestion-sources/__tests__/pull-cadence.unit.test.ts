@@ -9,6 +9,7 @@
  * parse. So the load-bearing test is: every recommended schedule round-trips.
  */
 import { describe, expect, it } from "vitest";
+
 import { SOURCE_TYPE_OPTIONS } from "../model/ingestion-source-catalog.ts";
 import {
   composerCadenceError,
@@ -262,9 +263,7 @@ describe("given the pull-cadence cron mapping", () => {
       expect(shortPullCadence("0 * * * *")).toBe("Hourly");
       expect(shortPullCadence("30 * * * *")).toBe("Hourly at 30 minutes past");
       expect(shortPullCadence("0 9 * * *")).toBe("Daily at 09:00 UTC");
-      expect(shortPullCadence("0 9 * * 1")).toBe(
-        "Weekly on Monday at 09:00 UTC",
-      );
+      expect(shortPullCadence("0 9 * * 1")).toBe("Weekly on Monday at 09:00 UTC");
       expect(shortPullCadence("0 9 1 * *")).toBe("Custom schedule");
       expect(shortPullCadence(null)).toBeNull();
       expect(shortPullCadence("")).toBeNull();

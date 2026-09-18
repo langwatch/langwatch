@@ -1,14 +1,14 @@
+import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
+import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 /**
  * The per-run deadline has to be enforceable, not advisory. The scheduler abandons a run it
  * considers stale (INGESTION_PULL_STALE_RUN_MS) and starts a fresh one from the same cursor.
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
-import { IngestionPullDeadlineExceededError } from "../ingestion-pull-worker.service.ts";
-import { createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
 
-import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
+import { createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
+import { IngestionPullDeadlineExceededError } from "../ingestion-pull-worker.service.ts";
 
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();
@@ -22,7 +22,6 @@ beforeEach(() => {
   ocsfInsert.mockReset();
   ensureGovProject.mockReset();
   ensureGovProject.mockResolvedValue({ id: "gov-proj-1" });
-
 });
 
 afterEach(() => {

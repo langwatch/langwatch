@@ -2,9 +2,10 @@
  * One Customer.io sink for every lifecycle-signal suite in this package.
  */
 import { vi } from "vitest";
+
+import { setSink } from "../../../rules/nurturing-sink-registry-service.rules.ts";
 import { BillingErrorReporter } from "../../billing-error-reporter.service.ts";
 import { NurturingService } from "../../nurturing.service.ts";
-import { setSink } from "../../../rules/nurturing-sink-registry-service.rules.ts";
 
 export class RecordingErrorReporter extends BillingErrorReporter {
   readonly capture = vi.fn();

@@ -1,21 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Badge, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Menu } from "@langwatch/design-system/menu";
 import { MoreVertical } from "lucide-react";
 import numeral from "numeral";
 
-import { ListTable } from "@langwatch/design-system/list-table";
-import { Menu } from "@langwatch/design-system/menu";
-
+import type { GovernanceIngestionSourceView } from "../../../behavior/governance-api.ts";
 import { useGovernanceRouter } from "../../../behavior/governance-router.ts";
 import { Link } from "../../../ui/elements/governance-link.tsx";
 import { UserAvatar } from "../../../ui/elements/user-avatar.tsx";
 import { SOURCE_TYPE_LABEL } from "../../ingestion-sources/model/ingestion-source-catalog.ts";
-import type { GovernanceIngestionSourceView } from "../../../behavior/governance-api.ts";
 import { MATCH_EVIDENCE_KIND } from "../model/match-evidence-kind.ts";
 import { SPEND_WINDOW_LABEL } from "../model/people-filters.ts";
-import { describePerson, formatRelativeTime, formatUsd } from "./people-table.tsx";
 import type { PeopleRow, PersonMatchStatus } from "../model/people-rows.ts";
+import { describePerson, formatRelativeTime, formatUsd } from "./people-table.tsx";
 
 /**
  * One table for everyone: the people the gateway metered and the people the
@@ -41,8 +40,7 @@ const STATUS_PALETTE: Record<PersonMatchStatus, string> = {
 /** The proof column's words, keyed off the engine's own vocabulary. */
 const EVIDENCE_LABEL: Record<string, string> = {
   [MATCH_EVIDENCE_KIND.VERIFIED_EMAIL]: "confirmed address",
-  [MATCH_EVIDENCE_KIND.VERIFIED_EMAIL_AND_DIRECTORY_ID]:
-    "confirmed address and directory",
+  [MATCH_EVIDENCE_KIND.VERIFIED_EMAIL_AND_DIRECTORY_ID]: "confirmed address and directory",
   [MATCH_EVIDENCE_KIND.DIRECTORY_ID]: "directory identifier",
   [MATCH_EVIDENCE_KIND.HUMAN_CONFIRMED]: "confirmed by a person",
 };
@@ -63,8 +61,7 @@ const EVIDENCE_LABEL: Record<string, string> = {
  * source pulls is asked in the composer. The trim stays for the rest.
  */
 export function providerLabel(provider: string): string {
-  const label =
-    SOURCE_TYPE_LABEL[provider as keyof typeof SOURCE_TYPE_LABEL] ?? provider;
+  const label = SOURCE_TYPE_LABEL[provider as keyof typeof SOURCE_TYPE_LABEL] ?? provider;
   return label.replace(/\s*\([^)]*\)\s*$/, "");
 }
 
@@ -154,15 +151,12 @@ export function UnifiedPeopleTable({
 
 /** Where a person's own page lives, for the rows that have one. */
 function personHref(row: PeopleRow): string | null {
-  return row.actor
-    ? `/governance/users/${encodeURIComponent(row.actor)}`
-    : null;
+  return row.actor ? `/governance/users/${encodeURIComponent(row.actor)}` : null;
 }
 
 /** The two names a row is shown under: printed, and the avatar's initials. */
 function personNames(row: PeopleRow): { primary: string; avatarName: string } {
-  const described =
-    row.provider === null ? describePerson(row.displayName) : null;
+  const described = row.provider === null ? describePerson(row.displayName) : null;
   return {
     primary: described?.primary ?? row.displayName,
     avatarName: described?.avatarName ?? row.displayName,
@@ -181,11 +175,8 @@ function matchSummary({
   /** The name already on the row, so the phrase does not repeat it. */
   primary: string;
 }): string | null {
-  const memberName =
-    row.matchDetail && row.matchDetail !== primary ? row.matchDetail : null;
-  const evidence = row.evidenceKind
-    ? (EVIDENCE_LABEL[row.evidenceKind] ?? row.evidenceKind)
-    : null;
+  const memberName = row.matchDetail && row.matchDetail !== primary ? row.matchDetail : null;
+  const evidence = row.evidenceKind ? (EVIDENCE_LABEL[row.evidenceKind] ?? row.evidenceKind) : null;
   return [memberName, evidence].filter(Boolean).join(" · ") || null;
 }
 
@@ -225,25 +216,17 @@ function PersonRow({
       </Table.Cell>
 
       <Table.Cell textAlign="end" whiteSpace="nowrap">
-        {row.requests === null
-          ? notMeasured
-          : numeral(row.requests).format("0,0")}
+        {row.requests === null ? notMeasured : numeral(row.requests).format("0,0")}
       </Table.Cell>
 
       <Table.Cell color="fg.muted" whiteSpace="nowrap">
-        {row.lastActiveIso === null
-          ? notMeasured
-          : formatRelativeTime(row.lastActiveIso)}
+        {row.lastActiveIso === null ? notMeasured : formatRelativeTime(row.lastActiveIso)}
       </Table.Cell>
 
       <PersonStatusCell row={row} matchDetail={matchDetail} />
 
       {onAssignDepartment && (
-        <PersonActionsCell
-          row={row}
-          primary={primary}
-          onAssignDepartment={onAssignDepartment}
-        />
+        <PersonActionsCell row={row} primary={primary} onAssignDepartment={onAssignDepartment} />
       )}
     </Table.Row>
   );
@@ -292,18 +275,11 @@ function PersonNameCell({
                 {primary}
               </Link>
             ) : (
-              <Text
-                fontWeight="semibold"
-                truncate
-                minWidth="5rem"
-                title={primary}
-              >
+              <Text fontWeight="semibold" truncate minWidth="5rem" title={primary}>
                 {primary}
               </Text>
             )}
-            {row.isMachine && (
-              <ShrinkingBadge label="machine login" colorPalette="gray" />
-            )}
+            {row.isMachine && <ShrinkingBadge label="machine login" colorPalette="gray" />}
             {row.needsReview && (
               <ShrinkingBadge
                 label="needs review"
@@ -348,12 +324,7 @@ function PersonStatusCell({
           {STATUS_LABEL[row.status]}
         </Badge>
         {matchDetail && (
-          <Text
-            fontSize="xs"
-            color="fg.muted"
-            lineClamp={1}
-            title={matchDetail}
-          >
+          <Text fontSize="xs" color="fg.muted" lineClamp={1} title={matchDetail}>
             {matchDetail}
           </Text>
         )}
@@ -451,12 +422,7 @@ function PersonIdentityLine({
             colorPalette="gray"
           />
         ) : (
-          <Text
-            fontSize="xs"
-            color="fg.muted"
-            flexShrink={0}
-            whiteSpace="nowrap"
-          >
+          <Text fontSize="xs" color="fg.muted" flexShrink={0} whiteSpace="nowrap">
             {providerLabel(row.provider)}
           </Text>
         ))}
@@ -476,11 +442,7 @@ function PersonIdentityLine({
             />
           </Link>
         ) : (
-          <ShrinkingBadge
-            label={row.mostUsedTarget}
-            variant="surface"
-            shrink={4}
-          />
+          <ShrinkingBadge label={row.mostUsedTarget} variant="surface" shrink={4} />
         ))}
     </HStack>
   );

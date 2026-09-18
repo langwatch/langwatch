@@ -1,10 +1,11 @@
-import Stripe from "stripe";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   BillingPriceCatalogue,
   PlanTypes,
   STRIPE_PRICE_NAMES,
 } from "@langwatch/enterprise-billing-contract";
+import Stripe from "stripe";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 
 const prices = BillingPriceCatalogue.create("test").prices;

@@ -13,22 +13,23 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { DashboardSelect } from "./DashboardSelect.tsx";
+import { docsUrl } from "@langwatch/config/docs-url";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-surface.tsx";
-import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Link } from "../../ui/elements/governance-link.tsx";
+
+import { api, type RouterOutputs } from "../../behavior/governance-api.ts";
 import {
   useGovernanceToaster,
   useShowErrorToast,
   type GovernanceToaster,
 } from "../../behavior/governance-feedback.ts";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { useGovernanceScope } from "../../behavior/governance-session.ts";
-import { api, type RouterOutputs } from "../../behavior/governance-api.ts";
-import { docsUrl } from "@langwatch/config/docs-url";
+import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-surface.tsx";
+import { Link } from "../../ui/elements/governance-link.tsx";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
+import { DashboardSelect } from "./DashboardSelect.tsx";
 
 /**
  * The Anomaly rules pane of the inventory page, wired to api.anomalyRules.*

@@ -1,12 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { NUMERIC_OVERRIDE_FIELDS } from "../services/plan-provider.service.ts";
 import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
-import { PrismaSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository.ts";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-describe("PrismaSubscriptionRepository", () => {
+import { PrismaBillingSubscription } from "../repositories/prisma/prisma.subscription.repository.ts";
+import { NUMERIC_OVERRIDE_FIELDS } from "../services/plan-provider.service.ts";
+
+describe("PrismaBillingSubscription", () => {
   let prisma: { subscription: { update: ReturnType<typeof vi.fn> } };
-  let repo: PrismaSubscriptionRepository;
+  let repo: PrismaBillingSubscription;
 
   beforeEach(() => {
     prisma = {
@@ -14,7 +15,7 @@ describe("PrismaSubscriptionRepository", () => {
         update: vi.fn().mockResolvedValue({}),
       },
     };
-    repo = PrismaSubscriptionRepository.create(prisma as unknown as PrismaClient);
+    repo = PrismaBillingSubscription.create(prisma as unknown as PrismaClient);
   });
 
   describe("cancel()", () => {

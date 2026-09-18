@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+
 import type { OrganizationPricingRepository } from "../repositories/organization-pricing.repository.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 

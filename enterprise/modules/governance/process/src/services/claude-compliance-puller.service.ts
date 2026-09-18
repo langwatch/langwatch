@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
+
+import type {
+  GovernanceHttpClient,
+  IngestionPullDiagnosticsSink,
+} from "../app/governance.members.ts";
 /**
  * Anthropic (Claude) Compliance reference puller — built on top of
  * the HttpPollingPullerAdapter with the URL + auth shape locked to
@@ -23,8 +29,6 @@ import {
   type HttpPollingConfig,
   HttpPollingPullerAdapter,
 } from "../channels/http/http.polling.channel.ts";
-import type { GovernanceHttpClient,IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
-import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 /**
  * Locked reference config for Anthropic's compliance API. Admins

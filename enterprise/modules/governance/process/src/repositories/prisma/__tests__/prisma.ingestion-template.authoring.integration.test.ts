@@ -1,4 +1,8 @@
-import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
+import {
+  PlatformTemplateImmutableError,
+  TemplateNotFoundError,
+} from "@langwatch/enterprise-governance-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Ingestion template authoring: platform rows immutable, org rows mutable,
@@ -6,14 +10,10 @@ import { createGovernanceTestConnection } from "../../../app/__tests__/governanc
  */
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
-import { PrismaIngestionTemplateRepository } from "../prisma.ingestion-template.repository.ts";
-import { IngestionTemplateService } from "../../../services/ingestion-template.service.ts";
-import {
-  PlatformTemplateImmutableError,
-  TemplateNotFoundError,
-} from "@langwatch/enterprise-governance-contract";
 
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
+import { IngestionTemplateService } from "../../../services/ingestion-template.service.ts";
+import { PrismaIngestionTemplateRepository } from "../prisma.ingestion-template.repository.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the rows

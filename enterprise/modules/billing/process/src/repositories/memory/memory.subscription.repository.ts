@@ -2,10 +2,11 @@
 
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
+
 import {
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
-  SubscriptionRepository,
+  BillingSubscription,
 } from "../subscription.repository.ts";
 import type { MemoryBillingOrganization, MemoryBillingStore } from "./memory-billing.store.ts";
 
@@ -29,13 +30,13 @@ const TIERED_PLANS: readonly string[] = [
  * The subscription aggregate, held in the shared store. Ordering matches the
  * Prisma twin: newest created first, so a second pending row shadows the first.
  */
-export class MemorySubscriptionRepository extends SubscriptionRepository {
+export class MemoryBillingSubscription extends BillingSubscription {
   private constructor(private readonly store: MemoryBillingStore) {
     super();
   }
 
-  static create(store: MemoryBillingStore): MemorySubscriptionRepository {
-    return new MemorySubscriptionRepository(store);
+  static create(store: MemoryBillingStore): MemoryBillingSubscription {
+    return new MemoryBillingSubscription(store);
   }
 
   async findActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {
@@ -82,9 +83,7 @@ export class MemorySubscriptionRepository extends SubscriptionRepository {
     return this.update(input.id, (subscription) => ({ ...subscription, plan: input.plan }));
   }
 
-  async findByStripeId(
-    stripeSubscriptionId: string,
-  ): Promise<BillingSubscriptionRecord | null> {
+  async findByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
     return (
       this.store.subscriptions.find(
         (subscription) => subscription.stripeSubscriptionId === stripeSubscriptionId,

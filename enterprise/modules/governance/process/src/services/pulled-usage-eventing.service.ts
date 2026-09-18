@@ -20,6 +20,7 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+
 import {
   COST_ROLLUP_WATCH_PROCESS_NAME,
   CostRollupWatchProcess,
@@ -78,7 +79,11 @@ export class PulledUsageEventingAdapter {
     return { recordPulledUsage: RecordPulledUsageCommand } as const;
   }
 
-  build(): StaticPipelineDefinition<PulledUsageEvent, Record<string, Projection>, RegisteredCommand> {
+  build(): StaticPipelineDefinition<
+    PulledUsageEvent,
+    Record<string, Projection>,
+    RegisteredCommand
+  > {
     const pipeline = definePipeline<PulledUsageEvent>({
       name: PULLED_USAGE_PIPELINE_NAME,
       aggregate: defineAggregate({

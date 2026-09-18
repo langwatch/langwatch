@@ -5,8 +5,9 @@ import {
   type PulledUsageCostBasis,
   type PulledUsageCostStatus,
 } from "@langwatch/enterprise-governance-contract";
-import type { PulledUsageRateReader } from "../app/governance.members.ts";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
+
+import type { PulledUsageRateReader } from "../app/governance.members.ts";
 
 export type PulledUsageQuantities = {
   tokensInput: number;
@@ -91,9 +92,7 @@ export class PulledUsagePricingService {
         // figure — a decimal string of money — and only its denomination
         // differs. Absent stays absent: there is no rate here to fill it with.
         costNanoUsd:
-          input.costUsdBiller === undefined
-            ? null
-            : providerCostToNanoMinor(input.costUsdBiller),
+          input.costUsdBiller === undefined ? null : providerCostToNanoMinor(input.costUsdBiller),
         rateVersion: null,
         costBasis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
         costStatus: input.costStatus,

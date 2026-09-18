@@ -63,9 +63,7 @@ describe("given a registered tool", () => {
     it("drops the token row, which would repeat the usage figure", () => {
       // The plan fixes the money, so the token count moves nothing a reader
       // could act on. It is the same fact in a second typeface.
-      expect(applicableRowsForTool(assistant("codex"))).not.toContain(
-        "tokens30Days",
-      );
+      expect(applicableRowsForTool(assistant("codex"))).not.toContain("tokens30Days");
     });
 
     /** @scenario "A row that does not apply to a tool is left off its card" */

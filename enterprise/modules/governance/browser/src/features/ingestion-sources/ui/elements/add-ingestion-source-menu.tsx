@@ -7,6 +7,7 @@ import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Lock } from "lucide-react";
 // biome-ignore lint/style/useImportType: React is needed at runtime for JSX in non-jsdom test environments
 import React from "react";
+
 import {
   gatedSourceTypeOptions,
   groupForMode,

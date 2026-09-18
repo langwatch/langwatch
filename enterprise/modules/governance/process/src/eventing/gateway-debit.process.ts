@@ -1,9 +1,5 @@
 import type { JsonValue, ProcessManagerApplier } from "@langwatch/eventing";
-import {
-  GatewayDebitIntent,
-  type WriteGatewayDebitsPayload,
-  writeGatewayDebitsSchema,
-} from "./gateway-debit.intent.ts";
+
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -15,6 +11,11 @@ import {
   type GatewaySpendOutcomeData,
   type GatewaySpendProcessingEvent,
 } from "../app/governance.members.ts";
+import {
+  GatewayDebitIntent,
+  type WriteGatewayDebitsPayload,
+  writeGatewayDebitsSchema,
+} from "./gateway-debit.intent.ts";
 
 export const GATEWAY_DEBITS_PROCESS_NAME = "gatewayDebits" as const;
 

@@ -6,16 +6,17 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
  * half read through the gateway's own `check`. ADR-088.
  */
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import type { GatewayBudgetSpend } from "@langwatch/gateway-process";
 import {
   GatewayBudgetClickHouseRepository,
   PrismaGatewayAdapter,
   TestProjectApi,
-  type GatewayBudgetSpend,
   type GatewayService,
-} from "@langwatch/gateway-server/testing";
+} from "@langwatch/gateway-process/testing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
+import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -113,8 +114,8 @@ function pulledTotalsFor(scopeIds: string[]) {
   return budgets.readPulledUsageTotals({
     tenantId: GOV_PROJECT_ID,
     scopeIds,
-    from: WINDOW_FROM,
-    to: WINDOW_TO,
+    from: Temporal.Instant.from(WINDOW_FROM.toISOString()),
+    to: Temporal.Instant.from(WINDOW_TO.toISOString()),
   });
 }
 
@@ -137,7 +138,7 @@ async function writeGatewayDebit(costNanoUsd: number): Promise<void> {
       tokensCacheWrite: 0,
       model: "gpt-5-mini",
       status: "SUCCESS",
-      occurredAt: new Date(),
+      occurredAt: Temporal.Now.instant(),
     },
   ]);
 }

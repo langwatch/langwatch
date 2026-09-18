@@ -6,11 +6,12 @@ import {
   type PersonalUsageWindow,
   personalUsageQueryInputSchema,
 } from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
+
 import type {
   IngestionPrincipalSummaryRow,
   PersonalUsageReader,
 } from "../app/governance.members.ts";
-import { Temporal } from "@langwatch/time";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 

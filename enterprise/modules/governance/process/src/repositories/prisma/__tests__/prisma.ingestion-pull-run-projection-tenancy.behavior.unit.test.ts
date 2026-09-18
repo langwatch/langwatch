@@ -1,9 +1,10 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaIngestionPullRunProjectionRepository } from "../prisma.ingestion-pull-run-projection.repository.ts";
-import type { IngestionPullRunStatusData } from "../../../eventing/ingestion-pull-run-status-eventing.projection.ts";
 import type { StoredProjection } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
+
+import type { IngestionPullRunStatusData } from "../../../eventing/ingestion-pull-run-status-eventing.projection.ts";
+import { PrismaIngestionPullRunProjectionRepository } from "../prisma.ingestion-pull-run-projection.repository.ts";
 
 type GuardParams = {
   action: "findUnique" | "upsert";
@@ -43,17 +44,6 @@ function storedProjection(): StoredProjection<IngestionPullRunStatusData> {
       // the same time: the two kinds keep their own columns precisely so this
       // is representable, and a fixture that only ever carried one kind would
       // not notice a repository that dropped the other.
-      LastAgentsListingAt: 2_000,
-      LastAgentsListingOutcome: "listed",
-      LastAgentsListingCount: 12,
-      LastAgentsListingReason: null,
-      LastAgentsListingStatus: null,
-      LastPeopleListingAt: 2_000,
-      LastPeopleListingOutcome: "refused",
-      LastPeopleDirectoryCount: null,
-      LastPeopleWithheldCount: null,
-      LastPeopleListingReason: "listing_failed",
-      LastPeopleListingStatus: 403,
       CreatedAt: 1_000,
       UpdatedAt: 2_000,
       LastEventOccurredAt: 2_000,

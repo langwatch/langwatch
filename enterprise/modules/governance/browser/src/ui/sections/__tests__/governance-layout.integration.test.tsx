@@ -5,6 +5,7 @@
 
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
 import GovernanceLayout from "../governance-layout.tsx";
 

@@ -12,7 +12,7 @@
  * and a refusal never picks up a count it does not have.
  */
 
-import { agentsListingOutcome } from "@langwatch/enterprise-governance-server";
+import { agentsListingOutcome } from "@langwatch/enterprise-governance-process";
 import { describe, expect, it } from "vitest";
 
 const row = (outcome: string | null, reason: string | null) => ({
@@ -40,28 +40,22 @@ describe("given a source's last agents listing", () => {
       });
     });
 
-    it.each([
-      "not_found",
-      "not_configured",
-    ])("treats %s as a fix rather than a retry", (reason) => {
+    it.each(["not_found", "not_configured"])("treats %s as a fix rather than a retry", (reason) => {
       expect(agentsListingOutcome(row("refused", reason))).toEqual({
         outcome: "refused",
         cause: "access",
       });
     });
 
-    it.each([
-      "rate_limited",
-      "unavailable",
-      "unreachable",
-      "malformed_response",
-      "listing_failed",
-    ])("treats %s as worth asking again rather than a permission to audit", (reason) => {
-      expect(agentsListingOutcome(row("refused", reason))).toEqual({
-        outcome: "refused",
-        cause: "unreachable",
-      });
-    });
+    it.each(["rate_limited", "unavailable", "unreachable", "malformed_response", "listing_failed"])(
+      "treats %s as worth asking again rather than a permission to audit",
+      (reason) => {
+        expect(agentsListingOutcome(row("refused", reason))).toEqual({
+          outcome: "refused",
+          cause: "unreachable",
+        });
+      },
+    );
 
     /**
      * The bound that stopped the walk is ours, and every page the provider was
@@ -84,9 +78,7 @@ describe("given a source's last agents listing", () => {
      * send this reader round a loop.
      */
     it("treats a provider that stopped paginating as incomplete, not as one that went quiet", () => {
-      expect(
-        agentsListingOutcome(row("refused", "pagination_stalled")),
-      ).toEqual({
+      expect(agentsListingOutcome(row("refused", "pagination_stalled"))).toEqual({
         outcome: "refused",
         cause: "incomplete",
       });
@@ -119,9 +111,10 @@ describe("given a source's last agents listing", () => {
      * fault.
      */
     it("falls to asking again for a reason this build has never heard of", () => {
-      expect(
-        agentsListingOutcome(row("refused", "quota_exhausted_v2")),
-      ).toEqual({ outcome: "refused", cause: "unreachable" });
+      expect(agentsListingOutcome(row("refused", "quota_exhausted_v2"))).toEqual({
+        outcome: "refused",
+        cause: "unreachable",
+      });
     });
 
     /**
@@ -177,9 +170,10 @@ describe("given a source's last agents listing", () => {
      * complete was not, and the next person writes the same passing test.
      */
     it("still falls to asking again for an ordinary unknown word (control)", () => {
-      expect(
-        agentsListingOutcome(row("refused", "some_future_reason")),
-      ).toEqual({ outcome: "refused", cause: "unreachable" });
+      expect(agentsListingOutcome(row("refused", "some_future_reason"))).toEqual({
+        outcome: "refused",
+        cause: "unreachable",
+      });
     });
 
     it("carries no count, so nothing downstream can read one", () => {

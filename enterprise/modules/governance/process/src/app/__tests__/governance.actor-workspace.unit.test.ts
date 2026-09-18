@@ -4,19 +4,15 @@
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, PersonalWorkspace } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+
+import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import {
-  GovernanceApp,
-  type GovernanceActorUser,
-  type GovernancePersonalVirtualKeyMembers,
-  type GovernanceCliMembers,
-  type GovernanceIngestMembers,
-} from "../governance.app.ts";
-import { TestGovernanceService } from "./support/test-governance-service.ts";
+import { GovernanceApp, type GovernanceActorUser } from "../governance.app.ts";
 
 /** A dependency this operation never reaches; calling one is the test's bug. */
 const unreachable = <Method>(): Method =>
@@ -46,37 +42,29 @@ function buildApp(options: {
   workspace?: PersonalWorkspace | null;
 }) {
   const tryFindUser = vi.fn(async () => options.user ?? null);
-  const isOrganizationMember = vi.fn(async () => options.isMember ?? false);
+  const isOrganizationMember = vi.fn(async () =>
+    options.isMember ? { userId: "member-1" } : null,
+  );
   const tryFindPersonalWorkspace = vi.fn(async () => options.workspace ?? null);
 
+  // The two Prisma reads `createGovernanceMemberInfrastructure` wraps: `findFirst`
+  // is the only method either port calls, so the rest of each delegate is unreachable.
+  const prisma = {
+    user: { findFirst: tryFindUser },
+    organizationUser: { findFirst: isOrganizationMember },
+    virtualKey: { findFirst: unreachable<GovernanceMemberDatabase["virtualKey"]["findFirst"]>() },
+  } as unknown as GovernanceMemberDatabase;
+
   const app = GovernanceApp.create({
+    config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
       organizations: createApiFixture<OrganizationApi>({ tryFindPersonalWorkspace }),
       permissions: createApiFixture<AuthzApi>(),
     },
-    members: {
-      governance: new TestGovernanceService(),
-      personalVirtualKeys: {
-        isOrganizationMember,
-        hasActivePersonalKeyLabelled:
-          unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
-      },
-      actors: { findUser: tryFindUser },
-      cli: {
-        accessTokens: unreachable<GovernanceCliMembers["accessTokens"]>(),
-        members: unreachable<GovernanceCliMembers["members"]>(),
-        plans: unreachable<GovernanceCliMembers["plans"]>(),
-        persons: unreachable<GovernanceCliMembers["persons"]>(),
-        supportContacts: unreachable<GovernanceCliMembers["supportContacts"]>(),
-      },
-      ingest: {
-        projects: unreachable<GovernanceIngestMembers["projects"]>(),
-        principals: unreachable<GovernanceIngestMembers["principals"]>(),
-        traceCollection: unreachable<GovernanceIngestMembers["traceCollection"]>(),
-      },
-    },
+    members: { prisma },
+    resources: new ResourceScope(),
   });
 
   return { app, tryFindUser, isOrganizationMember, tryFindPersonalWorkspace };
@@ -103,7 +91,10 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
         projectId: "project-personal-1",
         projectSlug: "ariana-personal",
       });
-      expect(tryFindUser).toHaveBeenCalledWith({ token: "ariana@acme.com" });
+      expect(tryFindUser).toHaveBeenCalledWith({
+        where: { OR: [{ id: "ariana@acme.com" }, { email: "ariana@acme.com" }] },
+        select: { id: true, name: true, email: true },
+      });
     });
 
     it("falls back to the email, then the id, for a person with no name", async () => {

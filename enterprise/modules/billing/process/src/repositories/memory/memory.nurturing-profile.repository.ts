@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { NurturingProfileRepository, type NurturingProfile } from "../nurturing-profile.repository.ts";
+import {
+  NurturingProfileRepository,
+  type NurturingProfile,
+} from "../nurturing-profile.repository.ts";
 import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /** The lifecycle-signal reads, answered from the seats the store holds. */

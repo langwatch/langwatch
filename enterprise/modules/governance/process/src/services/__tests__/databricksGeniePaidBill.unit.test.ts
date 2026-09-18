@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
+import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 /**
  * @vitest-environment node
  *
@@ -18,16 +20,29 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
   DatabricksGeniePullerAdapter,
   databricksGeniePullConfigSchema,
   PAID_GENIE_BILL_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
-import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
 const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
+
+const testHttp: GovernanceHttpClient = {
+  async fetch(url, init) {
+    const response = await ssrfSafeFetch(url, init);
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: "",
+      json: () => response.json(),
+      text: () => response.text(),
+    };
+  },
+};
 
 const WORKSPACE_URL = "https://adb-1.azuredatabricks.net";
 const WAREHOUSE_ID = "095eb666b2ed2762";
@@ -44,8 +59,7 @@ const ONE_DAY_MS = 24 * HOUR_MS;
  */
 const DAY = new Date(Date.now() - 2 * ONE_DAY_MS).toISOString().slice(0, 10);
 /** Where a first read with no configured start begins: thirty days back, day-aligned. */
-const FIRST_RUN_FLOOR_MS =
-  Math.floor((Date.now() - 30 * ONE_DAY_MS) / ONE_DAY_MS) * ONE_DAY_MS;
+const FIRST_RUN_FLOOR_MS = Math.floor((Date.now() - 30 * ONE_DAY_MS) / ONE_DAY_MS) * ONE_DAY_MS;
 /** The same limit the warehouse read holds for. */
 const MAX_HOLD_MS = 7 * ONE_DAY_MS;
 
@@ -115,8 +129,7 @@ function rowsInWindow({
     name: string;
     value: string;
   }[];
-  const bound = (name: string) =>
-    Date.parse(parameters.find((p) => p.name === name)?.value ?? "");
+  const bound = (name: string) => Date.parse(parameters.find((p) => p.name === name)?.value ?? "");
   const fromMs = bound("from_date");
   const toMs = bound("to_date");
   if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return rows;
@@ -126,11 +139,7 @@ function rowsInWindow({
   });
 }
 
-function answer(
-  plan: StatementPlan,
-  columns: string[],
-  body: Record<string, unknown>,
-) {
+function answer(plan: StatementPlan, columns: string[], body: Record<string, unknown>) {
   if (plan.kind === "http") return reply({}, plan.status);
   if (plan.kind === "state") {
     return reply({
@@ -180,7 +189,7 @@ async function pull({
   warehouseId?: string;
   cursor?: string | null;
 }) {
-  return new DatabricksGeniePullerAdapter().runOnce(
+  return DatabricksGeniePullerAdapter.create(testHttp).runOnce(
     { cursor, credentials: { token: "dapi-fixture" } },
     {
       adapter: "databricks_genie",
@@ -195,14 +204,12 @@ async function pull({
   );
 }
 
-function billEvents(result: Awaited<ReturnType<typeof pull>>) {
+function billEvents(result: Awaited<ReturnType<typeof pull>>): NormalizedPullEvent[] {
   return result.events.filter((event) => event.action === "genie_bill");
 }
 
 function hintOf(event: { extra?: Record<string, unknown> }) {
-  return event.extra?.[PULLED_USAGE_HINT_KEY] as
-    | Record<string, unknown>
-    | undefined;
+  return event.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown> | undefined;
 }
 
 function cursorOf(result: { cursor: string | null }) {
@@ -221,9 +228,8 @@ function firstBillParameter(name: string): string {
   if (first === undefined) {
     throw new Error("no bill statement was posted");
   }
-  return (first.parameters as { name: string; value: string }[]).find(
-    (p) => p.name === name,
-  )!.value;
+  return (first.parameters as { name: string; value: string }[]).find((p) => p.name === name)!
+    .value;
 }
 
 const paidRow = (
@@ -490,9 +496,7 @@ describe("given a Genie source with the paid bill read switched on", () => {
         if (stop.reported) {
           expect(result.notices).toContain(PAID_GENIE_BILL_UNREADABLE);
         } else {
-          expect(result.notices ?? []).not.toContain(
-            PAID_GENIE_BILL_UNREADABLE,
-          );
+          expect(result.notices ?? []).not.toContain(PAID_GENIE_BILL_UNREADABLE);
         }
       });
     }
@@ -528,9 +532,7 @@ describe("given a Genie source with the paid bill read switched on", () => {
       // but not back at the start of history.
       expect(Date.parse(from)).toBeLessThanOrEqual(reachedMs);
       expect(Date.parse(from)).toBeGreaterThan(reachedMs - 4 * 24 * HOUR_MS);
-      expect(cursorOf(second).paidBillReadThroughMs).toBeGreaterThanOrEqual(
-        reachedMs,
-      );
+      expect(cursorOf(second).paidBillReadThroughMs).toBeGreaterThanOrEqual(reachedMs);
     });
   });
 
@@ -558,9 +560,7 @@ describe("given a Genie source with the paid bill read switched on", () => {
       expect(secondCursor.paidBillHeldSinceMs).toBe(heldSinceMs);
       // And the second run asked about the held period again, from at or
       // before the floor — never from a floor that crept forward.
-      expect(Date.parse(firstBillParameter("from_date"))).toBeLessThanOrEqual(
-        FIRST_RUN_FLOOR_MS,
-      );
+      expect(Date.parse(firstBillParameter("from_date"))).toBeLessThanOrEqual(FIRST_RUN_FLOOR_MS);
       expect(billEvents(second)).toHaveLength(0);
       expect(second.notices).toContain(PAID_GENIE_BILL_UNREADABLE);
     });
@@ -606,8 +606,7 @@ describe("given a Genie source with the paid bill read switched on", () => {
 
       // Moved on: the position is at the end of the window it asked about,
       // and the hold is released so the next one ages from its own start.
-      const endOfTodayMs =
-        Math.floor(Date.now() / ONE_DAY_MS) * ONE_DAY_MS + ONE_DAY_MS;
+      const endOfTodayMs = Math.floor(Date.now() / ONE_DAY_MS) * ONE_DAY_MS + ONE_DAY_MS;
       expect(next.paidBillReadThroughMs).toBe(endOfTodayMs);
       expect(next.paidBillHeldSinceMs).toBeNull();
       // Nothing recorded for the span it gave up on — no row, so no zero.

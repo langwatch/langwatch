@@ -14,6 +14,7 @@
  * integration tests can stay about rendering.
  */
 import { describe, expect, it } from "vitest";
+
 import { recordingGovernanceToaster } from "../../../../testing.tsx";
 import {
   buildCreateInput,
@@ -137,6 +138,7 @@ describe("given the create input for a pull-mode source", () => {
       const input = buildCreateInput({
         composer: genieComposer({}),
         organizationId: "org-1",
+        toaster: recordingGovernanceToaster(),
       });
       expect((input?.pullConfig as { readPaidGenieBill?: unknown }).readPaidGenieBill).toBe(false);
     });
@@ -155,6 +157,7 @@ describe("given the create input for a pull-mode source", () => {
           },
         }),
         organizationId: "org-1",
+        toaster: recordingGovernanceToaster(),
       });
       expect((input?.pullConfig as { readPaidGenieBill?: unknown }).readPaidGenieBill).toBe(true);
     });

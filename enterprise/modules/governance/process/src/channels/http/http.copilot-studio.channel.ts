@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
+
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { CopilotStudioPullerChannel } from "../copilot-studio.channel.ts";
 /**
  * Microsoft Copilot Studio reference puller — built on top of the
  * generic HttpPollingPullerAdapter with the URL + auth shape locked
@@ -16,9 +20,6 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  */
 import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http.polling.channel.ts";
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
-import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
-import type { CopilotStudioPullerChannel } from "../copilot-studio.channel.ts";
 
 /**
  * Locked reference config for Microsoft Copilot Studio. The URL +

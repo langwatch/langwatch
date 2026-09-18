@@ -15,12 +15,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  harness,
-  openTab,
-  renderScreen,
-  SAMPLE_CHOICE_KEY,
-} from "./inventoryScreenHarness";
+import { harness, openTab, renderScreen, SAMPLE_CHOICE_KEY } from "./inventoryScreenHarness";
 
 describe("given an admin on the Inventory page", () => {
   describe("when sample mode is explicitly enabled", () => {
@@ -42,9 +37,7 @@ describe("given an admin on the Inventory page", () => {
     it("says a consumption-billed tool has no seats rather than zero", () => {
       renderScreen();
       const card = screen.getByTestId("tool-card-sample-databricks-genie");
-      expect(
-        within(card).getByText("no seats, billed on consumption"),
-      ).toBeInTheDocument();
+      expect(within(card).getByText("no seats, billed on consumption")).toBeInTheDocument();
     });
 
     // Nine digits against a short label cannot be compared card to card.
@@ -64,9 +57,7 @@ describe("given an admin on the Inventory page", () => {
     it("still carries the exact token count as the row's accessible name", () => {
       renderScreen();
       const card = screen.getByTestId("tool-card-sample-custom-agents");
-      expect(
-        within(card).getByLabelText("Tokens · 30 days: 412,900,000"),
-      ).toBeInTheDocument();
+      expect(within(card).getByLabelText("Tokens · 30 days: 412,900,000")).toBeInTheDocument();
     });
 
     /** @scenario "A count below a million is left exact and grouped" */
@@ -97,9 +88,7 @@ describe("given an admin on the Inventory page", () => {
         error: new Error("read failed"),
       };
       renderScreen();
-      await userEvent.click(
-        screen.getByRole("button", { name: "See sample data" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "See sample data" }));
       await openTab(/Sources/);
       expect(screen.queryByRole("alert")).toBeNull();
     });

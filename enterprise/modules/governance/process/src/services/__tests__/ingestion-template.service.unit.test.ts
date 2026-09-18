@@ -8,6 +8,7 @@ import {
   type PlatformIngestionTemplateSyncResult,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   IngestionTemplateRepository,
   type IngestionTemplateMutationResult,

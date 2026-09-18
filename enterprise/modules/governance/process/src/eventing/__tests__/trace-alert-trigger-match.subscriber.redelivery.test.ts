@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type {
   TraceAlertMetricsSink,
   TraceAlertOriginGuard,
@@ -7,10 +8,7 @@ import type {
   TraceAlertTrigger,
 } from "../../app/governance.members.ts";
 import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
-import {
-  governanceTraceContext,
-  governanceTraceEvent,
-} from "./governance-subscriber.fixtures.ts";
+import { governanceTraceContext, governanceTraceEvent } from "./governance-subscriber.fixtures.ts";
 
 class FixedTriggers implements TraceAlertTriggerReader {
   activeForProject(): Promise<TraceAlertTrigger[]> {

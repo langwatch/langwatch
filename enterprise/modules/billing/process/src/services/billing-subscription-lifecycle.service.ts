@@ -1,11 +1,7 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * What a Stripe subscription's own lifecycle events do to our records: deletion, update, and
- * the payment-success sync that reconciles quantities, retention and the seat policy.
- */
-import { createLogger } from "@langwatch/observability";
-import { planQuantities, planQuantitiesOf } from "@langwatch/plans";
-import type Stripe from "stripe";
+import {
+  PLATFORM_DEFAULT_RETENTION_DAYS,
+  retentionCategories,
+} from "@langwatch/data-retention-contract";
 import {
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
@@ -13,14 +9,17 @@ import {
   SubscriptionRecordNotFoundError,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
-import {
-  PLATFORM_DEFAULT_RETENTION_DAYS,
-  retentionCategories,
-} from "@langwatch/data-retention-contract";
-import { BestEffortService } from "./best-effort.service.ts";
-import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
-import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * What a Stripe subscription's own lifecycle events do to our records: deletion, update, and
+ * the payment-success sync that reconciles quantities, retention and the seat policy.
+ */
+import { createLogger } from "@langwatch/observability";
+import { planQuantities, planQuantitiesOf } from "@langwatch/plans";
+import { nowInstant } from "@langwatch/time";
+import type Stripe from "stripe";
+
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
 import type {
@@ -28,7 +27,9 @@ import type {
   SubscriptionWithOrg,
 } from "../repositories/billing-webhook-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
-import { nowInstant } from "@langwatch/time";
+import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
+import { BestEffortService } from "./best-effort.service.ts";
+import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
 

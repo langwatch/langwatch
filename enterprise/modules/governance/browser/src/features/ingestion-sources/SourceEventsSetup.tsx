@@ -2,13 +2,10 @@
 import { Box, Code, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
 import { Inbox, Info } from "lucide-react";
+
 import { GovernanceEmptyState } from "../../ui/elements/governance-empty-state.tsx";
 import { Link } from "../../ui/elements/governance-link.tsx";
-
-import {
-  needsIngestSecret,
-  type SourceType,
-} from "./model/ingestion-source-catalog.ts";
+import { needsIngestSecret, type SourceType } from "./model/ingestion-source-catalog.ts";
 
 /**
  * The two things the Events section shows when it is not showing rows: the
@@ -53,11 +50,7 @@ export type SourceEventsSetupSource = {
  * union member — it just stops matching, at runtime, in the same silent way.
  * Annotated, a rename stops the build here instead.
  */
-const OTEL_PUSH_TYPES: SourceType[] = [
-  "otel_generic",
-  "claude_cowork",
-  "claude_code",
-];
+const OTEL_PUSH_TYPES: SourceType[] = ["otel_generic", "claude_cowork", "claude_code"];
 const WEBHOOK_PUSH_TYPES: SourceType[] = ["workato", "s3_custom"];
 
 /**
@@ -68,9 +61,7 @@ const WEBHOOK_PUSH_TYPES: SourceType[] = ["workato", "s3_custom"];
  * URL with a literal `<mode>` segment in it — a 404 shown to a reader the
  * surrounding copy tells to paste it.
  */
-function pushRouteFor(
-  source: SourceEventsSetupSource,
-): "otel" | "webhook" | null {
+function pushRouteFor(source: SourceEventsSetupSource): "otel" | "webhook" | null {
   // The fixture is structural by design (see above), so the union is reached
   // by cast. An unrecognised string simply matches neither list.
   const sourceType = source.sourceType as SourceType;
@@ -93,15 +84,11 @@ function pushRouteFor(
  * it. A caller that has no endpoint to show has to say something else; there
  * is no string that is honest here.
  */
-export function ingestEndpointFor(
-  source: SourceEventsSetupSource,
-): string | null {
+export function ingestEndpointFor(source: SourceEventsSetupSource): string | null {
   const route = pushRouteFor(source);
   if (!route) return null;
   const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://langwatch.invalid";
+    typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
   return `${baseUrl}/api/ingest/${route}/${source.id}`;
 }
 
@@ -128,11 +115,7 @@ export function ingestEndpointFor(
  * have been the component outright, except its body is one string plus one doc
  * link; this needs an endpoint, a sample body and two links.
  */
-export function EventsSetupPopover({
-  source,
-}: {
-  source: SourceEventsSetupSource;
-}) {
+export function EventsSetupPopover({ source }: { source: SourceEventsSetupSource }) {
   const route = pushRouteFor(source);
   const endpoint = ingestEndpointFor(source);
   const showsSecret = needsIngestSecret({
@@ -176,20 +159,18 @@ export function EventsSetupPopover({
               </Text>
             ) : (
               <Text fontSize="sm" color="fg.muted">
-                This source is pulled, not pushed to. LangWatch fetches from the
-                provider on the source&apos;s schedule, and events appear here
-                after the first successful pull.
+                This source is pulled, not pushed to. LangWatch fetches from the provider on the
+                source&apos;s schedule, and events appear here after the first successful pull.
               </Text>
             )}
             {/* Push-only: it is advice about where to send spans, and a source
                 that receives none has nowhere to send them. */}
             {route && (
               <Text fontSize="xs" color="fg.muted">
-                Spans land in the LangWatch trace store with this source&apos;s
-                origin tag, viewable in the trace viewer. If you are sending
-                agent traces from your own LangWatch SDK, use{" "}
-                <Code fontSize="xs">/api/otel/v1/traces</Code> with your project
-                API key - different auth, same trace store. See{" "}
+                Spans land in the LangWatch trace store with this source&apos;s origin tag, viewable
+                in the trace viewer. If you are sending agent traces from your own LangWatch SDK,
+                use <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key -
+                different auth, same trace store. See{" "}
                 <Link
                   href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
                   color="blue.600"
@@ -214,25 +195,14 @@ export function EventsSetupPopover({
                 Asking the catalog keeps that answer in one place. */}
             {showsSecret && (
               <Text fontSize="xs" color="fg.muted">
-                Rotating this source&apos;s secret shows the new bearer once,
-                with a copy-paste curl example. The previous secret stays valid
-                for 24h while you roll the new value through every upstream
-                client.
+                Rotating this source&apos;s secret shows the new bearer once, with a copy-paste curl
+                example. The previous secret stays valid for 24h while you roll the new value
+                through every upstream client.
               </Text>
             )}
             {route === "otel" && (
-              <Box
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="md"
-                padding={3}
-              >
-                <Text
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  color="fg.muted"
-                  mb={2}
-                >
+              <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
                   Minimum viable OTLP body shape (camelCase keys):
                 </Text>
                 <Code
@@ -259,9 +229,9 @@ export function EventsSetupPopover({
   }]
 }`}</Code>
                 <Text fontSize="xs" color="fg.muted" mt={2}>
-                  Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on
-                  success. If you get <Code fontSize="xs">events: 0</Code> with
-                  a hint, the body shape didn&apos;t parse. See the{" "}
+                  Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
+                  <Code fontSize="xs">events: 0</Code> with a hint, the body shape didn&apos;t
+                  parse. See the{" "}
                   <Link
                     href="https://docs.langwatch.ai/ai-gateway/governance/ingestion-sources/otel-generic"
                     color="blue.600"

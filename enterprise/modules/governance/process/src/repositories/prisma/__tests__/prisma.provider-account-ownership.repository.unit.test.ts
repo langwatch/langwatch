@@ -26,6 +26,7 @@
 
 import { ValidationError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
+
 // Not yet implemented: the provider-account arm of the
 // one-connection-per-account rule, plus the save-time account lookup it calls.
 import {
@@ -41,9 +42,7 @@ const FIRST_KEY = "sk-ant-admin-FIRSTKEY-0000000000";
 /** A second administrator key on the same organisation — a rotation overlap. */
 const SECOND_KEY = "sk-ant-admin-SECONDKEY-000000000";
 
-const existingReader = (
-  overrides: Partial<ProviderAccountReader> = {},
-): ProviderAccountReader => ({
+const existingReader = (overrides: Partial<ProviderAccountReader> = {}): ProviderAccountReader => ({
   id: "src_first",
   name: "Anthropic spend, first",
   providerAccountId: ACCOUNT,
@@ -176,9 +175,7 @@ describe("given a connection reading token usage from a provider account", () =>
         assertProviderAccountIsFree({
           sourceType: "anthropic_admin",
           parserConfig: configCarrying(SECOND_KEY, "cost"),
-          claimedBy: [
-            existingReader({ report: "usage", name: "Anthropic usage" }),
-          ],
+          claimedBy: [existingReader({ report: "usage", name: "Anthropic usage" })],
           lookUpProviderAccount,
         }),
       ).resolves.toMatchObject({ providerAccountId: ACCOUNT });
@@ -199,9 +196,7 @@ describe("given a connection reading a provider account that the admin has disab
         assertProviderAccountIsFree({
           sourceType: "anthropic_admin",
           parserConfig: configCarrying(SECOND_KEY, "cost"),
-          claimedBy: [
-            existingReader({ disabled: true, name: "Anthropic spend, first" }),
-          ],
+          claimedBy: [existingReader({ disabled: true, name: "Anthropic spend, first" })],
           lookUpProviderAccount,
         }),
       ).rejects.toThrow(/archive/i);
@@ -214,9 +209,7 @@ describe("given a connection reading a provider account that the admin has disab
         assertProviderAccountIsFree({
           sourceType: "anthropic_admin",
           parserConfig: configCarrying(SECOND_KEY, "cost"),
-          claimedBy: [
-            existingReader({ disabled: true, name: "Anthropic spend, first" }),
-          ],
+          claimedBy: [existingReader({ disabled: true, name: "Anthropic spend, first" })],
           lookUpProviderAccount,
         }),
       ).rejects.toThrow(/Anthropic spend, first/);

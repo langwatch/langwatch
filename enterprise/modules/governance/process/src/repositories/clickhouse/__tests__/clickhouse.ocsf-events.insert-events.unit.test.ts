@@ -14,6 +14,7 @@
  */
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
+
 import type { GovernanceOcsfEvent } from "../../../app/governance.members.ts";
 import {
   ClickHouseOcsfEventsRepository,
@@ -28,7 +29,13 @@ function makeRepository() {
   return { client, insert, repository };
 }
 
-function rowsFor({ count, tenantId = "gov-1" }: { count: number; tenantId?: string }): GovernanceOcsfEvent[] {
+function rowsFor({
+  count,
+  tenantId = "gov-1",
+}: {
+  count: number;
+  tenantId?: string;
+}): GovernanceOcsfEvent[] {
   return Array.from({ length: count }, (_, index) => ({
     tenantId,
     eventId: `evt-${index}`,
@@ -56,9 +63,7 @@ describe("ClickHouseOcsfEventsRepository.insertEvents", () => {
       await repository.insertEvents(rowsFor({ count: 1201 }));
 
       expect(insert).toHaveBeenCalledTimes(3);
-      expect(insert.mock.calls.map(([options]) => options.values.length)).toEqual([
-        500, 500, 201,
-      ]);
+      expect(insert.mock.calls.map(([options]) => options.values.length)).toEqual([500, 500, 201]);
     });
 
     it("keeps the rows in order across the chunks", async () => {

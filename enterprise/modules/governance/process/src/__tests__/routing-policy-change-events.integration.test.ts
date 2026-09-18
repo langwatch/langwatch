@@ -1,4 +1,4 @@
-import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/auth-cache.feature, Rule "A routing-policy or
@@ -6,8 +6,7 @@ import { createGovernanceTestConnection } from "../app/__tests__/governance-data
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-
+import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
 

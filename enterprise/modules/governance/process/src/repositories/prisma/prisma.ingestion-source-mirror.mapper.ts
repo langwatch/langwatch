@@ -60,9 +60,7 @@ export function buildIngestionSourceMirror({
   state: IngestionPullRunStatusData;
 }): IngestionSourceMirror {
   const deliveredEvents =
-    state.Enabled &&
-    state.LastRunOutcome === "completed" &&
-    state.LastRunEventCount > 0;
+    state.Enabled && state.LastRunOutcome === "completed" && state.LastRunEventCount > 0;
 
   return {
     pollerCursor: state.Cursor,
@@ -73,21 +71,16 @@ export function buildIngestionSourceMirror({
     // advance either way: it answers "when did data last arrive", which an
     // empty run does not move. Conflating the two is what made a dead puller
     // read as a quiet one (ADR-128).
-    lastSuccessAt:
-      state.LastSuccessAt === null ? undefined : new Date(state.LastSuccessAt),
+    lastSuccessAt: state.LastSuccessAt === null ? undefined : new Date(state.LastSuccessAt),
     lastEventAt:
-      deliveredEvents && state.LastRunAt !== null
-        ? new Date(state.LastRunAt)
-        : undefined,
+      deliveredEvents && state.LastRunAt !== null ? new Date(state.LastRunAt) : undefined,
     status: deliveredEvents ? "active" : undefined,
     // Mirrored for the same reason `lastSuccessAt` above is: every reader of
     // the health surface selects from this row, and two of them render a LIST
     // of sources, so reaching a per-run projection would be one query per row
     // on a screen built to show many at once.
     lastReadThroughAt:
-      state.LastReadThroughAt === null
-        ? undefined
-        : new Date(state.LastReadThroughAt),
+      state.LastReadThroughAt === null ? undefined : new Date(state.LastReadThroughAt),
     lastRunCompleteness: state.LastRunCompleteness ?? undefined,
   };
 }

@@ -31,5 +31,4 @@ export const MATCH_EVIDENCE_KIND = {
   HUMAN_CONFIRMED: "human_confirmed",
 } as const;
 
-export type MatchEvidenceKind =
-  (typeof MATCH_EVIDENCE_KIND)[keyof typeof MATCH_EVIDENCE_KIND];
+export type MatchEvidenceKind = (typeof MATCH_EVIDENCE_KIND)[keyof typeof MATCH_EVIDENCE_KIND];

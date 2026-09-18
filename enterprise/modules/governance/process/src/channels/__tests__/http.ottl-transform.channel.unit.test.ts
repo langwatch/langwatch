@@ -1,7 +1,9 @@
 import { createHash, createHmac } from "crypto";
+
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { OttlGatewayUnavailableError } from "../ottl-transform.channel.ts";
+
 import { HttpOttlTransformChannel } from "../http/http.ottl-transform.channel.ts";
+import { OttlGatewayUnavailableError } from "../ottl-transform.channel.ts";
 
 const BASE_URL = "https://gateway.internal.test";
 const SECRET = "shared-secret";
@@ -32,9 +34,7 @@ describe("HttpOttlTransformChannel", () => {
   describe("given a configured base URL and secret", () => {
     describe("when validate is called", () => {
       it("signs and posts the exact request shape the gateway expects", async () => {
-        request.mockResolvedValueOnce(
-          new Response(JSON.stringify({ ok: true }), { status: 200 }),
-        );
+        request.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
         const result = await channel().validate(["set(foo, 1)"]);
 

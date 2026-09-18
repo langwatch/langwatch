@@ -64,13 +64,17 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+
 import {
-  PersonalUsageDashboardService,
-  type PersonalUsageRollup,
-} from "../services/personal-usage-dashboard.service.ts";
+  createGovernanceMemberInfrastructure,
+  type GovernanceMemberDatabase,
+} from "../governance.server.ts";
+import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
+import { DepartmentService } from "../services/department.service.ts";
 import {
   GovernanceCliAccessService,
   type GovernanceCliAccessApi,
@@ -91,9 +95,6 @@ import {
   GovernanceIngestAccessService,
   type GovernanceIngestAccessApi,
 } from "../services/governance-ingest-access.service.ts";
-import { DepartmentService } from "../services/department.service.ts";
-import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
-import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import type { GovernanceIngestRateLimiter } from "../services/governance-ingest-rate-limit.service.ts";
 import {
   GovernanceIngestReceiverService,
@@ -104,11 +105,15 @@ import {
   type GovernanceIngestSpend,
   type GovernanceIngestTraceCollection,
 } from "../services/governance-ingest-receiver.service.ts";
+import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
-import type { GovernanceProjectDirectory } from "./governance.members.ts";
+import {
+  PersonalUsageDashboardService,
+  type PersonalUsageRollup,
+} from "../services/personal-usage-dashboard.service.ts";
 import type { GovernanceCliRestApi } from "../transport/governance-cli.rest.ts";
 import type { GovernanceIngestRestApi } from "../transport/governance-ingest.rest.ts";
-import type { PlanProvider } from "@langwatch/entitlement-contract";
+import type { GovernanceProjectDirectory } from "./governance.members.ts";
 
 /**
  * The two questions personal virtual keys ask of the process's database.
@@ -279,10 +284,16 @@ export type GovernanceBespokeMembers = Omit<
   "projects" | "organizations" | "permissions"
 >;
 
-/** How a process installs this application: three peers, and what is left. */
+/**
+ * How a process installs this application: three peers, its own Prisma read,
+ * and the still-unfinished governance/cli/ingest bag (see
+ * {@link GovernanceAppDependencies.governance}) — untouched by the
+ * personalVirtualKeys/actors conversion below.
+ */
 type GovernanceSetup = FeatureSetup<
   typeof GovernanceApp.dependencies,
-  GovernanceBespokeMembers,
+  Readonly<{ prisma: GovernanceMemberDatabase }> &
+    Pick<GovernanceBespokeMembers, "governance" | "cli" | "ingest">,
   undefined,
   GovernanceRepositories
 >;
@@ -291,13 +302,7 @@ export class GovernanceApp
   implements GovernanceRestApi, GovernanceCliRestApi, GovernanceIngestRestApi
 {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly reads = [
-    "governance",
-    "personalVirtualKeys",
-    "actors",
-    "cli",
-    "ingest",
-  ] as const;
+  static readonly reads = ["prisma"] as const;
   /**
    * The three peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
@@ -311,9 +316,14 @@ export class GovernanceApp
   };
 
   static create({ members, dependencies, repositories }: GovernanceSetup): GovernanceApp {
+    const { personalVirtualKeys, actors } = createGovernanceMemberInfrastructure(members.prisma);
     return new GovernanceApp(
       {
-        ...members,
+        personalVirtualKeys,
+        actors,
+        governance: members.governance,
+        cli: members.cli,
+        ingest: members.ingest,
         projects: dependencies.projects,
         organizations: dependencies.organizations,
         permissions: dependencies.permissions,

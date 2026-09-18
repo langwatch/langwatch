@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { describe, expect, it, vi } from "vitest";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { ProjectQuarantineTenantResolverService } from "../quarantine-tenant.service.ts";
 
 describe("ProjectQuarantineTenantResolverService", () => {

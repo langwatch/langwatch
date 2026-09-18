@@ -104,7 +104,10 @@ describe("given the memory-backed governance repositories", () => {
       });
 
       await expect(
-        repositories.spendSpikeAnomalies.hasOpenAlert({ ruleId: rule.id, since: fromDate(new Date(0)) }),
+        repositories.spendSpikeAnomalies.hasOpenAlert({
+          ruleId: rule.id,
+          since: fromDate(new Date(0)),
+        }),
       ).resolves.toBe(false);
 
       await repositories.spendSpikeAnomalies.createAlert({
@@ -122,7 +125,10 @@ describe("given the memory-backed governance repositories", () => {
       });
 
       await expect(
-        repositories.spendSpikeAnomalies.hasOpenAlert({ ruleId: rule.id, since: fromDate(new Date(0)) }),
+        repositories.spendSpikeAnomalies.hasOpenAlert({
+          ruleId: rule.id,
+          since: fromDate(new Date(0)),
+        }),
       ).resolves.toBe(true);
     });
   });

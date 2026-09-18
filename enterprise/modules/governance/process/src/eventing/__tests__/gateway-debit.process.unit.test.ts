@@ -17,11 +17,7 @@ import {
   type ProcessEventEnvelope,
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  GATEWAY_DEBITS_PROCESS_NAME,
-  GatewayDebitProcess,
-  type GatewayDebitsState,
-} from "../gateway-debit.process.ts";
+
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -31,6 +27,11 @@ import {
   type GatewayResolvedBudget,
   type GatewaySpendProcessingEvent,
 } from "../../app/governance.members.ts";
+import {
+  GATEWAY_DEBITS_PROCESS_NAME,
+  GatewayDebitProcess,
+  type GatewayDebitsState,
+} from "../gateway-debit.process.ts";
 
 class StubGatewayDebit implements GatewayBudgetLedger {
   resolve(): Promise<GatewayResolvedBudget[]> {

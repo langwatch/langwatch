@@ -22,9 +22,14 @@ vi.mock("@langwatch/observability", () => ({
   createWarnThrottle: () => ({ claim: () => 0, reset: () => {} }),
 }));
 
-import { BillingErrorReporter, UsageLimitEmailChannel, type UsageLimitEmailData } from "../index.ts";
-import { NotificationService } from "../services/billing-usage-notice.service.ts";
 import { Temporal } from "@langwatch/time";
+
+import {
+  BillingErrorReporter,
+  UsageLimitEmailChannel,
+  type UsageLimitEmailData,
+} from "../index.ts";
+import { NotificationService } from "../services/billing-usage-notice.service.ts";
 
 class FakeErrorReporter extends BillingErrorReporter {
   private constructor(readonly capture = vi.fn()) {

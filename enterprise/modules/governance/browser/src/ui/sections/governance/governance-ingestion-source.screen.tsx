@@ -13,20 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { confirmArchiveSource } from "../../../features/ingestion-sources/model/confirm-archive-source.ts";
-import {
-  runCompleteness,
-  SOURCE_HEALTH_REFRESH,
-  sourceBadge,
-} from "../../../features/ingestion-sources/model/source-health-display.ts";
-import { ArrowLeft, Copy, KeyRound, Pencil, RotateCw, Trash2 } from "lucide-react";
-import numeral from "numeral";
-import { type ReactNode, useCallback, useState } from "react";
-
-import { EnterpriseLockedSurface } from "../../../ui/elements/enterprise-locked-surface.tsx";
-import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
-import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
-import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -36,30 +23,43 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Link } from "../../../ui/elements/governance-link.tsx";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Pagination } from "@langwatch/design-system/pagination";
-import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
-import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
-import { readHandledError } from "../../../model/handled-error.ts";
-import { useGovernanceScope } from "../../../behavior/governance-session.ts";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+import { ArrowLeft, Copy, KeyRound, Pencil, RotateCw, Trash2 } from "lucide-react";
+import numeral from "numeral";
+import { type ReactNode, useCallback, useState } from "react";
+
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
+import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
 import { useGovernanceRouter } from "../../../behavior/governance-router.ts";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { useGovernanceScope } from "../../../behavior/governance-session.ts";
+import { confirmArchiveSource } from "../../../features/ingestion-sources/model/confirm-archive-source.ts";
 import {
   needsIngestSecret,
   type SourceType,
 } from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
+import {
+  runCompleteness,
+  SOURCE_HEALTH_REFRESH,
+  sourceBadge,
+} from "../../../features/ingestion-sources/model/source-health-display.ts";
 import {
   type SourceEventsPager,
   useSourceEventsPager,
 } from "../../../features/source-events/behavior/use-source-events-pager.ts";
 import { type PageRequest } from "../../../features/source-events/model/governance-events-pager.ts";
 import { SourceEventsTable } from "../../../features/source-events/ui/sections/source-events-table.tsx";
-import { useDestinationContext } from "./ingestion-source-forms.ts";
+import { readHandledError } from "../../../model/handled-error.ts";
+import { EnterpriseLockedSurface } from "../../../ui/elements/enterprise-locked-surface.tsx";
+import { Link } from "../../../ui/elements/governance-link.tsx";
+import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
+import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
+import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
-import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+import { useDestinationContext } from "./ingestion-source-forms.ts";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every

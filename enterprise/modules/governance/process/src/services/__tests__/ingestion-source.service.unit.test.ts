@@ -1,10 +1,17 @@
 import { Buffer } from "node:buffer";
-import { describe, expect, it, vi } from "vitest";
-import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
+
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceDiagnosticsSink,
+import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
+import { toDate } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
+import type {
+  GovernanceDiagnosticsSink,
   IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,GovernanceEncryptor } from "../../app/governance.members.ts";
+  IngestionSourceLifecycleChannel,
+  GovernanceEncryptor,
+} from "../../app/governance.members.ts";
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
@@ -17,8 +24,6 @@ import {
 } from "../ingestion-source-secret.service.ts";
 import { IngestionSourceService } from "../ingestion-source.service.ts";
 import { PullDestinationService } from "../pull-destination.service.ts";
-import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
-import { toDate } from "@langwatch/time";
 
 const NOW = Date.parse("2026-08-24T10:00:00.000Z");
 

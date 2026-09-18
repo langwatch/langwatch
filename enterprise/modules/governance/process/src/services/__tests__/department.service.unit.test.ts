@@ -5,6 +5,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { DepartmentRepository } from "../../repositories/department.repository.ts";
 import { DepartmentService } from "../department.service.ts";
 
@@ -42,6 +43,10 @@ class MemoryDepartmentRepository extends DepartmentRepository {
 
   async getAssignments(): Promise<DepartmentAssignments> {
     return { users: [], teams: [], projects: [] };
+  }
+
+  async departmentsOnDay(): Promise<Map<string, string>> {
+    return new Map();
   }
 
   async create(): Promise<Department> {

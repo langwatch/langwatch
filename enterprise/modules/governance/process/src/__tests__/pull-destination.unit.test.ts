@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { GovernanceValidationError } from "@langwatch/enterprise-governance-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   DATABRICKS_GENIE_ADAPTER_ID,
   PullDestinationService,

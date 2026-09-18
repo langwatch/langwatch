@@ -17,15 +17,16 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-dataverse.feature
  */
 
-import { describe, expect, it } from "vitest";
+import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { spanSchema } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   COPILOT_CONVERSATION_ACTION,
   COPILOT_ROUTING_PROFILE,
   COPILOT_TURN_SPAN_NAME,
 } from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
 import * as CopilotStudioTraceMapperService from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
-import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 const ORIGIN = {
   ingestionSourceId: "source-1",

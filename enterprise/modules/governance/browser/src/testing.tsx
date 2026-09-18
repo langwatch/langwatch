@@ -173,7 +173,6 @@ export class FakeGovernanceHost extends GovernanceHostApi {
     return this.options.currentUser ?? null;
   }
 
-
   hasPermission(permission: string): boolean {
     return permissionSatisfiedBy({ granted: this.granted, requested: permission });
   }

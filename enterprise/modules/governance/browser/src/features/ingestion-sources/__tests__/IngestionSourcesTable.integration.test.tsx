@@ -11,18 +11,15 @@
  *        "Row actions live in the overflow menu",
  *        "Archiving from the row asks the same question the detail page asks")
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
-import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { FakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
 import type { Source } from "../../../ui/sections/governance/ingestion-source-forms.ts";
-import {
-  IngestionSourcesTable,
-  sortSourcesForTable,
-} from "../IngestionSourcesTable";
+import { IngestionSourcesTable, sortSourcesForTable } from "../IngestionSourcesTable";
 
 function makeSource(overrides: Partial<Source> & { id: string }): Source {
   return {
@@ -42,7 +39,7 @@ const WORKATO = makeSource({
   name: "Workato prod",
   sourceType: "workato",
   status: "active",
-  lastEventAt: new Date(Date.now() - 2 * 60 * 1000),
+  lastEventAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
 });
 const OTEL = makeSource({
   id: "src-otel",
@@ -58,14 +55,6 @@ const ANTHROPIC = makeSource({
 
 const FLEET = [ANTHROPIC, WORKATO, OTEL];
 
-function Providers({ children }: { children: ReactNode }) {
-  return (
-    <ChakraProvider value={defaultSystem}>
-      <MemoryRouter>{children}</MemoryRouter>
-    </ChakraProvider>
-  );
-}
-
 function renderTable({
   sources = FLEET,
   canManage = true,
@@ -78,8 +67,8 @@ function renderTable({
     onRotate: vi.fn(),
     onArchive: vi.fn(),
   };
-  render(
-    <Providers>
+  renderWithGovernanceHost(
+    <MemoryRouter>
       <IngestionSourcesTable
         sources={sources}
         canManage={canManage}
@@ -87,7 +76,8 @@ function renderTable({
         archivingId={null}
         {...handlers}
       />
-    </Providers>,
+    </MemoryRouter>,
+    { host: FakeGovernanceHost.create() },
   );
   return handlers;
 }
@@ -119,23 +109,17 @@ describe("given the ingestion sources table", () => {
       renderTable();
 
       const rows = screen.getAllByRole("row").slice(1); // header row first
-      expect(
-        rows.map((row) => within(row).getAllByRole("cell")[0]?.textContent),
-      ).toEqual([
+      expect(rows.map((row) => within(row).getAllByRole("cell")[0]?.textContent)).toEqual([
         expect.stringContaining("Agents OpenTelemetry"),
         expect.stringContaining("Workato prod"),
         expect.stringContaining("Anthropic spend"),
       ]);
-      expect(
-        screen.getByRole("columnheader", { name: "Delivery" }),
-      ).toBeVisible();
+      expect(screen.getByRole("columnheader", { name: "Delivery" })).toBeVisible();
       expect(screen.getAllByText("Real-time")).toHaveLength(2);
       expect(screen.getAllByText("Scheduled")).toHaveLength(1);
       // The two group headings the page used to draw are gone.
       expect(screen.queryByText("Real-time streams")).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("Synced on a schedule"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Synced on a schedule")).not.toBeInTheDocument();
     });
 
     /** @scenario "The sources table shows delivery as a column" */
@@ -147,9 +131,7 @@ describe("given the ingestion sources table", () => {
       expect(within(row).getByText("Hourly")).toBeVisible();
       // Push sources carry no cadence.
       const pushRow = screen.getByTestId("source-row-src-workato");
-      expect(
-        within(pushRow).queryByText(/Hourly|Every/),
-      ).not.toBeInTheDocument();
+      expect(within(pushRow).queryByText(/Hourly|Every/)).not.toBeInTheDocument();
     });
   });
 
@@ -159,21 +141,15 @@ describe("given the ingestion sources table", () => {
       const user = userEvent.setup();
       const handlers = renderTable();
 
-      await user.click(
-        screen.getByRole("button", { name: "Actions for Workato prod" }),
-      );
-      expect(
-        await screen.findByRole("menuitem", { name: /Rotate secret/ }),
-      ).toBeVisible();
+      await user.click(screen.getByRole("button", { name: "Actions for Workato prod" }));
+      expect(await screen.findByRole("menuitem", { name: /Rotate secret/ })).toBeVisible();
       expect(screen.getByRole("menuitem", { name: /Edit/ })).toBeVisible();
       stubConfirm(true);
       await user.click(screen.getByRole("menuitem", { name: /Archive/ }));
       expect(handlers.onArchive).toHaveBeenCalledWith("src-workato");
       // No inline buttons anywhere in the row.
       expect(
-        within(screen.getByTestId("source-row-src-workato")).getAllByRole(
-          "button",
-        ),
+        within(screen.getByTestId("source-row-src-workato")).getAllByRole("button"),
       ).toHaveLength(1);
     });
 
@@ -182,15 +158,9 @@ describe("given the ingestion sources table", () => {
       const user = userEvent.setup();
       renderTable();
 
-      await user.click(
-        screen.getByRole("button", { name: "Actions for Anthropic spend" }),
-      );
-      expect(
-        await screen.findByRole("menuitem", { name: /Edit/ }),
-      ).toBeVisible();
-      expect(
-        screen.queryByRole("menuitem", { name: /Rotate secret/ }),
-      ).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Actions for Anthropic spend" }));
+      expect(await screen.findByRole("menuitem", { name: /Edit/ })).toBeVisible();
+      expect(screen.queryByRole("menuitem", { name: /Rotate secret/ })).not.toBeInTheDocument();
     });
   });
 
@@ -198,9 +168,7 @@ describe("given the ingestion sources table", () => {
     async function openArchive() {
       const user = userEvent.setup();
       const handlers = renderTable();
-      await user.click(
-        screen.getByRole("button", { name: "Actions for Workato prod" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Actions for Workato prod" }));
       const item = await screen.findByRole("menuitem", { name: /Archive/ });
       return { user, handlers, item };
     }
@@ -278,9 +246,7 @@ describe("given the ingestion sources table", () => {
     it("renders no row actions at all", () => {
       renderTable({ canManage: false });
 
-      expect(
-        screen.queryByRole("button", { name: /Actions for/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
       expect(screen.getByText("Workato prod")).toBeVisible();
     });
   });

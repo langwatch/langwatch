@@ -1,12 +1,13 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import "@testing-library/jest-dom/vitest";
 /**
  * @vitest-environment jsdom
  * Team detail page: names missing breakdowns, no inert controls, reader's own link text.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import "@testing-library/jest-dom/vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const TEAM_ID = "team-1";
@@ -44,8 +45,8 @@ vi.mock("~/hooks/useActivePlan", () => ({
 vi.mock("~/components/governance/GovernanceLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
 }));
-vi.mock("~/utils/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/utils/api")>()),
+vi.mock("../../../../behavior/governance-api.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../behavior/governance-api.ts")>()),
   api: {
     activityMonitor: {
       spendByTeam: {
@@ -90,9 +91,7 @@ describe("given a team with spend in the window", () => {
   it("says the deeper breakdowns are not available yet", () => {
     renderPage();
 
-    expect(
-      screen.getByRole("heading", { name: TEAM_NAME }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: TEAM_NAME })).toBeInTheDocument();
     expect(
       screen.getByText(
         "Per-day spend, per-user breakdown and model mix for this team are not available yet.",
@@ -107,12 +106,11 @@ describe("given a team with spend in the window", () => {
   it("describes both links without jargon or an internal route", () => {
     renderPage();
 
-    expect(
-      screen.getByRole("link", { name: /workspace traces/ }),
-    ).toHaveAttribute("href", `/${PROJECT_SLUG}/traces`);
-    expect(
-      screen.getByText(/The trace explorer opens with this team's data/),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /workspace traces/ })).toHaveAttribute(
+      "href",
+      `/${PROJECT_SLUG}/traces`,
+    );
+    expect(screen.getByText(/The trace explorer opens with this team's data/)).toBeInTheDocument();
     expect(
       screen.getByText(/shows this team's spend next to every other team's/),
     ).toBeInTheDocument();

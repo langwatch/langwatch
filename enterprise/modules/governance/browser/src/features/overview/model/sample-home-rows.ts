@@ -36,14 +36,12 @@ export interface SampleInsight {
 export const SAMPLE_INSIGHTS: readonly SampleInsight[] = [
   {
     severity: "warning",
-    headline:
-      "Three registered agents have run without a named owner since May.",
+    headline: "Three registered agents have run without a named owner since May.",
     date: "Yesterday",
   },
   {
     severity: "look",
-    headline:
-      "Assistant spend rose 18% this month, nearly all of it in one department.",
+    headline: "Assistant spend rose 18% this month, nearly all of it in one department.",
     date: "Aug 2",
   },
   {

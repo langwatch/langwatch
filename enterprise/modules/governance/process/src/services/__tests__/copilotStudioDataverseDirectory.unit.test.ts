@@ -15,8 +15,8 @@
  * Spec: specs/governance/governance-people-discovery.feature
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RedirectRefusedError } from "@langwatch/egress";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface FetchCall {
   url: string;
@@ -42,9 +42,7 @@ let errors: string[] = [];
 let usersReplies: { status: number; body: unknown }[] = [];
 
 function captured(args: unknown[]): string {
-  return args
-    .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
-    .join(" ");
+  return args.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" ");
 }
 
 const graphUser = (over: Record<string, unknown> = {}) => ({
@@ -107,10 +105,10 @@ beforeEach(() => {
         });
       }
       if (url.includes("/bots")) {
-        return new Response(
-          JSON.stringify({ value: [{ botid: BOT_ID, name: "eng-agent" }] }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ value: [{ botid: BOT_ID, name: "eng-agent" }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
       }
       return new Response(JSON.stringify({ value: [transcriptRow()] }), {
         status: 200,
@@ -132,10 +130,11 @@ async function runPull({
   readDirectory?: boolean;
   cursor?: string | null;
 }) {
-  const { CopilotStudioDataversePuller } = await import(
-    "../copilot-studio-dataverse-puller.service.ts"
-  );
-  const adapter = new CopilotStudioDataversePuller();
+  const { HttpCopilotStudioDataverseChannel } =
+    await import("../../channels/http/http.copilot-studio-dataverse.channel.ts");
+  const adapter = HttpCopilotStudioDataverseChannel.create({
+    fetch: async (url, init) => globalThis.fetch(url, init),
+  });
   return adapter.runOnce(
     { cursor, credentials: CREDENTIALS },
     {
@@ -149,8 +148,7 @@ async function runPull({
   );
 }
 
-const usersCalls = () =>
-  capturedCalls.filter((call) => call.url.includes("/v1.0/users"));
+const usersCalls = () => capturedCalls.filter((call) => call.url.includes("/v1.0/users"));
 const directoryEvents = <T extends { action: string }>(events: T[]) =>
   events.filter((event) => event.action === "directory_report");
 const conversationEvents = <T extends { action: string }>(events: T[]) =>
@@ -213,8 +211,7 @@ describe("the directory read inside the Dataverse source", () => {
           status: 200,
           body: {
             value: [graphUser()],
-            "@odata.nextLink":
-              "https://graph.microsoft.com/v1.0/users?$skiptoken=page2",
+            "@odata.nextLink": "https://graph.microsoft.com/v1.0/users?$skiptoken=page2",
           },
         },
         { status: 200, body: { value: [graphUser({ id: SECOND_USER_ID })] } },
@@ -245,9 +242,7 @@ describe("the directory read inside the Dataverse source", () => {
       expect(directoryEvents(result.events)).toHaveLength(0);
       expect(conversationEvents(result.events)).toHaveLength(1);
       expect(storedDirectoryDay(result.cursor)).toBeNull();
-      expect(errors.some((line) => line.includes("not Microsoft Graph"))).toBe(
-        true,
-      );
+      expect(errors.some((line) => line.includes("not Microsoft Graph"))).toBe(true);
     });
   });
 
@@ -259,9 +254,7 @@ describe("the directory read inside the Dataverse source", () => {
       const result = await runPull({ readDirectory: true });
 
       expect(
-        warnings.some((line) =>
-          line.includes("has not consented to the directory read"),
-        ),
+        warnings.some((line) => line.includes("has not consented to the directory read")),
       ).toBe(true);
       expect(conversationEvents(result.events)).toHaveLength(1);
       expect(result.errorCount).toBe(0);

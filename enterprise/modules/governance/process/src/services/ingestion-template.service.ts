@@ -18,8 +18,9 @@ import {
   type UpdateIngestionTemplateOttlInput,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
-import type { IngestionTemplateRepository } from "../repositories/ingestion-template.repository.ts";
 import { type Instant, nowInstant } from "@langwatch/time";
+
+import type { IngestionTemplateRepository } from "../repositories/ingestion-template.repository.ts";
 
 export class IngestionTemplateService {
   private constructor(
@@ -51,10 +52,7 @@ export class IngestionTemplateService {
     return this.repository.listAdminVisible(input.organizationId);
   }
 
-  findByIdForOrg(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<IngestionTemplate | null> {
+  findByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate | null> {
     return this.repository.findVisible(input);
   }
 

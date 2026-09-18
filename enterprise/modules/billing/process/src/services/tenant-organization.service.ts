@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
+
 import type { TenantOrganizationRepository } from "../repositories/tenant-organization.repository.ts";
 
 const logger = createLogger("langwatch:billing:tenantOrganization");

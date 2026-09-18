@@ -1,6 +1,3 @@
-import { createLogger } from "@langwatch/observability";
-import { generate } from "@langwatch/ksuid";
-import type Stripe from "stripe";
 import {
   AmbiguousSubscriptionError,
   Currency,
@@ -16,7 +13,11 @@ import {
   SubscriptionNotLinkedError,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
-import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
+import type Stripe from "stripe";
+
 import {
   type InviteInput,
   type SeatEventDatabase,
@@ -25,7 +26,7 @@ import {
   resolveProrationDate,
   seatChangeParams,
 } from "../rules/seat-event-quote.rules.ts";
-import { nowInstant, Temporal, toDate } from "@langwatch/time";
+import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
 const logger = createLogger("langwatch:billing:seatEventSubscription");
 

@@ -27,11 +27,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import {
-  EmptyEventsState,
-  EventsSetupPopover,
-  ingestEndpointFor,
-} from "../SourceEventsSetup";
+import { EmptyEventsState, EventsSetupPopover, ingestEndpointFor } from "../SourceEventsSetup";
 
 function renderUi(ui: ReactNode) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
@@ -47,9 +43,7 @@ describe("given an ingestion source with no events", () => {
 
       expect(screen.getByTestId("source-events-empty")).toBeTruthy();
       expect(screen.getByText("No events from this source yet")).toBeTruthy();
-      expect(
-        screen.getByText(/Nothing has arrived on this source's endpoint/),
-      ).toBeTruthy();
+      expect(screen.getByText(/Nothing has arrived on this source's endpoint/)).toBeTruthy();
     });
 
     /** @scenario "An idle source explains itself in a pane, not in a wall of setup text" */
@@ -57,9 +51,7 @@ describe("given an ingestion source with no events", () => {
       renderUi(<EmptyEventsState />);
 
       expect(screen.queryByText(/Push an OTLP body to/)).toBeNull();
-      expect(
-        screen.queryByText(/Spans land in the LangWatch trace store/),
-      ).toBeNull();
+      expect(screen.queryByText(/Spans land in the LangWatch trace store/)).toBeNull();
       expect(screen.queryByText(/copy-paste curl example/)).toBeNull();
       expect(screen.queryByText(/Minimum viable OTLP body shape/)).toBeNull();
     });
@@ -73,9 +65,7 @@ describe("given an ingestion source with no events", () => {
       renderUi(<EmptyEventsState />);
 
       expect(
-        within(screen.getByTestId("source-events-empty")).queryAllByRole(
-          "button",
-        ),
+        within(screen.getByTestId("source-events-empty")).queryAllByRole("button"),
       ).toHaveLength(0);
     });
 
@@ -120,9 +110,7 @@ describe("given the setup instructions behind the heading's (i)", () => {
       const endpoint = ingestEndpointFor(OTEL_SOURCE);
       if (endpoint === null) throw new Error("an OTLP source has an endpoint");
       expect(screen.getByText(endpoint)).toBeVisible();
-      expect(
-        screen.getByText(/Spans land in the LangWatch trace store/),
-      ).toBeVisible();
+      expect(screen.getByText(/Spans land in the LangWatch trace store/)).toBeVisible();
       expect(screen.getByText(/copy-paste curl example/)).toBeVisible();
     });
 
@@ -140,9 +128,7 @@ describe("given the setup instructions behind the heading's (i)", () => {
       const link = await screen.findByRole("link", {
         name: /Choosing the right OTel endpoint/,
       });
-      expect(link.getAttribute("href")).toContain(
-        "trace-vs-activity-ingestion",
-      );
+      expect(link.getAttribute("href")).toContain("trace-vs-activity-ingestion");
       // Anchors with an href are focusable; a tabindex of -1 would take it back
       // out of the tab order, which is the failure this guards.
       expect(link.getAttribute("tabindex")).not.toBe("-1");
@@ -164,9 +150,7 @@ describe("given the setup instructions behind the heading's (i)", () => {
     /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
     it("leaves out the OTLP body sample", async () => {
       const user = userEvent.setup();
-      renderUi(
-        <EventsSetupPopover source={{ id: "src_2", sourceType: "workato" }} />,
-      );
+      renderUi(<EventsSetupPopover source={{ id: "src_2", sourceType: "workato" }} />);
 
       await user.click(screen.getByTestId("events-setup-info"));
 
@@ -177,9 +161,7 @@ describe("given the setup instructions behind the heading's (i)", () => {
       // absence above is a real branch rather than a typo that could never
       // have matched anything.
       renderUi(<EventsSetupPopover source={OTEL_SOURCE} />);
-      expect(
-        screen.queryByText(/Minimum viable OTLP body shape/),
-      ).not.toBeNull();
+      expect(screen.queryByText(/Minimum viable OTLP body shape/)).not.toBeNull();
     });
   });
 });
@@ -188,12 +170,10 @@ describe("given a source's ingest endpoint", () => {
   describe("when the source type decides the mode", () => {
     /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
     it("routes OTel sources to the otel path and webhooks to the webhook path", () => {
-      expect(ingestEndpointFor(OTEL_SOURCE)).toContain(
-        "/api/ingest/otel/src_1",
+      expect(ingestEndpointFor(OTEL_SOURCE)).toContain("/api/ingest/otel/src_1");
+      expect(ingestEndpointFor({ id: "src_2", sourceType: "workato" })).toContain(
+        "/api/ingest/webhook/src_2",
       );
-      expect(
-        ingestEndpointFor({ id: "src_2", sourceType: "workato" }),
-      ).toContain("/api/ingest/webhook/src_2");
     });
 
     /**
@@ -243,9 +223,9 @@ describe("given a source's ingest endpoint", () => {
      */
     /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
     it("keeps the callback endpoint an S3 source really does listen on", () => {
-      expect(
-        ingestEndpointFor({ id: "src_6", sourceType: "s3_custom" }),
-      ).toContain("/api/ingest/webhook/src_6");
+      expect(ingestEndpointFor({ id: "src_6", sourceType: "s3_custom" })).toContain(
+        "/api/ingest/webhook/src_6",
+      );
     });
   });
 });
@@ -256,9 +236,7 @@ describe("given a pull source's setup popover", () => {
     it("says the source is pulled instead of naming an endpoint to push to", async () => {
       const user = userEvent.setup();
       renderUi(
-        <EventsSetupPopover
-          source={{ id: "src_5", sourceType: "copilot_studio_dataverse" }}
-        />,
+        <EventsSetupPopover source={{ id: "src_5", sourceType: "copilot_studio_dataverse" }} />,
       );
 
       await user.click(screen.getByTestId("events-setup-info"));

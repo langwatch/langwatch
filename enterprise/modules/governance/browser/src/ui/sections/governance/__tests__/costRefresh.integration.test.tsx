@@ -4,13 +4,7 @@
  * Tests cost screen refresh and collection state updates.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -112,17 +106,13 @@ vi.mock("~/utils/api", () => {
             amountUsd: 123.45,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
-            currencyTotals: [
-              { currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 },
-            ],
+            currencyTotals: [{ currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 }],
           },
           gateway: {
             amountUsd: 67.89,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
-            currencyTotals: [
-              { currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 },
-            ],
+            currencyTotals: [{ currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 }],
           },
           seats: { status: "awaiting_data" },
           series: [{ day: "2026-01-15", billedUsd: 123.45, gatewayUsd: 67.89 }],
@@ -139,9 +129,7 @@ vi.mock("~/utils/api", () => {
         dailyByProvider: read("governanceCost.dailyByProvider", { rows: [] }),
         spendByModel: read("governanceCost.spendByModel", {
           unavailableReason: null,
-          rows: [
-            { model: "claude-opus-5", amountUsd: 310.5, cellsWithoutAmount: 0 },
-          ],
+          rows: [{ model: "claude-opus-5", amountUsd: 310.5, cellsWithoutAmount: 0 }],
           windowDays: 30,
         }),
         // `periodRecords` is deliberately NOT in `READS_ON_THE_SCREEN`; this
@@ -228,9 +216,7 @@ describe("bringing the cost screen up to date", () => {
       // collection warning that was not is a worse screen than one where both
       // are old together, and the warning rides the summary read — so the
       // absence of any single name here is a screen that half-refreshes.
-      expect([...new Set(harness.reissued)].toSorted()).toEqual(
-        READS_ON_THE_SCREEN,
-      );
+      expect([...new Set(harness.reissued)].toSorted()).toEqual(READS_ON_THE_SCREEN);
 
       // While the reads are in flight the control has to say so, or a reader
       // who sees nothing move clicks it again.
@@ -277,21 +263,15 @@ describe("bringing the cost screen up to date", () => {
       harness.failed = ["activityMonitor.spendByDepartment"];
       renderScreen();
 
-      const panel = screen
-        .getByText("Cost by department")
-        .closest('[data-testid="cost-panel"]');
+      const panel = screen.getByText("Cost by department").closest('[data-testid="cost-panel"]');
       expect(panel).not.toBeNull();
       const department = within(panel as HTMLElement);
 
-      expect(
-        department.getByText(/could not be brought up to date/i),
-      ).toBeInTheDocument();
+      expect(department.getByText(/could not be brought up to date/i)).toBeInTheDocument();
       // Every panel here renders an unanswered read and an absent figure the
       // same way, so a failed refresh would otherwise land as a blank beside
       // freshly filled neighbours and read as no spend.
-      expect(
-        department.queryByText("Nothing in this window yet."),
-      ).not.toBeInTheDocument();
+      expect(department.queryByText("Nothing in this window yet.")).not.toBeInTheDocument();
       expect(department.queryByText("Not available.")).not.toBeInTheDocument();
 
       // Its neighbours answered and keep their figures, so this cannot pass
@@ -307,9 +287,7 @@ describe("bringing the cost screen up to date", () => {
     it("issues no read that polls or re-runs on focus, and says so at each call site", () => {
       renderScreen();
 
-      const issued = [
-        ...new Set(harness.reads.map((call) => call.path)),
-      ].toSorted();
+      const issued = [...new Set(harness.reads.map((call) => call.path))].toSorted();
       expect(issued).toEqual(READS_ON_THE_SCREEN);
 
       for (const call of harness.reads) {

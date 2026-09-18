@@ -1,9 +1,3 @@
-import {
-  Prisma,
-  type AiToolEntry as PrismaAiToolEntry,
-  type AiToolEntryDepartment,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
 import type {
   AiToolEntry,
   AiToolMemberInput,
@@ -14,6 +8,13 @@ import type {
   SeedAiToolStarterPackInput,
   UpdateAiToolEntryInput,
 } from "@langwatch/enterprise-governance-contract";
+import {
+  Prisma,
+  type AiToolEntry as PrismaAiToolEntry,
+  type AiToolEntryDepartment,
+  type PrismaClient,
+} from "@langwatch/prisma-client/generated";
+
 import { AiToolCatalogRepository } from "../ai-tool-catalog.repository.ts";
 
 type EntryRow = PrismaAiToolEntry & {
@@ -324,9 +325,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
     );
   }
 
-  async listRoutingPolicyOptions(
-    organizationId: string,
-  ): Promise<{ id: string; name: string }[]> {
+  async listRoutingPolicyOptions(organizationId: string): Promise<{ id: string; name: string }[]> {
     return this.database.routingPolicy.findMany({
       where: {
         organizationId,

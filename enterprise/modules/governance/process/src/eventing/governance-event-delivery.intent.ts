@@ -1,5 +1,6 @@
 import type { IntentContext, NewOutboxMessage } from "@langwatch/eventing";
 import { z } from "zod";
+
 import {
   type GovernanceWebhookChannel,
   type GovernanceWebhookEnvelope,

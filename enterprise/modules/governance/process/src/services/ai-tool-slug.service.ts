@@ -2,6 +2,7 @@
 
 /** A catalogue entry's stable slug: no peer answers this, so it stays in-module. */
 import { generate as generateKsuid } from "@langwatch/ksuid";
+
 import type { AiToolSlug } from "../repositories/ai-tool-catalog.repository.ts";
 
 export class GovernanceAiToolSlugService implements AiToolSlug {

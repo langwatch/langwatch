@@ -2,6 +2,8 @@ import {
   GOVERNANCE_ATTR,
   isGovernanceOriginTrace,
 } from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
+
 import {
   type GovernanceOcsfEventWriter,
   type GovernanceSubscriberDiagnosticsSink,
@@ -9,7 +11,6 @@ import {
   type GovernanceTraceContext,
   type GovernanceTraceEvent,
 } from "../app/governance.members.ts";
-import { Temporal } from "@langwatch/time";
 
 export const GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS = 30_000;
 export const GOVERNANCE_OCSF_INVOKE_ACTIVITY_ID = 6;

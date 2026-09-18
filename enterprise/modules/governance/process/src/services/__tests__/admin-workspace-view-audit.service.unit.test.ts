@@ -1,12 +1,13 @@
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
+
+import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import type { AdminWorkspaceViewOcsfChannel } from "../../app/governance.members.ts";
 import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceTarget,
 } from "../../repositories/admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../admin-workspace-view-audit.service.ts";
-import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 
 class MemoryAuditRepository extends AdminWorkspaceViewAuditRepository {
   target: AdminWorkspaceTarget | null = {

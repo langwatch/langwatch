@@ -50,8 +50,7 @@ function replyOf({
     properties: {
       columns: columns.map((name) => ({
         name,
-        type:
-          name === "MeterCategory" || name === "Currency" ? "String" : "Number",
+        type: name === "MeterCategory" || name === "Currency" ? "String" : "Number",
       })),
       rows,
       nextLink,
@@ -67,9 +66,7 @@ describe("reading an Azure Cost Management daily reply", () => {
 
       expect(read.days).toHaveLength(44);
       expect(read.unreadableRows).toBe(0);
-      expect(new Set(read.days.map((d) => d.currencyCode))).toEqual(
-        new Set(["EUR"]),
-      );
+      expect(new Set(read.days.map((d) => d.currencyCode))).toEqual(new Set(["EUR"]));
     });
 
     /** @scenario "The daily bill is read as the currency the customer is billed in" */
@@ -91,9 +88,7 @@ describe("reading an Azure Cost Management daily reply", () => {
       const read = readAzureCostRows({ response: capturedReply });
 
       // The reply says 20260823, which is a Number column, not a date.
-      expect(read.days.every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.day))).toBe(
-        true,
-      );
+      expect(read.days.every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.day))).toBe(true);
       expect(new Set(read.days.map((d) => d.day))).toContain("2026-08-23");
       expect(new Set(read.days.map((d) => d.day))).toContain("2026-08-30");
     });
@@ -121,13 +116,7 @@ describe("reading an Azure Cost Management daily reply", () => {
       // meter category and the meter category as money.
       const read = readAzureCostRows({
         response: replyOf({
-          columns: [
-            "Currency",
-            "MeterCategory",
-            "UsageDate",
-            "CostUSD",
-            "Cost",
-          ],
+          columns: ["Currency", "MeterCategory", "UsageDate", "CostUSD", "Cost"],
           rows: [["EUR", "Load Balancer", 20260823, 0.6, 0.527171286737249]],
         }),
       });
@@ -184,16 +173,8 @@ describe("reading an Azure Cost Management daily reply", () => {
     it("reads a credit as the negative amount it is", () => {
       const read = readAzureCostRows({
         response: replyOf({
-          columns: [
-            "Cost",
-            "CostUSD",
-            "UsageDate",
-            "MeterCategory",
-            "Currency",
-          ],
-          rows: [
-            [-1.53352588022719, -1.74538248058057, 20260823, "Storage", "EUR"],
-          ],
+          columns: ["Cost", "CostUSD", "UsageDate", "MeterCategory", "Currency"],
+          rows: [[-1.53352588022719, -1.74538248058057, 20260823, "Storage", "EUR"]],
         }),
       });
 
@@ -218,32 +199,29 @@ describe("reading an Azure Cost Management daily reply", () => {
 
     /** @scenario "A cost reply spread over several pages is read whole" */
     it("reports no link when the reply is complete, as the captured one is", () => {
-      expect(readAzureCostRows({ response: capturedReply }).nextLink).toBe(
-        null,
-      );
+      expect(readAzureCostRows({ response: capturedReply }).nextLink).toBe(null);
     });
 
     /** @scenario "A cost reply spread over several pages is read whole" */
-    it.each([
-      "",
-      " ",
-      "\n\t",
-    ])("reports no link when the field is present but empty (%j), keeping the days it read", (nextLink) => {
-      const read = readAzureCostRows({
-        response: replyOf({
-          columns: ["Cost", "UsageDate", "MeterCategory"],
-          rows: [[1.25, 20260823, "Storage"]],
-          nextLink,
-        }),
-      });
+    it.each(["", " ", "\n\t"])(
+      "reports no link when the field is present but empty (%j), keeping the days it read",
+      (nextLink) => {
+        const read = readAzureCostRows({
+          response: replyOf({
+            columns: ["Cost", "UsageDate", "MeterCategory"],
+            rows: [[1.25, 20260823, "Storage"]],
+            nextLink,
+          }),
+        });
 
-      // An empty marker is "there is no next page". Reported as a link it
-      // would reach the caller's host check, name no host, be refused like a
-      // foreign one, and cost the window the day below.
-      expect(read.nextLink).toBe(null);
-      expect(read.days).toHaveLength(1);
-      expect(read.days[0]?.day).toBe("2026-08-23");
-    });
+        // An empty marker is "there is no next page". Reported as a link it
+        // would reach the caller's host check, name no host, be refused like a
+        // foreign one, and cost the window the day below.
+        expect(read.nextLink).toBe(null);
+        expect(read.days).toHaveLength(1);
+        expect(read.days[0]?.day).toBe("2026-08-23");
+      },
+    );
   });
 
   describe("when the reply is not the shape this reads at all", () => {
@@ -429,9 +407,7 @@ describe("reading an Azure Cost Management daily reply", () => {
 
     /** @scenario "The bill is not asked about on every run" */
     it("is not due a few minutes after it was last asked about", () => {
-      expect(
-        azureCostReadIsDue({ nowMs: NOW_MS, readAtMs: NOW_MS - 5 * 60_000 }),
-      ).toBe(false);
+      expect(azureCostReadIsDue({ nowMs: NOW_MS, readAtMs: NOW_MS - 5 * 60_000 })).toBe(false);
     });
 
     /** @scenario "The bill is not asked about on every run" */
@@ -441,9 +417,7 @@ describe("reading an Azure Cost Management daily reply", () => {
       // to pin moves whenever the constant does, and would stay green if the
       // interval were cut back to minutes — which is the failure this gate
       // exists to prevent.
-      expect(
-        azureCostReadIsDue({ nowMs: NOW_MS, readAtMs: NOW_MS - 60 * 60_000 }),
-      ).toBe(false);
+      expect(azureCostReadIsDue({ nowMs: NOW_MS, readAtMs: NOW_MS - 60 * 60_000 })).toBe(false);
     });
 
     /** @scenario "The bill is not asked about on every run" */
@@ -469,9 +443,7 @@ describe("reading an Azure Cost Management daily reply", () => {
       // A clock that moved backwards, or a position rewound by hand. Waiting
       // for real time to catch up would jam the source shut for as long as the
       // skew lasts, which nothing here can bound.
-      expect(
-        azureCostReadIsDue({ nowMs: NOW_MS, readAtMs: NOW_MS + ONE_DAY_MS }),
-      ).toBe(true);
+      expect(azureCostReadIsDue({ nowMs: NOW_MS, readAtMs: NOW_MS + ONE_DAY_MS })).toBe(true);
     });
 
     /** @scenario "A successful read records that the bill was asked about even when no figure changed" */
@@ -540,13 +512,7 @@ describe("given a subscription billing both AI services and unrelated infrastruc
     it("reports a category outside the list rather than failing to read it", () => {
       const read = readAzureCostRows({
         response: replyOf({
-          columns: [
-            "UsageDate",
-            "Cost",
-            "CostUSD",
-            "Currency",
-            "MeterCategory",
-          ],
+          columns: ["UsageDate", "Cost", "CostUSD", "Currency", "MeterCategory"],
           rows: [
             [20260115, 4.5, 4.5, "USD", "Foundry Models"],
             [20260115, 99.0, 99.0, "USD", "Load Balancer"],
@@ -569,13 +535,7 @@ describe("given a subscription whose bill is asked only for the AI categories", 
     it("fails the run saying no AI lines were found, rather than pricing the day", () => {
       const read = readAzureCostRows({
         response: replyOf({
-          columns: [
-            "UsageDate",
-            "Cost",
-            "CostUSD",
-            "Currency",
-            "MeterCategory",
-          ],
+          columns: ["UsageDate", "Cost", "CostUSD", "Currency", "MeterCategory"],
           rows: [],
         }),
       });
@@ -623,13 +583,7 @@ describe("given a subscription whose bill is asked only for the AI categories", 
       // a verdict that fails every read.
       const read = readAzureCostRows({
         response: replyOf({
-          columns: [
-            "UsageDate",
-            "Cost",
-            "CostUSD",
-            "Currency",
-            "MeterCategory",
-          ],
+          columns: ["UsageDate", "Cost", "CostUSD", "Currency", "MeterCategory"],
           rows: [[20260115, 4.5, 4.5, "USD", "Foundry Models"]],
         }),
       });

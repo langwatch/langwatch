@@ -8,6 +8,7 @@ import type {
 import { generate } from "@langwatch/ksuid";
 import type { Instant } from "@langwatch/time";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import { SpendSpikeAnomalyRepository } from "../spend-spike-anomaly.repository.ts";
 import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
@@ -40,8 +41,7 @@ export class MemorySpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
   async hasOpenAlert(input: { ruleId: string; since: Instant }): Promise<boolean> {
     const since = toDate(input.since).getTime();
     return this.store.alerts.some(
-      (alert) =>
-        alert.ruleId === input.ruleId && alert.open && alert.detectedAt.getTime() >= since,
+      (alert) => alert.ruleId === input.ruleId && alert.open && alert.detectedAt.getTime() >= since,
     );
   }
 
@@ -66,10 +66,7 @@ export class MemorySpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     return alert;
   }
 
-  async recordDispatch(input: {
-    alertId: string;
-    detail: Record<string, unknown>;
-  }): Promise<void> {
+  async recordDispatch(input: { alertId: string; detail: Record<string, unknown> }): Promise<void> {
     this.store.alerts.find((alert) => alert.id === input.alertId)?.dispatches.push(input.detail);
   }
 }

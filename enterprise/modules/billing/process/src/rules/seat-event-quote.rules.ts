@@ -1,11 +1,11 @@
+import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
+import { nowInstant } from "@langwatch/time";
 /**
  * The pure shape and arithmetic behind a seat-change quote: what a previewed invoice's two
  * money figures mean, the Stripe parameters a seat quantity change is made with, and how long
  * a quote stays confirmable. No Stripe call and no database read happens here.
  */
 import type Stripe from "stripe";
-import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
-import { nowInstant } from "@langwatch/time";
 
 export type InviteInput = {
   email: string;

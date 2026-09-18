@@ -14,15 +14,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findUnique, update, insertEvent, runOnce, isEnabled } = vi.hoisted(
-  () => ({
-    findUnique: vi.fn(),
-    update: vi.fn(),
-    insertEvent: vi.fn(),
-    runOnce: vi.fn(),
-    isEnabled: vi.fn(),
-  }),
-);
+const { findUnique, update, insertEvent, runOnce, isEnabled } = vi.hoisted(() => ({
+  findUnique: vi.fn(),
+  update: vi.fn(),
+  insertEvent: vi.fn(),
+  runOnce: vi.fn(),
+  isEnabled: vi.fn(),
+}));
 
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: (...a: unknown[]) => isEnabled(...a) },

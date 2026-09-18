@@ -16,6 +16,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it } from "vitest";
+
 import type { EnvironmentSource } from "../discoveredEnvironments";
 import { EnvironmentsTab } from "../EnvironmentsTab";
 
@@ -25,7 +26,7 @@ function source(overrides: Partial<EnvironmentSource>): EnvironmentSource {
     name: "A source",
     sourceType: "copilot_studio_dataverse",
     parserConfig: {},
-    createdAt: new Date("2026-06-01T00:00:00.000Z"),
+    createdAt: "2026-06-01T00:00:00.000Z",
     ...overrides,
   };
 }
@@ -77,9 +78,7 @@ describe("given sources that name environments", () => {
         }),
       ]);
       expect(screen.queryByTestId("environments-table")).toBeNull();
-      expect(
-        screen.getByText(/appear here once a source points at one/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/appear here once a source points at one/i)).toBeInTheDocument();
     });
   });
 });

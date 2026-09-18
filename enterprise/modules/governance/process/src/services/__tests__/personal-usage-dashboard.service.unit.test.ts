@@ -8,6 +8,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { InternalProject } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   PersonalUsageDashboardService,
   type PersonalUsageDashboardServiceOptions,

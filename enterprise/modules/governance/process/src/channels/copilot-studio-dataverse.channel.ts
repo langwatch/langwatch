@@ -3,6 +3,7 @@ import type {
   PullResult,
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
+
 import type { CopilotStudioDataverseConfig } from "./http/http.copilot-studio-dataverse.channel.ts";
 
 /** Vendor channel for Copilot Studio Dataverse transcript pulls. */

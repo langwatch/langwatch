@@ -12,14 +12,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findUnique, insertEvent, runOnce, isEnabled, recordFromPulledEvents } =
-  vi.hoisted(() => ({
-    findUnique: vi.fn(),
-    insertEvent: vi.fn(),
-    runOnce: vi.fn(),
-    isEnabled: vi.fn(),
-    recordFromPulledEvents: vi.fn(),
-  }));
+const { findUnique, insertEvent, runOnce, isEnabled, recordFromPulledEvents } = vi.hoisted(() => ({
+  findUnique: vi.fn(),
+  insertEvent: vi.fn(),
+  runOnce: vi.fn(),
+  isEnabled: vi.fn(),
+  recordFromPulledEvents: vi.fn(),
+}));
 
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: (...a: unknown[]) => isEnabled(...a) },
@@ -108,9 +107,7 @@ const pulledEvent = {
 beforeEach(() => {
   findUnique.mockReset().mockResolvedValue(SOURCE_ROW);
   insertEvent.mockReset().mockResolvedValue(undefined);
-  runOnce
-    .mockReset()
-    .mockResolvedValue({ events: [pulledEvent], cursor: null, errorCount: 0 });
+  runOnce.mockReset().mockResolvedValue({ events: [pulledEvent], cursor: null, errorCount: 0 });
   isEnabled.mockReset().mockResolvedValue(false);
   recordFromPulledEvents.mockReset().mockResolvedValue({ discovered: 1 });
 });
@@ -168,9 +165,9 @@ describe("the pull run's identity-match seam", () => {
 
   describe("when no matcher is composed", () => {
     it("the run completes as it always did — the port is optional", async () => {
-      await expect(
-        runIngestionPull({ sourceId: "src_1", cursor: null }),
-      ).resolves.toMatchObject({ eventCount: 1 });
+      await expect(runIngestionPull({ sourceId: "src_1", cursor: null })).resolves.toMatchObject({
+        eventCount: 1,
+      });
     });
   });
 });

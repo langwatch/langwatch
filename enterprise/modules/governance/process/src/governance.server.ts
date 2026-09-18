@@ -25,10 +25,7 @@ import {
   type PostgresGovernanceAdapterOptions,
   type PostgresGovernanceServices,
 } from "./app/governance-policy-composition.build.ts";
-import {
-  GovernanceApp,
-  type GovernanceBespokeMembers,
-} from "./app/governance.app.ts";
+import { GovernanceApp, type GovernanceBespokeMembers } from "./app/governance.app.ts";
 import type {
   GovernanceDiagnosticsSink,
   GovernanceEncryptor,
@@ -312,7 +309,10 @@ export function createGovernanceServices(
   return PostgresGovernanceAdapter.create(options).build();
 }
 
-type GovernanceMemberDatabase = Pick<PrismaClient, "organizationUser" | "user" | "virtualKey">;
+export type GovernanceMemberDatabase = Pick<
+  PrismaClient,
+  "organizationUser" | "user" | "virtualKey"
+>;
 
 /** Live process adapters for the two bespoke reads used by the mounted REST surface. */
 export function createGovernanceMemberInfrastructure(

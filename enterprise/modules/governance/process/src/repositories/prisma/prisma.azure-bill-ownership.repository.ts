@@ -138,25 +138,17 @@ export function assertAzureBillHasItsOwnCredential(params: {
     "Reading this subscription's bill needs its own app registration — a billing client ID and secret holding the Cost Management Reader role. The conversation credential is never used for the bill, so without the billing pair the spend would stay unreadable. Add both billing fields, or leave the subscription empty.";
 
   const credentials = parserConfig?.credentials;
-  if (
-    typeof credentials !== "object" ||
-    credentials === null ||
-    Array.isArray(credentials)
-  ) {
+  if (typeof credentials !== "object" || credentials === null || Array.isArray(credentials)) {
     // Nothing readable to judge. The one save that may pass is an edit
     // carrying the sealed envelope across for a claim that was already
     // judged when it was made; a create, or an edit that ADDS the claim,
     // has never had its pair checked by anyone.
-    if (
-      storedParserConfig !== undefined &&
-      readClaimedSubscription(storedParserConfig) !== null
-    ) {
+    if (storedParserConfig !== undefined && readClaimedSubscription(storedParserConfig) !== null) {
       return;
     }
     const editComplaint =
       "This change claims an Azure subscription, but the credentials on file were never checked for the bill's own app registration. Re-enter the credentials — including the billing client ID and secret — to claim the bill.";
-    const message =
-      storedParserConfig === undefined ? complaint : editComplaint;
+    const message = storedParserConfig === undefined ? complaint : editComplaint;
     throw new ValidationError(message, {
       meta: { formErrors: [message] },
     });
@@ -166,10 +158,7 @@ export function assertAzureBillHasItsOwnCredential(params: {
     const value = (credentials as Record<string, unknown>)[key];
     return typeof value === "string" ? value.trim() : "";
   };
-  if (
-    readBillingKey("billingClientId") &&
-    readBillingKey("billingClientSecret")
-  ) {
+  if (readBillingKey("billingClientId") && readBillingKey("billingClientSecret")) {
     return;
   }
 
@@ -210,9 +199,7 @@ export function assertAzureBillNotAlreadyClaimed(params: {
 
   const wanted = claimed.toLowerCase();
   const owner = claimedBy.find(
-    (reader) =>
-      reader.id !== sourceId &&
-      reader.subscriptionId.trim().toLowerCase() === wanted,
+    (reader) => reader.id !== sourceId && reader.subscriptionId.trim().toLowerCase() === wanted,
   );
   if (!owner) return;
 

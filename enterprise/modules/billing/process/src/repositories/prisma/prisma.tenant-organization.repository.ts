@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { TenantOrganizationRepository } from "../tenant-organization.repository.ts";
 
 /**

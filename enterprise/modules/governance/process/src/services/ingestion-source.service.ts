@@ -12,18 +12,21 @@ import {
   type UpdateGovernanceIngestionSourceCommand,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
-import type { GovernanceDiagnosticsSink,
+import { Temporal } from "@langwatch/time";
+
+import type {
+  GovernanceDiagnosticsSink,
   IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel } from "../app/governance.members.ts";
+  IngestionSourceLifecycleChannel,
+} from "../app/governance.members.ts";
 import type {
   IngestionSourceRepository,
   UpdateIngestionSourceRecord,
 } from "../repositories/ingestion-source.repository.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 import type { IngestionSecretService } from "./ingestion-source-secret.service.ts";
-import type { PullDestinationService } from "./pull-destination.service.ts";
 import { IngestionSourceValidationService } from "./ingestion-source-validation.service.ts";
-import { Temporal } from "@langwatch/time";
+import type { PullDestinationService } from "./pull-destination.service.ts";
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 

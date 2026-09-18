@@ -8,7 +8,8 @@ import {
   cliUserInputSchema,
   revokeCliSessionInputSchema,
 } from "@langwatch/enterprise-governance-contract";
-import type { CliTokenStore,GovernanceDiagnosticsSink } from "../app/governance.members.ts";
+
+import type { CliTokenStore, GovernanceDiagnosticsSink } from "../app/governance.members.ts";
 
 export class DefaultGovernanceCliSessionInventoryService {
   private constructor(

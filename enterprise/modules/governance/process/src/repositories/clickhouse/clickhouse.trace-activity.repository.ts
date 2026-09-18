@@ -22,6 +22,7 @@ import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
 } from "@langwatch/enterprise-governance-contract";
+
 import type {
   GovernanceSetupActivityReader,
   QuarantineTraceActivityReader,
@@ -33,7 +34,9 @@ export class ClickHouseTraceActivityRepository
 {
   private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {}
 
-  static create(resolveClient: GovernanceClickHouseTenantResolver): ClickHouseTraceActivityRepository {
+  static create(
+    resolveClient: GovernanceClickHouseTenantResolver,
+  ): ClickHouseTraceActivityRepository {
     return new ClickHouseTraceActivityRepository(resolveClient);
   }
 

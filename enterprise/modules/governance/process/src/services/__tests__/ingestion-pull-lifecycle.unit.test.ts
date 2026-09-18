@@ -1,13 +1,16 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
-import type { GovernanceDiagnosticsSink,
+
+import type {
+  GovernanceDiagnosticsSink,
   IngestionPullLifecycleChannel,
-  IngestionPullTenantResolver } from "../../app/governance.members.ts";
+  IngestionPullTenantResolver,
+} from "../../app/governance.members.ts";
 import {
   IngestionPullLifecycleRepository,
   type IngestionPullLifecycleSource,
 } from "../../repositories/ingestion-pull-lifecycle.repository.ts";
 import { IngestionPullLifecycleService } from "../ingestion-pull-lifecycle.service.ts";
-import { Temporal } from "@langwatch/time";
 
 const source = (
   overrides: Partial<IngestionPullLifecycleSource> = {},

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { Cluster, Redis } from "ioredis";
+
 import {
   BILLING_ORG_CACHE_PREFIX,
   BILLING_ORG_CACHE_TTL_MS,

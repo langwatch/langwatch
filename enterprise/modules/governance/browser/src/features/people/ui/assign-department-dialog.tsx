@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Button, createListCollection, Text, VStack } from "@chakra-ui/react";
-import { useState } from "react";
-
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
+import { useState } from "react";
 
-import {
-  useGovernanceToaster,
-  useShowErrorToast,
-} from "../../../behavior/governance-feedback.ts";
 import { api } from "../../../behavior/governance-api.ts";
+import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -86,8 +82,7 @@ export function AssignDepartmentDialog({
         <Dialog.Body paddingBottom={6}>
           <VStack align="stretch" gap={3}>
             <Text fontSize="sm" color="fg.muted">
-              {personName}'s spend, including personal AI use, rolls up to the
-              department you pick.
+              {personName}'s spend, including personal AI use, rolls up to the department you pick.
             </Text>
             <Select.Root
               collection={collection}

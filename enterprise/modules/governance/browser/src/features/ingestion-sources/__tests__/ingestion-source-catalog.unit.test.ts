@@ -7,6 +7,7 @@
  * specs/ai-gateway/governance/ingestion-sources.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   gatedSourceTypeOptions,
   groupForMode,
@@ -80,9 +81,7 @@ describe("given the ingestion-source catalog", () => {
     /** @scenario "A source type nothing reads can no longer be chosen" */
     it("is not offered on any plan", () => {
       for (const isEnterprise of [true, false]) {
-        const offered = gatedSourceTypeOptions({ isEnterprise }).map(
-          (o) => o.value,
-        );
+        const offered = gatedSourceTypeOptions({ isEnterprise }).map((o) => o.value);
         // The guard against a vacuous pass: a filter that dropped everything
         // would satisfy the absences below while breaking the whole menu.
         expect(offered).toContain("otel_generic");
@@ -101,7 +100,7 @@ describe("given the ingestion-source catalog", () => {
         expect(SOURCE_TYPE_LABEL[value]).toBeTruthy();
         const option = SOURCE_TYPE_OPTIONS.find((o) => o.value === value);
         expect(option).toBeDefined();
-        expect(option?.icon).toBeTruthy();
+        expect(option && "icon" in option ? option.icon : null).toBeTruthy();
       }
     });
 
@@ -118,13 +117,11 @@ describe("given the ingestion-source catalog", () => {
 
   describe("when a source type works but has not been run against a tenant", () => {
     it("stays out of the picker without claiming it could never deliver data", () => {
-      const option = SOURCE_TYPE_OPTIONS.find(
-        (o) => o.value === "claude_compliance",
-      );
+      const option = SOURCE_TYPE_OPTIONS.find((o) => o.value === "claude_compliance");
       for (const isEnterprise of [true, false]) {
-        expect(
-          gatedSourceTypeOptions({ isEnterprise }).map((o) => o.value),
-        ).not.toContain("claude_compliance");
+        expect(gatedSourceTypeOptions({ isEnterprise }).map((o) => o.value)).not.toContain(
+          "claude_compliance",
+        );
       }
       // The claim that made the old blurb true was the missing builder, and
       // the builder exists now. Repeating it here would be a page telling a

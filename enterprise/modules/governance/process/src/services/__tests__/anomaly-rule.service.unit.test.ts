@@ -2,14 +2,15 @@ import type {
   AnomalyRule,
   CreateAnomalyRuleInput,
 } from "@langwatch/enterprise-governance-contract";
+import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import {
   AnomalyRuleRepository,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
 } from "../../repositories/anomaly-rule.repository.ts";
 import { AnomalyRuleService } from "../anomaly-rule.service.ts";
-import { Temporal, toDate } from "@langwatch/time";
 
 const FIXED_NOW = Temporal.Instant.from("2026-08-24T12:00:00.000Z");
 

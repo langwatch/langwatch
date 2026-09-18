@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import type {
   GovernanceClickHouseClient,
   GovernanceClickHouseResult,
@@ -21,8 +22,7 @@ type ClickHouseQuery = {
 class RecordedClickHouseClient implements GovernanceClickHouseClient {
   readonly queries: ClickHouseQuery[] = [];
 
-  constructor(private readonly rowsForQuery: (query: ClickHouseQuery) => unknown) {
-  }
+  constructor(private readonly rowsForQuery: (query: ClickHouseQuery) => unknown) {}
 
   async query(input: ClickHouseQuery): Promise<GovernanceClickHouseResult> {
     this.queries.push(input);
@@ -33,8 +33,7 @@ class RecordedClickHouseClient implements GovernanceClickHouseClient {
 class RecordedClickHouseResolver implements GovernanceClickHouseResolver {
   readonly organizationIds: string[] = [];
 
-  constructor(private readonly client: GovernanceClickHouseClient | null) {
-  }
+  constructor(private readonly client: GovernanceClickHouseClient | null) {}
 
   async tryResolve(organizationId: string): Promise<GovernanceClickHouseClient | null> {
     this.organizationIds.push(organizationId);

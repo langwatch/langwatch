@@ -1,12 +1,14 @@
 import type {
   GovernanceOtlpPolicyInput,
-  GovernanceOtlpReceiverPolicies,TraceDepartmentInput
+  GovernanceOtlpReceiverPolicies,
+  TraceDepartmentInput,
 } from "@langwatch/enterprise-governance-contract";
-import { buildIngestKeyReceiverPolicies } from "../rules/ingest-key-provenance.rules.ts";
-import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import { z } from "zod";
+
+import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
+import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
+import { buildIngestKeyReceiverPolicies } from "../rules/ingest-key-provenance.rules.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 const UNASSIGNED_DEPARTMENT = "unassigned";
 const codingAssistantConfigSchema = z.looseObject({

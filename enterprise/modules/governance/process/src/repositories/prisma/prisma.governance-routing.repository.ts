@@ -1,9 +1,3 @@
-import {
-  Prisma,
-  type PrismaClient,
-  type RoutingPolicy as PrismaRoutingPolicy,
-  type RoutingPolicyScope as PrismaRoutingPolicyScope,
-} from "@langwatch/prisma-client/generated";
 import type {
   CreateRoutingPolicyInput,
   DeleteRoutingPolicyInput,
@@ -14,6 +8,13 @@ import type {
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
+import {
+  Prisma,
+  type PrismaClient,
+  type RoutingPolicy as PrismaRoutingPolicy,
+  type RoutingPolicyScope as PrismaRoutingPolicyScope,
+} from "@langwatch/prisma-client/generated";
+
 import { RoutingPolicyRepository } from "../routing-policy.repository.ts";
 
 type PolicyRow = PrismaRoutingPolicy & { scopes: PrismaRoutingPolicyScope[] };
@@ -228,9 +229,7 @@ export class PrismaRoutingPolicyRepository extends RoutingPolicyRepository {
     });
   }
 
-  async findDefaultForUser(
-    input: ResolveDefaultRoutingPolicyInput,
-  ): Promise<RoutingPolicy | null> {
+  async findDefaultForUser(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy | null> {
     if (input.personalTeamId) {
       const team = await this.database.routingPolicy.findFirst({
         where: {

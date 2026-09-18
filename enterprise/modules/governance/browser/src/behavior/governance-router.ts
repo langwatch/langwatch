@@ -2,6 +2,7 @@
 // push/replace expect absolute paths or query rewrites.
 
 import { useCallback, useMemo } from "react";
+
 import { useGovernanceHost } from "../model/governance-host.ts";
 
 export type GovernanceRouter = {

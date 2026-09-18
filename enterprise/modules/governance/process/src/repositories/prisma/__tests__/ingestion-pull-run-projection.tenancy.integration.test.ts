@@ -13,8 +13,6 @@
  * Decision: ADR-128.
  */
 
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTenantId, type StoredProjection } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -25,8 +23,11 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { Organization, PrismaClient, Team } from "@langwatch/prisma-client/generated";
+import { PROJECT_KIND } from "@langwatch/project-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { ensureHiddenGovernanceProject } from "../../../governanceProject.service";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import type { IngestionPullRunStatusData } from "../../../eventing/ingestion-pull-run-status-eventing.projection.ts";
 import { PrismaIngestionPullRunProjectionRepository } from "../prisma.ingestion-pull-run-projection.repository.ts";
 
@@ -41,9 +42,7 @@ const connection = databaseUrl
   ? PrismaConnectionService.create({
       guard: new AllowTestQueries(),
       logger: createLogger("langwatch:governance:test:ingestion-pull-run-projection-tenancy"),
-    }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -66,9 +65,7 @@ let foreignSourceId: string;
 /** The tenant every store() below writes under: this org's governance home. */
 let homeProjectId: string;
 
-function projectionFor(
-  sourceId: string,
-): StoredProjection<IngestionPullRunStatusData> {
+function projectionFor(sourceId: string): StoredProjection<IngestionPullRunStatusData> {
   return {
     state: {
       SourceId: sourceId,
@@ -89,17 +86,6 @@ function projectionFor(
       // the same time: the two kinds keep their own columns precisely so this
       // is representable, and a fixture that only ever carried one kind would
       // not notice a repository that dropped the other.
-      LastAgentsListingAt: 2_000,
-      LastAgentsListingOutcome: "listed",
-      LastAgentsListingCount: 12,
-      LastAgentsListingReason: null,
-      LastAgentsListingStatus: null,
-      LastPeopleListingAt: 2_000,
-      LastPeopleListingOutcome: "refused",
-      LastPeopleDirectoryCount: null,
-      LastPeopleWithheldCount: null,
-      LastPeopleListingReason: "listing_failed",
-      LastPeopleListingStatus: 403,
       CreatedAt: 1_000,
       UpdatedAt: 2_000,
       LastEventOccurredAt: 2_000,
@@ -147,8 +133,19 @@ beforeAll(async () => {
     },
   });
   foreignSourceId = foreignSource.id;
-  homeProjectId = (await ensureHiddenGovernanceProject(prisma, organization.id))
-    .id;
+  homeProjectId = (
+    await prisma.project.create({
+      data: {
+        name: "Governance",
+        slug: `governance-${ns}`,
+        teamId: team.id,
+        apiKey: `api-${ns}`,
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        language: "",
+        framework: "",
+      },
+    })
+  ).id;
 });
 
 afterAll(async () => {
@@ -185,7 +182,7 @@ afterAll(async () => {
 describe("given a run-status projection whose source belongs to another organization", () => {
   describe("when it is stored under this organization's governance tenant", () => {
     it("leaves the other organization's source completely untouched", async () => {
-      const repository = new PrismaIngestionPullRunProjectionRepository(prisma);
+      const repository = PrismaIngestionPullRunProjectionRepository.create(prisma);
 
       await repository.store(projectionFor(foreignSourceId), {
         aggregateId: foreignSourceId,
@@ -217,7 +214,7 @@ describe("given a run-status projection whose source belongs to this organizatio
           status: "awaiting_first_event",
         },
       });
-      const repository = new PrismaIngestionPullRunProjectionRepository(prisma);
+      const repository = PrismaIngestionPullRunProjectionRepository.create(prisma);
 
       await repository.store(projectionFor(source.id), {
         aggregateId: source.id,

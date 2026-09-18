@@ -27,11 +27,12 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+
+import type { GovernanceEventsProcessingEvent } from "../app/governance.members.ts";
 import {
   GOVERNANCE_EVENTS_PROCESS_NAME,
   GovernanceEventDeliveryProcess,
 } from "../eventing/governance-event-delivery.process.ts";
-import type { GovernanceEventsProcessingEvent } from "../app/governance.members.ts";
 
 type GovernanceVkLifecycleEvent = Extract<
   GovernanceEventsProcessingEvent,

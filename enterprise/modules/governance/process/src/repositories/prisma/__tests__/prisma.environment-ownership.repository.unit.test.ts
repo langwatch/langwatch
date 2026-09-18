@@ -20,6 +20,7 @@
 
 import { ValidationError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
+
 // The environment arm of the one-connection-per-account rule. Lives beside
 // `prisma.azure-bill-ownership.repository.ts` rather than inside it, because an environment is not
 // an Azure bill and the module is named after what it owns.
@@ -30,9 +31,7 @@ import {
 
 const ENVIRONMENT = "https://orgtest01.crm4.dynamics.com";
 
-const existingReader = (
-  overrides: Partial<EnvironmentReader> = {},
-): EnvironmentReader => ({
+const existingReader = (overrides: Partial<EnvironmentReader> = {}): EnvironmentReader => ({
   id: "src_first",
   name: "Copilot Studio, first",
   environmentUrl: ENVIRONMENT,

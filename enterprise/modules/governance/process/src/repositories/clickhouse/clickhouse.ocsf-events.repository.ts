@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
-import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
+
 import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventsReader,

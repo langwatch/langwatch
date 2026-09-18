@@ -744,6 +744,16 @@ export interface GovernanceWebhookChannel {
 }
 
 export interface ActivityMonitorRepository {
+  sourceDataCoverage(input: {
+    organizationId: string;
+    sourceId: string;
+    windowDays: number;
+  }): Promise<{
+    health: "healthy" | "unhealthy";
+    consecutiveFailures: number;
+    lastSuccessfulPullIso: string | null;
+    days: { dayStartIso: string; covered: boolean }[];
+  }>;
   summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary>;
   spendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]>;
   spendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]>;

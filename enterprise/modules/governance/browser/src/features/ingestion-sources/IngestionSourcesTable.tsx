@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Badge, Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
-import type { Source } from "../../ui/sections/governance/ingestion-source-forms.ts";
-import { MoreVertical, Pencil, RotateCw, Trash2 } from "lucide-react";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Link } from "../../ui/elements/governance-link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
+import { nowInstant, toEpochMs, type TimeInput } from "@langwatch/time";
+import { MoreVertical, Pencil, RotateCw, Trash2 } from "lucide-react";
+
+import { Link } from "../../ui/elements/governance-link.tsx";
+import type { Source } from "../../ui/sections/governance/ingestion-source-forms.ts";
 import { confirmArchiveSource } from "./model/confirm-archive-source.ts";
-import { shortPullCadence } from "./model/pull-cadence.ts";
-import { runCompleteness, sourceBadge } from "./model/source-health-display.ts";
 import {
   groupForMode,
   modeForSourceType,
@@ -18,8 +18,9 @@ import {
   type SourceGroup,
   type SourceType,
 } from "./model/ingestion-source-catalog.ts";
+import { shortPullCadence } from "./model/pull-cadence.ts";
+import { runCompleteness, sourceBadge } from "./model/source-health-display.ts";
 import { SourceTypeIconGlyph } from "./ui/elements/source-type-icon-glyph.tsx";
-import { nowInstant, toEpochMs, type TimeInput } from "@langwatch/time";
 
 /**
  * The configured ingestion sources as one table. Delivery (real-time or

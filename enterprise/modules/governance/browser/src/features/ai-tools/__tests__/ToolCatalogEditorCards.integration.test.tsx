@@ -97,11 +97,7 @@ function renderEditor() {
   const onEditTile = vi.fn();
   render(
     <ChakraProvider value={defaultSystem}>
-      <ToolCatalogEditor
-        organizationId="org-1"
-        onAddTile={vi.fn()}
-        onEditTile={onEditTile}
-      />
+      <ToolCatalogEditor organizationId="org-1" onAddTile={vi.fn()} onEditTile={onEditTile} />
     </ChakraProvider>,
   );
   return { onEditTile };
@@ -125,9 +121,7 @@ describe("<ToolCatalogEditor /> cards", () => {
       expect(within(anthropic).getByText("Model provider")).toBeVisible();
       expect(within(anthropic).getByText("Disabled")).toBeVisible();
       expect(within(anthropic).getByText("Engineering")).toBeVisible();
-      expect(
-        within(anthropic).queryByText(/CLI paths/),
-      ).not.toBeInTheDocument();
+      expect(within(anthropic).queryByText(/CLI paths/)).not.toBeInTheDocument();
 
       const wiki = screen.getByTestId("catalog-card-entry-wiki");
       expect(within(wiki).getByText("Internal tool")).toBeVisible();
@@ -150,17 +144,11 @@ describe("<ToolCatalogEditor /> cards", () => {
       const user = userEvent.setup();
       const { onEditTile } = renderEditor();
 
-      await user.click(
-        screen.getByRole("button", { name: "Actions for Claude Code" }),
-      );
-      expect(
-        await screen.findByRole("menuitem", { name: /Disable/ }),
-      ).toBeVisible();
+      await user.click(screen.getByRole("button", { name: "Actions for Claude Code" }));
+      expect(await screen.findByRole("menuitem", { name: /Disable/ })).toBeVisible();
       expect(screen.getByRole("menuitem", { name: /Delete/ })).toBeVisible();
       await user.click(screen.getByRole("menuitem", { name: /Edit/ }));
-      expect(onEditTile).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "entry-claude" }),
-      );
+      expect(onEditTile).toHaveBeenCalledWith(expect.objectContaining({ id: "entry-claude" }));
     });
   });
 
@@ -168,9 +156,9 @@ describe("<ToolCatalogEditor /> cards", () => {
     /** @scenario "the catalog renders cards with only the fields a tile has" */
     it("reads both paths as allowed when the config does not say", () => {
       const base = entriesFixture[0]!;
-      expect(
-        cliPathsLine({ ...base, config: { setupCommand: "x" } } as never),
-      ).toBe("CLI paths: gateway · direct");
+      expect(cliPathsLine({ ...base, config: { setupCommand: "x" } } as never)).toBe(
+        "CLI paths: gateway · direct",
+      );
       expect(
         cliPathsLine({
           ...base,
@@ -183,9 +171,7 @@ describe("<ToolCatalogEditor /> cards", () => {
           config: { setupCommand: "x", allowVk: false, allowOtelDirect: false },
         } as never),
       ).toBe("CLI paths: none");
-      expect(
-        cliPathsLine({ ...base, type: "model_provider" } as never),
-      ).toBeNull();
+      expect(cliPathsLine({ ...base, type: "model_provider" } as never)).toBeNull();
     });
   });
 });

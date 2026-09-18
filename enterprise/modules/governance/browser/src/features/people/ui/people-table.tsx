@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { HStack, Text } from "@chakra-ui/react";
+import type { Department, DepartmentAssignments } from "@langwatch/enterprise-governance-contract";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Lock } from "lucide-react";
 import numeral from "numeral";
 
-import { nowInstant, toEpochMs } from "@langwatch/time";
-
-import type { Department, DepartmentAssignments } from "@langwatch/enterprise-governance-contract";
 import type { GovernanceIngestionSourceView } from "../../../behavior/governance-api.ts";
 
 /**
@@ -64,15 +63,12 @@ export function departmentNameForActor({
 }: {
   actor: string;
   assignments: DepartmentAssignments | undefined;
-  departments: readonly Department[] | undefined;
+  departments: readonly Pick<Department, "id" | "name">[] | undefined;
 }): string | null {
   if (!assignments || !departments) return null;
   const member = assignments.users.find((user) => user.id === actor);
   if (!member?.departmentId) return null;
-  return (
-    departments.find((department) => department.id === member.departmentId)
-      ?.name ?? null
-  );
+  return departments.find((department) => department.id === member.departmentId)?.name ?? null;
 }
 
 /**
@@ -93,8 +89,7 @@ export function sourceForTarget({
   return (
     sources.find(
       (source) =>
-        source.name.toLowerCase() === wanted ||
-        source.sourceType.toLowerCase() === wanted,
+        source.name.toLowerCase() === wanted || source.sourceType.toLowerCase() === wanted,
     ) ?? null
   );
 }
@@ -117,8 +112,7 @@ export const formatRelativeTime = (
   if (Number.isNaN(epochMs)) return "—";
   const diffMs = nowMs - epochMs;
   if (diffMs < 0) return "just now";
-  const plural = (n: number, unit: string) =>
-    `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+  const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"} ago`;
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return "just now";
   const min = Math.floor(sec / 60);
@@ -144,10 +138,7 @@ export function EnterpriseLockedLine() {
       data-testid="people-enterprise-locked"
     >
       <Lock size={14} aria-hidden="true" />
-      <Text>
-        Available on Enterprise plans. Upgrade to see spend and activity per
-        person.
-      </Text>
+      <Text>Available on Enterprise plans. Upgrade to see spend and activity per person.</Text>
     </HStack>
   );
 }

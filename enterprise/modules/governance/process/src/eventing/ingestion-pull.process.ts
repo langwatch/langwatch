@@ -7,12 +7,10 @@ import type {
   Event,
   ProcessHandlerContext,
   ProcessIntent,
-  ProcessManagerApplier,IntentSpec
+  ProcessManagerApplier,
+  IntentSpec,
 } from "@langwatch/eventing";
-import {
-  IngestionPullIntent,
-  ingestionPullRunIntentSchema,
-} from "./ingestion-pull.intent.ts";
+
 import type { IngestionPullScheduler } from "../app/governance.members.ts";
 import {
   INGESTION_PULL_CONCURRENCY,
@@ -20,6 +18,7 @@ import {
   INGESTION_PULL_MAX_ATTEMPTS,
   IngestionPullService,
 } from "../services/ingestion-pull.service.ts";
+import { IngestionPullIntent, ingestionPullRunIntentSchema } from "./ingestion-pull.intent.ts";
 
 export const INGESTION_PULL_PROCESS_NAME = "ingestionPull" as const;
 export const INGESTION_PULL_STALE_RUN_MS = 30 * 60 * 1_000;

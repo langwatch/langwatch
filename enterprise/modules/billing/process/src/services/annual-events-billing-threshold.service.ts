@@ -1,8 +1,8 @@
-import type Stripe from "stripe";
 import {
   isAnnualGrowthEventsPrice,
   type StripePriceMap,
 } from "@langwatch/enterprise-billing-contract";
+import type Stripe from "stripe";
 
 /**
  * Amount of accrued metered usage (in the subscription currency's minor unit — 750.00 USD

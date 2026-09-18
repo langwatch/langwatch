@@ -36,18 +36,23 @@
  * Spec: specs/ai-governance/puller-framework/openai-admin-cost.feature
  */
 
-import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
 import {
   OPENAI_ADMIN_ADAPTER_ID,
   openaiAdminPullConfigSchema,
   PULLED_USAGE_HINT_KEY,
-  type OpenAiAdminPullConfig,type GovernancePuller as PullerAdapter,type NormalizedPullEvent,type PullResult,type PullRunOptions
+  type OpenAiAdminPullConfig,
+  type GovernancePuller as PullerAdapter,
+  type NormalizedPullEvent,
+  type PullResult,
+  type PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
 import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
+import { z } from "zod";
+
 import type { GovernanceHttpClient, GovernanceHttpResponse } from "../app/governance.members.ts";
 import * as AdminUsageReportAdapter from "../rules/admin-usage-report.rules.ts";
-import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:openai-admin-puller");
 
@@ -1139,8 +1144,7 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
  * line was the alternative and is not one — a reader looking at the source
  * cannot be shown a log.
  */
-export const PER_KEY_ATTRIBUTION_UNAVAILABLE =
-  "per_key_attribution_unavailable" as const;
+export const PER_KEY_ATTRIBUTION_UNAVAILABLE = "per_key_attribution_unavailable" as const;
 
 /**
  * The notices field, or nothing at all.
@@ -1150,7 +1154,5 @@ export const PER_KEY_ATTRIBUTION_UNAVAILABLE =
  * not know how.
  */
 function runNotices(hasLostKeyAttribution: boolean): { notices?: string[] } {
-  return hasLostKeyAttribution
-    ? { notices: [PER_KEY_ATTRIBUTION_UNAVAILABLE] }
-    : {};
+  return hasLostKeyAttribution ? { notices: [PER_KEY_ATTRIBUTION_UNAVAILABLE] } : {};
 }

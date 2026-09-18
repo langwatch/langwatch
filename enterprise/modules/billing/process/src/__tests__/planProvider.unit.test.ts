@@ -1,8 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getFreePlanLimits,
+  PLAN_LIMITS,
+  PlanTypes,
+  SubscriptionStatus,
+} from "@langwatch/enterprise-billing-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { getFreePlanLimits, PLAN_LIMITS,PlanTypes,SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
-import { NUMERIC_OVERRIDE_FIELDS, SaaSPlanProviderService } from "../services/plan-provider.service.ts";
-import { PrismaSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository.ts";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { PrismaBillingSubscription } from "../repositories/prisma/prisma.subscription.repository.ts";
+import {
+  NUMERIC_OVERRIDE_FIELDS,
+  SaaSPlanProviderService,
+} from "../services/plan-provider.service.ts";
 
 const mockEnv: {
   IS_SAAS: boolean | undefined;
@@ -11,7 +20,7 @@ const mockEnv: {
 
 const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProviderService =>
   SaaSPlanProviderService.create({
-    subscriptions: PrismaSubscriptionRepository.create(db),
+    subscriptions: PrismaBillingSubscription.create(db),
     isSaas: mockEnv.IS_SAAS ?? false,
     adminEmails: mockEnv.ADMIN_EMAILS,
   });

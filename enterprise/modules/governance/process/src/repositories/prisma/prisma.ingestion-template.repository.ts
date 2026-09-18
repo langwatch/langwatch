@@ -6,12 +6,13 @@ import {
   type PlatformIngestionTemplateSyncResult,
 } from "@langwatch/enterprise-governance-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
+
 import {
   IngestionTemplateRepository,
   type IngestionTemplateMutationResult,
   type NewIngestionTemplate,
 } from "../ingestion-template.repository.ts";
-import { toDate, type Instant } from "@langwatch/time";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 

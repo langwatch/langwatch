@@ -1,4 +1,5 @@
-import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
+import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Every org gets the standard AI tool set automatically (zero-touch default catalog).
@@ -8,9 +9,7 @@ import { createGovernanceTestConnection } from "../../../app/__tests__/governanc
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
+import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
 import { PrismaAiToolCatalogRepository } from "../prisma.ai-tool-catalog.repository.ts";
 
 /**

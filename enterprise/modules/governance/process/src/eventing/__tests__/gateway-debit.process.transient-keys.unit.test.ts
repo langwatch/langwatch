@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,

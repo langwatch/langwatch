@@ -26,6 +26,7 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import { SourceEditDrawer } from "../governance-inventory.screen.tsx";
 
@@ -76,13 +77,7 @@ type DrawerSource = Parameters<typeof SourceEditDrawer>[0]["source"];
  * answer to "has this ever pulled", rather than an inference from `status`,
  * which is wrong in both directions.
  */
-const anthropicSource = ({
-  report,
-  hasPulled,
-}: {
-  report: string;
-  hasPulled: boolean;
-}) =>
+const anthropicSource = ({ report, hasPulled }: { report: string; hasPulled: boolean }) =>
   ({
     id: "src_anthropic",
     name: "Anthropic org",
@@ -157,9 +152,7 @@ describe("given the edit drawer's title", () => {
     it("names the provider it is editing", () => {
       renderDrawer(anthropicSource({ report: "cost", hasPulled: false }));
 
-      expect(
-        screen.getByRole("heading", { name: "Edit Anthropic Admin API" }),
-      ).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Edit Anthropic Admin API" })).toBeTruthy();
       expect(screen.queryByRole("heading", { name: "Edit source" })).toBeNull();
     });
 
@@ -238,9 +231,7 @@ describe("given a source with settings its adapter can no longer change", () => 
       // Chakra keeps popover content mounted and hidden while closed, so only a
       // visibility matcher tells "behind the marker" from "in the body".
       expect(screen.getByTestId("edit-source-notes")).toBeVisible();
-      expect(
-        screen.getByText(/is fixed once a source has pulled/i),
-      ).not.toBeVisible();
+      expect(screen.getByText(/is fixed once a source has pulled/i)).not.toBeVisible();
     });
 
     /** @scenario "A locked report is still readable and still reachable" */

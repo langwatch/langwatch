@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { applyOtlpReceiverPolicy, type OtlpReceiverRequest } from "@langwatch/otlp";
+import { describe, expect, it } from "vitest";
+
 import {
   buildIngestKeyReceiverPolicies,
   originForIngestSourceType,

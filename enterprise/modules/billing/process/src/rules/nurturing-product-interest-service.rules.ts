@@ -1,5 +1,6 @@
-import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
+
+import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 /**
  * Valid integration method trait values sent to Customer.io.

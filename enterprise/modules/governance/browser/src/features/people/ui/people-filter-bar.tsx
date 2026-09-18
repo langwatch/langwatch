@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Box, Text } from "@chakra-ui/react";
-import { Building2 } from "lucide-react";
-
 import { Menu } from "@langwatch/design-system/menu";
+import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
+import { Building2 } from "lucide-react";
 
 import {
   FilterChip,
   FilterChipRow,
   SortChip,
 } from "../../../ui/elements/governance-filter-chip.tsx";
-import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 
 /**
  * Both choices the People table offers, in one row under the page header:
@@ -42,8 +41,7 @@ export function PeopleFilterBar({
     { key: "requests", label: "Requests" },
     { key: "lastActivity", label: "Last active" },
   ];
-  const sortLabel =
-    sortOptions.find((option) => option.key === sortBy)?.label ?? "Spend";
+  const sortLabel = sortOptions.find((option) => option.key === sortBy)?.label ?? "Spend";
 
   return (
     <Box data-testid="people-filter-row">
@@ -59,11 +57,7 @@ export function PeopleFilterBar({
             All departments
           </Menu.Item>
           {departments.map((name) => (
-            <Menu.Item
-              key={name}
-              value={name}
-              onClick={() => onDepartmentChange(name)}
-            >
+            <Menu.Item key={name} value={name} onClick={() => onDepartmentChange(name)}>
               {name}
             </Menu.Item>
           ))}
@@ -71,11 +65,7 @@ export function PeopleFilterBar({
 
         <SortChip value={sortLabel}>
           {sortOptions.map((option) => (
-            <Menu.Item
-              key={option.key}
-              value={option.key}
-              onClick={() => onSortChange(option.key)}
-            >
+            <Menu.Item key={option.key} value={option.key} onClick={() => onSortChange(option.key)}>
               {option.label}
             </Menu.Item>
           ))}
@@ -89,8 +79,8 @@ export function PeopleFilterBar({
             borderTopWidth="1px"
             borderColor="border.muted"
           >
-            Ranks the people with measured spend. Anyone a connected source
-            named but nothing measured follows, most recently seen first.
+            Ranks the people with measured spend. Anyone a connected source named but nothing
+            measured follows, most recently seen first.
           </Text>
         </SortChip>
       </FilterChipRow>

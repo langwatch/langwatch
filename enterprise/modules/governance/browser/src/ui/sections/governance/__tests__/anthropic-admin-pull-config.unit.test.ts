@@ -10,9 +10,9 @@
  * the new source type gets the guard from day one.
  */
 
+import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import {
   buildAnthropicAdminPullConfig,
   buildParserConfig,
@@ -83,9 +83,7 @@ describe("buildAnthropicAdminPullConfig", () => {
     const base = { credentialsToken: "sk-ant-admin-test" };
 
     expect(
-      buildAnthropicAdminPullConfig(
-        composer({ ...base, report: "usage", bucketWidth: "2h" }),
-      ),
+      buildAnthropicAdminPullConfig(composer({ ...base, report: "usage", bucketWidth: "2h" })),
     ).toMatchObject({ bucketWidth: "1d" });
 
     const onCost = buildAnthropicAdminPullConfig(

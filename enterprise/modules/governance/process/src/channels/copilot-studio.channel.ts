@@ -3,6 +3,7 @@ import type {
   PullResult,
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
+
 import type { HttpPollingConfig } from "./http/http.polling.channel.ts";
 
 /** Vendor channel for the locked Microsoft Graph Copilot Studio audit pull. */

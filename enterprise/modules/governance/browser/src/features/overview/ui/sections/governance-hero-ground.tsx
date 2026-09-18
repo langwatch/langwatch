@@ -7,6 +7,7 @@ import { Box } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { MeshGradient } from "@paper-design/shaders-react";
 import type { ReactNode } from "react";
+
 import { useReducedMotion } from "../elements/use-reduced-motion.ts";
 
 /** Langy's palette, resolved. The shader cannot read CSS variables. */
@@ -50,10 +51,8 @@ export function GovernanceHeroGround({ children }: { children: ReactNode }) {
         opacity={{ base: 0.3, _dark: 0.45 }}
         filter={{ base: "blur(15px)", _dark: "blur(5px)" }}
         css={{
-          maskImage:
-            "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
-          WebkitMaskImage:
-            "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+          maskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+          WebkitMaskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
         }}
       >
         <MeshGradient

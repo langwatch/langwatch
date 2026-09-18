@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { BillingAccountFactsRepository } from "../billing-account-facts.repository.ts";
 
 /** Prisma implementation of the narrow organization reads Billing needs. */

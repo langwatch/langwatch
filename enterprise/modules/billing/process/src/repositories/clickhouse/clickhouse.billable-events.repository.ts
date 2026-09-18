@@ -15,7 +15,11 @@
  *     (per-tenant routing lands on the same org's instance either way).
  */
 import type { DataFormat } from "@clickhouse/client";
-import { BillableEventsRepository, type BillableEventsWindow } from "../billable-events.repository.ts";
+
+import {
+  BillableEventsRepository,
+  type BillableEventsWindow,
+} from "../billable-events.repository.ts";
 
 /**
  * The one read shape these queries issue, rather than a vendor client.

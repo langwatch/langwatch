@@ -7,6 +7,8 @@
  */
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
+import { toEpochMs } from "@langwatch/time";
+
 import {
   MS_THRESHOLD,
   ROLE_AGENT,
@@ -18,7 +20,6 @@ import {
   type IndexedRow,
   type TranscriptRow,
 } from "../rules/copilot-transcript.rules.ts";
-import { toEpochMs } from "@langwatch/time";
 
 /**
  * Both spellings of the role, because Bot Framework has two.

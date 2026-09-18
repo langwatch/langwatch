@@ -19,8 +19,9 @@
  * back into the form must not carry `credentials` with it.
  */
 
-import { describe, expect, it } from "vitest";
 import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
+import { describe, expect, it } from "vitest";
+
 import { recommendedPullSchedule } from "../../../../features/ingestion-sources/model/pull-cadence.ts";
 import { recordingGovernanceToaster } from "../../../../testing.tsx";
 import {

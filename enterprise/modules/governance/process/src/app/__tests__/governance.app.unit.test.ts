@@ -10,27 +10,39 @@
  * (the CLI/ingest accessors) builds its own app with the bag present.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { GovernanceCallSurface } from "@langwatch/enterprise-governance-contract";
+import type {
+  GovernanceCallSurface,
+  GovernanceProjectCaller,
+} from "@langwatch/enterprise-governance-contract";
+import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
+
+import { governanceServer } from "../../governance.server.ts";
+import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
+import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import {
   GovernanceApp,
-  type GovernanceActorDirectory,
-  type GovernancePersonalVirtualKeyMembers,
-  type GovernanceProjectCaller,
   type GovernanceCliMembers,
   type GovernanceIngestMembers,
 } from "../governance.app.ts";
-import { governanceServer } from "../../governance.server.ts";
 import { TestGovernanceService } from "./support/test-governance-service.ts";
 
 /** A dependency these operations never reach; calling one is the test's bug. */
 const unreachable = <Method>(): Method =>
   (() => Promise.reject(new Error("not reachable from this operation"))) as Method;
+
+/** The two Prisma reads behind `personalVirtualKeys`/`actors`, unreached by these tests. */
+const unreachablePrisma = {
+  user: { findFirst: unreachable<GovernanceMemberDatabase["user"]["findFirst"]>() },
+  organizationUser: {
+    findFirst: unreachable<GovernanceMemberDatabase["organizationUser"]["findFirst"]>(),
+  },
+  virtualKey: { findFirst: unreachable<GovernanceMemberDatabase["virtualKey"]["findFirst"]>() },
+} as unknown as GovernanceMemberDatabase;
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-1";
@@ -40,21 +52,15 @@ function buildApp() {
   const repositories = MemoryGovernanceRepositories.create();
 
   const app = GovernanceApp.create({
+    config: void 0,
     repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
     },
-    members: {
-      personalVirtualKeys: {
-        isOrganizationMember:
-          unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
-        hasActivePersonalKeyLabelled:
-          unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
-      },
-      actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
-    },
+    members: { prisma: unreachablePrisma },
+    resources: new ResourceScope(),
   });
 
   return { app, getOrganizationId, repositories };
@@ -66,6 +72,7 @@ function buildAppWithUnfinishedCapability() {
   const governance = new TestGovernanceService();
 
   const app = GovernanceApp.create({
+    config: void 0,
     repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
@@ -73,14 +80,8 @@ function buildAppWithUnfinishedCapability() {
       permissions: createApiFixture<AuthzApi>(),
     },
     members: {
+      prisma: unreachablePrisma,
       governance,
-      personalVirtualKeys: {
-        isOrganizationMember:
-          unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
-        hasActivePersonalKeyLabelled:
-          unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
-      },
-      actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
       cli: {
         accessTokens: unreachable<GovernanceCliMembers["accessTokens"]>(),
         members: unreachable<GovernanceCliMembers["members"]>(),
@@ -94,6 +95,7 @@ function buildAppWithUnfinishedCapability() {
         traceCollection: unreachable<GovernanceIngestMembers["traceCollection"]>(),
       },
     },
+    resources: new ResourceScope(),
   });
 
   return { app };

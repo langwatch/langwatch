@@ -4,6 +4,7 @@ import type {
   CioOrgTraits,
   CioPersonTraits,
 } from "@langwatch/enterprise-billing-contract";
+
 import { CustomerIoChannel } from "../customer-io.channel.ts";
 
 export class MemoryCustomerIoChannel extends CustomerIoChannel {

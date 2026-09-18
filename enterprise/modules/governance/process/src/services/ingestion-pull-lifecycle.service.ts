@@ -3,11 +3,11 @@ import type {
   IngestionPullLifecycleChannel,
   IngestionPullTenantResolver,
 } from "../app/governance.members.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import type {
   IngestionPullLifecycleRepository,
   IngestionPullLifecycleSource,
 } from "../repositories/ingestion-pull-lifecycle.repository.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 export class IngestionPullLifecycleService {
   private constructor(

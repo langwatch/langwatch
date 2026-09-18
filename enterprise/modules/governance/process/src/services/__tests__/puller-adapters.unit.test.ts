@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
-import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
 import type {
   GovernanceHttpClient,
   GovernanceHttpResponse,
   GovernanceObjectStore,
 } from "../../app/governance.members.ts";
+import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
+import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
 
 const httpConfig = {
   adapter: "http_polling",

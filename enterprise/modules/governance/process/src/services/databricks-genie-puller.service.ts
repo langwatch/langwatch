@@ -53,14 +53,21 @@
  *   instead of minting a second one.
  */
 
-import { createLogger } from "@langwatch/observability";
 import { Buffer } from "node:buffer";
+
+import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
+import type {
+  GovernancePuller as PullerAdapter,
+  NormalizedPullEvent,
+  PullResult,
+  PullRunOptions,
+} from "@langwatch/enterprise-governance-contract";
+import { createLogger } from "@langwatch/observability";
+import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
 import type { GovernanceHttpClient } from "../app/governance.members.ts";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "./pull-destination.service.ts";
 import { TERMINAL_MESSAGE_STATUSES } from "../rules/genie-trace-mapper-service.rules.ts";
-import { DatabricksWarehouseCostService } from "./puller-databricks-warehouse-cost.service.ts";
 import {
   GENIE_CLIENT_APPLICATION,
   GENIE_FREE_USAGE_SKU_MARKER,
@@ -71,14 +78,8 @@ import {
 } from "../rules/warehouse-cost.rules.ts";
 import { GENIE_SPACES_PATH, walkGenieSpaces } from "./genie-spaces.service.ts";
 import type { GenieSpace } from "./genie-spaces.service.ts";
-import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
-import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
-import type {
-  GovernancePuller as PullerAdapter,
-  NormalizedPullEvent,
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "./pull-destination.service.ts";
+import { DatabricksWarehouseCostService } from "./puller-databricks-warehouse-cost.service.ts";
 
 const logger = createLogger("langwatch:governance:databricks-genie-puller");
 

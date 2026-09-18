@@ -68,9 +68,7 @@ function directoryDepartmentOf(person: PersonDepartmentFacts): string | null {
  * hop the reader cannot see. The linked value stays the fallback so a person
  * an administrator assigned by hand still reads as assigned.
  */
-export function departmentLabelFor(
-  person: PersonDepartmentFacts,
-): string | null {
+export function departmentLabelFor(person: PersonDepartmentFacts): string | null {
   if (person.erasedAt !== null) return null;
   return directoryDepartmentOf(person) ?? person.link?.departmentName ?? null;
 }
@@ -101,13 +99,8 @@ export interface ObservedDepartment {
  * reshuffles equal-count rows between refreshes reads as though the data
  * changed.
  */
-export function groupObservedDepartments(
-  people: PersonDepartmentFacts[],
-): ObservedDepartment[] {
-  const byName = new Map<
-    string,
-    { peopleCount: number; providers: Set<string> }
-  >();
+export function groupObservedDepartments(people: PersonDepartmentFacts[]): ObservedDepartment[] {
+  const byName = new Map<string, { peopleCount: number; providers: Set<string> }>();
   for (const person of people) {
     const name = directoryDepartmentOf(person);
     if (name === null) continue;
@@ -122,7 +115,5 @@ export function groupObservedDepartments(
       peopleCount,
       providers: [...providers].toSorted(),
     }))
-    .toSorted(
-      (a, b) => b.peopleCount - a.peopleCount || a.name.localeCompare(b.name),
-    );
+    .toSorted((a, b) => b.peopleCount - a.peopleCount || a.name.localeCompare(b.name));
 }

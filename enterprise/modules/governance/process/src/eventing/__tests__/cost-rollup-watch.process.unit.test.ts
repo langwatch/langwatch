@@ -11,14 +11,15 @@ import {
   type ProcessRef,
 } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import type { CostRollupDayComparer, CostRollupDayLook } from "../../app/governance.members.ts";
+import { PulledUsageEventingAdapter } from "../../services/pulled-usage-eventing.service.ts";
 import {
   COST_ROLLUP_WATCH_PROCESS_NAME,
   type CostRollupWatchState,
   CostRollupWatchProcess,
   nextCostRollupCheckAt,
 } from "../cost-rollup-watch.process.ts";
-import { PulledUsageEventingAdapter } from "../../services/pulled-usage-eventing.service.ts";
 
 const TENANT = "project-governance-1";
 

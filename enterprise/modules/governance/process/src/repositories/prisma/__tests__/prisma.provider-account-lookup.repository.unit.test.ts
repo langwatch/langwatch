@@ -23,7 +23,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const { fetchStub } = vi.hoisted(() => ({ fetchStub: vi.fn() }));
 
-vi.mock("~/utils/ssrfProtection", () => ({ ssrfSafeFetch: fetchStub }));
+vi.mock("../../../services/ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: fetchStub }));
 
 // A reversible stand-in for the shared AES helper, so the sealed-envelope case
 // below can be built here without an app key. The real crypto is covered by
@@ -33,8 +33,10 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (blob: string) => blob.slice("cipher(".length, -1),
 }));
 
-import { encryptParserConfigCredentials } from "../ingestionCredentials";
-import { lookUpProviderAccount } from "../prisma.provider-account-lookup.repository";
+import {
+  createProviderAccountLookup,
+  lookUpProviderAccount,
+} from "../prisma.provider-account-lookup.repository.ts";
 
 /** An obviously fake administrator key. */
 const ADMIN_KEY = "sk-ant-admin-EXAMPLEKEY-00000000";
@@ -64,9 +66,7 @@ describe("given a connection saved through the composer, which writes the admini
   describe("when the Anthropic account is looked up", () => {
     it("sends that key and answers with the organisation the provider named", async () => {
       fetchStub.mockReset();
-      fetchStub.mockResolvedValue(
-        providerResponding({ json: { id: "org_example_0001" } }),
-      );
+      fetchStub.mockResolvedValue(providerResponding({ json: { id: "org_example_0001" } }));
 
       const account = await lookUpProviderAccount({
         sourceType: "anthropic_admin",
@@ -102,16 +102,13 @@ describe("given an edit that did not resend the secret, so the stored envelope w
   describe("when the account is looked up", () => {
     it("opens the envelope and sends the same key", async () => {
       fetchStub.mockReset();
-      fetchStub.mockResolvedValue(
-        providerResponding({ json: { id: "org_example_0001" } }),
-      );
-      const sealed = encryptParserConfigCredentials({
-        report: "cost",
-        credentials: { token: ADMIN_KEY },
-      })!;
-      expect(typeof sealed.credentials).toBe("string");
+      fetchStub.mockResolvedValue(providerResponding({ json: { id: "org_example_0001" } }));
+      const sealed = { report: "cost", credentials: "sealed-admin-key" };
+      const lookup = createProviderAccountLookup({
+        decrypt: () => ({ token: ADMIN_KEY }),
+      });
 
-      await lookUpProviderAccount({
+      await lookup({
         sourceType: "anthropic_admin",
         parserConfig: sealed,
       });

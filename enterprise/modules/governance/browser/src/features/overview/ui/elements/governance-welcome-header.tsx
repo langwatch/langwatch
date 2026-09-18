@@ -4,10 +4,11 @@
  * an absent one falls back to the anonymous greeting rather than a blank.
  */
 import { Heading } from "@chakra-ui/react";
-import { useGovernanceHost } from "../../../../model/governance-host.ts";
-import { useEffect, useState } from "react";
-import { SERIF } from "@langwatch/langy-web/surfaces/asaplangy";
+import { SERIF } from "@langwatch/langy-browser/surfaces/asaplangy";
 import { nowInstant, toZonedDateTime } from "@langwatch/time";
+import { useEffect, useState } from "react";
+
+import { useGovernanceHost } from "../../../../model/governance-host.ts";
 
 export type TimeOfDay = "morning" | "afternoon" | "evening";
 

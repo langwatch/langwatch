@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import type Stripe from "stripe";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   LicensePurchaseService,

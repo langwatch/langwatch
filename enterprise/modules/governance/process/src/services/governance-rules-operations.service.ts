@@ -3,12 +3,12 @@ import type {
   GovernanceOtlpReceiverPolicies,
 } from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-
 import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyRuleService } from "./anomaly-rule.service.ts";
-import type { PostgresGovernancePolicyService } from "./governance-policy.service.ts";
-import type { DepartmentService } from "./department.service.ts";
+
 import type { DefaultGovernanceAiToolCatalogService } from "./ai-tool-catalog.service.ts";
+import type { AnomalyRuleService } from "./anomaly-rule.service.ts";
+import type { DepartmentService } from "./department.service.ts";
+import type { PostgresGovernancePolicyService } from "./governance-policy.service.ts";
 
 /** Private cohesive collaborator for the rules operation set. */
 export class GovernanceRulesOperationsService {
@@ -98,18 +98,14 @@ export class GovernanceRulesOperationsService {
   readonly aiToolGetById: GovernanceApi["aiToolGetById"] = (...args) =>
     this.aiTools.getById(...args);
 
-  readonly aiToolCreate: GovernanceApi["aiToolCreate"] = (...args) =>
-    this.aiTools.create(...args);
+  readonly aiToolCreate: GovernanceApi["aiToolCreate"] = (...args) => this.aiTools.create(...args);
 
-  readonly aiToolUpdate: GovernanceApi["aiToolUpdate"] = (...args) =>
-    this.aiTools.update(...args);
+  readonly aiToolUpdate: GovernanceApi["aiToolUpdate"] = (...args) => this.aiTools.update(...args);
 
-  readonly aiToolRemove: GovernanceApi["aiToolRemove"] = (...args) =>
-    this.aiTools.remove(...args);
+  readonly aiToolRemove: GovernanceApi["aiToolRemove"] = (...args) => this.aiTools.remove(...args);
 
-  readonly aiToolEnsureDefaultCatalog: GovernanceApi["aiToolEnsureDefaultCatalog"] = (
-    ...args
-  ) => this.aiTools.ensureDefaultCatalog(...args);
+  readonly aiToolEnsureDefaultCatalog: GovernanceApi["aiToolEnsureDefaultCatalog"] = (...args) =>
+    this.aiTools.ensureDefaultCatalog(...args);
 
   readonly aiToolSeedStarterPack: GovernanceApi["aiToolSeedStarterPack"] = (...args) =>
     this.aiTools.seedStarterPack(...args);
@@ -117,8 +113,9 @@ export class GovernanceRulesOperationsService {
   readonly aiToolListConfiguredProvidersForUser: GovernanceApi["aiToolListConfiguredProvidersForUser"] =
     (...args) => this.aiTools.listConfiguredProvidersForUser(...args);
 
-  readonly aiToolListProviderOptionsForAdmin: GovernanceApi["aiToolListProviderOptionsForAdmin"] =
-    (...args) => this.aiTools.listProviderOptionsForAdmin(...args);
+  readonly aiToolListProviderOptionsForAdmin: GovernanceApi["aiToolListProviderOptionsForAdmin"] = (
+    ...args
+  ) => this.aiTools.listProviderOptionsForAdmin(...args);
 
   readonly aiToolListRoutingPolicyOptionsForAdmin: GovernanceApi["aiToolListRoutingPolicyOptionsForAdmin"] =
     (...args) => this.aiTools.listRoutingPolicyOptionsForAdmin(...args);

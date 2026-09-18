@@ -1,8 +1,8 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { PrismaBillingWebhookOrganizationRepository } from "../prisma.billing-webhook-organization.repository.ts";
 

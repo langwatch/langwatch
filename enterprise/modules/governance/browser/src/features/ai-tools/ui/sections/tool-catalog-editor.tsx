@@ -19,29 +19,28 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
-import {
-  arrayMove,
-  rectSortingStrategy,
-  SortableContext,
-  useSortable,
-} from "@dnd-kit/sortable";
+import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { ProviderScopeChips } from "@langwatch/authz-browser-kit/scope-picker";
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { TileIcon } from "@langwatch/user-browser/surfaces/tile-icon";
 import { GripVertical, MoreVertical, PackageOpen, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { TileIcon } from "@langwatch/user-web/surfaces/tile-icon";
+
+import { api } from "../../../../behavior/governance-api.ts";
+import {
+  useGovernanceToaster,
+  useShowErrorToast,
+} from "../../../../behavior/governance-feedback.ts";
 import type {
   AiToolEntry,
   CodingAssistantConfig,
   ExternalToolConfig,
 } from "../../model/ai-tool-tile.ts";
 import { useAiToolCatalog } from "./useAiToolCatalog.ts";
-import { ProviderScopeChips } from "@langwatch/authz-web-kit/scope-picker";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { Menu } from "@langwatch/design-system/menu";
-import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback.ts";
-import { api } from "../../../../behavior/governance-api.ts";
 
 const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
   coding_assistant: "Coding assistants",
@@ -98,8 +97,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
     onSuccess: () => {
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tools" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tools" }),
   });
 
   const importStarterPackMutation = api.aiTools.importStarterPack.useMutation({
@@ -301,12 +299,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
               <Heading as="h3" size="sm">
                 {SECTION_LABELS[type]} ({items.length})
               </Heading>
-              <Button
-                size="xs"
-                variant="outline"
-                marginLeft="auto"
-                onClick={() => onAddTile(type)}
-              >
+              <Button size="xs" variant="outline" marginLeft="auto" onClick={() => onAddTile(type)}>
                 <Plus size={14} /> Add tool
               </Button>
             </HStack>
@@ -359,9 +352,9 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
             </Dialog.Header>
             <Dialog.Body>
               <Text fontSize="sm" color="fg.muted">
-                This permanently removes the tool from the catalog and from
-                every member&apos;s /me portal. It cannot be undone. To hide it
-                without losing its configuration, use Disable instead.
+                This permanently removes the tool from the catalog and from every member&apos;s /me
+                portal. It cannot be undone. To hide it without losing its configuration, use
+                Disable instead.
               </Text>
             </Dialog.Body>
             <Dialog.Footer>
@@ -403,15 +396,8 @@ function SortableSection({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={onDragEnd}
-    >
-      <SortableContext
-        items={items.map((e) => e.id)}
-        strategy={rectSortingStrategy}
-      >
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext items={items.map((e) => e.id)} strategy={rectSortingStrategy}>
         {/* Sized to the container, not the viewport: with the assistant
             panel open the pane is half the window, and three fixed
             columns would squeeze every name into an ellipsis. */}
@@ -586,19 +572,10 @@ function CatalogCard({
             )}
           </HStack>
         </VStack>
-        <TileIcon
-          iconAsset={entry.iconAsset}
-          iconKey={entry.iconKey}
-          type={entry.type}
-          size={32}
-        />
+        <TileIcon iconAsset={entry.iconAsset} iconKey={entry.iconKey} type={entry.type} size={32} />
         <Menu.Root>
           <Menu.Trigger asChild>
-            <Button
-              variant="ghost"
-              size="xs"
-              aria-label={`Actions for ${entry.displayName}`}
-            >
+            <Button variant="ghost" size="xs" aria-label={`Actions for ${entry.displayName}`}>
               <MoreVertical size={14} />
             </Button>
           </Menu.Trigger>
@@ -635,10 +612,7 @@ function CatalogCard({
           </Menu.Content>
         </Menu.Root>
       </HStack>
-      <ProviderScopeChips
-        size="xs"
-        scopes={scopeChipsFor(entry, departmentNameById)}
-      />
+      <ProviderScopeChips size="xs" scopes={scopeChipsFor(entry, departmentNameById)} />
       {detail && (
         <Text fontSize="xs" color="fg.muted" lineClamp={1}>
           {detail}

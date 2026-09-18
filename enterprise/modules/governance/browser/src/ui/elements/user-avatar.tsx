@@ -23,9 +23,7 @@ export function UserAvatar({
 
   return (
     <Avatar.Root {...rootProps}>
-      {showImage ? (
-        <Avatar.Image src={image!} onError={() => setBrokenImageUrl(image!)} />
-      ) : null}
+      {showImage ? <Avatar.Image src={image!} onError={() => setBrokenImageUrl(image!)} /> : null}
       <Avatar.Fallback name={name ?? undefined} />
     </Avatar.Root>
   );

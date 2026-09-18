@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it, vi } from "vitest";
+
 import {
   StripeUsageReportingBuilder,
-  StripeUsageReportingUnavailable,StripeUsageReportingService
+  StripeUsageReportingUnavailable,
+  StripeUsageReportingService,
 } from "../usage-reporting.service.ts";
 
 function meterIdFor(nodeEnvironment: string | undefined): string {

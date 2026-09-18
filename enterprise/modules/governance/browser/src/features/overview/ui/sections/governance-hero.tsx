@@ -4,6 +4,8 @@
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { AskChip } from "@langwatch/design-system/ask-chip";
+import { HeroLeadPill } from "@langwatch/design-system/hero-lead-pill";
 import {
   MenuContent,
   MenuItem,
@@ -11,17 +13,16 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@langwatch/design-system/menu";
+import { HeroAskField } from "@langwatch/project-browser/surfaces/hero-ask-field";
 import { Bot, Building2, PackageOpen, Settings2 } from "lucide-react";
 import type React from "react";
+
 import { useGovernanceRouter } from "../../../../behavior/governance-router.ts";
 import { useGovernanceHost } from "../../../../model/governance-host.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import type { SourceType } from "../../../ingestion-sources/model/ingestion-source-catalog.ts";
 import { SourceTypeIconGlyph } from "../../../ingestion-sources/ui/elements/source-type-icon-glyph.tsx";
-import { AskChip } from "@langwatch/design-system/ask-chip";
 import { GovernanceWelcomeHeader } from "../elements/governance-welcome-header.tsx";
-import { HeroAskField } from "@langwatch/project-web/surfaces/hero-ask-field";
-import { HeroLeadPill } from "@langwatch/design-system/hero-lead-pill";
 
 /**
  * Same width as the project home's own ask field (`ASK_MEASURE` there),
@@ -97,9 +98,7 @@ export function GovernanceHero({
       <VStack align="center" gap={3} width="full" maxWidth={ASK_MEASURE}>
         <HeroAskField
           placeholder={
-            canAsk
-              ? "Ask Langy, search, or jump to anything"
-              : "Search, or jump to anything"
+            canAsk ? "Ask Langy, search, or jump to anything" : "Search, or jump to anything"
           }
         />
 
@@ -107,12 +106,7 @@ export function GovernanceHero({
           {canManageSources ? <AddSourcePill /> : null}
           <HStack gap={2} flexWrap="wrap" justify="center">
             {LEAD_CHIPS.map((chip) => (
-              <AskChip
-                key={chip.key}
-                icon={chip.icon}
-                label={chip.label}
-                href={chip.href}
-              />
+              <AskChip key={chip.key} icon={chip.icon} label={chip.label} href={chip.href} />
             ))}
           </HStack>
         </VStack>
@@ -135,9 +129,7 @@ function AddSourcePill() {
           label="Add source"
           glyphs={LEAD_SOURCE_VENDORS.map((vendor) => ({
             key: vendor.sourceType,
-            icon: (
-              <SourceTypeIconGlyph sourceType={vendor.sourceType} size="10px" />
-            ),
+            icon: <SourceTypeIconGlyph sourceType={vendor.sourceType} size="10px" />,
           }))}
         />
       </MenuTrigger>

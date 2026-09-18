@@ -25,22 +25,26 @@
  * resolved to names elsewhere.
  */
 
+import {
+  type GovernancePuller as PullerAdapter,
+  type NormalizedPullEvent,
+  type PullResult,
+  type PullRunOptions,
+  copilotStudioDataversePullConfigSchema,
+  type CopilotStudioDataversePullConfig,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
+
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import { COPILOT_CONVERSATION_ACTION } from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
-import { Temporal, nowInstant } from "@langwatch/time";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   isEnvironmentOrigin,
   isSameEnvironment,
 } from "../../rules/dataverse-environment-service.rules.ts";
-import type {
-  GovernancePuller as PullerAdapter,
-  NormalizedPullEvent,
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
+export { copilotStudioDataversePullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import type { CopilotStudioDataversePullerChannel } from "../copilot-studio-dataverse.channel.ts";
 
 const logger = createLogger("langwatch:puller:copilot_studio_dataverse");
@@ -89,27 +93,7 @@ const API_VERSION = "v9.2";
  */
 const FIRST_RUN_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 
-export const copilotStudioDataversePullConfigSchema = z.object({
-  adapter: z.literal(COPILOT_STUDIO_DATAVERSE_ADAPTER_ID),
-  /** Environment base URL, e.g. `https://org12345.crm.dynamics.com`. */
-  environmentUrl: z.string().url(),
-  /**
-   * Which agents to read. Empty means every agent the credential can see,
-   * which is what most customers want and what silently starts covering an
-   * agent the day someone creates one.
-   *
-   * Required to be a uuid because the id is written into the `$filter` as a
-   * bare `Edm.Guid` literal, which is the only form Dataverse accepts for a
-   * lookup column. Bare means unquoted, and unquoted means an id that is not a
-   * guid would be read as part of the filter expression rather than as a value
-   * — so the shape that makes the query correct is the same shape that keeps
-   * anything else out of it. A malformed id is refused here, where the source
-   * says why, instead of arriving as an opaque HTTP 400 on every run.
-   */
-  botIds: z.array(z.string().uuid()).default([]),
-});
-
-export type CopilotStudioDataverseConfig = z.infer<typeof copilotStudioDataversePullConfigSchema>;
+export type CopilotStudioDataverseConfig = CopilotStudioDataversePullConfig;
 
 const tokenResponseSchema = z.object({
   access_token: z.string().min(1),

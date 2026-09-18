@@ -6,7 +6,11 @@ import {
   recordWorkspaceViewInputSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
-import type { GovernanceDiagnosticsSink,AdminWorkspaceViewOcsfChannel } from "../app/governance.members.ts";
+
+import type {
+  GovernanceDiagnosticsSink,
+  AdminWorkspaceViewOcsfChannel,
+} from "../app/governance.members.ts";
 import type { AdminWorkspaceViewAuditRepository } from "../repositories/admin-workspace-view-audit.repository.ts";
 
 const skipped = (): RecordWorkspaceViewResult => ({

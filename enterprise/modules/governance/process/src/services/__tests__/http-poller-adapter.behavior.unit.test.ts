@@ -6,11 +6,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
 import {
   type GovernanceHttpClient,
   type GovernanceHttpResponse,
 } from "../../app/governance.members.ts";
+import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
 
 const VALID_CONFIG = {
   adapter: "http_polling" as const,

@@ -24,6 +24,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import {
   defaultBackfillStart,
   SOURCE_BACKFILL_MONTHS,
@@ -38,18 +39,13 @@ import {
   seedComposerParserConfig,
 } from "../governance-inventory.screen.tsx";
 
-const fieldFor = (
-  sourceType: "openai_admin" | "anthropic_admin",
-  key: string,
-) => {
+const fieldFor = (sourceType: "openai_admin" | "anthropic_admin", key: string) => {
   const field = PARSER_FIELDS[sourceType].find((f) => f.key === key);
   if (!field) throw new Error(`no ${sourceType} field named ${key}`);
   return field;
 };
 
-const openAiComposerWith = (
-  parserConfig: Record<string, string>,
-): ComposerState => ({
+const openAiComposerWith = (parserConfig: Record<string, string>): ComposerState => ({
   sourceType: "openai_admin",
   name: "OpenAI org",
   description: "",
@@ -91,9 +87,7 @@ describe("given the date a scheduled source reads history from", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-09-15T10:30:00.000Z"));
 
-      expect(defaultParserValues("openai_admin").startingAt).toBe(
-        "2025-09-15T00:00:00.000Z",
-      );
+      expect(defaultParserValues("openai_admin").startingAt).toBe("2025-09-15T00:00:00.000Z");
     });
 
     /** @scenario "A new OpenAI source proposes a year of history" */
@@ -114,9 +108,7 @@ describe("given the date a scheduled source reads history from", () => {
       // Six months before the 31st of August is the 31st of February, which
       // Date rolls forward into March. The proposal would then be five months
       // back and three days, on a form whose hint says six.
-      expect(defaultBackfillStart("anthropic_admin")).toBe(
-        "2026-02-28T00:00:00.000Z",
-      );
+      expect(defaultBackfillStart("anthropic_admin")).toBe("2026-02-28T00:00:00.000Z");
     });
 
     /** @scenario "A proposal from a day the target month does not have lands in that month" */
@@ -124,9 +116,7 @@ describe("given the date a scheduled source reads history from", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-03-31T10:30:00.000Z"));
 
-      expect(defaultBackfillStart("anthropic_admin")).toBe(
-        "2025-09-30T00:00:00.000Z",
-      );
+      expect(defaultBackfillStart("anthropic_admin")).toBe("2025-09-30T00:00:00.000Z");
     });
 
     /** @scenario "A proposal from a day the target month does not have lands in that month" */
@@ -137,9 +127,7 @@ describe("given the date a scheduled source reads history from", () => {
       // A year back from the 29th only exists every fourth year, so this is
       // the same rollover with the target month a year away rather than six
       // months.
-      expect(defaultBackfillStart("openai_admin")).toBe(
-        "2023-02-28T00:00:00.000Z",
-      );
+      expect(defaultBackfillStart("openai_admin")).toBe("2023-02-28T00:00:00.000Z");
     });
   });
 
@@ -178,9 +166,7 @@ describe("given the date a scheduled source reads history from", () => {
   describe("when the admin clears the proposed date", () => {
     /** @scenario "Clearing the proposal still means the adapter's own default" */
     it("carries no start date into the saved config", () => {
-      const built = buildOpenAiAdminPullConfig(
-        openAiComposerWith({ startingAt: "" }),
-      );
+      const built = buildOpenAiAdminPullConfig(openAiComposerWith({ startingAt: "" }));
 
       expect(built).not.toBeNull();
       expect(built).not.toHaveProperty("startingAt");

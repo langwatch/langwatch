@@ -2,8 +2,9 @@
 // resolution and OCSF composition (mocks storage edges only; real dispatch logic).
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
+
 import { TestHttp, createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
+import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
 
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();

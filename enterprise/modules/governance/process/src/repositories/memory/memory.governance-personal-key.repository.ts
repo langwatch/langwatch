@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PersonalVirtualKey } from "@langwatch/enterprise-governance-contract";
+
 import { PersonalVirtualKeyRepository } from "../personal-virtual-key.repository.ts";
 import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 

@@ -20,21 +20,21 @@ export interface ExploreSelection {
   interval: ExploreInterval;
 }
 
-export const EXPLORE_MEASURES: ReadonlyArray<{
+export const EXPLORE_MEASURES: readonly {
   value: ExploreMeasure;
   label: string;
   aggregate: string;
-}> = [
+}[] = [
   { value: "cost", label: "Cost", aggregate: "sum(cost)" },
   { value: "requests", label: "Requests", aggregate: "count()" },
   { value: "tokens", label: "Tokens", aggregate: "sum(tokens)" },
   { value: "error_rate", label: "Error rate", aggregate: "avg(is_error)" },
 ];
 
-export const EXPLORE_BREAKDOWNS: ReadonlyArray<{
+export const EXPLORE_BREAKDOWNS: readonly {
   value: ExploreBreakdown;
   label: string;
-}> = [
+}[] = [
   { value: "department", label: "Department" },
   { value: "tool", label: "Tool" },
   { value: "model", label: "Model" },
@@ -42,12 +42,12 @@ export const EXPLORE_BREAKDOWNS: ReadonlyArray<{
   { value: "project", label: "Project" },
 ];
 
-export const EXPLORE_INTERVALS: ReadonlyArray<{
+export const EXPLORE_INTERVALS: readonly {
   value: ExploreInterval;
   label: string;
   adverb: string;
   bin: string;
-}> = [
+}[] = [
   { value: "day", label: "Daily", adverb: "daily", bin: "1d" },
   { value: "week", label: "Weekly", adverb: "weekly", bin: "1w" },
   { value: "month", label: "Monthly", adverb: "monthly", bin: "1M" },
@@ -64,10 +64,10 @@ export const DEFAULT_EXPLORE_SELECTION: ExploreSelection = {
 };
 
 /** Named starting points. Each carries a whole selection, never a patch. */
-export const EXPLORE_TEMPLATES: ReadonlyArray<{
+export const EXPLORE_TEMPLATES: readonly {
   label: string;
   selection: ExploreSelection;
-}> = [
+}[] = [
   { label: "Spend by department", selection: DEFAULT_EXPLORE_SELECTION },
   {
     label: "Spend by tool",

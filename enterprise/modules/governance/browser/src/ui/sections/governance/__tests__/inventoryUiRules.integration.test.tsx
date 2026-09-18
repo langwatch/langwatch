@@ -47,15 +47,11 @@ describe("given an admin on the Inventory page", () => {
       expect(actions?.contains(sampleToggle)).toBe(true);
       expect(actions?.contains(addTool)).toBe(true);
 
-      const outlineSmall = screen.getByText(
-        "reference outline small",
-      ).className;
+      const outlineSmall = screen.getByText("reference outline small").className;
       const ghostSmall = screen.getByText("reference ghost small").className;
       const subtleSmall = screen.getByText("reference subtle small").className;
       const solidSmall = screen.getByText("reference solid small").className;
-      const solidSmallTrigger = screen.getByText(
-        "reference solid small trigger",
-      ).className;
+      const solidSmallTrigger = screen.getByText("reference solid small trigger").className;
 
       // The old assertion here was `addTool.className !== sampleToggle.className`,
       // which is satisfied by any two buttons that differ at all. A grey Add
@@ -73,19 +69,13 @@ describe("given an admin on the Inventory page", () => {
       // Exactly one OUTLINE, which is what carries the weight solid used to.
       // Asserted as a count for the same reason it always was: a row where
       // nothing stands out reads as a row with no primary action.
-      const headerButtons = actions
-        ? Array.from(actions.querySelectorAll("button"))
-        : [];
-      expect(
-        headerButtons.filter((button) => button.className === outlineSmall),
-      ).toHaveLength(1);
+      const headerButtons = actions ? Array.from(actions.querySelectorAll("button")) : [];
+      expect(headerButtons.filter((button) => button.className === outlineSmall)).toHaveLength(1);
       // And nothing in the row is solid, in either the branded or the plain
       // form. This is the half that fails if solid orange creeps back.
       expect(
         headerButtons.filter(
-          (button) =>
-            button.className === solidSmall ||
-            button.className === solidSmallTrigger,
+          (button) => button.className === solidSmall || button.className === solidSmallTrigger,
         ),
       ).toHaveLength(0);
 
@@ -120,8 +110,7 @@ describe("given an admin on the Inventory page", () => {
       connectTools();
       renderScreen();
 
-      const createControls = () =>
-        screen.queryAllByRole("button", { name: /Add (tool|source)/ });
+      const createControls = () => screen.queryAllByRole("button", { name: /Add (tool|source)/ });
       const heading = screen.getByRole("heading", { name: "Inventory" });
       const headerRow = heading.closest("div")?.parentElement;
 
@@ -155,9 +144,7 @@ describe("given an admin on the Inventory page", () => {
       renderScreen();
 
       const empty = screen.getByTestId("tool-catalog-empty");
-      expect(
-        within(empty).getByText("No tools registered yet"),
-      ).toBeInTheDocument();
+      expect(within(empty).getByText("No tools registered yet")).toBeInTheDocument();
       // The sentence says what fills the catalog. Asserted because a headline
       // alone is the old grey-box empty state wearing a bigger font.
       expect(
@@ -189,9 +176,7 @@ describe("given an admin on the Inventory page", () => {
       // would be the original defect wearing a matching coat. Followed all the
       // way to the drawer the header's own button opens.
       await userEvent.click(inside);
-      expect(
-        await screen.findByRole("heading", { name: /Add tool/ }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: /Add tool/ })).toBeInTheDocument();
     });
 
     // A reader without the registry grant must not be shown an empty catalog
@@ -199,11 +184,7 @@ describe("given an admin on the Inventory page", () => {
     // needs instead, with the tab strip still in place.
     /** @scenario "The catalog stays hidden from a reader without the registry grant" */
     it("tells a reader without the registry grant which grant the catalog needs", () => {
-      harness.permissions = [
-        "organization:view",
-        "governance:view",
-        "ingestionSources:view",
-      ];
+      harness.permissions = ["organization:view", "governance:view", "ingestionSources:view"];
       emptyWithSamplesOff();
       renderScreen();
 
@@ -254,9 +235,7 @@ describe("given an admin on the Inventory page", () => {
       // itself selected, which is earlier than the pane it reveals finishing
       // its own render. The synchronous form passed on a warm local machine
       // and failed on a loaded CI worker.
-      expect(
-        await screen.findByTestId("tool-catalog-empty"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("tool-catalog-empty")).toBeInTheDocument();
       unmount();
 
       connectTools();
@@ -277,9 +256,7 @@ describe("given an admin on the Inventory page", () => {
       // the absence on its own proves nothing — a pane that has not rendered
       // yet is also missing its empty state, and the pair would pass on a
       // catalog that never arrived.
-      expect(
-        await screen.findByTestId("tool-card-tool-claude-code"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("tool-card-tool-claude-code")).toBeInTheDocument();
       expect(screen.queryByTestId("tool-catalog-empty")).toBeNull();
     });
 
@@ -296,12 +273,8 @@ describe("given an admin on the Inventory page", () => {
       // TOOL registers a registry entry and opens a different drawer, so
       // pressing it here would sweep the wrong one.
       await openTab(/Sources/);
-      await userEvent.click(
-        screen.getAllByRole("button", { name: /Add source/ })[0]!,
-      );
-      await userEvent.click(
-        await screen.findByRole("menuitem", { name: /Anthropic Admin API/ }),
-      );
+      await userEvent.click(screen.getAllByRole("button", { name: /Add source/ })[0]!);
+      await userEvent.click(await screen.findByRole("menuitem", { name: /Anthropic Admin API/ }));
       await screen.findByRole("dialog");
       // Required, not probed. `anthropic_admin` always puts PullCadenceField
       // behind Advanced, so the old `if (advanced)` never fired — it only
@@ -312,9 +285,7 @@ describe("given an admin on the Inventory page", () => {
       // native-free. Without this the test passes just as loudly on a drawer
       // that never rendered the control, which is how the narrow version of
       // this assertion went green over five native selects.
-      expect(
-        screen.getByRole("combobox", { name: "Frequency" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Frequency" })).toBeInTheDocument();
       expect(findNativeSelects(document.body)).toHaveLength(0);
     });
   });

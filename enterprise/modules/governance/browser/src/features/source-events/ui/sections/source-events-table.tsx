@@ -13,11 +13,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Fragment, type ReactNode, useState } from "react";
-import { EventDetailRow } from "./source-event-detail-panels.tsx";
-import type { SourceEventsPager } from "../../behavior/use-source-events-pager.ts";
-import { nowInstant,toEpochMs } from "@langwatch/time";
+
 import { readableDate } from "../../../../model/display-formatters.ts";
+import type { SourceEventsPager } from "../../behavior/use-source-events-pager.ts";
+import { EventDetailRow } from "./source-event-detail-panels.tsx";
 
 /**
  * The events section of the ingestion-source detail page: a cursor-walked

@@ -2,6 +2,7 @@
 
 import { GROWTH_SEAT_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import {
   type BillingReportOrganizationLookup,
   BillingReportOrganizationRepository,

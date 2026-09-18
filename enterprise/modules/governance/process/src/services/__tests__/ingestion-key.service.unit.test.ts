@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
 import type { OrganizationService } from "@langwatch/organization-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 import type { IngestionKeyIssuer, IngestionKeyRepository } from "../../app/governance.members.ts";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";
-import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 
 class FakeIngestionKeyRepository implements IngestionKeyRepository {
   prior: Awaited<ReturnType<IngestionKeyRepository["findIngestKey"]>> = null;

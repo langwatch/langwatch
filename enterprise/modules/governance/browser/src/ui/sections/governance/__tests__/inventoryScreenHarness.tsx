@@ -44,19 +44,18 @@
  *   - specs/ai-governance/dashboard/governance-ui-controls.feature
  */
 import { Button } from "@chakra-ui/react";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 import "@testing-library/jest-dom/vitest";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
-import { builtinRolePermissions } from "@langwatch/authz-contract";
-
-import { SAMPLE_CHOICE_KEY } from "../../../../ui/elements/governance-sample-mode.ts";
 import {
   fakeGovernanceHost,
   renderWithGovernanceHost,
   type GovernanceQuery,
 } from "../../../../testing.tsx";
+import { SAMPLE_CHOICE_KEY } from "../../../../ui/elements/governance-sample-mode.ts";
 
 const hoistedHarness = vi.hoisted(() => ({
   permissions: [] as string[],

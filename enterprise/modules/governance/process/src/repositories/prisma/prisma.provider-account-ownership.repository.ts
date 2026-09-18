@@ -57,11 +57,7 @@ const PROVIDER_ACCOUNT_SOURCE_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /** Whether a source of this type reads an account the provider can name. */
-export function readsProviderAccount({
-  sourceType,
-}: {
-  sourceType: string;
-}): boolean {
+export function readsProviderAccount({ sourceType }: { sourceType: string }): boolean {
   return PROVIDER_ACCOUNT_SOURCE_TYPES.has(sourceType);
 }
 
@@ -121,9 +117,7 @@ export interface ProviderAccountReader {
 /** The config key naming which report of an account a source reads. */
 export const REPORT_FIELD = "report";
 
-function readReport(
-  parserConfig: Record<string, unknown> | null | undefined,
-): string | null {
+function readReport(parserConfig: Record<string, unknown> | null | undefined): string | null {
   const value = parserConfig?.[REPORT_FIELD];
   if (typeof value !== "string") return null;
   const trimmed = value.trim().toLowerCase();

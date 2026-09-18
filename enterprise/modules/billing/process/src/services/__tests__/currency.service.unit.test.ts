@@ -3,8 +3,8 @@
  * inference, unknown falls back to EUR. Local IPs need careful handling.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Currency } from "@langwatch/enterprise-billing-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { lookup } = vi.hoisted(() => ({ lookup: vi.fn() }));
 vi.mock("geoip-country", () => ({ default: { lookup } }));

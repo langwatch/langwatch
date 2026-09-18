@@ -19,7 +19,6 @@
 
 import { z } from "zod";
 
-import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
 import {
   type AgentListing,
   type AgentListingRefusal,
@@ -34,6 +33,7 @@ import {
   dataverseHeaders,
   isEnvironmentOrigin,
 } from "../rules/dataverse-environment-service.rules.ts";
+import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 

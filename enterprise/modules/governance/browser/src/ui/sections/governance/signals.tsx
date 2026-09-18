@@ -1,9 +1,9 @@
 import { Badge, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { BellPlus, Plus } from "lucide-react";
 
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import GovernanceLayout from "../governance-layout.tsx";
 import { Link } from "../../elements/governance-link.tsx";
+import GovernanceLayout from "../governance-layout.tsx";
 
 /**
  * Rule registry placeholder. Nothing creates rules yet. Preview badge, disabled buttons
@@ -22,9 +22,8 @@ function SignalsPage() {
               </Badge>
             </HStack>
             <Text color="fg.muted">
-              A preview of where signal rules will live: a condition to watch
-              for, and what happens when one fires. Nothing is being watched
-              yet.
+              A preview of where signal rules will live: a condition to watch for, and what happens
+              when one fires. Nothing is being watched yet.
             </Text>
           </VStack>
           <HStack gap={2} flexShrink={0}>
@@ -46,9 +45,8 @@ function SignalsPage() {
           <HStack gap={2} align="baseline" flexWrap="wrap">
             <Text fontWeight="semibold">What this page will hold</Text>
             <Text fontSize="sm" color="fg.muted">
-              one registry for the rules that watch your activity. The alerts
-              they raise will be listed in the{" "}
-              <Link href="/governance/insights">Insights inbox</Link>.
+              one registry for the rules that watch your activity. The alerts they raise will be
+              listed in the <Link href="/governance/insights">Insights inbox</Link>.
             </Text>
           </HStack>
           <VStack
@@ -59,9 +57,7 @@ function SignalsPage() {
             paddingY={14}
             paddingX={6}
           >
-            <Text color="fg.muted">
-              No rules here yet. Creating one is coming.
-            </Text>
+            <Text color="fg.muted">No rules here yet. Creating one is coming.</Text>
           </VStack>
         </VStack>
 

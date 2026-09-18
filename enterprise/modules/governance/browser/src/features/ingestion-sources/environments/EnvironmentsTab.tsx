@@ -12,12 +12,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Boxes } from "lucide-react";
-import type { ReactNode } from "react";
-import { useState } from "react";
-import { Temporal, toDate, toEpochMs } from "@langwatch/time";
-import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
-import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -27,7 +21,13 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+import { Temporal, toDate, toEpochMs } from "@langwatch/time";
+import { Boxes } from "lucide-react";
+import type { ReactNode } from "react";
+import { useState } from "react";
 
+import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
+import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import {
   discoverEnvironments,
   type EnvironmentRow,

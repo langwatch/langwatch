@@ -9,6 +9,7 @@
  * pagination risk on very large organizations.
  */
 import type { OrganizationApi } from "@langwatch/organization-contract";
+
 import type { CliAdminContactReader } from "../app/governance.members.ts";
 
 /** The one organization operation this service needs, out of `OrganizationApi`'s whole surface. */

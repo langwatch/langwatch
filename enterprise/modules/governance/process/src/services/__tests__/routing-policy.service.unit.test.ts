@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
 import {
   RoutingPolicyModelMustBeConcreteError,
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyProviderScopeError,
   type RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { RoutingPolicyRepository } from "../../repositories/routing-policy.repository.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../governance-routing.service.ts";
 

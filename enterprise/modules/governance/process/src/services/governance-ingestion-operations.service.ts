@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
-import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service.ts";
+import type { GovernanceOttlGateway } from "@langwatch/enterprise-governance-contract";
+
 import type { GovernanceEventingChannel } from "../app/governance.members.ts";
+import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service.ts";
 import type { IngestionKeyService } from "./ingestion-source-key.service.ts";
 import type { IngestionSourceService } from "./ingestion-source.service.ts";
 import type { IngestionTemplateService } from "./ingestion-template.service.ts";
 import type { DefaultGovernanceOcsfExportService } from "./ocsf-export.service.ts";
-import type { GovernanceOttlGateway } from "@langwatch/enterprise-governance-contract";
 
 /** Private cohesive collaborator for the ingestion operation set. */
 export class GovernanceIngestionOperationsService {
@@ -41,9 +42,8 @@ export class GovernanceIngestionOperationsService {
     );
   }
 
-  readonly extractCanonicalCostEvents: GovernanceApi["extractCanonicalCostEvents"] = (
-    ...args
-  ) => this.canonicalCost.extract(...args);
+  readonly extractCanonicalCostEvents: GovernanceApi["extractCanonicalCostEvents"] = (...args) =>
+    this.canonicalCost.extract(...args);
 
   readonly ingestionConfigure: GovernanceApi["ingestionConfigure"] = (...args) =>
     this.eventing.configureIngestion(...args);
@@ -51,9 +51,8 @@ export class GovernanceIngestionOperationsService {
   readonly ingestionDisable: GovernanceApi["ingestionDisable"] = (...args) =>
     this.eventing.disableIngestion(...args);
 
-  readonly ingestionRecordRunCompleted: GovernanceApi["ingestionRecordRunCompleted"] = (
-    ...args
-  ) => this.eventing.recordIngestionRunCompleted(...args);
+  readonly ingestionRecordRunCompleted: GovernanceApi["ingestionRecordRunCompleted"] = (...args) =>
+    this.eventing.recordIngestionRunCompleted(...args);
 
   readonly ingestionRecordRunFailed: GovernanceApi["ingestionRecordRunFailed"] = (...args) =>
     this.eventing.recordIngestionRunFailed(...args);
@@ -65,9 +64,8 @@ export class GovernanceIngestionOperationsService {
     ...args
   ) => this.ingestionKeys.ensureForProject(...args);
 
-  readonly ingestionKeyIssueForProject: GovernanceApi["ingestionKeyIssueForProject"] = (
-    ...args
-  ) => this.ingestionKeys.issueForProject(...args);
+  readonly ingestionKeyIssueForProject: GovernanceApi["ingestionKeyIssueForProject"] = (...args) =>
+    this.ingestionKeys.issueForProject(...args);
 
   readonly ingestionKeyEnsureForPersonalProject: GovernanceApi["ingestionKeyEnsureForPersonalProject"] =
     (...args) => this.ingestionKeys.ensureForPersonalProject(...args);
@@ -85,9 +83,8 @@ export class GovernanceIngestionOperationsService {
   readonly ingestionSourceList: GovernanceApi["ingestionSourceList"] = (...args) =>
     this.ingestionSources.list(...args);
 
-  readonly findIngestionSourceById: GovernanceApi["findIngestionSourceById"] = (
-    ...args
-  ) => this.ingestionSources.findById(...args);
+  readonly findIngestionSourceById: GovernanceApi["findIngestionSourceById"] = (...args) =>
+    this.ingestionSources.findById(...args);
 
   readonly ingestionSourceGetById: GovernanceApi["ingestionSourceGetById"] = (...args) =>
     this.ingestionSources.getById(...args);
@@ -95,8 +92,9 @@ export class GovernanceIngestionOperationsService {
   readonly ingestionSourceLiveTraceProjectIds: GovernanceApi["ingestionSourceLiveTraceProjectIds"] =
     (...args) => this.ingestionSources.liveTraceProjectIds(...args);
 
-  readonly findIngestionSourceByIngestSecret: GovernanceApi["findIngestionSourceByIngestSecret"] =
-    (...args) => this.ingestionSources.findByIngestSecret(...args);
+  readonly findIngestionSourceByIngestSecret: GovernanceApi["findIngestionSourceByIngestSecret"] = (
+    ...args
+  ) => this.ingestionSources.findByIngestSecret(...args);
 
   readonly ingestionSourceCreate: GovernanceApi["ingestionSourceCreate"] = (...args) =>
     this.ingestionSources.createSource(...args);
@@ -104,9 +102,8 @@ export class GovernanceIngestionOperationsService {
   readonly ingestionSourceUpdate: GovernanceApi["ingestionSourceUpdate"] = (...args) =>
     this.ingestionSources.updateSource(...args);
 
-  readonly ingestionSourceRotateSecret: GovernanceApi["ingestionSourceRotateSecret"] = (
-    ...args
-  ) => this.ingestionSources.rotateSecret(...args);
+  readonly ingestionSourceRotateSecret: GovernanceApi["ingestionSourceRotateSecret"] = (...args) =>
+    this.ingestionSources.rotateSecret(...args);
 
   readonly ingestionSourceArchive: GovernanceApi["ingestionSourceArchive"] = (...args) =>
     this.ingestionSources.archive(...args);
@@ -138,14 +135,12 @@ export class GovernanceIngestionOperationsService {
   readonly templateCloneFromPlatform: GovernanceApi["templateCloneFromPlatform"] = (...args) =>
     this.templates.cloneFromPlatform(...args);
 
-  readonly templateSyncPlatformCatalog: GovernanceApi["templateSyncPlatformCatalog"] = (
-    ...args
-  ) => this.templates.syncPlatformCatalog(...args);
+  readonly templateSyncPlatformCatalog: GovernanceApi["templateSyncPlatformCatalog"] = (...args) =>
+    this.templates.syncPlatformCatalog(...args);
 
   readonly ocsfList: GovernanceApi["ocsfList"] = (...args) => this.ocsf.list(...args);
 
-  readonly ottlValidate: GovernanceApi["ottlValidate"] = (...args) =>
-    this.ottl.validate(...args);
+  readonly ottlValidate: GovernanceApi["ottlValidate"] = (...args) => this.ottl.validate(...args);
 
   readonly ottlTransform: GovernanceApi["ottlTransform"] = (...args) =>
     this.ottl.transform(...args);

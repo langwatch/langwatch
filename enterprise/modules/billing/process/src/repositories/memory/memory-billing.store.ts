@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { Instant } from "@langwatch/time";
+
 import type { BillingCheckpoint } from "../billing-checkpoint.repository.ts";
-import type { BillingSubscriptionRecord } from "../subscription.repository.ts";
 import type { NurturingProfile } from "../nurturing-profile.repository.ts";
+import type { BillingSubscriptionRecord } from "../subscription.repository.ts";
 
 /** An organization as every billing row in the memory tier sees it. */
 export type MemoryBillingOrganization = {

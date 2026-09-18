@@ -31,11 +31,12 @@
  * bodies.
  */
 
-import type { IngestionPullRunProjection } from "@langwatch/prisma-client/generated";
 import type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
 } from "@langwatch/enterprise-governance-contract";
+import type { IngestionPullRunProjection } from "@langwatch/prisma-client/generated";
+
 import type { ListingRefusalReason } from "../rules/provider-listing.rules.ts";
 
 /**

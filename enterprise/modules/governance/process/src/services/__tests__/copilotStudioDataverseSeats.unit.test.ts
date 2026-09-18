@@ -16,9 +16,10 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-dataverse.feature
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RedirectRefusedError } from "@langwatch/egress";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import capturedCostReply from "./fixtures/azureCostManagementDailyResponse.json";
 
 interface FetchCall {
@@ -193,7 +194,6 @@ afterEach(() => {
 });
 
 async function runPull({
-  readSeats = true,
   azureSubscriptionId,
   cursor = null,
 }: {
@@ -201,24 +201,36 @@ async function runPull({
   azureSubscriptionId?: string;
   cursor?: string | null;
 }) {
-  const { CopilotStudioDataversePuller } =
-    await import("../copilot-studio-dataverse-puller.service.ts");
-  const adapter = new CopilotStudioDataversePuller();
+  const { HttpCopilotStudioDataverseChannel } =
+    await import("../../channels/http/http.copilot-studio-dataverse.channel.ts");
+  const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
+  const http: GovernanceHttpClient = {
+    async fetch(url, init) {
+      const response = await ssrfSafeFetch(url, init);
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: "",
+        json: () => response.json(),
+        text: () => response.text(),
+      };
+    },
+  };
+  const adapter = HttpCopilotStudioDataverseChannel.create(http);
   return adapter.runOnce(
     { cursor, credentials: CREDENTIALS },
     {
       adapter: "copilot_studio_dataverse" as const,
       environmentUrl: ENVIRONMENT_URL,
       botIds: [],
-      readSeats,
+      readSeats: true,
       readDirectory: false,
-      ...(azureSubscriptionId === undefined ? {} : { azureSubscriptionId }),
     },
   );
 }
 
 const graphCalls = () => capturedCalls.filter((call) => call.url.includes(GRAPH_HOST));
-const seatEvents = <T extends { action: string }>(events: T[]) =>
+const seatEvents = <T extends { action: string; source_event_id: string }>(events: T[]) =>
   events.filter((event) => event.action === "seat_report");
 const costEvents = <T extends { action: string }>(events: T[]) =>
   events.filter((event) => event.action === "cost_report");

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 /**
  * Turning the Azure bill into events, and deciding what the next run asks for
  * when this one could not read it.
@@ -14,7 +15,6 @@
  * Decision: ADR-128 §3.
  */
 import { describe, expect, it } from "vitest";
-import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 
 import {
   AZURE_COST_MAX_HOLD_MS,
@@ -46,10 +46,7 @@ describe("the events one Azure cost read produces", () => {
     /** @scenario "The daily bill is read as the currency the customer is billed in" */
     it("carries the billed amount, its currency and Microsoft's dollar figure", () => {
       const [event] = eventsFor([day()]);
-      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<
-        string,
-        unknown
-      >;
+      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown>;
 
       expect(hint.costUsd).toBe("0.527171286737249");
       expect(hint.currency).toBe("EUR");
@@ -83,29 +80,18 @@ describe("the events one Azure cost read produces", () => {
       // Same event id and same dimensions means the same restatement key,
       // which is what makes the finished figure land ON the partial one
       // rather than beside it and double the day.
-      expect(onceFinished[0]?.source_event_id).toBe(
-        whileRunning[0]?.source_event_id,
-      );
-      const before = whileRunning[0]?.extra?.[PULLED_USAGE_HINT_KEY] as Record<
-        string,
-        unknown
-      >;
-      const after = onceFinished[0]?.extra?.[PULLED_USAGE_HINT_KEY] as Record<
-        string,
-        unknown
-      >;
+      expect(onceFinished[0]?.source_event_id).toBe(whileRunning[0]?.source_event_id);
+      const before = whileRunning[0]?.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown>;
+      const after = onceFinished[0]?.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown>;
       expect(after.dimensions).toEqual(before.dimensions);
       // The money is NOT among the dimensions, or a correction would mint a
       // fresh key and be added on top of the figure it corrects.
-      expect(
-        JSON.stringify(after.dimensions).includes("0.527171286737249"),
-      ).toBe(false);
+      expect(JSON.stringify(after.dimensions).includes("0.527171286737249")).toBe(false);
     });
 
     /** @scenario "A day already recorded is re-read and its figure replaced, not added to" */
     it("keys on the day and meter alone, never on the subscription", () => {
-      const under = (subscriptionId: string) =>
-        azureCostEvents({ days: [day()], subscriptionId });
+      const under = (subscriptionId: string) => azureCostEvents({ days: [day()], subscriptionId });
       const hintOf = (events: ReturnType<typeof under>) =>
         events[0]?.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown>;
 
@@ -114,9 +100,7 @@ describe("the events one Azure cost read produces", () => {
       // admin correcting a mistyped one mints fresh keys for the whole
       // trailing week — and those days are ADDED beside the figures they were
       // meant to replace.
-      expect(
-        hintOf(under("aaaaaaaa-0000-0000-0000-000000000000")).dimensions,
-      ).toEqual(
+      expect(hintOf(under("aaaaaaaa-0000-0000-0000-000000000000")).dimensions).toEqual(
         hintOf(under("bbbbbbbb-0000-0000-0000-000000000000")).dimensions,
       );
     });
@@ -145,13 +129,8 @@ describe("the events one Azure cost read produces", () => {
   describe("when a day is a credit rather than a charge", () => {
     /** @scenario "A refunded day is recorded as the credit the provider reported" */
     it("carries the negative figure through unchanged", () => {
-      const [event] = eventsFor([
-        day({ costMinor: "-0.527171286737249", costUsd: "-0.6" }),
-      ]);
-      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<
-        string,
-        unknown
-      >;
+      const [event] = eventsFor([day({ costMinor: "-0.527171286737249", costUsd: "-0.6" })]);
+      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown>;
 
       expect(hint.costUsd).toBe("-0.527171286737249");
       expect(hint.costUsdBiller).toBe("-0.6");
@@ -182,10 +161,7 @@ describe("the events one Azure cost read produces", () => {
       const [event] = eventsFor([
         day({ currencyCode: "EUR", costMinor: "12.34", costUsd: "13.50" }),
       ]);
-      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<
-        string,
-        unknown
-      >;
+      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown>;
 
       // The euro figure, still in euros.
       expect(hint.costUsd).toBe("12.34");
@@ -210,13 +186,8 @@ describe("the events one Azure cost read produces", () => {
       // and it would land in a total as a real, wrong zero. The field is
       // absent instead, and the amount leaves in the currency it was billed
       // in.
-      const [event] = eventsFor([
-        day({ currencyCode: "EUR", costMinor: "12.34", costUsd: null }),
-      ]);
-      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<
-        string,
-        unknown
-      >;
+      const [event] = eventsFor([day({ currencyCode: "EUR", costMinor: "12.34", costUsd: null })]);
+      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown>;
 
       expect(widened(event).cost_usd).toBeUndefined();
       // Not merely absent: absent AND still exported, in euros.
@@ -230,13 +201,8 @@ describe("the events one Azure cost read produces", () => {
   describe("when the subscription is billed in dollars", () => {
     /** @scenario "The daily bill is read as the currency the customer is billed in" */
     it("carries no separate biller conversion, since the amount is already one", () => {
-      const [event] = eventsFor([
-        day({ currencyCode: "USD", costMinor: "0.6", costUsd: null }),
-      ]);
-      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<
-        string,
-        unknown
-      >;
+      const [event] = eventsFor([day({ currencyCode: "USD", costMinor: "0.6", costUsd: null })]);
+      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<string, unknown>;
 
       expect(hint.currency).toBe("USD");
       expect(hint.costUsdBiller).toBeUndefined();

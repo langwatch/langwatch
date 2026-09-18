@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
+
 import { azureBillSourceId, withAzureBillIdentity } from "../prisma.azure-bill-identity.repository";
 
 const subscription = "aaaaaaaa-0000-4000-8000-000000000001";
-function clientWith(
-  history: { id: string; parserConfig: Record<string, unknown> }[],
-) {
+function clientWith(history: { id: string; parserConfig: Record<string, unknown> }[]) {
   return {
     ingestionSource: { findMany: vi.fn().mockResolvedValue(history) },
   } as unknown as PrismaClient;
@@ -29,9 +28,7 @@ describe("withAzureBillIdentity()", () => {
       organizationId: "org",
       parserConfig: { azureSubscriptionId: subscription.toUpperCase() },
     });
-    expect(azureBillSourceId({ id: "third", parserConfig: config })).toBe(
-      "first",
-    );
+    expect(azureBillSourceId({ id: "third", parserConfig: config })).toBe("first");
   });
 
   it("remembers a disconnected subscription for a later replacement", async () => {
@@ -47,9 +44,7 @@ describe("withAzureBillIdentity()", () => {
       organizationId: "org",
       parserConfig: { azureSubscriptionId: subscription },
     });
-    expect(azureBillSourceId({ id: "second", parserConfig: replacement })).toBe(
-      "first",
-    );
+    expect(azureBillSourceId({ id: "second", parserConfig: replacement })).toBe("first");
   });
 
   it("ignores a caller's forged billing identity on create", async () => {
@@ -79,16 +74,12 @@ describe("withAzureBillIdentity()", () => {
         _azureBillSourceId: "victim",
       },
     });
-    expect(azureBillSourceId({ id: "second", parserConfig: config })).toBe(
-      "first",
-    );
+    expect(azureBillSourceId({ id: "second", parserConfig: config })).toBe("first");
   });
 
   it("does not reuse a different subscription's history", async () => {
     const config = await withAzureBillIdentity({
-      prisma: clientWith([
-        { id: "other", parserConfig: { azureSubscriptionId: "different" } },
-      ]),
+      prisma: clientWith([{ id: "other", parserConfig: { azureSubscriptionId: "different" } }]),
       organizationId: "org",
       parserConfig: { azureSubscriptionId: subscription },
     });

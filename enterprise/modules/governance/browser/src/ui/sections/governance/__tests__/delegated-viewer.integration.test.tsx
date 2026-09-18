@@ -1,3 +1,4 @@
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment jsdom
@@ -33,7 +34,6 @@ import { cleanup, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { builtinRolePermissions } from "@langwatch/authz-contract";
 import {
   fakeGovernanceHost,
   renderWithGovernanceHost,
@@ -91,7 +91,6 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
 import AnomalyRulesPage from "../governance-anomaly-rules.screen.tsx";
 import IngestionSourceDetailPage from "../governance-ingestion-source.screen.tsx";
 import InventoryPage from "../governance-inventory.screen.tsx";
-
 import GovernanceOverviewPage from "../governance-overview.screen.tsx";
 import PeoplePage from "../governance-people.screen.tsx";
 import TeamDetailPage from "../governance-team.screen.tsx";

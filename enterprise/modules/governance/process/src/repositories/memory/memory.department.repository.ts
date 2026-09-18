@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type {
-  Department,
-  DepartmentAssignments,
-} from "@langwatch/enterprise-governance-contract";
+import type { Department, DepartmentAssignments } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import { DepartmentRepository } from "../department.repository.ts";
 import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
@@ -59,6 +57,24 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
       teams: entries(this.store.departmentOfTeam),
       projects: entries(this.store.departmentOfProject),
     };
+  }
+
+  async departmentsOnDay(input: {
+    organizationId: string;
+    userIds: readonly string[];
+    dayUtc: string;
+  }): Promise<Map<string, string>> {
+    const owned = new Set(
+      this.store.departments
+        .filter((department) => department.organizationId === input.organizationId)
+        .map((department) => department.id),
+    );
+    return new Map(
+      input.userIds.flatMap((userId) => {
+        const departmentId = this.store.departmentOfUser.get(userId);
+        return departmentId && owned.has(departmentId) ? [[userId, departmentId]] : [];
+      }),
+    );
   }
 
   async create(input: { organizationId: string; name: string }): Promise<Department> {

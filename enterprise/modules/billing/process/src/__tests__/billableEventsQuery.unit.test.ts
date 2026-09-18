@@ -1,7 +1,8 @@
+import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { BillableEventsQueryService } from "../index.ts";
 import { type BillableEventsRepository as BillableEvents } from "../repositories/billable-events.repository.ts";
-import { Temporal } from "@langwatch/time";
 
 const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
   findTraceSummariesTotalUniq: vi.fn(),

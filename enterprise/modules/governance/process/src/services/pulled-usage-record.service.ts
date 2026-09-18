@@ -95,7 +95,10 @@ function reportedMoney({
   event: NormalizedPullEvent;
 }): { amount: string; currencyCode: string } | null {
   if (hint.costUsd !== undefined) {
-    return { amount: hint.costUsd, currencyCode: PULLED_USAGE_DEFAULT_CURRENCY_CODE };
+    return {
+      amount: hint.costUsd,
+      currencyCode: hint.currency ?? PULLED_USAGE_DEFAULT_CURRENCY_CODE,
+    };
   }
   if (event.cost_amount !== undefined && event.cost_currency !== undefined) {
     return { amount: event.cost_amount, currencyCode: event.cost_currency };
@@ -175,6 +178,7 @@ export class PulledUsageRecordService {
         basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
         costUsd: reported.amount,
         currencyCode: reported.currencyCode,
+        costUsdBiller: hint.costUsdBiller,
         costStatus: hint.costStatus,
       });
     } else {

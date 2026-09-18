@@ -54,9 +54,7 @@ describe("given an admin on the Inventory page", () => {
       // source-as-tool linkage that was removed.
       expect(screen.queryByTestId("tool-card-src-genie")).toBeNull();
       expect(screen.queryByText("Warehouse questions")).toBeNull();
-      expect(
-        screen.getByTestId("tool-card-tool-support-desk"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("tool-card-tool-support-desk")).toBeInTheDocument();
     });
 
     /** @scenario "A tool registered but not published is still in the catalog" */
@@ -108,12 +106,8 @@ describe("given an admin on the Inventory page", () => {
       renderScreen();
       await openTab(/Environments/);
       const table = await screen.findByTestId("environments-table");
-      expect(
-        within(table).getByText("example-env.crm.test"),
-      ).toBeInTheDocument();
-      expect(
-        within(table).getByText("Discovered from Assistant transcripts"),
-      ).toBeInTheDocument();
+      expect(within(table).getByText("example-env.crm.test")).toBeInTheDocument();
+      expect(within(table).getByText("Discovered from Assistant transcripts")).toBeInTheDocument();
     });
 
     /** @scenario "A discovered row says nobody created it" */
@@ -121,27 +115,19 @@ describe("given an admin on the Inventory page", () => {
       renderScreen();
       await openTab(/Environments/);
       const table = await screen.findByTestId("environments-table");
-      expect(
-        within(table).getAllByText("Discovered automatically").length,
-      ).toBeGreaterThan(0);
+      expect(within(table).getAllByText("Discovered automatically").length).toBeGreaterThan(0);
     });
 
     /** @scenario "Sample environments replace discovered environments until disabled" */
     it("replaces discovered environments and restores them when samples are off", async () => {
       renderScreen();
-      await userEvent.click(
-        screen.getByRole("button", { name: "See sample data" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "See sample data" }));
       await openTab(/Environments/);
       const table = await screen.findByTestId("environments-table");
       expect(within(table).getByText("Production")).toBeInTheDocument();
       expect(within(table).queryByText("example-env.crm.test")).toBeNull();
-      await userEvent.click(
-        screen.getByRole("button", { name: "Hide sample data" }),
-      );
-      expect(
-        within(table).getByText("example-env.crm.test"),
-      ).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Hide sample data" }));
+      expect(within(table).getByText("example-env.crm.test")).toBeInTheDocument();
       expect(within(table).queryByText("Production")).toBeNull();
     });
 
@@ -150,9 +136,7 @@ describe("given an admin on the Inventory page", () => {
       renderScreen();
       await openTab(/Sources/);
       expect(screen.getByTestId("source-row-src-genie")).toBeInTheDocument();
-      await userEvent.click(
-        screen.getByRole("button", { name: "See sample data" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "See sample data" }));
       expect(screen.queryByTestId("source-row-src-genie")).toBeNull();
       const rows = screen.getAllByTestId(/^source-row-/);
       expect(rows.length).toBeGreaterThan(0);
@@ -160,35 +144,23 @@ describe("given an admin on the Inventory page", () => {
         expect(within(row).queryByRole("link")).toBeNull();
         expect(within(row).queryByRole("button")).toBeNull();
       }
-      await userEvent.click(
-        screen.getByRole("button", { name: "Hide sample data" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "Hide sample data" }));
       expect(screen.getByTestId("source-row-src-genie")).toBeInTheDocument();
     });
 
     /** @scenario "The catalog is offered as a grid or as a table" */
     it("switches the catalog between a grid of cards and a table", async () => {
       renderScreen();
-      expect(screen.getByTestId("tool-catalog-cards")).toHaveAttribute(
-        "data-layout",
-        "grid",
-      );
+      expect(screen.getByTestId("tool-catalog-cards")).toHaveAttribute("data-layout", "grid");
       expect(screen.queryByRole("table")).toBeNull();
       await userEvent.click(screen.getByRole("radio", { name: /List/ }));
       await waitFor(() =>
-        expect(screen.getByTestId("tool-catalog-cards")).toHaveAttribute(
-          "data-layout",
-          "list",
-        ),
+        expect(screen.getByTestId("tool-catalog-cards")).toHaveAttribute("data-layout", "list"),
       );
       // A real table with a row per tool, not the same tall card stacked.
       const table = screen.getByRole("table");
-      expect(
-        within(table).getByRole("columnheader", { name: "Tool" }),
-      ).toBeInTheDocument();
-      expect(
-        within(table).getByTestId("tool-card-tool-claude-code"),
-      ).toBeInTheDocument();
+      expect(within(table).getByRole("columnheader", { name: "Tool" })).toBeInTheDocument();
+      expect(within(table).getByTestId("tool-card-tool-claude-code")).toBeInTheDocument();
     });
 
     /** @scenario "Table headers are spelled out rather than abbreviated" */
@@ -205,9 +177,7 @@ describe("given an admin on the Inventory page", () => {
         "Agents",
         "Top department",
       ]) {
-        expect(
-          within(table).getByRole("columnheader", { name: header }),
-        ).toBeInTheDocument();
+        expect(within(table).getByRole("columnheader", { name: header })).toBeInTheDocument();
       }
       // The design mock abbreviated these three. The section's copy rule does
       // not allow it, and a header is exactly where a guess costs the most.
@@ -231,21 +201,15 @@ describe("given an admin on the Inventory page", () => {
     /** @scenario "Sample mode replaces the cards rather than filling them in" */
     it("shows the sample tools and no card built from the real registry", async () => {
       renderScreen();
-      await userEvent.click(
-        screen.getByRole("button", { name: "See sample data" }),
-      );
-      expect(
-        await screen.findByTestId("tool-card-sample-claude-code"),
-      ).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "See sample data" }));
+      expect(await screen.findByTestId("tool-card-sample-claude-code")).toBeInTheDocument();
       expect(screen.queryByTestId("tool-card-tool-openai")).toBeNull();
     });
 
     /** @scenario "A sample card offers no action that would act on a real tool" */
     it("offers no row actions while sample mode is on", async () => {
       renderScreen();
-      await userEvent.click(
-        screen.getByRole("button", { name: "See sample data" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "See sample data" }));
       const card = await screen.findByTestId("tool-card-sample-claude-code");
       expect(within(card).queryByRole("button")).toBeNull();
     });
@@ -257,32 +221,22 @@ describe("given an admin on the Inventory page", () => {
     /** @scenario "Registering a tool opens the registration drawer" */
     it("opens the tool registration drawer from Add tool", async () => {
       renderScreen();
-      await userEvent.click(
-        screen.getAllByRole("button", { name: /Add tool/ })[0]!,
-      );
-      expect(
-        await screen.findByRole("heading", { name: /Add tool/ }),
-      ).toBeInTheDocument();
+      await userEvent.click(screen.getAllByRole("button", { name: /Add tool/ })[0]!);
+      expect(await screen.findByRole("heading", { name: /Add tool/ })).toBeInTheDocument();
     });
 
     /** @scenario "The add deep link opens the registration drawer" */
     it("opens the registration drawer from the add deep link", async () => {
       renderScreen({ at: "/governance/inventory?tab=catalog&add=1" });
-      expect(
-        await screen.findByRole("heading", { name: /Add tool/ }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: /Add tool/ })).toBeInTheDocument();
     });
 
     /** @scenario "A tool row offers edit, publish and remove in one menu" */
     it("puts every per-tool action in one overflow menu", async () => {
       renderScreen();
-      await userEvent.click(
-        screen.getByRole("button", { name: "Actions for Claude Code" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "Actions for Claude Code" }));
       for (const action of ["Edit", "Unpublish", "Remove"]) {
-        expect(
-          await screen.findByRole("menuitem", { name: action }),
-        ).toBeInTheDocument();
+        expect(await screen.findByRole("menuitem", { name: action })).toBeInTheDocument();
       }
     });
 

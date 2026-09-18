@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { OttlGatewayUnavailableError } from "../ottl-transform.channel.ts";
+
 import { MemoryOttlTransformChannel } from "../memory/memory.ottl-transform.channel.ts";
+import { OttlGatewayUnavailableError } from "../ottl-transform.channel.ts";
 
 describe("MemoryOttlTransformChannel", () => {
   describe("given no canned answers were provided", () => {

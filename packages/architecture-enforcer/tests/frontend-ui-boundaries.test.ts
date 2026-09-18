@@ -104,7 +104,7 @@ function writeSharedPackage(
 
 function writeWebFeature(feature: string, name: string, dependencies: string[] = []): void {
   write(
-    `modules/${feature}/web/src/features/${name}/feature.json`,
+    `modules/${feature}/browser/src/features/${name}/feature.json`,
     JSON.stringify({ version: 0, dependencies }),
   );
 }

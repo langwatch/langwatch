@@ -5,6 +5,7 @@ import type {
   CioPersonTraits,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
+
 import { CustomerIoChannel, type CustomerIoChannelOptions } from "../customer-io.channel.ts";
 
 const logger = createLogger("ee:customer-io-channel");

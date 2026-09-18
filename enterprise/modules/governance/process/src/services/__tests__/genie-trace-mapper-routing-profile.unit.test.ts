@@ -15,15 +15,16 @@
  * from a closed set.
  */
 
-import { describe, expect, it } from "vitest";
+import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { spanSchema } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   type ConversationRoutingProfile,
   KNOWN_AGENT_IDENTITIES,
 } from "../../rules/conversation-trace-assembly-service.rules.ts";
 import { GENIE_ROUTING_PROFILE } from "../../rules/genie-trace-mapper-service.rules.ts";
 import * as GenieTraceMapperService from "../../rules/genie-trace-mapper-service.rules.ts";
-import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 const ORIGIN = {
   ingestionSourceId: "source-1",

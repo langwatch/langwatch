@@ -1,9 +1,10 @@
 // MCP governance toolset: mirrors Hono API shape, dispatches in-process through
 // shared services. RBAC at tool layer; OAuth for writes, project-apiKey for reads.
 
-import { type ZodRawShape, z } from "zod";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import { type ZodRawShape, z } from "zod";
+
 import type { GovernanceDirectory } from "../../repositories/governance-directory.repository.ts";
 
 type ToolCallback = (

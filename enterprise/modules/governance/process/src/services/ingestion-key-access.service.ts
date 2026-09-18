@@ -7,6 +7,7 @@
  */
 import type { ApiKeyApi, ApiKeyRevocationCause } from "@langwatch/api-key-contract";
 import { fromDate } from "@langwatch/time";
+
 import type {
   IngestionKeyIssuer,
   IngestionKeyRepository,
@@ -77,9 +78,7 @@ export class ApiKeyIngestionKeyRepositoryService implements IngestionKeyReposito
       .then((keys) => keys.map(storedIngestionKeyOf));
   }
 
-  async findByLookupId(input: {
-    lookupId: string;
-  }): Promise<StoredIngestionKeyOwnership | null> {
+  async findByLookupId(input: { lookupId: string }): Promise<StoredIngestionKeyOwnership | null> {
     const key = await this.apiKeys.findByLookupId(input);
     if (!key) return null;
 

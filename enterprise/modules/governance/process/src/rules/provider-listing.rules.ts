@@ -109,9 +109,7 @@ export type ProviderListing<T> =
 
 /** Picks the `listed`/`empty` arm from what the provider actually returned. */
 export function itemsListed<T>(items: T[]): ProviderListing<T> {
-  return items.length === 0
-    ? { outcome: "empty", items: [] }
-    : { outcome: "listed", items };
+  return items.length === 0 ? { outcome: "empty", items: [] } : { outcome: "listed", items };
 }
 
 export function listingRefused<T>(refusal: ListingRefusal): ProviderListing<T> {

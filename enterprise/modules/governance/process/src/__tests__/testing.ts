@@ -5,13 +5,13 @@
  */
 import type { GovernanceClickHouseResolver } from "../app/governance.members.ts";
 import {
-  PrismaActivityMonitorRepository,
-  type ActivityMonitorDatabase,
-} from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
-import {
   PrismaDepartmentRepository,
   type DepartmentDatabase,
 } from "../repositories/prisma/prisma.department.repository.ts";
+import {
+  PrismaActivityMonitorRepository,
+  type ActivityMonitorDatabase,
+} from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
 import { DepartmentService } from "../services/department.service.ts";
 import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
 

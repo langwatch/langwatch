@@ -1,6 +1,7 @@
+import { BillingPriceCatalogue } from "@langwatch/enterprise-billing-contract";
 import Stripe from "stripe";
 import { afterAll, describe, expect, it } from "vitest";
-import { BillingPriceCatalogue } from "@langwatch/enterprise-billing-contract";
+
 import { StripeUsageReportingService } from "../services/usage-reporting.service.ts";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;

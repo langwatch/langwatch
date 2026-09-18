@@ -33,8 +33,18 @@
  *     permanently.
  */
 
+import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
+import { toEpochMs } from "@langwatch/time";
 import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
 import type { z } from "zod";
+
+import {
+  type BotFacts,
+  type ConversationGroup,
+  type ToolCall,
+  type Turn,
+} from "../rules/copilot-transcript.rules.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../rules/dataverse-environment-service.rules.ts";
 import * as ConversationTraceAssemblyService from "./conversation-trace-assembly-service.rules.ts";
 import type {
   ConversationRoutingProfile,
@@ -43,17 +53,8 @@ import type {
   OtlpJsonSpan,
   RoutingOrigin,
 } from "./conversation-trace-assembly-service.rules.ts";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../rules/dataverse-environment-service.rules.ts";
-import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import * as CopilotTranscriptGroupingService from "./copilot-transcript-grouping-service.rules.ts";
 import * as CopilotTurnAssemblyService from "./copilot-turn-assembly-service.rules.ts";
-import {
-  type BotFacts,
-  type ConversationGroup,
-  type ToolCall,
-  type Turn,
-} from "../rules/copilot-transcript.rules.ts";
-import { toEpochMs } from "@langwatch/time";
 
 type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
 

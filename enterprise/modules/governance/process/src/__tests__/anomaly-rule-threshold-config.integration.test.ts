@@ -1,4 +1,5 @@
-import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
+import { safeParseSpendSpikeThresholdConfig } from "@langwatch/enterprise-governance-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature
@@ -6,9 +7,7 @@ import { createGovernanceTestConnection } from "../app/__tests__/governance-data
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-import { safeParseSpendSpikeThresholdConfig } from "@langwatch/enterprise-governance-contract";
+import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 import { PrismaAnomalyRuleRepository } from "../repositories/prisma/prisma.anomaly-rule.repository.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 

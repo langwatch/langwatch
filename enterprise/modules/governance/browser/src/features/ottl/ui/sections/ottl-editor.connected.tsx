@@ -1,10 +1,11 @@
+import { useMemo } from "react";
+
+import { api } from "../../../../behavior/governance-api.ts";
 import {
   GovernanceOttlValidationClient,
   type GovernanceOttlValidationResult,
 } from "../../model/governance-ottl-validation-client.ts";
 import { OttlEditor } from "../elements/ottl-editor.tsx";
-import { useMemo } from "react";
-import { api } from "../../../../behavior/governance-api.ts";
 class AppGovernanceOttlValidationClient extends GovernanceOttlValidationClient {
   private constructor(
     private readonly validateOttl: (input: {

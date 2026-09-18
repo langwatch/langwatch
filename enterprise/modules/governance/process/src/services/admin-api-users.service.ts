@@ -21,11 +21,11 @@
 
 import { z } from "zod";
 
-import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
 import type { DiscoveredPersonRecord, PeopleListing } from "../rules/people-listing.rules.ts";
 import { peopleListed, peopleRefused } from "../rules/people-listing.rules.ts";
 import type { ListingRefusal } from "../rules/provider-listing.rules.ts";
 import { refusalFromStatus, refusalFromThrown } from "../rules/provider-listing.rules.ts";
+import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
 
 const LISTING_TIMEOUT_MS = 15_000;
 const PAGE_SIZE = 100;
@@ -36,8 +36,7 @@ const PAGE_SIZE = 100;
  */
 const MAX_PAGES = 100;
 
-export const ANTHROPIC_USERS_URL =
-  "https://api.anthropic.com/v1/organizations/users";
+export const ANTHROPIC_USERS_URL = "https://api.anthropic.com/v1/organizations/users";
 export const OPENAI_USERS_URL = "https://api.openai.com/v1/organization/users";
 
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -99,9 +98,7 @@ function readMemberRows({ response }: { response: unknown }): {
  * The address is a fact about them, never the key. Both providers re-issue
  * one, and keying on it would move a person's whole history on a rename.
  */
-function membersAsPeople(
-  members: z.infer<typeof memberSchema>[],
-): DiscoveredPersonRecord[] {
+function membersAsPeople(members: z.infer<typeof memberSchema>[]): DiscoveredPersonRecord[] {
   return members.map((member) => ({
     rawActorId: member.id,
     displayName: member.name?.trim() ?? "",

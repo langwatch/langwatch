@@ -37,15 +37,19 @@ import {
   ANTHROPIC_ADMIN_ADAPTER_ID,
   anthropicAdminPullConfigSchema,
   PULLED_USAGE_HINT_KEY,
-  type AnthropicAdminPullConfig,type GovernancePuller as PullerAdapter,type NormalizedPullEvent,type PullResult,type PullRunOptions
+  type AnthropicAdminPullConfig,
+  type GovernancePuller as PullerAdapter,
+  type NormalizedPullEvent,
+  type PullResult,
+  type PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
+import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant, Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
-import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
 import type { GovernanceHttpClient } from "../app/governance.members.ts";
 import * as AdminUsageReportAdapter from "../rules/admin-usage-report.rules.ts";
-import { nowInstant, Temporal, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:anthropic-admin-puller");
 
@@ -228,11 +232,10 @@ const pageSchema = z.object({
  * were one field until a cost read started looking back, and collapsing them
  * again is what walks the saved position backwards on every run.
  */
-interface ParsedCursor
-  extends Pick<
-    z.infer<typeof cursorSchema>,
-    "startingAt" | "page" | "watermark"
-  > {
+interface ParsedCursor extends Pick<
+  z.infer<typeof cursorSchema>,
+  "startingAt" | "page" | "watermark"
+> {
   requestStart: string;
 }
 
@@ -345,7 +348,8 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
             // workspace somebody deleted all produce exactly that page. This is the
             // floor the sibling connection already applies at its own drain.
             startingAt:
-              AnthropicAdminPullerAdapter.laterInstant(newestEmitted, positionOnRecord) ?? positionOnRecord,
+              AnthropicAdminPullerAdapter.laterInstant(newestEmitted, positionOnRecord) ??
+              positionOnRecord,
             page: null,
             query,
             watermark: null,
@@ -505,8 +509,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       throw new DispatchError({
         message: `HTTP ${response.status} (anthropic ${config.report}_report): key refused`,
         retryable: false,
-        customerMessage:
-          "Anthropic refused this key. Check the admin key and its permissions.",
+        customerMessage: "Anthropic refused this key. Check the admin key and its permissions.",
       });
     }
     if (!response.ok) {
@@ -706,7 +709,10 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
             // Only a drained cursor gets the look-back.
             requestStart:
               config.report === "cost" && parsed.page === null
-                ? AnthropicAdminPullerAdapter.costRequestStart({ stored: parsed.startingAt, config })
+                ? AnthropicAdminPullerAdapter.costRequestStart({
+                    stored: parsed.startingAt,
+                    config,
+                  })
                 : parsed.startingAt,
             page: parsed.page,
             watermark: parsed.watermark,
@@ -761,7 +767,9 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
         (candidate) => candidate !== null && !Number.isNaN(toEpochMs(candidate)),
       );
       const usageRestart =
-        resumeFrom ?? config.startingAt ?? AnthropicAdminPullerAdapter.defaultStartingAt(config.report);
+        resumeFrom ??
+        config.startingAt ??
+        AnthropicAdminPullerAdapter.defaultStartingAt(config.report);
       return {
         startingAt: usageRestart,
         requestStart: usageRestart,
@@ -925,7 +933,6 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     return url;
   }
 
-
   // ---- ported from main: helpers this branch did not have ----
 
   /**
@@ -986,13 +993,16 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
   }): void {
     const colliding = AnthropicAdminPullerAdapter.collidingRowsByKey(events);
     if (colliding.size === 0) return;
-    const dimensionNames = Object.keys(AnthropicAdminPullerAdapter.emittedHint(events[0]!)?.dimensions ?? {});
+    const dimensionNames = Object.keys(
+      AnthropicAdminPullerAdapter.emittedHint(events[0]!)?.dimensions ?? {},
+    );
     // Per key, never across keys: rows under two different keys differ in the
     // dimensions BY DESIGN, and naming those would report the key as its own
     // explanation.
     const differingNames = new Set<string>();
     for (const rows of colliding.values()) {
-      for (const name of AnthropicAdminPullerAdapter.differingFieldNames(rows)) differingNames.add(name);
+      for (const name of AnthropicAdminPullerAdapter.differingFieldNames(rows))
+        differingNames.add(name);
     }
     const differingClause =
       differingNames.size === 0
@@ -1024,9 +1034,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       if (seen === undefined) amountByKey.set(key, amount);
       else if (seen !== amount) collidingKeys.add(key);
     }
-    return new Map(
-      [...collidingKeys].map((key) => [key, rowsByKey.get(key) ?? []]),
-    );
+    return new Map([...collidingKeys].map((key) => [key, rowsByKey.get(key) ?? []]));
   }
 
   /**
@@ -1050,7 +1058,8 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     const storedMs = toEpochMs(stored);
     if (Number.isNaN(storedMs)) return stored;
 
-    const configuredStart = config.startingAt ?? AnthropicAdminPullerAdapter.defaultStartingAt("cost");
+    const configuredStart =
+      config.startingAt ?? AnthropicAdminPullerAdapter.defaultStartingAt("cost");
     const floorMs = toEpochMs(configuredStart);
     const lookedBackMs = storedMs - COST_RESTATEMENT_LOOKBACK_DAYS * MS_PER_DAY;
     const notBeforeConfigured = Number.isNaN(floorMs)
@@ -1089,8 +1098,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
         // a reordered-but-equal object would be named as differing, which only
         // adds a word to a message the amount mismatch already justified.
         // `undefined` and an explicit null are the same absence here.
-        const differs =
-          JSON.stringify(first[name] ?? null) !== JSON.stringify(row[name] ?? null);
+        const differs = JSON.stringify(first[name] ?? null) !== JSON.stringify(row[name] ?? null);
         if (differs) {
           names.add(name);
         }
@@ -1156,9 +1164,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
    * none parse yields null, and null resumes from the window start — a re-read,
    * never a skip.
    */
-  private static newestBucketStart(
-    buckets: z.infer<typeof bucketSchema>[],
-  ): string | null {
+  private static newestBucketStart(buckets: z.infer<typeof bucketSchema>[]): string | null {
     let newest: string | null = null;
     let newestMs = Number.NEGATIVE_INFINITY;
     for (const bucket of buckets) {
@@ -1170,9 +1176,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     return newest;
   }
 
-  private static parsedRawPayload(
-    event: NormalizedPullEvent,
-  ): Record<string, unknown> | null {
+  private static parsedRawPayload(event: NormalizedPullEvent): Record<string, unknown> | null {
     try {
       const value: unknown = JSON.parse(event.raw_payload);
       return typeof value === "object" && value !== null && !Array.isArray(value)

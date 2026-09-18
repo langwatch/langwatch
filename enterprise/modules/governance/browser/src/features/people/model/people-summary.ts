@@ -47,12 +47,8 @@ export function summarizePeople({
 }): PeopleSummary {
   return {
     people: peopleMeasured ? rows.length : null,
-    unmatched: peopleMeasured
-      ? rows.filter((row) => row.status === "unmatched").length
-      : null,
-    unassigned: peopleMeasured
-      ? rows.filter((row) => row.department === null).length
-      : null,
+    unmatched: peopleMeasured ? rows.filter((row) => row.status === "unmatched").length : null,
+    unassigned: peopleMeasured ? rows.filter((row) => row.department === null).length : null,
     departments: departmentsMeasured ? departmentCount : null,
   };
 }

@@ -7,7 +7,7 @@
  * WHAT THIS FILE USED TO BE, AND WHY IT IS SMALLER. Its ancestor
  * (`platform/app/src/pages/governance/__tests__/editPullSourceConfig.lifecycle.unit.test.ts`)
  * ran each submission through `IngestionPullLifecycleService.sync` from
- * `@langwatch/enterprise-governance-server` and asserted on the process
+ * `@langwatch/enterprise-governance-process` and asserted on the process
  * manager: `configure` with a cron, or `disable`. That crossing is the whole
  * value of the suite — the cadence bug was never visible inside either half,
  * because the drawer emitted a defensible `null` and the lifecycle correctly
@@ -24,6 +24,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { recordingGovernanceToaster } from "../../../../testing.tsx";
 import { buildEditSubmission, seedPullSchedule } from "../governance-inventory.screen.tsx";
 

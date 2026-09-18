@@ -5,8 +5,8 @@
  */
 import { Badge, Box, Button, Grid, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { Link } from "../../../../ui/elements/governance-link.tsx";
 
+import { Link } from "../../../../ui/elements/governance-link.tsx";
 import type { SampleActivityRow, SampleInsight } from "../../model/sample-home-rows.ts";
 import {
   INSIGHTS_HREF,
@@ -27,16 +27,10 @@ export function GovernanceHomeSections({
   /** Whether the two lists carry invented rows rather than empty lines. */
   sample: boolean;
 }) {
-  const activity = SAMPLE_ACTIVITY.filter(
-    (row) => canSetUpInsights || !row.ridesInsightsFlag,
-  );
+  const activity = SAMPLE_ACTIVITY.filter((row) => canSetUpInsights || !row.ridesInsightsFlag);
 
   return (
-    <Grid
-      templateColumns={{ base: "1fr", lg: "2fr 1fr" }}
-      gap={{ base: 8, lg: 10 }}
-      width="full"
-    >
+    <Grid templateColumns={{ base: "1fr", lg: "2fr 1fr" }} gap={{ base: 8, lg: 10 }} width="full">
       <HomeSection label="Insights" sample={sample}>
         {sample ? (
           <RowList>

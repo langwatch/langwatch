@@ -12,6 +12,7 @@
  * Spec: specs/ai-governance/puller-framework/s3-polling.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { GovernanceObjectStore } from "../../app/governance.members.ts";
 import { OpenAiComplianceReferencePullerAdapter } from "../openai-compliance-puller.service.ts";
 

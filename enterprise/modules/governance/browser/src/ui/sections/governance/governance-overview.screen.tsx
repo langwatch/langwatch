@@ -1,13 +1,17 @@
 import { Badge, Box, Heading, HStack, Spacer, VStack } from "@chakra-ui/react";
-import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
-import { GovernanceHero, HOME_MEASURE } from "../../../features/overview/ui/sections/governance-hero.tsx";
+
+import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { GovernanceHeroGround } from "../../../features/overview/ui/sections/governance-hero-ground.tsx";
+import {
+  GovernanceHero,
+  HOME_MEASURE,
+} from "../../../features/overview/ui/sections/governance-hero.tsx";
 import { GovernanceHomeSections } from "../../../features/overview/ui/sections/governance-home-sections.tsx";
 import { QuarantineFillAlert } from "../../../features/overview/ui/sections/quarantine-fill-panel.tsx";
-import { SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
-import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { useGovernanceHost } from "../../../model/governance-host.ts";
-import { useGovernanceScope } from "../../../behavior/governance-session.ts";
+import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
+import { SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
+import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 
 /**
  * The overview: a greeting, the inline palette, the ways in, and the two

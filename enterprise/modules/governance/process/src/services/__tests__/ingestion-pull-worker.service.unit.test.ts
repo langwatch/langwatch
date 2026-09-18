@@ -1,16 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
-import type {
-  InternalProject,
-  InternalProjectQuery,
-  ProjectWithTeam,
-} from "@langwatch/project-contract";
 import type {
   GovernanceIngestionSource,
   NormalizedPullEvent,
   PulledUsageObservedEventData,
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
-import { type GovernanceEncryptor,
+import type {
+  InternalProject,
+  InternalProjectQuery,
+  ProjectWithTeam,
+} from "@langwatch/project-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
+import {
+  type GovernanceEncryptor,
   type GovernanceOcsfEventSink,
   type GovernanceTraceIngestionClient,
   type GovernanceTraceRequest,
@@ -18,7 +21,9 @@ import { type GovernanceEncryptor,
   type IngestionPullDiagnosticsSink,
   type IngestionPullSourceReader,
   type PulledUsageDispatcher,
-  type PulledUsageEntitlements,type PulledUsageRateReader } from "../../app/governance.members.ts";
+  type PulledUsageEntitlements,
+  type PulledUsageRateReader,
+} from "../../app/governance.members.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import {
   IngestionPullDeadlineExceededError,
@@ -28,7 +33,6 @@ import {
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../puller-registry.service.ts";
-import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 
 function ingestionSource(
   overrides: Partial<GovernanceIngestionSource> = {},

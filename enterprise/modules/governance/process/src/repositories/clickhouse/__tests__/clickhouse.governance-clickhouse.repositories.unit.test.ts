@@ -17,6 +17,7 @@
 import type { QueryRequest, QueryResult } from "@langwatch/clickhouse-client";
 import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
+
 import { ClickHouseGovernanceRepositories } from "../clickhouse.governance-clickhouse.repositories.ts";
 
 /** These cases are about reads; a write reaching the driver is the test failing. */

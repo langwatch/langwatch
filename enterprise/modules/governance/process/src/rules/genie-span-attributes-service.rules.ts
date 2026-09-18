@@ -7,8 +7,7 @@
  */
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import * as ConversationTraceAssemblyService from "./conversation-trace-assembly-service.rules.ts";
-import type { OtlpJsonAttr, OtlpJsonSpan } from "./conversation-trace-assembly-service.rules.ts";
+
 import {
   DROPPED_THOUGHT_TYPE,
   MS_THRESHOLD,
@@ -18,6 +17,8 @@ import {
   type GenieMessageFrame,
   type GenieThought,
 } from "../rules/genie-message.rules.ts";
+import * as ConversationTraceAssemblyService from "./conversation-trace-assembly-service.rules.ts";
+import type { OtlpJsonAttr, OtlpJsonSpan } from "./conversation-trace-assembly-service.rules.ts";
 import { GENIE_QUERY_SPAN_NAME } from "./genie-trace-mapper-service.rules.ts";
 
 /** "THOUGHT_TYPE_UNDERSTANDING" and "UNDERSTANDING" both → "UNDERSTANDING". */

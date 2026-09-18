@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import {
-  absorbFetch,
-  buildPageRequest,
-} from "../features/source-events/model/governance-events-pager.ts";
+
 import {
   cronFromPullParts,
   partsFromPullCron,
 } from "../features/ingestion-sources/model/pull-cadence.ts";
+import {
+  absorbFetch,
+  buildPageRequest,
+} from "../features/source-events/model/governance-events-pager.ts";
 
 describe("governance web logic", () => {
   it("round-trips a supported cadence", () => {

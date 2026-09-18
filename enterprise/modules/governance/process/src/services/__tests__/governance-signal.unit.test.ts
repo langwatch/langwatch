@@ -1,11 +1,15 @@
-import { describe, expect, it } from "vitest";
-import type { GovernanceDiagnosticsSink,
-  GovernanceSignalChannel,
-  GovernanceResolvedBudgetCrossing,GatewayBudgetCrossingCandidate,
-  GovernanceBudgetCrossingData,
-  GovernanceVkLifecycleData } from "../../app/governance.members.ts";
-import { GovernanceSignalService } from "../governance-signal.service.ts";
 import { type Instant, Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import type {
+  GovernanceDiagnosticsSink,
+  GovernanceSignalChannel,
+  GovernanceResolvedBudgetCrossing,
+  GatewayBudgetCrossingCandidate,
+  GovernanceBudgetCrossingData,
+  GovernanceVkLifecycleData,
+} from "../../app/governance.members.ts";
+import { GovernanceSignalService } from "../governance-signal.service.ts";
 
 class RecordingDiagnostics implements GovernanceDiagnosticsSink {
   readonly warnings: {

@@ -28,10 +28,7 @@
 
 import { toEpochMs } from "@langwatch/time";
 
-import {
-  departmentLabelFor,
-  type PersonDepartmentFacts,
-} from "./observed-departments.ts";
+import { departmentLabelFor, type PersonDepartmentFacts } from "./observed-departments.ts";
 
 /** What a row needs from the activity monitor's per-person spend read. */
 export interface SpendFacts {
@@ -195,9 +192,7 @@ function spendRowFor({
     status,
     matchDetail,
     evidenceKind,
-    department:
-      (person ? departmentLabelFor(person) : null) ??
-      departmentForActor(spend.actor),
+    department: (person ? departmentLabelFor(person) : null) ?? departmentForActor(spend.actor),
     spendUsd: asNumber(spend.spendUsd),
     requests: spend.requests,
     lastActiveIso: spend.lastActivityIso,
@@ -258,8 +253,7 @@ function discoveredRowFor(person: DiscoveredFacts): PeopleRow {
  * places between reads, and the table would look unstable for no reason.
  */
 const byMostRecentlySeen = (a: DiscoveredFacts, b: DiscoveredFacts) =>
-  asTime(b.lastSeenAt) - asTime(a.lastSeenAt) ||
-  a.displayText.localeCompare(b.displayText);
+  asTime(b.lastSeenAt) - asTime(a.lastSeenAt) || a.displayText.localeCompare(b.displayText);
 
 /**
  * The one table, ordered the way the reader asked for it.
@@ -311,11 +305,7 @@ export function mergePeopleRows({
 /** Every department name any row on the table shows, for the filter chip. */
 export function departmentsPresent(rows: readonly PeopleRow[]): string[] {
   return [
-    ...new Set(
-      rows
-        .map((row) => row.department)
-        .filter((name): name is string => !!name),
-    ),
+    ...new Set(rows.map((row) => row.department).filter((name): name is string => !!name)),
   ].toSorted((a, b) => a.localeCompare(b));
 }
 

@@ -12,6 +12,7 @@ import type {
   SpendOverTimeGroupBy,
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
+
 import type { ActivityMonitorRepository } from "../app/governance.members.ts";
 
 export class ActivityMonitorService {
@@ -19,6 +20,14 @@ export class ActivityMonitorService {
 
   static create(repository: ActivityMonitorRepository): ActivityMonitorService {
     return new ActivityMonitorService(repository);
+  }
+
+  sourceDataCoverage(input: {
+    organizationId: string;
+    sourceId: string;
+    windowDays: number;
+  }): ReturnType<ActivityMonitorRepository["sourceDataCoverage"]> {
+    return this.repository.sourceDataCoverage(input);
   }
 
   summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary> {

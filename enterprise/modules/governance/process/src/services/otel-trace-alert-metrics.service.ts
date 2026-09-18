@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
+
 import { type TraceAlertMetricsSink } from "../app/governance.members.ts";
 
 /**
@@ -33,8 +34,7 @@ export class OtelTraceAlertMetricsAdapter implements TraceAlertMetricsSink {
     );
   }
 
-  private constructor(private readonly records: CounterHandle) {
-  }
+  private constructor(private readonly records: CounterHandle) {}
 
   /**
    * The zero guard is the application's, kept: `inc(0)` is a write that moves

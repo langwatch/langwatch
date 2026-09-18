@@ -3,12 +3,13 @@
  * Tests department handling and table invariants: two providers stay separate, shared money
  * shown once, erased person via stand-in. Real page, mocked boundaries.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { FakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 
 const harness = vi.hoisted(() => ({
   people: [] as unknown[],
@@ -53,7 +54,7 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
-vi.mock("~/utils/api", () => {
+vi.mock("../../../../behavior/governance-api.ts", () => {
   const dataFor = (path: string): unknown => {
     if (path === "governancePeople.list") return harness.people;
     if (path === "governancePeople.suggestions") return [];
@@ -119,14 +120,18 @@ const discovered = (over: Record<string, unknown>) => ({
  * People tab (the default address); departments their directories named
  * sit on the Departments tab, alongside the ones the admin created.
  */
-const renderPage = (entry = "/governance/people") =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <MemoryRouter initialEntries={[entry]}>
-        <PeoplePage />
-      </MemoryRouter>
-    </ChakraProvider>,
+const renderPage = (entry = "/governance/people") => {
+  const host = FakeGovernanceHost.create({
+    permissions: ["activityMonitor:view", "governance:manage"],
+    query: entry.includes("tab=departments") ? { tab: "departments" } : {},
+  });
+  return renderWithGovernanceHost(
+    <MemoryRouter initialEntries={[entry]}>
+      <PeoplePage />
+    </MemoryRouter>,
+    { host },
   );
+};
 
 const DEPARTMENTS_TAB = "/governance/people?tab=departments";
 
@@ -174,18 +179,12 @@ describe("given people the providers named", () => {
 
       // One table, one heading. The second panel and the paragraph explaining
       // why it existed are gone; the badge carries the whole distinction.
-      expect(
-        screen.queryByText("Departments the providers see"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Departments the providers see")).not.toBeInTheDocument();
 
       const engineering = screen.getByTestId("department-row-Engineering");
-      expect(
-        within(engineering).getByText("Microsoft Copilot Studio"),
-      ).toBeVisible();
+      expect(within(engineering).getByText("Microsoft Copilot Studio")).toBeVisible();
       expect(within(engineering).getByText("2 people")).toBeVisible();
-      expect(
-        within(screen.getByTestId("department-row-GTM")).getByText("1 person"),
-      ).toBeVisible();
+      expect(within(screen.getByTestId("department-row-GTM")).getByText("1 person")).toBeVisible();
     });
 
     /** @scenario "A department only a directory named carries its provider and no row actions" */
@@ -193,9 +192,7 @@ describe("given people the providers named", () => {
       // Rename and Archive act on a `Department` record. A name a directory
       // asserted is not one, which is the difference the separate panel used to
       // enforce by being separate.
-      harness.people = [
-        discovered({ displayText: "A", directoryDepartment: "Engineering" }),
-      ];
+      harness.people = [discovered({ displayText: "A", directoryDepartment: "Engineering" })];
       renderPage(DEPARTMENTS_TAB);
 
       expect(screen.getByText("Engineering")).toBeVisible();
@@ -209,18 +206,14 @@ describe("given people the providers named", () => {
     /** @scenario "A department the organization created and one a directory names are one row" */
     it("renders one row carrying the record's actions and the provider badge", () => {
       harness.departments = [{ id: "dept_1", name: "Engineering" }];
-      harness.people = [
-        discovered({ displayText: "A", directoryDepartment: "Engineering" }),
-      ];
+      harness.people = [discovered({ displayText: "A", directoryDepartment: "Engineering" })];
       renderPage(DEPARTMENTS_TAB);
 
       expect(screen.getAllByTestId(/^department-row-/)).toHaveLength(1);
       const row = screen.getByTestId("department-row-Engineering");
       expect(within(row).getByText("Microsoft Copilot Studio")).toBeVisible();
       // It is still the organization's record, so it can still be managed.
-      expect(
-        screen.getByRole("button", { name: "Actions for Engineering" }),
-      ).toBeVisible();
+      expect(screen.getByRole("button", { name: "Actions for Engineering" })).toBeVisible();
     });
   });
 
@@ -246,9 +239,7 @@ describe("given people the providers named", () => {
       renderPage(DEPARTMENTS_TAB);
 
       expect(
-        screen.getByText(
-          "No departments yet. Create one to start attributing spend.",
-        ),
+        screen.getByText("No departments yet. Create one to start attributing spend."),
       ).toBeVisible();
     });
   });
@@ -346,12 +337,8 @@ describe("given two providers that named the same address", () => {
 
       const rows = screen.getAllByRole("row", { name: /M Silva/ });
       expect(rows).toHaveLength(2);
-      expect(
-        rows.filter((row) => within(row).queryByText(/Copilot/)).length,
-      ).toBe(1);
-      expect(
-        rows.filter((row) => within(row).queryByText(/OpenAI/)).length,
-      ).toBe(1);
+      expect(rows.filter((row) => within(row).queryByText(/Copilot/)).length).toBe(1);
+      expect(rows.filter((row) => within(row).queryByText(/OpenAI/)).length).toBe(1);
     });
 
     /** @scenario "Spend claimed by two providers is shown once, on neither of them" */

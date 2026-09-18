@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+
+import type { PersonalBudgetOverviewReader } from "../app/governance.members.ts";
 import type { ActivityMonitorService } from "./ingestion-source-activity.service.ts";
 import type { DefaultGovernancePersonalUsageService } from "./personal-usage.service.ts";
-import type { PersonalBudgetOverviewReader } from "../app/governance.members.ts";
 
 /** Private cohesive collaborator for the activity operation set. */
 export class GovernanceActivityOperationsService {
@@ -46,9 +47,8 @@ export class GovernanceActivityOperationsService {
   readonly activityEventsForSource: GovernanceApi["activityEventsForSource"] = (...args) =>
     this.activity.eventsForSource(...args);
 
-  readonly activitySourceHealthMetrics: GovernanceApi["activitySourceHealthMetrics"] = (
-    ...args
-  ) => this.activity.sourceHealthMetrics(...args);
+  readonly activitySourceHealthMetrics: GovernanceApi["activitySourceHealthMetrics"] = (...args) =>
+    this.activity.sourceHealthMetrics(...args);
 
   readonly personalUsageSummary: GovernanceApi["personalUsageSummary"] = (...args) =>
     this.personalUsage.summary(...args);

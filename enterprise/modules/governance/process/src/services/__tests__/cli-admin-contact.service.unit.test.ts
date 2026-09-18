@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { describe, expect, it, vi } from "vitest";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { OrganizationCliAdminContactService } from "../cli-admin-contact.service.ts";
 
 describe("OrganizationCliAdminContactService", () => {

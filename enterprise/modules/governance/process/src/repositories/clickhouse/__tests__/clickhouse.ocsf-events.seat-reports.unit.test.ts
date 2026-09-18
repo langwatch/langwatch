@@ -14,6 +14,7 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { describe, expect, it, vi } from "vitest";
+
 import { ClickHouseOcsfEventsRepository } from "../clickhouse.ocsf-events.repository.ts";
 
 const SEAT_REPORT_ACTION = "seat_report";

@@ -4,13 +4,7 @@ import {
   deriveSourceHealth,
   type RunCompleteness,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  CircleAlert,
-  CircleCheck,
-  CircleDashed,
-  CircleDotDashed,
-  CircleX,
-} from "lucide-react";
+import { CircleAlert, CircleCheck, CircleDashed, CircleDotDashed, CircleX } from "lucide-react";
 
 /**
  * Health is derived at read time from the failure count below, so it only

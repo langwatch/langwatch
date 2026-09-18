@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { OtlpKeyValue, OtlpReceiverPolicy } from "@langwatch/otlp";
 import type {
   GovernanceOtlpPolicyInput,
   GovernanceOtlpReceiverPolicies,
 } from "@langwatch/enterprise-governance-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { OtlpKeyValue, OtlpReceiverPolicy } from "@langwatch/otlp";
 
 const CODING_AGENT_SOURCES = new Set([
   "claude_code",

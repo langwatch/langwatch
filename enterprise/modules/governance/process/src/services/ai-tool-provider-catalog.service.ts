@@ -7,6 +7,7 @@
  * see `.claude/handoffs/gov-peer-ports.md` for the open decision.
  */
 import { modelProviders } from "@langwatch/model-provider-contract";
+
 import type { AiToolProviderCatalog } from "../repositories/ai-tool-catalog.repository.ts";
 
 export class ModelProviderAiToolCatalogService implements AiToolProviderCatalog {

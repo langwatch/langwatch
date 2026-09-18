@@ -4,8 +4,9 @@ import type {
   CioOrgTraits,
   CioPersonTraits,
 } from "@langwatch/enterprise-billing-contract";
-import type { CustomerIoChannel } from "../channels/customer-io.channel.ts";
+
 import { customerIoChannels } from "../channels/customer-io-channels.registry.ts";
+import type { CustomerIoChannel } from "../channels/customer-io.channel.ts";
 import {
   NullBillingErrorReporter,
   type BillingErrorReporter,

@@ -6,7 +6,7 @@ import {
   ingestionPullRunCompletedEventSchema,
   type IngestionPullProcessingEvent,
   GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
-  GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE
+  GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
 } from "@langwatch/enterprise-governance-contract";
 import {
   InMemoryProcessStore,
@@ -20,41 +20,46 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { IngestionPullEventingAdapter } from "../ingestion-pull-eventing.service.ts";
-import { PulledUsageEventingAdapter } from "../pulled-usage-eventing.service.ts";
+
 import {
   type GatewayBudgetLedger,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,
-  type GatewaySpendProcessingEvent,type GovernanceWebhookChannel,type GovernanceWebhookSendBatch,
+  type GatewaySpendProcessingEvent,
+  type GovernanceWebhookChannel,
+  type GovernanceWebhookSendBatch,
   type IngestionPullMetricsSink,
   type IngestionPullOutcomeChannel,
   type IngestionPullRunner,
-  type IngestionPullScheduler,type PulledUsageLedgerRepository,type PulledUsageLedgerRow
+  type IngestionPullScheduler,
+  type PulledUsageLedgerRepository,
+  type PulledUsageLedgerRow,
 } from "../../app/governance.members.ts";
-import {
-  type IngestionPullRunStatusData,
-  IngestionPullRunStatusEventingProjection,
-} from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
 import {
   type GatewayDebitsState,
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
 } from "../../eventing/gateway-debit.process.ts";
-import { GovernanceEventDeliveryProcess } from "../../eventing/governance-event-delivery.process.ts";
 import { GovernanceEventDeliveryIntent } from "../../eventing/governance-event-delivery.intent.ts";
+import { GovernanceEventDeliveryProcess } from "../../eventing/governance-event-delivery.process.ts";
+import {
+  type IngestionPullRunStatusData,
+  IngestionPullRunStatusEventingProjection,
+} from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
 import {
   INGESTION_PULL_PROCESS_NAME,
   type IngestionPullProcessState,
   IngestionPullProcess,
 } from "../../eventing/ingestion-pull.process.ts";
-import { IngestionPullService } from "../ingestion-pull.service.ts";
 import { PulledUsageLedgerIntent } from "../../eventing/pulled-usage-ledger.intent.ts";
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
 } from "../governance-events.service.ts";
+import { IngestionPullEventingAdapter } from "../ingestion-pull-eventing.service.ts";
+import { IngestionPullService } from "../ingestion-pull.service.ts";
+import { PulledUsageEventingAdapter } from "../pulled-usage-eventing.service.ts";
 
 class FixedSchedule implements IngestionPullScheduler {
   nextRunAt(input: { cron: string; after: number }): number {
@@ -83,8 +88,7 @@ class UnusedMetrics implements IngestionPullMetricsSink {
 }
 
 class FailingPull implements IngestionPullRunner {
-  constructor(private readonly error: Error) {
-  }
+  constructor(private readonly error: Error) {}
 
   async run(): Promise<{ nextCursor: string | null; eventCount: number }> {
     throw this.error;
@@ -259,6 +263,8 @@ describe("governance Eventing adapters", () => {
       tokensOutput: 2,
       tokensCacheRead: 3,
       tokensCacheWrite: 4,
+      costNanoMinor: costNanoUsd,
+      currencyCode: "USD",
       costNanoUsd,
       rateVersion: "v1",
       costBasis: "computed" as const,

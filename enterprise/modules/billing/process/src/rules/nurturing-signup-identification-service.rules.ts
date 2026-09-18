@@ -1,8 +1,8 @@
-import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
-import type { OrganizationIntent } from "@langwatch/organization-contract";
-
 import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
+import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
+
+import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 /**
  * The onboarding answers a new person gives, as this signal reads them.

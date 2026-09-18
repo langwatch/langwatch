@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Circle, Text } from "@chakra-ui/react";
-import { TileIcon } from "@langwatch/user-web/surfaces/tile-icon";
-
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TileIcon } from "@langwatch/user-browser/surfaces/tile-icon";
 
 import { SourceTypeIconGlyph } from "../ui/elements/source-type-icon-glyph.tsx";
-import {
-  exactCardCount,
-  formatCardCount,
-  type ToolCard,
-  toolInitials,
-} from "./toolCards";
+import { exactCardCount, formatCardCount, type ToolCard, toolInitials } from "./toolCards";
 
 /**
  * The two pieces the grid card and the list table both draw: one figure, and
@@ -50,17 +44,12 @@ export function ToolCardFigure({
 }) {
   // A count arrives as a number and is shortened here; anything already shaped
   // for reading arrives as the string it should show.
-  const compact =
-    typeof value === "number" ? formatCardCount(value) : undefined;
+  const compact = typeof value === "number" ? formatCardCount(value) : undefined;
   const exact = typeof value === "number" ? exactCardCount(value) : undefined;
 
   if (value === undefined) {
     return (
-      <Tooltip
-        content={emptyReason}
-        showArrow
-        positioning={{ placement: "top" }}
-      >
+      <Tooltip content={emptyReason} showArrow positioning={{ placement: "top" }}>
         <Text
           fontSize="xs"
           color="fg.subtle"
@@ -81,11 +70,7 @@ export function ToolCardFigure({
     // Shortened on the card, exact on hover and to a screen reader: the
     // compact form is a reading aid, never the only place the figure lives.
     return (
-      <Tooltip
-        content={`${exact} exactly`}
-        showArrow
-        positioning={{ placement: "top" }}
-      >
+      <Tooltip content={`${exact} exactly`} showArrow positioning={{ placement: "top" }}>
         <Text
           fontSize="xs"
           fontWeight="medium"
@@ -101,12 +86,7 @@ export function ToolCardFigure({
   }
 
   return (
-    <Text
-      fontSize="xs"
-      fontWeight="medium"
-      fontVariantNumeric="tabular-nums"
-      textAlign={align}
-    >
+    <Text fontSize="xs" fontWeight="medium" fontVariantNumeric="tabular-nums" textAlign={align}>
       {value}
     </Text>
   );
@@ -117,26 +97,12 @@ export function ToolCardFigure({
  * vendor glyph for a sample card that names a source type, and initials when
  * neither exists.
  */
-export function ToolCardMark({
-  card,
-  size = 20,
-}: {
-  card: ToolCard;
-  size?: number;
-}) {
+export function ToolCardMark({ card, size = 20 }: { card: ToolCard; size?: number }) {
   if (card.tile) {
-    return (
-      <TileIcon
-        iconAsset={card.tile.iconAsset}
-        type={card.tile.type}
-        size={size}
-      />
-    );
+    return <TileIcon iconAsset={card.tile.iconAsset} type={card.tile.type} size={size} />;
   }
   if (card.sourceType) {
-    return (
-      <SourceTypeIconGlyph sourceType={card.sourceType} size={`${size}px`} />
-    );
+    return <SourceTypeIconGlyph sourceType={card.sourceType} size={`${size}px`} />;
   }
   return (
     <Circle

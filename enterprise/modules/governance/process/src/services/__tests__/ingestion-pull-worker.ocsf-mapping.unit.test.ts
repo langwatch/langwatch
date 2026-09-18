@@ -1,12 +1,12 @@
-// Tests NormalizedPullEvent→OCSF mapping (eventId, raw_event, time-coercion, actor field).
-// Real mapper imported to catch bugs (hand-copied contracts missed them).
-import { describe, expect, it } from "vitest";
-import { Temporal } from "@langwatch/time";
-
 import {
   PULLED_USAGE_HINT_KEY,
   type NormalizedPullEvent,
 } from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
+// Tests NormalizedPullEvent→OCSF mapping (eventId, raw_event, time-coercion, actor field).
+// Real mapper imported to catch bugs (hand-copied contracts missed them).
+import { describe, expect, it } from "vitest";
+
 import { mapToOcsfRow, ocsfActorFields } from "../../rules/ocsf-pull-event-mapping.rules.ts";
 
 const baseEvent: NormalizedPullEvent = {

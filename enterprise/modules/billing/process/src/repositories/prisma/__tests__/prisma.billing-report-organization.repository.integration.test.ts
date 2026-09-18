@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  *
@@ -20,8 +22,8 @@
  */
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaBillingReportOrganizationRepository } from "../prisma.billing-report-organization.repository.ts";
 
 const namespace = `billing-lookup-${randomUUID().slice(0, 8)}`;

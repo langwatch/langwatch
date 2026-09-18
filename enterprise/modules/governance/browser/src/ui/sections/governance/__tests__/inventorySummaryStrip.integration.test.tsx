@@ -14,12 +14,7 @@ import "@testing-library/jest-dom/vitest";
 import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  connectTools,
-  harness,
-  openTab,
-  renderScreen,
-} from "./inventoryScreenHarness";
+import { connectTools, harness, openTab, renderScreen } from "./inventoryScreenHarness";
 
 describe("given an admin on the Inventory page", () => {
   describe("when the page renders with tools and sources", () => {
@@ -45,8 +40,7 @@ describe("given an admin on the Inventory page", () => {
       const strip = screen.getByTestId("inventory-summary");
       const firstTab = screen.getAllByRole("tab")[0]!;
       expect(
-        strip.compareDocumentPosition(firstTab) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        strip.compareDocumentPosition(firstTab) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
@@ -66,11 +60,7 @@ describe("given an admin on the Inventory page", () => {
   describe("when the reader cannot see the tool registry", () => {
     /** @scenario "A figure the page cannot measure is a dash, never a zero" */
     it("draws a dash for the tool count rather than a zero", () => {
-      harness.permissions = [
-        "organization:view",
-        "governance:view",
-        "ingestionSources:view",
-      ];
+      harness.permissions = ["organization:view", "governance:view", "ingestionSources:view"];
       connectTools();
       renderScreen();
       const strip = screen.getByTestId("inventory-summary");
@@ -99,9 +89,7 @@ describe("given an admin on the Inventory page", () => {
       expect(within(tools).getByText("—")).toBeInTheDocument();
       expect(within(tools).queryByText("0")).toBeNull();
       // The tab badge is the same claim in a smaller place.
-      expect(screen.getByRole("tab", { name: /^Catalog/ }).textContent).toBe(
-        "Catalog",
-      );
+      expect(screen.getByRole("tab", { name: /^Catalog/ }).textContent).toBe("Catalog");
     });
   });
 
@@ -125,12 +113,8 @@ describe("given an admin on the Inventory page", () => {
       expect(within(sources).getByText("—")).toBeInTheDocument();
       expect(within(environments).queryByText("0")).toBeNull();
       // And the tab badge agrees with the tab beside it.
-      expect(
-        screen.getByRole("tab", { name: /^Environments/ }).textContent,
-      ).toBe("Environments");
-      expect(screen.getByRole("tab", { name: /^Sources/ }).textContent).toBe(
-        "Sources",
-      );
+      expect(screen.getByRole("tab", { name: /^Environments/ }).textContent).toBe("Environments");
+      expect(screen.getByRole("tab", { name: /^Sources/ }).textContent).toBe("Sources");
     });
 
     /** @scenario "A figure the page cannot measure is a dash, never a zero" */

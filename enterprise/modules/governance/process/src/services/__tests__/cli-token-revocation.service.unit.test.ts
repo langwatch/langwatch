@@ -3,6 +3,7 @@
  * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
  */
 import { describe, expect, it } from "vitest";
+
 import type { CliTokenStore } from "../../app/governance.members.ts";
 import { DefaultGovernanceCliTokenRevocationService } from "../cli-token-revocation.service.ts";
 

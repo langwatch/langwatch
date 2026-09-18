@@ -1,5 +1,6 @@
-import { type PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AdminWorkspaceKind } from "@langwatch/enterprise-governance-contract";
+import { type PrismaClient } from "@langwatch/prisma-client/generated";
+
 import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceAuditRow,

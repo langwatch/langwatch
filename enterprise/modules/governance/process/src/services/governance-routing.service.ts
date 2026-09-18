@@ -20,6 +20,7 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
+
 import type { RoutingPolicyRepository } from "../repositories/routing-policy.repository.ts";
 
 const MOVING_MODEL_NAME = /^(openai|anthropic|gemini)\/(latest|latest-mini)$/;
@@ -27,7 +28,9 @@ const MOVING_MODEL_NAME = /^(openai|anthropic|gemini)\/(latest|latest-mini)$/;
 export class DefaultGovernanceRoutingPolicyService {
   private constructor(private readonly repository: RoutingPolicyRepository) {}
 
-  static create(options: { repository: RoutingPolicyRepository }): DefaultGovernanceRoutingPolicyService {
+  static create(options: {
+    repository: RoutingPolicyRepository;
+  }): DefaultGovernanceRoutingPolicyService {
     return new DefaultGovernanceRoutingPolicyService(options.repository);
   }
 
@@ -98,9 +101,7 @@ export class DefaultGovernanceRoutingPolicyService {
   }
 
   findDefaultForUser(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy | null> {
-    return this.repository.findDefaultForUser(
-      resolveDefaultRoutingPolicyInputSchema.parse(input),
-    );
+    return this.repository.findDefaultForUser(resolveDefaultRoutingPolicyInputSchema.parse(input));
   }
 
   private async getOwn(id: string, organizationId: string): Promise<RoutingPolicy> {

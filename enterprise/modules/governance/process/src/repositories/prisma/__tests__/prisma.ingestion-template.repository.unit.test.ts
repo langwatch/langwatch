@@ -1,7 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { describe, expect, it, vi } from "vitest";
-import { PrismaIngestionTemplateRepository } from "../prisma.ingestion-template.repository.ts";
 import { Temporal, toDate } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { PrismaIngestionTemplateRepository } from "../prisma.ingestion-template.repository.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 const NOW_INSTANT = Temporal.Instant.from("2026-08-24T00:00:00.000Z");

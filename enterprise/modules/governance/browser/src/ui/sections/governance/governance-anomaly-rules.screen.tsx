@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Heading, VStack } from "@chakra-ui/react";
+
 import { AnomalyRulesTab } from "../../../features/ingestion-sources/AnomalyRulesTab";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 

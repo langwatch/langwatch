@@ -17,6 +17,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { editSourceNotes } from "../governance-inventory.screen.tsx";
 
 /** What each note is recognisable by, independent of its exact wording. */
@@ -97,10 +98,7 @@ describe("given the notes an edit drawer owes about locked settings", () => {
       );
 
       for (const { hasPulled, report, notes } of everyCombination) {
-        expect(
-          notes.length,
-          `hasPulled=${hasPulled} report=${report}`,
-        ).toBeLessThanOrEqual(2);
+        expect(notes.length, `hasPulled=${hasPulled} report=${report}`).toBeLessThanOrEqual(2);
       }
     });
 
@@ -112,10 +110,7 @@ describe("given the notes an edit drawer owes about locked settings", () => {
           const saysFixed = START_FIXED_NOTE.test(joined);
           const saysMovable = RESTATE_NOTE.test(joined);
 
-          expect(
-            saysFixed && saysMovable,
-            `hasPulled=${hasPulled} report=${report}`,
-          ).toBe(false);
+          expect(saysFixed && saysMovable, `hasPulled=${hasPulled} report=${report}`).toBe(false);
         }
       }
     });

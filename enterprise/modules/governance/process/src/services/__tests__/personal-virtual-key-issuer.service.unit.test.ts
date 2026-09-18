@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { describe, expect, it, vi } from "vitest";
-import { Temporal } from "@langwatch/time";
 import type { GatewayApi, GatewayVirtualKeyRecord } from "@langwatch/gateway-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
 import { GatewayPersonalVirtualKeyIssuerService } from "../personal-virtual-key-issuer.service.ts";
 
 function virtualKeyRecord(

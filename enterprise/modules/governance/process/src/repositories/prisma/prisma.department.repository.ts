@@ -4,6 +4,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { DepartmentRepository } from "../department.repository.ts";
 
 /**
@@ -12,7 +13,7 @@ import { DepartmentRepository } from "../department.repository.ts";
  */
 export type DepartmentDatabase = Pick<
   PrismaClient,
-  "department" | "organizationUser" | "project" | "team"
+  "department" | "departmentMembershipHistory" | "organizationUser" | "project" | "team"
 >;
 
 export class PrismaDepartmentRepository extends DepartmentRepository {
@@ -71,6 +72,30 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
       teams,
       projects,
     };
+  }
+
+  async departmentsOnDay(input: {
+    organizationId: string;
+    userIds: readonly string[];
+    dayUtc: string;
+  }): Promise<Map<string, string>> {
+    if (input.userIds.length === 0) return new Map();
+
+    const dayStart = new Date(`${input.dayUtc}T00:00:00.000Z`);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+    const rows = await this.prisma.departmentMembershipHistory.findMany({
+      where: {
+        organizationId: input.organizationId,
+        userId: { in: [...input.userIds] },
+        validFrom: { lt: dayEnd },
+        OR: [{ validTo: null }, { validTo: { gt: dayStart } }],
+      },
+      orderBy: { validFrom: "asc" },
+      select: { userId: true, departmentId: true },
+    });
+
+    return new Map(rows.map((row) => [row.userId, row.departmentId]));
   }
 
   async create(input: { organizationId: string; name: string }): Promise<Department> {

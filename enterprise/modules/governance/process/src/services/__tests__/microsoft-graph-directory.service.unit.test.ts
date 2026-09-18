@@ -34,8 +34,7 @@ describe("reading a directory page", () => {
     const read = readDirectoryUserRows({
       response: {
         value: [graphUser()],
-        "@odata.nextLink":
-          "https://graph.microsoft.com/v1.0/users?$skiptoken=x",
+        "@odata.nextLink": "https://graph.microsoft.com/v1.0/users?$skiptoken=x",
       },
     });
 
@@ -125,24 +124,12 @@ describe("shaping directory events", () => {
 describe("the next-page host gate", () => {
   /** @scenario "A next-page link is followed only when it is Microsoft Graph over https" */
   it("accepts only https Microsoft Graph with a clean authority", () => {
-    expect(
-      isMicrosoftGraphUrl(
-        "https://graph.microsoft.com/v1.0/users?$skiptoken=x",
-      ),
-    ).toBe(true);
-    expect(isMicrosoftGraphUrl("http://graph.microsoft.com/v1.0/users")).toBe(
-      false,
-    );
+    expect(isMicrosoftGraphUrl("https://graph.microsoft.com/v1.0/users?$skiptoken=x")).toBe(true);
+    expect(isMicrosoftGraphUrl("http://graph.microsoft.com/v1.0/users")).toBe(false);
     expect(isMicrosoftGraphUrl("https://evil.test/v1.0/users")).toBe(false);
-    expect(
-      isMicrosoftGraphUrl("https://graph.microsoft.com.evil.test/users"),
-    ).toBe(false);
-    expect(
-      isMicrosoftGraphUrl("https://user:pass@graph.microsoft.com/users"),
-    ).toBe(false);
-    expect(isMicrosoftGraphUrl("https://graph.microsoft.com:8443/users")).toBe(
-      false,
-    );
+    expect(isMicrosoftGraphUrl("https://graph.microsoft.com.evil.test/users")).toBe(false);
+    expect(isMicrosoftGraphUrl("https://user:pass@graph.microsoft.com/users")).toBe(false);
+    expect(isMicrosoftGraphUrl("https://graph.microsoft.com:8443/users")).toBe(false);
     expect(isMicrosoftGraphUrl("not a url")).toBe(false);
   });
 });

@@ -3,8 +3,8 @@ import type {
   GovernanceOtlpReceiverPolicies,
 } from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-
 import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+
 import type { GovernanceActivityOperationsService } from "./governance-activity-operations.service.ts";
 import type { GovernanceIngestionOperationsService } from "./governance-ingestion-operations.service.ts";
 import type { GovernanceLifecycleOperationsService } from "./governance-lifecycle-operations.service.ts";
@@ -114,9 +114,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly aiToolRemove: GovernanceApi["aiToolRemove"] = (...args) =>
     this.rules.aiToolRemove(...args);
 
-  readonly aiToolEnsureDefaultCatalog: GovernanceApi["aiToolEnsureDefaultCatalog"] = (
-    ...args
-  ) => this.rules.aiToolEnsureDefaultCatalog(...args);
+  readonly aiToolEnsureDefaultCatalog: GovernanceApi["aiToolEnsureDefaultCatalog"] = (...args) =>
+    this.rules.aiToolEnsureDefaultCatalog(...args);
 
   readonly aiToolSeedStarterPack: GovernanceApi["aiToolSeedStarterPack"] = (...args) =>
     this.rules.aiToolSeedStarterPack(...args);
@@ -124,8 +123,9 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly aiToolListConfiguredProvidersForUser: GovernanceApi["aiToolListConfiguredProvidersForUser"] =
     (...args) => this.rules.aiToolListConfiguredProvidersForUser(...args);
 
-  readonly aiToolListProviderOptionsForAdmin: GovernanceApi["aiToolListProviderOptionsForAdmin"] =
-    (...args) => this.rules.aiToolListProviderOptionsForAdmin(...args);
+  readonly aiToolListProviderOptionsForAdmin: GovernanceApi["aiToolListProviderOptionsForAdmin"] = (
+    ...args
+  ) => this.rules.aiToolListProviderOptionsForAdmin(...args);
 
   readonly aiToolListRoutingPolicyOptionsForAdmin: GovernanceApi["aiToolListRoutingPolicyOptionsForAdmin"] =
     (...args) => this.rules.aiToolListRoutingPolicyOptionsForAdmin(...args);
@@ -147,9 +147,8 @@ export class DefaultGovernanceService implements GovernanceApi {
     ...args
   ) => this.rules.aiToolResolveCliCatalogForUser(...args);
 
-  readonly extractCanonicalCostEvents: GovernanceApi["extractCanonicalCostEvents"] = (
-    ...args
-  ) => this.ingestion.extractCanonicalCostEvents(...args);
+  readonly extractCanonicalCostEvents: GovernanceApi["extractCanonicalCostEvents"] = (...args) =>
+    this.ingestion.extractCanonicalCostEvents(...args);
 
   readonly ingestionConfigure: GovernanceApi["ingestionConfigure"] = (...args) =>
     this.ingestion.ingestionConfigure(...args);
@@ -157,9 +156,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly ingestionDisable: GovernanceApi["ingestionDisable"] = (...args) =>
     this.ingestion.ingestionDisable(...args);
 
-  readonly ingestionRecordRunCompleted: GovernanceApi["ingestionRecordRunCompleted"] = (
-    ...args
-  ) => this.ingestion.ingestionRecordRunCompleted(...args);
+  readonly ingestionRecordRunCompleted: GovernanceApi["ingestionRecordRunCompleted"] = (...args) =>
+    this.ingestion.ingestionRecordRunCompleted(...args);
 
   readonly ingestionRecordRunFailed: GovernanceApi["ingestionRecordRunFailed"] = (...args) =>
     this.ingestion.ingestionRecordRunFailed(...args);
@@ -171,9 +169,8 @@ export class DefaultGovernanceService implements GovernanceApi {
     ...args
   ) => this.ingestion.ingestionKeyEnsureForProject(...args);
 
-  readonly ingestionKeyIssueForProject: GovernanceApi["ingestionKeyIssueForProject"] = (
-    ...args
-  ) => this.ingestion.ingestionKeyIssueForProject(...args);
+  readonly ingestionKeyIssueForProject: GovernanceApi["ingestionKeyIssueForProject"] = (...args) =>
+    this.ingestion.ingestionKeyIssueForProject(...args);
 
   readonly ingestionKeyEnsureForPersonalProject: GovernanceApi["ingestionKeyEnsureForPersonalProject"] =
     (...args) => this.ingestion.ingestionKeyEnsureForPersonalProject(...args);
@@ -191,9 +188,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly ingestionSourceList: GovernanceApi["ingestionSourceList"] = (...args) =>
     this.ingestion.ingestionSourceList(...args);
 
-  readonly findIngestionSourceById: GovernanceApi["findIngestionSourceById"] = (
-    ...args
-  ) => this.ingestion.findIngestionSourceById(...args);
+  readonly findIngestionSourceById: GovernanceApi["findIngestionSourceById"] = (...args) =>
+    this.ingestion.findIngestionSourceById(...args);
 
   readonly ingestionSourceLiveTraceProjectIds: GovernanceApi["ingestionSourceLiveTraceProjectIds"] =
     (...args) => this.ingestion.ingestionSourceLiveTraceProjectIds(...args);
@@ -201,8 +197,9 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly ingestionSourceGetById: GovernanceApi["ingestionSourceGetById"] = (...args) =>
     this.ingestion.ingestionSourceGetById(...args);
 
-  readonly findIngestionSourceByIngestSecret: GovernanceApi["findIngestionSourceByIngestSecret"] =
-    (...args) => this.ingestion.findIngestionSourceByIngestSecret(...args);
+  readonly findIngestionSourceByIngestSecret: GovernanceApi["findIngestionSourceByIngestSecret"] = (
+    ...args
+  ) => this.ingestion.findIngestionSourceByIngestSecret(...args);
 
   readonly ingestionSourceCreate: GovernanceApi["ingestionSourceCreate"] = (...args) =>
     this.ingestion.ingestionSourceCreate(...args);
@@ -210,9 +207,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly ingestionSourceUpdate: GovernanceApi["ingestionSourceUpdate"] = (...args) =>
     this.ingestion.ingestionSourceUpdate(...args);
 
-  readonly ingestionSourceRotateSecret: GovernanceApi["ingestionSourceRotateSecret"] = (
-    ...args
-  ) => this.ingestion.ingestionSourceRotateSecret(...args);
+  readonly ingestionSourceRotateSecret: GovernanceApi["ingestionSourceRotateSecret"] = (...args) =>
+    this.ingestion.ingestionSourceRotateSecret(...args);
 
   readonly ingestionSourceArchive: GovernanceApi["ingestionSourceArchive"] = (...args) =>
     this.ingestion.ingestionSourceArchive(...args);
@@ -244,9 +240,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly templateCloneFromPlatform: GovernanceApi["templateCloneFromPlatform"] = (...args) =>
     this.ingestion.templateCloneFromPlatform(...args);
 
-  readonly templateSyncPlatformCatalog: GovernanceApi["templateSyncPlatformCatalog"] = (
-    ...args
-  ) => this.ingestion.templateSyncPlatformCatalog(...args);
+  readonly templateSyncPlatformCatalog: GovernanceApi["templateSyncPlatformCatalog"] = (...args) =>
+    this.ingestion.templateSyncPlatformCatalog(...args);
 
   readonly ocsfList: GovernanceApi["ocsfList"] = (...args) => this.ingestion.ocsfList(...args);
 
@@ -281,9 +276,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly activityEventsForSource: GovernanceApi["activityEventsForSource"] = (...args) =>
     this.activity.activityEventsForSource(...args);
 
-  readonly activitySourceHealthMetrics: GovernanceApi["activitySourceHealthMetrics"] = (
-    ...args
-  ) => this.activity.activitySourceHealthMetrics(...args);
+  readonly activitySourceHealthMetrics: GovernanceApi["activitySourceHealthMetrics"] = (...args) =>
+    this.activity.activitySourceHealthMetrics(...args);
 
   readonly personalUsageSummary: GovernanceApi["personalUsageSummary"] = (...args) =>
     this.activity.personalUsageSummary(...args);

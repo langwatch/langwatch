@@ -29,6 +29,7 @@ import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import { SourceComposerDrawer, SourceEditDrawer } from "../governance-inventory.screen.tsx";
 
@@ -66,9 +67,7 @@ const DESTINATION_CTX = {
   organizationId: ORG_ID,
   organizationName: "Acme",
   availableTeams: [{ id: "team_data", name: "Data" }],
-  availableProjects: [
-    { id: "proj_analytics", name: "Analytics · Data", teamId: "team_data" },
-  ],
+  availableProjects: [{ id: "proj_analytics", name: "Analytics · Data", teamId: "team_data" }],
 };
 
 type ComposerState = Parameters<typeof SourceComposerDrawer>[0]["composer"];
@@ -114,8 +113,7 @@ const renderComposer = (sourceType = "databricks_genie") =>
  * Scoped to the field rather than reached through `getByRole("combobox")`:
  * the Genie drawer holds more than one select once Advanced is open.
  */
-const destinationPicker = () =>
-  screen.getByTestId("ingestion-trace-destination");
+const destinationPicker = () => screen.getByTestId("ingestion-trace-destination");
 
 /**
  * Opening the group is asynchronous — it mounts its contents on the way — so
@@ -206,8 +204,7 @@ const renderEditDrawer = (source = editableSource) =>
  * app's select now rather than the browser's, so it is a combobox button
  * reading its choice in words, with no `value` and no options until opened.
  */
-const frequencyPicker = () =>
-  screen.queryByRole("combobox", { name: "Frequency" });
+const frequencyPicker = () => screen.queryByRole("combobox", { name: "Frequency" });
 
 describe("given the create drawer for a pull-mode conversation source", () => {
   describe("when it first opens", () => {
@@ -250,12 +247,8 @@ describe("given the create drawer for a pull-mode conversation source", () => {
       // two particular facts, asked for with a word that appears nowhere else
       // an admin can see. The two fields sit on top of each other, so the
       // mismatched shape was visible without reading either of them.
-      expect(
-        screen.getByPlaceholderText("Display name for this source"),
-      ).toBeTruthy();
-      expect(
-        screen.getByPlaceholderText("Description for this source"),
-      ).toBeTruthy();
+      expect(screen.getByPlaceholderText("Display name for this source")).toBeTruthy();
+      expect(screen.getByPlaceholderText("Description for this source")).toBeTruthy();
       expect(screen.queryByPlaceholderText(/fleet/i)).toBeNull();
     });
   });
@@ -291,9 +284,7 @@ describe("given the create drawer for a pull-mode conversation source", () => {
       const picker = frequencyPicker();
       if (!picker) throw new Error("the cadence picker did not open");
       await user.click(picker);
-      await user.click(
-        await screen.findByRole("option", { name: "Every hour" }),
-      );
+      await user.click(await screen.findByRole("option", { name: "Every hour" }));
 
       await user.click(screen.getByText("Advanced"));
       await waitFor(() => {
@@ -311,9 +302,7 @@ describe("given the create drawer for a pull-mode conversation source", () => {
 
       await openAdvanced({ user, awaiting: "destination" });
       await user.click(within(destinationPicker()).getByRole("combobox"));
-      await user.click(
-        within(screen.getByRole("listbox")).getByText("Analytics · Data"),
-      );
+      await user.click(within(screen.getByRole("listbox")).getByText("Analytics · Data"));
 
       await user.click(screen.getByText("Advanced"));
       await waitFor(() => {
@@ -321,9 +310,9 @@ describe("given the create drawer for a pull-mode conversation source", () => {
       });
       await openAdvanced({ user, awaiting: "destination" });
 
-      expect(
-        within(destinationPicker()).getByRole("combobox").textContent,
-      ).toContain("Analytics · Data");
+      expect(within(destinationPicker()).getByRole("combobox").textContent).toContain(
+        "Analytics · Data",
+      );
     });
   });
 });
@@ -409,9 +398,7 @@ describe("given the create drawer for a source that routes conversations", () =>
 
       await openAdvanced({ user, awaiting: "destination" });
       await user.click(within(destinationPicker()).getByRole("combobox"));
-      await user.click(
-        within(screen.getByRole("listbox")).getByText("Analytics · Data"),
-      );
+      await user.click(within(screen.getByRole("listbox")).getByText("Analytics · Data"));
 
       const hint = await screen.findByTestId("composer-destination-hint");
       expect(hint.textContent).toContain("Analytics · Data");
@@ -448,9 +435,7 @@ describe("given a source type that explains what it needs granted", () => {
 
       // Chakra's popover keeps its content mounted and hidden while closed, so
       // only a visibility matcher can tell "behind the (i)" from "in the body".
-      expect(
-        screen.getByText(/Needs an app registration with a client secret/),
-      ).not.toBeVisible();
+      expect(screen.getByText(/Needs an app registration with a client secret/)).not.toBeVisible();
       expect(screen.getByTestId("source-type-blurb")).toBeVisible();
     });
 
@@ -465,9 +450,7 @@ describe("given a source type that explains what it needs granted", () => {
       // the assertion above is a real state rather than a string that never
       // matched anything.
       expect(
-        await screen.findByText(
-          /Needs an app registration with a client secret/,
-        ),
+        await screen.findByText(/Needs an app registration with a client secret/),
       ).toBeVisible();
     });
   });

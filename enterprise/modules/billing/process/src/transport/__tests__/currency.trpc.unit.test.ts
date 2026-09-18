@@ -34,9 +34,9 @@ describe("given the mounted currency router", () => {
   describe("when its procedures are read", () => {
     it("exposes exactly the one name the pricing pages call, as a query", () => {
       expect(Object.keys(router._def.procedures)).toEqual(["detectCurrency"]);
-      expect(
-        (router._def.procedures.detectCurrency as { _def: { type: string } })._def.type,
-      ).toBe("query");
+      expect((router._def.procedures.detectCurrency as { _def: { type: string } })._def.type).toBe(
+        "query",
+      );
     });
   });
 });

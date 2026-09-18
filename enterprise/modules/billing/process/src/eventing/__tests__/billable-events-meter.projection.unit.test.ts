@@ -1,18 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Event, ProjectionStoreContext } from "@langwatch/eventing";
+import { describe, expect, it, vi } from "vitest";
+
 import type { BillableEventRecord } from "../../repositories/billable-events-meter.repository.ts";
+import { BillableEventsMeterClickHouseRepository } from "../../repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
+import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.billing.repositories.ts";
+import {
+  BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
+  BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
+  RedisBillingTenantOrganizationCacheAdapter,
+} from "../../repositories/redis/redis.tenant-organization-cache.repository.ts";
+import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 import {
   BILLABLE_EVENTS_METER_PROJECTION_NAME,
   BillableEventsMeterProjection,
 } from "../billable-events-meter.projection.ts";
-import {
-  BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
-  BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
-  RedisTenantOrganizationCacheRepository,
-} from "../../repositories/redis/redis.tenant-organization-cache.repository.ts";
-import { BillableEventsMeterClickHouseRepository } from "../../repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
-import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.billing.repositories.ts";
-import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 
 /**
  * App metered event types restated not imported; pins wire values that
@@ -55,7 +56,7 @@ function compose(options: {
     organizations: PostgresBillingRepositories.create({
       prisma: { project: { findUnique } } as never,
     }).tenantOrganizations,
-    cache: RedisTenantOrganizationCacheRepository.create({ redis: redis as never }),
+    cache: RedisBillingTenantOrganizationCacheAdapter.create({ redis: redis as never }),
   });
 
   const projection = BillableEventsMeterProjection.create({

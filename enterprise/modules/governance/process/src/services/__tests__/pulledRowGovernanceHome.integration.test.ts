@@ -18,9 +18,6 @@
  * Decision: ADR-128.
  */
 
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PROJECT_KIND } from "@langwatch/project-contract";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -31,6 +28,10 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { Organization, PrismaClient, Team } from "@langwatch/prisma-client/generated";
+import { PROJECT_KIND } from "@langwatch/project-contract";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { pulledUsageScopeId } from "../../../process-manager/pulledUsageLedger.process";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 import { buildPulledUsageRecord } from "../pulledUsageRecord";
@@ -46,9 +47,7 @@ const connection = databaseUrl
   ? PrismaConnectionService.create({
       guard: new AllowTestQueries(),
       logger: createLogger("langwatch:governance:test:pulled-row-governance-home"),
-    }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -122,12 +121,8 @@ afterAll(async () => {
     await prisma.project
       .deleteMany({ where: { team: { organizationId: org.id } } })
       .catch(() => undefined);
-    await prisma.team
-      .deleteMany({ where: { organizationId: org.id } })
-      .catch(() => undefined);
-    await prisma.organization
-      .delete({ where: { id: org.id } })
-      .catch(() => undefined);
+    await prisma.team.deleteMany({ where: { organizationId: org.id } }).catch(() => undefined);
+    await prisma.organization.delete({ where: { id: org.id } }).catch(() => undefined);
   }
 });
 
@@ -168,20 +163,11 @@ describe("a pulled usage record arriving from a provider source", () => {
     it("mints one home per organization, and pulling again mints no second", async () => {
       // The second organization gets its home first, so the assertion below
       // is about tenancy and not about ordering.
-      const otherHome = await ensureHiddenGovernanceProject(
-        prisma,
-        otherOrganization.id,
-      );
+      const otherHome = await ensureHiddenGovernanceProject(prisma, otherOrganization.id);
       expect(otherHome.teamId).toBe(otherTeam.id);
 
-      const first = await ensureHiddenGovernanceProject(
-        prisma,
-        organization.id,
-      );
-      const second = await ensureHiddenGovernanceProject(
-        prisma,
-        organization.id,
-      );
+      const first = await ensureHiddenGovernanceProject(prisma, organization.id);
+      const second = await ensureHiddenGovernanceProject(prisma, organization.id);
 
       expect(second.id).toBe(first.id);
       expect(await governanceHomesFor(organization.id)).toHaveLength(1);

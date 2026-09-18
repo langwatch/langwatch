@@ -64,8 +64,7 @@ const READS = [
   ],
   [
     "by virtual key",
-    (repo: ClickHouseGatewaySpendRepository, input: ReadInput) =>
-      repo.sumWindowByVirtualKey(input),
+    (repo: ClickHouseGatewaySpendRepository, input: ReadInput) => repo.sumWindowByVirtualKey(input),
   ],
 ] as const;
 

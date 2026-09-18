@@ -11,6 +11,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
+
 import { RoutingPolicyRepository } from "../routing-policy.repository.ts";
 import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
@@ -112,9 +113,7 @@ export class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
     this.store.routingPolicies.splice(this.indexOfOwned(input), 1);
   }
 
-  async findDefaultForUser(
-    input: ResolveDefaultRoutingPolicyInput,
-  ): Promise<RoutingPolicy | null> {
+  async findDefaultForUser(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy | null> {
     return (
       this.store.routingPolicies.find(
         (policy) => policy.organizationId === input.organizationId && policy.isDefault,

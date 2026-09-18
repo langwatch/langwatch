@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { describe, expect, it, vi } from "vitest";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   ApiKeyIngestionKeyIssuerService,
   ApiKeyIngestionKeyRepositoryService,

@@ -1,16 +1,16 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { Temporal } from "@langwatch/time";
 /**
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PrismaBillingWebhookSubscriptionRepository } from "../prisma.billing-webhook-subscription.repository.ts";
 import {
-  SubscriptionRepository,
+  BillingSubscription,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
 } from "../../subscription.repository.ts";
-import { Temporal } from "@langwatch/time";
+import { PrismaBillingWebhookBillingSubscription } from "../prisma.billing-webhook-subscription.repository.ts";
 
 const SUBSCRIPTION: BillingSubscriptionRecord = {
   id: "subscription-1",
@@ -38,7 +38,7 @@ function recordNotFound(): Error & { code: string } {
   return Object.assign(new Error("No Subscription found"), { code: "P2025" });
 }
 
-function repositoryDouble(overrides: Partial<SubscriptionRepository> = {}) {
+function repositoryDouble(overrides: Partial<BillingSubscription> = {}) {
   return {
     findActive: vi.fn(),
     findLastNonCancelled: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
@@ -54,12 +54,12 @@ function repositoryDouble(overrides: Partial<SubscriptionRepository> = {}) {
     migrateToSeatEvent: vi.fn(() => Promise.resolve([])),
     updateQuantities: vi.fn(() => Promise.resolve(WITH_ORGANIZATION)),
     ...overrides,
-  } as unknown as SubscriptionRepository;
+  } as unknown as BillingSubscription;
 }
 
 function compose(
   options: {
-    repository?: SubscriptionRepository;
+    repository?: BillingSubscription;
     license?: string | null;
   } = {},
 ) {
@@ -72,11 +72,11 @@ function compose(
 
   return {
     subscriptions,
-    adapter: PrismaBillingWebhookSubscriptionRepository.create({ subscriptions, database }),
+    adapter: PrismaBillingWebhookBillingSubscription.create({ subscriptions, database }),
   };
 }
 
-describe("PrismaBillingWebhookSubscriptionRepository", () => {
+describe("PrismaBillingWebhookBillingSubscription", () => {
   describe("when a payment activates the subscription", () => {
     /** @scenario "An activation carries the organization's trial licence to the webhook" */
     it("carries the organization's trial licence beside the activated row", async () => {
@@ -132,7 +132,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
       const { adapter } = compose({
         repository: repositoryDouble({
           activate: vi.fn(() => Promise.reject(recordNotFound())),
-        } as Partial<SubscriptionRepository>),
+        } as Partial<BillingSubscription>),
       });
 
       await expect(
@@ -147,7 +147,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
       const { adapter } = compose({
         repository: repositoryDouble({
           activate: vi.fn(() => Promise.reject(new Error("connection refused"))),
-        } as Partial<SubscriptionRepository>),
+        } as Partial<BillingSubscription>),
       });
 
       await expect(

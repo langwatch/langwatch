@@ -51,7 +51,9 @@ export class MemoryOttlTransformChannel extends GovernanceOttlGateway {
 
   async transform(input: OttlTransformInput): Promise<OttlTransformResult> {
     if (!this.transformResult) {
-      throw new OttlGatewayUnavailableError("No OTTL gateway is configured for this memory channel");
+      throw new OttlGatewayUnavailableError(
+        "No OTTL gateway is configured for this memory channel",
+      );
     }
     return this.transformResult(input);
   }

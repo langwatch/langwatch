@@ -15,6 +15,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
+
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 
 interface FetchCall {
@@ -682,9 +683,9 @@ describe("given a config naming which agents to read", () => {
     // cannot go in quoted either. Saying so here names the field; letting it
     // through spends a run to be told "incompatible types" by a server that
     // mentions no field at all.
-    expect(() =>
-      adapter.validateConfig({ ...CONFIG, botIds: ["engineering-agent"] }),
-    ).toThrow(ZodError);
+    expect(() => adapter.validateConfig({ ...CONFIG, botIds: ["engineering-agent"] })).toThrow(
+      ZodError,
+    );
   });
 });
 
@@ -1212,9 +1213,7 @@ describe("given an Azure bill that does not fit in one reply", () => {
     }): Promise<{ day: string; costMinor: string }[] | null>;
   }
 
-  async function readTheBill(
-    options: { signal?: AbortSignal; deadlineMs?: number } = {},
-  ) {
+  async function readTheBill(options: { signal?: AbortSignal; deadlineMs?: number } = {}) {
     const adapter = await newAdapter();
     return (adapter as unknown as PageWalk).fetchAzureCostPages({
       subscriptionId: "sub-1",
@@ -1250,9 +1249,7 @@ describe("given an Azure bill that does not fit in one reply", () => {
   function costCalls() {
     // Lowercased before matching: a host is case-insensitive, and a link that
     // shouts its host is still a call to Azure that these counts must see.
-    return capturedCalls.filter((call) =>
-      call.url.toLowerCase().includes("management.azure.com"),
-    );
+    return capturedCalls.filter((call) => call.url.toLowerCase().includes("management.azure.com"));
   }
 
   describe("when the next page is Azure Resource Manager's own", () => {
@@ -1274,9 +1271,7 @@ describe("given an Azure bill that does not fit in one reply", () => {
       const days = await readTheBill();
 
       expect(days?.map((day) => day.day)).toEqual(["2026-08-01", "2026-08-02"]);
-      expect(costCalls()[1]?.url).toBe(
-        "https://management.azure.com/next-page",
-      );
+      expect(costCalls()[1]?.url).toBe("https://management.azure.com/next-page");
     });
 
     /** @scenario "A cost reply spread over several pages is read whole" */
@@ -1301,25 +1296,23 @@ describe("given an Azure bill that does not fit in one reply", () => {
 
   describe("when the next page field is present but empty", () => {
     /** @scenario "A cost reply spread over several pages is read whole" */
-    it.each([
-      "",
-      "   ",
-    ])("ends the walk on %j and keeps the days it already read", async (nextLink) => {
-      responseQueue.push({
-        status: 200,
-        body: costPage({ day: 20260801, cost: 1.5, nextLink }),
-      });
+    it.each(["", "   "])(
+      "ends the walk on %j and keeps the days it already read",
+      async (nextLink) => {
+        responseQueue.push({
+          status: 200,
+          body: costPage({ day: 20260801, cost: 1.5, nextLink }),
+        });
 
-      const days = await readTheBill();
+        const days = await readTheBill();
 
-      // Null here would hold the window and later give it up with the day
-      // below unpriced again, which is what an empty marker used to cost.
-      expect(days?.map((day) => day.day)).toEqual(["2026-08-01"]);
-      expect(costCalls()).toHaveLength(1);
-      expect(errors.join(" ")).not.toContain(
-        "refusing an Azure cost next-page link",
-      );
-    });
+        // Null here would hold the window and later give it up with the day
+        // below unpriced again, which is what an empty marker used to cost.
+        expect(days?.map((day) => day.day)).toEqual(["2026-08-01"]);
+        expect(costCalls()).toHaveLength(1);
+        expect(errors.join(" ")).not.toContain("refusing an Azure cost next-page link");
+      },
+    );
   });
 
   describe("when the next page points somewhere that is not Azure", () => {
@@ -1376,9 +1369,7 @@ describe("given an Azure bill that does not fit in one reply", () => {
       expect(costCalls()).toHaveLength(1);
       // And the refusal is said out loud. A window that stalls silently is
       // indistinguishable to an operator from one they have no permission on.
-      expect(errors.join(" ")).toContain(
-        "refusing an Azure cost next-page link",
-      );
+      expect(errors.join(" ")).toContain("refusing an Azure cost next-page link");
     });
   });
 
@@ -1545,9 +1536,7 @@ describe("given a subscription billing both AI services and unrelated infrastruc
 
       // Belt and braces on top of the request filter: Azure answered with a
       // category outside the list, and it becomes no recorded cost at all.
-      expect(read.events.map((event) => event.target)).toEqual([
-        "Foundry Models",
-      ]);
+      expect(read.events.map((event) => event.target)).toEqual(["Foundry Models"]);
     });
   });
 });

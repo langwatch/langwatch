@@ -17,6 +17,7 @@ import {
   type RevokePersonalVirtualKeyInput,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
+
 import type { PersonalVirtualKeyIssuer } from "../app/governance.members.ts";
 import { PersonalVirtualKeyRepository } from "../repositories/personal-virtual-key.repository.ts";
 

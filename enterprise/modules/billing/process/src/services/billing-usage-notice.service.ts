@@ -1,6 +1,3 @@
-import { createLogger } from "@langwatch/observability";
-import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webhook";
-import { nowInstant,toDate,type Instant } from "@langwatch/time";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
@@ -8,12 +5,12 @@ import type {
   SignupNotificationPayload,
   SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
-import {
-  NullBillingErrorReporter,
-  type BillingErrorReporter,
-} from "./billing-error-reporter.service.ts";
-import type { UsageLimitEmailChannel } from "../channels/usage-limit-email.channel.ts";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webhook";
+
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
+import type { UsageLimitEmailChannel } from "../channels/usage-limit-email.channel.ts";
 import {
   type HubspotFormBody,
   billingThresholdFailureText,
@@ -28,6 +25,10 @@ import {
   signupAlertText,
   signupFormBody,
 } from "../rules/billing-usage-notice-copy.rules.ts";
+import {
+  NullBillingErrorReporter,
+  type BillingErrorReporter,
+} from "./billing-error-reporter.service.ts";
 
 const logger = createLogger("ee:notification-service");
 

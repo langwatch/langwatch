@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it, vi } from "vitest";
+
+import type { BillingReportOrganizationLookup } from "../../organization/billing-report-organization.repository.ts";
 import {
-  RedisBillingOrganizationCacheRepository,
+  RedisBillingOrganizationCacheAdapter,
   type BillingOrganizationCacheRedis,
 } from "../redis.billing-organization-cache.repository.ts";
-import type { BillingReportOrganizationLookup } from "../../organization/billing-report-organization.repository.ts";
 
 /** The whole verdict is what the cache stores, not just the organization. */
 const ORGANIZATION: BillingReportOrganizationLookup = {
@@ -18,12 +19,12 @@ const ORGANIZATION: BillingReportOrganizationLookup = {
 };
 
 function cacheOver(redis: Partial<BillingOrganizationCacheRedis>) {
-  return RedisBillingOrganizationCacheRepository.create({
+  return RedisBillingOrganizationCacheAdapter.create({
     redis: redis as BillingOrganizationCacheRedis,
   });
 }
 
-describe("RedisBillingOrganizationCacheRepository", () => {
+describe("RedisBillingOrganizationCacheAdapter", () => {
   describe("given the keyspace the App's own cache writes", () => {
     /**
      * Frozen twin: the App caches this read through

@@ -1,10 +1,11 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import {
   DuplicateSubscriptionsReportRepository,
   type SubscriptionReportRow,
 } from "../../repositories/duplicate-subscriptions-report.repository.ts";
 import { reportDuplicateSubscriptions } from "../duplicate-subscriptions-report.task.ts";
-import { Temporal } from "@langwatch/time";
 
 function row(overrides: Partial<SubscriptionReportRow>): SubscriptionReportRow {
   return {

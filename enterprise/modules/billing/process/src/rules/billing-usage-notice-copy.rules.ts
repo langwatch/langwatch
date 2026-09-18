@@ -1,4 +1,3 @@
-import type { IncomingWebhookSendArguments } from "@slack/webhook";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
@@ -6,6 +5,7 @@ import type {
   SignupNotificationPayload,
   SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
+import type { IncomingWebhookSendArguments } from "@slack/webhook";
 
 type SlackBlocks = IncomingWebhookSendArguments["blocks"];
 

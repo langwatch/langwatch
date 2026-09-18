@@ -40,11 +40,7 @@ export class OrganizationSupportContactService {
    * Nothing when the organization has no admin membership, or when every admin
    * membership is orphaned.
    */
-  async findOrgAdminEmail({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<string | null> {
+  async findOrgAdminEmail({ organizationId }: { organizationId: string }): Promise<string | null> {
     const adminUserIds = await this.repository.findAdminUserIds({ organizationId });
     if (adminUserIds.length === 0) {
       return null;
@@ -74,11 +70,7 @@ export class OrganizationSupportContactService {
    * no contact to surface, and inventing one would send a blocked person
    * nowhere.
    */
-  async findSupportContact({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<string | null> {
+  async findSupportContact({ organizationId }: { organizationId: string }): Promise<string | null> {
     const configured = await this.repository.findConfiguredSupportContact({ organizationId });
     const trimmed = configured?.trim();
     if (trimmed) {

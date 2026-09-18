@@ -2,11 +2,11 @@ import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import type { GovernanceHttpClient, GovernanceHttpResponse } from "../../app/governance.members.ts";
 import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
 } from "../databricks-genie-puller.service.ts";
-import type { GovernanceHttpClient, GovernanceHttpResponse } from "../../app/governance.members.ts";
 
 const workspaceUrl = "https://workspace.example.test";
 const warehouseId = "warehouse-1";
@@ -171,7 +171,7 @@ describe("Databricks Genie puller", () => {
       actor: "dana@example.test",
     });
     // No warehouse, so nothing priced it - and an unpriced question carries no
-// amount rather than a zero, which the ledger would read as a measurement.
+    // amount rather than a zero, which the ledger would read as a measurement.
     expect(hint(result).costStatus).toBe("estimate");
     expect(hint(result).costUsd).toBeUndefined();
     expect(workspace.costRequests).toEqual([]);

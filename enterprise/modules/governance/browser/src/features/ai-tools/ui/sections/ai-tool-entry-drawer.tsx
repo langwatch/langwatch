@@ -12,15 +12,25 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Bot, Wrench } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-
+import { ScopeChipPicker, type ScopeChipPickerEntry } from "@langwatch/authz-browser-kit/scope-picker";
 import {
   ASSISTANT_KINDS,
   ASSISTANT_OPTIONS,
   ASSISTANT_PRESETS,
   type AssistantKind,
-} from "@langwatch/coding-agent-web/surfaces/agent-identity";
+} from "@langwatch/coding-agent-browser/surfaces/agent-identity";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Switch } from "@langwatch/design-system/switch";
+import { Bot, Wrench } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { api } from "../../../../behavior/governance-api.ts";
+import {
+  useGovernanceToaster,
+  useShowErrorToast,
+} from "../../../../behavior/governance-feedback.ts";
+import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
+import { Link } from "../../../../ui/elements/governance-link.tsx";
 import { type AiToolEntry, type AiToolTileType } from "../../model/ai-tool-tile.ts";
 import {
   isToolPresetAsset,
@@ -28,19 +38,6 @@ import {
   TOOL_PRESETS,
   toolPresetAsset,
 } from "../elements/tool-icons.tsx";
-import {
-  ScopeChipPicker,
-  type ScopeChipPickerEntry,
-} from "@langwatch/authz-web-kit/scope-picker";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Link } from "../../../../ui/elements/governance-link.tsx";
-import { Switch } from "@langwatch/design-system/switch";
-import {
-  useGovernanceToaster,
-  useShowErrorToast,
-} from "../../../../behavior/governance-feedback.ts";
-import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
-import { api } from "../../../../behavior/governance-api.ts";
 const TILE_TYPE_OPTIONS: { value: AiToolTileType; label: string }[] = [
   { value: "coding_assistant", label: "Coding assistant" },
   { value: "model_provider", label: "Model provider" },
@@ -840,9 +837,7 @@ function ModelProviderFields({
 }: {
   form: ModelProviderForm;
   setForm: (f: FormState) => void;
-  providerOptions:
-    | { providerKey: string; displayName: string; configured: boolean }[]
-    | undefined;
+  providerOptions: { providerKey: string; displayName: string; configured: boolean }[] | undefined;
   providerOptionsLoading: boolean;
   routingPolicyOptions: { id: string; name: string }[] | undefined;
   routingPolicyOptionsLoading: boolean;

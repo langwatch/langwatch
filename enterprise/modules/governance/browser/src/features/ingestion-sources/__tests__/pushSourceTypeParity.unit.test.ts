@@ -6,6 +6,7 @@
 
 import { isPushSourceType } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
+
 import { needsIngestSecret, SOURCE_TYPE_OPTIONS } from "../model/ingestion-source-catalog.ts";
 
 describe("given the catalog and service both classify source types", () => {

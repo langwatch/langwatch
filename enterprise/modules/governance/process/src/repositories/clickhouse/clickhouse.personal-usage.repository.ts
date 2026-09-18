@@ -32,6 +32,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
 import { type Instant, Temporal } from "@langwatch/time";
+
 import type {
   IngestionPrincipalSummaryRow,
   PersonalUsageReader,
@@ -128,7 +129,9 @@ function formatSettings(settings: Record<string, number | string>): string {
 export class ClickHousePersonalUsageRepository implements PersonalUsageReader {
   private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {}
 
-  static create(resolveClient: GovernanceClickHouseTenantResolver): ClickHousePersonalUsageRepository {
+  static create(
+    resolveClient: GovernanceClickHouseTenantResolver,
+  ): ClickHousePersonalUsageRepository {
     return new ClickHousePersonalUsageRepository(resolveClient);
   }
 

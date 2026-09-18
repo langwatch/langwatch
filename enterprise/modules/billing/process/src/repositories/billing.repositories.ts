@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { BillingCheckpointRepository } from "./billing-checkpoint.repository.ts";
-import type { BillingReportOrganizationRepository } from "./organization/billing-report-organization.repository.ts";
 import type { BillingAccountFactsRepository } from "./billing-account-facts.repository.ts";
-import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
-import type { SubscriptionRepository } from "./subscription.repository.ts";
-import type { TenantOrganizationRepository } from "./tenant-organization.repository.ts";
+import type { BillingCheckpointRepository } from "./billing-checkpoint.repository.ts";
 import type { BillingWebhookOrganization } from "./billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscription } from "./billing-webhook-subscription.repository.ts";
 import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscriptions-report.repository.ts";
 import type { NurturingProfileRepository } from "./nurturing-profile.repository.ts";
+import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
+import type { BillingReportOrganizationRepository } from "./organization/billing-report-organization.repository.ts";
+import type { BillingSubscription } from "./subscription.repository.ts";
+import type { TenantOrganizationRepository } from "./tenant-organization.repository.ts";
 
 /**
  * The rows the billing module owns, chosen once at boot.
@@ -26,7 +26,7 @@ export interface BillingRepositories {
   readonly organizations: BillingAccountFactsRepository;
   readonly organizationPricing: OrganizationPricingRepository;
   readonly reportOrganizations: BillingReportOrganizationRepository;
-  readonly subscriptions: SubscriptionRepository;
+  readonly subscriptions: BillingSubscription;
   readonly tenantOrganizations: TenantOrganizationRepository;
   readonly webhookOrganizations: BillingWebhookOrganization;
   readonly webhookSubscriptions: BillingWebhookSubscription;

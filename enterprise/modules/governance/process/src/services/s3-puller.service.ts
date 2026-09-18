@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type {
+  GovernancePuller as PullerAdapter,
+  NormalizedPullEvent,
+  PullResult,
+  PullRunOptions,
+} from "@langwatch/enterprise-governance-contract";
+import { nowInstant } from "@langwatch/time";
 /**
  * S3PollingPullerAdapter — universal S3-polling adapter for SaaS
  * platforms that drop audit logs as files in a customer-owned bucket
@@ -26,16 +33,12 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceObjectStore,IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
-import { nowInstant } from "@langwatch/time";
-import { NullIngestionPullDiagnosticsAdapter } from "./ingestion-pull-diagnostics.service.ts";
 
 import type {
-  GovernancePuller as PullerAdapter,
-  NormalizedPullEvent,
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
+  GovernanceObjectStore,
+  IngestionPullDiagnosticsSink,
+} from "../app/governance.members.ts";
+import { NullIngestionPullDiagnosticsAdapter } from "./ingestion-pull-diagnostics.service.ts";
 
 const MAX_FILES_PER_RUN = 100;
 const MAX_BYTES_PER_FILE = 50 * 1024 * 1024; // 50 MB safety cap

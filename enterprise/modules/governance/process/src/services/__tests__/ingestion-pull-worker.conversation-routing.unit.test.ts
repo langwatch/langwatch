@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
 /**
  * A destination project column on an ingestion source only means something
  * for a source whose events are conversations. A counts-pulling source (usage
@@ -10,7 +11,7 @@
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  */
 import { describe, expect, it } from "vitest";
-import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
+
 import { createWorkerService } from "../../__tests__/support/puller-test-ports.ts";
 
 function countsPullingSource() {

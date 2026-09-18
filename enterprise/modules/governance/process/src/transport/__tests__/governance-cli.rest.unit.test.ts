@@ -5,9 +5,9 @@
  * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { PersonalSourceTypeNotAllowedError } from "@langwatch/enterprise-governance-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";

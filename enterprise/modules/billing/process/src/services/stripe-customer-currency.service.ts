@@ -1,11 +1,12 @@
-import { createLogger } from "@langwatch/observability";
-import type Stripe from "stripe";
 import {
   BillingCustomerDeletedError,
   Currency,
   type Currency as CurrencyType,
   UnsupportedBillingCurrencyError,
 } from "@langwatch/enterprise-billing-contract";
+import { createLogger } from "@langwatch/observability";
+import type Stripe from "stripe";
+
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 
 const logger = createLogger("langwatch:billing:stripeCustomerCurrency");

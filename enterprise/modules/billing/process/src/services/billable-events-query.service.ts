@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import type { BillableEventsRepository } from "../repositories/billable-events.repository.ts";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
+
+import type { BillableEventsRepository } from "../repositories/billable-events.repository.ts";
 
 const logger = createLogger("langwatch:billing:billableEventsQuery");
 

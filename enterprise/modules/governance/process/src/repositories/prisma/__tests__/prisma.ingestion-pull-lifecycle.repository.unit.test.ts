@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { PrismaIngestionPullLifecycleRepository } from "../prisma.ingestion-pull-lifecycle.repository.ts";
+
 import type { IngestionPullLifecycleDatabase } from "../../ingestion-pull-lifecycle.repository.ts";
+import { PrismaIngestionPullLifecycleRepository } from "../prisma.ingestion-pull-lifecycle.repository.ts";
 
 describe("PrismaIngestionPullLifecycleRepository", () => {
   it("only discovers processes belonging to Governance projects", async () => {

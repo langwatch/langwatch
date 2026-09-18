@@ -33,6 +33,7 @@
  * workspace comes to report nothing at all.
  */
 import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
+
 import {
   GENIE_FREE_USAGE_SKU_MARKER,
   ONE_HOUR_MS,

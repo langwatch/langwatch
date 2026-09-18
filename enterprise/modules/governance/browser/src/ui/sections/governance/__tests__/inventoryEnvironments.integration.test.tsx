@@ -15,11 +15,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import {
-  openTab,
-  renderScreen,
-  SAMPLE_CHOICE_KEY,
-} from "./inventoryScreenHarness";
+import { openTab, renderScreen, SAMPLE_CHOICE_KEY } from "./inventoryScreenHarness";
 
 describe("given an admin on the Inventory page", () => {
   describe("when nothing is connected and samples are turned off", () => {
@@ -27,9 +23,7 @@ describe("given an admin on the Inventory page", () => {
     it("says where environments come from instead of listing none", async () => {
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
       renderScreen();
-      await userEvent.click(
-        screen.getByRole("button", { name: "Hide sample data" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "Hide sample data" }));
       await openTab(/Environments/);
       expect(
         await screen.findByText(/appear here once a source points at one/i),
@@ -45,9 +39,7 @@ describe("given an admin on the Inventory page", () => {
       // Two on an empty pane, and deliberately so: the header's control and
       // the empty state's second doorway to it. Same component, same label,
       // same flow — the first is the header's.
-      await userEvent.click(
-        screen.getAllByRole("button", { name: /Add environment/ })[0]!,
-      );
+      await userEvent.click(screen.getAllByRole("button", { name: /Add environment/ })[0]!);
       return screen.findByRole("dialog");
     }
 
@@ -56,9 +48,7 @@ describe("given an admin on the Inventory page", () => {
       const dialog = await openAddEnvironment();
       expect(within(dialog).getByText("Name")).toBeInTheDocument();
       expect(within(dialog).getByText("Description")).toBeInTheDocument();
-      expect(
-        within(dialog).getByRole("button", { name: "Add environment" }),
-      ).toBeDisabled();
+      expect(within(dialog).getByRole("button", { name: "Add environment" })).toBeDisabled();
     });
 
     /** @scenario "The add dialog says the environment will not be stored" */
@@ -72,17 +62,10 @@ describe("given an admin on the Inventory page", () => {
     /** @scenario "An added environment joins the table for this sitting" */
     it("puts the added environment in the table", async () => {
       const dialog = await openAddEnvironment();
-      await userEvent.type(
-        within(dialog).getByPlaceholderText("Production"),
-        "Blue ring",
-      );
-      await userEvent.click(
-        within(dialog).getByRole("button", { name: "Add environment" }),
-      );
+      await userEvent.type(within(dialog).getByPlaceholderText("Production"), "Blue ring");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Add environment" }));
       const table = await screen.findByTestId("environments-table");
-      await waitFor(() =>
-        expect(within(table).getByText("Blue ring")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(within(table).getByText("Blue ring")).toBeInTheDocument());
     });
   });
 });

@@ -95,9 +95,7 @@ describe("<ToolCatalogEditor /> starter pack import", () => {
 
       await user.click(toggle);
 
-      expect(
-        await screen.findByText(/Adds starter tools the catalog never had/i),
-      ).toBeTruthy();
+      expect(await screen.findByText(/Adds starter tools the catalog never had/i)).toBeTruthy();
       expect(screen.getByText("Codex")).toBeTruthy();
     });
   });

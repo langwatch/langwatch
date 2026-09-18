@@ -1,10 +1,10 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
 } from "@langwatch/enterprise-governance-contract";
-import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

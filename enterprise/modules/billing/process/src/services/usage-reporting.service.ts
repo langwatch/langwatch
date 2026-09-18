@@ -1,10 +1,10 @@
-import { createLogger } from "@langwatch/observability";
-import Stripe from "stripe";
 import {
   BillingPriceCatalogue,
   getStripeEnvironmentFromNodeEnv,
   UsageReportFailedError,
 } from "@langwatch/enterprise-billing-contract";
+import { createLogger } from "@langwatch/observability";
+import Stripe from "stripe";
 import { z } from "zod";
 
 const logger = createLogger("langwatch:billing:usageReportingService");

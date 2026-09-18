@@ -1,3 +1,4 @@
+import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
 /**
  * A seat quote must reproduce the number the customer read, not merely
  * resemble it: money figures come off the invoice deterministically, apply
@@ -5,7 +6,7 @@
  */
 import type Stripe from "stripe";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
+
 import {
   QUOTE_VALIDITY_SECONDS,
   quotedAmounts,

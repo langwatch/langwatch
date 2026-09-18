@@ -26,8 +26,9 @@
  * hourly source migrated to daily by opening its drawer and changing its name.
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import {
   ANTHROPIC_BUCKET_WIDTHS,
   buildAnthropicAdminPullConfig,
@@ -122,9 +123,7 @@ describe("Anthropic composer controls", () => {
       expect(reportWhenOn()).toBe("cost");
       expect(reportWhenOff()).toBe("usage");
 
-      const built = buildAnthropicAdminPullConfig(
-        composerWith({ report: reportWhenOff() }),
-      );
+      const built = buildAnthropicAdminPullConfig(composerWith({ report: reportWhenOff() }));
 
       expect(built).toMatchObject({ report: "usage" });
     });
@@ -181,12 +180,8 @@ describe("Anthropic composer controls", () => {
       // "Off" is the position of a control the admin can no longer see. The
       // question a locked field has to answer is which report this source
       // records.
-      expect(switchReadOnlyLabel({ control, value: "usage" })).toBe(
-        "Usage report",
-      );
-      expect(switchReadOnlyLabel({ control, value: "cost" })).toBe(
-        "Cost report",
-      );
+      expect(switchReadOnlyLabel({ control, value: "usage" })).toBe("Usage report");
+      expect(switchReadOnlyLabel({ control, value: "cost" })).toBe("Cost report");
     });
 
     /** @scenario "A locked report names the report rather than a switch position" */
@@ -209,9 +204,7 @@ describe("Anthropic composer controls", () => {
       if (plain.kind !== "switch") throw new Error("expected a switch");
 
       expect(switchReadOnlyLabel({ control: plain, value: "true" })).toBe("On");
-      expect(switchReadOnlyLabel({ control: plain, value: "false" })).toBe(
-        "Off",
-      );
+      expect(switchReadOnlyLabel({ control: plain, value: "false" })).toBe("Off");
     });
   });
 
@@ -250,31 +243,24 @@ describe("Anthropic composer controls", () => {
       // is carried forward, so drift would either drop a width the adapter
       // honours or preserve one it has stopped accepting.
       expect([...ANTHROPIC_BUCKET_WIDTHS]).toEqual([
-        ...anthropicAdminPullConfigSchema.shape.bucketWidth.removeDefault()
-          .options,
+        ...anthropicAdminPullConfigSchema.shape.bucketWidth.removeDefault().options,
       ]);
     });
 
     /** @scenario "A usage source is written down as daily" */
     it("is written down as daily on a usage source that holds nothing", () => {
-      const built = buildAnthropicAdminPullConfig(
-        composerWith({ report: reportWhenOff() }),
-      );
+      const built = buildAnthropicAdminPullConfig(composerWith({ report: reportWhenOff() }));
 
       // Explicit rather than omitted. The adapter defaults to daily too, but a
       // stored config that says nothing cannot be told from one saved before
       // the field existed.
       expect(built).toMatchObject({ bucketWidth: "1d" });
-      expect(
-        anthropicAdminPullConfigSchema.shape.bucketWidth.parse(undefined),
-      ).toBe("1d");
+      expect(anthropicAdminPullConfigSchema.shape.bucketWidth.parse(undefined)).toBe("1d");
     });
 
     /** @scenario "A cost source carries no bucket width" */
     it("is left out entirely on a cost source", () => {
-      const built = buildAnthropicAdminPullConfig(
-        composerWith({ report: reportWhenOn() }),
-      );
+      const built = buildAnthropicAdminPullConfig(composerWith({ report: reportWhenOn() }));
 
       expect(built).not.toBeNull();
       expect(built).not.toHaveProperty("bucketWidth");
@@ -371,9 +357,7 @@ describe("Anthropic composer controls", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-09-15T10:30:00.000Z"));
 
-      expect(defaultParserValues("anthropic_admin").startingAt).toBe(
-        "2026-03-15T00:00:00.000Z",
-      );
+      expect(defaultParserValues("anthropic_admin").startingAt).toBe("2026-03-15T00:00:00.000Z");
     });
 
     /** @scenario "Editing shows the stored date rather than proposing a new one" */

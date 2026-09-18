@@ -1,3 +1,5 @@
+import { Currency, SubscriptionRecordNotFoundError } from "@langwatch/enterprise-billing-contract";
+import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What a completed Stripe checkout does to our records: linking the subscription, persisting
@@ -5,18 +7,17 @@
  * the annual billing threshold.
  */
 import { createLogger } from "@langwatch/observability";
+import { Temporal } from "@langwatch/time";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
-import { Currency, SubscriptionRecordNotFoundError } from "@langwatch/enterprise-billing-contract";
+
+import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
+import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
+import type { BillingWebhookSubscription } from "../repositories/billing-webhook-subscription.repository.ts";
 import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
-import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
-import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
-import type { BillingWebhookSubscription } from "../repositories/billing-webhook-subscription.repository.ts";
-import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
-import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:billing:checkoutCompletion");
 

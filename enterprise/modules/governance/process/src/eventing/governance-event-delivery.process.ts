@@ -1,13 +1,10 @@
-import type { ProcessManagerApplier } from "@langwatch/eventing";
-import {
-  deliverGovernanceSchema,
-  GovernanceEventDeliveryIntent,
-  governanceSendBatchSchema,
-} from "./governance-event-delivery.intent.ts";
 import {
   GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
   GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
 } from "@langwatch/enterprise-governance-contract";
+import type { ProcessManagerApplier } from "@langwatch/eventing";
+import { Temporal } from "@langwatch/time";
+
 import {
   type GovernanceWebhookChannel,
   type GovernanceBudgetCrossingData,
@@ -15,7 +12,11 @@ import {
   type GovernanceVkLifecycleData,
   type GovernanceWebhookEnvelope,
 } from "../app/governance.members.ts";
-import { Temporal } from "@langwatch/time";
+import {
+  deliverGovernanceSchema,
+  GovernanceEventDeliveryIntent,
+  governanceSendBatchSchema,
+} from "./governance-event-delivery.intent.ts";
 
 export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;
 

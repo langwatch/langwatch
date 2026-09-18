@@ -1,15 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
-import type { Event } from "@langwatch/eventing";
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
+import type { Event } from "@langwatch/eventing";
+import { Temporal, type Instant } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.billing.repositories.ts";
+import { RedisBillingTenantOrganizationCacheAdapter } from "../../repositories/redis/redis.tenant-organization-cache.repository.ts";
+import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 import {
   BILLING_METER_DISPATCH_SUBSCRIBER_NAME,
   BILLING_METER_DISPATCH_SUPPRESS_MS,
   BillingMeterDispatchSubscriber,
 } from "../billing-meter-dispatch.subscriber.ts";
-import { RedisTenantOrganizationCacheRepository } from "../../repositories/redis/redis.tenant-organization-cache.repository.ts";
-import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.billing.repositories.ts";
-import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
-import { Temporal, type Instant } from "@langwatch/time";
 
 function compose(
   options: {
@@ -26,7 +27,7 @@ function compose(
       organizations: PostgresBillingRepositories.create({
         prisma: { project: { findUnique } } as never,
       }).tenantOrganizations,
-      cache: RedisTenantOrganizationCacheRepository.create({
+      cache: RedisBillingTenantOrganizationCacheAdapter.create({
         redis: { get: vi.fn(async () => null), setex: vi.fn(async () => "OK") } as never,
       }),
     }),

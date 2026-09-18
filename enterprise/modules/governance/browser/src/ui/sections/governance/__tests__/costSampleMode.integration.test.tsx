@@ -119,9 +119,7 @@ const costSummary = ({ billedUsd }: { billedUsd: number | null }) => ({
     cellsWithoutAmount: 0,
     currenciesWithoutUsdAmount: [],
     currencyTotals:
-      billedUsd === null
-        ? []
-        : [{ currencyCode: "USD", amount: billedUsd, cellsWithoutAmount: 0 }],
+      billedUsd === null ? [] : [{ currencyCode: "USD", amount: billedUsd, cellsWithoutAmount: 0 }],
   },
   gateway: {
     amountUsd: null,
@@ -130,10 +128,7 @@ const costSummary = ({ billedUsd }: { billedUsd: number | null }) => ({
     currencyTotals: [],
   },
   seats: { status: "awaiting_data" },
-  series:
-    billedUsd === null
-      ? []
-      : [{ day: "2026-08-01", billedUsd, gatewayUsd: null }],
+  series: billedUsd === null ? [] : [{ day: "2026-08-01", billedUsd, gatewayUsd: null }],
   windowDays: 30,
 });
 
@@ -204,9 +199,7 @@ describe("the sample panels on the cost screen", () => {
     it("offers to show the sample panels rather than hiding the option", () => {
       renderScreen();
 
-      expect(
-        screen.getByRole("button", { name: "See sample data" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "See sample data" })).toBeInTheDocument();
     });
 
     it("does not let a filter change put the invented panels back", () => {
@@ -246,9 +239,7 @@ describe("the sample panels on the cost screen", () => {
     it("says on the screen that the figures are not real", () => {
       renderScreen();
 
-      expect(screen.getByRole("status")).toHaveTextContent(
-        /nothing here is real/i,
-      );
+      expect(screen.getByRole("status")).toHaveTextContent(/nothing here is real/i);
     });
 
     it("does not pull the invented panels away on a filter change", () => {

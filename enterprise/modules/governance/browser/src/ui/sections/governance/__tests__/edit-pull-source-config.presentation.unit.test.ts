@@ -10,8 +10,9 @@
  * offers a setting that cannot take effect, or hides one that can.
  */
 
-import { describe, expect, it } from "vitest";
 import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   buildAnthropicAdminPullConfig,
   isBackfillStartLocked,

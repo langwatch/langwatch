@@ -23,7 +23,11 @@ export class MemoryOrganizationSupportContactRepository extends OrganizationSupp
       .map((member) => member.userId);
   }
 
-  async findEmailsByUserIds({ userIds }: { userIds: string[] }): Promise<Map<string, string | null>> {
+  async findEmailsByUserIds({
+    userIds,
+  }: {
+    userIds: string[];
+  }): Promise<Map<string, string | null>> {
     const emails = new Map<string, string | null>();
     for (const userId of userIds) {
       const person = this.store.people.get(userId);

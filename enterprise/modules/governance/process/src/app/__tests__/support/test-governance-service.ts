@@ -10,8 +10,7 @@ const unsupported = <Method>(): Method =>
  */
 export class TestGovernanceService implements GovernanceApi {
   activityEventsForSource = unsupported<GovernanceApi["activityEventsForSource"]>();
-  activityIngestionSourcesHealth =
-    unsupported<GovernanceApi["activityIngestionSourcesHealth"]>();
+  activityIngestionSourcesHealth = unsupported<GovernanceApi["activityIngestionSourcesHealth"]>();
   activityRecentAnomalies = unsupported<GovernanceApi["activityRecentAnomalies"]>();
   activitySourceHealthMetrics = unsupported<GovernanceApi["activitySourceHealthMetrics"]>();
   activitySpendByDepartment = unsupported<GovernanceApi["activitySpendByDepartment"]>();
@@ -33,8 +32,7 @@ export class TestGovernanceService implements GovernanceApi {
     unsupported<GovernanceApi["aiToolListRoutingPolicyOptionsForAdmin"]>();
   aiToolRemove = unsupported<GovernanceApi["aiToolRemove"]>();
   aiToolReorder = unsupported<GovernanceApi["aiToolReorder"]>();
-  aiToolResolveCliCatalogForUser =
-    unsupported<GovernanceApi["aiToolResolveCliCatalogForUser"]>();
+  aiToolResolveCliCatalogForUser = unsupported<GovernanceApi["aiToolResolveCliCatalogForUser"]>();
   aiToolResolvePolicy = unsupported<GovernanceApi["aiToolResolvePolicy"]>();
   aiToolResolvePolicyMap = unsupported<GovernanceApi["aiToolResolvePolicyMap"]>();
   aiToolResolvePolicyOverrides = unsupported<GovernanceApi["aiToolResolvePolicyOverrides"]>();
@@ -57,8 +55,7 @@ export class TestGovernanceService implements GovernanceApi {
   departmentCreate = unsupported<GovernanceApi["departmentCreate"]>();
   departmentList = unsupported<GovernanceApi["departmentList"]>();
   departmentRename = unsupported<GovernanceApi["departmentRename"]>();
-  departmentResolveByNameOrCreate =
-    unsupported<GovernanceApi["departmentResolveByNameOrCreate"]>();
+  departmentResolveByNameOrCreate = unsupported<GovernanceApi["departmentResolveByNameOrCreate"]>();
   extractCanonicalCostEvents = unsupported<GovernanceApi["extractCanonicalCostEvents"]>();
   ingestionConfigure = unsupported<GovernanceApi["ingestionConfigure"]>();
   ingestionDisable = unsupported<GovernanceApi["ingestionDisable"]>();
@@ -70,8 +67,7 @@ export class TestGovernanceService implements GovernanceApi {
     unsupported<GovernanceApi["ingestionKeyIssueForPersonalProject"]>();
   ingestionKeyListForPersonalProject =
     unsupported<GovernanceApi["ingestionKeyListForPersonalProject"]>();
-  tryDescribePersonalIngestionKey =
-    unsupported<GovernanceApi["tryDescribePersonalIngestionKey"]>();
+  tryDescribePersonalIngestionKey = unsupported<GovernanceApi["tryDescribePersonalIngestionKey"]>();
   ingestionRecordRunCompleted = unsupported<GovernanceApi["ingestionRecordRunCompleted"]>();
   ingestionRecordRunFailed = unsupported<GovernanceApi["ingestionRecordRunFailed"]>();
   ingestionSourceArchive = unsupported<GovernanceApi["ingestionSourceArchive"]>();
@@ -91,8 +87,7 @@ export class TestGovernanceService implements GovernanceApi {
   personalUsageBreakdownByModel = unsupported<GovernanceApi["personalUsageBreakdownByModel"]>();
   personalUsageDailyBuckets = unsupported<GovernanceApi["personalUsageDailyBuckets"]>();
   personalUsageSummary = unsupported<GovernanceApi["personalUsageSummary"]>();
-  personalVirtualKeyEnsureDefault =
-    unsupported<GovernanceApi["personalVirtualKeyEnsureDefault"]>();
+  personalVirtualKeyEnsureDefault = unsupported<GovernanceApi["personalVirtualKeyEnsureDefault"]>();
   personalVirtualKeyIssue = unsupported<GovernanceApi["personalVirtualKeyIssue"]>();
   personalVirtualKeyList = unsupported<GovernanceApi["personalVirtualKeyList"]>();
   personalVirtualKeyRevoke = unsupported<GovernanceApi["personalVirtualKeyRevoke"]>();

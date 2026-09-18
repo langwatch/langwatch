@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type {
+  GovernancePuller as PullerAdapter,
+  NormalizedPullEvent,
+  PullResult,
+  PullRunOptions,
+} from "@langwatch/enterprise-governance-contract";
+import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
 /**
  * HttpPollingPullerAdapter — universal HTTP-polling adapter for
  * paginated REST audit-log APIs. Mirrors Airbyte's HTTP-source
@@ -18,16 +26,12 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceHttpClient, GovernanceHttpResponse,IngestionPullDiagnosticsSink } from "../../app/governance.members.ts";
-import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
-import { nowInstant } from "@langwatch/time";
 
 import type {
-  GovernancePuller as PullerAdapter,
-  NormalizedPullEvent,
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
+  GovernanceHttpClient,
+  GovernanceHttpResponse,
+  IngestionPullDiagnosticsSink,
+} from "../../app/governance.members.ts";
 
 const TEMPLATE_PATTERN = /\$\{\{([\w.]+)\}\}/g;
 const RETRY_DELAYS_MS = [250, 500] as const;

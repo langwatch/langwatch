@@ -1,14 +1,15 @@
 import { Box, Heading, HStack, SimpleGrid, Spinner, Text, VStack } from "@chakra-ui/react";
-import numeral from "numeral";
-import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
-import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
-import { Link } from "../../../ui/elements/governance-link.tsx";
-import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
-import { useGovernanceScope } from "../../../behavior/governance-session.ts";
-import { api } from "../../../behavior/governance-api.ts";
-import { useGovernanceRouter } from "../../../behavior/governance-router.ts";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
+import numeral from "numeral";
+
+import { api } from "../../../behavior/governance-api.ts";
+import { useGovernanceRouter } from "../../../behavior/governance-router.ts";
+import { useGovernanceScope } from "../../../behavior/governance-session.ts";
+import { Link } from "../../../ui/elements/governance-link.tsx";
+import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
+import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 const fmtUsd = (n: number | string) => {
   const v = typeof n === "string" ? Number(n) : n;
   return v === 0 ? "$0.00" : numeral(v).format("$0,0.00");

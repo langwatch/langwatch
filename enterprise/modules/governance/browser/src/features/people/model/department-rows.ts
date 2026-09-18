@@ -157,11 +157,8 @@ export function mergeDepartmentRows({
       key,
       name: existing?.name ?? seen.name,
       record: existing?.record ?? null,
-      providers: [
-        ...new Set([...(existing?.providers ?? []), ...seen.providers]),
-      ].toSorted(),
-      directoryPeopleCount:
-        (existing?.directoryPeopleCount ?? 0) + seen.peopleCount,
+      providers: [...new Set([...(existing?.providers ?? []), ...seen.providers])].toSorted(),
+      directoryPeopleCount: (existing?.directoryPeopleCount ?? 0) + seen.peopleCount,
     });
   }
 

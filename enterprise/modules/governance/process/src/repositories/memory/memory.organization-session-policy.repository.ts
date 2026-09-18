@@ -20,10 +20,7 @@ export class MemoryOrganizationSessionPolicyRepository extends OrganizationSessi
     return this.byOrganization.get(organizationId) ?? UNBOUNDED;
   }
 
-  async setMaxDurationDays(
-    organizationId: string,
-    maxSessionDurationDays: number,
-  ): Promise<void> {
+  async setMaxDurationDays(organizationId: string, maxSessionDurationDays: number): Promise<void> {
     this.byOrganization.set(organizationId, { maxSessionDurationDays });
   }
 }

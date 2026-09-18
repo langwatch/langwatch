@@ -1,9 +1,3 @@
-/**
- * The usage-limit warning as it reaches a person: the copy the mail is built from, the send to
- * every deliverable admin, and the record written once at least one send succeeded. A hook that
- * cannot be resolved truthfully is left out rather than guessed — the message still goes out.
- */
-import { createLogger } from "@langwatch/observability";
 import {
   NOTIFICATION_TYPES,
   type BillingPricingModel,
@@ -12,12 +6,19 @@ import type {
   NotificationService as NotificationRecordService,
   Notification,
 } from "@langwatch/notification-contract";
-import type { NotificationService, UsageLimitEmailData } from "./billing-usage-notice.service.ts";
+/**
+ * The usage-limit warning as it reaches a person: the copy the mail is built from, the send to
+ * every deliverable admin, and the record written once at least one send succeeded. A hook that
+ * cannot be resolved truthfully is left out rather than guessed — the message still goes out.
+ */
+import { createLogger } from "@langwatch/observability";
+import { nowInstant, toDate } from "@langwatch/time";
+
 import type {
   BillingNextStepResolver,
   BillingUsageUnit,
 } from "../rules/usage-warning-thresholds.rules.ts";
-import { nowInstant, toDate } from "@langwatch/time";
+import type { NotificationService, UsageLimitEmailData } from "./billing-usage-notice.service.ts";
 
 const logger = createLogger("langwatch:notifications:usageWarning");
 

@@ -2,7 +2,6 @@
  * Warning an organization that it is approaching its monthly usage limit.
  */
 
-import { createLogger } from "@langwatch/observability";
 import {
   NOTIFICATION_TYPES,
   USAGE_UNKNOWN,
@@ -14,6 +13,8 @@ import type {
   NotificationService as NotificationRecordService,
   Notification,
 } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
+
 import type { NotificationService, UsageLimitEmailData } from "./billing-usage-notice.service.ts";
 
 const logger = createLogger("langwatch:notifications:usageWarning");
@@ -27,6 +28,8 @@ export type CheckAndSendWarningResult =
   | { outcome: "sent"; notification: Notification }
   | { outcome: "skipped" };
 
+import { toDate } from "@langwatch/time";
+
 import {
   USAGE_WARNING_THRESHOLDS,
   findCrossedUsageThreshold,
@@ -36,7 +39,6 @@ import {
   type UsageWarningServiceOptions,
 } from "../rules/usage-warning-thresholds.rules.ts";
 import { UsageWarningDispatchService } from "./usage-warning-dispatch.service.ts";
-import { toDate } from "@langwatch/time";
 
 export class UsageWarningService {
   private readonly records: NotificationRecordService;

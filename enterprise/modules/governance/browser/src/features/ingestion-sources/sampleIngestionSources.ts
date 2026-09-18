@@ -1,6 +1,7 @@
+import { Temporal, nowInstant } from "@langwatch/time";
+
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { Source } from "../../ui/sections/governance/ingestion-source-forms.ts";
-import { Temporal, nowInstant } from "@langwatch/time";
 import { modeForSourceType, sampleSourceTypeOptions } from "./model/ingestion-source-catalog.ts";
 
 /**
@@ -98,7 +99,7 @@ export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map(
   const lastEventAt =
     state.lastEventAgoMs === null
       ? null
-        : Temporal.Instant.fromEpochMilliseconds(NOW_MS - state.lastEventAgoMs).toString();
+      : Temporal.Instant.fromEpochMilliseconds(NOW_MS - state.lastEventAgoMs).toString();
   return {
     id: `sample-source-${option.value}`,
     organizationId: "sample",

@@ -15,11 +15,29 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import { DatabricksGeniePullerAdapter } from "../databricks-genie-puller.service.ts";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
 const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
+
+const testHttp: GovernanceHttpClient = {
+  async fetch(url, init) {
+    const response = await ssrfSafeFetch(url, init);
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: "",
+      json: () => response.json(),
+      text: () => response.text(),
+    };
+  },
+};
+
+function makePuller(options?: { maxRequests?: number }): DatabricksGeniePullerAdapter {
+  return DatabricksGeniePullerAdapter.create(testHttp, options);
+}
 
 const workspaceUrl = "https://adb-1.azuredatabricks.net";
 
@@ -62,7 +80,7 @@ describe("DatabricksGeniePullerAdapter space enumeration", () => {
         return reply({ conversations: [] });
       });
 
-      const result = await new DatabricksGeniePullerAdapter().runOnce(
+      const result = await makePuller().runOnce(
         { cursor: null, credentials: { token: "t" } },
         config,
       );
@@ -71,12 +89,8 @@ describe("DatabricksGeniePullerAdapter space enumeration", () => {
       expect(urls.filter((u) => u.includes("page_token=p2"))).toHaveLength(1);
       // Both spaces were reached, which is the thing a dropped second page
       // would silently cost: the sweep would run green over half the workspace.
-      expect(urls.some((u) => u.includes("/spaces/s1/conversations"))).toBe(
-        true,
-      );
-      expect(urls.some((u) => u.includes("/spaces/s2/conversations"))).toBe(
-        true,
-      );
+      expect(urls.some((u) => u.includes("/spaces/s1/conversations"))).toBe(true);
+      expect(urls.some((u) => u.includes("/spaces/s2/conversations"))).toBe(true);
       expect(result.errorCount).toBe(0);
     });
   });
@@ -92,7 +106,7 @@ describe("DatabricksGeniePullerAdapter space enumeration", () => {
 
       // One request for the whole run: the first page is read, and the budget
       // is exhausted before the second is asked for.
-      await new DatabricksGeniePullerAdapter({ maxRequests: 1 }).runOnce(
+      await makePuller({ maxRequests: 1 }).runOnce(
         { cursor: null, credentials: { token: "t" } },
         config,
       );
@@ -110,7 +124,7 @@ describe("DatabricksGeniePullerAdapter space enumeration", () => {
         }),
       );
 
-      const result = await new DatabricksGeniePullerAdapter().runOnce(
+      const result = await makePuller().runOnce(
         { cursor: null, credentials: { token: "t" } },
         config,
       );

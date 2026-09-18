@@ -24,18 +24,20 @@ import {
   TemplateNotFoundError,
 } from "@langwatch/enterprise-governance-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   GovernanceApp,
   type GovernanceActorDirectory,
   type GovernancePersonalVirtualKeyMembers,
 } from "../../app/governance.app.ts";
+import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
+import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { governanceRest, governanceRestCaller, governanceRestSurface } from "../governance.rest.ts";
 
 /** A dependency this door never reaches; calling one is the test's own bug. */
@@ -126,6 +128,7 @@ function buildApi(
   const repositories = MemoryGovernanceRepositories.create();
 
   const app = GovernanceApp.create({
+    config: void 0,
     repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
@@ -141,6 +144,7 @@ function buildApi(
       },
       actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
     },
+    resources: new ResourceScope(),
   });
 
   const granted = new Set(options.grants ?? ["aiTools:view", "aiTools:manage"]);

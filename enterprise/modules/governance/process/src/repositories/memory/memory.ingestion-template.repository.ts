@@ -8,6 +8,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import type { Instant } from "@langwatch/time";
+
 import {
   IngestionTemplateRepository,
   type IngestionTemplateMutationResult,

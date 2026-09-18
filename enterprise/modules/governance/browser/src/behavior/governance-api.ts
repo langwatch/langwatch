@@ -5,6 +5,7 @@ import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorSummary,
+  AgentsListingOutcome,
   AiToolEntry,
   AiToolProviderOption,
   AiToolType,
@@ -54,6 +55,55 @@ export type GovernanceIngestionSourceView = {
   createdAt: string;
   updatedAt: string;
   createdById: string | null;
+  errorCount: number;
+  lastRunCompleteness: "complete" | "truncated" | null;
+  pullStatus: {
+    lastRunAt: string | null;
+    outcome: string | null;
+    error: string | null;
+    backfillThrough: string | null;
+    hasMore: boolean | null;
+  } | null;
+  lastSuccessAt: string | null;
+};
+
+export type GovernanceDepartmentView = Omit<Department, "createdAt" | "updatedAt"> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GovernanceAgentView = {
+  id: string;
+  name: string;
+  environment: string | null;
+  owner: string | null;
+  models: string[];
+  source: "copilot_studio" | "custom" | "databricks";
+  costUsd30d: number | null;
+  requests30d: number | null;
+  lastActiveMinutesAgo: number | null;
+  health: "responding" | "idle" | "erroring" | null;
+  registeredDaysAgo: number | null;
+};
+
+export type GovernancePersonView = {
+  id: string;
+  provider: string;
+  kind: string;
+  displayText: string;
+  rawActorId: string;
+  directoryDepartment: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  erasedAt: string | null;
+  suspendedAt: string | null;
+  suspendedReason: string | null;
+  link: {
+    userId: string;
+    evidenceKind: string;
+    memberName: string | null;
+    departmentName: string | null;
+  } | null;
 };
 
 /**
@@ -176,6 +226,69 @@ export type GovernanceOrganizationGraph = {
 };
 
 export type GovernanceApiMap = {
+  modelProvider: {
+    getResolvedDefault: {
+      query: {
+        input: { projectId: string; featureKey: string };
+        output: { model: string | null };
+      };
+    };
+  };
+  langy: {
+    modelsAllowed: {
+      query: {
+        input: { projectId: string };
+        output: { modelsAllowed: string[] };
+      };
+    };
+  };
+  governanceAgents: {
+    list: { query: { input: { organizationId: string }; output: GovernanceAgentView[] } };
+    syncSources: {
+      query: {
+        input: { organizationId: string };
+        output: {
+          id: string;
+          name: string;
+          sourceType: string;
+          lastListing: AgentsListingOutcome | null;
+        }[];
+      };
+    };
+    requestListing: {
+      mutation: {
+        input: { organizationId: string };
+        output: { requested: number; sources: { id: string; name: string }[] };
+      };
+    };
+  };
+  governancePeople: {
+    list: { query: { input: { organizationId: string }; output: GovernancePersonView[] } };
+    suggestions: {
+      query: {
+        input: { organizationId: string };
+        output: {
+          id: string;
+          personDisplayText: string;
+          personProvider: string;
+          memberName: string | null;
+          userId: string;
+        }[];
+      };
+    };
+    runMatch: {
+      mutation: {
+        input: { organizationId: string };
+        output: { linked: number; unproven: number };
+      };
+    };
+    confirmSuggestion: {
+      mutation: {
+        input: { organizationId: string; suggestionId: string };
+        output: GovernanceAcknowledgement;
+      };
+    };
+  };
   activityMonitor: {
     summary: {
       query: {
@@ -400,7 +513,13 @@ export type GovernanceApiMap = {
 
   departments: {
     list: {
-      query: { input: { organizationId: string }; output: Department[] };
+      query: { input: { organizationId: string }; output: GovernanceDepartmentView[] };
+    };
+    assignments: {
+      query: {
+        input: { organizationId: string };
+        output: import("@langwatch/enterprise-governance-contract").DepartmentAssignments;
+      };
     };
     create: {
       mutation: {
@@ -417,6 +536,12 @@ export type GovernanceApiMap = {
     archive: {
       mutation: {
         input: { organizationId: string; id: string };
+        output: GovernanceAcknowledgement;
+      };
+    };
+    assignUser: {
+      mutation: {
+        input: { organizationId: string; userId: string; departmentId: string | null };
         output: GovernanceAcknowledgement;
       };
     };

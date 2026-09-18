@@ -5,14 +5,14 @@ import { MemoryAdminWorkspaceViewAuditRepository } from "./memory.admin-workspac
 import { MemoryAnomalyRuleRepository } from "./memory.anomaly-rule.repository.ts";
 import { MemoryDepartmentRepository } from "./memory.department.repository.ts";
 import { MemoryGovernanceDirectoryRepository } from "./memory.governance-directory.repository.ts";
-import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
 import { MemoryGovernanceOcsfExportRepository } from "./memory.governance-ocsf-export.repository.ts";
-import { MemoryGovernanceSetupStateRepository } from "./memory.governance-setup-state.repository.ts";
-import { MemoryGovernanceStore } from "./memory.governance.store.ts";
-import { MemoryOrganizationSessionPolicyRepository } from "./memory.organization-session-policy.repository.ts";
-import { MemoryOrganizationSupportContactRepository } from "./memory.organization-support-contact.repository.ts";
 import { MemoryPersonalVirtualKeyRepository } from "./memory.governance-personal-key.repository.ts";
 import { MemoryRoutingPolicyRepository } from "./memory.governance-routing.repository.ts";
+import { MemoryGovernanceSetupStateRepository } from "./memory.governance-setup-state.repository.ts";
+import { MemoryGovernanceStore } from "./memory.governance.store.ts";
+import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
+import { MemoryOrganizationSessionPolicyRepository } from "./memory.organization-session-policy.repository.ts";
+import { MemoryOrganizationSupportContactRepository } from "./memory.organization-support-contact.repository.ts";
 import { MemorySpendSpikeAnomalyRepository } from "./memory.spend-spike-anomaly.repository.ts";
 
 /** The "memory" tier: every governance repository, with no database behind it. */

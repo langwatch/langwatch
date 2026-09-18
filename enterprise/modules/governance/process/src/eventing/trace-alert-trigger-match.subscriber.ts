@@ -4,7 +4,7 @@ import {
   type TraceAlertMetricsSink,
   type TraceAlertOriginGuard,
   type TraceAlertTriggerMatchChannel,
-  type TraceAlertTriggerReader
+  type TraceAlertTriggerReader,
 } from "../app/governance.members.ts";
 
 export class TraceAlertTriggerMatchSubscriber {

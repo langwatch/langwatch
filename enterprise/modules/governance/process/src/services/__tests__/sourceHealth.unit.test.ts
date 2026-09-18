@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { isDayCoveredByPull, noDataSinceNotice } from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
 /**
  * Which days a pull actually reached, and what a source that has never
  * finished a run is allowed to say about itself.
@@ -19,9 +21,6 @@
  * Decision: ADR-128.
  */
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@langwatch/time";
-
-import { isDayCoveredByPull, noDataSinceNotice } from "@langwatch/enterprise-governance-contract";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 

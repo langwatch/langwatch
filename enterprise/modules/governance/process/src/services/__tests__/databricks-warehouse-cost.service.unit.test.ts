@@ -15,13 +15,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { DatabricksWarehouseCostService } from "../puller-databricks-warehouse-cost.service.ts";
 import {
   GENIE_FREE_USAGE_SKU_MARKER,
   WAREHOUSE_COST_CHUNK_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
   type WarehousePricedStatement,
 } from "../../rules/warehouse-cost.rules.ts";
+import { DatabricksWarehouseCostService } from "../puller-databricks-warehouse-cost.service.ts";
 
 const warehouseCosts = DatabricksWarehouseCostService.create();
 

@@ -1,4 +1,5 @@
 import { type GovernanceSetupState } from "@langwatch/enterprise-governance-contract";
+
 import type { GovernanceSetupActivityReader } from "../app/governance.members.ts";
 import type { GovernanceSetupStateRepository } from "../repositories/governance-setup-state.repository.ts";
 

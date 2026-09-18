@@ -3,17 +3,9 @@
  * from Langy with per-caller text (one shape, many voices).
  */
 
-import {
-  Box,
-  Button,
-  type ButtonProps,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import type { ComponentType, PropsWithChildren, ReactNode } from "react";
-
+import { Box, Button, type ButtonProps, HStack, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import type { ComponentType, PropsWithChildren, ReactNode } from "react";
 
 /** Card shape + surface, copied from the Langy briefing's `CARD` token. */
 const CARD = {
@@ -41,9 +33,7 @@ export function GovernanceEmptyStateAction({
   }
 >) {
   if (emphasis === "primary") {
-    return (
-      <PageLayout.HeaderButton {...props}>{children}</PageLayout.HeaderButton>
-    );
+    return <PageLayout.HeaderButton {...props}>{children}</PageLayout.HeaderButton>;
   }
 
   return (

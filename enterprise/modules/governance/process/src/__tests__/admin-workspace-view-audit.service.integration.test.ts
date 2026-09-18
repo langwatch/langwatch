@@ -1,4 +1,6 @@
-import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
+import { ADMIN_WORKSPACE_VIEW_ACTION } from "@langwatch/enterprise-governance-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
@@ -6,10 +8,7 @@ import { createGovernanceTestConnection } from "../app/__tests__/governance-data
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { ADMIN_WORKSPACE_VIEW_ACTION } from "@langwatch/enterprise-governance-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-
+import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 import type { AdminWorkspaceViewOcsfChannel } from "../app/governance.members.ts";
 import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";

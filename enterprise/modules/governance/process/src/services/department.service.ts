@@ -4,6 +4,7 @@ import {
   type Department,
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
+
 import type { DepartmentRepository } from "../repositories/department.repository.ts";
 
 export class DepartmentService {
@@ -23,6 +24,14 @@ export class DepartmentService {
 
   getAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
     return this.repository.getAssignments(input.organizationId);
+  }
+
+  departmentsOnDay(input: {
+    organizationId: string;
+    userIds: readonly string[];
+    dayUtc: string;
+  }): Promise<Map<string, string>> {
+    return this.repository.departmentsOnDay(input);
   }
 
   create(input: { organizationId: string; name: string }): Promise<Department> {

@@ -69,9 +69,7 @@ const newestEventStampedAtMidnight = {
   events24h: 4,
   events7d: 28,
   events30d: 120,
-  lastSuccessIso: new Date(
-    new Date().setUTCHours(0, 0, 0, 0) - 11 * 60 * 60 * 1000,
-  ).toISOString(),
+  lastSuccessIso: new Date(new Date().setUTCHours(0, 0, 0, 0) - 11 * 60 * 60 * 1000).toISOString(),
 } as unknown as Parameters<typeof SourceHealthCards>[0]["health"];
 
 function renderRow() {
@@ -93,11 +91,7 @@ function renderRow() {
 function renderHealthCards() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SourceHealthCards
-        health={newestEventStampedAtMidnight}
-        error={null}
-        isLoading={false}
-      />
+      <SourceHealthCards health={newestEventStampedAtMidnight} error={null} isLoading={false} />
     </ChakraProvider>,
   );
 }
@@ -110,9 +104,7 @@ describe("given a source whose data arrives long after the day it covers", () =>
 
       // The list is a table: the column is named for what the cell holds.
       expect(screen.getByText("Data last arrived")).toBeDefined();
-      expect(
-        screen.getByText(`${ARRIVED_MINUTES_AGO} minutes ago`),
-      ).toBeDefined();
+      expect(screen.getByText(`${ARRIVED_MINUTES_AGO} minutes ago`)).toBeDefined();
     });
 
     /** @scenario "The list says when data last arrived" */
@@ -145,9 +137,7 @@ describe("given a source whose data arrives long after the day it covers", () =>
       await user.hover(screen.getByText("Newest event time"));
 
       expect(
-        await screen.findByText(
-          /time carried on the event itself, not the time we collected it/i,
-        ),
+        await screen.findByText(/time carried on the event itself, not the time we collected it/i),
       ).toBeDefined();
     });
   });

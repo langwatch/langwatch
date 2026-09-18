@@ -72,8 +72,7 @@ vi.mock("~/server/app-layer/app", () => ({
     },
     traces: {
       collection: {
-        handleOtlpTraceRequest: (...a: unknown[]) =>
-          handleOtlpTraceRequest(...a),
+        handleOtlpTraceRequest: (...a: unknown[]) => handleOtlpTraceRequest(...a),
       },
     },
   }),
@@ -192,10 +191,7 @@ describe("given a pull carrying an event that names an erased person", () => {
     /** @scenario "Suppression removes only the erased person from the export" */
     it("exports the other conversation and leaves the erased address out of it", async () => {
       runOnce.mockResolvedValue({
-        events: [
-          genieEvent(ERASED, "msg-erased"),
-          genieEvent(STAYS, "msg-stays"),
-        ],
+        events: [genieEvent(ERASED, "msg-erased"), genieEvent(STAYS, "msg-stays")],
         cursor: null,
         errorCount: 0,
       });
@@ -210,10 +206,7 @@ describe("given a pull carrying an event that names an erased person", () => {
     /** @scenario "An erased identifier is never re-discovered" */
     it("discovers the other person and never the erased identifier", async () => {
       runOnce.mockResolvedValue({
-        events: [
-          genieEvent(ERASED, "msg-erased"),
-          genieEvent(STAYS, "msg-stays"),
-        ],
+        events: [genieEvent(ERASED, "msg-erased"), genieEvent(STAYS, "msg-stays")],
         cursor: null,
         errorCount: 0,
       });

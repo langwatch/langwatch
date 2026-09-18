@@ -4,6 +4,11 @@ export abstract class DepartmentRepository {
   abstract getAll(organizationId: string): Promise<Department[]>;
   abstract findById(input: { id: string; organizationId: string }): Promise<Department | null>;
   abstract getAssignments(organizationId: string): Promise<DepartmentAssignments>;
+  abstract departmentsOnDay(input: {
+    organizationId: string;
+    userIds: readonly string[];
+    dayUtc: string;
+  }): Promise<Map<string, string>>;
   abstract create(input: { organizationId: string; name: string }): Promise<Department>;
   abstract resolveByNameOrCreate(input: {
     organizationId: string;
