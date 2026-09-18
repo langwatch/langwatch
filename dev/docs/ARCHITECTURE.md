@@ -371,7 +371,19 @@ healthPort })` opens the one HTTP door, `/healthz` answering during boot.
 Everything else arrives through ONE generic word — `.with(component)` — and
 Server never learns a domain word: the packages own the vocabulary.
 `prometheusMetrics({ token })` comes from `@langwatch/observability` (so an
-OTel export variant can sit beside it without any main changing shape),
+OTel export variant can sit beside it without any main changing shape).
+**Telemetry initializes immediately after the config parse** (ruled
+2026-09-18): one named call, `initializeTelemetry(process.observability)`,
+wires traces, logs and metrics from config alone — no `instrumentation.node`
+preload file, and anything requiring preload is out of scope by design.
+**Metrics transport is a binary knob**, `process.observability.metrics.mode:
+"prometheus" | "otlp"` — absent means `prometheus` so no self-hosted scrape
+setup breaks on upgrade; LangWatch production sets `otlp` (a push is
+cheaper than a scrape at our cardinality). Under `otlp` the scrape endpoint
+is NOT mounted, and composing `prometheusMetrics` refuses by name — an
+unmounted endpoint is honest, a mounted-but-empty one lies to a prober.
+Traces and logs compose through the `langwatch` SDK's own observability
+setup where its API fits — the platform dogfoods its SDK.
 `hostedMembers(stores)` from process-stores, `hostedRuntime({ name, runtime,
 drain })` from the process package. A raw `{ name, start, stop }` object
 literal at a call site is banned — if a component has no spoken factory,
