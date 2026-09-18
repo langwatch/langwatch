@@ -389,19 +389,49 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   // AI Gateway governance — read identity, deep-link, request budget increase.
-  program
-    .command("whoami")
-    .description("Print the identity persisted by `langwatch login --device` (governance plane).")
-    .action(async () => {
+  // Speaks the output port: `-o json|yaml`, `--json <fields>` and `--jq` all
+  // project from the returned `data`. No bespoke boolean `--json` — that spelling
+  // is the port's own projection flag and a boolean would collide with it.
+  emitsResult(
+    program
+      .command("whoami")
+      .description(
+        "Print the identity persisted by `langwatch login --device` (governance plane).",
+      ),
+    async () => {
       try {
         const { whoamiCommand } = await import("./commands/whoami.js");
-        await whoamiCommand();
+        return await whoamiCommand();
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
         process.exit(1);
       }
-    });
+    },
+  );
+
+  // LangWatchQL query — the door a headless coding agent runs analytics SQL
+  // through. Project-implicit: no `--project` flag, no `X-Project-Id`
+  // header, the configured API key alone decides the reachable rows. Speaks
+  // the output port: `data` is the rows array, so `-o json` is the primary
+  // spelling; `table` is the human fallback.
+  emitsResult(
+    program
+      .command("query <sql>")
+      .description(
+        "Run a read-only LangWatchQL SELECT against your analytics data and print the rows.",
+      ),
+    async (sql: string) => {
+      try {
+        const { queryCommand } = await import("./commands/query.js");
+        return await queryCommand(sql);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
 
   // AI Gateway governance — wrapped tool runners.
   // Each `langwatch <tool>` exec's the underlying binary with the

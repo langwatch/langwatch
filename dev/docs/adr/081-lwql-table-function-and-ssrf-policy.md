@@ -106,7 +106,7 @@ one-line fix rather than a mystery.
 ## References
 
 - Issue [#6480](https://github.com/langwatch/langwatch/issues/6480) — LangWatchQL analytics SQL API
-- `specs/analytics/lwql-api.feature` — the behavioural contract
+- `specs/lwql/api.feature` — the behavioural contract
 - `platform/app/src/server/analytics/lwql/provisioning/accessModel.ts` — the grants, row policies and settings profile
 - `platform/app/src/server/analytics/lwql/validation/validate.ts` — the default-deny AST walk
 - `platform/app/src/server/ops/explain-core.ts` — `TABLE_FUNCTION_RE`, the ops endpoint's separate name-list pre-check

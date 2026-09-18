@@ -279,6 +279,12 @@ export const useOrganizationTeamProject = (
       router.query.project === publicEnv.data.DEMO_PROJECT_SLUG,
   );
 
+  // Hoisted so the loading contract below can tell "switched off because the
+  // session has not resolved" from "switched off because nothing here is
+  // organization-scoped". The two look identical on the query itself.
+  const isOrganizationsQueryEnabled =
+    session.status !== "loading" && (!!session.data || !isPublicRoute);
+
   const organizations = api.organization.getAll.useQuery(
     { isDemo: isDemo },
     {
@@ -295,8 +301,7 @@ export const useOrganizationTeamProject = (
       // Waiting for RESOLUTION rather than for data is what makes it correct
       // both ways: an unauthenticated visitor on a private route still asks,
       // and is still refused, which is the answer that sends them to the door.
-      enabled:
-        session.status !== "loading" && (!!session.data || !isPublicRoute),
+      enabled: isOrganizationsQueryEnabled,
       // Small reference query that drives load-bearing client state (current
       // project incl. defaultModel). Cheap to refetch — prefer freshness over
       // a "cache forever" default. Background refetch on focus picks up edits
@@ -650,9 +655,33 @@ export const useOrganizationTeamProject = (
     team,
   ]);
 
-  if (organizations.isLoading && !organizations.isFetched) {
+  // React Query derives `isLoading` as `isPending && isFetching`, so a query it
+  // was told not to run reports `isLoading: false` with no data — the same
+  // shape as one that answered with nothing. Asking `isLoading` alone
+  // therefore called the workspace RESOLVED for the whole width of the session
+  // fetch, and callers read the empty graph as fact: the project chrome drew
+  // its full-page not-found scene on every refresh of a project address, and
+  // the landing redirect sent a member who has organizations to
+  // /onboarding/welcome before correcting itself.
+  //
+  // So the question is "has this read answered", not "is it in flight" — with
+  // the wait for the session counted as part of the read, but only on an
+  // address that will need the graph whatever the session turns out to say.
+  // An address anybody can open needs none, so it resolves immediately rather
+  // than holding the share page and the sign-in screen behind a session fetch
+  // whose answer cannot change what they draw.
+  const isAwaitingOrganizations =
+    !organizations.isFetched &&
+    !organizations.isError &&
+    (isOrganizationsQueryEnabled ||
+      (session.status === "loading" && !isPublicRoute));
+
+  if (isAwaitingOrganizations) {
     return {
       isLoading: true,
+      // Nothing has failed yet — the read is still out. A caller that draws a
+      // failure must not draw one for a workspace that is merely on its way.
+      workspaceError: undefined,
       project: publicShareProjectData,
       hasPermission: () => false,
       hasOrgPermission: () => false,
@@ -778,6 +807,14 @@ export const useOrganizationTeamProject = (
 
   return {
     isLoading: false,
+    // The third answer the graph can give, beside a list and an empty list: it
+    // refused. `organizations` is `undefined` for a refusal exactly as it is
+    // for a read still in flight, so a caller that has only those two cannot
+    // tell a workspace it may not read from one it does not have — and the one
+    // that sends people to onboarding must never confuse them. Carrying the
+    // error itself rather than a flag is what lets a screen resolve the
+    // customer-facing words from the code-keyed registry (ADR-045).
+    workspaceError: organizations.error,
     isRefetching: organizations.isRefetching,
     organizations: organizations.data,
     organization,

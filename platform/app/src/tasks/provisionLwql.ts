@@ -27,7 +27,7 @@
  *   composition this orchestrates
  * @see ../server/analytics/lwql/provisioning/selfProvisioning.ts — the self-hosted extras
  * @see ../server/clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";

@@ -1,22 +1,24 @@
 /**
  * The frame-side shim, as a string of plain JavaScript.
  *
- * A string rather than a module because it executes inside a sandboxed
- * `srcdoc` iframe: `buildSrcdoc` inlines it as the document's first executed
- * script, ahead of the CDN-loaded React/ReactDOM/Recharts/Babel globals and
- * the author runtime that compiles and mounts the widget's file. It installs
- * the `LW` global, forwards console output and uncaught errors to the
- * parent, posts a heartbeat, and — the init-race fix — calls
- * `window.__lwActivateAuthor` only AFTER `lw:init` has delivered the port,
- * dashboardContext and params, so author code can read `LW.dashboardContext`
- * / `LW.params` synchronously at its first line.
+ * A string rather than a module because it executes inside the sandboxed
+ * chart frame: `buildFrameHtml` inlines it as the document's first executed
+ * script (the document is served from `CHART_FRAME_PATH`, not a `srcdoc`
+ * attribute), ahead of the CDN-loaded React/ReactDOM/Recharts/Babel globals
+ * and the author runtime that compiles and mounts the widget's file. It
+ * installs the `LW` global, forwards console output and uncaught errors to the
+ * parent, posts a heartbeat, and — the init-race fix — publishes the widget
+ * source (`window.__LW_AUTHOR_SOURCE__`) and calls `window.__lwActivateAuthor`
+ * only AFTER `lw:init` has delivered the port, source, dashboardContext and
+ * params, so author code can read `LW.dashboardContext` / `LW.params`
+ * synchronously at its first line.
  *
  * The shim itself knows nothing about Babel or the module format — that
  * lives in `bridge/authorRuntime.ts`, which is what defines the hook this
  * file calls. It does know about React for exactly one thing:
  * `LW.useChartQuery`, a hook wrapping `LW.query`'s promise in
  * `window.React.useState`/`useEffect` (React is CDN-loaded ahead of this
- * script — see `buildSrcdoc`). A future non-React chart kind can still reuse
+ * script — see `buildFrameHtml`). A future non-React chart kind can still reuse
  * everything else in this file unchanged and simply not call that hook.
  *
  * Protocol constants are interpolated from `bridgeProtocol.ts` so the two
@@ -299,8 +301,8 @@ export function buildShimScript(): string {
   }
 
   // The activation hook itself is generic — the shim knows nothing about
-  // templates, React or Babel. buildSrcdoc defines window.__lwActivateAuthor
-  // before this script runs; whatever runtime it wires up (today: the
+  // templates, React or Babel. buildFrameHtml wires window.__lwActivateAuthor
+  // before this script runs; whatever runtime it sets up (today: the
   // author-runtime that compiles and mounts a React file) is what actually
   // runs the author's code.
   function activateAuthor() {
@@ -316,6 +318,13 @@ export function buildShimScript(): string {
   window.addEventListener("message", function (event) {
     var data = event.data || {};
     if (data.type !== "lw:init") return;
+    // Only the parent frame that embeds us may initialise the frame. Without
+    // this, a document opened at top level (window.parent === window, no real
+    // parent) or cross-embedded by another window could post its own source
+    // and run arbitrary code at whatever origin the document loaded at. We
+    // only ever run at an opaque origin (sandbox), but this closes the shim
+    // side of that guard regardless.
+    if (window.parent === window || event.source !== window.parent) return;
     // The transferred port comes from the FIRST init only; later inits ignored.
     if (port || !event.ports || !event.ports[0]) return;
     port = event.ports[0];
@@ -323,6 +332,9 @@ export function buildShimScript(): string {
     LW.dashboardContext = data.dashboardContext;
     LW.params = data.params;
     LW.theme = data.dashboardContext.theme;
+    // The widget source rides on init (the frame document carries none), where
+    // the author runtime reads it below in activateAuthor().
+    window.__LW_AUTHOR_SOURCE__ = typeof data.source === "string" ? data.source : "";
     buffered.forEach(function (message) { port.postMessage(message); });
     buffered = [];
     setInterval(function () {
