@@ -234,26 +234,22 @@ apps/api/src/
 ```
 
 ```ts
-// apps/api/src/main.ts — the whole process
+// apps/api/src/main.ts — the whole process (target shape; the landed
+// interim uses createServerApp + withStores, see git log)
 import "@langwatch/time/polyfill";
 
-const server  = await Server.start({ name: "langwatch-api", config: apiConfig });
-const stores  = await openStores(server.config.stores, server.resources);
+const config = apiConfig();                   // §6: one generated Zod parse
+const server = Server.create({ name: "langwatch-api", logger, healthPort: config.process.port });
 
-await createApp({ role: "api", server })
-  .withModules(processModules)               // generated from the catalogue
-  .withConfig(server.config.modules)         // one validated slice per module
-  .withStores(stores)                        // the one supply call; tier rides the value
-  .withTransportAuth((a) => a
-    .withStaticTokens({ cron, langyInternal, instanceAdmin })
-    .withBrowserSession(session))
-  .provide({ licenseSource })                // every declared supply token, one line each
-  .boot();                                   // registers everything on the server
+const app = await createProcessApp("api", config) // resolves process AND module
+  .withModules(processModules)                    //   dependencies from config
+  .withDependencies({ licenseSource })            // the one code override
+  .boot();
 
-await server.serve({ port: server.config.process.port, static: uiBundle() });
+await server.serve(app, { ui: config.process.ui }); // worker: server.run(app)
 ```
 
-**`Server.start` ordering is the point:** fatal handlers first (raw stderr
+**`Server.create` ordering is the point:** fatal handlers first (raw stderr
 until a logger exists) → secrets resolve → config parses **under** telemetry,
 so a parse failure is logged with the service name instead of vanishing →
 signals wired, deadline armed. `/healthz` answers **during** boot, not after.
@@ -289,6 +285,21 @@ drain })` from the process package. A raw `{ name, start, stop }` object
 literal at a call site is banned — if a component has no spoken factory,
 write the factory. Transport/route discovery is likewise built in at the
 layer that owns the route table (`boot()`/the api package), never a module.
+
+**The router is the spine, and it is generic** (ruled 2026-09-18). The
+Server defines ONE router at the very beginning; every surface **plugs in
+on a path hierarchy** — `/api/trpc` is the tRPC surface, `/api` the REST
+surface, `/` the static bundle. Routing is by path prefix, never by an
+ordered list of handlers each inspecting a request and claiming it. The
+router is passed down the stack and appended to; the beginning of a path
+can never be changed by whoever received it. The router itself knows no
+transport vocabulary — tRPC hosting, REST hosting, asset serving, security
+headers, trusted-proxy handling and browser-session composition are each
+their own class in the package that owns that concern, and each arrives
+with what it declared (registry-resolved, §3), never with a hand-assembled
+composition bag. There is no "door": `boot()` registers every installed
+module's declared transports onto the router, and the main never sees a
+namespace, a mount, or any transport internals.
 
 **Deployment-choice modules are one line in the main.** The audit sink is
 the worked example: OSS composes `auditLogNullServer` (records nothing),
@@ -333,6 +344,22 @@ only when everything the installed modules declared has been supplied**. An
 absent supply is a compile refusal — `MissingSupply<...>` names the whole
 outstanding set at once — never a runtime fallback, never a logged absence,
 never an absence class.
+
+**The vocabulary is dependencies, in two kinds** (ruled 2026-09-18; the
+"members" wording above is the interim spelling and dies with the kernel).
+**Process dependencies** are global — `prisma`, `clickhouse`, `redis`,
+`logger`, `clock`, `rateLimiter` — one instance for the whole process; if a
+process uses Prisma it uses it everywhere. **Module dependencies** are what
+only that module needs. A module **registers** process dependencies by name
+(strings: `registerProcessDependencies`); the app **adds** them as objects
+(`addProcessDependencies`); `createProcessApp(role, config)` resolves both
+kinds from config, with `.withDependencies({...})` as the one code
+override. Delivery is **registry-based**: a module declares what it needs
+or supports in a registry (the `defineRepositories({ live, memory })`
+pattern generalised — the module says "for this I support these", the app
+chooses which), and every `create()` **arrives with its things already
+resolved**. Passing a hand-assembled composition object into anything is
+banned as a shape — nothing receives a bag it has to pick apart.
 
 The `processModules` list is generated from `modules/catalogue.json`
 (`pnpm generate:modules` → `@langwatch/installed-modules`). **Installing a
@@ -388,6 +415,27 @@ Secrets resolve before the parse through `@langwatch/secrets` (ADR-132):
 classified keys, ordered chain (env/.env → 1Password opt-in → refusal by
 name), redaction everywhere. Nothing outside the secrets package, config
 composition and boot files reads a secret env var.
+
+**One generated Zod parse per process** (ruled 2026-09-18). The process's
+schema is generated from its installed module list: each module's own Zod
+schema merges in, so no value is declared twice. Every key is a **root
+object** — `process` for the global values, or the module's name for its
+slice — and Zod reads the environment directly at the one boot seam.
+`.readonly()` on the schema is the immutability story; there is no
+`Object.freeze`, no hand-built projection type mirroring the schema, and no
+re-plumbing from an env read into a second structure. What the parse returns
+is what the process holds.
+
+**Config and secrets are separate** (ruled 2026-09-18). A secret is never a
+field on the parsed config object and never travels inside it. Secrets
+resolve through the chain above and are **injected into the thing that uses
+them as early as possible**: the cipher is constructed with its key, the
+database client with its URL, the token verifier with its bearer secret —
+and only the constructed collaborator travels, as a process or module
+dependency. A module's config slice may not declare a key `keys.json`
+classifies as `secret` or `composite`; the schema generator refuses it by
+name. Connection strings are composite secrets, so they belong at the
+dependency-construction seam, never in a config object a module reads.
 
 **Three layers, and which one a value belongs to** (ruled 2026-09-18):
 
