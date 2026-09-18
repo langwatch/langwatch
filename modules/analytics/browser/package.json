@@ -11,6 +11,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/analytics.web.ts",
+      "types": "./dist/analytics.web.d.ts",
+      "default": "./src/analytics.web.ts"
+    },
     ".": {
       "langwatch-declaration-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
@@ -82,9 +87,10 @@
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
-    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-browser-kit": "workspace:*",
+    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
@@ -94,7 +100,7 @@
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@monaco-editor/react": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-table": "catalog:",

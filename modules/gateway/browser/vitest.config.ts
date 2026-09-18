@@ -12,7 +12,7 @@ export default defineConfig({
         new URL("../contract/src/index.ts", import.meta.url),
       ),
       "@langwatch/authz-browser-kit/scope-picker": fileURLToPath(
-        new URL("../../authz/web-kit/src/scope-picker/index.ts", import.meta.url),
+        new URL("../../authz/browser-kit/src/scope-picker/index.ts", import.meta.url),
       ),
       "@langwatch/model-provider-contract": fileURLToPath(
         new URL("../../model-provider/contract/src/index.ts", import.meta.url),

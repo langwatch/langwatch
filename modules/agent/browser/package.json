@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/agent.web.ts",
+      "types": "./dist/agent.web.d.ts",
+      "default": "./src/agent.web.ts"
+    },
     "./agent-editors": {
       "langwatch-declaration-source": "./src/agent-editors.ts",
       "types": "./dist/agent-editors.d.ts",
@@ -46,12 +51,13 @@
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-browser": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:"
   },

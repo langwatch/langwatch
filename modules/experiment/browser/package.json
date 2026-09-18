@@ -11,6 +11,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/experiment.web.ts",
+      "types": "./dist/experiment.web.d.ts",
+      "default": "./src/experiment.web.ts"
+    },
     ".": {
       "langwatch-declaration-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
@@ -90,14 +95,15 @@
   "dependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
-    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/csv": "workspace:*",
-    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-browser": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/evaluator-browser": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
@@ -109,10 +115,10 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
-    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-table": "catalog:",

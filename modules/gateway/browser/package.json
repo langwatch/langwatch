@@ -10,6 +10,11 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/gateway.web.ts",
+      "types": "./dist/gateway.web.d.ts",
+      "default": "./src/gateway.web.ts"
+    },
     "./drawers": {
       "types": "./dist/drawers.d.ts",
       "default": "./src/drawers.ts"
@@ -31,8 +36,9 @@
   "dependencies": {
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
@@ -40,7 +46,7 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "papaparse": "catalog:",
     "react-hook-form": "catalog:",
@@ -52,8 +58,8 @@
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
     "@langwatch/test-harness": "workspace:*",
-    "@langwatch/trace-process": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
+    "@langwatch/trace-process": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

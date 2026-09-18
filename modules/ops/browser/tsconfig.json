@@ -33,10 +33,10 @@
       "path": "../../../enterprise/modules/sso/contract/tsconfig.build.json"
     },
     {
-      "path": "../../feature-flag/contract/tsconfig.build.json"
+      "path": "../../feature-flag/browser/tsconfig.build.json"
     },
     {
-      "path": "../../feature-flag/web/tsconfig.build.json"
+      "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -46,6 +46,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
