@@ -314,9 +314,10 @@ All 33 assigned, none orphaned: rung 1 ×1, 2 ×1, 4 ×2, 5 ×1, 7 ×1, 8 ×1, 9
 
 ## Open questions
 
-- Whether a pi icon asset exists or may be used. `ASSISTANT_PRESETS` requires an
-  icon location; rung 18 assumes a new asset and has checked neither the
-  directory nor the licensing.
+- ~~Whether a pi icon asset exists or may be used.~~ Closed by v13. Both halves
+  were checked: pi is MIT-licensed, and the mark is published by pi itself at
+  `https://pi.dev/logo-auto.svg`. The asset ships at
+  `public/images/external-icons/pi.svg`, byte-identical to that source.
 - Which test lane rungs 16 and 19 belong to. The package has its own test
   configuration and sits outside the app's two-lane split.
 - Whether pi needs its own branch in `buildOtelEnvBlock`. The fallback returns

@@ -1025,7 +1025,7 @@ before the edit. Two agents falsifying one file at once needs a lock, not care.
 
 - [x] 18.1 `me/tiles/assistantIcons.ts:19` — pi in `ASSISTANT_KINDS`
 - [x] 18.2 same file `:78-87` — pi preset
-- [x] 18.3 icon settled: **no asset added.** No pi mark exists in `public/images/external-icons/` and we hold no license to redistribute one. `iconUrl: null` is an already-supported state (`AssistantPreset.iconUrl: string | null`); `TileIcon.tsx:37` and `AiToolEntryDrawer.tsx:614` both fall through to the neutral `<Bot />` glyph. Reason recorded in a comment at the preset.
+- [x] 18.3 icon settled: **asset added** — `public/images/external-icons/pi.svg`. Reversed by v13; the original entry read "no asset added … we hold no license to redistribute one", and the licence half of that was never checked. pi is MIT (npm `@earendil-works/pi-coding-agent`, `github.com/earendil-works/pi`), and the mark is served from pi's own site at `https://pi.dev/logo-auto.svg`, fetched byte-identical to what ships here. The `iconUrl: null` fall-through to `<Bot />` still exists for kinds that have no mark; pi no longer uses it.
 - [x] 18.4 `ee/governance/services/aiToolEntry.service.ts:83` — pi in `SUPPORTED_ASSISTANT_KINDS`
 - [x] 18.5 same file `:106-109` — `pi: "pi"` in `ASSISTANT_KIND_TO_TOOL_SLUG`
 - [x] 18.6 `me/tiles/__tests__/assistantIcons.unit.test.ts` binds `@scenario "The tool tile offers pi"`
