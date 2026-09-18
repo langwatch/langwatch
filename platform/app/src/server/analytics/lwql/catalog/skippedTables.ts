@@ -40,6 +40,11 @@ export const LWQL_CATALOG_SKIPPED_TABLES: Record<string, string> = {
   goose_db_version:
     "the goose migration-version table, engine-internal tooling state — no " +
     "tenant column at all",
+  instant_eval_runs:
+    "the state of an Instant Eval run while it is running: its progress, its " +
+    "spend and the statement it was started from. Read through the runs API, " +
+    "which is where a run is started and watched; what the run produced is " +
+    "the judgments dataset",
 };
 
 /**
