@@ -58,6 +58,58 @@ const FACETS_DESCRIPTION =
   "Use it whenever you are unsure how a value is spelled. `GET /api/v1/query/reference` lists the fields and their fixed vocabularies; only this endpoint knows the open ones.";
 
 /**
+ * A window bound arriving as a query string.
+ *
+ * Everything in a query string is a string, and `flexibleDateSchema` sends one
+ * straight to `Date.parse`, which answers NaN for `"1720000000000"`. Epoch
+ * milliseconds are half of the documented format, so the digits are turned into
+ * a number first and anything else is left for the ISO branch.
+ */
+const facetWindowBoundSchema = z.preprocess(
+  (value) =>
+    typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value,
+  flexibleDateSchema,
+);
+
+/**
+ * The 422 this route really sends.
+ *
+ * `baseResponses` documents the flat `{ error, message }` the traces family
+ * published before validation gained structure, and a caller reading only that
+ * cannot find which parameter it got wrong. The refusal carries `target`,
+ * `fields` and one reason per issue, so this route documents what it sends
+ * rather than the family's floor.
+ */
+const traceFacetsValidationErrorSchema = z.object({
+  error: z.literal("validation_error"),
+  message: z.string(),
+  target: z.literal("query"),
+  fields: z.array(z.string()),
+  reasons: z.array(
+    z.object({
+      code: z.string(),
+      meta: z
+        .object({
+          field: z.string().optional(),
+          type: z.string().optional(),
+          message: z.string().optional(),
+          received: z.string().optional(),
+          expected: z.array(z.string()).optional(),
+        })
+        .optional(),
+    }),
+  ),
+  trace: z.string().optional(),
+});
+
+/** The 403 an attribute-key field gets in a project that hides captures. */
+const traceFacetsWithheldErrorSchema = z.object({
+  error: z.literal("trace_attribute_values_withheld"),
+  message: z.string(),
+  trace: z.string().optional(),
+});
+
+/**
  * The facets query, and where the two answers diverge.
  *
  * `limit` and `offset` carry defaults so the value branch never has to decide
@@ -74,8 +126,8 @@ const traceFacetsQuerySchema = z.object({
     .max(1000)
     .default(DEFAULT_FACET_VALUE_LIMIT),
   offset: z.coerce.number().int().min(0).default(0),
-  startDate: flexibleDateSchema.optional(),
-  endDate: flexibleDateSchema.optional(),
+  startDate: facetWindowBoundSchema.optional(),
+  endDate: facetWindowBoundSchema.optional(),
 });
 
 /**
@@ -266,6 +318,7 @@ export function registerTracesRoutes(
         filter,
         tenantId: project.id,
         timeRange: { from: startDate, to: endDate },
+        dateField,
       });
 
       const traceService = TraceService.create(prisma);
@@ -743,6 +796,24 @@ const FACETS_ROUTE_DOC: Parameters<typeof describeRoute>[0] = {
   ],
   responses: {
     ...baseResponses,
+    403: {
+      description:
+        "The field is an attribute key and this project hides captured input or output, so its values are not listed.",
+      content: {
+        "application/json": {
+          schema: resolver(traceFacetsWithheldErrorSchema),
+        },
+      },
+    },
+    422: {
+      description:
+        "The query did not name a facet with values to list. `fields` names the offending parameter and each reason carries what was received and what exists.",
+      content: {
+        "application/json": {
+          schema: resolver(traceFacetsValidationErrorSchema),
+        },
+      },
+    },
     200: {
       description:
         "Without `field`, every facet the project has with its top values and whether the payload is still being computed. With `field`, that field's values and counts plus the distinct total and whether more remain.",
@@ -779,12 +850,13 @@ function registerFacetsRoute(
         const { field, prefix, limit, offset, startDate, endDate } =
           c.req.valid("query");
 
+        // One clock read for both ends: two calls can land in different
+        // milliseconds, and the default window would then run over a day.
+        const now = Date.now();
         const timeRange = {
           from:
-            startDate === undefined
-              ? Date.now() - DAY_MS
-              : coerceToEpoch(startDate),
-          to: endDate === undefined ? Date.now() : coerceToEpoch(endDate),
+            startDate === undefined ? now - DAY_MS : coerceToEpoch(startDate),
+          to: endDate === undefined ? now : coerceToEpoch(endDate),
         };
 
         const list = getApp().traces.list;
@@ -797,10 +869,13 @@ function registerFacetsRoute(
           return c.json(discover);
         }
 
+        const protections = await getProtectionsForProject(prisma, {
+          projectId: project.id,
+        });
         const result = await list.getFacetValues({
           tenantId: project.id,
           timeRange,
-          facetKey: resolveFacetKey(field),
+          facetKey: resolveFacetKey({ field, protections }),
           limit,
           offset,
           ...(prefix === undefined ? {} : { prefix }),

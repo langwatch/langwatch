@@ -7,7 +7,7 @@
  * told it the value is `error`, and it writes `attribute.foo:bar` because
  * nothing showed it the namespaced form. These do.
  *
- * Every example is asserted runnable rather than reviewed: the drift test
+ * Every example is parsed and compiled rather than reviewed: the drift test
  * parses each one, runs the semantic check the search bar runs, and compiles it
  * to the ClickHouse condition the filter would execute. An example that stops
  * translating — because a field was renamed, or a value form withdrawn — fails

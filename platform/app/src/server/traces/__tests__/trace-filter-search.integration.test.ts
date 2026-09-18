@@ -20,6 +20,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { TRACE_FILTER_EXAMPLES } from "~/server/app-layer/traces/query-language/examples";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
@@ -174,6 +175,34 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await stopTestContainers();
+});
+
+describe("every filter example the reference publishes", () => {
+  /**
+   * Compiling is not running. A fragment can parse, pass the semantic check and
+   * still be refused by ClickHouse for a type it cannot compare or a function
+   * that does not exist on this schema, and the reader of a published example
+   * finds that out one round trip later. So each one is executed here, against
+   * the same tables the search reads.
+   *
+   * The assertion is that the database accepted it, not what came back: these
+   * fixtures are built for the narrowing tests above, and pinning a row count
+   * per example would make this suite a second, worse copy of them.
+   */
+  /** @scenario "Every published filter example runs against the real schema" */
+  it.each(
+    TRACE_FILTER_EXAMPLES.map((example) => [example.id, example.text]),
+  )("runs %s", async (_id, text) => {
+    const compiled = translateFilterToClickHouse(text, tenantId, WINDOW);
+    expect(compiled).not.toBeNull();
+    await expect(
+      ch.query({
+        query: `SELECT count() AS matches FROM trace_summaries ts WHERE TenantId = {tenantId:String} AND ${compiled?.sql}`,
+        query_params: compiled?.params ?? {},
+        format: "JSONEachRow",
+      }),
+    ).resolves.toBeDefined();
+  });
 });
 
 describe("a trace search carrying a compiled trace filter", () => {

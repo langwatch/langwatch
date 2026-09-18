@@ -64,6 +64,7 @@ import {
   startLangWatchQLPostgres,
 } from "~/server/analytics/lwql/__tests__/lwqlClickHouseHarness";
 import { LWQL_VIEW_CATALOG } from "~/server/analytics/lwql/catalog/lwqlViews";
+import { LWQL_EXAMPLES } from "~/server/analytics/lwql/examples";
 import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
@@ -201,6 +202,16 @@ describe("given the /api/v1/query REST family", () => {
     }
     return body;
   };
+
+  /** Reads the query reference as one project, asserting it answered. */
+  const readReference = async (project: Project) =>
+    succeed(
+      await app.request(referencePath, {
+        method: "GET",
+        headers: authHeaders(project.apiKey),
+      }),
+      "GET /api/v1/query/reference",
+    );
 
   /** Reads the queryable schema as one project, asserting it answered. */
   const readSchema = async (project: Project) =>
@@ -412,6 +423,46 @@ describe("given the /api/v1/query REST family", () => {
       });
       const result = await succeed(response, "GET /api/v1/query/schema");
       expect(result.database).toBe(database);
+    });
+  });
+
+  describe("every LangWatchQL example the reference publishes", () => {
+    /**
+     * A test value for one declared parameter, by its declared type.
+     *
+     * The examples publish a type and a description rather than a value, so
+     * this binds the smallest thing each type accepts. What is under test is
+     * that the statement runs at all, not what it returns: the seeded rows
+     * belong to the suites above and pinning counts here would make this a
+     * second, worse copy of them.
+     */
+    const bind = (type: string): string | number => {
+      if (type.startsWith("DateTime")) return "1970-01-01 00:00:00.000";
+      if (/^U?Int|^Float|^Decimal/.test(type)) return 1;
+      return "";
+    };
+
+    /** @scenario "Every published statement runs against the real catalog" */
+    it.each(
+      LWQL_EXAMPLES.map((example) => [example.id, example] as const),
+    )("runs %s", async (_id, example) => {
+      const parameters = Object.fromEntries(
+        example.parameters.map((parameter) => [
+          parameter.name,
+          bind(parameter.type),
+        ]),
+      );
+      const reference = await readReference(projectA);
+      const published = reference.examples.find(
+        (candidate: any) => candidate.id === example.id,
+      );
+      expect(published).toBeDefined();
+      const body = await run({
+        project: projectA,
+        sql: published.text,
+        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
+      });
+      expect(Array.isArray(body.rows)).toBe(true);
     });
   });
 

@@ -17,6 +17,7 @@ import {
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
+import { runnableLabel } from "./requirements";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
@@ -78,9 +79,7 @@ function printExample(example: Example): void {
   console.log(
     chalk.gray(
       `  ${example.language} · ${example.intent} · ${example.tags.join(", ")}${
-        example.available
-          ? ""
-          : ` · needs ${example.requires.gates.join(", ")}`
+        example.available ? "" : ` · ${runnableLabel(example)}`
       }`,
     ),
   );

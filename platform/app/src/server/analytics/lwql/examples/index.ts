@@ -8,7 +8,7 @@
  * of a conversation, a keyset export. These are those, written once and read by
  * the reference endpoint, the CLI and the MCP server.
  *
- * Every statement is asserted runnable rather than reviewed: the drift test runs
+ * Every statement is validated rather than reviewed: the drift test runs
  * each one through the LangWatchQL validator against the real catalog and fails
  * when one stops validating, and checks that each declared parameter is one the
  * statement actually binds. A published example the API would refuse is worse
@@ -263,7 +263,7 @@ LIMIT 50`,
     title: "Export captured input and output, page by page",
     intent: "export",
     tags: ["export", "paging", "parameters"],
-    sql: `SELECT TraceId, OccurredAt, CapturedInput, CapturedOutput
+    sql: `SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
 FROM analytics.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
@@ -285,6 +285,6 @@ LIMIT 1000`,
     ],
     gates: ["input", "output"],
     notes:
-      "The query API has no pagination of its own. This is the shape that pages without rewriting the statement, which is what `langwatch query --page-by keyset` rebinds between pages.",
+      "The query API has no pagination of its own. This is the shape that pages without rewriting the statement, which is what `langwatch query --page-by keyset` rebinds between pages. The two ordering columns are aliased to the cursor parameters' own names, which is where the next page's cursor is read from: alias whichever columns you order by, or the walk cannot tell them from any other value in the row.",
   },
 ];

@@ -138,7 +138,7 @@ export class QueryApiService {
   /**
    * Describes both query languages in one payload: the LangWatchQL schema,
    * limits and endpoints, the trace filter's syntax and fields, worked examples
-   * asserted runnable in both, and which language answers which kind of
+   * validated in both, and which language answers which kind of
    * question.
    */
   async reference(): Promise<QueryReferenceResult> {

@@ -114,3 +114,15 @@ Feature: One query reference for both query languages
   Scenario: The MCP server's committed reference fixture matches the platform
     When the reference is built with no permissions withheld
     Then it equals the fixture the MCP server's tests assert against
+
+  @unit
+  Scenario: Examples name the database this deployment serves
+    Given a deployment serving the analytics views from another database
+    When the reference is built for it
+    Then every published statement names that database rather than the default
+
+  @integration
+  Scenario: Every published statement runs against the real catalog
+    Given the LangWatchQL examples the reference publishes
+    When each one is sent to the query endpoint with its parameters bound
+    Then the endpoint answers rows for every one of them

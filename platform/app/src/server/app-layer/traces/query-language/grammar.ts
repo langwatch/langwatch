@@ -18,7 +18,7 @@
  */
 export const QUERY_SYNTAX_DOC = `# Trace query syntax
 
-A small Lucene-flavoured language for filtering traces. Every clause is a
+A small Lucene-flavored language for filtering traces. Every clause is a
 \`field:value\` pair joined by boolean operators. Free text without a field
 matches against trace input/output.
 

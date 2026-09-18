@@ -3,7 +3,8 @@
  *
  * The first command an agent should run before it filters or aggregates
  * anything: it says which language answers which kind of question, lists every
- * field and column, and carries worked examples that are asserted runnable.
+ * field and column, and carries worked examples the platform validates before
+ * publishing them. Each one also says whether THIS key can run it.
  *
  * `--section` exists because the whole document is large and an agent usually
  * knows which half it needs. The default is still the whole thing, so a caller
@@ -19,6 +20,7 @@ import {
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
+import { runnableLabel } from "./requirements";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
@@ -139,7 +141,7 @@ function printExamples(reference: QueryReferenceResult): void {
       Language: example.language,
       Intent: example.intent,
       Title: example.title,
-      Runnable: example.available ? "yes" : `needs ${example.requires.gates.join(", ")}`,
+      Runnable: runnableLabel(example),
     })),
     headers: ["Id", "Language", "Intent", "Title", "Runnable"],
   });

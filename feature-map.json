@@ -138,10 +138,10 @@
             "docs": null
           },
           "sync": "code-to-platform",
-          "produces": [
+          "produces": [],
+          "consumes": [
             "traces"
-          ],
-          "consumes": []
+          ]
         },
         {
           "id": "observability.user-events",

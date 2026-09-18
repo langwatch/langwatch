@@ -24,24 +24,32 @@
  */
 
 import chalk from "chalk";
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 
 import {
   type QueryRunResult,
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import {
   type QueryColumn,
   type QueryOutputFormat,
-  QUERY_OUTPUT_FORMATS,
   type QueryRow,
   renderRows,
 } from "./rows";
+import {
+  type ParameterValue,
+  printTable,
+  refuse,
+  resolveFormat,
+  resolveLimit,
+  resolveParameters,
+  resolveStatement,
+  resolveTimeWindow,
+} from "./run-options";
 
 /**
  * The cursor parameters `--page-by keyset` rebinds.
@@ -63,9 +71,6 @@ const KEYSET_START = {
 /** Pages a keyset walk will fetch before it stops on its own. */
 const MAX_KEYSET_PAGES = 1_000;
 
-/** Rows a table prints before it stops being a table. */
-const TABLE_ROW_CAP = 200;
-
 export interface QueryRunOptions {
   sqlFile?: string;
   start?: string;
@@ -78,171 +83,38 @@ export interface QueryRunOptions {
   project?: string;
 }
 
-type ParameterValue = string | number | boolean | null;
 
-function refuse(message: string): never {
-  console.error(chalk.red(`Error: ${message}`));
-  process.exit(1);
-}
-
-/** The statement, from the argument or the file, never from both. */
-function resolveStatement({
-  sql,
-  sqlFile,
-}: {
-  sql?: string;
-  sqlFile?: string;
-}): string {
-  if (sql !== undefined && sqlFile !== undefined) {
-    refuse("give a statement or --sql-file, not both");
-  }
-  if (sqlFile !== undefined) {
-    try {
-      return readFileSync(sqlFile, "utf-8");
-    } catch {
-      refuse(`could not read --sql-file ${sqlFile}`);
-    }
-  }
-  if (sql === undefined || sql.trim().length === 0) {
-    refuse(
-      'give a statement: langwatch query "SELECT count() FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 1)"',
-    );
-  }
-  return sql;
-}
-
-/**
- * `--param k=v` into bound parameters.
- *
- * Values stay strings. A parameter's type is declared inside the statement
- * (`{days:UInt32}`) and the database coerces on that declaration, so guessing a
- * type here could only ever disagree with the one the author wrote.
- */
-function resolveParameters(pairs: readonly string[] = []): Record<
-  string,
-  ParameterValue
-> {
-  const parameters: Record<string, ParameterValue> = {};
-  for (const pair of pairs) {
-    const separator = pair.indexOf("=");
-    if (separator <= 0) {
-      refuse(`--param needs key=value, got "${pair}"`);
-    }
-    parameters[pair.slice(0, separator)] = pair.slice(separator + 1);
-  }
-  return parameters;
-}
-
-function resolveFormat(format = "table"): QueryOutputFormat {
-  if (!(QUERY_OUTPUT_FORMATS as readonly string[]).includes(format)) {
-    refuse(`--format must be one of ${QUERY_OUTPUT_FORMATS.join(", ")}`);
-  }
-  return format as QueryOutputFormat;
-}
-
-function resolveLimit(limit?: string): number | undefined {
-  if (limit === undefined) return undefined;
-  const parsed = Number(limit);
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    refuse("--limit must be a whole number of at least 1");
-  }
-  return parsed;
-}
-
-/** The window, honoured only when both ends are given. */
-function resolveTimeWindow({
-  start,
-  end,
-}: {
-  start?: string;
-  end?: string;
-}): { start: string; end: string } | undefined {
-  if (start === undefined && end === undefined) return undefined;
-  if (start === undefined || end === undefined) {
-    refuse("--start and --end must be given together");
-  }
-  return { start, end };
-}
-
-/** A cell as a table shows it: JSON for anything structured, blank for absent. */
-function tableCell(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value as string | number | boolean);
-}
-
-function printTable(result: {
-  columns: readonly QueryColumn[];
-  rows: readonly QueryRow[];
-  statistics?: { elapsedMs: number };
-  truncated?: boolean;
-  diagnostics?: readonly { code: string; message: string }[];
-}): void {
-  console.log();
-  if (result.rows.length === 0) {
-    console.log(chalk.gray("The statement returned no rows."));
-  } else {
-    const headers = result.columns.map((column) => column.name);
-    const shown = result.rows.slice(0, TABLE_ROW_CAP);
-    formatTable({
-      data: shown.map((row) =>
-        Object.fromEntries(
-          headers.map((name) => [name, tableCell(row[name])]),
-        ),
-      ),
-      headers,
-    });
-    if (result.rows.length > shown.length) {
-      console.log();
-      console.log(
-        chalk.gray(
-          `Showing ${shown.length} of ${result.rows.length} rows. Use --format jsonl or -o file for all of them.`,
-        ),
-      );
-    }
-  }
-  if (result.truncated) {
-    console.log();
-    console.log(
-      chalk.yellow(
-        "The result hit a response ceiling and was cut short. Aggregate further, or page with --page-by keyset.",
-      ),
-    );
-  }
-  for (const diagnostic of result.diagnostics ?? []) {
-    console.log();
-    console.log(chalk.yellow(`${diagnostic.code}: ${diagnostic.message}`));
-  }
-  console.log();
-}
-
-/** The last row's cursor, for the next page's binding. */
 function cursorFrom(rows: readonly QueryRow[]): {
   after_ts: string;
   after_id: string;
 } | null {
   const last = rows[rows.length - 1];
   if (!last) return null;
-  const timestamp = Object.values(last).find(
-    (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value),
+  const timestamp = last[AFTER_TIMESTAMP_PARAMETER];
+  const id = last[AFTER_ID_PARAMETER];
+  if (typeof timestamp !== "string" || typeof id !== "string") return null;
+  return { after_ts: timestamp, after_id: id };
+}
+
+/** What a keyset statement has to project for the walk to read its cursor. */
+function requireCursorColumns(columns: readonly QueryColumn[]): void {
+  const projected = new Set(columns.map((column) => column.name));
+  const missing = [AFTER_TIMESTAMP_PARAMETER, AFTER_ID_PARAMETER].filter(
+    (name) => !projected.has(name),
   );
-  const id = last.TraceId ?? last.traceId;
-  return {
-    after_ts:
-      typeof timestamp === "string"
-        ? timestamp
-        : KEYSET_START[AFTER_TIMESTAMP_PARAMETER],
-    after_id: typeof id === "string" ? id : "",
-  };
+  if (missing.length === 0) return;
+  refuse(
+    `--page-by keyset reads the next page's cursor from the columns ${AFTER_TIMESTAMP_PARAMETER} and ${AFTER_ID_PARAMETER}, and this statement projects neither${missing.length === 1 ? ` ${missing[0]}` : ""}. Alias the two columns you order by, for example \`SELECT StartedAt AS ${AFTER_TIMESTAMP_PARAMETER}, TraceId AS ${AFTER_ID_PARAMETER}\`. See \`langwatch query examples --tag paging\`.`,
+  );
 }
 
 /**
  * Walks every page of a keyset statement, rebinding the cursor.
  *
- * The cursor comes from the row the previous page ended on, so the walk needs
- * the ordering columns to be projected. `TraceId` and the first timestamp-shaped
- * value are what it reads; a statement ordering by anything else pages wrong,
- * which is why the reference's keyset example projects both.
+ * The cursor comes from the row the previous page ended on, read from the two
+ * columns the statement projects under the cursor parameters' names. The walk
+ * stops on the first short page, on a cursor that did not move, and on the row
+ * budget `--limit` set.
  */
 async function walkKeyset({
   service,
@@ -257,7 +129,7 @@ async function walkKeyset({
   parameters: Record<string, ParameterValue>;
   timeWindow?: { start: string; end: string };
   limit?: number;
-  onPage: (page: QueryRunResult) => void;
+  onPage: (page: QueryRunResult, rows: readonly QueryRow[]) => void;
 }): Promise<{ pages: number; rows: number }> {
   if (!sql.includes(AFTER_TIMESTAMP_PARAMETER) || !sql.includes(AFTER_ID_PARAMETER)) {
     refuse(
@@ -278,9 +150,13 @@ async function walkKeyset({
     });
     pages += 1;
     if (page.rows.length === 0) break;
+    if (pages === 1) requireCursorColumns(page.columns);
 
-    onPage(page);
-    rows += page.rows.length;
+    // `--limit` is a budget for the whole walk, not for each page: slicing to
+    // the flag on every page would write it once per page.
+    const remaining = limit === undefined ? page.rows.length : limit - rows;
+    onPage(page, page.rows.slice(0, remaining));
+    rows += Math.min(page.rows.length, remaining);
 
     // A page shorter than the one before it is the end of the result: the
     // statement's own LIMIT is what sizes a full page, so the first short page
@@ -302,89 +178,135 @@ async function walkKeyset({
   return { pages, rows };
 }
 
+/** The keyset branch: walk every page, rendering each as it lands. */
+async function runKeysetWalk({
+  service,
+  statement,
+  parameters,
+  timeWindow,
+  limit,
+  format,
+  output,
+}: {
+  service: QueryApiService;
+  statement: string;
+  parameters: Record<string, ParameterValue>;
+  timeWindow?: { start: string; end: string };
+  limit?: number;
+  format: QueryOutputFormat;
+  output?: string;
+}): Promise<void> {
+  const spinner = createSpinner("Running statement...").start();
+  const chunks: string[] = [];
+  let columns: readonly QueryColumn[] = [];
+  try {
+    const walked = await walkKeyset({
+      service,
+      sql: statement,
+      parameters,
+      timeWindow,
+      limit,
+      onPage: (page, rows) => {
+        columns = page.columns;
+        chunks.push(
+          renderRows({
+            format: format === "table" ? "jsonl" : format,
+            columns: page.columns,
+            rows,
+          }),
+        );
+      },
+    });
+    spinner.succeed(
+      `Read ${walked.rows} row${walked.rows !== 1 ? "s" : ""} over ${walked.pages} page${walked.pages !== 1 ? "s" : ""}`,
+    );
+  } catch (error) {
+    failSpinner({ spinner, error, action: "run statement" });
+    process.exit(1);
+  }
+  writeOrPrint({ body: chunks.join("\n"), output, columns });
+}
+
+/** The single-response branch, which is every statement that does not page. */
+async function runSinglePage({
+  service,
+  statement,
+  parameters,
+  timeWindow,
+  limit,
+  format,
+  output,
+}: {
+  service: QueryApiService;
+  statement: string;
+  parameters: Record<string, ParameterValue>;
+  timeWindow?: { start: string; end: string };
+  limit?: number;
+  format: QueryOutputFormat;
+  output?: string;
+}): Promise<CommandResult | void> {
+  const spinner = createSpinner("Running statement...").start();
+  let result: QueryRunResult;
+  try {
+    result = await service.query({
+      sql: statement,
+      ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
+      ...(timeWindow ? { timeWindow } : {}),
+    });
+  } catch (error) {
+    failSpinner({ spinner, error, action: "run statement" });
+    process.exit(1);
+  }
+
+  const rows = limit === undefined ? result.rows : result.rows.slice(0, limit);
+  spinner.succeed(
+    `${rows.length} row${rows.length !== 1 ? "s" : ""} in ${result.statistics.elapsedMs}ms`,
+  );
+
+  if (format !== "table" || output !== undefined) {
+    return writeOrPrint({
+      body: renderRows({
+        format: format === "table" ? "json" : format,
+        columns: result.columns,
+        rows,
+      }),
+      output,
+      columns: result.columns,
+    });
+  }
+
+  return {
+    data: { ...result, rows },
+    table: () => printTable({ ...result, rows }),
+  };
+}
+
 export const runQueryCommand = async (
   sql: string | undefined,
   options: QueryRunOptions = {},
 ): Promise<CommandResult | void> => {
   await resolveCredentials({ project: options.project });
 
-  const statement = resolveStatement({ sql, sqlFile: options.sqlFile });
-  const parameters = resolveParameters(options.param);
-  const format = resolveFormat(options.format);
-  const limit = resolveLimit(options.limit);
-  const timeWindow = resolveTimeWindow(options);
   const pageByKeyset = options.pageBy === "keyset";
   if (options.pageBy !== undefined && !pageByKeyset) {
     refuse("--page-by only understands `keyset`");
   }
 
-  const service = new QueryApiService();
-  const spinner = createSpinner("Running statement...").start();
+  const common = {
+    service: new QueryApiService(),
+    statement: resolveStatement({ sql, sqlFile: options.sqlFile }),
+    parameters: resolveParameters(options.param),
+    format: resolveFormat(options.format),
+    ...(resolveLimit(options.limit) === undefined
+      ? {}
+      : { limit: resolveLimit(options.limit) }),
+    ...(resolveTimeWindow(options)
+      ? { timeWindow: resolveTimeWindow(options) }
+      : {}),
+    ...(options.output === undefined ? {} : { output: options.output }),
+  };
 
-  try {
-    if (pageByKeyset) {
-      const chunks: string[] = [];
-      let columns: readonly QueryColumn[] = [];
-      const walked = await walkKeyset({
-        service,
-        sql: statement,
-        parameters,
-        timeWindow,
-        limit,
-        onPage: (page) => {
-          columns = page.columns;
-          const rows =
-            limit === undefined ? page.rows : page.rows.slice(0, limit);
-          chunks.push(
-            renderRows({
-              format: format === "table" ? "jsonl" : format,
-              columns: page.columns,
-              rows,
-            }),
-          );
-        },
-      });
-      spinner.succeed(
-        `Read ${walked.rows} row${walked.rows !== 1 ? "s" : ""} over ${walked.pages} page${walked.pages !== 1 ? "s" : ""}`,
-      );
-      return writeOrPrint({
-        body: chunks.join("\n"),
-        output: options.output,
-        columns,
-      });
-    }
-
-    const result = await service.query({
-      sql: statement,
-      ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
-      ...(timeWindow ? { timeWindow } : {}),
-    });
-    const rows = limit === undefined ? result.rows : result.rows.slice(0, limit);
-
-    spinner.succeed(
-      `${rows.length} row${rows.length !== 1 ? "s" : ""} in ${result.statistics.elapsedMs}ms`,
-    );
-
-    if (format !== "table" || options.output !== undefined) {
-      return writeOrPrint({
-        body: renderRows({
-          format: format === "table" ? "json" : format,
-          columns: result.columns,
-          rows,
-        }),
-        output: options.output,
-        columns: result.columns,
-      });
-    }
-
-    return {
-      data: { ...result, rows },
-      table: () => printTable({ ...result, rows }),
-    };
-  } catch (error) {
-    failSpinner({ spinner, error, action: "run statement" });
-    process.exit(1);
-  }
+  return pageByKeyset ? runKeysetWalk(common) : runSinglePage(common);
 };
 
 /**
@@ -408,9 +330,11 @@ function writeOrPrint({
     return;
   }
   writeFileSync(output, body.endsWith("\n") ? body : `${body}\n`);
-  console.log(
-    chalk.green(
+  // On stderr: with `--output` the whole point is that stdout stays empty, so
+  // a shell redirect of the command's output carries the rows and nothing else.
+  process.stderr.write(
+    `${chalk.green(
       `Written to ${output} (${columns.length} column${columns.length !== 1 ? "s" : ""})`,
-    ),
+    )}\n`,
   );
 }

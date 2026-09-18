@@ -18,6 +18,7 @@
  * @see specs/traces/trace-filter-api.feature
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { RequestValidationError } from "~/server/api/validation";
 import { FACET_REGISTRY } from "~/server/app-layer/traces/facet-registry";
 import {
@@ -26,6 +27,9 @@ import {
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
 } from "~/server/app-layer/traces/filter-to-clickhouse/value-helpers";
+import { redactHiddenAttributes } from "~/server/traces/mappers/redactAttributes";
+import type { Protections } from "~/server/traces/protections";
+import { canReadCapturedContent } from "~/server/traces/protections";
 
 /** The body field a refusal points at. */
 const FIELD_FIELD = "field";
@@ -50,11 +54,73 @@ const DRILLABLE_KEYS: readonly string[] = FACET_REGISTRY.filter(
 ).map((definition) => definition.key);
 
 /**
+ * Refuses the values behind an arbitrary attribute key to a caller who cannot
+ * read captured content.
+ *
+ * A registry facet is a known dimension: a model name, a status, an evaluator
+ * id. An attribute key is whatever the instrumentation put there, and the
+ * gen_ai conventions put prompts and completions in exactly these namespaces.
+ * Listing their distinct values would hand back, one value at a time, what the
+ * trace read path redacts. Attribute KEYS stay readable: a key names a
+ * dimension, and the discovery payload is how a caller learns this project's
+ * vocabulary for the filter language.
+ */
+export class TraceAttributeValuesWithheldError extends HandledError {
+  declare readonly code: "trace_attribute_values_withheld";
+
+  constructor(field: string) {
+    super(
+      "trace_attribute_values_withheld",
+      "Attribute values are not listed for a project that hides captured input or output",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        meta: { field },
+        tips: [
+          "Facet a named field instead, for example `model`, `status` or `evaluator`",
+          "GET /api/traces/facets with no field lists every facet this project has",
+        ],
+      },
+    );
+    this.name = "TraceAttributeValuesWithheldError";
+  }
+}
+
+/**
+ * Whether the caller may read the values behind one attribute key.
+ *
+ * Two rules, both already written elsewhere and asked here rather than
+ * restated: the project must let this viewer read captured content at all, and
+ * the key itself must not match a restrict rule whose audience excludes them.
+ * The second is asked by handing the key to the read path's own redactor and
+ * seeing whether it comes back replaced.
+ */
+function mayReadAttributeValues({
+  key,
+  protections,
+}: {
+  key: string;
+  protections: Protections;
+}): boolean {
+  if (!canReadCapturedContent(protections)) return false;
+  const probe = { [key]: "" };
+  return redactHiddenAttributes(probe, protections.hiddenAttributes) === probe;
+}
+
+/**
  * The key to hand the facet store, given what the caller wrote.
  *
  * @throws RequestValidationError 422 when the field has no values to list.
+ * @throws TraceAttributeValuesWithheldError 403 when the field is an attribute
+ * key and the project withholds captured content.
  */
-export function resolveFacetKey(field: string): string {
+export function resolveFacetKey({
+  field,
+  protections,
+}: {
+  field: string;
+  protections: Protections;
+}): string {
   const trimmed = field.trim();
   const normalized = trimmed.startsWith(TRACE_ATTRIBUTE_PREFIX)
     ? `${TRACE_ATTRIBUTE_PREFIX_LEGACY}${trimmed.slice(TRACE_ATTRIBUTE_PREFIX.length)}`
@@ -62,7 +128,17 @@ export function resolveFacetKey(field: string): string {
 
   for (const prefix of STORE_ATTRIBUTE_PREFIXES) {
     if (!normalized.startsWith(prefix)) continue;
-    if (normalized.length > prefix.length) return normalized;
+    if (normalized.length > prefix.length) {
+      if (
+        !mayReadAttributeValues({
+          key: normalized.slice(prefix.length),
+          protections,
+        })
+      ) {
+        throw new TraceAttributeValuesWithheldError(trimmed);
+      }
+      return normalized;
+    }
     throw refuse({
       field: trimmed,
       message: `\`${prefix}\` needs an attribute key after it, for example \`${prefix}gen_ai.request.model\`.`,

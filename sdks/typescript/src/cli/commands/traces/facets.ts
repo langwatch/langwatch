@@ -64,18 +64,94 @@ function summarise(facet: DiscoverPayload["facets"][number]): string {
     .join(", ");
 }
 
+/** The values answer: one field, its values, and whether more remain. */
+function valuesResult({
+  payload,
+  field,
+}: {
+  payload: FacetValuesPayload;
+  field: string | undefined;
+}): CommandResult {
+  return {
+    data: payload,
+    table: () => {
+      console.log();
+      formatTable({
+        data: payload.values.map((entry) => ({
+          Value: entry.label ?? entry.value,
+          Traces: String(entry.count),
+        })),
+        headers: ["Value", "Traces"],
+        emptyMessage: `Nothing recorded for ${field ?? "that field"} in this window.`,
+      });
+      if (payload.hasMore) {
+        console.log();
+        console.log(
+          chalk.gray(
+            `More values remain. Narrow with ${chalk.cyan("--prefix")} or raise ${chalk.cyan("--limit")}.`,
+          ),
+        );
+      }
+      console.log();
+    },
+  };
+}
+
+/** The discovery answer: every facet this project has, with a taste of each. */
+function discoverResult(discover: DiscoverPayload): CommandResult {
+  return {
+    data: discover,
+    table: () => {
+      console.log();
+      formatTable({
+        data: discover.facets.map((facet) => ({
+          Field: facet.key,
+          Kind: facet.kind,
+          "Top values": summarise(facet),
+        })),
+        headers: ["Field", "Kind", "Top values"],
+        emptyMessage:
+          "No facets yet: this project has no traces in the window.",
+      });
+      if (discover.pending) {
+        console.log();
+        console.log(
+          chalk.yellow(
+            "These values are still being computed. Run the command again shortly for the finished set.",
+          ),
+        );
+      }
+      console.log();
+      console.log(
+        chalk.gray(
+          `One field in full: ${chalk.cyan("langwatch trace facets <field>")}. Every field the language knows: ${chalk.cyan("langwatch trace fields")}.`,
+        ),
+      );
+      console.log();
+    },
+  };
+}
+
+/** `--limit` as a number, or a refusal. */
+function resolveLimit(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const limit = Number(raw);
+  if (!Number.isInteger(limit) || limit < 1) {
+    console.error(
+      chalk.red("Error: --limit must be a whole number of at least 1"),
+    );
+    process.exit(1);
+  }
+  return limit;
+}
+
 export const traceFacetsCommand = async (
   field: string | undefined,
   options: TraceFacetsOptions = {},
 ): Promise<CommandResult | void> => {
   await resolveCredentials({ project: options.project });
 
-  const limit = options.limit === undefined ? undefined : Number(options.limit);
-  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
-    console.error(chalk.red("Error: --limit must be a whole number of at least 1"));
-    process.exit(1);
-  }
-
+  const limit = resolveLimit(options.limit);
   const service = new TracesApiService();
   const spinner = createSpinner(
     field === undefined
@@ -88,7 +164,9 @@ export const traceFacetsCommand = async (
       ...(field === undefined ? {} : { field }),
       ...(options.prefix === undefined ? {} : { prefix: options.prefix }),
       ...(limit === undefined ? {} : { limit }),
-      ...(options.startDate === undefined ? {} : { startDate: options.startDate }),
+      ...(options.startDate === undefined
+        ? {}
+        : { startDate: options.startDate }),
       ...(options.endDate === undefined ? {} : { endDate: options.endDate }),
     });
 
@@ -96,65 +174,14 @@ export const traceFacetsCommand = async (
       spinner.succeed(
         `${payload.values.length} of ${payload.total} value${payload.total !== 1 ? "s" : ""}${payload.hasMore ? ", more remain" : ""}`,
       );
-      return {
-        data: payload,
-        table: () => {
-          console.log();
-          formatTable({
-            data: payload.values.map((entry) => ({
-              Value: entry.label ?? entry.value,
-              Traces: String(entry.count),
-            })),
-            headers: ["Value", "Traces"],
-            emptyMessage: `Nothing recorded for ${field ?? "that field"} in this window.`,
-          });
-          if (payload.hasMore) {
-            console.log();
-            console.log(
-              chalk.gray(
-                `More values remain. Narrow with ${chalk.cyan("--prefix")} or raise ${chalk.cyan("--limit")}.`,
-              ),
-            );
-          }
-          console.log();
-        },
-      };
+      return valuesResult({ payload, field });
     }
 
     const discover = payload as unknown as DiscoverPayload;
     spinner.succeed(
       `${discover.facets.length} facet${discover.facets.length !== 1 ? "s" : ""}${discover.pending ? ", still being computed" : ""}`,
     );
-    return {
-      data: discover,
-      table: () => {
-        console.log();
-        formatTable({
-          data: discover.facets.map((facet) => ({
-            Field: facet.key,
-            Kind: facet.kind,
-            "Top values": summarise(facet),
-          })),
-          headers: ["Field", "Kind", "Top values"],
-          emptyMessage: "No facets yet: this project has no traces in the window.",
-        });
-        if (discover.pending) {
-          console.log();
-          console.log(
-            chalk.yellow(
-              "These values are still being computed. Run the command again shortly for the finished set.",
-            ),
-          );
-        }
-        console.log();
-        console.log(
-          chalk.gray(
-            `One field in full: ${chalk.cyan("langwatch trace facets <field>")}. Every field the language knows: ${chalk.cyan("langwatch trace fields")}.`,
-          ),
-        );
-        console.log();
-      },
-    };
+    return discoverResult(discover);
   } catch (error) {
     failSpinner({ spinner, error, action: "read trace facets" });
     process.exit(1);

@@ -41,9 +41,18 @@ vi.mock("~/server/traces/trace.service", () => ({
   },
 }));
 
+const mockGetProtections = vi.fn();
+
 vi.mock("~/server/api/utils", () => ({
-  getProtectionsForProject: vi.fn().mockResolvedValue({}),
+  getProtectionsForProject: mockGetProtections,
 }));
+
+/** A project that shows captured content and restricts no attribute. */
+const OPEN_PROTECTIONS = {
+  canSeeCosts: true,
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+};
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
@@ -107,6 +116,7 @@ const facets = (query = "") =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetProtections.mockResolvedValue(OPEN_PROTECTIONS);
   mockGetDiscover.mockResolvedValue({
     facets: [
       {
@@ -249,6 +259,91 @@ describe("GET /facets", () => {
       const response = await facets("?field=span.attribute.");
       expect(response.status).toBe(422);
       expect(mockGetFacetValues).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the window is given as epoch milliseconds", () => {
+    /** @scenario "A window bound is accepted as epoch milliseconds or as an ISO string" */
+    it("accepts the digits a query string carries them as", async () => {
+      const response = await facets(
+        "?field=model&startDate=1720000000000&endDate=1720086400000",
+      );
+      expect(response.status).toBe(200);
+      expect(mockGetFacetValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeRange: { from: 1720000000000, to: 1720086400000 },
+        }),
+      );
+    });
+
+    it("accepts an ISO string on the same parameters", async () => {
+      const response = await facets(
+        "?field=model&startDate=2026-09-01T00:00:00.000Z",
+      );
+      expect(response.status).toBe(200);
+      const { timeRange } = mockGetFacetValues.mock.calls[0]?.[0] as {
+        timeRange: { from: number };
+      };
+      expect(timeRange.from).toBe(Date.parse("2026-09-01T00:00:00.000Z"));
+    });
+  });
+
+  describe("when the project withholds captured content", () => {
+    beforeEach(() => {
+      mockGetProtections.mockResolvedValue({
+        ...OPEN_PROTECTIONS,
+        canSeeCapturedInput: false,
+      });
+    });
+
+    /** @scenario "Attribute values are withheld where captured content is" */
+    it("refuses the values behind an attribute key", async () => {
+      const response = await facets(
+        "?field=span.attribute.gen_ai.request.model",
+      );
+      expect(response.status).toBe(403);
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe("trace_attribute_values_withheld");
+      expect(mockGetFacetValues).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Attribute values are withheld where captured content is" */
+    it("still answers a named facet, which is a dimension rather than content", async () => {
+      const response = await facets("?field=model");
+      expect(response.status).toBe(200);
+      expect(mockGetFacetValues).toHaveBeenCalled();
+    });
+
+    /** @scenario "Attribute values are withheld where captured content is" */
+    it("still answers the discovery payload, which lists keys rather than values", async () => {
+      const response = await facets();
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe("when one attribute is restricted to an audience this caller is not in", () => {
+    beforeEach(() => {
+      mockGetProtections.mockResolvedValue({
+        ...OPEN_PROTECTIONS,
+        hiddenAttributes: [
+          { pattern: "gen_ai.prompt", visibleTo: "Security group" },
+        ],
+      });
+    });
+
+    /** @scenario "Attribute values are withheld where captured content is" */
+    it("refuses that key's values", async () => {
+      const response = await facets("?field=span.attribute.gen_ai.prompt");
+      expect(response.status).toBe(403);
+      expect(mockGetFacetValues).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Attribute values are withheld where captured content is" */
+    it("answers a key the rule does not name", async () => {
+      const response = await facets(
+        "?field=span.attribute.gen_ai.request.model",
+      );
+      expect(response.status).toBe(200);
     });
   });
 });

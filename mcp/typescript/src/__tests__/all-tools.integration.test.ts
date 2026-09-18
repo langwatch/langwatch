@@ -416,7 +416,6 @@ function createMockServer(): Server {
       const routeKey = `${method} ${url.split("?")[0]}`;
       lastRequests[routeKey] = { method, url, body };
 
-      // --- Query endpoints ---
       if (url === "/api/v1/query/reference" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(QUERY_REFERENCE_FIXTURE));
@@ -958,9 +957,6 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  // =====================
-  // 3b. run_query
-  // =====================
   describe("run_query", () => {
     describe("when the statement returns rows", () => {
       /** @scenario Agent runs an analytics SQL statement and reads a table */

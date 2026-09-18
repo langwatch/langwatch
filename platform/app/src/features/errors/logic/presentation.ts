@@ -2538,6 +2538,12 @@ const presentations = {
   },
   // The one sharer-facing code here: raised when someone tries to mint a trace
   // link while the project has sharing switched off.
+  trace_attribute_values_withheld: {
+    title: "This project hides captured content",
+    describe: () =>
+      "Attribute values can carry prompts and completions, so they are listed only where captured input and output are visible. Ask a project admin to change what traces capture, or filter on a named field such as model or status.",
+  },
+
   trace_sharing_disabled: {
     title: "Sharing is turned off for this project",
     describe: () =>

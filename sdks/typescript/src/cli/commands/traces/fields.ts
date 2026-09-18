@@ -20,6 +20,7 @@ import {
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
+import { runnableLabel } from "../query/requirements";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
@@ -69,6 +70,9 @@ function printExamples(reference: QueryReferenceResult): void {
   for (const example of examples) {
     console.log(`  ${chalk.cyan(example.text)}`);
     console.log(`    ${chalk.gray(example.title)}`);
+    if (!example.available) {
+      console.log(`    ${chalk.yellow(runnableLabel(example))}`);
+    }
     if (example.notes) console.log(`    ${chalk.gray(example.notes)}`);
     console.log();
   }

@@ -47,12 +47,26 @@ export const MAX_TRACE_FILTER_LENGTH = 4_000;
 const FILTER_FIELD = "filter";
 
 /**
+ * The table a span or event clause reaches into.
+ *
+ * Read back out of the compiled SQL rather than tracked while translating: the
+ * translator is the language's, this rule is the boundary's, and the string it
+ * emits is our own deterministic output rather than a parsed foreign format.
+ */
+const SPAN_SCOPED_TABLE = "stored_spans";
+
+/**
  * Compiles a filter string into the condition the trace read appends, or
  * `undefined` when there is nothing to filter on.
  *
  * An absent filter and an empty one are the same request — a caller building
  * the body from optional parts should not have to strip the key to mean "no
  * filter", and the translator already answers `null` for whitespace.
+ *
+ * A span or event clause is bounded by the span's own start time, so it cannot
+ * ride the `updated` axis: a trace modified today can have started last week,
+ * and the clause would quietly drop it. That combination is refused rather than
+ * answered with a result set missing rows nobody can see are missing.
  *
  * @throws RequestValidationError 422, naming `filter` and — for an unknown
  *   field — the fields the language does have.
@@ -61,16 +75,36 @@ export function compileTraceFilter({
   filter,
   tenantId,
   timeRange,
+  dateField,
 }: {
   filter: string | undefined;
   tenantId: string;
   timeRange: { from: number; to: number };
+  dateField: "occurred" | "updated";
 }): { sql: string; params: Record<string, unknown> } | undefined {
   if (!filter || filter.trim().length === 0) return undefined;
   try {
-    return (
-      translateFilterToClickHouse(filter, tenantId, timeRange) ?? undefined
-    );
+    const compiled =
+      translateFilterToClickHouse(filter, tenantId, timeRange) ?? undefined;
+    if (
+      compiled &&
+      dateField === "updated" &&
+      compiled.sql.includes(SPAN_SCOPED_TABLE)
+    ) {
+      throw new RequestValidationError({
+        target: "json",
+        violations: [
+          {
+            field: FILTER_FIELD,
+            type: "filter_unsupported_on_updated_axis",
+            message:
+              'A span, event or free-text clause matches spans by when they started, and `dateField: "updated"` selects traces by when they were last modified. A trace modified inside the window can have spans older than it, so the two together would drop traces silently. Filter on trace-level fields instead, or pull on the `occurred` axis.',
+            received: filter,
+          },
+        ],
+      });
+    }
+    return compiled;
   } catch (error) {
     if (error instanceof FilterFieldUnknownError) {
       const field = error.meta?.field;

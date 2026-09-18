@@ -752,6 +752,63 @@ describe("POST /search with a trace filter", () => {
     });
   });
 
+  describe("when a span clause rides the updated axis", () => {
+    /**
+     * A span clause matches spans by when they started; the updated axis
+     * selects traces by when they were last modified. A trace modified today
+     * can have started last week, and combining the two would drop it with
+     * nothing in the response to say so.
+     */
+    /** @scenario "A span clause is refused on the updated axis rather than silently dropping traces" */
+    it("answers 422 rather than a result set missing rows", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        dateField: "updated",
+        filter: "span.attribute.gen_ai.request.model:gpt-5-mini",
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as {
+        fields: string[];
+        reasons: { meta: { type: string } }[];
+      };
+      expect(body.fields).toEqual(["filter"]);
+      expect(body.reasons[0]?.meta.type).toBe(
+        "filter_unsupported_on_updated_axis",
+      );
+      expect(mockGetAllTracesForProject).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A span clause is refused on the updated axis rather than silently dropping traces" */
+    it("allows a trace-level clause on the same axis", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        dateField: "updated",
+        filter: "status:error",
+      });
+      expect(res.status).toBe(200);
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: { sql: string };
+      };
+      expect(options.filterWhere?.sql).toContain("ContainsErrorStatus");
+    });
+
+    /** @scenario "A span clause is refused on the updated axis rather than silently dropping traces" */
+    it("allows the same span clause on the occurred axis", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "span.attribute.gen_ai.request.model:gpt-5-mini",
+      });
+      expect(res.status).toBe(200);
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: { sql: string };
+      };
+      expect(options.filterWhere?.sql).toContain("stored_spans");
+    });
+  });
+
   describe("when the filter names a field the language does not have", () => {
     /** @scenario "A filter naming an unknown field lists the fields that exist" */
     it("answers 422 and names the fields that exist", async () => {

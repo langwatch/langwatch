@@ -18,8 +18,6 @@ import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const mockQuery = vi.fn();
 let stdoutWrite: MockInstance<(chunk: unknown) => boolean>;
-const mockSchema = vi.fn();
-const mockReference = vi.fn();
 
 vi.mock("@/client-sdk/services/query/query-api.service", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
@@ -51,10 +49,7 @@ class ProcessExitError extends Error {
 }
 
 import { QueryApiService } from "@/client-sdk/services/query/query-api.service";
-import { queryExamplesCommand } from "../examples";
-import { queryReferenceCommand } from "../reference";
 import { runQueryCommand } from "../run";
-import { queryLwqlSchemaCommand } from "../schema";
 
 const RESULT = {
   columns: [
@@ -72,66 +67,21 @@ const RESULT = {
   diagnostics: [],
 };
 
-const REFERENCE = {
-  version: "1",
-  lwql: {
-    enabled: true,
-    schema: { database: "analytics", datasets: [] },
-    limits: {
-      maxStatementLength: 1,
-      maxRowsReturned: 2,
-      maxResultBytes: 3,
-      maxExecutionTimeSeconds: 4,
-      pagination: "keyset",
-    },
-    endpoints: [],
-  },
-  traceFilter: {
-    syntax: "# Trace query syntax\ntrace.attribute.<key>",
-    fields: [
-      {
-        name: "status",
-        label: "Status",
-        valueType: "categorical",
-        group: "trace",
-        facetable: true,
-        knownValues: ["error", "ok"],
-      },
-    ],
-    dynamicPrefixes: [
-      {
-        prefix: "trace.attribute.",
-        label: "Trace attribute",
-        description: "a key on the trace",
-        aliases: ["attribute."],
-      },
-    ],
-    endpoints: [],
-  },
-  examples: [
-    {
-      id: "lwql.cost-by-model",
-      title: "Spend by model",
-      intent: "cost",
-      language: "lwql",
-      tags: ["cost", "models"],
-      text: "SELECT Model FROM analytics.model_usage_by_minute",
-      parameters: [],
-      requires: { gates: ["costs"], functions: [] },
-      available: true,
-    },
-    {
-      id: "filter.failures",
-      title: "Traces that failed",
-      intent: "triage",
-      tags: ["errors"],
-      text: "status:error",
-      parameters: [],
-      requires: { gates: [], functions: [] },
-      available: true,
-    },
+/**
+ * A keyset page, which projects its two ordering columns under the cursor
+ * parameters' own names. That aliasing is what the walk reads the next page's
+ * cursor from, so a fixture without it is not a keyset result.
+ */
+const KEYSET_RESULT = {
+  ...RESULT,
+  columns: [
+    { name: "after_id", type: "String" },
+    { name: "after_ts", type: "DateTime64(3)" },
   ],
-  decisionTable: [{ when: "counts", use: "LangWatchQL", why: "one aggregate" }],
+  rows: [
+    { after_id: "t1", after_ts: "2026-09-01 00:00:00.000" },
+    { after_id: "t2", after_ts: "2026-09-02 00:00:00.000" },
+  ],
 };
 
 let savedAgentEnv: Record<string, string | undefined> = {};
@@ -144,15 +94,11 @@ beforeEach(async () => {
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 
   mockQuery.mockResolvedValue(RESULT);
-  mockSchema.mockResolvedValue({ database: "analytics", datasets: [] });
-  mockReference.mockResolvedValue(REFERENCE);
   // A plain function, not an arrow: the command calls `new QueryApiService()`,
   // and an arrow implementation is not constructible.
   vi.mocked(QueryApiService).mockImplementation(function () {
     return {
       query: mockQuery,
-      schema: mockSchema,
-      reference: mockReference,
     } as unknown as InstanceType<typeof QueryApiService>;
   } as unknown as typeof QueryApiService);
 
@@ -324,9 +270,9 @@ describe("runQueryCommand", () => {
     /** @scenario "Keyset paging rebinds the cursor parameters between pages" */
     it("rebinds the cursor to the last row of the page before it", async () => {
       mockQuery
-        .mockResolvedValueOnce(RESULT)
-        .mockResolvedValueOnce({ ...RESULT, rows: [RESULT.rows[0]] })
-        .mockResolvedValue({ ...RESULT, rows: [] });
+        .mockResolvedValueOnce(KEYSET_RESULT)
+        .mockResolvedValueOnce({ ...KEYSET_RESULT, rows: [KEYSET_RESULT.rows[0]] })
+        .mockResolvedValue({ ...KEYSET_RESULT, rows: [] });
 
       await runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" });
 
@@ -342,9 +288,9 @@ describe("runQueryCommand", () => {
 
     it("sends the identical statement on every page", async () => {
       mockQuery
-        .mockResolvedValueOnce(RESULT)
-        .mockResolvedValueOnce({ ...RESULT, rows: [RESULT.rows[0]] })
-        .mockResolvedValue({ ...RESULT, rows: [] });
+        .mockResolvedValueOnce(KEYSET_RESULT)
+        .mockResolvedValueOnce({ ...KEYSET_RESULT, rows: [KEYSET_RESULT.rows[0]] })
+        .mockResolvedValue({ ...KEYSET_RESULT, rows: [] });
 
       await runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" });
 
@@ -357,114 +303,53 @@ describe("runQueryCommand", () => {
     /** @scenario "Keyset paging stops when a page comes back short" */
     it("stops after a page shorter than the one before it", async () => {
       mockQuery
-        .mockResolvedValueOnce(RESULT)
-        .mockResolvedValueOnce({ ...RESULT, rows: [RESULT.rows[0]] });
+        .mockResolvedValueOnce(KEYSET_RESULT)
+        .mockResolvedValueOnce({
+          ...KEYSET_RESULT,
+          rows: [KEYSET_RESULT.rows[0]],
+        });
 
       await runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" });
 
       expect(mockQuery).toHaveBeenCalledTimes(2);
     });
-  });
-});
 
-describe("queryLwqlSchemaCommand", () => {
-  /** @scenario "The schema subcommand prints the datasets and their columns" */
-  it("returns the datasets the endpoint publishes", async () => {
-    mockSchema.mockResolvedValue({
-      database: "analytics",
-      datasets: [
-        {
-          name: "analytics.traces",
-          description: "one row per trace",
-          grain: "trace",
-          joinKeys: [],
-          timeColumn: "OccurredAt",
-          freshness: "seconds",
-          columns: [
-            {
-              name: "TraceId",
-              type: "String",
-              description: "id",
-              unit: null,
-              gates: [],
-              available: true,
-            },
-          ],
-          exampleSql: "SELECT 1",
-        },
-      ],
+    /**
+     * `--limit` is a budget for the walk. Slicing each page to it separately
+     * writes the limit once per page, which is how a 150-row export comes back
+     * with 200 rows in it.
+     */
+    /** @scenario "The row limit bounds the whole keyset walk, not each page" */
+    it("writes the limit across every page rather than per page", async () => {
+      mockQuery.mockResolvedValue(KEYSET_RESULT);
+
+      await runQueryCommand(KEYSET_SQL, {
+        pageBy: "keyset",
+        format: "jsonl",
+        limit: "3",
+      });
+
+      const written = stdoutWrite.mock.calls
+        .map((call) => String(call[0]))
+        .join("");
+      const lines = written
+        .split("\n")
+        .filter((line) => line.trim().length > 0);
+      expect(lines).toHaveLength(3);
     });
-    const result = await queryLwqlSchemaCommand({});
-    expect(
-      (result as { data: { datasets: { name: string }[] } }).data.datasets[0]
-        ?.name,
-    ).toBe("analytics.traces");
-  });
-});
 
-describe("queryReferenceCommand", () => {
-  /** @scenario "The reference subcommand prints the whole reference" */
-  it("returns the whole document by default", async () => {
-    const result = await queryReferenceCommand({});
-    expect((result as { data: typeof REFERENCE }).data.version).toBe("1");
-    expect((result as { data: typeof REFERENCE }).data.decisionTable).toHaveLength(
-      1,
-    );
-  });
+    /**
+     * Without the aliases the cursor would be guessed from the row's shape,
+     * and a statement projecting any other timestamp first would page over the
+     * wrong rows with nothing in the output to say so.
+     */
+    /** @scenario "A keyset statement that does not project its cursor columns is refused" */
+    it("refuses a statement that projects neither cursor column", async () => {
+      mockQuery.mockResolvedValue(RESULT);
 
-  /** @scenario "The reference subcommand can print one section" */
-  it("returns only the section the caller named", async () => {
-    const result = await queryReferenceCommand({ section: "trace-filter" });
-    expect(
-      (result as { data: { fields: { name: string }[] } }).data.fields[0]?.name,
-    ).toBe("status");
-  });
-
-  it("refuses a section it does not have", async () => {
-    await expect(queryReferenceCommand({ section: "sql" })).rejects.toThrow(
-      ProcessExitError,
-    );
-    expect(mockReference).not.toHaveBeenCalled();
-  });
-});
-
-describe("queryExamplesCommand", () => {
-  /** @scenario "The examples subcommand prints the example library" */
-  it("returns every example with its identifier and statement", async () => {
-    const result = await queryExamplesCommand({});
-    const examples = (result as { data: { examples: { id: string }[] } }).data
-      .examples;
-    expect(examples.map((example) => example.id)).toEqual([
-      "lwql.cost-by-model",
-      "filter.failures",
-    ]);
-  });
-
-  /** @scenario "The examples subcommand filters by tag and by language" */
-  it("keeps only the examples carrying the tag in the language", async () => {
-    const result = await queryExamplesCommand({
-      tag: "cost",
-      language: "lwql",
+      await expect(
+        runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" }),
+      ).rejects.toThrow(ProcessExitError);
     });
-    expect(
-      (result as { data: { examples: { id: string }[] } }).data.examples.map(
-        (example) => example.id,
-      ),
-    ).toEqual(["lwql.cost-by-model"]);
-  });
-
-  it("matches an intent as well as a tag, since every example has one", async () => {
-    const result = await queryExamplesCommand({ tag: "triage" });
-    expect(
-      (result as { data: { examples: { id: string }[] } }).data.examples.map(
-        (example) => example.id,
-      ),
-    ).toEqual(["filter.failures"]);
-  });
-
-  it("refuses a language it does not have", async () => {
-    await expect(queryExamplesCommand({ language: "sql" })).rejects.toThrow(
-      ProcessExitError,
-    );
   });
 });

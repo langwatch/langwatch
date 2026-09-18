@@ -5,7 +5,7 @@ Feature: The trace filter language and its value discovery over the API key surf
   And to read the values a field actually holds
   So that I can find traces without a browser and without guessing values
 
-  The Trace Explorer's search bar is a query language (liqe, Lucene-flavoured)
+  The Trace Explorer's search bar is a query language (liqe, Lucene-flavored)
   with about fifty named fields plus three open-ended attribute namespaces. Until
   now it reached only over tRPC, so an API-key caller had the legacy filter map
   and a free-text query, and the value lists had no door at all. That is why
@@ -121,3 +121,29 @@ Feature: The trace filter language and its value discovery over the API key surf
     Then it prints every field with its label, value type and group
     And with the syntax flag it prints the language's syntax document
     And with the examples flag it prints the filter examples from the reference library
+
+  @unit
+  Scenario: A window bound is accepted as epoch milliseconds or as an ISO string
+    Given a caller asking for one field's values over a window
+    When the window bounds arrive on the query string as epoch milliseconds
+    Then they are read as the same instants an ISO string would name
+
+  @unit
+  Scenario: Attribute values are withheld where captured content is
+    Given a project that hides captured input or output from this caller
+    When the caller asks for the values behind an attribute key
+    Then the request is refused, because an attribute can carry a prompt
+    But a named facet and the discovery payload are still answered
+
+  @unit
+  Scenario: A span clause is refused on the updated axis rather than silently dropping traces
+    Given a search pulling by when traces were last modified
+    When the filter carries a clause that matches spans by when they started
+    Then the request is refused, naming the filter field
+    But a clause over trace fields alone runs on the same axis
+
+  @integration
+  Scenario: Every published filter example runs against the real schema
+    Given the filter examples the reference publishes
+    When each one is compiled and sent to ClickHouse
+    Then the database accepts every one of them

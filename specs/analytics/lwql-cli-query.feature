@@ -156,3 +156,15 @@ Feature: Running LangWatchQL from the CLI
   Scenario: The query family is claimed by the feature map
     When the CLI's command tree is compared with the feature map
     Then every query command the CLI registers is declared
+
+  @unit
+  Scenario: The row limit bounds the whole keyset walk, not each page
+    Given a keyset statement whose pages are larger than the row limit
+    When the walk runs
+    Then it writes the limit once, across every page together
+
+  @unit
+  Scenario: A keyset statement that does not project its cursor columns is refused
+    Given a keyset statement projecting neither cursor column
+    When the walk reads its first page
+    Then the command refuses rather than guessing the cursor from the row

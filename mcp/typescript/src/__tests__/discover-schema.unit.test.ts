@@ -73,7 +73,11 @@ describe("formatSchema()", () => {
       const example = reference.examples.find(
         (candidate) => candidate.language === "trace-filter",
       );
-      expect(result).toContain(example?.text ?? "");
+      // Asserted before it is used: `toContain(undefined ?? "")` passes against
+      // any string at all, so a fixture that lost its filter examples would
+      // read as a rendering that still shows them.
+      expect(example).toBeDefined();
+      expect(result).toContain(example?.text);
     });
   });
 
@@ -91,7 +95,10 @@ describe("formatSchema()", () => {
       const example = reference.examples.find(
         (candidate) => candidate.language === "lwql",
       );
-      expect(result).toContain(example?.text.split("\n")[0] ?? "");
+      expect(example).toBeDefined();
+      const firstLine = example?.text.split("\n")[0];
+      expect(firstLine).toBeTruthy();
+      expect(result).toContain(firstLine);
     });
 
     it("says the statement is run as written", async () => {
@@ -194,7 +201,9 @@ describe("formatSchema()", () => {
     it("says which language answers which question", async () => {
       const result = await formatSchema("all", reference);
       expect(result).toContain("## Which one to reach for");
-      expect(result).toContain(reference.decisionTable[0]?.when ?? "");
+      const first = reference.decisionTable[0];
+      expect(first).toBeDefined();
+      expect(result).toContain(first?.when);
     });
   });
 });

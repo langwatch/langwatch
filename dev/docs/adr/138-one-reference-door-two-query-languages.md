@@ -13,10 +13,10 @@ It answers counts, rates, groupings, time series and joins, over
 `analytics.traces`, `analytics.spans`, `analytics.trace_metrics` and the
 per-minute rollups. It returns columns.
 
-The trace filter is a Lucene-flavoured string (liqe) over one trace list. It has
+The trace filter is a Lucene-flavored string (liqe) over one trace list. It has
 about fifty named fields plus three open-ended attribute namespaces, reaches
 span events and evaluator verdicts, and returns whole traces with their spans.
-It already persists as a durable artefact: `Trigger.filterQuery` stores one
+It already persists as a durable artifact: `Trigger.filterQuery` stores one
 (ADR-043), and so does a saved view.
 
 A question belongs to one or the other, and picking wrong is expensive. An agent
@@ -57,13 +57,21 @@ MCP server's committed fixture be generated from it.
 
 **Four rules follow from wanting one door rather than two descriptions.**
 
-*Every published query is executed, not reviewed.* The two example libraries
-(`server/analytics/lwql/examples` and
-`app-layer/traces/query-language/examples.ts`) are asserted runnable: each
+*Every published query is checked by machine, not by reading.* The two example
+libraries (`server/analytics/lwql/examples` and
+`app-layer/traces/query-language/examples.ts`) are pinned by a test: each
 LangWatchQL statement goes through the real validator against the real catalog,
 and each filter string through the real parser, the real semantic check and the
-real ClickHouse compiler. A published example the API would refuse is worse than
-no example, because it costs its reader a round trip to find that out.
+real ClickHouse compiler. A published example the API would refuse on sight is
+worse than no example, because it costs its reader a round trip to find that
+out.
+
+That is a build-time check and it is not the same claim as "this runs for you".
+A statement can pass the validator and still be unavailable to a caller, which
+is what `available` on each example says: the column gates this key does not
+hold, or a project with no LangWatchQL surface at all. Unavailable examples stay
+published, with their requirements intact, because the requirement is the useful
+part of the answer.
 
 *Live values are not in the reference.* The values a field actually holds are
 tenant data, they move under the caller, and reading them all costs about thirty
@@ -94,7 +102,7 @@ field's values with it.
 
 **`GET /api/traces/facets` takes no `filter`.** The facet compute spans three
 tables (`trace_summaries`, `stored_spans`, `evaluation_runs`) and the filter
-translates only against `trace_summaries ts`, so a filter could be honoured on
+translates only against `trace_summaries ts`, so a filter could be honored on
 some facets and silently ignored on others. Value discovery is over the whole
 window, and the reference says so.
 

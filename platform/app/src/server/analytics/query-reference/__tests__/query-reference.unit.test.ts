@@ -297,6 +297,65 @@ describe("the query reference", () => {
     it("leaves the trace filter section intact", () => {
       expect(document.traceFilter.fields.length).toBeGreaterThan(0);
     });
+
+    /**
+     * A reader that branches on `available` per example, rather than on the
+     * section flag, would otherwise be told a statement is runnable on a
+     * project with no surface to run it on.
+     */
+    /** @scenario "The LangWatchQL section says whether the surface is open to this project" */
+    it("marks every SQL example unavailable", () => {
+      const sql = document.examples.filter(
+        (example) => example.language === "lwql",
+      );
+      expect(sql.length).toBeGreaterThan(0);
+      expect(sql.every((example) => !example.available)).toBe(true);
+    });
+
+    /** @scenario "The LangWatchQL section says whether the surface is open to this project" */
+    it("leaves the filter examples runnable, which the surface does not gate", () => {
+      const filters = document.examples.filter(
+        (example) => example.language === "trace-filter",
+      );
+      expect(filters.every((example) => example.available)).toBe(true);
+    });
+  });
+});
+
+describe("given a deployment serving the views from another database", () => {
+  const document = describeQueryReference({
+    protections: EVERYTHING,
+    lwqlEnabled: true,
+    database: "lwql_test_db",
+  });
+
+  /**
+   * The schema section already names every dataset under the deployment's own
+   * qualifier. An example still naming `analytics.` would be a published
+   * statement pointing at a database the caller cannot reach.
+   */
+  /** @scenario "Examples name the database this deployment serves" */
+  it("qualifies every SQL example with that database", () => {
+    const sql = document.examples.filter(
+      (example) => example.language === "lwql",
+    );
+    expect(sql.length).toBeGreaterThan(0);
+    for (const example of sql) {
+      expect(example.text).not.toContain("analytics.");
+    }
+    expect(sql.some((example) => example.text.includes("lwql_test_db."))).toBe(
+      true,
+    );
+  });
+
+  /** @scenario "Examples name the database this deployment serves" */
+  it("leaves the filter examples alone, which name no database", () => {
+    const filters = document.examples.filter(
+      (example) => example.language === "trace-filter",
+    );
+    for (const example of filters) {
+      expect(example.text).not.toContain("lwql_test_db");
+    }
   });
 });
 

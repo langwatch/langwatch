@@ -38555,8 +38555,14 @@ datasets. It returns columns, not traces.
 
 `GET /api/v1/query/reference` describes both languages in one payload: the SQL
 datasets and columns, the filter fields and syntax, worked examples in each, and
-the decision table above. Every example in it is checked against the validator
-and the translator on every build, so an example it publishes runs.
+the decision table above.
+
+Every example goes through the real validator and the real translator on every
+build, so a published example is never one the API would refuse on sight.
+
+Whether your key can run a given example is a separate question, and each
+example answers it. `available` is false when a column it reads is withheld
+from you, and `requires` says what it would take.
 
 ```bash
 langwatch query reference

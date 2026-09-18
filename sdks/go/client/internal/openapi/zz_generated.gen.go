@@ -10867,31 +10867,12 @@ func (e PostApiScenarioEventsJSONBody0MetadataLangwatchActorLabel) Valid() bool 
 	}
 }
 
-// Defines values for PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind.
-const (
-	Human     PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind = "human"
-	Simulated PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind = "simulated"
-)
-
-// Valid indicates whether the value is a known member of the PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind enum.
-func (e PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind) Valid() bool {
-	switch e {
-	case Human:
-		return true
-	case Simulated:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType.
 const (
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeCode      PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "code"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeConnected PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "connected"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeHttp      PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "http"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypePrompt    PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "prompt"
-	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeVoice     PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "voice"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeWorkflow  PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "workflow"
 )
 
@@ -10905,8 +10886,6 @@ func (e PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType) Valid() bool 
 	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeHttp:
 		return true
 	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypePrompt:
-		return true
-	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeVoice:
 		return true
 	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeWorkflow:
 		return true
@@ -10980,16 +10959,15 @@ func (e PostApiScenarioEventsJSONBody1ResultsVerdict) Valid() bool {
 
 // Defines values for PostApiScenarioEventsJSONBody1Status.
 const (
-	CANCELLED         PostApiScenarioEventsJSONBody1Status = "CANCELLED"
-	ERROR             PostApiScenarioEventsJSONBody1Status = "ERROR"
-	FAILED            PostApiScenarioEventsJSONBody1Status = "FAILED"
-	INPROGRESS        PostApiScenarioEventsJSONBody1Status = "IN_PROGRESS"
-	PENDING           PostApiScenarioEventsJSONBody1Status = "PENDING"
-	PENDINGEVALUATION PostApiScenarioEventsJSONBody1Status = "PENDING_EVALUATION"
-	QUEUED            PostApiScenarioEventsJSONBody1Status = "QUEUED"
-	RUNNING           PostApiScenarioEventsJSONBody1Status = "RUNNING"
-	STALLED           PostApiScenarioEventsJSONBody1Status = "STALLED"
-	SUCCESS           PostApiScenarioEventsJSONBody1Status = "SUCCESS"
+	CANCELLED  PostApiScenarioEventsJSONBody1Status = "CANCELLED"
+	ERROR      PostApiScenarioEventsJSONBody1Status = "ERROR"
+	FAILED     PostApiScenarioEventsJSONBody1Status = "FAILED"
+	INPROGRESS PostApiScenarioEventsJSONBody1Status = "IN_PROGRESS"
+	PENDING    PostApiScenarioEventsJSONBody1Status = "PENDING"
+	QUEUED     PostApiScenarioEventsJSONBody1Status = "QUEUED"
+	RUNNING    PostApiScenarioEventsJSONBody1Status = "RUNNING"
+	STALLED    PostApiScenarioEventsJSONBody1Status = "STALLED"
+	SUCCESS    PostApiScenarioEventsJSONBody1Status = "SUCCESS"
 )
 
 // Valid indicates whether the value is a known member of the PostApiScenarioEventsJSONBody1Status enum.
@@ -11004,8 +10982,6 @@ func (e PostApiScenarioEventsJSONBody1Status) Valid() bool {
 	case INPROGRESS:
 		return true
 	case PENDING:
-		return true
-	case PENDINGEVALUATION:
 		return true
 	case QUEUED:
 		return true
@@ -11515,7 +11491,6 @@ const (
 	GetApiSuites200JSONResponseBodyTargetsTypeConnected GetApiSuites200JSONResponseBodyTargetsType = "connected"
 	GetApiSuites200JSONResponseBodyTargetsTypeHttp      GetApiSuites200JSONResponseBodyTargetsType = "http"
 	GetApiSuites200JSONResponseBodyTargetsTypePrompt    GetApiSuites200JSONResponseBodyTargetsType = "prompt"
-	GetApiSuites200JSONResponseBodyTargetsTypeVoice     GetApiSuites200JSONResponseBodyTargetsType = "voice"
 	GetApiSuites200JSONResponseBodyTargetsTypeWorkflow  GetApiSuites200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -11529,8 +11504,6 @@ func (e GetApiSuites200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuites200JSONResponseBodyTargetsTypeHttp:
 		return true
 	case GetApiSuites200JSONResponseBodyTargetsTypePrompt:
-		return true
-	case GetApiSuites200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case GetApiSuites200JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -11623,7 +11596,6 @@ const (
 	PostApiSuitesJSONBodyTargetsTypeConnected PostApiSuitesJSONBodyTargetsType = "connected"
 	PostApiSuitesJSONBodyTargetsTypeHttp      PostApiSuitesJSONBodyTargetsType = "http"
 	PostApiSuitesJSONBodyTargetsTypePrompt    PostApiSuitesJSONBodyTargetsType = "prompt"
-	PostApiSuitesJSONBodyTargetsTypeVoice     PostApiSuitesJSONBodyTargetsType = "voice"
 	PostApiSuitesJSONBodyTargetsTypeWorkflow  PostApiSuitesJSONBodyTargetsType = "workflow"
 )
 
@@ -11637,8 +11609,6 @@ func (e PostApiSuitesJSONBodyTargetsType) Valid() bool {
 	case PostApiSuitesJSONBodyTargetsTypeHttp:
 		return true
 	case PostApiSuitesJSONBodyTargetsTypePrompt:
-		return true
-	case PostApiSuitesJSONBodyTargetsTypeVoice:
 		return true
 	case PostApiSuitesJSONBodyTargetsTypeWorkflow:
 		return true
@@ -11731,7 +11701,6 @@ const (
 	PostApiSuites201JSONResponseBodyTargetsTypeConnected PostApiSuites201JSONResponseBodyTargetsType = "connected"
 	PostApiSuites201JSONResponseBodyTargetsTypeHttp      PostApiSuites201JSONResponseBodyTargetsType = "http"
 	PostApiSuites201JSONResponseBodyTargetsTypePrompt    PostApiSuites201JSONResponseBodyTargetsType = "prompt"
-	PostApiSuites201JSONResponseBodyTargetsTypeVoice     PostApiSuites201JSONResponseBodyTargetsType = "voice"
 	PostApiSuites201JSONResponseBodyTargetsTypeWorkflow  PostApiSuites201JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -11745,8 +11714,6 @@ func (e PostApiSuites201JSONResponseBodyTargetsType) Valid() bool {
 	case PostApiSuites201JSONResponseBodyTargetsTypeHttp:
 		return true
 	case PostApiSuites201JSONResponseBodyTargetsTypePrompt:
-		return true
-	case PostApiSuites201JSONResponseBodyTargetsTypeVoice:
 		return true
 	case PostApiSuites201JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -11839,7 +11806,6 @@ const (
 	GetApiSuitesById200JSONResponseBodyTargetsTypeConnected GetApiSuitesById200JSONResponseBodyTargetsType = "connected"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeHttp      GetApiSuitesById200JSONResponseBodyTargetsType = "http"
 	GetApiSuitesById200JSONResponseBodyTargetsTypePrompt    GetApiSuitesById200JSONResponseBodyTargetsType = "prompt"
-	GetApiSuitesById200JSONResponseBodyTargetsTypeVoice     GetApiSuitesById200JSONResponseBodyTargetsType = "voice"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeWorkflow  GetApiSuitesById200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -11853,8 +11819,6 @@ func (e GetApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeHttp:
 		return true
 	case GetApiSuitesById200JSONResponseBodyTargetsTypePrompt:
-		return true
-	case GetApiSuitesById200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -11929,7 +11893,6 @@ const (
 	PatchApiSuitesByIdJSONBodyTargetsTypeConnected PatchApiSuitesByIdJSONBodyTargetsType = "connected"
 	PatchApiSuitesByIdJSONBodyTargetsTypeHttp      PatchApiSuitesByIdJSONBodyTargetsType = "http"
 	PatchApiSuitesByIdJSONBodyTargetsTypePrompt    PatchApiSuitesByIdJSONBodyTargetsType = "prompt"
-	PatchApiSuitesByIdJSONBodyTargetsTypeVoice     PatchApiSuitesByIdJSONBodyTargetsType = "voice"
 	PatchApiSuitesByIdJSONBodyTargetsTypeWorkflow  PatchApiSuitesByIdJSONBodyTargetsType = "workflow"
 )
 
@@ -11943,8 +11906,6 @@ func (e PatchApiSuitesByIdJSONBodyTargetsType) Valid() bool {
 	case PatchApiSuitesByIdJSONBodyTargetsTypeHttp:
 		return true
 	case PatchApiSuitesByIdJSONBodyTargetsTypePrompt:
-		return true
-	case PatchApiSuitesByIdJSONBodyTargetsTypeVoice:
 		return true
 	case PatchApiSuitesByIdJSONBodyTargetsTypeWorkflow:
 		return true
@@ -12037,7 +11998,6 @@ const (
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeConnected PatchApiSuitesById200JSONResponseBodyTargetsType = "connected"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeHttp      PatchApiSuitesById200JSONResponseBodyTargetsType = "http"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypePrompt    PatchApiSuitesById200JSONResponseBodyTargetsType = "prompt"
-	PatchApiSuitesById200JSONResponseBodyTargetsTypeVoice     PatchApiSuitesById200JSONResponseBodyTargetsType = "voice"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeWorkflow  PatchApiSuitesById200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -12051,8 +12011,6 @@ func (e PatchApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeHttp:
 		return true
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypePrompt:
-		return true
-	case PatchApiSuitesById200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -12145,7 +12103,6 @@ const (
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnected PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "connected"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeHttp      PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "http"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypePrompt    PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "prompt"
-	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeVoice     PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "voice"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeWorkflow  PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -12160,8 +12117,6 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType) Valid() bool {
 		return true
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypePrompt:
 		return true
-	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeVoice:
-		return true
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeWorkflow:
 		return true
 	default:
@@ -12175,7 +12130,6 @@ const (
 	PostApiSuitesByIdRunJSONBodyTargetsTypeConnected PostApiSuitesByIdRunJSONBodyTargetsType = "connected"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeHttp      PostApiSuitesByIdRunJSONBodyTargetsType = "http"
 	PostApiSuitesByIdRunJSONBodyTargetsTypePrompt    PostApiSuitesByIdRunJSONBodyTargetsType = "prompt"
-	PostApiSuitesByIdRunJSONBodyTargetsTypeVoice     PostApiSuitesByIdRunJSONBodyTargetsType = "voice"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeWorkflow  PostApiSuitesByIdRunJSONBodyTargetsType = "workflow"
 )
 
@@ -12190,8 +12144,6 @@ func (e PostApiSuitesByIdRunJSONBodyTargetsType) Valid() bool {
 		return true
 	case PostApiSuitesByIdRunJSONBodyTargetsTypePrompt:
 		return true
-	case PostApiSuitesByIdRunJSONBodyTargetsTypeVoice:
-		return true
 	case PostApiSuitesByIdRunJSONBodyTargetsTypeWorkflow:
 		return true
 	default:
@@ -12205,7 +12157,6 @@ const (
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnected PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "connected"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeHttp      PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "http"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypePrompt    PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "prompt"
-	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeVoice     PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "voice"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeWorkflow  PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "workflow"
 )
 
@@ -12219,8 +12170,6 @@ func (e PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType) Valid() bool {
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeHttp:
 		return true
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypePrompt:
-		return true
-	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeWorkflow:
 		return true
@@ -12268,6 +12217,51 @@ func (e GetApiTracesFacets200JSONResponseBody0FacetsKind) Valid() bool {
 	case GetApiTracesFacets200JSONResponseBody0FacetsKindDynamicKeys:
 		return true
 	case GetApiTracesFacets200JSONResponseBody0FacetsKindRange:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTracesFacets403JSONResponseBodyError.
+const (
+	TraceAttributeValuesWithheld GetApiTracesFacets403JSONResponseBodyError = "trace_attribute_values_withheld"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTracesFacets403JSONResponseBodyError enum.
+func (e GetApiTracesFacets403JSONResponseBodyError) Valid() bool {
+	switch e {
+	case TraceAttributeValuesWithheld:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTracesFacets422JSONResponseBodyError.
+const (
+	ValidationError GetApiTracesFacets422JSONResponseBodyError = "validation_error"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTracesFacets422JSONResponseBodyError enum.
+func (e GetApiTracesFacets422JSONResponseBodyError) Valid() bool {
+	switch e {
+	case ValidationError:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTracesFacets422JSONResponseBodyTarget.
+const (
+	Query GetApiTracesFacets422JSONResponseBodyTarget = "query"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTracesFacets422JSONResponseBodyTarget enum.
+func (e GetApiTracesFacets422JSONResponseBodyTarget) Valid() bool {
+	switch e {
+	case Query:
 		return true
 	default:
 		return false
@@ -12712,7 +12706,6 @@ const (
 	ListAgents200JSONResponseBodyDataTypeConnected ListAgents200JSONResponseBodyDataType = "connected"
 	ListAgents200JSONResponseBodyDataTypeHttp      ListAgents200JSONResponseBodyDataType = "http"
 	ListAgents200JSONResponseBodyDataTypeSignature ListAgents200JSONResponseBodyDataType = "signature"
-	ListAgents200JSONResponseBodyDataTypeVoice     ListAgents200JSONResponseBodyDataType = "voice"
 	ListAgents200JSONResponseBodyDataTypeWorkflow  ListAgents200JSONResponseBodyDataType = "workflow"
 )
 
@@ -12727,8 +12720,6 @@ func (e ListAgents200JSONResponseBodyDataType) Valid() bool {
 		return true
 	case ListAgents200JSONResponseBodyDataTypeSignature:
 		return true
-	case ListAgents200JSONResponseBodyDataTypeVoice:
-		return true
 	case ListAgents200JSONResponseBodyDataTypeWorkflow:
 		return true
 	default:
@@ -12742,7 +12733,6 @@ const (
 	CreateAgentJSONBodyTypeConnected CreateAgentJSONBodyType = "connected"
 	CreateAgentJSONBodyTypeHttp      CreateAgentJSONBodyType = "http"
 	CreateAgentJSONBodyTypeSignature CreateAgentJSONBodyType = "signature"
-	CreateAgentJSONBodyTypeVoice     CreateAgentJSONBodyType = "voice"
 	CreateAgentJSONBodyTypeWorkflow  CreateAgentJSONBodyType = "workflow"
 )
 
@@ -12756,8 +12746,6 @@ func (e CreateAgentJSONBodyType) Valid() bool {
 	case CreateAgentJSONBodyTypeHttp:
 		return true
 	case CreateAgentJSONBodyTypeSignature:
-		return true
-	case CreateAgentJSONBodyTypeVoice:
 		return true
 	case CreateAgentJSONBodyTypeWorkflow:
 		return true
@@ -12829,7 +12817,6 @@ const (
 	CreateAgent201JSONResponseBodyTypeConnected CreateAgent201JSONResponseBodyType = "connected"
 	CreateAgent201JSONResponseBodyTypeHttp      CreateAgent201JSONResponseBodyType = "http"
 	CreateAgent201JSONResponseBodyTypeSignature CreateAgent201JSONResponseBodyType = "signature"
-	CreateAgent201JSONResponseBodyTypeVoice     CreateAgent201JSONResponseBodyType = "voice"
 	CreateAgent201JSONResponseBodyTypeWorkflow  CreateAgent201JSONResponseBodyType = "workflow"
 )
 
@@ -12843,8 +12830,6 @@ func (e CreateAgent201JSONResponseBodyType) Valid() bool {
 	case CreateAgent201JSONResponseBodyTypeHttp:
 		return true
 	case CreateAgent201JSONResponseBodyTypeSignature:
-		return true
-	case CreateAgent201JSONResponseBodyTypeVoice:
 		return true
 	case CreateAgent201JSONResponseBodyTypeWorkflow:
 		return true
@@ -13135,7 +13120,6 @@ const (
 	ArchiveAgent200JSONResponseBodyTypeConnected ArchiveAgent200JSONResponseBodyType = "connected"
 	ArchiveAgent200JSONResponseBodyTypeHttp      ArchiveAgent200JSONResponseBodyType = "http"
 	ArchiveAgent200JSONResponseBodyTypeSignature ArchiveAgent200JSONResponseBodyType = "signature"
-	ArchiveAgent200JSONResponseBodyTypeVoice     ArchiveAgent200JSONResponseBodyType = "voice"
 	ArchiveAgent200JSONResponseBodyTypeWorkflow  ArchiveAgent200JSONResponseBodyType = "workflow"
 )
 
@@ -13149,8 +13133,6 @@ func (e ArchiveAgent200JSONResponseBodyType) Valid() bool {
 	case ArchiveAgent200JSONResponseBodyTypeHttp:
 		return true
 	case ArchiveAgent200JSONResponseBodyTypeSignature:
-		return true
-	case ArchiveAgent200JSONResponseBodyTypeVoice:
 		return true
 	case ArchiveAgent200JSONResponseBodyTypeWorkflow:
 		return true
@@ -13222,7 +13204,6 @@ const (
 	GetAgent200JSONResponseBodyTypeConnected GetAgent200JSONResponseBodyType = "connected"
 	GetAgent200JSONResponseBodyTypeHttp      GetAgent200JSONResponseBodyType = "http"
 	GetAgent200JSONResponseBodyTypeSignature GetAgent200JSONResponseBodyType = "signature"
-	GetAgent200JSONResponseBodyTypeVoice     GetAgent200JSONResponseBodyType = "voice"
 	GetAgent200JSONResponseBodyTypeWorkflow  GetAgent200JSONResponseBodyType = "workflow"
 )
 
@@ -13237,8 +13218,6 @@ func (e GetAgent200JSONResponseBodyType) Valid() bool {
 		return true
 	case GetAgent200JSONResponseBodyTypeSignature:
 		return true
-	case GetAgent200JSONResponseBodyTypeVoice:
-		return true
 	case GetAgent200JSONResponseBodyTypeWorkflow:
 		return true
 	default:
@@ -13252,7 +13231,6 @@ const (
 	UpdateAgentJSONBodyTypeConnected UpdateAgentJSONBodyType = "connected"
 	UpdateAgentJSONBodyTypeHttp      UpdateAgentJSONBodyType = "http"
 	UpdateAgentJSONBodyTypeSignature UpdateAgentJSONBodyType = "signature"
-	UpdateAgentJSONBodyTypeVoice     UpdateAgentJSONBodyType = "voice"
 	UpdateAgentJSONBodyTypeWorkflow  UpdateAgentJSONBodyType = "workflow"
 )
 
@@ -13266,8 +13244,6 @@ func (e UpdateAgentJSONBodyType) Valid() bool {
 	case UpdateAgentJSONBodyTypeHttp:
 		return true
 	case UpdateAgentJSONBodyTypeSignature:
-		return true
-	case UpdateAgentJSONBodyTypeVoice:
 		return true
 	case UpdateAgentJSONBodyTypeWorkflow:
 		return true
@@ -13339,7 +13315,6 @@ const (
 	UpdateAgent200JSONResponseBodyTypeConnected UpdateAgent200JSONResponseBodyType = "connected"
 	UpdateAgent200JSONResponseBodyTypeHttp      UpdateAgent200JSONResponseBodyType = "http"
 	UpdateAgent200JSONResponseBodyTypeSignature UpdateAgent200JSONResponseBodyType = "signature"
-	UpdateAgent200JSONResponseBodyTypeVoice     UpdateAgent200JSONResponseBodyType = "voice"
 	UpdateAgent200JSONResponseBodyTypeWorkflow  UpdateAgent200JSONResponseBodyType = "workflow"
 )
 
@@ -13354,8 +13329,6 @@ func (e UpdateAgent200JSONResponseBodyType) Valid() bool {
 		return true
 	case UpdateAgent200JSONResponseBodyTypeSignature:
 		return true
-	case UpdateAgent200JSONResponseBodyTypeVoice:
-		return true
 	case UpdateAgent200JSONResponseBodyTypeWorkflow:
 		return true
 	default:
@@ -13369,7 +13342,6 @@ const (
 	ReplaceAgentJSONBodyTypeConnected ReplaceAgentJSONBodyType = "connected"
 	ReplaceAgentJSONBodyTypeHttp      ReplaceAgentJSONBodyType = "http"
 	ReplaceAgentJSONBodyTypeSignature ReplaceAgentJSONBodyType = "signature"
-	ReplaceAgentJSONBodyTypeVoice     ReplaceAgentJSONBodyType = "voice"
 	ReplaceAgentJSONBodyTypeWorkflow  ReplaceAgentJSONBodyType = "workflow"
 )
 
@@ -13383,8 +13355,6 @@ func (e ReplaceAgentJSONBodyType) Valid() bool {
 	case ReplaceAgentJSONBodyTypeHttp:
 		return true
 	case ReplaceAgentJSONBodyTypeSignature:
-		return true
-	case ReplaceAgentJSONBodyTypeVoice:
 		return true
 	case ReplaceAgentJSONBodyTypeWorkflow:
 		return true
@@ -13456,7 +13426,6 @@ const (
 	ReplaceAgent200JSONResponseBodyTypeConnected ReplaceAgent200JSONResponseBodyType = "connected"
 	ReplaceAgent200JSONResponseBodyTypeHttp      ReplaceAgent200JSONResponseBodyType = "http"
 	ReplaceAgent200JSONResponseBodyTypeSignature ReplaceAgent200JSONResponseBodyType = "signature"
-	ReplaceAgent200JSONResponseBodyTypeVoice     ReplaceAgent200JSONResponseBodyType = "voice"
 	ReplaceAgent200JSONResponseBodyTypeWorkflow  ReplaceAgent200JSONResponseBodyType = "workflow"
 )
 
@@ -13470,8 +13439,6 @@ func (e ReplaceAgent200JSONResponseBodyType) Valid() bool {
 	case ReplaceAgent200JSONResponseBodyTypeHttp:
 		return true
 	case ReplaceAgent200JSONResponseBodyTypeSignature:
-		return true
-	case ReplaceAgent200JSONResponseBodyTypeVoice:
 		return true
 	case ReplaceAgent200JSONResponseBodyTypeWorkflow:
 		return true
@@ -14785,7 +14752,6 @@ const (
 	ListRunPlans200JSONResponseBodyTargetsTypeConnected ListRunPlans200JSONResponseBodyTargetsType = "connected"
 	ListRunPlans200JSONResponseBodyTargetsTypeHttp      ListRunPlans200JSONResponseBodyTargetsType = "http"
 	ListRunPlans200JSONResponseBodyTargetsTypePrompt    ListRunPlans200JSONResponseBodyTargetsType = "prompt"
-	ListRunPlans200JSONResponseBodyTargetsTypeVoice     ListRunPlans200JSONResponseBodyTargetsType = "voice"
 	ListRunPlans200JSONResponseBodyTargetsTypeWorkflow  ListRunPlans200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -14799,8 +14765,6 @@ func (e ListRunPlans200JSONResponseBodyTargetsType) Valid() bool {
 	case ListRunPlans200JSONResponseBodyTargetsTypeHttp:
 		return true
 	case ListRunPlans200JSONResponseBodyTargetsTypePrompt:
-		return true
-	case ListRunPlans200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case ListRunPlans200JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -14926,7 +14890,6 @@ const (
 	RunRunPlanJSONBodyConfigTargetsTypeConnected RunRunPlanJSONBodyConfigTargetsType = "connected"
 	RunRunPlanJSONBodyConfigTargetsTypeHttp      RunRunPlanJSONBodyConfigTargetsType = "http"
 	RunRunPlanJSONBodyConfigTargetsTypePrompt    RunRunPlanJSONBodyConfigTargetsType = "prompt"
-	RunRunPlanJSONBodyConfigTargetsTypeVoice     RunRunPlanJSONBodyConfigTargetsType = "voice"
 	RunRunPlanJSONBodyConfigTargetsTypeWorkflow  RunRunPlanJSONBodyConfigTargetsType = "workflow"
 )
 
@@ -14941,8 +14904,6 @@ func (e RunRunPlanJSONBodyConfigTargetsType) Valid() bool {
 		return true
 	case RunRunPlanJSONBodyConfigTargetsTypePrompt:
 		return true
-	case RunRunPlanJSONBodyConfigTargetsTypeVoice:
-		return true
 	case RunRunPlanJSONBodyConfigTargetsTypeWorkflow:
 		return true
 	default:
@@ -14956,7 +14917,6 @@ const (
 	RunRunPlan200JSONResponseBodyItemsTargetTypeConnected RunRunPlan200JSONResponseBodyItemsTargetType = "connected"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeHttp      RunRunPlan200JSONResponseBodyItemsTargetType = "http"
 	RunRunPlan200JSONResponseBodyItemsTargetTypePrompt    RunRunPlan200JSONResponseBodyItemsTargetType = "prompt"
-	RunRunPlan200JSONResponseBodyItemsTargetTypeVoice     RunRunPlan200JSONResponseBodyItemsTargetType = "voice"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeWorkflow  RunRunPlan200JSONResponseBodyItemsTargetType = "workflow"
 )
 
@@ -14970,8 +14930,6 @@ func (e RunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeHttp:
 		return true
 	case RunRunPlan200JSONResponseBodyItemsTargetTypePrompt:
-		return true
-	case RunRunPlan200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeWorkflow:
 		return true
@@ -15112,7 +15070,6 @@ const (
 	GetRunPlan200JSONResponseBodyTargetsTypeConnected GetRunPlan200JSONResponseBodyTargetsType = "connected"
 	GetRunPlan200JSONResponseBodyTargetsTypeHttp      GetRunPlan200JSONResponseBodyTargetsType = "http"
 	GetRunPlan200JSONResponseBodyTargetsTypePrompt    GetRunPlan200JSONResponseBodyTargetsType = "prompt"
-	GetRunPlan200JSONResponseBodyTargetsTypeVoice     GetRunPlan200JSONResponseBodyTargetsType = "voice"
 	GetRunPlan200JSONResponseBodyTargetsTypeWorkflow  GetRunPlan200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -15127,8 +15084,6 @@ func (e GetRunPlan200JSONResponseBodyTargetsType) Valid() bool {
 		return true
 	case GetRunPlan200JSONResponseBodyTargetsTypePrompt:
 		return true
-	case GetRunPlan200JSONResponseBodyTargetsTypeVoice:
-		return true
 	case GetRunPlan200JSONResponseBodyTargetsTypeWorkflow:
 		return true
 	default:
@@ -15142,7 +15097,6 @@ const (
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeConnected RerunRunPlan200JSONResponseBodyItemsTargetType = "connected"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeHttp      RerunRunPlan200JSONResponseBodyItemsTargetType = "http"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypePrompt    RerunRunPlan200JSONResponseBodyItemsTargetType = "prompt"
-	RerunRunPlan200JSONResponseBodyItemsTargetTypeVoice     RerunRunPlan200JSONResponseBodyItemsTargetType = "voice"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeWorkflow  RerunRunPlan200JSONResponseBodyItemsTargetType = "workflow"
 )
 
@@ -15156,8 +15110,6 @@ func (e RerunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeHttp:
 		return true
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypePrompt:
-		return true
-	case RerunRunPlan200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeWorkflow:
 		return true
@@ -15619,7 +15571,6 @@ const (
 	RunTestSuiteJSONBodyTargetsTypeConnected RunTestSuiteJSONBodyTargetsType = "connected"
 	RunTestSuiteJSONBodyTargetsTypeHttp      RunTestSuiteJSONBodyTargetsType = "http"
 	RunTestSuiteJSONBodyTargetsTypePrompt    RunTestSuiteJSONBodyTargetsType = "prompt"
-	RunTestSuiteJSONBodyTargetsTypeVoice     RunTestSuiteJSONBodyTargetsType = "voice"
 	RunTestSuiteJSONBodyTargetsTypeWorkflow  RunTestSuiteJSONBodyTargetsType = "workflow"
 )
 
@@ -15634,8 +15585,6 @@ func (e RunTestSuiteJSONBodyTargetsType) Valid() bool {
 		return true
 	case RunTestSuiteJSONBodyTargetsTypePrompt:
 		return true
-	case RunTestSuiteJSONBodyTargetsTypeVoice:
-		return true
 	case RunTestSuiteJSONBodyTargetsTypeWorkflow:
 		return true
 	default:
@@ -15649,7 +15598,6 @@ const (
 	RunTestSuite200JSONResponseBodyItemsTargetTypeConnected RunTestSuite200JSONResponseBodyItemsTargetType = "connected"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeHttp      RunTestSuite200JSONResponseBodyItemsTargetType = "http"
 	RunTestSuite200JSONResponseBodyItemsTargetTypePrompt    RunTestSuite200JSONResponseBodyItemsTargetType = "prompt"
-	RunTestSuite200JSONResponseBodyItemsTargetTypeVoice     RunTestSuite200JSONResponseBodyItemsTargetType = "voice"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeWorkflow  RunTestSuite200JSONResponseBodyItemsTargetType = "workflow"
 )
 
@@ -15663,8 +15611,6 @@ func (e RunTestSuite200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeHttp:
 		return true
 	case RunTestSuite200JSONResponseBodyItemsTargetTypePrompt:
-		return true
-	case RunTestSuite200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeWorkflow:
 		return true
@@ -22529,9 +22475,6 @@ type PostApiScenarioEventsJSONBody0MetadataAgentsRole string
 // PostApiScenarioEventsJSONBody0MetadataLangwatchActorLabel defines parameters for PostApiScenarioEvents.
 type PostApiScenarioEventsJSONBody0MetadataLangwatchActorLabel string
 
-// PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind defines parameters for PostApiScenarioEvents.
-type PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind string
-
 // PostApiScenarioEventsJSONBody0MetadataLangwatchTargetParameters0 defines parameters for PostApiScenarioEvents.
 type PostApiScenarioEventsJSONBody0MetadataLangwatchTargetParameters0 = string
 
@@ -22563,13 +22506,6 @@ type PostApiScenarioEventsJSONBody_0_Metadata struct {
 			Hostname string  `json:"hostname"`
 			Label    *string `json:"label"`
 		} `json:"agentInstance,omitempty"`
-		Caller *struct {
-			Effects              string  `json:"effects"`
-			InterruptProbability float32 `json:"interruptProbability"`
-			Voice                string  `json:"voice"`
-		} `json:"caller,omitempty"`
-		CallerKind             *PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind                                           `json:"callerKind,omitempty"`
-		IsCutAtLimit           *bool                                                                                                `json:"isCutAtLimit,omitempty"`
 		JudgeModel             *string                                                                                              `json:"judgeModel,omitempty"`
 		ResolvedJudgeModel     *string                                                                                              `json:"resolvedJudgeModel,omitempty"`
 		ResolvedSimulatorModel *string                                                                                              `json:"resolvedSimulatorModel,omitempty"`
@@ -24002,6 +23938,15 @@ type GetApiTracesFacets200JSONResponseBody1 struct {
 type GetApiTracesFacets200JSONResponseBody struct {
 	union json.RawMessage
 }
+
+// GetApiTracesFacets403JSONResponseBodyError defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets403JSONResponseBodyError string
+
+// GetApiTracesFacets422JSONResponseBodyError defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets422JSONResponseBodyError string
+
+// GetApiTracesFacets422JSONResponseBodyTarget defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets422JSONResponseBodyTarget string
 
 // PostApiTracesSearchJSONBody defines parameters for PostApiTracesSearch.
 type PostApiTracesSearchJSONBody struct {
@@ -26458,12 +26403,17 @@ type RunRunPlanJSONBody struct {
 	Config struct {
 		// Evaluators The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]RunRunPlanJSONBody_Config_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                          `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// JudgeModel The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default.
@@ -26790,18 +26740,26 @@ type ListTestSuites200JSONResponseBodyFieldsType string
 type CreateTestSuiteJSONBody struct {
 	// Evaluators The evaluators that run after every scenario run. Up to 20. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates.
 	Evaluators *[]struct {
+		// EvaluatorId The id of the saved evaluator this attachment runs.
 		EvaluatorId string `json:"evaluatorId"`
-		Id          string `json:"id"`
+
+		// Id The attachment id. Stable across edits of the attachment.
+		Id string `json:"id"`
 
 		// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 		Mappings map[string]CreateTestSuiteJSONBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-		Required bool                                                                        `json:"required"`
+
+		// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+		Required bool `json:"required"`
 	} `json:"evaluators,omitempty"`
 
 	// Fields The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean.
 	Fields *[]struct {
-		Identifier string                            `json:"identifier"`
-		Type       CreateTestSuiteJSONBodyFieldsType `json:"type"`
+		// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+		Identifier string `json:"identifier"`
+
+		// Type The value type every scenario carries for this field.
+		Type CreateTestSuiteJSONBodyFieldsType `json:"type"`
 	} `json:"fields,omitempty"`
 
 	// Name The test suite name, as it reads in the platform.
@@ -26905,18 +26863,26 @@ type GetTestSuite200JSONResponseBodyFieldsType string
 type UpdateTestSuiteJSONBody struct {
 	// Evaluators The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid.
 	Evaluators *[]struct {
+		// EvaluatorId The id of the saved evaluator this attachment runs.
 		EvaluatorId string `json:"evaluatorId"`
-		Id          string `json:"id"`
+
+		// Id The attachment id. Stable across edits of the attachment.
+		Id string `json:"id"`
 
 		// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 		Mappings map[string]UpdateTestSuiteJSONBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-		Required bool                                                                        `json:"required"`
+
+		// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+		Required bool `json:"required"`
 	} `json:"evaluators,omitempty"`
 
 	// Fields The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use.
 	Fields *[]struct {
-		Identifier string                            `json:"identifier"`
-		Type       UpdateTestSuiteJSONBodyFieldsType `json:"type"`
+		// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+		Identifier string `json:"identifier"`
+
+		// Type The value type every scenario carries for this field.
+		Type UpdateTestSuiteJSONBodyFieldsType `json:"type"`
 	} `json:"fields,omitempty"`
 
 	// Name The new name. The slug is kept.
@@ -98594,6 +98560,10 @@ func (r UpdateProjectResponse) ContentType() string {
 type GetProjectApiKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *struct {
+		// ApiKey Send as X-Auth-Token, Bearer, or Basic
+		ApiKey string `json:"apiKey"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -98623,6 +98593,10 @@ func (r GetProjectApiKeyResponse) ContentType() string {
 type RegenerateProjectApiKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *struct {
+		// ApiKey Send as X-Auth-Token, Bearer, or Basic
+		ApiKey string `json:"apiKey"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -102582,13 +102556,11 @@ type GetApiSimulationRunsResponse struct {
 			ScenarioRunId string `json:"scenarioRunId"`
 
 			// ScenarioVersion The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.
-			ScenarioVersion *int `json:"scenarioVersion,omitempty"`
-
-			// Status Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.
-			Status    string   `json:"status"`
-			Timestamp float32  `json:"timestamp"`
-			TotalCost *float32 `json:"totalCost,omitempty"`
-			UpdatedAt float32  `json:"updatedAt"`
+			ScenarioVersion *int     `json:"scenarioVersion,omitempty"`
+			Status          string   `json:"status"`
+			Timestamp       float32  `json:"timestamp"`
+			TotalCost       *float32 `json:"totalCost,omitempty"`
+			UpdatedAt       float32  `json:"updatedAt"`
 		} `json:"runs"`
 	}
 	JSON400 *struct {
@@ -102820,13 +102792,11 @@ type GetApiSimulationRunsByScenarioRunIdResponse struct {
 		ScenarioRunId string `json:"scenarioRunId"`
 
 		// ScenarioVersion The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.
-		ScenarioVersion *int `json:"scenarioVersion,omitempty"`
-
-		// Status Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.
-		Status    string   `json:"status"`
-		Timestamp float32  `json:"timestamp"`
-		TotalCost *float32 `json:"totalCost,omitempty"`
-		UpdatedAt float32  `json:"updatedAt"`
+		ScenarioVersion *int     `json:"scenarioVersion,omitempty"`
+		Status          string   `json:"status"`
+		Timestamp       float32  `json:"timestamp"`
+		TotalCost       *float32 `json:"totalCost,omitempty"`
+		UpdatedAt       float32  `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Error   string  `json:"error"`
@@ -103880,9 +103850,27 @@ type GetApiTracesFacetsResponse struct {
 		Error   string  `json:"error"`
 		Message *string `json:"message,omitempty"`
 	}
+	JSON403 *struct {
+		Error   GetApiTracesFacets403JSONResponseBodyError `json:"error"`
+		Message string                                     `json:"message"`
+		Trace   *string                                    `json:"trace,omitempty"`
+	}
 	JSON422 *struct {
-		Error   string  `json:"error"`
-		Message *string `json:"message,omitempty"`
+		Error   GetApiTracesFacets422JSONResponseBodyError `json:"error"`
+		Fields  []string                                   `json:"fields"`
+		Message string                                     `json:"message"`
+		Reasons []struct {
+			Code string `json:"code"`
+			Meta *struct {
+				Expected *[]string `json:"expected,omitempty"`
+				Field    *string   `json:"field,omitempty"`
+				Message  *string   `json:"message,omitempty"`
+				Received *string   `json:"received,omitempty"`
+				Type     *string   `json:"type,omitempty"`
+			} `json:"meta,omitempty"`
+		} `json:"reasons"`
+		Target GetApiTracesFacets422JSONResponseBodyTarget `json:"target"`
+		Trace  *string                                     `json:"trace,omitempty"`
 	}
 	JSON500 *struct {
 		Error   string  `json:"error"`
@@ -107088,12 +107076,17 @@ type ListRunPlansResponse struct {
 
 		// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]ListRunPlans200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Id The run plan id.
@@ -107302,12 +107295,17 @@ type GetRunPlanResponse struct {
 
 		// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]GetRunPlan200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                              `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Id The run plan id.
@@ -107480,18 +107478,26 @@ type ListTestSuitesResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]ListTestSuites200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                  `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			Identifier string                                      `json:"identifier"`
-			Type       ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
+			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+			Identifier string `json:"identifier"`
+
+			// Type The value type every scenario carries for this field.
+			Type ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -107553,18 +107559,26 @@ type CreateTestSuiteResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]CreateTestSuite201JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                   `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			Identifier string                                       `json:"identifier"`
-			Type       CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
+			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+			Identifier string `json:"identifier"`
+
+			// Type The value type every scenario carries for this field.
+			Type CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -107662,18 +107676,26 @@ type GetTestSuiteResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]GetTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			Identifier string                                    `json:"identifier"`
-			Type       GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
+			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+			Identifier string `json:"identifier"`
+
+			// Type The value type every scenario carries for this field.
+			Type GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -107744,18 +107766,26 @@ type UpdateTestSuiteResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
+			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-			Id          string `json:"id"`
+
+			// Id The attachment id. Stable across edits of the attachment.
+			Id string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]UpdateTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-			Required bool                                                                                   `json:"required"`
+
+			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+			Required bool `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			Identifier string                                       `json:"identifier"`
-			Type       UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
+			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+			Identifier string `json:"identifier"`
+
+			// Type The value type every scenario carries for this field.
+			Type UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -123370,6 +123400,19 @@ func ParseGetProjectApiKeyResponse(rsp *http.Response) (*GetProjectApiKeyRespons
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// ApiKey Send as X-Auth-Token, Bearer, or Basic
+			ApiKey string `json:"apiKey"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -123384,6 +123427,19 @@ func ParseRegenerateProjectApiKeyResponse(rsp *http.Response) (*RegenerateProjec
 	response := &RegenerateProjectApiKeyResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// ApiKey Send as X-Auth-Token, Bearer, or Basic
+			ApiKey string `json:"apiKey"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil
@@ -128138,13 +128194,11 @@ func ParseGetApiSimulationRunsResponse(rsp *http.Response) (*GetApiSimulationRun
 				ScenarioRunId string `json:"scenarioRunId"`
 
 				// ScenarioVersion The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.
-				ScenarioVersion *int `json:"scenarioVersion,omitempty"`
-
-				// Status Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.
-				Status    string   `json:"status"`
-				Timestamp float32  `json:"timestamp"`
-				TotalCost *float32 `json:"totalCost,omitempty"`
-				UpdatedAt float32  `json:"updatedAt"`
+				ScenarioVersion *int     `json:"scenarioVersion,omitempty"`
+				Status          string   `json:"status"`
+				Timestamp       float32  `json:"timestamp"`
+				TotalCost       *float32 `json:"totalCost,omitempty"`
+				UpdatedAt       float32  `json:"updatedAt"`
 			} `json:"runs"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -128442,13 +128496,11 @@ func ParseGetApiSimulationRunsByScenarioRunIdResponse(rsp *http.Response) (*GetA
 			ScenarioRunId string `json:"scenarioRunId"`
 
 			// ScenarioVersion The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.
-			ScenarioVersion *int `json:"scenarioVersion,omitempty"`
-
-			// Status Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.
-			Status    string   `json:"status"`
-			Timestamp float32  `json:"timestamp"`
-			TotalCost *float32 `json:"totalCost,omitempty"`
-			UpdatedAt float32  `json:"updatedAt"`
+			ScenarioVersion *int     `json:"scenarioVersion,omitempty"`
+			Status          string   `json:"status"`
+			Timestamp       float32  `json:"timestamp"`
+			TotalCost       *float32 `json:"totalCost,omitempty"`
+			UpdatedAt       float32  `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -129600,10 +129652,34 @@ func ParseGetApiTracesFacetsResponse(rsp *http.Response) (*GetApiTracesFacetsRes
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Error   GetApiTracesFacets403JSONResponseBodyError `json:"error"`
+			Message string                                     `json:"message"`
+			Trace   *string                                    `json:"trace,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {
-			Error   string  `json:"error"`
-			Message *string `json:"message,omitempty"`
+			Error   GetApiTracesFacets422JSONResponseBodyError `json:"error"`
+			Fields  []string                                   `json:"fields"`
+			Message string                                     `json:"message"`
+			Reasons []struct {
+				Code string `json:"code"`
+				Meta *struct {
+					Expected *[]string `json:"expected,omitempty"`
+					Field    *string   `json:"field,omitempty"`
+					Message  *string   `json:"message,omitempty"`
+					Received *string   `json:"received,omitempty"`
+					Type     *string   `json:"type,omitempty"`
+				} `json:"meta,omitempty"`
+			} `json:"reasons"`
+			Target GetApiTracesFacets422JSONResponseBodyTarget `json:"target"`
+			Trace  *string                                     `json:"trace,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -133351,12 +133427,17 @@ func ParseListRunPlansResponse(rsp *http.Response) (*ListRunPlansResponse, error
 
 			// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]ListRunPlans200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Id The run plan id.
@@ -133553,12 +133634,17 @@ func ParseGetRunPlanResponse(rsp *http.Response) (*GetRunPlanResponse, error) {
 
 			// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]GetRunPlan200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                              `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Id The run plan id.
@@ -133723,18 +133809,26 @@ func ParseListTestSuitesResponse(rsp *http.Response) (*ListTestSuitesResponse, e
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]ListTestSuites200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                  `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				Identifier string                                      `json:"identifier"`
-				Type       ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
+				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+				Identifier string `json:"identifier"`
+
+				// Type The value type every scenario carries for this field.
+				Type ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.
@@ -133792,18 +133886,26 @@ func ParseCreateTestSuiteResponse(rsp *http.Response) (*CreateTestSuiteResponse,
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]CreateTestSuite201JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                   `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				Identifier string                                       `json:"identifier"`
-				Type       CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
+				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+				Identifier string `json:"identifier"`
+
+				// Type The value type every scenario carries for this field.
+				Type CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.
@@ -133893,18 +133995,26 @@ func ParseGetTestSuiteResponse(rsp *http.Response) (*GetTestSuiteResponse, error
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]GetTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				Identifier string                                    `json:"identifier"`
-				Type       GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
+				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+				Identifier string `json:"identifier"`
+
+				// Type The value type every scenario carries for this field.
+				Type GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.
@@ -133971,18 +134081,26 @@ func ParseUpdateTestSuiteResponse(rsp *http.Response) (*UpdateTestSuiteResponse,
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
+				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-				Id          string `json:"id"`
+
+				// Id The attachment id. Stable across edits of the attachment.
+				Id string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]UpdateTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-				Required bool                                                                                   `json:"required"`
+
+				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+				Required bool `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				Identifier string                                       `json:"identifier"`
-				Type       UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
+				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
+				Identifier string `json:"identifier"`
+
+				// Type The value type every scenario carries for this field.
+				Type UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.

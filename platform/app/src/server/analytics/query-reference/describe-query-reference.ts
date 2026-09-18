@@ -3,7 +3,7 @@
  *
  * LangWatch answers two of them, and they are not alternatives. LangWatchQL is
  * SQL over the analytics datasets: counts, rates, groupings, time series,
- * joins. The trace filter is a Lucene-flavoured string over one trace list:
+ * joins. The trace filter is a Lucene-flavored string over one trace list:
  * named fields, open-ended attribute namespaces, evaluator verdicts, free text.
  * A question belongs to one or the other, and picking wrong is expensive — an
  * agent that only knows the filter writes twelve searches where one `GROUP BY`
@@ -63,6 +63,7 @@ import { lwqlHeldPermissions } from "../lwql/catalog/types";
 import { LWQL_EXAMPLES } from "../lwql/examples";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../lwql/executor";
 import { DEFAULT_LWQL_RESOURCE_LIMITS, MAX_LWQL_LENGTH } from "../lwql/limits";
+import { DEFAULT_LWQL_DATABASE } from "../lwql/lwql.service";
 import {
   describeLangWatchQLSchema,
   type LangWatchQLSchema,
@@ -337,10 +338,28 @@ function isAvailable({
   return gates.every((gate) => held.has(gate));
 }
 
+/**
+ * The statement, qualified with the database this deployment actually serves.
+ *
+ * The library writes `analytics.<view>`, which is the name in production and
+ * the name a reader should learn. A deployment can serve the same views out of
+ * another database, and there a published example would name a database the
+ * caller cannot reach. The schema section already publishes every dataset under
+ * the deployment's own qualifier; this keeps the examples agreeing with it.
+ */
+function qualify({ sql, database }: { sql: string; database: string }): string {
+  if (database === DEFAULT_LWQL_DATABASE) return sql;
+  return sql.split(`${DEFAULT_LWQL_DATABASE}.`).join(`${database}.`);
+}
+
 function describeExamples({
   held,
+  lwqlEnabled,
+  database,
 }: {
   held: ReadonlySet<FieldProtection>;
+  lwqlEnabled: boolean;
+  database: string;
 }): readonly QueryReferenceExample[] {
   const lwql: QueryReferenceExample[] = LWQL_EXAMPLES.map((example) => ({
     id: example.id,
@@ -348,10 +367,13 @@ function describeExamples({
     intent: example.intent,
     language: "lwql" as const,
     tags: example.tags,
-    text: example.sql,
+    text: qualify({ sql: example.sql, database }),
     parameters: example.parameters,
     requires: { gates: example.gates, functions: [] },
-    available: isAvailable({ gates: example.gates, held }),
+    // Two ways a SQL example is not runnable here: a column it reads is
+    // withheld from this caller, or the project has no LangWatchQL surface at
+    // all. A consumer reading `available` reads one answer, not one of them.
+    available: lwqlEnabled && isAvailable({ gates: example.gates, held }),
     ...(example.notes ? { notes: example.notes } : {}),
   }));
   const filters: QueryReferenceExample[] = TRACE_FILTER_EXAMPLES.map(
@@ -418,7 +440,7 @@ export function describeQueryReference({
       dynamicPrefixes: describeDynamicPrefixes(),
       endpoints: TRACE_FILTER_ENDPOINTS,
     },
-    examples: describeExamples({ held }),
+    examples: describeExamples({ held, lwqlEnabled, database }),
     decisionTable: DECISION_TABLE,
   };
 }
