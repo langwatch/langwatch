@@ -11,6 +11,7 @@ export function deriveUiDeployment(config: PublicAppConfig): UiDeployment {
   return {
     isDevelopment: config.mode === "development",
     isSaaS: config.deployment === "saas",
+    appBaseUrl: config.appBaseUrl,
     ...(config.demoProjectSlug ? { demoProjectSlug: config.demoProjectSlug } : {}),
     ...(config.licensePaymentUrl ? { licensePaymentUrl: config.licensePaymentUrl } : {}),
     hasNlpService: config.capabilities.nlp,

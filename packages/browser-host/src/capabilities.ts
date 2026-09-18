@@ -270,6 +270,11 @@ export type UiDeployment = {
   isDevelopment: boolean;
   /** The hosted product rather than a self-hosted one. */
   isSaaS: boolean;
+  /**
+   * This deployment's own address. Required, not optional: a host that must
+   * answer one has no honest absence, and `""` renders a link that looks real.
+   */
+  appBaseUrl: string;
   /** The shared demo project, when this deployment configures one. */
   demoProjectSlug?: string;
   /** Where a licence is bought, when this deployment sells one. */
@@ -282,6 +287,9 @@ export type UiDeployment = {
 const PRODUCTION_UI_DEPLOYMENT: UiDeployment = {
   isDevelopment: false,
   isSaaS: false,
+  // The composition that declared no deployment declared no address either;
+  // the document's own origin is the one answer that is never a guess.
+  appBaseUrl: typeof window === "undefined" ? "" : window.location.origin,
   hasNlpService: true,
   hasLangevals: true,
 };

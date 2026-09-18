@@ -24,6 +24,7 @@ describe("deriveUiDeployment", () => {
 
     expect(deployment.isDevelopment).toBe(true);
     expect(deployment.isSaaS).toBe(true);
+    expect(deployment.appBaseUrl).toBe("https://app.example");
   });
 
   describe("given a deployment that sells a licence", () => {
