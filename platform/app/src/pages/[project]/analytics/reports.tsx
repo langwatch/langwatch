@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DashboardAutoRefreshMenu } from "~/components/analytics/DashboardAutoRefreshMenu";
 import {
   DashboardRefreshedAtContext,
@@ -20,8 +20,19 @@ import GraphsLayout from "~/components/GraphsLayout";
 import { toaster } from "~/components/ui/toaster";
 import { useWidgetGranularity } from "~/features/analytics-query/hooks/useWidgetGranularity";
 import { CreateDashboardWidgetDrawer } from "~/features/custom-chart-playground/CreateDashboardWidgetDrawer";
+import {
+  buildWidgetRenderResult,
+  useWidgetRenderReceiptStore,
+} from "~/features/custom-chart-playground/renderReceipt/widgetRenderReceiptStore";
+import {
+  useRegisterLangyActions,
+  useRegisterLangyPageContext,
+} from "~/features/langy/LangyContext";
+import { dashboardContextChip } from "~/features/langy/logic/langyContextChips";
+import type { LangyUiActionHandlers } from "~/features/langy/uiActions/types";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
+import { getWidgetRenderPayloadSchema } from "~/server/analytics/dashboardWidgetRenderActions";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { ReportGrid } from "../../../components/analytics/reports";
@@ -83,6 +94,43 @@ function ReportsContent() {
     (d) => d.id === activeDashboardId,
   );
   const dashboardTitle = currentDashboard?.name ?? "Reports";
+
+  // Tell Langy which dashboard is open (with its human name), so attaching the
+  // dashboard chip advertises the dashboard UI actions (CHIP_KIND_TO_MANIFEST).
+  const dashboardPageContext = useMemo(
+    () =>
+      activeDashboardId
+        ? [
+            dashboardContextChip({
+              dashboardId: activeDashboardId,
+              name: dashboardTitle,
+            }),
+          ]
+        : [],
+    [activeDashboardId, dashboardTitle],
+  );
+  useRegisterLangyPageContext(dashboardPageContext);
+
+  // The one live UI action this page answers: read the render receipts the
+  // mounted widgets published (see `DashboardWidgetFrame`) so an off-screen
+  // agent can "see" what each card painted. The receipts→result mapping is
+  // pure and lives in the store module; this is only the store read + filter.
+  const langyActions = useMemo<LangyUiActionHandlers>(
+    () => ({
+      "dashboard.getWidgetRender": {
+        payloadSchema: getWidgetRenderPayloadSchema,
+        run: (payload: { widgetId?: string; includeMarkup?: boolean }) =>
+          buildWidgetRenderResult({
+            receipts: useWidgetRenderReceiptStore.getState().receipts,
+            dashboardId: activeDashboardId ?? null,
+            widgetId: payload.widgetId,
+            includeMarkup: payload.includeMarkup,
+          }),
+      },
+    }),
+    [activeDashboardId],
+  );
+  useRegisterLangyActions(langyActions);
 
   // Graphs for the active dashboard
   const graphsQuery = api.graphs.getAll.useQuery(

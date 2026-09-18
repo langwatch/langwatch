@@ -18,7 +18,7 @@
  */
 
 import { Box, Text } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { useDashboardRefreshedAt } from "~/components/analytics/useDashboardAutoRefresh";
 import { usePeriodSelector } from "~/components/PeriodSelector";
@@ -26,8 +26,10 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 
 import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
+import type { ChartFrameRenderReceipt } from "./bridge/frameBridge";
 import { FrameDiagnosticBadge } from "./FrameDiagnosticBadge";
 import { declaredParamDefaults } from "./paramsSnapshot";
+import { useWidgetRenderReceiptStore } from "./renderReceipt/widgetRenderReceiptStore";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
 import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
 import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
@@ -126,6 +128,35 @@ export function DashboardWidgetFrame({
     resetKey: definition.code,
   });
 
+  // The render receipt — what the frame actually painted — is kept per widget
+  // so an off-screen agent (Langy) can read this card through
+  // `dashboard.getWidgetRender`. It exists only while this card is mounted, so
+  // it is dropped when the card leaves the grid.
+  const publishReceipt = useWidgetRenderReceiptStore((state) => state.publish);
+  const removeReceipt = useWidgetRenderReceiptStore((state) => state.remove);
+  const onRenderReceipt = useCallback(
+    (receipt: ChartFrameRenderReceipt) => {
+      publishReceipt({
+        ...receipt,
+        widgetId: id,
+        widgetName,
+        dashboardId,
+        theme: dashboardContext.theme,
+        timeWindow: dashboardContext.timeWindow,
+        capturedAt: Date.now(),
+      });
+    },
+    [
+      publishReceipt,
+      id,
+      widgetName,
+      dashboardId,
+      dashboardContext.theme,
+      dashboardContext.timeWindow,
+    ],
+  );
+  useEffect(() => () => removeReceipt(id), [id, removeReceipt]);
+
   if (!parsed.success) {
     return (
       <Text fontSize="13px" color="fg.muted" padding={4}>
@@ -144,6 +175,7 @@ export function DashboardWidgetFrame({
         params={paramsSnapshot}
         onLog={onLog}
         onNavigate={onNavigate}
+        onRenderReceipt={onRenderReceipt}
         maxHeight={maxHeight}
       />
       <FrameDiagnosticBadge diagnostic={diagnostic} />

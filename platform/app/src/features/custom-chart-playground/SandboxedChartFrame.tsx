@@ -27,6 +27,7 @@ import {
 import type {
   ChartFrameExecuteQuery,
   ChartFrameLogEntry,
+  ChartFrameRenderReceipt,
 } from "./bridge/frameBridge";
 import { createFrameBridge } from "./bridge/frameBridge";
 import {
@@ -56,6 +57,13 @@ export interface SandboxedChartFrameProps {
     params: Readonly<Record<string, unknown>>;
   }) => void;
   /**
+   * The frame's render receipt (status, error text, rendered markup, height),
+   * arriving on mount and on every DOM change. A host that wants to expose
+   * what the widget painted (see `DashboardWidgetFrame`) captures it; the
+   * playground preview omits it.
+   */
+  onRenderReceipt?: (receipt: ChartFrameRenderReceipt) => void;
+  /**
    * Upper bound on the frame's rendered height, in px. Defaults to the
    * protocol ceiling. A widget passes its card's row-span height so a taller
    * card gives the chart more room without lifting the bridge's own clamp.
@@ -71,6 +79,7 @@ export function SandboxedChartFrame({
   params,
   onLog,
   onNavigate,
+  onRenderReceipt,
   maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
 }: SandboxedChartFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -108,6 +117,8 @@ export function SandboxedChartFrame({
   onLogRef.current = onLog;
   const onNavigateRef = useRef(onNavigate);
   onNavigateRef.current = onNavigate;
+  const onRenderReceiptRef = useRef(onRenderReceipt);
+  onRenderReceiptRef.current = onRenderReceipt;
   const initialDashboardContextRef = useRef(dashboardContext);
   const paramsRef = useRef(params);
   paramsRef.current = params;
@@ -130,6 +141,7 @@ export function SandboxedChartFrame({
       onLog: (entry) => onLogRef.current(entry),
       onHeightChange: setHeight,
       onNavigate: (args) => onNavigateRef.current?.(args),
+      onRenderReceipt: (receipt) => onRenderReceiptRef.current?.(receipt),
       onTeardown: noteTornDown,
     });
     bridgeRef.current = bridge;
