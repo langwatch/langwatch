@@ -993,6 +993,25 @@ invented:
   by modules only through their declared `*HostApi`. Ambient React context is
   never a cross-module transport; modules never import a vendor (posthog,
   router, theme) directly.
+- **A capability travels by declaration** (ruled 2026-09-18). `defineWebModule`
+  carries a capability slot, and the composition root reaches a module's
+  capability implementation through `./declaration` like everything else. The
+  gap that forced it: a capability implementation had no legal home once a
+  browser package closed. It cannot be a kit — kit rule 3 says a kit fetches
+  nothing, and `useUiScopeReading` runs `organization.getAll` — and it cannot
+  be reached directly, because that is the side door §3.4 just shut. The two
+  rejected answers are worth naming. Exempting the composition root reopens
+  the hole: "composition root" is a door, and doors get claimed by whoever can
+  argue they are composing. Relaxing rule 3 for capabilities destroys the
+  property that makes a kit safe to depend on — a kit that may fetch is a
+  browser package with a nicer name. Declaring it instead completes the
+  sentence this section already starts: capabilities are composed by the shell
+  and reach modules through a declared `*HostApi`.
+
+  A theme config is NOT a capability. It is pure data, it fetches nothing, and
+  it belongs in a kit — `apps/ui` keeps the skin, so `langy-theme` travelling
+  as theme data is the shape, not an exception to it.
+
 - **One Analytics capability** wraps every instrumentation destination
   (posthog, gtag, browser tracing). Modules emit named events through it —
   the browser twin of a channel.
