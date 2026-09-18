@@ -119,6 +119,12 @@ export const FRONTEND_FEATURE_FLAGS = [
   // remembered locally, and falls back to the deployment's `IDENTITY_ROUTER_V2`
   // when no override is set. See useIdentityFrontDoor.
   "release_ui_identity_front_door_enabled",
+  // Voice agents v1: gates every voice surface — the voice agent-type option,
+  // the "Talk to it" card action, "Call it myself" in a run, the caller-voice
+  // scenario section/chip, and the voice agent editor drawer. Off by default;
+  // the server enforces the same flag in depth. See
+  // specs/features/agents/voice-agents-v1.feature (AC29).
+  "release_voice_agents_enabled",
 ] as const;
 
 /**

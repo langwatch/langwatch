@@ -380,6 +380,13 @@ export const FEATURE_FLAGS = [
     description:
       "Offers the Webhook (generic HTTP request) delivery channel for automations (ADR-040). Gates the delivery-picker card, the save route accepting SEND_WEBHOOK, and the test-fire path. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_webhook_automations.",
   },
+  {
+    key: "release_voice_agents_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Voice agents: register an ElevenLabs agent, talk to it, call it from a run, and run scenarios with a simulated caller",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [
