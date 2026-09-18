@@ -14397,6 +14397,7 @@ const (
 	APPFUNCTIONUNRESOLVEDKEYS  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_UNRESOLVED_KEYS"
 	APPFUNCTIONVALUETRUNCATED  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_VALUE_TRUNCATED"
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
+	INSTANTEVALSKIPPED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INSTANT_EVAL_SKIPPED"
 	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
 	POSSIBLEFANOUT             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
 	RESULTTRUNCATED            PostApiV1Query200JSONResponseBodyDiagnosticsCode = "RESULT_TRUNCATED"
@@ -14411,6 +14412,8 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	case APPFUNCTIONVALUETRUNCATED:
 		return true
 	case INCOMPLETECOMPARISONPERIOD:
+		return true
+	case INSTANTEVALSKIPPED:
 		return true
 	case MISSINGTIMEBUCKETS:
 		return true
@@ -14515,6 +14518,7 @@ func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsGates) Valid() bool {
 // Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind.
 const (
 	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindSpan   GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "span"
+	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindText   GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "text"
 	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindThread GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "thread"
 	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindTrace  GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "trace"
 )
@@ -14524,9 +14528,29 @@ func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind) Valid() bool {
 	switch e {
 	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindSpan:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindText:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindThread:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindTrace:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsKind.
+const (
+	Eval       GetApiV1QuerySchema200JSONResponseBodyFunctionsKind = "eval"
+	Extraction GetApiV1QuerySchema200JSONResponseBodyFunctionsKind = "extraction"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyFunctionsKind enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsKind) Valid() bool {
+	switch e {
+	case Eval:
+		return true
+	case Extraction:
 		return true
 	default:
 		return false
@@ -26145,6 +26169,9 @@ type GetApiV1QuerySchema200JSONResponseBodyFunctionsGates string
 
 // GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind defines parameters for GetApiV1QuerySchema.
 type GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind string
+
+// GetApiV1QuerySchema200JSONResponseBodyFunctionsKind defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyFunctionsKind string
 
 // ListRunPlansParams defines parameters for ListRunPlans.
 type ListRunPlansParams struct {
@@ -106251,12 +106278,13 @@ type GetApiV1QuerySchemaResponse struct {
 		} `json:"datasets"`
 		Functions []struct {
 			Available   bool                                                    `json:"available"`
-			Cap         float32                                                 `json:"cap"`
+			Cap         int                                                     `json:"cap"`
 			Description string                                                  `json:"description"`
 			Encoding    GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding `json:"encoding"`
 			ExampleSql  string                                                  `json:"exampleSql"`
 			Gates       []GetApiV1QuerySchema200JSONResponseBodyFunctionsGates  `json:"gates"`
 			KeyKind     GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind  `json:"keyKind"`
+			Kind        GetApiV1QuerySchema200JSONResponseBodyFunctionsKind     `json:"kind"`
 			Name        string                                                  `json:"name"`
 			Returns     string                                                  `json:"returns"`
 			Signature   string                                                  `json:"signature"`
@@ -132249,12 +132277,13 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 			} `json:"datasets"`
 			Functions []struct {
 				Available   bool                                                    `json:"available"`
-				Cap         float32                                                 `json:"cap"`
+				Cap         int                                                     `json:"cap"`
 				Description string                                                  `json:"description"`
 				Encoding    GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding `json:"encoding"`
 				ExampleSql  string                                                  `json:"exampleSql"`
 				Gates       []GetApiV1QuerySchema200JSONResponseBodyFunctionsGates  `json:"gates"`
 				KeyKind     GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind  `json:"keyKind"`
+				Kind        GetApiV1QuerySchema200JSONResponseBodyFunctionsKind     `json:"kind"`
 				Name        string                                                  `json:"name"`
 				Returns     string                                                  `json:"returns"`
 				Signature   string                                                  `json:"signature"`

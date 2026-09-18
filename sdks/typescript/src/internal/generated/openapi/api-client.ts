@@ -1048,7 +1048,7 @@ export interface paths {
          *
          *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          *
-         *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused. A run that would need more distinct conversations, traces or spans than the published cap answers 422 rather than a partial result.
+         *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A run that would need more distinct conversations, traces or spans than the published cap answers 422 rather than a partial result.
          *
          *     The project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.
          *
@@ -8915,7 +8915,7 @@ export interface operations {
                         coarsenedFromSeconds?: number;
                         diagnostics: {
                             /** @enum {string} */
-                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS";
+                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "INSTANT_EVAL_SKIPPED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
@@ -9065,11 +9065,13 @@ export interface operations {
                             name: string;
                             signature: string;
                             description: string;
+                            /** @enum {string} */
+                            kind: "extraction" | "eval";
                             returns: string;
                             /** @enum {string} */
                             encoding: "text" | "json";
                             /** @enum {string} */
-                            keyKind: "trace" | "thread" | "span";
+                            keyKind: "trace" | "thread" | "span" | "text";
                             cap: number;
                             gates: ("input" | "output" | "costs")[];
                             available: boolean;

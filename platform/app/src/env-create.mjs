@@ -285,6 +285,20 @@ export function createEnvConfig() {
       LANGWATCH_NLP_SERVICE: optionalIfBuildTime(z.string().url()),
       LANGWATCH_ENDPOINT: optionalIfBuildTime(z.string().url()),
       LANGEVALS_ENDPOINT: z.string().optional(),
+
+      // Instant Evals: the classifier behind the LangWatchQL eval functions.
+      // The key is LangWatch's own, never a customer's. With none set the
+      // functions are published as unavailable and every judgement is skipped,
+      // which is what a self-hosted install with nothing configured gets.
+      JEV_API_KEY: z.string().optional(),
+      JEV_BASE_URL: z.string().url().optional(),
+      INSTANT_EVAL_CLASSIFIER: z.enum(["jev", "null"]).optional(),
+      INSTANT_EVAL_GLOBAL_RPS: z.coerce.number().int().positive().optional(),
+      INSTANT_EVAL_QUERY_TOKEN_BUDGET: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
       // Self-hosted langevals on a plain HTTP service has no such cap,
@@ -728,6 +742,12 @@ export function createEnvConfig() {
         process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB,
       LANGWATCH_APP_REPLICAS: process.env.LANGWATCH_APP_REPLICAS,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
+      JEV_API_KEY: process.env.JEV_API_KEY,
+      JEV_BASE_URL: process.env.JEV_BASE_URL,
+      INSTANT_EVAL_CLASSIFIER: process.env.INSTANT_EVAL_CLASSIFIER,
+      INSTANT_EVAL_GLOBAL_RPS: process.env.INSTANT_EVAL_GLOBAL_RPS,
+      INSTANT_EVAL_QUERY_TOKEN_BUDGET:
+        process.env.INSTANT_EVAL_QUERY_TOKEN_BUDGET,
       LANGEVALS_STAGING_THRESHOLD_BYTES:
         process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,

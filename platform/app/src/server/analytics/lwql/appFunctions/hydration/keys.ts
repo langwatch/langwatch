@@ -23,23 +23,62 @@ export function collectKeys({
   rows,
 }: Pick<LangWatchQLHydrationInput, "calls" | "rows">): ResolvedCall[] {
   return calls.map((call) => {
-    const definition = lwqlAppFunction(call.function);
-    if (!definition) {
-      // Not a customer-facing condition: the validator only admits names from
-      // this same catalog, so a plan naming something else is our bug and must
-      // degrade to "unknown" rather than wear a handled code (ADR-045).
-      throw new Error(
-        `lwql hydration: the plan names "${call.function}", which is not an app function`,
-      );
-    }
-    const keys = new Map<string, readonly string[]>();
-    for (const row of rows) {
-      const parts = appFunctionKeyParts(row[call.column]);
-      if (!parts) continue;
-      keys.set(appFunctionKeyId(parts), parts);
-    }
-    return { call, definition, keys };
+    const definition = declaredFunction({ name: call.function, role: "names" });
+    const source = call.source
+      ? declaredFunction({ name: call.source.function, role: "nests" })
+      : undefined;
+    return {
+      call,
+      definition,
+      ...(source ? { source } : {}),
+      // The key in the column belongs to whichever function is innermost, so
+      // an eval over an extraction is read, capped and computed as that
+      // extraction. An eval over a plain column keeps its own `text` kind,
+      // which reads nothing.
+      keyKind: source?.keyKind ?? definition.keyKind,
+      keys: distinctColumnKeys({ column: call.column, rows }),
+    };
   });
+}
+
+/**
+ * The catalog entry a plan names.
+ *
+ * Not a customer-facing condition: the validator only admits names from this
+ * same catalog, so a plan naming something else is our bug and must degrade to
+ * "unknown" rather than wear a handled code (ADR-045).
+ */
+function declaredFunction({
+  name,
+  role,
+}: {
+  name: string;
+  role: "names" | "nests";
+}) {
+  const definition = lwqlAppFunction(name);
+  if (!definition) {
+    throw new Error(
+      `lwql hydration: the plan ${role} "${name}", which is not an app function`,
+    );
+  }
+  return definition;
+}
+
+/** Every distinct key one column carries, keyed by {@link appFunctionKeyId}. */
+function distinctColumnKeys({
+  column,
+  rows,
+}: {
+  column: string;
+  rows: readonly Record<string, unknown>[];
+}): Map<string, readonly string[]> {
+  const keys = new Map<string, readonly string[]>();
+  for (const row of rows) {
+    const parts = appFunctionKeyParts(row[column]);
+    if (!parts) continue;
+    keys.set(appFunctionKeyId(parts), parts);
+  }
+  return keys;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +101,8 @@ interface DistinctKeys {
   readonly threadKeys: Set<string>;
   /** Whole key id of every span-keyed call, so a pair counts once. */
   readonly spanPairs: Set<string>;
+  /** Texts judged straight from the column, which are read from nothing. */
+  readonly texts: Set<string>;
 }
 
 /** Adds one call's keys to the running sets. */
@@ -72,11 +113,12 @@ function addCallKeys({
   call: ResolvedCall;
   into: DistinctKeys;
 }) {
-  const kind = call.definition.keyKind;
+  const kind = call.keyKind;
   for (const [keyId, parts] of call.keys) {
     const [first] = parts;
     if (first === undefined) continue;
     if (kind === "thread") into.threadKeys.add(first);
+    else if (kind === "text") into.texts.add(first);
     else into.traceIds.add(first);
     if (kind === "span") into.spanPairs.add(keyId);
   }
@@ -87,6 +129,7 @@ export function distinctKeys(resolved: readonly ResolvedCall[]): DistinctKeys {
     traceIds: new Set(),
     threadKeys: new Set(),
     spanPairs: new Set(),
+    texts: new Set(),
   };
   for (const call of resolved) addCallKeys({ call, into: keys });
   return keys;
@@ -95,11 +138,12 @@ export function distinctKeys(resolved: readonly ResolvedCall[]): DistinctKeys {
 function distinctKeyCounts(
   resolved: readonly ResolvedCall[],
 ): Record<LangWatchQLAppFunctionKeyKind, number> {
-  const { traceIds, threadKeys, spanPairs } = distinctKeys(resolved);
+  const { traceIds, threadKeys, spanPairs, texts } = distinctKeys(resolved);
   return {
     trace: traceIds.size,
     thread: threadKeys.size,
     span: spanPairs.size,
+    text: texts.size,
   };
 }
 
@@ -116,7 +160,7 @@ export function assertKeyCaps(resolved: readonly ResolvedCall[]): void {
       cap,
       distinct,
       functions: resolved
-        .filter((entry) => entry.definition.keyKind === keyKind)
+        .filter((entry) => entry.keyKind === keyKind)
         .map((entry) => entry.definition.name),
     });
   }

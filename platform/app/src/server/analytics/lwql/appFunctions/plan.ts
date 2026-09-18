@@ -20,6 +20,22 @@
  * @see ../validation/validate.ts — what writes it
  */
 
+/** An option value as the validator read it out of the statement. */
+export type LangWatchQLAppFunctionOption = string | number | readonly string[];
+
+/**
+ * The extraction call nested inside an eval call.
+ *
+ * Present only for an eval function written over another app function, which
+ * is the usual way: `eval(conversation(ConversationId), '…')`. The database's
+ * two identity UDFs leave the *inner* function's key in the column, so
+ * hydration runs the extraction first and judges what it produced.
+ */
+export interface LangWatchQLAppFunctionSource {
+  readonly function: string;
+  readonly options: readonly LangWatchQLAppFunctionOption[];
+}
+
 /** One admitted app-function call in the outermost projection. */
 export interface LangWatchQLAppFunctionCall {
   /**
@@ -35,5 +51,7 @@ export interface LangWatchQLAppFunctionCall {
    * takes only a key. Options are literals so this is a property of the
    * statement, knowable before a single row comes back.
    */
-  readonly options: readonly (string | number)[];
+  readonly options: readonly LangWatchQLAppFunctionOption[];
+  /** The extraction call this one judges, for an eval function written over one. */
+  readonly source?: LangWatchQLAppFunctionSource;
 }

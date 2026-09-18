@@ -114,11 +114,18 @@ describe("given the app-function catalog", () => {
       }
     });
 
-    it("gates every function that returns captured content", () => {
+    it("gates every extraction function that returns captured content", () => {
       for (const definition of LWQL_APP_FUNCTION_CATALOG) {
-        // `thread_traces` is the one function carrying no content: it answers
-        // with trace ids. Every other one returns what a customer said or what
-        // a model answered, and must require the permission for it.
+        // An eval function returns a number or a label about a text, never the
+        // text: whatever content it read was named by an expression the walk
+        // already gated, so a gate here would duplicate that check.
+        if (definition.kind === "eval") {
+          expect(definition.gates, definition.name).toEqual([]);
+          continue;
+        }
+        // `thread_traces` is the one extraction function carrying no content:
+        // it answers with trace ids. Every other one returns what a customer
+        // said or what a model answered, and must require the permission.
         if (definition.name === "thread_traces") {
           expect(definition.gates).toEqual([]);
           continue;
@@ -152,6 +159,7 @@ describe("given the app-function catalog", () => {
           allowedTables: ALLOWED_TABLES,
           gatedColumns: [],
           heldPermissions: ["input", "output", "costs"],
+          instantEvalsEnabled: true,
           defaultDatabase: DATABASE,
         });
 
@@ -174,6 +182,7 @@ describe("given the app-function catalog", () => {
           allowedTables: ALLOWED_TABLES,
           gatedColumns: [],
           heldPermissions: ["input", "output", "costs"],
+          instantEvalsEnabled: true,
           defaultDatabase: DATABASE,
         });
 

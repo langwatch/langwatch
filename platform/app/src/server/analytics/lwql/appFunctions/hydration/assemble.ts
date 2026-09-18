@@ -10,6 +10,7 @@ import { appFunctionKeyId, appFunctionKeyParts } from "../keys";
 import type {
   ComputedValue,
   ComputedValues,
+  LangWatchQLEvalUsage,
   LangWatchQLHydrationInput,
   LangWatchQLHydrationResult,
   ResolvedCall,
@@ -23,10 +24,12 @@ export function assembleResult({
   input,
   resolved,
   computed,
+  evalUsage,
 }: {
   input: LangWatchQLHydrationInput;
   resolved: readonly ResolvedCall[];
   computed: ComputedValues;
+  evalUsage?: LangWatchQLEvalUsage;
 }): LangWatchQLHydrationResult {
   const hydrated = input.rows.map((row) => {
     const next: Record<string, unknown> = { ...row };
@@ -69,6 +72,7 @@ export function assembleResult({
         keys: countWhere({ computed, entry, predicate: (v) => !v.isResolved }),
       }))
       .filter((report) => report.keys > 0),
+    ...(evalUsage ? { evalUsage } : {}),
   };
 }
 

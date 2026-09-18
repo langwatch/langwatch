@@ -5,6 +5,12 @@
  * so a query and the trace drawer answer with the same text rather than with
  * two renderings that drift.
  *
+ * Only the extraction functions are computed here. An eval function's value is
+ * a judgement, which needs the text this module produces and then a
+ * classification of it, and that is `./evaluate.ts` — which calls back into
+ * {@link computeAppFunctionValue} for exactly the same text a caller would have
+ * got by projecting the nested function on its own.
+ *
  * @see ../conversation.ts
  * @see ../traceValues.ts
  * @see ../hydrate.ts
@@ -14,7 +20,9 @@ import type { Trace } from "~/server/tracer/types";
 import { cutToEstimatedTokens } from "~/shared/traces/tokenBudget";
 import { toError } from "~/utils/posthogErrorCapture";
 import { LangWatchQLAppFunctionHydrationFailedError } from "../../errors";
+import type { LangWatchQLAppFunctionDefinition } from "../catalog";
 import { renderThreadConversation, threadTraceIds } from "../conversation";
+import type { LangWatchQLAppFunctionOption } from "../plan";
 import {
   type LlmMessagesSide,
   renderReadableTrace,
@@ -49,12 +57,18 @@ export async function computeValues({
   const computed = new Map<string, Map<string, ComputedValue>>();
   try {
     for (const entry of resolved) {
+      if (entry.definition.kind !== "extraction") continue;
       const perKey = new Map<string, ComputedValue>();
       for (const [keyId, parts] of entry.keys) {
         perKey.set(
           keyId,
           capValue({
-            computed: await computeOne({ entry, parts, traces }),
+            computed: await computeAppFunctionValue({
+              definition: entry.definition,
+              options: entry.call.options,
+              parts,
+              traces,
+            }),
             maxBytes: input.limits.maxHydratedValueBytes,
           }),
         );
@@ -69,22 +83,25 @@ export async function computeValues({
   return computed;
 }
 
-/** One key's value, for one call. */
-async function computeOne({
-  entry,
+/** One key's value, for one extraction function called with these options. */
+export async function computeAppFunctionValue({
+  definition,
+  options,
   parts,
   traces,
 }: {
-  entry: ResolvedCall;
+  definition: LangWatchQLAppFunctionDefinition;
+  options: readonly LangWatchQLAppFunctionOption[];
   parts: readonly string[];
   traces: FetchedTraces;
 }): Promise<ComputedValue> {
   const [first, second] = parts;
   if (first === undefined) return NOT_RESOLVED;
 
-  if (entry.definition.keyKind === "thread") {
+  if (definition.keyKind === "thread") {
     return computeThreadValue({
-      entry,
+      definition,
+      options,
       threadKey: first,
       threadTraces: traces.byThread.get(first) ?? [],
     });
@@ -92,20 +109,27 @@ async function computeOne({
 
   const trace = traces.byId.get(first);
   if (!trace) return NOT_RESOLVED;
-  return await computeTraceValue({ entry, trace, spanId: second });
+  return await computeTraceValue({
+    definition,
+    options,
+    trace,
+    spanId: second,
+  });
 }
 
 function computeThreadValue({
-  entry,
+  definition,
+  options,
   threadKey,
   threadTraces,
 }: {
-  entry: ResolvedCall;
+  definition: LangWatchQLAppFunctionDefinition;
+  options: readonly LangWatchQLAppFunctionOption[];
   threadKey: string;
   threadTraces: readonly Trace[];
 }): ComputedValue {
   if (threadTraces.length === 0) return NOT_RESOLVED;
-  const { name } = entry.definition;
+  const { name } = definition;
 
   if (name === "thread_traces") {
     return {
@@ -120,8 +144,8 @@ function computeThreadValue({
     traces: threadTraces,
     ...(name === "conversation_bounded"
       ? {
-          maxTokens: numberOption({ entry, at: 0 }),
-          untilTraceId: stringOption({ entry, at: 1 }),
+          maxTokens: numberOption({ definition, options, at: 0 }),
+          untilTraceId: stringOption({ definition, options, at: 1 }),
         }
       : {}),
   });
@@ -136,21 +160,23 @@ const MESSAGES_SIDES: Readonly<Record<string, LlmMessagesSide>> = {
 };
 
 async function computeTraceValue({
-  entry,
+  definition,
+  options,
   trace,
   spanId,
 }: {
-  entry: ResolvedCall;
+  definition: LangWatchQLAppFunctionDefinition;
+  options: readonly LangWatchQLAppFunctionOption[];
   trace: Trace;
   spanId: string | undefined;
 }): Promise<ComputedValue> {
-  const { name } = entry.definition;
+  const { name } = definition;
 
   if (name === "llm_readable_trace") {
     return {
       value: await renderReadableTrace({
         trace,
-        maxTokens: numberOption({ entry, at: 0 }),
+        maxTokens: numberOption({ definition, options, at: 0 }),
       }),
       isTruncated: false,
       isResolved: true,
@@ -196,32 +222,36 @@ async function computeTraceValue({
  * a plausible-looking wrong budget.
  */
 function numberOption({
-  entry,
+  definition,
+  options,
   at,
 }: {
-  entry: ResolvedCall;
+  definition: LangWatchQLAppFunctionDefinition;
+  options: readonly LangWatchQLAppFunctionOption[];
   at: number;
 }): number {
-  const option = entry.call.options[at];
+  const option = options[at];
   if (typeof option !== "number" || !Number.isFinite(option)) {
     throw new Error(
-      `lwql hydration: "${entry.definition.name}" needs a numeric option at position ${at}`,
+      `lwql hydration: "${definition.name}" needs a numeric option at position ${at}`,
     );
   }
   return option;
 }
 
 function stringOption({
-  entry,
+  definition,
+  options,
   at,
 }: {
-  entry: ResolvedCall;
+  definition: LangWatchQLAppFunctionDefinition;
+  options: readonly LangWatchQLAppFunctionOption[];
   at: number;
 }): string {
-  const option = entry.call.options[at];
+  const option = options[at];
   if (typeof option !== "string") {
     throw new Error(
-      `lwql hydration: "${entry.definition.name}" needs a string option at position ${at}`,
+      `lwql hydration: "${definition.name}" needs a string option at position ${at}`,
     );
   }
   return option;
@@ -233,13 +263,14 @@ function stringOption({
  * Only a string value is cut. The one list-valued function returns a thread's
  * trace ids, which the thread read itself bounds at a thousand — tens of
  * kilobytes, orders of magnitude under the ceiling — so a cut there would be
- * dead code pretending to be a safeguard.
+ * dead code pretending to be a safeguard. A judged column holds a number, which
+ * has no length to cut.
  *
  * The cut goes through the shared token cutter at a quarter of the byte budget,
  * which is exactly a byte cut on a UTF-8 boundary: a cut landing mid-character
  * would otherwise ship a replacement character.
  */
-function capValue({
+export function capValue({
   computed,
   maxBytes,
 }: {

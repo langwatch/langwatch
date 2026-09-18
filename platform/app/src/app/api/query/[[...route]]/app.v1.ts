@@ -206,9 +206,12 @@ function registerSchema(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const { protections } = await callerContext(c);
+      const { project, protections } = await callerContext(c);
       return c.json(
-        await getLangWatchQLService().describeSchema({ protections }),
+        await getLangWatchQLService().describeSchema({
+          projectId: project.id,
+          protections,
+        }),
       );
     },
   );

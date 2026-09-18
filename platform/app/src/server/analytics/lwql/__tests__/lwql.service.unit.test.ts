@@ -834,11 +834,13 @@ describe("given the LangWatchQL service", () => {
       ).toBe("lwql_unavailable");
     });
 
-    it("still describes the schema, which discloses nothing a caller could read", () => {
-      expect(
-        serviceWith(null).describeSchema({ protections: FULLY_PERMITTED })
-          .datasets,
-      ).toHaveLength(LWQL_VIEW_CATALOG.length);
+    it("still describes the schema, which discloses nothing a caller could read", async () => {
+      const schema = await serviceWith(null).describeSchema({
+        projectId: PROJECT.id,
+        protections: FULLY_PERMITTED,
+      });
+
+      expect(schema.datasets).toHaveLength(LWQL_VIEW_CATALOG.length);
     });
   });
 

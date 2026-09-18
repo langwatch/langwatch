@@ -26,6 +26,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { lwqlAppFunctionNames } from "../appFunctions/catalog";
+import { LWQL_EVAL_FUNCTION_CATALOG } from "../appFunctions/evalCatalog";
 import {
   lwqlAppFunctionGrantAuditQuery,
   lwqlClickHouseSetupStatements,
@@ -192,6 +193,53 @@ describe("given the LangWatchQL app functions provisioned on a real server", () 
         harness,
         context: "a projection UDF must not widen the row policy",
       });
+    });
+  });
+
+  describe("when an eval function is called", () => {
+    /** @scenario "The eval functions are provisioned as projection UDFs like every other app function" */
+    it("holds one of our own SQL user-defined functions for every declared name", async () => {
+      const rows = await serverFunctions();
+      const evalNames = LWQL_EVAL_FUNCTION_CATALOG.map(
+        (definition) => definition.name,
+      );
+
+      expect(evalNames.length).toBeGreaterThan(0);
+      for (const name of evalNames) {
+        const row = rows.find((candidate) => candidate.name === name);
+        expect(row?.origin, name).toBe(LWQL_SQL_UDF_ORIGIN);
+      }
+    });
+
+    /** @scenario "A statement calling an eval function is recorded verbatim and hands back its text" */
+    it("records the statement verbatim and answers with the text it was given", async () => {
+      const queryId = `lwql-evalfn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const sql =
+        `SELECT TraceId, eval(TraceId, 'The trace failed') AS annoyed ` +
+        `/* eval-function-verbatim-marker */ FROM ${database}.traces ORDER BY TraceId LIMIT 3`;
+
+      const rows = await selectRows<{ TraceId: string; annoyed: string }>(
+        tenantA,
+        sql,
+        { query_id: queryId },
+      );
+      await harness.applyAsAdmin(["SYSTEM FLUSH LOGS"]);
+
+      expect(rows.length).toBeGreaterThan(0);
+      // The database's half: the eval UDF is the identity on the text it was
+      // given, so the application receives the text to judge rather than a
+      // value the database invented.
+      for (const row of rows) expect(row.annoyed).toBe(row.TraceId);
+
+      const entries = await selectRows<{ query: string }>(
+        harness.admin,
+        `SELECT query FROM system.query_log WHERE query_id = '${queryId}' AND type = 'QueryFinish'`,
+      );
+      expect(
+        entries.length,
+        "no query_log entry for the audited query — the verbatim claim would be vacuous",
+      ).toBeGreaterThan(0);
+      for (const entry of entries) expect(entry.query).toContain(sql);
     });
   });
 

@@ -88,6 +88,7 @@ export const SCHEMA_RESPONSE: LangWatchQLSchema = {
   functions: [
     {
       name: "conversation",
+      kind: "extraction",
       signature: "conversation(thread_key)",
       description: "The whole thread as markdown.",
       returns: "Nullable(String)",
@@ -101,6 +102,7 @@ export const SCHEMA_RESPONSE: LangWatchQLSchema = {
     },
     {
       name: "thread_traces",
+      kind: "extraction",
       signature: "thread_traces(thread_key)",
       description: "The thread's trace identifiers, oldest first.",
       returns: "Array(String)",

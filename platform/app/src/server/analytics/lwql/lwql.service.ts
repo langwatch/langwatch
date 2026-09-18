@@ -52,9 +52,17 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { InstantEvalClassifier } from "~/server/app-layer/instant-evals/classifier/classifier";
+import {
+  instantEvalCostUsd,
+  instantEvalPriceUsd,
+} from "~/server/app-layer/instant-evals/classifier/pricing";
 import type { Protections } from "../../traces/protections";
 import { hydrateLangWatchQLAppFunctions } from "./appFunctions/hydrate";
-import type { LangWatchQLHydrationResult } from "./appFunctions/hydration/contract";
+import type {
+  LangWatchQLEvalUsage,
+  LangWatchQLHydrationResult,
+} from "./appFunctions/hydration/contract";
 import {
   createLangWatchQLAppFunctionTraceSource,
   type LangWatchQLAppFunctionTraceSource,
@@ -86,6 +94,10 @@ import {
   type LangWatchQLStatistics,
   lwqlConnectionFromEnv,
 } from "./executor";
+import {
+  createLangWatchQLInstantEvalSupport,
+  type LangWatchQLInstantEvalSupport,
+} from "./instantEvalSupport";
 import {
   assertLangWatchQLGranularityDeclaration,
   type LangWatchQLBudgetOverflowMode,
@@ -346,6 +358,16 @@ export interface LangWatchQLServiceDependencies {
    */
   readonly traceSource?: LangWatchQLAppFunctionTraceSource;
   /**
+   * Everything an eval function needs: the project gate, the judge, the
+   * ceilings on one query, and where its cost is recorded.
+   *
+   * A dependency, and built on first use like the trace source, so a suite can
+   * drive the whole judged path against a fake classifier with no datastore —
+   * and a deployment whose callers never write an eval function never resolves
+   * a feature flag or opens a connection pool.
+   */
+  readonly instantEvals?: LangWatchQLInstantEvalSupport;
+  /**
    * The clock the diagnostics ask "has this period finished yet" against.
    *
    * A dependency rather than a call to `Date.now()` inside the rule, so that
@@ -367,6 +389,7 @@ export class LangWatchQLService {
   private readonly limits: LangWatchQLResultLimits;
   private readonly now: () => Date;
   private cachedTraceSource?: LangWatchQLAppFunctionTraceSource;
+  private cachedInstantEvals?: LangWatchQLInstantEvalSupport;
 
   /**
    * Releases the transport the executor holds, where it holds one.
@@ -403,15 +426,19 @@ export class LangWatchQLService {
    * LangWatchQL identity can still describe what the API would expose. Answering
    * it does not disclose anything a caller could not read in the docs.
    */
-  describeSchema({
+  async describeSchema({
+    projectId,
     protections,
   }: {
+    /** Whose eval-function availability is being described. */
+    projectId: string;
     protections: Protections;
-  }): LangWatchQLSchema {
+  }): Promise<LangWatchQLSchema> {
     return describeLangWatchQLSchema({
       database: this.deps.database,
       protections,
       views: this.views,
+      instantEvalsEnabled: await this.instantEvals().isEnabled({ projectId }),
     });
   }
 
@@ -445,6 +472,7 @@ export class LangWatchQLService {
     sql,
     parameters,
     timeWindow,
+    instantEvalsEnabled = false,
   }: {
     /** Logged with a refusal. The database, not this, decides the tenant. */
     readonly projectId: string;
@@ -453,6 +481,15 @@ export class LangWatchQLService {
     readonly parameters?: Readonly<Record<string, unknown>>;
     /** The period the surface is showing, when one is asking. */
     readonly timeWindow?: LangWatchQLTimeWindow;
+    /**
+     * Whether an eval function may be called.
+     *
+     * Resolved by {@link LangWatchQLService.execute}, which has the project and
+     * can await it. Defaulting to false is what makes the *save* path refuse a
+     * judged statement: saving a chart stores SQL somebody else will run later,
+     * and a gate resolved at save time would be the wrong caller's answer.
+     */
+    readonly instantEvalsEnabled?: boolean;
   }): ValidatedLangWatchQL {
     const validation = validateLangWatchQL({
       sql,
@@ -473,6 +510,7 @@ export class LangWatchQLService {
       // The positive form of the same permissions, which is what an app
       // function is gated on: it has no column for the withheld set to name.
       heldPermissions: lwqlHeldPermissions({ protections }),
+      instantEvalsEnabled,
       defaultDatabase: this.deps.database,
     });
 
@@ -545,10 +583,18 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
   }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+    // Resolved before validation, because whether an eval function may be
+    // called is part of what the validator decides.
+    const instantEvals = this.instantEvals();
+    const instantEvalsEnabled = await instantEvals.isEnabled({
+      projectId: project.id,
+    });
+
     const validation = this.validate({
       projectId: project.id,
       protections,
       sql,
+      instantEvalsEnabled,
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
     });
@@ -581,6 +627,7 @@ export class LangWatchQLService {
       sql,
       validation,
       granularity,
+      instantEvals,
     });
   }
 
@@ -605,6 +652,62 @@ export class LangWatchQLService {
       this.deps.traceSource ?? createLangWatchQLAppFunctionTraceSource());
   }
 
+  /** The Instant Evals dependency, built on first use. */
+  private instantEvals(): LangWatchQLInstantEvalSupport {
+    return (this.cachedInstantEvals ??=
+      this.deps.instantEvals ?? createLangWatchQLInstantEvalSupport());
+  }
+
+  /**
+   * Steps 5a and 5b: turn the keys into values, then record what that cost.
+   *
+   * Hydration runs after the database and before the diagnostics, because the
+   * diagnostics describe the answer a caller receives and hydration is what
+   * decides what that is: the row count, the byte total, and the type of every
+   * hydrated column. A statement that called no app function skips it entirely
+   * and reads nothing.
+   *
+   * The bill comes after, because the number recorded is what the classifier
+   * reported it charged, which only exists once it has answered. A query that
+   * judged nothing records nothing.
+   */
+  private async hydrateAndBill({
+    project,
+    protections,
+    validation,
+    execution,
+    instantEvals,
+  }: {
+    readonly project: LangWatchQLCaller;
+    readonly protections: Protections;
+    readonly validation: ValidatedLangWatchQL;
+    readonly execution: Awaited<ReturnType<LangWatchQLExecutor["execute"]>>;
+    readonly instantEvals: LangWatchQLInstantEvalSupport;
+  }): Promise<LangWatchQLHydrationResult> {
+    const hydration = await hydrateLangWatchQLAppFunctions({
+      projectId: project.id,
+      protections,
+      calls: validation.appFunctions,
+      columns: execution.columns,
+      rows: execution.rows,
+      limits: this.limits,
+      traceSource: this.traceSource(),
+      instantEvals: {
+        classifier: instantEvals.classifier(),
+        maxConcurrency: instantEvals.maxConcurrency,
+        queryTokenBudget: instantEvals.queryTokenBudget,
+      },
+    });
+
+    await recordInstantEvalCost({
+      projectId: project.id,
+      usage: hydration.evalUsage,
+      classifier: instantEvals.classifier(),
+      recordCost: instantEvals.recordCost,
+    });
+    return hydration;
+  }
+
   private async executeValidated({
     executor,
     project,
@@ -612,6 +715,7 @@ export class LangWatchQLService {
     sql,
     validation,
     granularity,
+    instantEvals,
   }: {
     readonly executor: LangWatchQLExecutor;
     readonly project: LangWatchQLCaller;
@@ -619,6 +723,7 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
+    readonly instantEvals: LangWatchQLInstantEvalSupport;
   }): Promise<LangWatchQLQueryResult> {
     const executionParameters = executionParametersFor({
       validation,
@@ -637,20 +742,12 @@ export class LangWatchQLService {
       usesAppFunctions: validation.appFunctions.length > 0,
     });
 
-    // Step 5a: replace each app-function key with the value it names. Runs
-    // after the database and before the diagnostics, because the diagnostics
-    // describe the answer a caller receives and hydration is what decides what
-    // that is — the row count, the byte total, and the type of every hydrated
-    // column. A statement that called no app function skips it entirely and
-    // reads nothing.
-    const hydration = await hydrateLangWatchQLAppFunctions({
-      projectId: project.id,
+    const hydration = await this.hydrateAndBill({
+      project,
       protections,
-      calls: validation.appFunctions,
-      columns: execution.columns,
-      rows: execution.rows,
-      limits: this.limits,
-      traceSource: this.traceSource(),
+      validation,
+      execution,
+      instantEvals,
     });
     const truncated = execution.truncated || hydration.isTruncatedByBytes;
 
@@ -747,6 +844,9 @@ function appFunctionDiagnosticsInput({
       isTruncatedByBytes: hydration.isTruncatedByBytes,
       valueTruncations: hydration.valueTruncations,
       unresolvedKeys: hydration.unresolvedKeys,
+      ...(hydration.evalUsage
+        ? { skippedJudgements: hydration.evalUsage.skipped }
+        : {}),
     },
   };
 }
@@ -871,4 +971,47 @@ export async function closeLangWatchQLService(): Promise<void> {
   const previous = cached;
   cached = null;
   await previous?.close();
+}
+
+/**
+ * Records what one query's judgements cost, or records nothing.
+ *
+ * Nothing when no eval function ran, and nothing when they ran but judged no
+ * text: a cost row of zero is a row a customer has to read and dismiss.
+ *
+ * Deliberately not allowed to fail the query. The judgements were made and the
+ * answer is correct; losing the cost row is an accounting problem to find in
+ * the logs, not a reason to refuse a caller a result they have already been
+ * charged for.
+ */
+async function recordInstantEvalCost({
+  projectId,
+  usage,
+  classifier,
+  recordCost,
+}: {
+  projectId: string;
+  usage: LangWatchQLEvalUsage | undefined;
+  classifier: InstantEvalClassifier;
+  recordCost: LangWatchQLInstantEvalSupport["recordCost"];
+}): Promise<void> {
+  if (!usage || usage.inputTokens <= 0) return;
+  const costUsd = instantEvalCostUsd({
+    inputTokens: usage.inputTokens,
+    pricing: classifier.pricing,
+  });
+  try {
+    await recordCost({
+      projectId,
+      inputTokens: usage.inputTokens,
+      requests: usage.requests,
+      costUsd,
+      priceUsd: instantEvalPriceUsd({ costUsd, pricing: classifier.pricing }),
+    });
+  } catch (error) {
+    logger.error(
+      { projectId, error },
+      "Instant Evals cost row could not be written",
+    );
+  }
 }
