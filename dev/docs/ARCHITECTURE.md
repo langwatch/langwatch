@@ -252,11 +252,12 @@ parse (§6). A hand-maintained per-app config module is a defect.
 import "@langwatch/time/polyfill";
 
 const server = await Server.create("langwatch-api")
-  .withSecrets(secretsChain())          // ADR-132 chain: env → 1Password → refusal by name
-  .withConfig(apiConfig)                // §6 generated parse, UNDER telemetry: refusals are logged, named
+  .withConfig(apiConfig)                // §6 parse from the installed modules' own schemas — FIRST
+  .withSecrets((config) =>              // config feeds secrets (ruled 2026-09-18): the fluent
+    Secrets.chain().env().file().onePassword(config.process.secretsVault))
   .withTelemetry(grafanaTelemetry())    // logger + trace links + OTLP export, from config
   .withMetrics(prometheusMetrics())     // scrape endpoint, token from config
-  .start();                             // fatal handlers → secrets → parse → /healthz live
+  .start();                             // fatal handlers → parse → secrets → /healthz live
 
 const app = await server.composeProcess("api")
   .withModules(processModules)          // dependencies resolve from config — no store lines (§5)
@@ -586,7 +587,28 @@ appears everywhere with no other edit. Framework-owned values follow the
 same rule at their owning package (the server's port and shutdown deadline
 on the process package, store connections on the stores config,
 observability on its own). There is no per-app config file — a `config.ts`
-in an app is a defect. Every key is a **root object** — `process` for the framework
+in an app is a defect. **The pre-existing config machinery is deleted, not
+migrated** (ruled 2026-09-18): RuntimeConfig definitions, the contract
+`*ConfigDefinition` files, the generated config map and both app config
+files all go; the compiler enumerates the fallout and this section is what
+replaces them.
+
+**Secrets are the sibling package, and a secret is a value you may only
+pass through** (approved 2026-09-18). A module declares its handles beside
+its config (`Secret.define`, env spellings, optionality); the app builds
+only the READER — a fluent adapter chain,
+`Secrets.chain().env().file().onePassword(...)` — installed on the Server
+preamble AFTER `withConfig`, as a function of the parsed config, so config
+can feed secrets (the 1Password vault key is a config fact). `boot()`
+scopes the resolver per module: a `create()` can resolve only the handles
+its own module declared, each resolve validates against the handle's
+schema and hands the value to a closure —
+`secrets.into(handle, (key) => Cipher.create(key))` — so only the
+constructed collaborator escapes and travels. There is no `get()` that
+returns a string to keep. When the last `create()` returns, the resolver
+SEALS: a post-boot resolve refuses by name. Declarations live on modules
+and framework packages; the server carries only the mechanism; the app
+declares nothing. Every key is a **root object** — `process` for the framework
 globals, or the module's name for its slice — and Zod reads the environment
 at the one boot seam. A missing required value refuses **naming module and
 key** (`github.appId ← GITHUB_APP_ID`); a module with a schema and no slice
