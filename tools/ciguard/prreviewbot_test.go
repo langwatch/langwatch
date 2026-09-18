@@ -162,7 +162,7 @@ func TestPRReviewBotTriggersOnReadyForReview(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "pull_request types")
 }
 
-// @scenario "In-progress review is cancelled for the same PR"
+// @scenario "In-progress review is canceled for the same PR"
 func TestPRReviewBotCancelsInProgressRunsForTheSamePR(t *testing.T) {
 	noCancel := strings.Replace(goodPRReviewBotWorkflow, "cancel-in-progress: true", "cancel-in-progress: false", 1)
 	root := writePRReviewBotWorkflow(t, noCancel)
@@ -211,6 +211,57 @@ func TestPRReviewBotRejectsAPinWithNoVersionComment(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
 	assert.Contains(t, strings.Join(problems, "\n"), "no version comment")
+}
+
+func TestPRReviewBotReportsMissingTriggerTypes(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow,
+		"\n    types: [opened, synchronize, reopened, ready_for_review]", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "declares no pull_request")
+}
+
+func TestPRReviewBotReportsAnExtraTriggerType(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow,
+		"types: [opened, synchronize, reopened, ready_for_review]",
+		"types: [opened, synchronize, reopened, ready_for_review, edited]", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "pull_request types")
+}
+
+func TestPRReviewBotReportsAMissingConcurrencyGroup(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow,
+		"\n  group: pr-review-bot-${{ github.event.pull_request.number }}", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "declares no concurrency group")
+}
+
+func TestPRReviewBotReportsAWorkflowWithNoUsesSteps(t *testing.T) {
+	_, stepsBlock, found := strings.Cut(goodPRReviewBotWorkflow, "    steps:")
+	require.True(t, found)
+	noUses := strings.Replace(goodPRReviewBotWorkflow, "    steps:"+stepsBlock,
+		"    steps:\n      - run: echo no actions here\n", 1)
+	root := writePRReviewBotWorkflow(t, noUses)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "has no `uses:` steps")
 }
 
 func TestPRReviewBotHoldsInTheLiveRepo(t *testing.T) {

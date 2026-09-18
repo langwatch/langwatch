@@ -8,6 +8,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/langwatch/langwatch/pkg/ciscan"
 )
 
 // PRReviewBotWorkflow is the workflow this guard reads.
@@ -30,11 +32,13 @@ var prReviewBotGateClauses = map[string]string{
 var prReviewBotTriggerTypes = []string{"opened", "synchronize", "reopened", "ready_for_review"}
 
 var (
-	triggerTypesPattern     = regexp.MustCompile(`(?m)^\s*types:\s*\[([^\]]*)\]`)
-	concurrencyGroupPattern = regexp.MustCompile(`(?m)^\s*group:\s*(.+?)\s*$`)
-	cancelInProgressPattern = regexp.MustCompile(`(?m)^\s*cancel-in-progress:\s*(\S+)\s*$`)
-	usesPattern             = regexp.MustCompile(`(?m)^\s*-?\s*uses:\s*([^@\s]+)@(\S+)\s*(#.*)?$`)
-	fullSHAPattern          = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	// usesCommentPattern recovers the trailing `# <version>` comment on a
+	// `uses:` line. The workflow is read structurally through ciscan; this raw
+	// scan exists only for the comment, which yaml drops. `[ \t]*` — not
+	// `\s*` — so the comment must sit on the same line as the pin it
+	// documents, never on a following line.
+	usesCommentPattern = regexp.MustCompile(`(?m)^[ \t]*-?[ \t]*uses:[ \t]*(\S+)[ \t]*(#.*)?$`)
+	fullSHAPattern     = regexp.MustCompile(`^[0-9a-f]{40}$`)
 )
 
 // PRReviewBot reports every way the PR Review Bot workflow has drifted from
@@ -42,25 +46,33 @@ var (
 // skip gate, the trigger types that can run a review, single-review-in-flight
 // concurrency, and full-SHA pinning on every action it uses.
 func PRReviewBot(repoRoot string) ([]string, error) {
+	workflow, err := ciscan.Load(repoRoot, PRReviewBotWorkflow)
+	if err != nil {
+		return nil, err
+	}
+
 	raw, err := os.ReadFile(filepath.Join(repoRoot, PRReviewBotWorkflow))
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", PRReviewBotWorkflow, err)
 	}
-	content := string(raw)
 
 	var problems []string
-	problems = append(problems, prReviewBotGates(content)...)
-	problems = append(problems, prReviewBotTriggers(content)...)
-	problems = append(problems, prReviewBotConcurrency(content)...)
-	problems = append(problems, prReviewBotPinning(content)...)
+	problems = append(problems, prReviewBotGates(workflow)...)
+	problems = append(problems, prReviewBotTriggers(workflow)...)
+	problems = append(problems, prReviewBotConcurrency(workflow)...)
+	problems = append(problems, prReviewBotPinning(workflow, string(raw))...)
 
 	return problems, nil
 }
 
-// prReviewBotGates checks the three skip clauses are still present in the
+// prReviewBotGates checks the three skip clauses are still present in some
 // job's `if:` condition.
-func prReviewBotGates(content string) []string {
-	var problems []string
+func prReviewBotGates(workflow *ciscan.Workflow) []string {
+	conditions := make([]string, 0, len(workflow.Jobs))
+	for _, job := range workflow.JobNames() {
+		conditions = append(conditions, workflow.Jobs[job].If)
+	}
+	joined := strings.Join(conditions, "\n")
 
 	names := make([]string, 0, len(prReviewBotGateClauses))
 	for name := range prReviewBotGateClauses {
@@ -68,9 +80,10 @@ func prReviewBotGates(content string) []string {
 	}
 	sort.Strings(names)
 
+	var problems []string
 	for _, name := range names {
 		clause := prReviewBotGateClauses[name]
-		if !strings.Contains(content, clause) {
+		if !strings.Contains(joined, clause) {
 			problems = append(problems, fmt.Sprintf(
 				"%s no longer gates on %q (%s check missing)", PRReviewBotWorkflow, clause, name))
 		}
@@ -83,17 +96,10 @@ func prReviewBotGates(content string) []string {
 // event types the review job's scenarios describe — no fewer (a dropped type
 // silently stops reviewing that event) and no more (an added type runs
 // against an event the gate above was never proven against).
-func prReviewBotTriggers(content string) []string {
-	match := triggerTypesPattern.FindStringSubmatch(content)
-	if match == nil {
+func prReviewBotTriggers(workflow *ciscan.Workflow) []string {
+	got := slices.Clone(workflow.On.PullRequest.Types)
+	if len(got) == 0 {
 		return []string{fmt.Sprintf("%s declares no pull_request `types:` list", PRReviewBotWorkflow)}
-	}
-
-	var got []string
-	for _, raw := range strings.Split(match[1], ",") {
-		if trimmed := strings.TrimSpace(raw); trimmed != "" {
-			got = append(got, trimmed)
-		}
 	}
 	sort.Strings(got)
 
@@ -105,56 +111,79 @@ func prReviewBotTriggers(content string) []string {
 	}
 
 	return []string{fmt.Sprintf(
-		"%s pull_request types are %v, want %v", PRReviewBotWorkflow, got, prReviewBotTriggerTypes)}
+		"%s pull_request types are %v, want %v",
+		PRReviewBotWorkflow, workflow.On.PullRequest.Types, prReviewBotTriggerTypes)}
 }
 
 // prReviewBotConcurrency checks the workflow cancels a superseded run for the
-// same PR rather than letting two reviews for the same PR race to
-// completion.
-func prReviewBotConcurrency(content string) []string {
+// same PR rather than letting two reviews for the same PR race to completion.
+func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 	var problems []string
 
-	group := concurrencyGroupPattern.FindStringSubmatch(content)
+	group := strings.TrimSpace(workflow.Concurrency.Group)
 	switch {
-	case group == nil:
+	case group == "":
 		problems = append(problems, fmt.Sprintf("%s declares no concurrency group", PRReviewBotWorkflow))
-	case !strings.Contains(group[1], "github.event.pull_request.number"):
+	case !strings.Contains(group, "github.event.pull_request.number"):
 		problems = append(problems, fmt.Sprintf(
-			"%s concurrency group %q does not key on the PR number", PRReviewBotWorkflow, group[1]))
+			"%s concurrency group %q does not key on the PR number", PRReviewBotWorkflow, group))
 	}
 
-	cancel := cancelInProgressPattern.FindStringSubmatch(content)
-	if cancel == nil || !strings.EqualFold(cancel[1], "true") {
+	if cancels, isValid := workflow.Concurrency.CancelsInProgress(); !isValid || !cancels {
 		problems = append(problems, fmt.Sprintf("%s does not set cancel-in-progress: true", PRReviewBotWorkflow))
 	}
 
 	return problems
 }
 
-// prReviewBotPinning enforces the pinning invariant every `uses:` step in
-// this workflow must meet: a full 40-character commit SHA, never a floating
-// tag or branch, with a trailing comment recording what it means.
-func prReviewBotPinning(content string) []string {
-	matches := usesPattern.FindAllStringSubmatch(content, -1)
-	if matches == nil {
+// prReviewBotPinning enforces the pinning invariant every `uses:` step in this
+// workflow must meet: a full 40-character commit SHA, never a floating tag or
+// branch, with a trailing comment recording what it means. The action and ref
+// come from ciscan; the comment comes from the raw scan, since yaml drops it.
+func prReviewBotPinning(workflow *ciscan.Workflow, raw string) []string {
+	commented := commentedUses(raw)
+
+	var uses []string
+	for _, job := range workflow.JobNames() {
+		for _, step := range workflow.Jobs[job].Steps {
+			if step.Uses != "" {
+				uses = append(uses, step.Uses)
+			}
+		}
+	}
+
+	if len(uses) == 0 {
 		return []string{fmt.Sprintf("%s has no `uses:` steps, so this guard is watching nothing", PRReviewBotWorkflow)}
 	}
 
 	var problems []string
-	for _, match := range matches {
-		action, ref, comment := match[1], match[2], strings.TrimSpace(match[3])
-
-		if !fullSHAPattern.MatchString(ref) {
+	for _, use := range uses {
+		action, ref, found := strings.Cut(use, "@")
+		if !found || !fullSHAPattern.MatchString(ref) {
 			problems = append(problems, fmt.Sprintf(
 				"%s pins %s to %q, which is not a full 40-character commit SHA", PRReviewBotWorkflow, action, ref))
+
 			continue
 		}
 
-		if comment == "" {
+		if !commented[use] {
 			problems = append(problems, fmt.Sprintf(
 				"%s pins %s to a SHA with no version comment", PRReviewBotWorkflow, action))
 		}
 	}
 
 	return problems
+}
+
+// commentedUses maps each `uses:` value to whether its line carries a trailing
+// `#` comment. A value can appear on more than one step; a single documented
+// occurrence is enough to treat that pin as commented.
+func commentedUses(raw string) map[string]bool {
+	commented := make(map[string]bool)
+	for _, match := range usesCommentPattern.FindAllStringSubmatch(raw, -1) {
+		use := match[1]
+		commented[use] = commented[use] || strings.TrimSpace(match[2]) != ""
+	}
+
+	return commented
 }
