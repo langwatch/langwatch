@@ -70,15 +70,49 @@ describe("resolving pi's session directory", () => {
       expect(resolved).toBe("/elsewhere/sessions");
     });
 
-    /** @scenario "A session kept somewhere other than the default place is still found" */
-    it("reads the joined-up spelling of the same flag", async () => {
+    /**
+     * pi has no `--flag=value` spelling: its parser matches whole tokens and
+     * drops `--session-dir=/x` into `unknownFlags`, then writes to its default.
+     * Honouring it here pointed capture at a directory pi never filled and
+     * reported nothing, so the joined-up form must resolve to the default.
+     *
+     * The assertion names the default rather than merely "not /elsewhere", so
+     * a resolver that threw the argument away and then went wrong somewhere
+     * else still fails.
+     *
+     * @scenario "A directory named in a spelling pi ignores does not move capture"
+     */
+    it("ignores the joined-up spelling, the way pi ignores it", async () => {
       const resolved = await resolvePiSessionDir({
         toolArgs: ["--session-dir=/elsewhere/sessions"],
         env: {},
         home,
+        cwd,
       });
 
-      expect(resolved).toBe("/elsewhere/sessions");
+      expect(resolved).toBe(
+        defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }),
+      );
+      expect(resolved).not.toBe("/elsewhere/sessions");
+    });
+
+    /**
+     * pi stops reading flags at `--`, so a `--session-dir` behind it is a
+     * message, not a relocation.
+     *
+     * @scenario "A directory named in a spelling pi ignores does not move capture"
+     */
+    it("stops reading flags at the argument terminator", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: ["--", "--session-dir", "/elsewhere/sessions"],
+        env: {},
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(
+        defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }),
+      );
     });
 
     /** @scenario "A session kept somewhere other than the default place is still found" */
@@ -501,11 +535,17 @@ describe("reading the session directory out of pi's arguments", () => {
     expect(sessionDirFromArgs(["--session-dir"])).toBeNull();
   });
 
-  it("does not mistake the next option for a directory", () => {
-    expect(sessionDirFromArgs(["--session-dir", "--verbose"])).toBeNull();
+  /**
+   * pi takes the next token unconditionally, so this really does name a
+   * directory called `--verbose` to pi. Reading it as "no directory" left
+   * capture on the default while pi wrote elsewhere.
+   */
+  it("takes a value that looks like a flag, because pi takes it", () => {
+    expect(sessionDirFromArgs(["--session-dir", "--verbose"])).toBe("--verbose");
   });
 
-  it("does not mistake an empty joined-up value for a directory", () => {
+  it("finds nothing in the joined-up spelling, which pi does not accept", () => {
+    expect(sessionDirFromArgs(["--session-dir=/joined"])).toBeNull();
     expect(sessionDirFromArgs(["--session-dir="])).toBeNull();
   });
 
@@ -513,9 +553,16 @@ describe("reading the session directory out of pi's arguments", () => {
     expect(sessionDirFromArgs(["--session-dirs", "/nope"])).toBeNull();
   });
 
-  it("keeps a directory whose name starts with a dash out of the value slot", () => {
-    // Only the joined-up spelling can name such a directory unambiguously.
-    expect(sessionDirFromArgs(["--session-dir=-weird"])).toBe("-weird");
+  it("names a directory that starts with a dash from the value slot", () => {
+    expect(sessionDirFromArgs(["--session-dir", "-weird"])).toBe("-weird");
+  });
+
+  it("stops at the argument terminator the way pi does", () => {
+    expect(sessionDirFromArgs(["--", "--session-dir", "/after"])).toBeNull();
+    // The terminator ends parsing, so an earlier flag still stands.
+    expect(
+      sessionDirFromArgs(["--session-dir", "/before", "--", "--session-dir", "/after"]),
+    ).toBe("/before");
   });
 
   it("lets a later flag override an earlier one", () => {
@@ -523,7 +570,8 @@ describe("reading the session directory out of pi's arguments", () => {
       sessionDirFromArgs([
         "--session-dir",
         "/first",
-        "--session-dir=/second",
+        "--session-dir",
+        "/second",
       ]),
     ).toBe("/second");
   });

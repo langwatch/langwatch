@@ -166,6 +166,28 @@ Feature: pi session capture
     Then that session is recorded
     And the folder we looked in is the one pi makes for the working directory, not its parent
 
+  @unit
+  # Reading pi's flags more loosely than pi reads them is the same failure as
+  # reading the wrong directory: capture watches a place pi never writes, sends
+  # nothing, and says nothing.
+  #
+  # pi's parser matches whole tokens, one branch per flag, with no pass that
+  # splits `--flag=value` first. So `--session-dir=/x` is an unknown flag to pi
+  # and pi writes to its default; we honoured it and watched an empty directory.
+  # The reverse case is the same bug from the other side: pi takes the token
+  # after the flag unconditionally, so `--session-dir --verbose` names a
+  # directory called `--verbose` to pi, and refusing to read it left capture on
+  # the default while pi wrote somewhere else. `--` ends pi's flag parsing, so a
+  # flag behind it names nothing.
+  #
+  # Settled by calling pi 0.85.1's own parser on each spelling rather than by
+  # reading its source: the space form yields the directory, the joined-up form
+  # yields nothing and lands in pi's unknown-flag map.
+  Scenario: A directory named in a spelling pi ignores does not move capture
+    Given a launch whose session directory is written in a spelling pi does not accept
+    When capture works out where to look
+    Then it looks where pi will actually write, not where the spelling pointed
+
   # --- Naming the agent, not the provider -----------------------------------
 
   @unit

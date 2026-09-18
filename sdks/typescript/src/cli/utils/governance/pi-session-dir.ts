@@ -163,29 +163,47 @@ export function defaultPiProjectSessionsDir({
 /**
  * A directory named on the command line, or null.
  *
- * Both spellings pi accepts are read: `--session-dir <dir>` and
- * `--session-dir=<dir>`. A flag with nothing after it, or one followed by
- * another flag, names no directory and falls through rather than capturing
- * `--verbose` as a path. The last spelling wins, the way an argument parser
- * that lets a later flag override an earlier one behaves.
+ * Only the spelling pi accepts is read, and that is narrower than it looks.
+ * pi's parser has one branch per flag, each of the shape
+ * `arg === "--session-dir" && i + 1 < args.length` (`cli/args.js:88-90`); there
+ * is no pass that splits `--flag=value` first. So `--session-dir=/x` is not a
+ * relocated directory to pi at all — it lands in pi's `unknownFlags` map and pi
+ * writes to its default. Verified by calling pi's own `parseArgs` on 0.85.1:
+ * `["--session-dir","/space/form"]` yields `/space/form`, while
+ * `["--session-dir=/joined/form"]` yields `undefined` and
+ * `unknownFlags: ["session-dir"]`.
+ *
+ * This function used to accept the joined-up spelling, and accepting it was a
+ * silent miss of the kind this whole file exists to close: the user's directory
+ * was honoured by us and ignored by pi, so we watched an empty directory while
+ * pi filled its default, captured nothing, and said nothing.
+ *
+ * The same correction runs the other way for a value that looks like a flag.
+ * pi takes `args[++i]` unconditionally, so `--session-dir --verbose` really does
+ * name a directory called `--verbose` to pi; refusing it here meant watching the
+ * default while pi wrote somewhere else. Mirroring pi means taking whatever the
+ * next token is, including one that starts with a dash and including the empty
+ * string — which pi then treats as unset (`main.js:532` tests `parsed.sessionDir`
+ * for truthiness), exactly as a null does here.
+ *
+ * `--` ends pi's flag parsing entirely (`cli/args.js:22-32`): everything after
+ * it is a message or a file argument, so a `--session-dir` behind it names
+ * nothing.
+ *
+ * The last occurrence wins, the way pi's loop leaves the final assignment
+ * standing.
  */
 export function sessionDirFromArgs(args: readonly string[]): string | null {
   let found: string | null = null;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === undefined) continue;
-    if (arg === SESSION_DIR_FLAG) {
-      const next = args[i + 1];
-      // A value that looks like a flag is the next option, not a path.
-      if (next === undefined || next === "" || next.startsWith("-")) continue;
-      found = next;
-      i++;
-      continue;
-    }
-    if (arg.startsWith(`${SESSION_DIR_FLAG}=`)) {
-      const value = arg.slice(SESSION_DIR_FLAG.length + 1);
-      if (value !== "") found = value;
-    }
+    if (arg === "--") break;
+    if (arg !== SESSION_DIR_FLAG) continue;
+    const next = args[i + 1];
+    // pi's own guard: a flag that ends the arguments names nothing.
+    if (next === undefined) continue;
+    found = next;
+    i++;
   }
   return found;
 }
