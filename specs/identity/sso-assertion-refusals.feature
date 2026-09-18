@@ -70,6 +70,18 @@ Feature: Why a single sign-on assertion was turned away
       # registrant exception applies only while a connection is on its setup
       # path.
 
+    @unit
+    Scenario: Go-live readiness does not survive suspension or teardown
+      Given the connection proved its domain, decided what an arrival gets and
+        has a live break-glass grant
+      And the connection is suspended or its removal has completed
+      When its identity provider sends a callback for that proved domain
+      Then the callback is refused before identity linking
+      # Suspension and teardown preserve every one of those settings, so the
+      # readiness exemption would still be satisfied by a connection whose
+      # administrator has closed the door. Readiness belongs to the setup path
+      # and ends with it.
+
   Rule: a connection that has done everything but the sign-in is trusted for it
 
     # THE DEADLOCK THIS BREAKS, and it made setup impossible rather than

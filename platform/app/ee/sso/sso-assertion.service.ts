@@ -468,10 +468,10 @@ export class SsoAssertionService {
    * decides whether an assertion that DELIBERATELY dialed this connection is
    * accepted, which before activation is the administrator proving it works.
    *
-   * The conditions are activation's own, minus the sign-in: this exact domain
-   * proved, somebody has said what happens to an arrival, and the
-   * organization still has a way in that does not go through the identity
-   * provider. The proof is what makes trusting the provider's word defensible
+   * The conditions are activation's own, minus the sign-in: the connection
+   * still on the setup path, this exact domain proved, somebody has said what
+   * happens to an arrival, and the organization still has a way in that does
+   * not go through the identity provider. The proof is what makes trusting the provider's word defensible
    * in the first place; the other two are what stop a connection admitting
    * people into a decision nobody has made, or stranding them if it goes
    * wrong.
@@ -487,6 +487,12 @@ export class SsoAssertionService {
     connection: SignInConnection;
     standing: { proved: boolean };
   }): Promise<boolean> {
+    // Readiness is the SETUP journey's exemption and nothing else. The fold
+    // preserves proof, the arrival decision and the break-glass grant through
+    // suspension and teardown, so without this a closed connection still
+    // satisfies every remaining condition and an in-flight callback walks
+    // past the refusal below (ADR-123).
+    if (!isSsoConnectionInSetup(connection.state)) return false;
     if (!standing.proved) return false;
     // Somebody has SAID, which is not the same as the connection having an
     // answer — it always has one. A connection that predates the question is

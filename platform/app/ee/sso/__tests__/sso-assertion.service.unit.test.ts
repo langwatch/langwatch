@@ -456,6 +456,47 @@ describe("given a connection that no longer accepts sign-in", () => {
     expect(codeOf(decision)).toBe("sso_sign_in_refused");
     expect(findRegistrantAtAddress).not.toHaveBeenCalled();
   });
+
+  /**
+   * The fold keeps the proof, the arrival decision and the break-glass grant
+   * when a connection is suspended or torn down, so a closed connection still
+   * answers every go-live readiness question. Readiness must not be what
+   * carries it: an administrator who closed the door closed it on the
+   * callback already in flight too.
+   */
+  /** @scenario "Go-live readiness does not survive suspension or teardown" */
+  it.each([
+    "REJECTED",
+    "SUSPENDED",
+    "TEARDOWN_PENDING",
+    "TORN_DOWN",
+  ])("refuses a %s connection that still satisfies every readiness condition", async (state) => {
+    const breakGlassSpy = vi.fn().mockResolvedValue(true);
+    const service = new SsoAssertionService({
+      connections: {
+        findConnectionForSignIn: async () =>
+          connection({ state, arrivalPolicyDecidedAtMs: 1_756_000_000_000 }),
+      },
+      memberships: {
+        findRegistrantAtAddress: async () => false,
+        findBoundMemberIdentity: async () => false,
+      },
+      breakGlass: { hasLiveBreakGlass: breakGlassSpy },
+    });
+
+    const decision = await service.decide({
+      providerId: CONNECTION_ID,
+      email: "newhire@acme.com",
+    });
+
+    expect(decision).toMatchObject({
+      action: "reject",
+      reason: "connection-not-accepting-sign-in",
+    });
+    expect(codeOf(decision)).toBe("sso_sign_in_refused");
+    // The state is an in-memory fact, so the door shut without a read.
+    expect(breakGlassSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe("given an address the gate cannot read a domain from", () => {
