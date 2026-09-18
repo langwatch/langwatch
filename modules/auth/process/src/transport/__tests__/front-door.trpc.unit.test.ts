@@ -22,6 +22,7 @@ const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
 
 /** The seven operations this surface calls; the rest of the module refuses. */
 const door: AuthApi = {
+  offersPasskeys: () => false,
   isWithinBudget,
   route,
   addressIsRegistered,

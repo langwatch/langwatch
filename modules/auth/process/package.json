@@ -51,6 +51,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@types/bcrypt": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

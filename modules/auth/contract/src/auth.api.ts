@@ -24,6 +24,11 @@ export type CliAccessSession = Readonly<{
  */
 export interface AuthApi {
   /**
+   * Whether this deployment offers passkeys. `PASSKEYS_ENABLED` has one owner,
+   * this module; a peer asks rather than declaring the variable a second time.
+   */
+  offersPasskeys(): boolean;
+  /**
    * Whether Better Auth accepts the token. Carries the RAW auth-session id
    * an impersonation starts/stops against; a process with no sign-in door
    * composed answers null, so callers are anonymous rather than failing.

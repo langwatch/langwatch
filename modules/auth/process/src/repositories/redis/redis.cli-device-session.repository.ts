@@ -1,12 +1,26 @@
-import type { RedisConnection } from "@langwatch/redis-client";
-
 import type { CliDeviceSessionRepository } from "../cli-device-session.repository.ts";
+
+type CliDeviceSessionRedis = Readonly<{
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, mode: "EX", ttlSeconds: number): Promise<unknown>;
+  set(
+    key: string,
+    value: string,
+    mode: "EX",
+    ttlSeconds: number,
+    condition: "NX",
+  ): Promise<"OK" | null>;
+  del(key: string): Promise<number>;
+  sadd(key: string, ...members: string[]): Promise<number>;
+  pexpire(key: string, ttlMs: number): Promise<number>;
+  srem(key: string, member: string): Promise<number>;
+}>;
 
 /** The Auth-owned Redis backing store for RFC 8628 device sessions. */
 export class RedisCliDeviceSessionRepository implements CliDeviceSessionRepository {
-  private constructor(private readonly redis: RedisConnection) {}
+  private constructor(private readonly redis: CliDeviceSessionRedis) {}
 
-  static create(redis: RedisConnection): RedisCliDeviceSessionRepository {
+  static create(redis: CliDeviceSessionRedis): RedisCliDeviceSessionRepository {
     return new RedisCliDeviceSessionRepository(redis);
   }
 
@@ -26,7 +40,11 @@ export class RedisCliDeviceSessionRepository implements CliDeviceSessionReposito
     await this.redis.del(key);
   }
 
-  async indexTokens(input: { indexKey: string; memberKeys: string[]; ttlMs: number }): Promise<void> {
+  async indexTokens(input: {
+    indexKey: string;
+    memberKeys: string[];
+    ttlMs: number;
+  }): Promise<void> {
     if (input.memberKeys.length === 0) return;
 
     await this.redis.sadd(input.indexKey, ...input.memberKeys);

@@ -1,31 +1,29 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { cliAccessTokenKey } from "@langwatch/auth-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { ResourceScope } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { RateLimiter, SecretResolver } from "@langwatch/process-stores/members";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthApp } from "../auth.app.ts";
-import { TestUserApi } from "./support/test-user-api.ts";
 
 const ACCESS_TOKEN = "lw_at_active";
 const AUTHORIZATION = `Bearer ${ACCESS_TOKEN}`;
 
-function redisForCliSessions() {
-  const values = new Map<string, string>();
-  const removed: string[][] = [];
-
-  return {
-    values,
-    removed,
-    get: async (key: string) => values.get(key) ?? null,
-    del: async (key: string) => Number(values.delete(key)),
-    srem: async (key: string, member: string) => {
-      removed.push([key, member]);
-      return 1;
+function appForCliSessions(repositories: MemoryAuthRepositories): AuthApp {
+  const secrets: SecretResolver = {
+    find: () => void 0,
+    read: (key) => {
+      throw new Error(`test double does not stub secrets.read("${key}")`);
     },
   };
-}
 
-function appForCliSessions(redis: ReturnType<typeof redisForCliSessions>): AuthApp {
   return AuthApp.create({
     config: {
       sessionUrl: undefined,
@@ -33,45 +31,40 @@ function appForCliSessions(redis: ReturnType<typeof redisForCliSessions>): AuthA
       passkeysEnabled: false,
       passkeyHandleSecret: undefined,
     },
-    repositories: MemoryAuthRepositories.create(),
+    repositories,
     dependencies: {
-      users: new TestUserApi({}) as never,
-      apiKeys: {} as never,
-      featureFlags: {} as never,
+      users: createApiFixture<UserApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
     },
     members: {
       logger: createLogger("langwatch:auth:test"),
-      prisma: {} as never,
-      redis: redis as never,
-      rateLimiter: { check: async () => ({ allowed: true }) } as never,
-      secrets: {
-        find: () => undefined,
-        read: (key: string) => {
-          throw new Error(`test double does not stub secrets.read(\"${key}\")`);
-        },
-      },
-      publicBaseUrl: undefined,
-      identityEmails: undefined as never,
-      rateLimit: undefined as never,
-      route: undefined as never,
+      prisma: createApiFixture<PrismaClient>(),
+      redis: createApiFixture(),
+      rateLimiter: createApiFixture<RateLimiter>(),
+      secrets,
+      publicBaseUrl: void 0,
+      identityEmails: void 0,
+      rateLimit: void 0,
+      route: void 0,
       signUp: null,
       invites: null,
-      authProvider: undefined as never,
-      federatedProvider: undefined,
+      authProvider: void 0,
+      federatedProvider: void 0,
       isSaas: false,
       processName: "langwatch-api",
     },
-    resources: { own: () => undefined } as never,
-    secrets: {} as never,
+    resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
   });
 }
 
 describe("the Auth CLI access-session peer", () => {
   it("resolves the caller facts without exposing the token record", async () => {
-    const redis = redisForCliSessions();
-    redis.values.set(
-      cliAccessTokenKey(ACCESS_TOKEN),
-      JSON.stringify({
+    const repositories = MemoryAuthRepositories.create();
+    await repositories.cliSessions.set({
+      key: cliAccessTokenKey(ACCESS_TOKEN),
+      value: JSON.stringify({
         user_id: "user-1",
         organization_id: "organization-1",
         issued_at: 0,
@@ -79,8 +72,9 @@ describe("the Auth CLI access-session peer", () => {
         client_info: { device_label: "Work laptop", hostname: "laptop" },
         cli_api_key_id: "key-secret-must-not-cross-the-peer-boundary",
       }),
-    );
-    const app = appForCliSessions(redis);
+      ttlSeconds: 60,
+    });
+    const app = appForCliSessions(repositories);
 
     await expect(app.findCliAccessSession({ authorization: AUTHORIZATION })).resolves.toEqual({
       userId: "user-1",
@@ -90,21 +84,31 @@ describe("the Auth CLI access-session peer", () => {
   });
 
   it("severs the presented bearer from Auth's token store and owner index", async () => {
-    const redis = redisForCliSessions();
-    redis.values.set(
-      cliAccessTokenKey(ACCESS_TOKEN),
-      JSON.stringify({
+    const repositories = MemoryAuthRepositories.create();
+    await repositories.cliSessions.set({
+      key: cliAccessTokenKey(ACCESS_TOKEN),
+      value: JSON.stringify({
         user_id: "user-1",
         organization_id: "organization-1",
         issued_at: 0,
         expires_at: Date.now() + 60_000,
       }),
-    );
-    const app = appForCliSessions(redis);
+      ttlSeconds: 60,
+    });
+    await repositories.cliSessions.indexTokens({
+      indexKey: "lwcli:user:user-1:tokens",
+      memberKeys: [cliAccessTokenKey(ACCESS_TOKEN)],
+      ttlMs: 60_000,
+    });
+    const app = appForCliSessions(repositories);
 
     await app.revokeCliAccessToken({ authorization: AUTHORIZATION, userId: "user-1" });
 
-    expect(redis.values.has(cliAccessTokenKey(ACCESS_TOKEN))).toBe(false);
-    expect(redis.removed).toEqual([["lwcli:user:user-1:tokens", cliAccessTokenKey(ACCESS_TOKEN)]]);
+    await expect(
+      repositories.cliSessions.tryGet(cliAccessTokenKey(ACCESS_TOKEN)),
+    ).resolves.toBeNull();
+    expect(repositories.cliSessions.tokenIndexes.get("lwcli:user:user-1:tokens")).toEqual(
+      new Set(),
+    );
   });
 });

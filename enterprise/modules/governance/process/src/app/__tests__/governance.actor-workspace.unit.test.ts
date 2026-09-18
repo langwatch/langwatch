@@ -3,7 +3,9 @@
  * Test verifies failed lookups return null (no info leak) and short-circuit.
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
  */
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, PersonalWorkspace } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -60,6 +62,8 @@ function buildApp(options: {
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
+      auth: createApiFixture<AuthApi>(),
+      entitlements: createApiFixture<EntitlementApi>(),
       organizations: createApiFixture<OrganizationApi>({ tryFindPersonalWorkspace }),
       permissions: createApiFixture<AuthzApi>(),
     },

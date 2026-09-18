@@ -11,11 +11,11 @@
  */
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type {
   GovernanceCallSurface,
   GovernanceProjectCaller,
 } from "@langwatch/enterprise-governance-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -71,7 +71,7 @@ function buildApp() {
 }
 
 /** The one app in this file that also carries the still-unfinished bag. */
-function buildAppWithUnfinishedCapability() {
+function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
   const repositories: GovernanceRepositories = MemoryGovernanceRepositories.create();
   const governance = new TestGovernanceService();
   const findCliAccessSession = vi.fn<AuthApi["findCliAccessSession"]>(async () => ({
@@ -79,9 +79,12 @@ function buildAppWithUnfinishedCapability() {
     organizationId: "organization-1",
     clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
   }));
-  const getActivePlan = vi.fn<EntitlementApi["getActivePlan"]>(async () => ({
-    type: "ENTERPRISE",
-  }) as never);
+  const getActivePlan = vi.fn<EntitlementApi["getActivePlan"]>(
+    async () =>
+      ({
+        type: planType,
+      }) as never,
+  );
 
   const app = GovernanceApp.create({
     config: void 0,
@@ -283,6 +286,19 @@ describe("GovernanceApp as the module a process installs", () => {
       ).resolves.toEqual({ entitled: true });
 
       expect(findCliAccessSession).toHaveBeenCalledWith({ authorization: "Bearer lw_at_token" });
+      expect(getActivePlan).toHaveBeenCalledWith({ organizationId: "organization-2" });
+    });
+
+    it("refuses the caller organization when its plan is not Enterprise", async () => {
+      const { app, getActivePlan } = buildAppWithUnfinishedCapability("FREE");
+
+      await expect(
+        app.cliAccess().planDecision({
+          organizationId: "organization-2",
+          feature: "ingestionSources",
+        }),
+      ).resolves.toMatchObject({ entitled: false });
+
       expect(getActivePlan).toHaveBeenCalledWith({ organizationId: "organization-2" });
     });
   });

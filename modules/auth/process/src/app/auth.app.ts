@@ -29,7 +29,6 @@ import type { BetterAuthTransport } from "../channels/http/http.better-auth.chan
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
-import { RedisCliDeviceSessionRepository } from "../repositories/redis/redis.cli-device-session.repository.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
 import {
@@ -120,9 +119,8 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
     /** The federated provider id Better Auth's federation gate reads — distinct
      * from `authProvider` above (ADR-027's resolver). Unresolved; see the handoff. */
     federatedProvider: string | undefined;
-    /** Whether this is the hosted product. OUT OF SCOPE for this port (an
-     * unsigned boolean granting entitlement has its own ruling) — left as a
-     * member exactly where the deleted `configSchema` left it. */
+    /** Whether this is the hosted product: the process's own fact, supplied
+     * as a member. The flag itself has a ruling of its own pending. */
     isSaas: boolean;
     /** Names this process in every refusal below. */
     processName: string;
@@ -165,6 +163,13 @@ export class AuthApp implements AuthApiContract {
   /** The identity {@link AuthApp.create} resolved, held for {@link baseUrl}. */
   #browserSession: BetterAuthDeploymentIdentity | undefined;
 
+  /** This deployment's answer to {@link AuthApp.offersPasskeys}. */
+  #offersPasskeys = false;
+
+  offersPasskeys(): boolean {
+    return this.#offersPasskeys;
+  }
+
   private constructor(
     sessions: BrowserSessionService,
     cliSessions: CliDeviceSessionService,
@@ -192,12 +197,14 @@ export class AuthApp implements AuthApiContract {
         now,
       }),
       CliDeviceSessionService.create({
-        store: RedisCliDeviceSessionRepository.create(members.redis),
+        store: repositories.cliSessions,
       }),
       signUpVerification({ members, repositories, now, users: dependencies.users }),
       members,
       { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
     );
+
+    app.#offersPasskeys = config.passkeysEnabled;
 
     const sessionSecret = members.secrets.find("NEXTAUTH_SECRET");
     assertAuthServerConfig(config, sessionSecret);

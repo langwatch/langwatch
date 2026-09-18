@@ -1,7 +1,7 @@
 import { defineRepositories } from "@langwatch/kernel";
 
+import { LiveAuthRepositories } from "./live/live.auth.repositories.ts";
 import { MemoryAuthRepositories } from "./memory/memory.auth.repositories.ts";
-import { PostgresAuthRepositories } from "./prisma/prisma.auth.repositories.ts";
 
 /**
  * Which backend the process selected. The memory twin is not a test fixture:
@@ -9,6 +9,6 @@ import { PostgresAuthRepositories } from "./prisma/prisma.auth.repositories.ts";
  * database, which is how the module's own installation test runs.
  */
 export const authRepositories = defineRepositories({
-  live: PostgresAuthRepositories,
+  live: LiveAuthRepositories,
   memory: MemoryAuthRepositories,
 });

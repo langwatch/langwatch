@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { AuthApi, type CliAccessSession } from "@langwatch/auth-contract";
 /**
  * The governance feature's application: what all three of its doors call.
  *
@@ -29,7 +30,6 @@
  */
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
-import { AuthApi, type CliAccessSession } from "@langwatch/auth-contract";
 import {
   NoEligibleProvidersError,
   NoEligibleModelProvidersError,

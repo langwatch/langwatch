@@ -19,12 +19,12 @@ import {
 } from "@langwatch/api/rest";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   InvalidSourceTypeError,
   PlatformTemplateImmutableError,
   TemplateNotFoundError,
 } from "@langwatch/enterprise-governance-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";

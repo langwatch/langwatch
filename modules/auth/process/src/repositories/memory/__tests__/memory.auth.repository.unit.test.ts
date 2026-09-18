@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryAuthSessionRepository } from "../memory.auth-session.repository.ts";
 import { MemoryAuthDatabase } from "../memory.auth.database.ts";
 import { MemoryAuthRepositories } from "../memory.auth.repositories.ts";
+import { MemoryCliDeviceSessionRepository } from "../memory.cli-device-session.repository.ts";
 import { MemorySignUpVerificationTokenRepository } from "../memory.signup-verification-token.repository.ts";
 
 const NOW = Temporal.Instant.from("2026-08-28T00:00:00.000Z");
@@ -121,11 +122,55 @@ describe("MemorySignUpVerificationTokenRepository", () => {
 
 describe("MemoryAuthRepositories", () => {
   describe("when the module selects the memory backend", () => {
-    it("hands both repositories over one store", () => {
+    it("hands the browser, CLI, and sign-up repositories over its selected stores", () => {
       const repositories = MemoryAuthRepositories.create();
 
       expect(repositories.sessions).toBeInstanceOf(MemoryAuthSessionRepository);
+      expect(repositories.cliSessions).toBeInstanceOf(MemoryCliDeviceSessionRepository);
       expect(repositories.signUpTokens).toBeInstanceOf(MemorySignUpVerificationTokenRepository);
     });
+  });
+});
+
+describe("MemoryCliDeviceSessionRepository", () => {
+  it("expires values after their configured TTL", async () => {
+    let now = 0;
+    const repository = MemoryCliDeviceSessionRepository.create({ now: () => now });
+
+    await repository.set({ key: "device", value: "pending", ttlSeconds: 1 });
+    now += 999;
+    await expect(repository.tryGet("device")).resolves.toBe("pending");
+
+    now += 1;
+    await expect(repository.tryGet("device")).resolves.toBeNull();
+  });
+
+  it("releases an expired exclusive claim for the next exchange", async () => {
+    let now = 0;
+    const repository = MemoryCliDeviceSessionRepository.create({ now: () => now });
+
+    await expect(repository.setIfAbsent({ key: "claim", value: "1", ttlSeconds: 1 })).resolves.toBe(
+      true,
+    );
+    await expect(repository.setIfAbsent({ key: "claim", value: "1", ttlSeconds: 1 })).resolves.toBe(
+      false,
+    );
+
+    now += 1_000;
+
+    await expect(repository.setIfAbsent({ key: "claim", value: "1", ttlSeconds: 1 })).resolves.toBe(
+      true,
+    );
+  });
+
+  it("expires a token index before a later operation can retain stale members", async () => {
+    let now = 0;
+    const repository = MemoryCliDeviceSessionRepository.create({ now: () => now });
+
+    await repository.indexTokens({ indexKey: "tokens", memberKeys: ["access"], ttlMs: 1_000 });
+    now += 1_000;
+    await repository.removeFromIndex({ indexKey: "tokens", memberKey: "access" });
+
+    expect(repository.tokenIndexes.has("tokens")).toBe(false);
   });
 });
