@@ -299,7 +299,11 @@ their own class in the package that owns that concern, and each arrives
 with what it declared (registry-resolved, §3), never with a hand-assembled
 composition bag. There is no "door": `boot()` registers every installed
 module's declared transports onto the router, and the main never sees a
-namespace, a mount, or any transport internals.
+namespace, a mount, or any transport internals. Transport auth follows the
+same rule as every dependency: it resolves from config, and a
+`withTransportAuth` override on the chain takes precedence over the config
+when stated — tests and special deployments override in code; an ordinary
+deployment states nothing.
 
 **Deployment-choice modules are one line in the main.** The audit sink is
 the worked example: OSS composes `auditLogNullServer` (records nothing),
