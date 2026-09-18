@@ -254,7 +254,7 @@ import "@langwatch/time/polyfill";
 const server = await Server.create("langwatch-api")
   .withConfig(apiConfig)                // §6 parse from the installed modules' own schemas — FIRST
   .withSecrets((config, secrets) =>     // config feeds secrets; the builder is handed in, never
-    secrets.chain()                     //   imported, and adapters speak the house words
+    secrets                             //   imported; it chains directly — no chain() word
       .withEnv()
       .withFile()
       .withOnePassword(config.process.secretsVault))
@@ -600,10 +600,13 @@ replaces them.
 pass through** (approved 2026-09-18). A module declares its handles beside
 its config (`Secret.define`, env spellings, optionality); the app builds
 only the READER — a fluent adapter chain built from a handed-in builder,
-`.withSecrets((config, secrets) => secrets.chain().withEnv().withFile()
+`.withSecrets((config, secrets) => secrets.withEnv().withFile()
 .withOnePassword(...))` — installed on the Server preamble AFTER
 `withConfig`, so config can feed secrets (the 1Password vault key is a
-config fact) and the builder is never imported. `boot()`
+config fact); the builder is never imported and chains directly. **The
+chain is a lookup order, not a store**: it holds no values, pre-fetches
+nothing, enumerates no vault — each declared handle is fetched singly, at
+its owner's construction site, and handed straight to its closure. `boot()`
 scopes the resolver per module: a `create()` can resolve only the handles
 its own module declared, each resolve validates against the handle's
 schema and hands the value to a closure —
