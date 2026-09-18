@@ -4,8 +4,6 @@ export type ApplicationPackageRole = "ui" | "api" | "worker" | "server";
 
 export type EnterpriseCompositionRole = "api" | "worker";
 
-export type FeatureLayoutVersion = 0;
-
 export type FeatureClassification = "core" | "enterprise";
 
 export type FeatureCatalogueEntry = {
@@ -46,7 +44,6 @@ export type ClassifiedPackage = {
   enterpriseCompositionRole?: EnterpriseCompositionRole;
   feature?: string;
   featureRoot?: string;
-  layoutVersion?: FeatureLayoutVersion;
   subjects?: readonly string[];
   enterprise: boolean;
 };

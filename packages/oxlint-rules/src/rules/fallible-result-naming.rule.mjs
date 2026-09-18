@@ -180,7 +180,6 @@ function isOneOrThrowGet(name, returnType) {
 
 export function isFallibleResultModule(file) {
   if (file.role !== "contract" && file.role !== "server") return false;
-  if (file.layoutVersion !== 0) return false;
   if (!file.relative?.startsWith("src/")) return false;
   return FALLIBLE_RESULT_MODULE.test(file.relative);
 }

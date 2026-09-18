@@ -95,7 +95,6 @@ function enterpriseComposition(
 
 function enterpriseFeature(feature: string, role: "contract" | "server" | "web"): void {
   const featureRoot = `enterprise/modules/${feature}`;
-  write(`${featureRoot}/feature.json`, JSON.stringify({ layoutVersion: 0 }));
   writeManifest(`${featureRoot}/${role}/package.json`, {
     name: `@langwatch/enterprise-${feature}-${role}`,
     dependencies: role === "contract" ? { zod: "^4.4.3" } : undefined,
@@ -241,10 +240,10 @@ describe("Enterprise aggregate boundaries", () => {
     enterpriseFeature("billing", "web");
     enterpriseComposition("api", {
       "@langwatch/enterprise-billing-contract": "workspace:*",
-      "@langwatch/enterprise-billing-server": "workspace:*",
+      "@langwatch/enterprise-billing-process": "workspace:*",
     });
     enterpriseComposition("worker", {
-      "@langwatch/enterprise-billing-server": "workspace:*",
+      "@langwatch/enterprise-billing-process": "workspace:*",
     });
     application("api", {
       dependencies: { "@langwatch/enterprise-api": "workspace:*" },
@@ -271,7 +270,7 @@ describe("Enterprise aggregate boundaries", () => {
     enterpriseComposition("worker");
     enterpriseComposition("api", {
       "@langwatch/enterprise-worker": "workspace:*",
-      "@langwatch/enterprise-billing-web": "workspace:*",
+      "@langwatch/enterprise-billing-browser": "workspace:*",
     });
     application("ui", {
       dependencies: { "@langwatch/enterprise-api": "workspace:*" },

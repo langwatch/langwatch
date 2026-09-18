@@ -27,14 +27,13 @@ beforeEach(() => {
       ],
     }),
   );
-  write("modules/dataset/feature.json", JSON.stringify({ layoutVersion: 0 }));
   write(
-    "modules/dataset/server/package.json",
-    JSON.stringify({ name: "@langwatch/dataset-server", type: "module" }),
+    "modules/dataset/process/package.json",
+    JSON.stringify({ name: "@langwatch/dataset-process", type: "module" }),
   );
-  write("modules/dataset/server/src/index.ts", "export {};");
+  write("modules/dataset/process/src/index.ts", "export {};");
   write(
-    "modules/dataset/server/src/services/dataset.service.ts",
+    "modules/dataset/process/src/services/dataset.service.ts",
     "export class DatasetService {}",
   );
 });
@@ -67,9 +66,9 @@ function baseline(): void {
     ],
     packages: [
       {
-        name: "@langwatch/dataset-server",
-        root: join(root, "modules/dataset/server"),
-        manifestPath: join(root, "modules/dataset/server/package.json"),
+        name: "@langwatch/dataset-process",
+        root: join(root, "modules/dataset/process"),
+        manifestPath: join(root, "modules/dataset/process/package.json"),
         manifest: {},
         kind: "server" as const,
         feature: "dataset",
@@ -113,9 +112,9 @@ describe("shrinking legacy feature fragment inventory", () => {
         ],
         [
           {
-            name: "@langwatch/dataset-server",
-            root: join(root, "modules/dataset/server"),
-            manifestPath: join(root, "modules/dataset/server/package.json"),
+            name: "@langwatch/dataset-process",
+            root: join(root, "modules/dataset/process"),
+            manifestPath: join(root, "modules/dataset/process/package.json"),
             manifest: {},
             kind: "server",
             feature: "dataset",

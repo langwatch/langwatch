@@ -60,6 +60,7 @@ import {
   restSchemaFromOwnContractRule,
   restDeclaresInputOutputRule,
   restHandlerThrowsRule,
+  restDeclaresItsAnswerRule,
   restNoErrorHandlerOverrideRule,
   secretsThroughSourceRule,
   serviceClassesRule,
@@ -114,6 +115,8 @@ export const rules = {
   "rest-declares-input-output": restDeclaresInputOutputRule,
 
   "rest-handler-throws": restHandlerThrowsRule,
+
+  "rest-declares-its-answer": restDeclaresItsAnswerRule,
 
   "rest-no-error-handler-override": restNoErrorHandlerOverrideRule,
   "service-loads-its-own-config": serviceLoadsItsOwnConfigRule,

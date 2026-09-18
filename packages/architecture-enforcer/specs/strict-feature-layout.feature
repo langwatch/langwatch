@@ -7,16 +7,9 @@ Feature: Strict versioned feature source layout
 
   @unit @architecture
   Scenario: A strict feature declares the initial layout version
-    Given a feature root contains feature.json with layoutVersion 0
-    And its contract and server files use the version-0 directories and names
+    Given a feature root's contract and server files use the version-0 directories and names
     When architecture lint checks the workspace
     Then no feature-source-layout violation is reported
-
-  @unit @architecture
-  Scenario: Unknown or missing layout versions fail
-    Given a feature has no readable feature.json or declares a version other than 0
-    When architecture lint checks the workspace
-    Then it reports the feature root and the supported layout version
 
   @unit @architecture
   Scenario: Server artifacts have canonical homes and names
@@ -105,10 +98,3 @@ Feature: Strict versioned feature source layout
     And casting the context or constructing a service or repository is rejected
     And awaiting a resolver before awaiting the service operation is rejected
     And direct context.app, context.actor(), and context.authorize() delegation is accepted
-
-  @integration @architecture
-  Scenario: Layout evolution is explicit
-    Given a future convention is materially different from layout version 0
-    When the convention is introduced
-    Then it is implemented as layout version 1 with its own ADR, spec, and fixtures
-    And existing version-0 packages retain their original rules until migrated

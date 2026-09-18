@@ -836,7 +836,7 @@ function transportSources(packages: readonly ClassifiedPackage[]): TransportSour
   const sources = new Map<string, TransportSource>();
 
   for (const pkg of packages) {
-    const strictFeatureApi = pkg.kind === "server" && pkg.layoutVersion === 0;
+    const strictFeatureApi = pkg.kind === "server";
     const apiApplication = pkg.kind === "application" && pkg.applicationRole === "api";
     if (!strictFeatureApi && !apiApplication) continue;
 

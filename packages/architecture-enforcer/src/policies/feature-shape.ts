@@ -80,16 +80,17 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "no-app":
     "One app: src/app/<feature>.app.ts is class <Feature>App implements <Feature>Api with static contract, static dependencies, a private constructor and static create(setup).",
   "installer-not-booted":
-    "A process boots the installer: createApp(...).withPersistence(...).withProvided(PeerApi, peer).withModule(<feature>Server).boot() in apps/api, apps/worker or apps/tasks. Delete the hand-built composition.",
+    "The generated module list is stale relative to the catalogue. Run `pnpm generate:modules` to regenerate modules/server-modules.generated.ts (and web-modules.generated.ts) from modules/catalogue.json, and check in the result.",
   "refusing-composition":
     "A process either installs the feature or does not. Delete the refusing*/absent twin; a missing provider fails boot by name.",
   "nested-web-entry":
-    "Public web pieces are flat entries src/<id>.ts exported as ./<id>; the screens/ and surfaces/ directories are the older spelling. A flat entry must be declared in apps/ui/src/features/catalogue.json (uses.screens or uses.surfaces) and its package listed as governed there, or frontend-ui-boundaries refuses the import.",
+    "Public web pieces are flat entries src/<id>.ts exported as ./<id> in the package's own package.json; the screens/ and surfaces/ directories are the older spelling. The package's exports map is the whole declaration — there is no separate catalogue file to register it in.",
 };
 
-const BOOT_SCAN_ROOTS = ["apps/api/src", "apps/worker/src", "apps/tasks/src"];
 const COMPOSITION_ROOTS = ["apps/api/src/features", "apps/worker/src/features"];
-const BOOTED_INSTALLER = /withModule\(\s*([A-Za-z0-9_]+)/g;
+const GENERATED_MODULE_LISTS = ["modules/server-modules.generated.ts", "modules/web-modules.generated.ts"];
+const GENERATED_MODULE_LIST_BLOCK = /export const \w+Modules = \[([\s\S]*?)\] as const/;
+const GENERATED_MODULE_LIST_ENTRY = /([A-Za-z0-9_]+)/g;
 const REFUSING_EXPORT = /export function refusing/;
 
 /**
@@ -144,15 +145,25 @@ function pascalCase(feature: string): string {
     .join("");
 }
 
-/** Every `<x>Server` identifier a process hands to `withModule(...)`. */
+/**
+ * Every `<x>Server`/`<x>Web` identifier the generated module lists install.
+ * Composition no longer names an installer textually — `withModule(` never
+ * appears beside a feature's identifier — so "installer not booted" now means
+ * the catalogue entry the generator would install is absent from the
+ * checked-in list: the generated file is stale relative to the catalogue.
+ */
 function bootedInstallers(root: string): Set<string> {
   const booted = new Set<string>();
 
-  for (const scanRoot of BOOT_SCAN_ROOTS) {
-    for (const file of sourceFiles(join(root, scanRoot))) {
-      for (const match of sourceText({ file }).matchAll(BOOTED_INSTALLER)) {
-        booted.add(match[1]!);
-      }
+  for (const listFile of GENERATED_MODULE_LISTS) {
+    const path = join(root, listFile);
+    if (!existsSync(path)) continue;
+
+    const block = GENERATED_MODULE_LIST_BLOCK.exec(sourceText({ file: path }));
+    if (!block) continue;
+
+    for (const match of block[1]!.matchAll(GENERATED_MODULE_LIST_ENTRY)) {
+      booted.add(match[1]!);
     }
   }
 
@@ -295,7 +306,7 @@ export function collectFeatureShapeFindings(
   return packages
     .flatMap((pkg) => {
       const feature = pkg.feature;
-      if (pkg.layoutVersion !== 0 || !feature || !features.has(feature)) return [];
+      if (!feature || !features.has(feature)) return [];
 
       const firstPackageOfFeature = !composed.has(feature);
       composed.add(feature);

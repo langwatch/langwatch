@@ -166,7 +166,6 @@ export const featureModuleClassesRule = defineRule({
     },
   },
   create(context, file) {
-    if (file.layoutVersion !== 0) return {};
     const normalized = file.workspacePath;
     const kind = featureModuleKind(normalized);
     if (!kind) return {};

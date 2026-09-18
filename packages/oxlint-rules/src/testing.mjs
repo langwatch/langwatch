@@ -6,9 +6,9 @@ import { resetClassificationCache } from "./classify.mjs";
 import { renderMessage } from "./define-rule.mjs";
 
 // Running a rule and standing up a workspace for it to run in. Rule tests used
-// to point the tester at the real repository root, so `feature.json`,
-// `catalogue.json` and every feature `package.json` were live inputs and
-// renaming a feature broke the lint suite. A fixture tree is the input now.
+// to point the tester at the real repository root, so `catalogue.json` and
+// every feature `package.json` were live inputs and renaming a feature broke
+// the lint suite. A fixture tree is the input now.
 
 /**
  * @typedef {{ messageId: string | undefined, message: string,
@@ -102,8 +102,9 @@ function writeFile(root, relativePath, contents) {
 
 /**
  * A throwaway workspace for a rule to be linted inside.
- * @param {object} [tree.features] Feature name to its `feature.json` layout
- *   version and the contract/server/web packages that exist for it.
+ * @param {object} [tree.features] Feature name to the contract/server/web
+ *   packages that exist for it. A module's presence and its package.json
+ *   exports are the whole declaration; there is no feature.json side-channel.
  * @param {object} [tree.catalogue] Feature id to the subjects it claims.
  * @param {Record<string, string>} [tree.files] Extra files, keyed by path.
  * @returns {object} cwd, write(path, contents), and cleanup().
@@ -114,11 +115,6 @@ export function createFixtureWorkspace({ catalogue = {}, features = {}, files = 
 
   for (const [feature, definition] of Object.entries(features)) {
     const root = `modules/${feature}`;
-    writeFile(
-      cwd,
-      `${root}/feature.json`,
-      JSON.stringify({ layoutVersion: definition.layoutVersion ?? 0, name: feature }),
-    );
     for (const [role, pkg] of Object.entries(definition.roles ?? {})) {
       const exports = Object.fromEntries((pkg.exports ?? ["."]).map((entry) => [entry, entry]));
       writeFile(

@@ -282,7 +282,7 @@ function violationsForRoleFile(
     (candidate) => file === candidate.root || file.startsWith(`${candidate.root}${sep}`),
   );
 
-  if (pkg?.layoutVersion !== 0) return violations;
+  if (!pkg) return violations;
 
   return [...violations, ...lintStrictSubscriberTest(file, pkg)];
 }

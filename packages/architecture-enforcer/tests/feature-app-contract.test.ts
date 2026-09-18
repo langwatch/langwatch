@@ -9,7 +9,7 @@ import { snapshotOf } from "./workspace.ts";
 let root: string;
 let packages: ClassifiedPackage[];
 const contract = "modules/widget/contract";
-const server = "modules/widget/server";
+const server = "modules/widget/process";
 let catalogue: FeatureCatalogueEntry[];
 
 function write(file: string, text: string): void {
@@ -65,7 +65,6 @@ beforeEach(() => {
       manifest,
       kind,
       feature: "widget",
-      layoutVersion: 0,
       enterprise: false,
     };
   });
@@ -332,7 +331,6 @@ describe("feature API contract lint", () => {
       kind: "contract",
       feature: "peer",
       enterprise: false,
-      layoutVersion: 0,
     });
     write(
       `${server}/src/widget.server.ts`,

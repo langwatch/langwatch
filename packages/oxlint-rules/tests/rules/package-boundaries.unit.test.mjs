@@ -4,8 +4,8 @@ import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: {
-    agent: { layoutVersion: 0, roles: { contract: {}, server: {}, web: {} } },
-    project: { layoutVersion: 0, roles: { contract: {}, server: {}, web: {} } },
+    agent: { roles: { contract: {}, server: {}, web: {} } },
+    project: { roles: { contract: {}, server: {}, web: {} } },
   },
 });
 
@@ -16,39 +16,22 @@ function report(filename, code) {
 }
 
 describe("given package-boundaries", () => {
-  it("allows an exact catalogue-declared cross-feature web dependency", () => {
+  it("allows a cross-feature web dependency through the surfaces/<id> door", () => {
     const fixture = createFixtureWorkspace({
       features: {
-        annotation: { layoutVersion: 0, roles: { web: {} } },
+        annotation: { roles: { web: {} } },
         organization: {
-          layoutVersion: 0,
-          roles: { web: { exports: ["./personal-workspace-features"] } },
+          roles: { web: { exports: ["./surfaces/personal-workspace-features"] } },
         },
       },
     });
-    fixture.write(
-      "apps/ui/src/features/catalogue.json",
-      JSON.stringify({
-        version: 0,
-        features: [
-          {
-            id: "annotations",
-            root: "annotation",
-            uses: {
-              screens: [],
-              surfaces: ["@langwatch/organization-web/personal-workspace-features"],
-            },
-          },
-        ],
-      }),
-    );
 
     try {
       expect(
         runRule(boundaryRule, {
           cwd: fixture.cwd,
-          filename: "modules/annotation/web/src/behavior/gate.ts",
-          code: 'import { client } from "@langwatch/organization-web/personal-workspace-features";',
+          filename: "modules/annotation/browser/src/behavior/gate.ts",
+          code: 'import { client } from "@langwatch/organization-browser/surfaces/personal-workspace-features";',
         }),
       ).toEqual([]);
     } finally {
@@ -56,27 +39,22 @@ describe("given package-boundaries", () => {
     }
   });
 
-  it("rejects an undeclared cross-feature web dependency", () => {
+  it("rejects a cross-feature web dependency outside the surfaces/<id> door", () => {
     const fixture = createFixtureWorkspace({
       features: {
-        annotation: { layoutVersion: 0, roles: { web: {} } },
+        annotation: { roles: { web: {} } },
         organization: {
-          layoutVersion: 0,
           roles: { web: { exports: ["./personal-workspace-features"] } },
         },
       },
     });
-    fixture.write(
-      "apps/ui/src/features/catalogue.json",
-      JSON.stringify({ version: 0, features: [] }),
-    );
 
     try {
       expect(
         runRule(boundaryRule, {
           cwd: fixture.cwd,
-          filename: "modules/annotation/web/src/behavior/gate.ts",
-          code: 'import { client } from "@langwatch/organization-web/personal-workspace-features";',
+          filename: "modules/annotation/browser/src/behavior/gate.ts",
+          code: 'import { client } from "@langwatch/organization-browser/personal-workspace-features";',
         }).map((entry) => entry.messageId),
       ).toContain("crossFeature");
     } finally {
@@ -88,14 +66,14 @@ describe("given package-boundaries", () => {
     /** @scenario "A web package importing another feature's server is reported as webImportsServer" */
     it("reports webImportsServer", () => {
       const found = report(
-        "modules/agent/web/src/behavior/agent-api.ts",
-        'import { ProjectService } from "@langwatch/project-server";',
+        "modules/agent/browser/src/behavior/agent-api.ts",
+        'import { ProjectService } from "@langwatch/project-process";',
       );
 
       expect(found.map((e) => e.messageId)).toContain("webImportsServer");
       const entry = found.find((e) => e.messageId === "webImportsServer");
       expect(entry.message).toBe(
-        "`@langwatch/project-server` is server-only, and this is a web package." +
+        "`@langwatch/project-process` is server-only, and this is a web package." +
           " Call the REST or tRPC endpoint the server exposes through this feature's" +
           " web client, and import any shared type from `@langwatch/<feature>-contract`.",
       );
@@ -106,13 +84,13 @@ describe("given package-boundaries", () => {
     /** @scenario "A server package importing another feature's web package is reported as serverImportsBrowser" */
     it("reports serverImportsBrowser with the specifier", () => {
       const found = report(
-        "modules/agent/server/src/services/agent.service.ts",
-        'import { ProjectCard } from "@langwatch/project-web";',
+        "modules/agent/process/src/services/agent.service.ts",
+        'import { ProjectCard } from "@langwatch/project-browser";',
       );
 
       const entry = found.find((e) => e.messageId === "serverImportsBrowser");
       expect(entry).toBeTruthy();
-      expect(entry.data.specifier).toBe("@langwatch/project-web");
+      expect(entry.data.specifier).toBe("@langwatch/project-browser");
     });
   });
 
@@ -140,7 +118,7 @@ describe("given package-boundaries", () => {
     /** @scenario "A deleted alias import is reported as deadAlias" */
     it("reports deadAlias with the specifier", () => {
       const found = report(
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
         'import { helper } from "~/lib/helper";',
       );
 
@@ -157,19 +135,19 @@ describe("given package-boundaries", () => {
       // Build a second workspace by hand: an enterprise feature package the
       // core `agent` feature then imports from.
       enterprise.write(
-        "modules/agent/server/package.json",
-        JSON.stringify({ name: "@langwatch/agent-server", exports: { ".": "." } }),
+        "modules/agent/process/package.json",
+        JSON.stringify({ name: "@langwatch/agent-process", exports: { ".": "." } }),
       );
-      enterprise.write("modules/agent/server/src/services/agent.service.ts", "export {}");
+      enterprise.write("modules/agent/process/src/services/agent.service.ts", "export {}");
       enterprise.write(
-        "enterprise/modules/governance/server/package.json",
-        JSON.stringify({ name: "@langwatch/enterprise-governance-server", exports: { ".": "." } }),
+        "enterprise/modules/governance/process/package.json",
+        JSON.stringify({ name: "@langwatch/enterprise-governance-process", exports: { ".": "." } }),
       );
       try {
         const found = runRule(boundaryRule, {
-          code: 'import { GovernanceService } from "@langwatch/enterprise-governance-server";',
+          code: 'import { GovernanceService } from "@langwatch/enterprise-governance-process";',
           cwd: enterprise.cwd,
-          filename: "modules/agent/server/src/services/agent.service.ts",
+          filename: "modules/agent/process/src/services/agent.service.ts",
         });
 
         expect(found.map((e) => e.messageId)).toContain("coreImportsEnterprise");
@@ -183,7 +161,7 @@ describe("given package-boundaries", () => {
     /** @scenario "An undeclared export subpath is reported as sealedExports" */
     it("reports sealedExports naming the subpath and package", () => {
       const found = report(
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
         'import { helper } from "@langwatch/project-contract/internal";',
       );
 
@@ -198,7 +176,7 @@ describe("given package-boundaries", () => {
     it("reports nothing", () => {
       expect(
         report(
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
           'import { AgentCommand } from "@langwatch/agent-contract";',
         ),
       ).toEqual([]);

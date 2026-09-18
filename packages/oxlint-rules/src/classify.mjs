@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 // One answer to "what file am I standing in", computed once per file and read
@@ -28,7 +27,6 @@ const TEST_DIRECTORY = /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)/;
 
 const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
 
-const layoutVersionCache = new Map();
 const classificationCache = new Map();
 
 /** The absolute path of the file a rule is looking at. */
@@ -42,29 +40,8 @@ export function workspacePathOf(cwd, filename) {
   return relative(cwd, filename).split(sep).join("/");
 }
 
-function featureLayoutVersion(cwd, enterprise, feature) {
-  const key = `${cwd}:${enterprise ? "enterprise:" : "core:"}${feature}`;
-  if (layoutVersionCache.has(key)) return layoutVersionCache.get(key);
-  const root = enterprise
-    ? join(cwd, "enterprise", "modules", feature)
-    : join(cwd, "modules", feature);
-  const path = join(root, "feature.json");
-  let version;
-  if (existsSync(path)) {
-    try {
-      const value = JSON.parse(readFileSync(path, "utf8"));
-      if (value.layoutVersion === 0) version = value.layoutVersion;
-    } catch {
-      version = undefined;
-    }
-  }
-  layoutVersionCache.set(key, version);
-  return version;
-}
-
-function strictSourceOf({ enterprise, feature, layoutVersion, relative: packageRelative, role }) {
+function strictSourceOf({ enterprise, feature, relative: packageRelative, role }) {
   if (role !== "contract" && role !== "server" && role !== "web") return undefined;
-  if (layoutVersion !== 0) return undefined;
   if (!packageRelative?.startsWith("src/")) return undefined;
   const sourcePath = packageRelative.slice("src/".length);
   if (TEST_DIRECTORY.test(sourcePath)) return undefined;
@@ -92,7 +69,6 @@ function classifyPath(cwd, filename) {
     isServiceModule: SERVICE_MODULE.test(workspacePath),
     isTest,
     kind: undefined,
-    layoutVersion: undefined,
     relative: undefined,
     role: "other",
     sourcePath: undefined,
@@ -111,7 +87,6 @@ function classifyPath(cwd, filename) {
       enterprise,
       feature: feature[2],
       kind: feature[3],
-      layoutVersion: featureLayoutVersion(cwd, enterprise, feature[2]),
       relative: packageRelative,
       role: feature[3],
       sourcePath: packageRelative.startsWith("src/")
@@ -179,5 +154,4 @@ export function classify(context) {
 /** Drops every memo. Only the fixture harness needs this. */
 export function resetClassificationCache() {
   classificationCache.clear();
-  layoutVersionCache.clear();
 }

@@ -2359,7 +2359,7 @@ export function lintFeatureSetupInfrastructure(
   const { packages, resolver } = snapshot;
 
   return packages
-    .filter((pkg) => pkg.kind === "server" && pkg.layoutVersion === 0)
+    .filter((pkg) => pkg.kind === "server")
     .flatMap((pkg) => {
       const appRoot = join(pkg.root, "src", "app");
       if (!existsSync(appRoot)) return [];

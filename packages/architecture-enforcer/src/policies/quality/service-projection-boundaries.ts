@@ -291,7 +291,7 @@ export function lintServiceProjectionBoundaries(
   const violations: ArchitectureViolation[] = [];
 
   for (const pkg of packages) {
-    if (pkg.kind !== "server" || pkg.layoutVersion !== 0) continue;
+    if (pkg.kind !== "server") continue;
 
     const sourceFiles = snapshot.files({
       directory: join(pkg.root, "src"),

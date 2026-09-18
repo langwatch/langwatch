@@ -35,7 +35,6 @@ function featurePackage({
   exports = { ".": "./src/index.ts" },
   source = "export const value = true;",
   enterprise = false,
-  layoutVersion = 0,
   subjects,
   capability = "service",
 }: {
@@ -46,7 +45,6 @@ function featurePackage({
   exports?: Record<string, unknown>;
   source?: string;
   enterprise?: boolean;
-  layoutVersion?: 0;
   subjects?: string[];
   /** The contract capability: the legacy abstract service, or the reference moduleApi token. */
   capability?: "service" | "api";
@@ -85,7 +83,6 @@ function featurePackage({
       return classificationOrder || left.id.localeCompare(right.id);
     });
   write("modules/catalogue.json", JSON.stringify(catalogue));
-  write(`${featureRoot}/feature.json`, JSON.stringify({ layoutVersion }));
   write(
     `${featureRoot}/adrs/${adrName}`,
     `# ADR-001: ${feature} package boundary
@@ -160,16 +157,16 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
   );
   write(`${prefix}/src/index.ts`, source);
   const serviceName = `${className(feature)}Service`;
-  if (layoutVersion === 0 && role === "contract" && capability === "service") {
+  if (role === "contract" && capability === "service") {
     write(`${prefix}/src/${feature}.service.ts`, `export abstract class ${serviceName} {}`);
   }
-  if (layoutVersion === 0 && role === "contract" && capability === "api") {
+  if (role === "contract" && capability === "api") {
     write(
       `${prefix}/src/${feature}.api.ts`,
       `import { moduleApi } from "@langwatch/kernel"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = moduleApi<${className(feature)}Api>()("${feature}");`,
     );
   }
-  if (layoutVersion === 0 && role === "server") {
+  if (role === "server") {
     write(
       `${prefix}/src/services/${feature}.service.ts`,
       `export class ${serviceName} { static create(): ${serviceName} { return new ${serviceName}(); } }`,
@@ -259,28 +256,6 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("feature-layout");
   });
 
-  /**
-   * A convention that differs from version 0 cannot arrive by declaring a
-   * number nobody implemented: the workspace reader refuses the version and
-   * stops governing the package, so the only way to introduce one is to build
-   * it as a version with rules of its own.
-   */
-  /** @scenario Layout evolution is explicit */
-  it("refuses a layout version it does not implement, rather than guessing at its rules", () => {
-    featurePackage({ feature: "agent", role: "contract" });
-    write("modules/agent/feature.json", JSON.stringify({ layoutVersion: 1 }));
-
-    const violations = lintWorkspace({ root, declarations: false });
-    const refusal = violations.find(
-      (violation) =>
-        violation.policy === "feature-source-layout" && violation.message.includes("layoutVersion"),
-    );
-
-    expect(refusal?.message).toContain("1");
-    // ...and version 0's own rules did not silently apply to it either.
-    expect(violations.filter((violation) => violation.policy === "feature-layout")).toEqual([]);
-  });
-
   /** @scenario "Retired schema runtimes cannot re-enter feature packages" */
   it("rejects the retired Zod runtime in a feature contract", () => {
     featurePackage({
@@ -328,9 +303,9 @@ describe("feature package boundary lint", () => {
     featurePackage({
       feature: "agent",
       role: "web",
-      dependencies: { "@langwatch/agent-server": "workspace:*" },
+      dependencies: { "@langwatch/agent-process": "workspace:*" },
       source:
-        'import type { value } from "@langwatch/agent-server"; export type View = typeof value;',
+        'import type { value } from "@langwatch/agent-process"; export type View = typeof value;',
     });
     expect(policies()).toContain("package-role");
   });
@@ -343,15 +318,15 @@ describe("feature package boundary lint", () => {
       "export abstract class ThisThisService {}",
     );
     write(
-      "modules/agent/server/src/repositories/prisma/prisma.ingestion-source.repository.ts",
+      "modules/agent/process/src/repositories/prisma/prisma.ingestion-source.repository.ts",
       "export abstract class PrismaIngestionSourceRepository {}",
     );
     write(
-      "modules/agent/server/src/adapters/clickhouse.trace.adapter.ts",
+      "modules/agent/process/src/adapters/clickhouse.trace.adapter.ts",
       "export class ClickhouseTraceAdapter { static create() { return new ClickhouseTraceAdapter(); } }",
     );
     write(
-      "modules/agent/server/src/ports/simulation-execution.port.ts",
+      "modules/agent/process/src/ports/simulation-execution.port.ts",
       "export abstract class SimulationExecution {}",
     );
 
@@ -368,9 +343,9 @@ describe("feature package boundary lint", () => {
     featurePackage({
       feature: "agent",
       role: "server",
-      dependencies: { "@langwatch/workflow-server": "workspace:*" },
+      dependencies: { "@langwatch/workflow-process": "workspace:*" },
       source:
-        'import type { value } from "@langwatch/workflow-server"; export type Value = typeof value;',
+        'import type { value } from "@langwatch/workflow-process"; export type Value = typeof value;',
     });
     expect(policies()).toContain("cross-feature");
   });
@@ -422,11 +397,11 @@ describe("feature package boundary lint", () => {
       source: 'export * from "./adapters/agent.adapter";',
     });
     write(
-      "modules/agent/server/src/adapters/agent.adapter.ts",
+      "modules/agent/process/src/adapters/agent.adapter.ts",
       'export * from "../repositories/agent.repository";',
     );
     write(
-      "modules/agent/server/src/repositories/agent.repository.ts",
+      "modules/agent/process/src/repositories/agent.repository.ts",
       "export class AgentRepository {}",
     );
 
@@ -441,11 +416,11 @@ describe("feature package boundary lint", () => {
       source: 'export { AgentRepository } from "./adapters/agent.adapter";',
     });
     write(
-      "modules/agent/server/src/adapters/agent.adapter.ts",
+      "modules/agent/process/src/adapters/agent.adapter.ts",
       'import { AgentRepository } from "../repositories/agent.repository";\nexport { AgentRepository };',
     );
     write(
-      "modules/agent/server/src/repositories/agent.repository.ts",
+      "modules/agent/process/src/repositories/agent.repository.ts",
       "export class AgentRepository {}",
     );
 
@@ -460,9 +435,9 @@ describe("feature package boundary lint", () => {
       source: 'export { AgentRepository } from "#app/repositories/agent.repository";',
     });
     write(
-      "modules/agent/server/package.json",
+      "modules/agent/process/package.json",
       JSON.stringify({
-        name: "@langwatch/agent-server",
+        name: "@langwatch/agent-process",
         type: "module",
         imports: { "#*": "./src/*.ts" },
         exports: { ".": "./src/index.ts" },
@@ -470,7 +445,7 @@ describe("feature package boundary lint", () => {
       }),
     );
     write(
-      "modules/agent/server/src/repositories/agent.repository.ts",
+      "modules/agent/process/src/repositories/agent.repository.ts",
       "export class AgentRepository {}",
     );
 
@@ -488,11 +463,11 @@ describe("feature package boundary lint", () => {
       },
     });
     write(
-      "modules/agent/server/src/testing.ts",
+      "modules/agent/process/src/testing.ts",
       'export { AgentRepository } from "./repositories/agent.repository";',
     );
     write(
-      "modules/agent/server/src/repositories/agent.repository.ts",
+      "modules/agent/process/src/repositories/agent.repository.ts",
       "export class AgentRepository {}",
     );
 
@@ -510,11 +485,11 @@ describe("feature package boundary lint", () => {
       },
     });
     write(
-      "modules/agent/server/src/testing.ts",
+      "modules/agent/process/src/testing.ts",
       'export { MemoryAgentRepository } from "./repositories/memory/memory.agent.repository";',
     );
     write(
-      "modules/agent/server/src/repositories/memory/memory.agent.repository.ts",
+      "modules/agent/process/src/repositories/memory/memory.agent.repository.ts",
       "export class MemoryAgentRepository {}",
     );
 
@@ -532,11 +507,11 @@ describe("feature package boundary lint", () => {
       },
     });
     write(
-      "modules/agent/server/src/testing.ts",
+      "modules/agent/process/src/testing.ts",
       'export { FakeAgentRepository } from "./repositories/fake.agent.repository";',
     );
     write(
-      "modules/agent/server/src/repositories/fake.agent.repository.ts",
+      "modules/agent/process/src/repositories/fake.agent.repository.ts",
       "export class FakeAgentRepository {}",
     );
 
@@ -554,10 +529,10 @@ describe("feature package boundary lint", () => {
       },
     });
     write(
-      "modules/agent/server/src/testing.ts",
+      "modules/agent/process/src/testing.ts",
       'export { agentFixture } from "./stores/agent.test-fakes";',
     );
-    write("modules/agent/server/src/stores/agent.test-fakes.ts", "export const agentFixture = {};");
+    write("modules/agent/process/src/stores/agent.test-fakes.ts", "export const agentFixture = {};");
 
     expect(policies()).not.toContain("private-runtime-export");
   });
@@ -573,11 +548,11 @@ describe("feature package boundary lint", () => {
       },
     });
     write(
-      "modules/agent/server/src/testing.ts",
+      "modules/agent/process/src/testing.ts",
       'export { AgentRepository } from "./repositories/prisma/prisma.agent.repository";',
     );
     write(
-      "modules/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
+      "modules/agent/process/src/repositories/prisma/prisma.agent.repository.ts",
       "export class AgentRepository {}",
     );
 
@@ -593,7 +568,7 @@ describe("feature package boundary lint", () => {
         'export { MemoryAgentRepository } from "./repositories/memory/memory.agent.repository";',
     });
     write(
-      "modules/agent/server/src/repositories/memory/memory.agent.repository.ts",
+      "modules/agent/process/src/repositories/memory/memory.agent.repository.ts",
       "export class MemoryAgentRepository {}",
     );
 
@@ -608,7 +583,7 @@ describe("feature package boundary lint", () => {
       source: 'export type { AgentDatabase } from "./repositories/agent.repository";',
     });
     write(
-      "modules/agent/server/src/repositories/agent.repository.ts",
+      "modules/agent/process/src/repositories/agent.repository.ts",
       "export type AgentDatabase = { agentId: string };\nexport class AgentRepository {}",
     );
 
@@ -623,11 +598,11 @@ describe("feature package boundary lint", () => {
       source: 'export { AgentAdapter } from "./adapters/agent.adapter";',
     });
     write(
-      "modules/agent/server/src/adapters/agent.adapter.ts",
+      "modules/agent/process/src/adapters/agent.adapter.ts",
       'import { AgentRepository } from "../repositories/agent.repository";\nexport class AgentAdapter { constructor(private repo: AgentRepository) {} static create() { return new AgentAdapter(new AgentRepository()); } }',
     );
     write(
-      "modules/agent/server/src/repositories/agent.repository.ts",
+      "modules/agent/process/src/repositories/agent.repository.ts",
       "export class AgentRepository {}",
     );
 
@@ -642,7 +617,7 @@ describe("feature package boundary lint", () => {
       source: 'export type Leaked = import("@prisma/client").PrismaClient;',
     });
     buildsDeclarations({
-      directory: "modules/agent/server",
+      directory: "modules/agent/process",
       sources: ["src/index.ts"],
       emitted: {
         "dist/index.d.ts": 'export type Leaked = import("@prisma/client").PrismaClient;\n',
@@ -667,37 +642,37 @@ describe("strict feature source layout", () => {
   /** @scenario A strict feature declares the initial layout version */
   /** @scenario "Test fixtures have a named non-production home" */
   it("accepts canonical version-0 contract and server source", () => {
-    featurePackage({ feature: "agent", role: "contract", layoutVersion: 0 });
+    featurePackage({ feature: "agent", role: "contract" });
     write("modules/agent/contract/src/agent.service.ts", "export abstract class AgentService {}");
-    featurePackage({ feature: "agent", role: "server", layoutVersion: 0 });
+    featurePackage({ feature: "agent", role: "server" });
     write(
-      "modules/agent/server/src/services/agent.service.ts",
+      "modules/agent/process/src/services/agent.service.ts",
       "export class AgentService { static create() { return new AgentService(); } }",
     );
     write(
-      "modules/agent/server/src/repositories/agent.repository.ts",
+      "modules/agent/process/src/repositories/agent.repository.ts",
       "export abstract class AgentRepository {}",
     );
     write(
-      "modules/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
+      "modules/agent/process/src/repositories/prisma/prisma.agent.repository.ts",
       "export class PrismaAgentRepository { static create() { return new PrismaAgentRepository(); } }",
     );
     write(
-      "modules/agent/server/src/transport/api-rest/agent.api.ts",
+      "modules/agent/process/src/transport/api-rest/agent.api.ts",
       "export class AgentApi { static create() { return new AgentApi(); } }",
     );
-    write("modules/agent/server/src/transport/agent.rest.ts", "export const agentRest = {};");
-    write("modules/agent/server/src/transport/agent.trpc.ts", "export const agentTrpc = {};");
+    write("modules/agent/process/src/transport/agent.rest.ts", "export const agentRest = {};");
+    write("modules/agent/process/src/transport/agent.trpc.ts", "export const agentTrpc = {};");
     write(
-      "modules/agent/server/src/fixtures/agent.fixture.ts",
+      "modules/agent/process/src/fixtures/agent.fixture.ts",
       "export const agentFixture = { id: 'agent_1' };",
     );
     write(
-      "modules/agent/server/src/subscribers/agent.subscriber.ts",
+      "modules/agent/process/src/subscribers/agent.subscriber.ts",
       "export class AgentSubscriber { static create() { return new AgentSubscriber(); } }",
     );
     write(
-      "modules/agent/server/src/tasks/agent-backfill.task.ts",
+      "modules/agent/process/src/tasks/agent-backfill.task.ts",
       "export class AgentBackfillTask { static create() { return new AgentBackfillTask(); } }",
     );
 
@@ -754,25 +729,25 @@ describe("strict feature source layout", () => {
    * nothing useful to say about it.
    */
   it("accepts tests and their helpers anywhere under a __tests__ directory", () => {
-    featurePackage({ feature: "agent", role: "server", layoutVersion: 0 });
-    write("modules/agent/server/src/services/agent.service.ts", "export class AgentService {}");
+    featurePackage({ feature: "agent", role: "server" });
+    write("modules/agent/process/src/services/agent.service.ts", "export class AgentService {}");
     write(
-      "modules/agent/server/src/services/__tests__/agent.service.unit.test.ts",
+      "modules/agent/process/src/services/__tests__/agent.service.unit.test.ts",
       "export const covered = true;",
     );
     // A name the production grammar would reject on every count: no artifact
     // suffix, four dotted parts, and a level that is not one of the three.
     write(
-      "modules/agent/server/src/services/__tests__/agent.retries.redelivery.test.ts",
+      "modules/agent/process/src/services/__tests__/agent.retries.redelivery.test.ts",
       "export const covered = true;",
     );
     // Helpers and fixtures travel with the tests that use them, at any depth.
     write(
-      "modules/agent/server/src/services/__tests__/support/testAgentService.ts",
+      "modules/agent/process/src/services/__tests__/support/testAgentService.ts",
       "export const stub = true;",
     );
     write(
-      "modules/agent/server/src/__tests__/fixtures/agent.fixtures.ts",
+      "modules/agent/process/src/__tests__/fixtures/agent.fixtures.ts",
       "export const fixture = true;",
     );
 
@@ -785,21 +760,11 @@ describe("strict feature source layout", () => {
    * production source is still a source path, and the grammar still applies.
    */
 
-  /** @scenario Unknown or missing layout versions fail */
-  it("rejects a missing or unknown layout version", () => {
-    featurePackage({ feature: "agent", role: "contract" });
-    rmSync(join(root, "modules/agent/feature.json"));
-    expect(policies()).toContain("feature-source-layout");
-
-    write("modules/agent/feature.json", JSON.stringify({ layoutVersion: 99 }));
-    expect(policies()).toContain("feature-source-layout");
-  });
-
   it("treats the last qualifier as the subject of a technology adapter", () => {
     featurePackage({ feature: "licensing", role: "contract" });
     featurePackage({ feature: "sso", role: "server" });
     write(
-      "modules/sso/server/src/adapters/licensing.sso.adapter.ts",
+      "modules/sso/process/src/adapters/licensing.sso.adapter.ts",
       "export class LicensingSsoAdapter {}",
     );
 
@@ -820,41 +785,16 @@ describe("strict feature source layout", () => {
     expect(policies()).toContain("feature-catalogue");
   });
 
-  /** @scenario "A local manifest cannot broaden a feature" */
-  /** @scenario "A new governance subject is deliberate" */
-  it("rejects local subject ownership expansion", () => {
-    featurePackage({ feature: "project", role: "contract" });
-    featurePackage({ feature: "governance", role: "server" });
-    write(
-      "modules/governance/server/src/services/project.service.ts",
-      "export class ProjectService { static create() { return new ProjectService(); } }",
-    );
-    write(
-      "modules/governance/feature.json",
-      JSON.stringify({ layoutVersion: 0, subjects: ["project"] }),
-    );
-
-    const violations = lintWorkspace({ root, declarations: false }).filter(
-      (violation) => violation.policy === "feature-source-subject",
-    );
-    const messages = violations.map((violation) => violation.message);
-
-    // The local manifest is refused in its own right...
-    expect(messages).toContain(
-      "feature.json may only select layoutVersion and declare its web surface uses; feature ownership is declared centrally.",
-    );
-  });
-
   /** @scenario "A rules/ module is a pure package of functions" */
   it("accepts a rules module exporting pure functions and constants", () => {
     featurePackage({ feature: "agent", role: "contract" });
     featurePackage({ feature: "agent", role: "server" });
     write(
-      "modules/agent/server/src/rules/agent-support.rules.ts",
+      "modules/agent/process/src/rules/agent-support.rules.ts",
       "export function isSiblingRule(value: number): boolean {\n  return value % 2 === 0;\n}\n",
     );
     write(
-      "modules/agent/server/src/rules/agent-eligibility.rules.ts",
+      "modules/agent/process/src/rules/agent-eligibility.rules.ts",
       [
         'import { createHash } from "node:crypto";',
         'import { value } from "@langwatch/agent-contract";',
@@ -876,7 +816,7 @@ describe("strict feature source layout", () => {
     featurePackage({ feature: "agent", role: "contract" });
     featurePackage({ feature: "agent", role: "server" });
     write(
-      "modules/agent/server/src/rules/agent-eligibility.rules.ts",
+      "modules/agent/process/src/rules/agent-eligibility.rules.ts",
       'export function names(): Set<string> {\n  return new Set(["a"]);\n}\n',
     );
 
@@ -886,7 +826,7 @@ describe("strict feature source layout", () => {
   it("rejects a rules module importing a service", () => {
     featurePackage({ feature: "agent", role: "server" });
     write(
-      "modules/agent/server/src/rules/agent-eligibility.rules.ts",
+      "modules/agent/process/src/rules/agent-eligibility.rules.ts",
       [
         'import { AgentService } from "../services/agent.service";',
         "",
@@ -913,7 +853,7 @@ describe("strict feature source layout", () => {
   it("rejects a rules module importing Prisma", () => {
     featurePackage({ feature: "agent", role: "server" });
     write(
-      "modules/agent/server/src/rules/agent-eligibility.rules.ts",
+      "modules/agent/process/src/rules/agent-eligibility.rules.ts",
       [
         'import { Prisma } from "@prisma/client";',
         "",
@@ -943,7 +883,7 @@ describe("Prisma client containment", () => {
   it("allows generated Prisma only in strict feature Prisma adapters", () => {
     featurePackage({ feature: "agent", role: "server" });
     write(
-      "modules/agent/server/src/repositories/prisma/prisma.agents.repository.ts",
+      "modules/agent/process/src/repositories/prisma/prisma.agents.repository.ts",
       'import type { Prisma } from "@langwatch/prisma-client/generated"; export class PrismaAgentsRepository { static create(_query: Prisma.AgentWhereInput) { return new PrismaAgentsRepository(); } }',
     );
 
@@ -961,21 +901,21 @@ describe("Prisma client containment", () => {
     featurePackage({
       feature: "agent",
       role: "web",
-      dependencies: { "@langwatch/agent-server": "workspace:*" },
+      dependencies: { "@langwatch/agent-process": "workspace:*" },
       subjects: ["agent", "shared", "shared"],
       source:
-        'import type { value } from "@langwatch/agent-server"; export type View = typeof value;',
+        'import type { value } from "@langwatch/agent-process"; export type View = typeof value;',
     });
     write(
       "modules/agent/contract/src/agent.service.ts",
       "export abstract class AgentService { abstract findById(): Promise<string | null>; }",
     );
     write(
-      "modules/agent/server/src/services/agent.service.ts",
+      "modules/agent/process/src/services/agent.service.ts",
       'import type { PrismaClient } from "@langwatch/prisma-client/generated"; export class AgentService { static create(_client: PrismaClient) { return new AgentService(); } }',
     );
     write(
-      "modules/agent/server/src/subscribers/agent.subscriber.ts",
+      "modules/agent/process/src/subscribers/agent.subscriber.ts",
       "export const handle = (events: { append(): void }) => events.append();",
     );
 
@@ -1010,11 +950,11 @@ describe("Prisma client containment", () => {
         'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository.ts";',
     });
     write(
-      "modules/agent/server/src/repositories/prisma/prisma.agents.repository.ts",
+      "modules/agent/process/src/repositories/prisma/prisma.agents.repository.ts",
       'export type { Prisma as PrismaBacked } from "@langwatch/prisma-client/generated";',
     );
     buildsDeclarations({
-      directory: "modules/agent/server",
+      directory: "modules/agent/process",
       sources: ["src/index.ts", "src/repositories/prisma/prisma.agents.repository.ts"],
       emitted: {
         "dist/index.d.ts":
@@ -1040,7 +980,7 @@ describe("Prisma client containment", () => {
       source: 'export type Leaked = import("@prisma/client").PrismaClient;',
     });
     buildsDeclarations({
-      directory: "modules/agent/server",
+      directory: "modules/agent/process",
       sources: ["src/index.ts"],
       emitted: {},
     });

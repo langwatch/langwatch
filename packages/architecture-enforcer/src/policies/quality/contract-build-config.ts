@@ -37,7 +37,7 @@ function excludesTests(value: unknown): boolean {
 
 /** One violation for a strict-contract package's build config, or `undefined` when it is fine. */
 function violationForPackage(pkg: ClassifiedPackage): ArchitectureViolation | undefined {
-  if (pkg.kind !== "contract" || pkg.layoutVersion !== 0) return undefined;
+  if (pkg.kind !== "contract") return undefined;
 
   const file = join(pkg.root, "tsconfig.build.json");
   const hasBuildScript = typeof pkg.manifest.scripts?.build === "string";

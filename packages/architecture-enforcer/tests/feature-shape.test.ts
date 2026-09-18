@@ -44,14 +44,22 @@ function pkg(kind: "contract" | "server" | "web", feature = "widget"): Classifie
     kind,
     feature,
     featureRoot,
-    layoutVersion: 0,
     subjects: [feature],
     enterprise: false,
   };
 }
 
+/** The generated module list a real process installs from; see generate-modules.mjs. */
+function generatedModuleList(identifiers: readonly string[] = []): void {
+  write(
+    "modules/server-modules.generated.ts",
+    `export const serverModules = [${identifiers.join(", ")}] as const;\n`,
+  );
+}
+
 /** The annotation reference shape, reduced to the paths the policy reads. */
 function referenceFeature(): void {
+  generatedModuleList(["widgetServer"]);
   write("modules/widget/contract/src/widget.api.ts");
   write("modules/widget/server/src/widget.server.ts");
   write("modules/widget/server/src/app/widget.app.ts");
@@ -326,9 +334,9 @@ describe("feature shape", () => {
     });
 
     /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
-    it("reports an installer no process boots, naming the installer file", () => {
+    it("reports an installer the generated module list omits, naming the installer file", () => {
       referenceFeature();
-      rmSync(join(root, "apps/api/src/features/widget/widget.composition.ts"));
+      generatedModuleList([]);
 
       expect(findings()).toEqual([
         {
@@ -341,10 +349,7 @@ describe("feature shape", () => {
 
     it("accepts a worker-side installer named after the feature", () => {
       referenceFeature();
-      write(
-        "apps/api/src/features/widget/widget.composition.ts",
-        'createApp().withModules([withMemoryRepositories(workerWidgetServer)]).boot();\n',
-      );
+      generatedModuleList(["workerWidgetServer"]);
 
       expect(findings()).toEqual([]);
     });

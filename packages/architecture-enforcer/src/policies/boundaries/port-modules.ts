@@ -59,7 +59,7 @@ export function lintStrictPortModules(snapshot: WorkspaceSnapshot): Architecture
   const violations: ArchitectureViolation[] = [];
 
   for (const pkg of packages) {
-    if (pkg.kind !== "server" || pkg.layoutVersion !== 0) continue;
+    if (pkg.kind !== "server") continue;
 
     for (const file of snapshot.files({ directory: pkg.root, accept: isStrictPort })) {
       if (hasOnlyExportedAbstractPortClasses(file)) continue;

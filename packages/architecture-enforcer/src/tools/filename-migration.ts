@@ -95,7 +95,7 @@ function strictSourceFiles(root: string): string[] {
     pkg.kind === "contract" || pkg.kind === "server" || pkg.kind === "web";
 
   return discoverClassifiedPackages(root)
-    .packages.filter((pkg) => pkg.layoutVersion === 0 && isFeatureSurface(pkg))
+    .packages.filter((pkg) => isFeatureSurface(pkg))
     .flatMap((pkg) => walkFiles(`${pkg.root}/src`, (path) => SOURCE_FILE.test(path)));
 }
 

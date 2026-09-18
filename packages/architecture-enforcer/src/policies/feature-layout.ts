@@ -745,8 +745,6 @@ export function lintFeatureLayouts(snapshot: WorkspaceSnapshot): ArchitectureVio
   const violations: ArchitectureViolation[] = [];
 
   for (const pkg of snapshot.packages) {
-    if (pkg.layoutVersion !== 0) continue;
-
     if (pkg.kind === "contract") violations.push(...lintContract(snapshot, pkg));
 
     if (pkg.kind === "server") {

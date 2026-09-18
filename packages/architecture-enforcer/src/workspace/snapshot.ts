@@ -1,11 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { readFeatureCatalogue } from "./feature-catalogue.ts";
-import {
-  FEATURE_CONFIGURATION_KEYS,
-  FEATURE_WEB_DECLARATION_SHAPE,
-  parseFeatureWebDeclaration,
-} from "./feature-web-declaration.ts";
 import { forgetFileListings, listFiles } from "./layout.ts";
 import {
   forgetWorkspaceModuleResolvers,
@@ -18,7 +13,6 @@ import type {
   ClassifiedPackage,
   EnterpriseCompositionRole,
   FeatureCatalogueEntry,
-  FeatureLayoutVersion,
   FeaturePackageRole,
   PackageManifest,
 } from "../types.ts";
@@ -48,90 +42,6 @@ function readManifest(path: string): PackageManifest {
   return JSON.parse(readFileSync(path, "utf8")) as PackageManifest;
 }
 
-function readFeatureConfiguration(
-  featureRoot: string,
-  violations: ArchitectureViolation[],
-): {
-  layoutVersion: FeatureLayoutVersion | undefined;
-} {
-  const path = join(featureRoot, "feature.json");
-
-  if (!existsSync(path)) {
-    violations.push({
-      policy: "feature-source-layout",
-      file: path,
-      message: "Feature ownership roots must declare a layoutVersion in feature.json.",
-      allowed: "Use layoutVersion 0, the initial strict feature layout.",
-    });
-
-    return { layoutVersion: void 0 };
-  }
-
-  let value: unknown;
-
-  try {
-    value = JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    violations.push({
-      policy: "feature-source-layout",
-      file: path,
-      message: `feature.json must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    });
-
-    return { layoutVersion: void 0 };
-  }
-
-  const layoutVersion =
-    typeof value === "object" && value !== null && "layoutVersion" in value
-      ? (value as { layoutVersion?: unknown }).layoutVersion
-      : void 0;
-
-  if (layoutVersion !== 0) {
-    violations.push({
-      policy: "feature-source-layout",
-      file: path,
-      message: `Unsupported feature layoutVersion ${JSON.stringify(layoutVersion)}.`,
-      allowed: "The only supported version is 0, the initial strict layout.",
-    });
-
-    return { layoutVersion: void 0 };
-  }
-
-  const keys = Object.keys(value as Record<string, unknown>);
-
-  let hasUnknownKey = false;
-
-  for (const key of keys) {
-    if (!FEATURE_CONFIGURATION_KEYS.has(key)) {
-      hasUnknownKey = true;
-      break;
-    }
-  }
-
-  if (hasUnknownKey) {
-    violations.push({
-      policy: "feature-source-subject",
-      file: path,
-      message:
-        "feature.json may only select layoutVersion and declare its web surface uses; feature ownership is declared centrally.",
-      allowed: "Change modules/catalogue.json and the owning ADR/spec to expand feature ownership.",
-    });
-  }
-
-  const { error } = parseFeatureWebDeclaration(value);
-
-  if (error) {
-    violations.push({
-      policy: "feature-source-subject",
-      file: path,
-      message: `feature.json web declaration must match its shape: ${error}`,
-      allowed: FEATURE_WEB_DECLARATION_SHAPE,
-    });
-  }
-
-  return { layoutVersion };
-}
-
 function directories(path: string): string[] {
   if (!existsSync(path)) return [];
 
@@ -154,7 +64,6 @@ export function discoverClassifiedPackages(root: string): {
   const discoverFeatures = (featuresRoot: string, enterprise: boolean) => {
     for (const feature of directories(featuresRoot)) {
       const featureRoot = join(featuresRoot, feature);
-      const { layoutVersion } = readFeatureConfiguration(featureRoot, violations);
       const catalogueEntry = catalogueByRoot.get(featureRoot);
 
       if (!catalogueEntry) {
@@ -222,7 +131,6 @@ export function discoverClassifiedPackages(root: string): {
           kind: role,
           feature,
           featureRoot,
-          layoutVersion,
           subjects: catalogueEntry?.subjects,
           enterprise,
         });

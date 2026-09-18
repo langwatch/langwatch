@@ -90,22 +90,6 @@ function webPackage(
 }
 
 /**
- * The module-side declaration: the sibling web surfaces a module's own web
- * package consumes, written into the feature.json the module already has.
- */
-function writeModuleDeclaration(
-  feature: string,
-  surfaces: string[],
-  { enterprise = false }: { enterprise?: boolean } = {},
-): void {
-  const featureRoot = enterprise ? `enterprise/modules/${feature}` : `modules/${feature}`;
-  write(
-    `${featureRoot}/feature.json`,
-    JSON.stringify({ layoutVersion: 0, web: { uses: { surfaces } } }),
-  );
-}
-
-/**
  * A first-party workspace package that is not a web package: the platform
  * modules a browser screen shares, whose portability the rule decides by
  * reading them.
@@ -150,35 +134,35 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([
       {
         id: "prompt-studio",
-        screens: ["@langwatch/prompt-web/screens/prompt-studio"],
+        screens: ["@langwatch/prompt-browser/screens/prompt-studio"],
       },
       {
         id: "trace-explorer",
-        surfaces: ["@langwatch/prompt-web/surfaces/prompt-reference"],
+        surfaces: ["@langwatch/prompt-browser/surfaces/prompt-reference"],
       },
     ]);
     write(
       "apps/ui/src/features/prompt-studio/index.ts",
-      'import { PromptStudio } from "@langwatch/prompt-web/screens/prompt-studio"; export { PromptStudio };',
+      'import { PromptStudio } from "@langwatch/prompt-browser/screens/prompt-studio"; export { PromptStudio };',
     );
     write(
       "apps/ui/src/features/trace-explorer/index.ts",
-      'import { PromptReference } from "@langwatch/prompt-web/surfaces/prompt-reference"; export { PromptReference };',
+      'import { PromptReference } from "@langwatch/prompt-browser/surfaces/prompt-reference"; export { PromptReference };',
     );
     write(
-      "modules/prompt/web/src/screens/prompt-studio/index.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       'export { PromptStudio } from "./private";',
     );
     write(
-      "modules/prompt/web/src/screens/prompt-studio/private/index.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/private/index.ts",
       "export const PromptStudio = true;",
     );
     write(
-      "modules/prompt/web/src/surfaces/prompt-reference/index.ts",
+      "modules/prompt/browser/src/surfaces/prompt-reference/index.ts",
       'export { PromptReference } from "./view";',
     );
     write(
-      "modules/prompt/web/src/surfaces/prompt-reference/view/index.ts",
+      "modules/prompt/browser/src/surfaces/prompt-reference/view/index.ts",
       "export const PromptReference = true;",
     );
 
@@ -193,28 +177,28 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([
       {
         id: "prompt-studio",
-        screens: ["@langwatch/prompt-web/prompt-studio"],
+        screens: ["@langwatch/prompt-browser/prompt-studio"],
       },
       {
         id: "trace-explorer",
-        surfaces: ["@langwatch/prompt-web/prompt-reference"],
+        surfaces: ["@langwatch/prompt-browser/prompt-reference"],
       },
     ]);
     write(
       "apps/ui/src/features/prompt-studio/index.ts",
-      'import { PromptStudio } from "@langwatch/prompt-web/prompt-studio"; export { PromptStudio };',
+      'import { PromptStudio } from "@langwatch/prompt-browser/prompt-studio"; export { PromptStudio };',
     );
     write(
       "apps/ui/src/features/trace-explorer/index.ts",
-      'import { PromptReference } from "@langwatch/prompt-web/prompt-reference"; export { PromptReference };',
+      'import { PromptReference } from "@langwatch/prompt-browser/prompt-reference"; export { PromptReference };',
     );
-    write("modules/prompt/web/src/prompt-studio.ts", "export const PromptStudio = true;");
+    write("modules/prompt/browser/src/prompt-studio.ts", "export const PromptStudio = true;");
     write(
-      "modules/prompt/web/src/prompt-reference.ts",
+      "modules/prompt/browser/src/prompt-reference.ts",
       'export { PromptReference } from "./ui/elements/prompt-reference";',
     );
     write(
-      "modules/prompt/web/src/ui/elements/prompt-reference.ts",
+      "modules/prompt/browser/src/ui/elements/prompt-reference.ts",
       "export const PromptReference = true;",
     );
 
@@ -229,16 +213,16 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([
       {
         id: "prompt-studio",
-        screens: ["@langwatch/prompt-web/prompt-studio"],
+        screens: ["@langwatch/prompt-browser/prompt-studio"],
       },
       { id: "trace-explorer" },
     ]);
     write(
       "apps/ui/src/features/trace-explorer/index.ts",
-      'import { PromptStudio } from "@langwatch/prompt-web/prompt-studio"; export { PromptStudio };',
+      'import { PromptStudio } from "@langwatch/prompt-browser/prompt-studio"; export { PromptStudio };',
     );
-    write("modules/prompt/web/src/prompt-studio.ts", "export const PromptStudio = true;");
-    write("modules/prompt/web/src/unlisted.ts", "export const Unlisted = true;");
+    write("modules/prompt/browser/src/prompt-studio.ts", "export const PromptStudio = true;");
+    write("modules/prompt/browser/src/unlisted.ts", "export const Unlisted = true;");
 
     expect(policies([promptWeb])).toEqual(
       expect.arrayContaining(["ui-screen-owner", "ui-web-public-entry"]),
@@ -257,24 +241,24 @@ describe("frontend UI architecture boundaries", () => {
         {
           id: "prompt-studio",
           root: "prompt",
-          surfaces: ["@langwatch/trace-web/trace-card"],
+          surfaces: ["@langwatch/trace-browser/trace-card"],
         },
       ],
-      ["@langwatch/prompt-web", "@langwatch/trace-web"],
+      ["@langwatch/prompt-browser", "@langwatch/trace-browser"],
     );
     write(
-      "modules/prompt/web/src/prompt-reference.ts",
+      "modules/prompt/browser/src/prompt-reference.ts",
       "export const PromptReference = true;",
     );
-    write("modules/trace/web/src/trace-card.ts", "export const TraceCard = true;");
-    promptWeb.manifest.dependencies = { "@langwatch/trace-web": "workspace:*" };
+    write("modules/trace/browser/src/trace-card.ts", "export const TraceCard = true;");
+    promptWeb.manifest.dependencies = { "@langwatch/trace-browser": "workspace:*" };
 
     const pairs = declaredWebDependencyPairs(snapshotOf({ root, packages: [promptWeb, traceWeb] }));
-    expect(pairs.has("@langwatch/prompt-web->@langwatch/trace-web")).toBe(true);
+    expect(pairs.has("@langwatch/prompt-browser->@langwatch/trace-browser")).toBe(true);
     expect(lintManifests(snapshotOf({ root, packages: [promptWeb, traceWeb] }), pairs)).toEqual([]);
 
     writeCatalogue([
-      { id: "prompt-studio", root: "prompt", screens: ["@langwatch/trace-web/trace-card"] },
+      { id: "prompt-studio", root: "prompt", screens: ["@langwatch/trace-browser/trace-card"] },
     ]);
     expect(declaredWebDependencyPairs(snapshotOf({ root, packages: [promptWeb, traceWeb] }))).toEqual(
       new Set(),
@@ -284,125 +268,16 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
-  /** @scenario "A module declares the sibling surfaces its web package consumes" */
-  it("permits a manifest dependency a module declares in its own feature.json", () => {
-    const scenarioWeb = webPackage("scenario", {
-      "./surfaces/scenario-summary": "./src/surfaces/scenario-summary/index.ts",
-    });
-    const suiteWeb = webPackage("suite", {
-      "./surfaces/run-formatters": "./src/surfaces/run-formatters/index.ts",
-    });
-    // No frontend feature has "scenario" as its root, so the browser
-    // catalogue has no entry through which this edge could be declared.
-    writeCatalogue([], ["@langwatch/scenario-web", "@langwatch/suite-web"]);
-    scenarioWeb.manifest.dependencies = { "@langwatch/suite-web": "workspace:*" };
-
-    writeModuleDeclaration("scenario", ["@langwatch/suite-web/surfaces/run-formatters"]);
-
-    const snapshot = snapshotOf({ root, packages: [scenarioWeb, suiteWeb] });
-    const pairs = declaredWebDependencyPairs(snapshot);
-
-    expect(pairs.has("@langwatch/scenario-web->@langwatch/suite-web")).toBe(true);
-    expect(lintManifests(snapshot, pairs)).toEqual([]);
-
-    writeModuleDeclaration("scenario", []);
-
-    const undeclared = snapshotOf({ root, packages: [scenarioWeb, suiteWeb] });
-
-    expect(declaredWebDependencyPairs(undeclared)).toEqual(new Set());
-    expect(lintManifests(undeclared, declaredWebDependencyPairs(undeclared))).toEqual(
-      expect.arrayContaining([expect.objectContaining({ policy: "cross-feature" })]),
-    );
-  });
-
-  /** @scenario "A declared surface use names a real surface door or fails" */
-  it("rejects a declared use naming a missing surface or a non-surface subpath", () => {
-    const scenarioWeb = webPackage("scenario", {
-      "./surfaces/scenario-summary": "./src/surfaces/scenario-summary/index.ts",
-    });
-    const suiteWeb = webPackage("suite", {
-      "./surfaces/run-formatters": "./src/surfaces/run-formatters/index.ts",
-      "./screens/suite": "./src/screens/suite/index.ts",
-    });
-    writeCatalogue([], ["@langwatch/scenario-web", "@langwatch/suite-web"]);
-    writeModuleDeclaration("scenario", [
-      "@langwatch/suite-web/surfaces/missing",
-      "@langwatch/suite-web/screens/suite",
-      "@langwatch/suite-web",
-    ]);
-
-    const declarationViolations = lint([scenarioWeb, suiteWeb]).filter(
-      (violation) => violation.policy === "ui-web-capability-declaration",
-    );
-
-    expect(declarationViolations.map((violation) => violation.specifier)).toEqual([
-      "@langwatch/suite-web/surfaces/missing",
-      "@langwatch/suite-web/screens/suite",
-      "@langwatch/suite-web",
-    ]);
-    expect(declarationViolations[0]!.file).toBe(join(root, "modules/scenario/feature.json"));
-    expect(
-      declaredWebDependencyPairs(snapshotOf({ root, packages: [scenarioWeb, suiteWeb] })),
-    ).toEqual(new Set());
-  });
-
-  /** @scenario "A declared surface use stays inside governance" */
-  it("rejects a declared use naming an ungoverned web package", () => {
-    const scenarioWeb = webPackage("scenario", {
-      "./surfaces/scenario-summary": "./src/surfaces/scenario-summary/index.ts",
-    });
-    const suiteWeb = webPackage("suite", {
-      "./surfaces/run-formatters": "./src/surfaces/run-formatters/index.ts",
-    });
-    writeCatalogue([], ["@langwatch/scenario-web"]);
-    writeModuleDeclaration("scenario", ["@langwatch/suite-web/surfaces/run-formatters"]);
-
-    const snapshot = snapshotOf({ root, packages: [scenarioWeb, suiteWeb] });
-
-    expect(
-      lint([scenarioWeb, suiteWeb])
-        .filter((violation) => violation.policy === "ui-web-package-governance")
-        .map((violation) => violation.specifier),
-    ).toEqual(["@langwatch/suite-web/surfaces/run-formatters"]);
-    expect(declaredWebDependencyPairs(snapshot)).toEqual(new Set());
-  });
-
-  /** @scenario "An enterprise module declares a surface use of a core module" */
-  it("permits a declared surface use from an enterprise module", () => {
-    const entitlementWeb = webPackage(
-      "entitlement",
-      { "./surfaces/entitlement-badge": "./src/surfaces/entitlement-badge/index.ts" },
-      { enterprise: true },
-    );
-    const suiteWeb = webPackage("suite", {
-      "./surfaces/run-formatters": "./src/surfaces/run-formatters/index.ts",
-    });
-    writeCatalogue([], ["@langwatch/entitlement-web", "@langwatch/suite-web"]);
-    entitlementWeb.manifest.dependencies = { "@langwatch/suite-web": "workspace:*" };
-
-    writeModuleDeclaration("entitlement", ["@langwatch/suite-web/surfaces/run-formatters"], {
-      enterprise: true,
-    });
-
-    const snapshot = snapshotOf({ root, packages: [entitlementWeb, suiteWeb] });
-    const pairs = declaredWebDependencyPairs(snapshot);
-
-    expect(pairs.has("@langwatch/entitlement-web->@langwatch/suite-web")).toBe(true);
-    expect(
-      lintManifests(snapshot, pairs).filter((violation) => violation.policy === "cross-feature"),
-    ).toEqual([]);
-  });
-
   /** @scenario "A web package can be governed before its screen migration completes" */
   it("governs an opted-in web package before a frontend feature owns its screen", () => {
     const promptWeb = webPackage("prompt", {
       ".": "./src/index.ts",
       "./surfaces/prompt-reference": "./src/surfaces/prompt-reference/index.ts",
     });
-    writeCatalogue([], ["@langwatch/prompt-web"]);
-    write("modules/prompt/web/src/index.ts", "export {};");
+    writeCatalogue([], ["@langwatch/prompt-browser"]);
+    write("modules/prompt/browser/src/index.ts", "export {};");
     write(
-      "modules/prompt/web/src/surfaces/prompt-reference/index.ts",
+      "modules/prompt/browser/src/surfaces/prompt-reference/index.ts",
       "export const PromptReference = true;",
     );
 
@@ -417,16 +292,16 @@ describe("frontend UI architecture boundaries", () => {
       [
         {
           id: "prompt-studio",
-          screens: ["@langwatch/prompt-web/screens/prompt-studio"],
+          screens: ["@langwatch/prompt-browser/screens/prompt-studio"],
         },
       ],
       [],
     );
     write(
       "apps/ui/src/features/prompt-studio/route.ts",
-      'import "@langwatch/prompt-web/screens/prompt-studio";',
+      'import "@langwatch/prompt-browser/screens/prompt-studio";',
     );
-    write("modules/prompt/web/src/screens/prompt-studio/index.ts", "export {};");
+    write("modules/prompt/browser/src/screens/prompt-studio/index.ts", "export {};");
 
     expect(
       policies([promptWeb]).filter((policy) => policy === "ui-web-package-governance"),
@@ -589,10 +464,10 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([{ id: "trace-explorer" }]);
     write(
       "apps/ui/src/features/trace-explorer/prompt-cell.ts",
-      'import "../../../../../modules/prompt/web/src/screens/prompt-studio";',
+      'import "../../../../../modules/prompt/browser/src/screens/prompt-studio";',
     );
     write(
-      "modules/prompt/web/src/screens/prompt-studio/index.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       "export const PromptStudio = true;",
     );
 
@@ -607,20 +482,20 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([
       {
         id: "trace-explorer",
-        surfaces: ["@langwatch/prompt-web/surfaces/prompt-reference"],
+        surfaces: ["@langwatch/prompt-browser/surfaces/prompt-reference"],
       },
     ]);
     write(
       "apps/ui/src/features/trace-explorer/prompt-cell.ts",
       [
-        "void import(`@langwatch/prompt-web/surfaces/prompt-reference`);",
-        'const modulePath = "@langwatch/prompt-web";',
+        "void import(`@langwatch/prompt-browser/surfaces/prompt-reference`);",
+        'const modulePath = "@langwatch/prompt-browser";',
         "void import(modulePath);",
         "require(modulePath);",
       ].join("\n"),
     );
     write(
-      "modules/prompt/web/src/surfaces/prompt-reference/index.ts",
+      "modules/prompt/browser/src/surfaces/prompt-reference/index.ts",
       "export const PromptReference = true;",
     );
 
@@ -639,20 +514,20 @@ describe("frontend UI architecture boundaries", () => {
       "./surfaces/prompt-reference": "./src/surfaces/prompt-reference/index.ts",
     });
     writeCatalogue([
-      { id: "trace-explorer", surfaces: ["@langwatch/prompt-web/screens/prompt-studio"] },
+      { id: "trace-explorer", surfaces: ["@langwatch/prompt-browser/screens/prompt-studio"] },
     ]);
     write(
       "apps/ui/src/features/trace-explorer/route.tsx",
       [
-        'import "@langwatch/prompt-web";',
-        'import "@langwatch/prompt-web/src/internal/table";',
-        'import "@langwatch/prompt-web/screens/prompt-studio";',
-        'import "@langwatch/prompt-web/surfaces/prompt-reference";',
+        'import "@langwatch/prompt-browser";',
+        'import "@langwatch/prompt-browser/src/internal/table";',
+        'import "@langwatch/prompt-browser/screens/prompt-studio";',
+        'import "@langwatch/prompt-browser/surfaces/prompt-reference";',
       ].join("\n"),
     );
-    write("modules/prompt/web/src/index.ts", "export {};");
-    write("modules/prompt/web/src/screens/prompt-studio/index.ts", "export {};");
-    write("modules/prompt/web/src/surfaces/prompt-reference/index.ts", "export {};");
+    write("modules/prompt/browser/src/index.ts", "export {};");
+    write("modules/prompt/browser/src/screens/prompt-studio/index.ts", "export {};");
+    write("modules/prompt/browser/src/surfaces/prompt-reference/index.ts", "export {};");
 
     expect(policies([promptWeb])).toEqual(
       expect.arrayContaining([
@@ -671,15 +546,15 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([
       {
         id: "trace-explorer",
-        surfaces: ["@langwatch/prompt-web/surfaces/prompt-reference/table"],
+        surfaces: ["@langwatch/prompt-browser/surfaces/prompt-reference/table"],
       },
     ]);
     write(
       "apps/ui/src/features/trace-explorer/prompt-table.tsx",
-      'import "@langwatch/prompt-web/surfaces/prompt-reference/table";',
+      'import "@langwatch/prompt-browser/surfaces/prompt-reference/table";',
     );
     write(
-      "modules/prompt/web/src/surfaces/prompt-reference/table.tsx",
+      "modules/prompt/browser/src/surfaces/prompt-reference/table.tsx",
       "export const PromptTable = true;",
     );
 
@@ -695,23 +570,23 @@ describe("frontend UI architecture boundaries", () => {
       "./surfaces/prompt-version": "./src/surfaces/prompt-version/index.ts",
     });
     writeCatalogue([
-      { id: "trace-explorer", surfaces: ["@langwatch/prompt-web/surfaces/prompt-reference"] },
+      { id: "trace-explorer", surfaces: ["@langwatch/prompt-browser/surfaces/prompt-reference"] },
     ]);
     write(
       "apps/ui/src/features/trace-explorer/route.ts",
-      'import "@langwatch/prompt-web/surfaces/prompt-reference";',
+      'import "@langwatch/prompt-browser/surfaces/prompt-reference";',
     );
     write(
-      "modules/prompt/web/src/surfaces/prompt-reference/index.ts",
+      "modules/prompt/browser/src/surfaces/prompt-reference/index.ts",
       [
         'import "../../internal/prompt-table";',
         'import "../../tables/prompt-table";',
-        'import "@langwatch/prompt-web/surfaces/prompt-version";',
+        'import "@langwatch/prompt-browser/surfaces/prompt-version";',
       ].join("\n"),
     );
-    write("modules/prompt/web/src/internal/prompt-table.ts", "export {};");
-    write("modules/prompt/web/src/tables/prompt-table.ts", "export {};");
-    write("modules/prompt/web/src/surfaces/prompt-version/index.ts", "export {};");
+    write("modules/prompt/browser/src/internal/prompt-table.ts", "export {};");
+    write("modules/prompt/browser/src/tables/prompt-table.ts", "export {};");
+    write("modules/prompt/browser/src/surfaces/prompt-version/index.ts", "export {};");
 
     expect(policies([promptWeb]).filter((policy) => policy === "ui-surface-closure")).toHaveLength(
       3,
@@ -724,14 +599,14 @@ describe("frontend UI architecture boundaries", () => {
       "./surfaces/prompt-reference": "./src/surfaces/prompt-reference/index.ts",
     });
     writeCatalogue([
-      { id: "trace-explorer", surfaces: ["@langwatch/prompt-web/surfaces/prompt-reference"] },
+      { id: "trace-explorer", surfaces: ["@langwatch/prompt-browser/surfaces/prompt-reference"] },
     ]);
     write(
       "apps/ui/src/features/trace-explorer/route.ts",
-      'import "@langwatch/prompt-web/surfaces/prompt-reference";',
+      'import "@langwatch/prompt-browser/surfaces/prompt-reference";',
     );
     write(
-      "modules/prompt/web/src/surfaces/prompt-reference/index.ts",
+      "modules/prompt/browser/src/surfaces/prompt-reference/index.ts",
       [
         'export { PromptReference } from "../../ui/sections/prompt-reference";',
         'export { usePromptReference } from "../../behavior/use-prompt-reference";',
@@ -739,15 +614,15 @@ describe("frontend UI architecture boundaries", () => {
       ].join("\n"),
     );
     write(
-      "modules/prompt/web/src/ui/sections/prompt-reference.tsx",
+      "modules/prompt/browser/src/ui/sections/prompt-reference.tsx",
       'import { promptReferenceLabel } from "../../model/prompt-reference"; export const PromptReference = promptReferenceLabel;',
     );
     write(
-      "modules/prompt/web/src/behavior/use-prompt-reference.ts",
+      "modules/prompt/browser/src/behavior/use-prompt-reference.ts",
       "export const usePromptReference = () => undefined;",
     );
     write(
-      "modules/prompt/web/src/model/prompt-reference.ts",
+      "modules/prompt/browser/src/model/prompt-reference.ts",
       'export type PromptReferenceValue = string; export const promptReferenceLabel = "prompt";',
     );
 
@@ -765,27 +640,27 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/model-providers": "./src/screens/model-providers/index.ts",
     });
     writeCatalogue([
-      { id: "trace-explorer", surfaces: ["@langwatch/prompt-web/surfaces/prompt-reference"] },
+      { id: "trace-explorer", surfaces: ["@langwatch/prompt-browser/surfaces/prompt-reference"] },
     ]);
     write(
       "apps/ui/src/features/trace-explorer/route.ts",
-      'import "@langwatch/prompt-web/surfaces/prompt-reference";',
+      'import "@langwatch/prompt-browser/surfaces/prompt-reference";',
     );
     write(
-      "modules/prompt/web/src/surfaces/prompt-reference/index.ts",
+      "modules/prompt/browser/src/surfaces/prompt-reference/index.ts",
       'export { PromptReference } from "../../ui/sections/prompt-reference";',
     );
     write(
-      "modules/prompt/web/src/ui/sections/prompt-reference.tsx",
+      "modules/prompt/browser/src/ui/sections/prompt-reference.tsx",
       [
-        'import { ModelSelector } from "@langwatch/model-provider-web/surfaces/model-selector";',
+        'import { ModelSelector } from "@langwatch/model-provider-browser/surfaces/model-selector";',
         "export const PromptReference = ModelSelector;",
       ].join("\n"),
     );
-    write("modules/model-provider/web/src/index.ts", "export {};");
-    write("modules/model-provider/web/src/surfaces/model-selector.tsx", "export {};");
+    write("modules/model-provider/browser/src/index.ts", "export {};");
+    write("modules/model-provider/browser/src/surfaces/model-selector.tsx", "export {};");
     write(
-      "modules/model-provider/web/src/screens/model-providers/index.ts",
+      "modules/model-provider/browser/src/screens/model-providers/index.ts",
       "export {};",
     );
 
@@ -796,10 +671,10 @@ describe("frontend UI architecture boundaries", () => {
     ).toEqual([]);
 
     write(
-      "modules/prompt/web/src/ui/sections/prompt-reference.tsx",
+      "modules/prompt/browser/src/ui/sections/prompt-reference.tsx",
       [
-        'import { ModelSelector } from "@langwatch/model-provider-web";',
-        'import { ModelProviders } from "@langwatch/model-provider-web/screens/model-providers";',
+        'import { ModelSelector } from "@langwatch/model-provider-browser";',
+        'import { ModelProviders } from "@langwatch/model-provider-browser/screens/model-providers";',
         "export const PromptReference = [ModelSelector, ModelProviders];",
       ].join("\n"),
     );
@@ -821,18 +696,18 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([
       {
         id: "prompt-studio",
-        screens: ["@langwatch/prompt-web/screens/prompt-studio"],
+        screens: ["@langwatch/prompt-browser/screens/prompt-studio"],
       },
     ]);
     write(
       "apps/ui/src/features/prompt-studio/route.ts",
-      'import "@langwatch/prompt-web/screens/prompt-studio";',
+      'import "@langwatch/prompt-browser/screens/prompt-studio";',
     );
     write(
-      "modules/prompt/web/src/screens/prompt-studio/index.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       [
         'import "./prompt-table";',
-        'import "@langwatch/prompt-server";',
+        'import "@langwatch/prompt-process";',
         'import "node:fs";',
         'import "react-router";',
         'import "~/screens/hidden";',
@@ -841,7 +716,7 @@ describe("frontend UI architecture boundaries", () => {
       ].join("\n"),
     );
     write(
-      "modules/prompt/web/src/screens/prompt-studio/prompt-table.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/prompt-table.ts",
       "export const PromptTable = true;",
     );
 
@@ -855,10 +730,10 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
     });
     writeCatalogue([
-      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+      { id: "prompt-studio", screens: ["@langwatch/prompt-browser/screens/prompt-studio"] },
     ]);
     write(
-      "modules/prompt/web/src/screens/prompt-studio/index.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       [
         'import "@langwatch/api/web";',
         'import "@langwatch/api";',
@@ -877,10 +752,10 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
     });
     writeCatalogue([
-      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+      { id: "prompt-studio", screens: ["@langwatch/prompt-browser/screens/prompt-studio"] },
     ]);
     write(
-      "modules/prompt/web/src/screens/prompt-studio/index.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       // The transport client's own imperative read, which is the shape every
       // page that walks a cursor uses. Catching it as the browser global made
       // the rule unusable for exactly the pages it governs.
@@ -896,17 +771,17 @@ describe("frontend UI architecture boundaries", () => {
       "./testing": "./src/__tests__/prompt-reference.fixture.ts",
     });
     writeCatalogue([
-      { id: "trace-explorer", surfaces: ["@langwatch/prompt-web/surfaces/prompt-reference"] },
+      { id: "trace-explorer", surfaces: ["@langwatch/prompt-browser/surfaces/prompt-reference"] },
     ]);
     write(
       "apps/ui/src/features/trace-explorer/route.ts",
-      'import "@langwatch/prompt-web/surfaces/prompt-reference";',
+      'import "@langwatch/prompt-browser/surfaces/prompt-reference";',
     );
     write(
-      "modules/prompt/web/src/surfaces/prompt-reference/index.ts",
+      "modules/prompt/browser/src/surfaces/prompt-reference/index.ts",
       [
-        'import "@langwatch/prompt-web/surfaces/prompt-version";',
-        'import "@langwatch/prompt-server";',
+        'import "@langwatch/prompt-browser/surfaces/prompt-version";',
+        'import "@langwatch/prompt-process";',
         'import "@langwatch/platform-api";',
         'import "@langwatch/prisma-client";',
         'import "@langwatch/observability";',
@@ -918,7 +793,7 @@ describe("frontend UI architecture boundaries", () => {
         'import "../../../../../../../platform/app/src/prompts";',
       ].join("\n"),
     );
-    write("modules/prompt/web/src/__tests__/prompt-reference.fixture.ts", "export {};");
+    write("modules/prompt/browser/src/__tests__/prompt-reference.fixture.ts", "export {};");
     write("platform/app/src/prompts.ts", "export {};");
 
     expect(policies([promptWeb]).filter((policy) => policy === "ui-surface-closure")).toHaveLength(
@@ -933,7 +808,7 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
     });
     writeCatalogue([
-      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+      { id: "prompt-studio", screens: ["@langwatch/prompt-browser/screens/prompt-studio"] },
     ]);
     writeSharedPackage("@langwatch/handled-error", "packages/handled-error", {
       "./presentation": "./src/presentation.ts",
@@ -950,7 +825,7 @@ describe("frontend UI architecture boundaries", () => {
       "export const CODES: Record<string, string> = {};",
     );
     write(
-      "modules/prompt/web/src/screens/prompt-studio/index.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       [
         'import { titleFor } from "@langwatch/handled-error/presentation";',
         "export const PromptStudio = titleFor;",
@@ -973,7 +848,7 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
     });
     writeCatalogue([
-      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+      { id: "prompt-studio", screens: ["@langwatch/prompt-browser/screens/prompt-studio"] },
     ]);
     writeSharedPackage("@langwatch/handled-error", "packages/handled-error", {
       "./presentation": "./src/presentation.ts",
@@ -992,7 +867,7 @@ describe("frontend UI architecture boundaries", () => {
       ['import { useMemo } from "react";', "export const CODES = { useMemo };"].join("\n"),
     );
     write(
-      "modules/prompt/web/src/screens/prompt-studio/index.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       [
         'import { titleFor } from "@langwatch/handled-error/presentation";',
         "export const PromptStudio = titleFor;",
@@ -1021,10 +896,10 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
     });
     writeCatalogue([
-      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+      { id: "prompt-studio", screens: ["@langwatch/prompt-browser/screens/prompt-studio"] },
     ]);
     write(
-      "modules/prompt/web/src/screens/prompt-studio/index.ts",
+      "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       [
         // The substitution is the whole subject: it is what threw a scanner out
         // of phase, so that every comment after it read as template text.
@@ -1044,7 +919,7 @@ describe("frontend UI architecture boundaries", () => {
     write(
       "apps/ui/src/features/prompt-studio/route.ts",
       [
-        'import "@langwatch/prompt-server";',
+        'import "@langwatch/prompt-process";',
         'import "@langwatch/prisma-client";',
         'import "~/server/trpc";',
         'import "@app/prompts";',
@@ -1071,9 +946,9 @@ describe("frontend UI architecture boundaries", () => {
   /** @scenario New browser architecture is strict while legacy application debt shrinks */
   it("fails a new violation outright, with no baseline entry to record it against", () => {
     const promptWeb = webPackage("prompt", { ".": "./src/index.ts" });
-    writeCatalogue([{ id: "prompt-studio" }], ["@langwatch/prompt-web"]);
-    write("apps/ui/src/features/prompt-studio/route.ts", 'import "@langwatch/prompt-server";');
-    write("modules/prompt/web/src/index.ts", 'import "@langwatch/prisma-client";');
+    writeCatalogue([{ id: "prompt-studio" }], ["@langwatch/prompt-browser"]);
+    write("apps/ui/src/features/prompt-studio/route.ts", 'import "@langwatch/prompt-process";');
+    write("modules/prompt/browser/src/index.ts", 'import "@langwatch/prisma-client";');
 
     const violations = lint([promptWeb]);
 
@@ -1082,7 +957,7 @@ describe("frontend UI architecture boundaries", () => {
     expect(files.some((file) => file.includes("apps/ui/src/features/prompt-studio/route.ts"))).toBe(
       true,
     );
-    expect(files.some((file) => file.includes("modules/prompt/web"))).toBe(true);
+    expect(files.some((file) => file.includes("modules/prompt/browser"))).toBe(true);
     // ...and neither is recorded as tolerated. A finding this policy hands
     // back is a failure; there is no allowed/baselined shape for it to take.
     for (const violation of violations) {
@@ -1150,8 +1025,8 @@ describe("frontend UI architecture boundaries", () => {
     "export const snippet = <code>process.env.API_KEY</code>;",
   ])("allows non-executable env examples in a public web closure: %s", (source) => {
     const agentWeb = webPackage("agent", { "./surfaces/editor": "./src/surfaces/editor/index.ts" });
-    writeCatalogue([{ id: "agents", surfaces: ["@langwatch/agent-web/surfaces/editor"] }]);
-    write("modules/agent/web/src/surfaces/editor/index.ts", source);
+    writeCatalogue([{ id: "agents", surfaces: ["@langwatch/agent-browser/surfaces/editor"] }]);
+    write("modules/agent/browser/src/surfaces/editor/index.ts", source);
 
     expect(policies([agentWeb]).filter((policy) => policy === "ui-surface-closure")).toEqual([]);
   });
@@ -1163,8 +1038,8 @@ describe("frontend UI architecture boundaries", () => {
     "export const snippet = `example process.env ${(() => process.env.API_KEY)()}`;",
   ])("rejects executable env reads inside a template interpolation: %s", (source) => {
     const agentWeb = webPackage("agent", { "./surfaces/editor": "./src/surfaces/editor/index.ts" });
-    writeCatalogue([{ id: "agents", surfaces: ["@langwatch/agent-web/surfaces/editor"] }]);
-    write("modules/agent/web/src/surfaces/editor/index.ts", source);
+    writeCatalogue([{ id: "agents", surfaces: ["@langwatch/agent-browser/surfaces/editor"] }]);
+    write("modules/agent/browser/src/surfaces/editor/index.ts", source);
     write("apps/ui/src/features/agents/route.ts", source);
 
     expect(policies([agentWeb]).filter((policy) => policy === "ui-surface-closure")).toHaveLength(
@@ -1181,26 +1056,26 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([
       {
         id: "agent-management",
-        screens: ["@langwatch/agent-web/screens/agent-management"],
-        surfaces: ["@langwatch/agent-web/surfaces/browser-port"],
+        screens: ["@langwatch/agent-browser/screens/agent-management"],
+        surfaces: ["@langwatch/agent-browser/surfaces/browser-port"],
       },
     ]);
     writeWebFeature("agent", "management", ["tunnel"]);
     writeWebFeature("agent", "tunnel");
     write(
-      "modules/agent/web/src/features/tunnel/index.ts",
+      "modules/agent/browser/src/features/tunnel/index.ts",
       'export { TunnelBadge } from "./ui/elements/tunnel-badge";',
     );
     write(
-      "modules/agent/web/src/features/tunnel/ui/elements/tunnel-badge.tsx",
+      "modules/agent/browser/src/features/tunnel/ui/elements/tunnel-badge.tsx",
       "export const TunnelBadge = true;",
     );
     write(
-      "modules/agent/web/src/features/management/ui/blocks/agent-card.tsx",
+      "modules/agent/browser/src/features/management/ui/blocks/agent-card.tsx",
       "export const AgentCard = true;",
     );
     write(
-      "modules/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      "modules/agent/browser/src/features/management/ui/sections/agent-management.tsx",
       [
         'import { AgentLabel } from "../../../../model/agent-label";',
         'import { agentBehavior } from "../../../../behavior/agent-behavior";',
@@ -1211,28 +1086,28 @@ describe("frontend UI architecture boundaries", () => {
       ].join("\n"),
     );
     write(
-      "modules/agent/web/src/model/agent-label.ts",
+      "modules/agent/browser/src/model/agent-label.ts",
       'export const AgentLabel = "Agent";',
     );
     write(
-      "modules/agent/web/src/behavior/agent-behavior.ts",
+      "modules/agent/browser/src/behavior/agent-behavior.ts",
       'import { AgentLabel } from "../model/agent-label"; export const agentBehavior = AgentLabel;',
     );
     write(
-      "modules/agent/web/src/ui/elements/package-element.tsx",
+      "modules/agent/browser/src/ui/elements/package-element.tsx",
       'import { AgentLabel } from "../../model/agent-label"; export const PackageElement = AgentLabel;',
     );
     write(
-      "modules/agent/web/src/screens/agent-management/index.ts",
+      "modules/agent/browser/src/screens/agent-management/index.ts",
       'export { AgentManagement } from "../../features/management/ui/sections/agent-management";',
     );
     write(
-      "modules/agent/web/src/surfaces/browser-port/index.ts",
+      "modules/agent/browser/src/surfaces/browser-port/index.ts",
       "export abstract class AgentBrowserPort {}",
     );
     write(
       "apps/ui/src/features/agent-management/index.ts",
-      'import "@langwatch/agent-web/screens/agent-management"; import "@langwatch/agent-web/surfaces/browser-port";',
+      'import "@langwatch/agent-browser/screens/agent-management"; import "@langwatch/agent-browser/surfaces/browser-port";',
     );
 
     expect(lint([agentWeb])).toEqual([]);
@@ -1244,26 +1119,26 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/agent-management": "./src/screens/agent-management/index.ts",
     });
     writeCatalogue([
-      { id: "agent-management", screens: ["@langwatch/agent-web/screens/agent-management"] },
+      { id: "agent-management", screens: ["@langwatch/agent-browser/screens/agent-management"] },
     ]);
     writeWebFeature("agent", "management", ["tunnel"]);
     writeWebFeature("agent", "tunnel");
-    write("modules/agent/web/src/agent-card.tsx", "export const AgentCard = true;");
-    write("modules/agent/web/src/components/card.tsx", "export const Card = true;");
+    write("modules/agent/browser/src/agent-card.tsx", "export const AgentCard = true;");
+    write("modules/agent/browser/src/components/card.tsx", "export const Card = true;");
     write(
-      "modules/agent/web/src/features/management/model/agent.ts",
+      "modules/agent/browser/src/features/management/model/agent.ts",
       'import "../ui/sections/agent-management";',
     );
     write(
-      "modules/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      "modules/agent/browser/src/features/management/ui/sections/agent-management.tsx",
       'import "@/features/tunnel/ui/elements/tunnel-badge";',
     );
     write(
-      "modules/agent/web/src/features/tunnel/ui/elements/tunnel-badge.tsx",
+      "modules/agent/browser/src/features/tunnel/ui/elements/tunnel-badge.tsx",
       "export const TunnelBadge = true;",
     );
     write(
-      "modules/agent/web/src/screens/agent-management/index.ts",
+      "modules/agent/browser/src/screens/agent-management/index.ts",
       "export const AgentManagement = true;",
     );
 
@@ -1283,28 +1158,28 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/agent-management": "./src/screens/agent-management/index.ts",
     });
     writeCatalogue([
-      { id: "agent-management", screens: ["@langwatch/agent-web/screens/agent-management"] },
+      { id: "agent-management", screens: ["@langwatch/agent-browser/screens/agent-management"] },
     ]);
     writeWebFeature("agent", "management");
     writeWebFeature("agent", "tunnel", ["management"]);
     write(
-      "modules/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      "modules/agent/browser/src/features/management/ui/sections/agent-management.tsx",
       'import "../../../tunnel";',
     );
     write(
-      "modules/agent/web/src/features/tunnel/index.ts",
+      "modules/agent/browser/src/features/tunnel/index.ts",
       'export { Tunnel } from "./ui/elements/tunnel";',
     );
     write(
-      "modules/agent/web/src/features/tunnel/ui/elements/tunnel.tsx",
+      "modules/agent/browser/src/features/tunnel/ui/elements/tunnel.tsx",
       'import "../../../management"; export const Tunnel = true;',
     );
     write(
-      "modules/agent/web/src/features/management/index.ts",
+      "modules/agent/browser/src/features/management/index.ts",
       'import "../tunnel"; import "../tunnel/ui/elements/tunnel"; export const Management = true;',
     );
     write(
-      "modules/agent/web/src/screens/agent-management/index.ts",
+      "modules/agent/browser/src/screens/agent-management/index.ts",
       "export const AgentManagement = true;",
     );
 
@@ -1326,25 +1201,25 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([
       {
         id: "agent-management",
-        screens: ["@langwatch/agent-web/screens/agent-management"],
-        surfaces: ["@langwatch/agent-web/surfaces/browser-port"],
+        screens: ["@langwatch/agent-browser/screens/agent-management"],
+        surfaces: ["@langwatch/agent-browser/surfaces/browser-port"],
       },
     ]);
     write(
-      "modules/agent/web/src/screens/agent-management/index.ts",
+      "modules/agent/browser/src/screens/agent-management/index.ts",
       'import "../../surfaces/browser-port"; import "../other-screen"; export const AgentManagement = true;',
     );
     write(
-      "modules/agent/web/src/surfaces/browser-port/index.ts",
+      "modules/agent/browser/src/surfaces/browser-port/index.ts",
       'import "../../features/management/ui/sections/agent-management"; export abstract class AgentBrowserPort {}',
     );
     writeWebFeature("agent", "management");
     write(
-      "modules/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      "modules/agent/browser/src/features/management/ui/sections/agent-management.tsx",
       'import "../../../../screens/other-screen"; export const AgentManagement = true;',
     );
     write(
-      "modules/agent/web/src/screens/other-screen/index.ts",
+      "modules/agent/browser/src/screens/other-screen/index.ts",
       "export const Other = true;",
     );
 
@@ -1363,14 +1238,14 @@ describe("frontend UI architecture boundaries", () => {
       "./surfaces/browser-port": "./src/surfaces/browser-port/index.ts",
     });
     writeCatalogue([
-      { id: "agent-management", surfaces: ["@langwatch/agent-web/surfaces/browser-port"] },
+      { id: "agent-management", surfaces: ["@langwatch/agent-browser/surfaces/browser-port"] },
     ]);
     write(
       "apps/ui/src/features/agent-management/route.ts",
-      'import "@langwatch/agent-web/surfaces/browser-port";',
+      'import "@langwatch/agent-browser/surfaces/browser-port";',
     );
     write(
-      "modules/agent/web/src/surfaces/browser-port/index.ts",
+      "modules/agent/browser/src/surfaces/browser-port/index.ts",
       [
         'export { BrowserPortView } from "../../ui/sections/browser-port-view";',
         'export { useBrowserPort } from "../../behavior/use-browser-port";',
@@ -1378,15 +1253,15 @@ describe("frontend UI architecture boundaries", () => {
       ].join("\n"),
     );
     write(
-      "modules/agent/web/src/ui/sections/browser-port-view.tsx",
+      "modules/agent/browser/src/ui/sections/browser-port-view.tsx",
       'import { browserPortLabel } from "../../model/browser-port"; export const BrowserPortView = browserPortLabel;',
     );
     write(
-      "modules/agent/web/src/behavior/use-browser-port.ts",
+      "modules/agent/browser/src/behavior/use-browser-port.ts",
       "export const useBrowserPort = () => undefined;",
     );
     write(
-      "modules/agent/web/src/model/browser-port.ts",
+      "modules/agent/browser/src/model/browser-port.ts",
       'export type BrowserPortValue = string; export const browserPortLabel = "port";',
     );
 
@@ -1400,13 +1275,13 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/agent-management": "./src/screens/agent-management/index.ts",
     });
     writeCatalogue([
-      { id: "agent-management", screens: ["@langwatch/agent-web/screens/agent-management"] },
+      { id: "agent-management", screens: ["@langwatch/agent-browser/screens/agent-management"] },
     ]);
     writeWebFeature("agent", "alpha", ["beta", "gamma"]);
     writeWebFeature("agent", "beta", ["gamma"]);
     writeWebFeature("agent", "gamma", ["beta"]);
     write(
-      "modules/agent/web/src/screens/agent-management/index.ts",
+      "modules/agent/browser/src/screens/agent-management/index.ts",
       "export const AgentManagement = true;",
     );
 
@@ -1423,15 +1298,15 @@ describe("frontend UI architecture boundaries", () => {
       "./screens/agent-management": "./src/screens/agent-management/index.ts",
     });
     writeCatalogue([
-      { id: "agent-management", screens: ["@langwatch/agent-web/screens/agent-management"] },
+      { id: "agent-management", screens: ["@langwatch/agent-browser/screens/agent-management"] },
     ]);
     writeWebFeature("agent", "management");
     write(
-      "modules/agent/web/src/screens/agent-management/index.ts",
+      "modules/agent/browser/src/screens/agent-management/index.ts",
       'export { AgentManagement } from "../../features/management/ui/sections/agent-management";',
     );
     write(
-      "modules/agent/web/src/features/management/ui/sections/agent-management.tsx",
+      "modules/agent/browser/src/features/management/ui/sections/agent-management.tsx",
       "fetch('/api/agents'); export const AgentManagement = true;",
     );
 

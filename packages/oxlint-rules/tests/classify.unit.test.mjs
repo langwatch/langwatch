@@ -4,7 +4,7 @@ import { createFixtureWorkspace } from "../src/testing.mjs";
 
 // The five helpers this replaces, and the question each one asked:
 //   normalizedFilename    -> `filename`
-//   classifyFile          -> `role`, `feature`, `enterprise`, `layoutVersion`, `relative`
+//   classifyFile          -> `role`, `feature`, `enterprise`, `relative`
 //   prismaPackageOf       -> `kind`, `sourcePath`
 //   isStrictServiceModule -> `isServiceModule`
 //   strictFeatureSource   -> `strictSource`
@@ -12,8 +12,7 @@ import { createFixtureWorkspace } from "../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: {
-    agent: { layoutVersion: 0, roles: { contract: {}, server: {}, web: {} } },
-    legacy: { layoutVersion: 1, roles: { server: {} } },
+    agent: { roles: { contract: {}, server: {}, web: {} } },
   },
 });
 
@@ -27,13 +26,12 @@ function classifyPath(workspacePath) {
 
 const CASES = [
   {
-    path: "modules/agent/server/src/services/agent.service.ts",
+    path: "modules/agent/process/src/services/agent.service.ts",
     expected: {
       role: "server",
       kind: "server",
       feature: "agent",
       enterprise: false,
-      layoutVersion: 0,
       relative: "src/services/agent.service.ts",
       sourcePath: "services/agent.service.ts",
       isTest: false,
@@ -54,7 +52,6 @@ const CASES = [
       role: "contract",
       kind: "contract",
       feature: "agent",
-      layoutVersion: 0,
       relative: "src/agent.commands.ts",
       sourcePath: "agent.commands.ts",
       isServiceModule: false,
@@ -68,23 +65,23 @@ const CASES = [
     },
   },
   {
-    path: "modules/agent/server/src/repositories/prisma/agent.repository.ts",
+    path: "modules/agent/process/src/repositories/prisma/agent.repository.ts",
     expected: { role: "server", kind: "server", isPrismaSeam: true, isServiceModule: false },
   },
   {
-    path: "modules/agent/server/src/adapters/postgres.agent.adapter.ts",
+    path: "modules/agent/process/src/adapters/postgres.agent.adapter.ts",
     expected: { role: "server", isPrismaSeam: true },
   },
   {
-    path: "modules/agent/server/src/adapters/redis.agent.adapter.ts",
+    path: "modules/agent/process/src/adapters/redis.agent.adapter.ts",
     expected: { role: "server", isPrismaSeam: false },
   },
   {
-    path: "modules/agent/server/src/services/__tests__/agent.service.unit.test.ts",
+    path: "modules/agent/process/src/services/__tests__/agent.service.unit.test.ts",
     expected: { role: "server", isTest: true, isProduction: false, strictSource: undefined },
   },
   {
-    path: "modules/agent/server/tests/wiring.integration.test.ts",
+    path: "modules/agent/process/tests/wiring.integration.test.ts",
     expected: {
       role: "server",
       relative: "tests/wiring.integration.test.ts",
@@ -93,17 +90,8 @@ const CASES = [
     },
   },
   {
-    path: "modules/agent/server/package.json",
+    path: "modules/agent/process/package.json",
     expected: { role: "other", kind: undefined, feature: undefined, relative: undefined },
-  },
-  {
-    path: "modules/legacy/server/src/services/legacy.service.ts",
-    expected: {
-      role: "server",
-      layoutVersion: undefined,
-      isServiceModule: true,
-      strictSource: undefined,
-    },
   },
   {
     path: "apps/api/src/features/agent/agent.composition.ts",
@@ -150,16 +138,15 @@ describe("given the one classification every rule gates on", () => {
   });
 
   describe("when the path is enterprise", () => {
-    it("carries the enterprise flag and still finds no layout version without a feature.json", () => {
+    it("carries the enterprise flag", () => {
       const file = classifyPath(
-        "enterprise/modules/governance/server/src/services/governance.service.ts",
+        "enterprise/modules/governance/process/src/services/governance.service.ts",
       );
 
       expect(file).toMatchObject({
         enterprise: true,
         feature: "governance",
         isServiceModule: true,
-        layoutVersion: undefined,
         role: "server",
       });
     });
@@ -168,7 +155,7 @@ describe("given the one classification every rule gates on", () => {
   describe("when the same file is classified twice", () => {
     it("returns the memoised object rather than recomputing it", () => {
       resetClassificationCache();
-      const context = { cwd: workspace.cwd, filename: "modules/agent/server/src/x.ts" };
+      const context = { cwd: workspace.cwd, filename: "modules/agent/process/src/x.ts" };
 
       expect(classify(context)).toBe(classify(context));
     });
@@ -179,11 +166,11 @@ describe("given the one classification every rule gates on", () => {
       resetClassificationCache();
       const file = classify({
         cwd: workspace.cwd,
-        filename: `${workspace.cwd}/modules/agent/server/src/services/agent.service.ts`,
+        filename: `${workspace.cwd}/modules/agent/process/src/services/agent.service.ts`,
       });
 
       expect(file.workspacePath).toBe(
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
     });
   });

@@ -57,6 +57,7 @@ export { schemaOutsideContractRule } from "./rules/schema-outside-contract.rule.
 export { restSchemaFromOwnContractRule } from "./rules/rest-schema-from-own-contract.rule.mjs";
 export { restDeclaresInputOutputRule } from "./rules/rest-declares-input-output.rule.mjs";
 export { restHandlerThrowsRule } from "./rules/rest-handler-throws.rule.mjs";
+export { restDeclaresItsAnswerRule } from "./rules/rest-declares-its-answer.rule.mjs";
 export { restNoErrorHandlerOverrideRule } from "./rules/rest-no-error-handler-override.rule.mjs";
 export { secretsThroughSourceRule } from "./rules/secrets-through-source.rule.mjs";
 export { serviceDoesNotOpenAChannelRule } from "./rules/service-does-not-open-a-channel.rule.mjs";

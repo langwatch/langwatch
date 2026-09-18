@@ -18,15 +18,14 @@ function packageForFixture(): ClassifiedPackage {
     kind: "server",
     feature: "example",
     featureRoot,
-    layoutVersion: 0,
     subjects: [],
     enterprise: false,
   };
 }
 
 function writePort(source: string): string {
-  const file = join(root, "modules/example/server/src/ports/example.port.ts");
-  mkdirSync(join(root, "modules/example/server/src/ports"), {
+  const file = join(root, "modules/example/process/src/ports/example.port.ts");
+  mkdirSync(join(root, "modules/example/process/src/ports"), {
     recursive: true,
   });
   writeFileSync(file, source);

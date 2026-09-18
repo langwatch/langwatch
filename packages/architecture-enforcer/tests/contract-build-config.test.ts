@@ -18,7 +18,6 @@ function contractPackage(feature: string, hasBuildScript = true): ClassifiedPack
     kind: "contract",
     feature,
     featureRoot,
-    layoutVersion: 0,
     subjects: [],
     enterprise: false,
   };

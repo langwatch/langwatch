@@ -12,7 +12,7 @@ const FOREIGN_ID_MODULES = new Set(["nanoid", "nanoid/non-secure", "uuid"]);
 function isFeatureOrProcessSource(file) {
   if (file.kind === "application") return true;
 
-  return file.layoutVersion === 0 && Boolean(file.strictSource);
+  return Boolean(file.strictSource);
 }
 
 function calleeName(callee) {

@@ -27,14 +27,13 @@ function server(feature: string, kind: "server" | "contract"): ClassifiedPackage
     manifest,
     kind,
     feature,
-    layoutVersion: 0,
     enterprise: false,
   };
 }
 
 function findings(body: string, extras = ""): ReturnType<typeof lintFeatureSetupInfrastructure> {
   write(
-    "modules/widget/server/src/app/widget.app.ts",
+    "modules/widget/process/src/app/widget.app.ts",
     `import type { FeatureSetup } from "@langwatch/kernel";
 ${extras}
 ${body}`,
@@ -176,7 +175,7 @@ type Unused = string;`,
 
   it("unwraps readonly infrastructure and detects arbitrary owned service classes", () => {
     write(
-      "modules/widget/server/src/service/custom.service.ts",
+      "modules/widget/process/src/service/custom.service.ts",
       "export class AuxiliaryService { run(): void {} }",
     );
     const result = findings(
@@ -191,7 +190,7 @@ type Unused = string;`,
 
   it("follows method and callback locators, generic interfaces, and defaults", () => {
     write(
-      "modules/widget/server/src/widget.api.ts",
+      "modules/widget/process/src/widget.api.ts",
       "export interface WidgetApi { read(): void }",
     );
     const result = findings(`

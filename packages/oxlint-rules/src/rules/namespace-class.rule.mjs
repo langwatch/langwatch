@@ -6,7 +6,7 @@ import { defineRule } from "../define-rule.mjs";
 // house shape for pure behaviour.
 
 function isStrictServerSource(file) {
-  return file.role === "server" && file.layoutVersion === 0 && Boolean(file.strictSource);
+  return file.role === "server" && Boolean(file.strictSource);
 }
 
 function memberName(member) {

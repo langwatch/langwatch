@@ -9,7 +9,6 @@ import { defineRule } from "../define-rule.mjs";
 // of violation, so the fix an agent reads names the actual mistake.
 
 const workspaceCache = new Map();
-const webDependencyCache = new Map();
 
 function directories(path) {
   if (!existsSync(path)) return [];
@@ -44,35 +43,6 @@ function loadWorkspace(cwd) {
   const workspace = { packages };
   workspaceCache.set(cwd, workspace);
   return workspace;
-}
-
-function declaredWebDependencies(cwd) {
-  const cached = webDependencyCache.get(cwd);
-  if (cached) return cached;
-
-  const dependencies = new Set();
-  const path = join(cwd, "apps", "ui", "src", "features", "catalogue.json");
-  if (!existsSync(path)) return dependencies;
-
-  try {
-    const catalogue = JSON.parse(readFileSync(path, "utf8"));
-    const features = Array.isArray(catalogue.features) ? catalogue.features : [];
-    for (const feature of features) {
-      if (typeof feature?.root !== "string") continue;
-      const surfaces = Array.isArray(feature.uses?.surfaces) ? feature.uses.surfaces : [];
-      for (const surface of surfaces) {
-        if (typeof surface === "string") dependencies.add(`${feature.root}:${surface}`);
-      }
-    }
-  } catch {
-    // The architecture validator reports malformed catalogues separately, so
-    // this rule reads a catalogue it cannot parse as declaring nothing rather
-    // than as declaring the half of it that parsed.
-    dependencies.clear();
-  }
-
-  webDependencyCache.set(cwd, dependencies);
-  return dependencies;
 }
 
 function packageRootForFile(filename, cwd) {
@@ -117,7 +87,7 @@ const RETIRED_PACKAGE_ENTRYPOINTS = new Map([
   ["zod/v3", "zod"],
   [
     "@langwatch/automations",
-    "@langwatch/automation-contract, @langwatch/automation-server, or @langwatch/automation-web",
+    "@langwatch/automation-contract, @langwatch/automation-process, or @langwatch/automation-browser",
   ],
   ["@ee", "the owning @langwatch/enterprise-<feature>-<surface> package"],
 ]);
@@ -229,10 +199,7 @@ export const boundaryRule = defineRule({
           // the real adapter or repository it runs against, which is the point of
           // the test rather than a layering breach.
           const appliesLayeringRules =
-            !escaped &&
-            productionSource &&
-            classification.layoutVersion === 0 &&
-            classification.role === "server";
+            !escaped && productionSource && classification.role === "server";
 
           if (appliesLayeringRules) {
             const targetWorkspacePath = relative(context.cwd, targetPath).split(sep).join("/");
@@ -279,10 +246,6 @@ export const boundaryRule = defineRule({
 
       if (target) {
         const subpath = packageSubpath(specifier, target.name);
-        const declaredWebDependency =
-          classification.role === "web" &&
-          target.pkg.role === "web" &&
-          declaredWebDependencies(context.cwd).has(`${classification.feature}:${specifier}`);
         // `./testing` is a package's declared test seam. A server package
         // publishes one for the runtimes that compose it; a web package
         // publishes one for the browser features that render it. Either way
@@ -319,8 +282,7 @@ export const boundaryRule = defineRule({
           target.pkg.feature !== classification.feature &&
           target.pkg.role !== "contract" &&
           !testSupportImport &&
-          !webSurfaceImport &&
-          !declaredWebDependency;
+          !webSurfaceImport;
 
         if (crossesFeatureBoundary) {
           context.report({

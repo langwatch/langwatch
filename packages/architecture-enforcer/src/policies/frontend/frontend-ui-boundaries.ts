@@ -4,7 +4,6 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
 import { browserOnlyPackage } from "./browser-packages.ts";
-import { declaredFeatureWebSurfaces } from "../../workspace/feature-web-declaration.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import {
   workspaceModuleResolver,
@@ -351,56 +350,6 @@ function webPackageForSpecifier(
       (candidate) => specifier === candidate.name || specifier.startsWith(`${candidate.name}/`),
     )
     .toSorted((left, right) => right.name.length - left.name.length)[0];
-}
-
-/**
- * One `web.uses.surfaces` entry of one module's feature.json, paired with the
- * web package that module owns.
- */
-type DeclaredWebUse = {
-  source: WebPackage;
-  specifier: string;
-  declarationPath: string;
-};
-
-/** Every surface use declared by the modules owning the given web packages. */
-function declaredWebUses(webPackages: readonly WebPackage[]): DeclaredWebUse[] {
-  const uses: DeclaredWebUse[] = [];
-
-  for (const source of webPackages) {
-    const featureRoot = source.featureRoot;
-    if (!featureRoot) continue;
-
-    for (const specifier of declaredFeatureWebSurfaces(featureRoot)) {
-      uses.push({ source, specifier, declarationPath: join(featureRoot, "feature.json") });
-    }
-  }
-
-  return uses;
-}
-
-/**
- * The package a declared use names, and the surface it names on it. The
- * catalogue is deliberately not consulted: a module-side declaration resolves
- * only through the literal `surfaces/<id>` door, never a flat entry or screen.
- */
-function resolvedWebUse(
-  webPackages: readonly WebPackage[],
-  specifier: string,
-): { target: WebPackage; capability: Capability } | undefined {
-  const target = webPackageForSpecifier(webPackages, specifier);
-  const capability = capabilityForSpecifier(webPackages, specifier);
-
-  if (!target) return void 0;
-
-  if (!capability) return void 0;
-
-  if (capability.kind !== "surface") return void 0;
-
-  const exports = packageExports(target);
-  if (!exports.has(capability.exportPath)) return void 0;
-
-  return { target, capability };
 }
 
 function featureForFile(uiFeaturesRoot: string, file: string): string | undefined {
@@ -1030,51 +979,6 @@ function lintDeclaredCapabilities(
           });
         }
       }
-    }
-  }
-
-  return violations;
-}
-
-/**
- * Surface uses a module declares for its own web package, the only declaration
- * open to a module whose name is no frontend feature root. One naming no real
- * surface is a violation where it is written, not a silently ignored line.
- */
-function lintDeclaredWebUses(
-  catalogue: UiFeatureCatalogue,
-  webPackages: readonly WebPackage[],
-): ArchitectureViolation[] {
-  const violations: ArchitectureViolation[] = [];
-  const governedWebPackages = new Set(catalogue.governedWebPackages);
-
-  for (const use of declaredWebUses(webPackages)) {
-    const resolved = resolvedWebUse(webPackages, use.specifier);
-
-    if (!resolved) {
-      violations.push({
-        policy: "ui-web-capability-declaration",
-        file: use.declarationPath,
-        specifier: use.specifier,
-        message:
-          "A declared web surface use must name one exact exported surfaces/<id> entry of a feature-web package.",
-        allowed:
-          "Name an existing @langwatch/<feature>-web/surfaces/<id> export, or remove the declaration.",
-      });
-
-      continue;
-    }
-
-    for (const pkg of [use.source, resolved.target]) {
-      if (governedWebPackages.has(pkg.name)) continue;
-
-      violations.push({
-        policy: "ui-web-package-governance",
-        file: use.declarationPath,
-        specifier: use.specifier,
-        message: `Declared web surface use involves ungoverned web package ${JSON.stringify(pkg.name)}.`,
-        allowed: "Add the package to governedWebPackages before a module declares the use.",
-      });
     }
   }
 
@@ -2490,7 +2394,6 @@ export function lintFrontendUiBoundaries(snapshot: WorkspaceSnapshot): Architect
     ...lintUiFeatureStructure(root),
     ...lintGovernedWebPackages(root, catalogue, webPackages),
     ...lintDeclaredCapabilities(root, catalogue, webPackages),
-    ...lintDeclaredWebUses(catalogue, webPackages),
     ...lintWebPublicExports(selectedWebPackages, catalogue),
     ...lintWebPrivateStructure(selectedWebPackages, catalogue),
     ...lintUiSourceBoundaries(root, catalogue, webPackages, portable),
@@ -2539,21 +2442,6 @@ export function declaredWebDependencyPairs(snapshot: WorkspaceSnapshot): Readonl
 
       allowed.add(`${source.name}->${target.name}`);
     }
-  }
-
-  // The module-side half of the same question. A module names the sibling
-  // surfaces its web package consumes in its own feature.json, which is the
-  // only declaration open to a module whose name is not a frontend feature
-  // root. Both packages must be governed and the specifier must be a real
-  // surfaces/<id> export, exactly as the catalogue-derived half requires.
-  for (const use of declaredWebUses(webPackages)) {
-    if (!governed.has(use.source.name)) continue;
-
-    const resolved = resolvedWebUse(webPackages, use.specifier);
-
-    if (!resolved || !governed.has(resolved.target.name)) continue;
-
-    allowed.add(`${use.source.name}->${resolved.target.name}`);
   }
 
   return allowed;
