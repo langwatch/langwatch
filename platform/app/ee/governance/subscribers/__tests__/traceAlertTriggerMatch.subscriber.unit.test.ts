@@ -123,6 +123,40 @@ describe("trace alert trigger match subscriber", () => {
     });
   });
 
+  describe("given a fold state with no recorded spans", () => {
+    /**
+     * A trace summary outside the fold's read window rehydrates empty:
+     * spanCount 0, occurredAt 0. Online evaluations skip that fold — there is
+     * nothing to evaluate — but that is an evaluation rule, enforced on the
+     * evaluation trigger, not in the shared origin guards this subscriber
+     * also runs.
+     *
+     * Alerting is a different question: a trigger matches on trace IDENTITY
+     * and its own filters, so an alert that is due stays due whether or not
+     * this replica folded the spans. Pinned so the evaluation rule cannot
+     * migrate back into the shared guards and silently stop alerts.
+     */
+    /** @scenario "a trace alert still fires for a trace with no recorded spans" */
+    it("still records a match, since alerting does not need folded spans", async () => {
+      const triggers = {
+        getActiveTraceTriggersForProject: vi
+          .fn()
+          .mockResolvedValue([trigger()]),
+      };
+      const recordTriggerMatch = { send: vi.fn().mockResolvedValue(undefined) };
+
+      await createTraceAlertTriggerMatchHandler({
+        triggers: triggers as never,
+        recordTriggerMatch,
+      })(event(), context(traceState({ spanCount: 0, occurredAt: 0 })));
+
+      expect(recordTriggerMatch.send).toHaveBeenCalledTimes(1);
+      expect(recordTriggerMatch.send).toHaveBeenCalledWith(
+        expect.objectContaining({ triggerId: "trigger-1", traceId: "trace-1" }),
+      );
+    });
+  });
+
   describe("given an automation with evaluation filters", () => {
     it("leaves the match to the evaluation subscriber", async () => {
       const triggers = {

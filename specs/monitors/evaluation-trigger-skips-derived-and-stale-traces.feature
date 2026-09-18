@@ -40,6 +40,12 @@ Feature: ON_MESSAGE evaluations only re-run on real, recent messages
     # there is no start time to compare. The signal is "no spans folded", not
     # "no start time": a recent span without valid timing also leaves the
     # start time unknown, and that trace must still be evaluated.
+    #
+    # This rule is scoped to evaluations on purpose. Trace alerts run off the
+    # same shared trace guards, but an alert matches on the trace's identity
+    # and its own filters, so one that is due stays due whether or not this
+    # replica folded the spans. Silencing alerts is a separate product
+    # decision and is not made here.
 
     @unit
     Scenario: a late origin resolution on a trace with no recorded spans does not re-run evaluations
@@ -52,3 +58,10 @@ Feature: ON_MESSAGE evaluations only re-run on real, recent messages
       Given a recent trace with one recorded span whose first-span time is unknown
       When the trace's origin is resolved
       Then an evaluation is dispatched
+
+    @unit
+    Scenario: a trace alert still fires for a trace with no recorded spans
+      Given a project with an active trace alert
+      And a trace whose fold state holds no spans
+      When a new span arrives on that trace
+      Then the trace alert records a match

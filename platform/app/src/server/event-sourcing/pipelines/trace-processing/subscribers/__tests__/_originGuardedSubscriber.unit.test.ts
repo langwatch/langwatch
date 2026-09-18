@@ -105,18 +105,23 @@ describe("passesTraceOriginGuards", () => {
   describe("given a fold state with no recorded spans", () => {
     // A trace summary outside the fold's read window rehydrates empty:
     // spanCount 0, occurredAt 0. The trace-age cap cannot fire on a zero
-    // start time, so a late origin resolution must be rejected on its own.
-    /** @scenario "a late origin resolution on a trace with no recorded spans does not re-run evaluations" */
-    it("rejects a late origin resolution even though the origin is set", () => {
+    // start time, so a late origin resolution passes every shared guard.
+    //
+    // That stays true here on purpose. The empty-fold rule is an EVALUATION
+    // rule, not a trace-processing one, so it lives on the evaluation
+    // trigger (see evaluationTrigger.guards.unit.test.ts) and not in this
+    // shared chain, which the EE trace-alert subscriber also runs. Alerting
+    // on a trace whose fold rehydrated empty is a separate product question
+    // from evaluating it, and this guard must not decide it for both.
+    it("admits a late origin resolution, leaving the rule to each subscriber", () => {
       expect(
         passesTraceOriginGuards(
           event({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
           fold({ spanCount: 0, occurredAt: 0 }),
         ),
-      ).toBe(false);
+      ).toBe(true);
     });
 
-    /** @scenario "a late origin resolution on a recent trace whose span has no valid timing still re-runs evaluations" */
     it("still admits a recent trace whose only span left the start time unknown", () => {
       expect(
         passesTraceOriginGuards(

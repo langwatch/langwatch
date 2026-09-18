@@ -49,7 +49,26 @@ export interface EvaluationTriggerSubscriberDeps {
  * the batch size. The oversized-trace guard lives in the handler for exactly
  * that reason — see below.
  */
-function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
+function isDispatchableEvaluationEvent(
+  event: TraceProcessingEvent,
+  foldState: TraceSummaryData,
+): boolean {
+  // A trace summary outside the fold's read window rehydrates EMPTY
+  // (spanCount 0, occurredAt 0). The shared 24h trace-age guard keys off the
+  // fold's first-span time and so cannot fire on a zero, which let a late
+  // origin_resolved on a weeks-old trace look brand new and dispatch every
+  // enabled monitor over the backlog.
+  //
+  // No folded span means nothing to evaluate, whatever the origin says. The
+  // rule sits here rather than in `passesTraceOriginGuards` because it is an
+  // evaluation rule: the EE trace-alert subscriber shares that chain, and its
+  // triggers match on trace identity, so an alert that is due stays due
+  // whether or not this replica folded the spans.
+  //
+  // Keyed on spanCount, not occurredAt: a recent span whose end time is
+  // missing also leaves occurredAt at 0 and must still be evaluated.
+  if (foldState.spanCount === 0) return false;
+
   // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
   // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
   // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a

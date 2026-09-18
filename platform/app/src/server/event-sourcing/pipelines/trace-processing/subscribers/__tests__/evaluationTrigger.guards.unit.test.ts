@@ -269,6 +269,68 @@ describe("evaluationTrigger subscriber", () => {
     });
   });
 
+  describe("when the fold state holds no spans", () => {
+    /**
+     * A trace summary outside the fold's read window rehydrates empty:
+     * spanCount 0, occurredAt 0. The 24h trace-age cap keys off the fold's
+     * first-span time and cannot fire on a zero, so a late origin_resolved
+     * on a weeks-old trace looked brand new and dispatched evaluations.
+     *
+     * The rule lives here rather than in the shared origin guards because it
+     * is an evaluation rule: there is nothing to evaluate. The EE trace-alert
+     * subscriber shares those guards and is deliberately left alone.
+     *
+     * Keyed on spanCount, not occurredAt: a recent span with no valid end
+     * time also leaves occurredAt at 0 and must still be evaluated.
+     */
+    /** @scenario "a late origin resolution on a trace with no recorded spans does not re-run evaluations" */
+    it("rejects pre-enqueue and dispatches nothing", async () => {
+      const deps = createDeps();
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        makeMonitor(),
+      ]);
+
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      const event = makeEvent({
+        id: "evt-origin-resolved",
+        type: "lw.obs.trace.origin_resolved",
+        data: { origin: "application" },
+      } as unknown as Partial<TraceProcessingEvent>);
+      const context = makeContext();
+      (context.state as { spanCount: number }).spanCount = 0;
+      (context.state as { occurredAt: number }).occurredAt = 0;
+
+      expect(subscriber.spec.when?.(event, context)).toBe(false);
+
+      await subscriber.spec.handler(event, context);
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "a late origin resolution on a recent trace whose span has no valid timing still re-runs evaluations" */
+    it("still dispatches for one recorded span whose start time is unknown", async () => {
+      const deps = createDeps();
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        makeMonitor(),
+      ]);
+
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      const event = makeEvent({
+        id: "evt-origin-resolved",
+        type: "lw.obs.trace.origin_resolved",
+        data: { origin: "application" },
+      } as unknown as Partial<TraceProcessingEvent>);
+      const context = makeContext();
+      (context.state as { occurredAt: number }).occurredAt = 0;
+
+      expect(subscriber.spec.when?.(event, context)).toBe(true);
+
+      await subscriber.spec.handler(event, context);
+
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when an evaluator-origin trace dispatches via origin_resolved", () => {
     /**
      * A trace's origin is normally settled from its spans, non-root ones

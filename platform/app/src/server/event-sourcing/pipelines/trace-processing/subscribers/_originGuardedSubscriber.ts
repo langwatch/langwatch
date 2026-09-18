@@ -65,13 +65,14 @@ export function passesTraceOriginGuards(
     return false;
   }
 
-  // 3b. Guard 3 cannot fire on a fold with no spans: a trace summary outside
-  //     the fold's read window rehydrates EMPTY (spanCount 0, occurredAt 0),
-  //     so a late origin_resolved on it would look brand new. No folded span
-  //     means nothing to evaluate, whatever the origin says. Keyed on
-  //     spanCount, not occurredAt: a recent span without valid timing also
-  //     leaves occurredAt at 0 and must still dispatch.
-  if (foldState.spanCount === 0) return false;
+  // NOTE: guard 3 cannot fire on a fold with no spans — a trace summary
+  // outside the fold's read window rehydrates EMPTY (spanCount 0,
+  // occurredAt 0), so a late origin_resolved on it looks brand new. The rule
+  // that covers this is deliberately NOT here: "no folded span means nothing
+  // to evaluate" is an evaluation rule, and this chain is also run by the EE
+  // trace-alert subscriber (ADR-052), whose triggers match on trace identity
+  // and stay due whether or not this replica folded the spans. It lives on
+  // the evaluation trigger instead, in `isDispatchableEvaluationEvent`.
 
   if (foldState.blockedByGuardrail && !foldState.computedOutput) return false;
 
@@ -97,11 +98,17 @@ export type TraceSummarySubscriber = {
 };
 
 /**
- * An extra pure, EVENT-ONLY guard, ANDed with the origin guards. Must be
- * synchronous and side-effect free: it runs pre-enqueue via `when` on the
- * fold's hot path. Guards needing IO belong in the handler.
+ * An extra pure guard, ANDed with the origin guards, for a rule that belongs
+ * to ONE subscriber rather than to every consumer of the shared chain. Reads
+ * the event and the committed fold state. Must be synchronous and side-effect
+ * free: it runs pre-enqueue via `when` on the fold's hot path, once per event
+ * of a coalesced batch, so anything logged here is multiplied by the batch
+ * size. Guards needing IO belong in the handler.
  */
-type ExtraGuard = (event: TraceProcessingEvent) => boolean;
+type ExtraGuard = (
+  event: TraceProcessingEvent,
+  foldState: TraceSummaryData,
+) => boolean;
 
 /**
  * Defines a trace-processing subscriber on the traceSummary fold that fires
@@ -109,10 +116,14 @@ type ExtraGuard = (event: TraceProcessingEvent) => boolean;
  *   1. the event is recent (<1h old, skips replay/resync floods),
  *   2. the event is a message event (span_received / origin_resolved) — derived
  *      enrichment events like topic_assigned do not re-run side effects,
- *   3. the trace itself is not older than MAX_TRACE_AGE_MS, and has at least
- *      one folded span (an empty rehydrated fold cannot be age-checked),
+ *   3. the trace itself is not older than MAX_TRACE_AGE_MS,
  *   4. the trace is not blocked by guardrail with no output, and
  *   5. `langwatch.origin` is resolved on the fold state.
+ *
+ * A subscriber needing a rule of its own on top — one that must not apply to
+ * every consumer of the shared chain — passes `isRelevant`. The evaluation
+ * trigger uses it to skip a fold with no spans; see the note in
+ * `passesTraceOriginGuards` for why that rule is not in the chain itself.
  *
  * The originGate subscriber handles deferred resolution for traces that
  * arrive without a resolved origin, so other origin-dependent subscribers
@@ -140,7 +151,7 @@ export function defineOriginGuardedTraceSubscriber(opts: {
     context: TriggerContext<TraceSummaryData>,
   ): boolean =>
     passesTraceOriginGuards(event, context.state) &&
-    (opts.isRelevant?.(event) ?? true);
+    (opts.isRelevant?.(event, context.state) ?? true);
 
   return {
     name: opts.name,
