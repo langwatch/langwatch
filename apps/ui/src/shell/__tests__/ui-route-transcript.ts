@@ -5,16 +5,19 @@
  */
 
 export const expectedUiRouteTranscript: readonly string[] = [
-  "route /auth/signin -> pages/auth/signin",
-  "route /auth/signup -> pages/auth/signup",
-  "route /auth/forgot-password -> pages/auth/forgot-password",
-  "route /auth/reset-password -> pages/auth/reset-password",
-  "route /auth/verify-email -> pages/auth/verify-email",
-  "route /auth/error -> pages/auth/error",
-  "route /auth/join -> pages/auth/join",
+  "layout -> auth",
+  "  route /auth/signin -> pages/auth/signin",
+  "  route /auth/signup -> pages/auth/signup",
+  "  route /auth/forgot-password -> pages/auth/forgot-password",
+  "  route /auth/reset-password -> pages/auth/reset-password",
+  "  route /auth/verify-email -> pages/auth/verify-email",
+  "  route /auth/error -> pages/auth/error",
+  "  route /auth/join -> pages/auth/join",
+  // Moved under the auth layout 2026-09-18: it is auth's own screen and reads
+  // auth's host, which only this layout mounts.
+  "  route /invite/accept -> pages/invite/accept",
   "route /authorize -> pages/authorize",
   "redirect /admin/* -> /ops/backoffice (from /admin) [map user=users users=users organization=organizations organizations=organizations project=projects projects=projects subscription=subscriptions subscriptions=subscriptions]",
-  "route /invite/accept -> pages/invite/accept",
   "route /mcp/authorize -> pages/mcp/authorize",
   "route /share/:id -> pages/share/[id]",
   "route /unsubscribe -> pages/unsubscribe",
