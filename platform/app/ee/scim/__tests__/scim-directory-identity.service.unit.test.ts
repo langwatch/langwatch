@@ -56,18 +56,11 @@ function createStore() {
     owners,
     connections,
     prisma: {
-      $transaction: async (operations: Promise<unknown>[]) =>
-        Promise.all(operations),
+      $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations),
       ssoConnection: {
-        findFirst: async ({
-          where,
-        }: {
-          where: { id: string; organizationId: string };
-        }) =>
+        findFirst: async ({ where }: { where: { id: string; organizationId: string } }) =>
           connections.find(
-            (row) =>
-              row.id === where.id &&
-              row.organizationId === where.organizationId,
+            (row) => row.id === where.id && row.organizationId === where.organizationId,
           ) ?? null,
         findMany: async ({
           where,
@@ -86,15 +79,10 @@ function createStore() {
           ),
       },
       scimDirectoryUser: {
-        findMany: async ({
-          where,
-        }: {
-          where: { organizationId: string; userId: string };
-        }) =>
+        findMany: async ({ where }: { where: { organizationId: string; userId: string } }) =>
           owners.filter(
             (owner) =>
-              owner.userId === where.userId &&
-              owner.organizationId === where.organizationId,
+              owner.userId === where.userId && owner.organizationId === where.organizationId,
           ),
         upsert: async ({
           create,
@@ -106,22 +94,14 @@ function createStore() {
           };
         }) => {
           const existing = owners.find(
-            (owner) =>
-              owner.connectionId === create.connectionId &&
-              owner.userId === create.userId,
+            (owner) => owner.connectionId === create.connectionId && owner.userId === create.userId,
           );
           if (!existing) owners.push({ ...create });
           return existing ?? create;
         },
-        deleteMany: async ({
-          where,
-        }: {
-          where: { connectionId: string; userId: string };
-        }) => {
+        deleteMany: async ({ where }: { where: { connectionId: string; userId: string } }) => {
           const index = owners.findIndex(
-            (owner) =>
-              owner.connectionId === where.connectionId &&
-              owner.userId === where.userId,
+            (owner) => owner.connectionId === where.connectionId && owner.userId === where.userId,
           );
           if (index >= 0) owners.splice(index, 1);
           return { count: index >= 0 ? 1 : 0 };
@@ -137,10 +117,7 @@ function createStore() {
               externalId: string;
             };
           };
-        }) =>
-          rows.find(
-            (row) => keyOf(row) === keyOf(where.connectionId_externalId),
-          ) ?? null,
+        }) => rows.find((row) => keyOf(row) === keyOf(where.connectionId_externalId)) ?? null,
         findMany: async ({ where }: { where: { userId: string } }) =>
           rows.filter((row) => row.userId === where.userId),
         upsert: async ({
@@ -157,9 +134,7 @@ function createStore() {
           create: Row;
           update: { userId: string };
         }) => {
-          const existing = rows.find(
-            (row) => keyOf(row) === keyOf(where.connectionId_externalId),
-          );
+          const existing = rows.find((row) => keyOf(row) === keyOf(where.connectionId_externalId));
           if (existing) {
             existing.userId = update.userId;
             return existing;
@@ -167,15 +142,9 @@ function createStore() {
           rows.push({ ...create });
           return create;
         },
-        deleteMany: async ({
-          where,
-        }: {
-          where: { connectionId: string; userId: string };
-        }) => {
+        deleteMany: async ({ where }: { where: { connectionId: string; userId: string } }) => {
           const index = rows.findIndex(
-            (row) =>
-              row.connectionId === where.connectionId &&
-              row.userId === where.userId,
+            (row) => row.connectionId === where.connectionId && row.userId === where.userId,
           );
           if (index >= 0) rows.splice(index, 1);
           return { count: index >= 0 ? 1 : 0 };
@@ -232,12 +201,12 @@ describe("ScimDirectoryIdentityService", () => {
         userId: "user_sam",
       });
 
-      await expect(
-        service.getUserId({ connectionId: OKTA, externalId: "u-1" }),
-      ).resolves.toBe("user_sam");
-      await expect(
-        service.getUserId({ connectionId: ENTRA, externalId: "c-99" }),
-      ).resolves.toBe("user_sam");
+      await expect(service.getUserId({ connectionId: OKTA, externalId: "u-1" })).resolves.toBe(
+        "user_sam",
+      );
+      await expect(service.getUserId({ connectionId: ENTRA, externalId: "c-99" })).resolves.toBe(
+        "user_sam",
+      );
       expect(store.rows).toHaveLength(2);
     });
   });
@@ -258,12 +227,12 @@ describe("ScimDirectoryIdentityService", () => {
         userId: "user_kim",
       });
 
-      await expect(
-        service.getUserId({ connectionId: OKTA, externalId: "u-1" }),
-      ).resolves.toBe("user_sam");
-      await expect(
-        service.getUserId({ connectionId: ENTRA, externalId: "u-1" }),
-      ).resolves.toBe("user_kim");
+      await expect(service.getUserId({ connectionId: OKTA, externalId: "u-1" })).resolves.toBe(
+        "user_sam",
+      );
+      await expect(service.getUserId({ connectionId: ENTRA, externalId: "u-1" })).resolves.toBe(
+        "user_kim",
+      );
     });
   });
 
@@ -396,9 +365,9 @@ describe("ScimDirectoryIdentityService", () => {
       await expect(
         service.getUserId({ connectionId: OKTA, externalId: "u-1" }),
       ).resolves.toBeNull();
-      await expect(
-        service.getUserId({ connectionId: ENTRA, externalId: "c-99" }),
-      ).resolves.toBe("user_sam");
+      await expect(service.getUserId({ connectionId: ENTRA, externalId: "c-99" })).resolves.toBe(
+        "user_sam",
+      );
     });
   });
   /** @scenario "Directory ownership is isolated by organization and follows connection retirement" */
@@ -503,11 +472,7 @@ describe("ScimDirectoryIdentityService", () => {
       userId: "shared",
       externalId: "new",
     });
-    expect(store.owners).toEqual([
-      { organizationId: ORG, connectionId: ENTRA, userId: "shared" },
-    ]);
-    expect(
-      await service.getUserId({ connectionId: OKTA, externalId: "old" }),
-    ).toBeNull();
+    expect(store.owners).toEqual([{ organizationId: ORG, connectionId: ENTRA, userId: "shared" }]);
+    expect(await service.getUserId({ connectionId: OKTA, externalId: "old" })).toBeNull();
   });
 });

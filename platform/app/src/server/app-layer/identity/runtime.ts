@@ -15,24 +15,21 @@ import { fireSsoAutoAddNurturingCalls } from "@ee/billing/nurturing/hooks/ssoAut
 import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
 import { PlanTypes } from "@ee/billing/planTypes";
 import { ScimDeprovisionService } from "@ee/scim/scim-deprovision.service";
-import {
-  ScimOversightService,
-  type ScimRedriveApplyPort,
-} from "@ee/scim/scim-oversight.service";
+import { ScimOversightService, type ScimRedriveApplyPort } from "@ee/scim/scim-oversight.service";
 import { PrismaScimReconciliationRepository } from "@ee/scim/scim-reconciliation.prisma.repository";
 import { ScimReconciliationService } from "@ee/scim/scim-reconciliation.service";
 import { ScimRequestLogService } from "@ee/scim/scim-request-log.service";
 import { PrismaScimSsoUsers } from "@ee/scim/scim-sso-user.prisma.repository";
+import { EventLogScimSyncActivityRepository } from "@ee/scim/scim-sync-event-log.repository";
 import { scimSyncLifecycle } from "@ee/scim/scim-sync.runtime";
 import type { ScimSyncLifecycle } from "@ee/scim/scim-sync.service";
-import { EventLogScimSyncActivityRepository } from "@ee/scim/scim-sync-event-log.repository";
 import { ScimTokenService } from "@ee/scim/scim-token.service";
-import { SsoBreakGlassService } from "@ee/sso/break-glass.service";
 import {
   breakGlassHolderEligibility,
   LocalDoorBreakGlassBinding,
   RequiresLocalDoorAndBinding,
 } from "@ee/sso/break-glass-binding";
+import { SsoBreakGlassService } from "@ee/sso/break-glass.service";
 import { IdentitySsoConnectionGrandfatherMigration } from "@ee/sso/connection-grandfather.migration";
 import { LegacySsoDomainRoutingRepository } from "@ee/sso/legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "@ee/sso/legacy-sso-organization.prisma.repository";
@@ -42,17 +39,13 @@ import { PrismaSsoAccountFactsRepository } from "@ee/sso/sso-account-facts.prism
 import { SsoArrivalService } from "@ee/sso/sso-arrival.service";
 import { SsoAssertionService } from "@ee/sso/sso-assertion.service";
 import { PrismaSsoBreakGlassRepository } from "@ee/sso/sso-break-glass.prisma.repository";
-import { SsoConnectionService } from "@ee/sso/sso-connection.service";
 import { PrismaSsoConnectionBackofficeRepository } from "@ee/sso/sso-connection-backoffice.prisma.repository";
 import { SsoConnectionBackofficeService } from "@ee/sso/sso-connection-backoffice.service";
 import { EventLogSsoConnectionHistoryRepository } from "@ee/sso/sso-connection-event-log.repository";
 import { SsoConnectionGrandfatherService } from "@ee/sso/sso-connection-grandfather.service";
 import { SsoConnectionGuards } from "@ee/sso/sso-connection-guards";
 import { SsoConnectionHistoryService } from "@ee/sso/sso-connection-history.service";
-import {
-  newSsoBreakGlassBindingId,
-  newSsoConnectionCommandId,
-} from "@ee/sso/sso-connection-id";
+import { newSsoBreakGlassBindingId, newSsoConnectionCommandId } from "@ee/sso/sso-connection-id";
 import { PrismaSsoConnectionIssuers } from "@ee/sso/sso-connection-issuers.prisma.repository";
 import { SsoConnectionLedgerWriter } from "@ee/sso/sso-connection-ledger";
 import { PrismaSsoConnectionProjectionRepository } from "@ee/sso/sso-connection-projection.prisma.repository";
@@ -63,8 +56,9 @@ import {
 } from "@ee/sso/sso-connection-reads.prisma.repository";
 import { PrismaSsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.prisma.repository";
 import { SsoConnectionDomainRoutingRepository } from "@ee/sso/sso-connection-routing.prisma.repository";
-import { PrismaSsoCredentialStore } from "@ee/sso/sso-credential.prisma.repository";
+import { SsoConnectionService } from "@ee/sso/sso-connection.service";
 import { SsoCredentialPolicy } from "@ee/sso/sso-credential-policy";
+import { PrismaSsoCredentialStore } from "@ee/sso/sso-credential.prisma.repository";
 import { HttpsDomainProofFileLookup } from "@ee/sso/sso-domain-file-lookup";
 import { SsoDomainReproofService } from "@ee/sso/sso-domain-reproof.service";
 import { engineProviderFor } from "@ee/sso/sso-engine-provider";
@@ -78,7 +72,6 @@ import { PrismaSsoMigrationEvidenceRepository } from "@ee/sso/sso-migration-evid
 import { SsoMigrationFinalizationService } from "@ee/sso/sso-migration-finalization.service";
 import { PrismaSsoLegacyIdentityRetirement } from "@ee/sso/sso-migration-legacy-retirement.prisma.repository";
 import { ssoProviderConfigCipher } from "@ee/sso/sso-provider-config-cipher";
-import { SsoSelfServeService } from "@ee/sso/sso-self-serve.service";
 import {
   DnsDomainProofLookup,
   InstanceLicenseProof,
@@ -88,6 +81,7 @@ import {
   PrismaSsoOrganizationMemberLookup,
   SsoSelfServeContextResolver,
 } from "@ee/sso/sso-self-serve-adapters";
+import { SsoSelfServeService } from "@ee/sso/sso-self-serve.service";
 import { SsoTestArrivalService } from "@ee/sso/sso-test-arrival.service";
 import {
   breakGlassIsLive,
@@ -130,10 +124,12 @@ import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory } from "better-auth/adapters";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nanoid } from "nanoid";
+
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { auth0BridgeActive } from "~/utils/auth0-bridge";
 import { captureException } from "~/utils/posthogErrorCapture";
+
 import { changeAuth0Password } from "../../auth0/passwordService";
 import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
 import type { SecondaryStorageDeps } from "../../better-auth/config/secondary-storage";
@@ -166,12 +162,12 @@ import { CredentialAccountService } from "./credential-account.service";
 import { CredentialAccountStorageAdapter } from "./credential-account.storage-adapter";
 import { resolveDialableInternalOrigins } from "./dialable-internal-origins";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
-import { IdentityLookupService } from "./identity-lookup.service";
 import {
   BetterAuthLinkProposalDirectory,
   BetterAuthOperatorSessions,
   InviteServiceOperatorInvitations,
 } from "./identity-lookup-adapters";
+import { IdentityLookupService } from "./identity-lookup.service";
 import {
   identityStorageTransactions,
   postgresTransactionOver,
@@ -188,7 +184,6 @@ import { LastWayInService } from "./last-way-in.service";
 import { IdentityLedgerWriter } from "./ledger";
 import { MemberProvenanceService } from "./member-provenance.service";
 import { MfaLedgerWriter } from "./mfa-ledger";
-import { OrganizationMfaService } from "./organization-mfa.service";
 import {
   EmailOrganizationMfaNotifier,
   PrismaOrganizationConnectionFactors,
@@ -196,6 +191,7 @@ import {
   PrismaOrganizationMfaSettings,
   PrismaSessionFactors,
 } from "./organization-mfa-adapters";
+import { OrganizationMfaService } from "./organization-mfa.service";
 import { PriorSessionService } from "./prior-session.service";
 import { pinnedFetch, systemHostResolver } from "./public-egress";
 import { PrismaCredentialAccountRepository } from "./repositories/credential-account.prisma.repository";
@@ -210,15 +206,15 @@ import { PrismaIdentityResolutionRepository } from "./repositories/identity-reso
 import { PrismaIdentitySecretCarryRepository } from "./repositories/identity-secret-carry.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./repositories/identity-users.prisma.repository";
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
+import { PrismaJoinRequestProjectionRepository } from "./repositories/join-request-projection.prisma.repository";
 import {
   PrismaJoinCandidateRepository,
   PrismaJoinRequestReadRepository,
 } from "./repositories/join-request.prisma.repository";
-import { PrismaJoinRequestProjectionRepository } from "./repositories/join-request-projection.prisma.repository";
 import { PrismaLastWayInRepository } from "./repositories/last-way-in.prisma.repository";
 import { PrismaMemberProvenanceRepository } from "./repositories/member-provenance.prisma.repository";
-import { PrismaMfaEnrollmentRepository } from "./repositories/mfa-enrollment.prisma.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "./repositories/mfa-enrollment-projection.prisma.repository";
+import { PrismaMfaEnrollmentRepository } from "./repositories/mfa-enrollment.prisma.repository";
 import { PrismaPasskeyRemovalRepository } from "./repositories/passkey-removal.prisma.repository";
 import { PrismaPriorSessionRepository } from "./repositories/prior-session.prisma.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
@@ -261,11 +257,11 @@ import {
   resolveFederatedMethod,
   signInMethodPolicyPort,
 } from "./signin-method-policy";
-import { SignUpVerificationService } from "./signup-verification.service";
 import { buildSignUpVerificationUrl } from "./signup-verification-link";
+import { SignUpVerificationService } from "./signup-verification.service";
 import { PrismaTwoStepAccount } from "./two-step-account.adapter";
-import { TwoStepVerificationService } from "./two-step-verification.service";
 import { BetterAuthTwoStepProtocol } from "./two-step-verification-adapters";
+import { TwoStepVerificationService } from "./two-step-verification.service";
 import { isAnyoneOnIdentityWrites, isUserOnIdentityWrites } from "./write-gate";
 
 /**
@@ -495,10 +491,7 @@ export function identityBridgeCeremonies(): Pick<
  */
 const breakGlassLimiter = new InProcessBreakGlassLimiter();
 
-const legacySsoDomainRouting = new LegacySsoDomainRoutingRepository(
-  prisma,
-  resolveFederatedMethod,
-);
+const legacySsoDomainRouting = new LegacySsoDomainRoutingRepository(prisma, resolveFederatedMethod);
 
 /**
  * Whether a connection can actually be dialed (D09) — the seam where the two
@@ -511,8 +504,7 @@ const ssoConnectionIssuers = new PrismaSsoConnectionIssuers(prisma);
 const ssoMethodIsConfigured = ssoMethodIsConfiguredWith({
   mountedMethodId: async () => (await resolveFederatedMethod())?.id ?? null,
   engineHoldsProvider: async ({ connectionId }) =>
-    (await ssoConnectionIssuers.findRegisteredProvider({ connectionId })) !==
-    null,
+    (await ssoConnectionIssuers.findRegisteredProvider({ connectionId })) !== null,
 });
 
 /**
@@ -581,11 +573,7 @@ export function signInRouter(): SignInRouterService {
  * open would hand out exactly the local password the connection exists to
  * prevent.
  */
-export async function addressRoutesToConnection({
-  email,
-}: {
-  email: string;
-}): Promise<boolean> {
+export async function addressRoutesToConnection({ email }: { email: string }): Promise<boolean> {
   return (await connectionGoverningAddress({ email })) !== null;
 }
 
@@ -609,8 +597,7 @@ export async function connectionGoverningAddress({
   const decision = await signInRouter().route({ identifier: email });
   if (decision.outcome !== "redirect_to_connection") return null;
   const connectionId =
-    decision.methodSet.find((method) => method.connectionId !== null)
-      ?.connectionId ?? null;
+    decision.methodSet.find((method) => method.connectionId !== null)?.connectionId ?? null;
   return connectionId === null ? null : { connectionId };
 }
 
@@ -650,10 +637,7 @@ export type LocalSignUpDecision =
     };
 
 function isManagedDomainFallback(decision: RoutingDecision): boolean {
-  return (
-    decision.outcome !== "redirect_to_connection" &&
-    isOrganizationManagedDecision(decision)
-  );
+  return decision.outcome !== "redirect_to_connection" && isOrganizationManagedDecision(decision);
 }
 
 export async function decideLocalSignUp(
@@ -687,9 +671,7 @@ export async function decideLocalSignUp(
       reasonCode: decision.reasonCode,
     };
   }
-  const existing = await deps.findUserIdByEmail(
-    normalizeIdentifierValue(email),
-  );
+  const existing = await deps.findUserIdByEmail(normalizeIdentifierValue(email));
   if (existing !== null) {
     return {
       outcome: "existing_account",
@@ -728,20 +710,16 @@ export async function decideLocalSignUp(
   return { outcome: "enroll", methodSet, reasonCode: decision.reasonCode };
 }
 
-export async function localSignUpDecision(
-  email: string,
-): Promise<LocalSignUpDecision> {
+export async function localSignUpDecision(email: string): Promise<LocalSignUpDecision> {
   return decideLocalSignUp(email, {
     router: signInRouter(),
-    findUserIdByEmail: (normalizedValue) =>
-      identityUsers.findUserIdByEmail({ normalizedValue }),
+    findUserIdByEmail: (normalizedValue) => identityUsers.findUserIdByEmail({ normalizedValue }),
     resolveDefaultMethods: async () =>
       (await signInMethodPolicyPort.resolvePolicy()).defaultMethods,
     // Email mode first, because it answers on its own; the switch is only
     // about a deployment that ALSO federates keeping a password door.
     passwordIsAllowed: async () =>
-      (await resolveAuthProvider()) === "email" ||
-      deploymentIssuesOwnPasswords(env),
+      (await resolveAuthProvider()) === "email" || deploymentIssuesOwnPasswords(env),
   });
 }
 
@@ -790,11 +768,7 @@ const ssoCredentials = new PrismaSsoCredentialStore(prisma);
  * same projection reached two ways and a derivation that differed between
  * them would be two answers to "what is registered".
  */
-export const ssoEngineProviderDerivation = ({
-  connection,
-}: {
-  connection: SsoConnectionState;
-}) =>
+export const ssoEngineProviderDerivation = ({ connection }: { connection: SsoConnectionState }) =>
   engineProviderFor({
     connection,
     credentials: ssoCredentials,
@@ -819,8 +793,7 @@ export function ssoBreakGlass(): SsoBreakGlassService {
           organizationId,
           userId,
         })) > 0,
-      holdsPassword: ({ userId }) =>
-        credentialAccounts().hasPassword({ userId }),
+      holdsPassword: ({ userId }) => credentialAccounts().hasPassword({ userId }),
     }),
   });
   return breakGlassService;
@@ -865,9 +838,7 @@ export function ssoSelfServe(): SsoSelfServeService {
     recovery: activationBreakGlassPort(),
     holdsPassword: ({ userId }) => credentialAccounts().hasPassword({ userId }),
   });
-  const licenseProof = new InstanceLicenseProof(
-    new SsoLicenseRepository(prisma),
-  );
+  const licenseProof = new InstanceLicenseProof(new SsoLicenseRepository(prisma));
   selfServeService = new SsoSelfServeService({
     connections: ssoConnections,
     reads: new PrismaSsoConnectionReadRepository(prisma),
@@ -973,10 +944,7 @@ function organizationJoinNotifications(): EmailJoinRequestNotifier {
 }
 
 export function joinMembership(): PrismaJoinMembership {
-  return (organizationJoinMembership ??= new PrismaJoinMembership(
-    prisma,
-    grantsLedgerWriter(),
-  ));
+  return (organizationJoinMembership ??= new PrismaJoinMembership(prisma, grantsLedgerWriter()));
 }
 
 /**
@@ -1010,8 +978,7 @@ export function joinRequestsService(): JoinRequestsService {
     // so an organization that upgrades this morning can open its door this
     // morning. Closing it never reaches here.
     joinPolicyEntitled: async ({ organizationId }) =>
-      (await getApp().planProvider.getActivePlan({ organizationId })).type ===
-      PlanTypes.ENTERPRISE,
+      (await getApp().planProvider.getActivePlan({ organizationId })).type === PlanTypes.ENTERPRISE,
   });
 }
 
@@ -1120,13 +1087,10 @@ export function organizationMfa(): OrganizationMfaService {
     sessions: new PrismaSessionFactors(prisma),
     members: new PrismaOrganizationMemberFactors(prisma),
     connections: new PrismaOrganizationConnectionFactors(prisma),
-    notifier: new EmailOrganizationMfaNotifier(
-      prisma,
-      async ({ userId, legacyEmail }) => {
-        if (!(await isLatched({ userId }))) return legacyEmail;
-        return identityEmail().resolveEmail({ userId });
-      },
-    ),
+    notifier: new EmailOrganizationMfaNotifier(prisma, async ({ userId, legacyEmail }) => {
+      if (!(await isLatched({ userId }))) return legacyEmail;
+      return identityEmail().resolveEmail({ userId });
+    }),
     // Stated once, here, like every other environment read this root owns.
     offered: deploymentOffersTwoStepVerification,
     // The plan, resolved the one way the app resolves plans: the provider
@@ -1134,8 +1098,7 @@ export function organizationMfa(): OrganizationMfaService {
     // self-hosted. Read per call rather than captured, so an organization
     // that upgrades this morning can turn the requirement on this morning.
     entitled: async ({ organizationId }) =>
-      (await getApp().planProvider.getActivePlan({ organizationId })).type ===
-      PlanTypes.ENTERPRISE,
+      (await getApp().planProvider.getActivePlan({ organizationId })).type === PlanTypes.ENTERPRISE,
   });
 }
 
@@ -1148,8 +1111,7 @@ export function organizationMfa(): OrganizationMfaService {
  * answers claims for a row better-auth is about to create, and nothing in it
  * can create, change or end a session of its own.
  */
-const verifiedCallbackProviderAssertions =
-  new VerifiedCallbackProviderAssertions();
+const verifiedCallbackProviderAssertions = new VerifiedCallbackProviderAssertions();
 
 export function sessionCallbackEvidence(): VerifiedCallbackProviderAssertions {
   return verifiedCallbackProviderAssertions;
@@ -1157,10 +1119,7 @@ export function sessionCallbackEvidence(): VerifiedCallbackProviderAssertions {
 
 export function sessionClaims(): SessionClaimsService {
   return new SessionClaimsService({
-    identifiers: new PrismaSessionIdentifiers(
-      prisma,
-      identityStorageTransactions,
-    ),
+    identifiers: new PrismaSessionIdentifiers(prisma, identityStorageTransactions),
     assertions: verifiedCallbackProviderAssertions,
   });
 }
@@ -1404,9 +1363,7 @@ export function identityStorageAdapter(): AdapterFactory<BetterAuthOptions> {
   return identityStorage;
 }
 
-const provisionedSsoUsers = PrismaScimSsoUsers.create(
-  identityStorageTransactions,
-);
+const provisionedSsoUsers = PrismaScimSsoUsers.create(identityStorageTransactions);
 
 export function ssoProvisionedUsers(): PrismaScimSsoUsers {
   return provisionedSsoUsers;
@@ -1451,12 +1408,10 @@ export function ssoRegisteredIssuers(): RegisteredIssuers {
 export function signUpConfirmationEndpoint(): SignUpConfirmationEndpoint {
   return new SignUpConfirmationEndpoint({
     verification: {
-      completeVerification: ({ token }) =>
-        signUpVerification().completeVerification({ token }),
+      completeVerification: ({ token }) => signUpVerification().completeVerification({ token }),
     },
     users: {
-      findUserIdByEmail: ({ email }) =>
-        identityUsers.findUserIdByEmail({ normalizedValue: email }),
+      findUserIdByEmail: ({ email }) => identityUsers.findUserIdByEmail({ normalizedValue: email }),
     },
     minter: sessionMinter(),
   });
@@ -1470,8 +1425,7 @@ export function signUpConfirmationEndpoint(): SignUpConfirmationEndpoint {
  * instances would be two scopes, and the hook would find every reset
  * unattributed.
  */
-let passwordResetSessionBridgeInstance: PasswordResetSessionBridge | null =
-  null;
+let passwordResetSessionBridgeInstance: PasswordResetSessionBridge | null = null;
 
 export function passwordResetSessionBridge(): PasswordResetSessionBridge {
   passwordResetSessionBridgeInstance ??= new PasswordResetSessionBridge({
@@ -1569,12 +1523,7 @@ export function credentialAccounts(): CredentialAccountService {
       matches: ({ password, hash: stored }) => compare(password, stored),
     },
     federated: {
-      changePassword: ({
-        email,
-        federatedUserId,
-        currentPassword,
-        newPassword,
-      }) =>
+      changePassword: ({ email, federatedUserId, currentPassword, newPassword }) =>
         changeAuth0Password({
           email,
           auth0UserId: federatedUserId,
@@ -1585,8 +1534,7 @@ export function credentialAccounts(): CredentialAccountService {
     identifiers: signUpIdentifier(),
     sessions: sessionRevocation(),
     milestones: {
-      signedUp: ({ userId }) =>
-        trackServerEvent({ userId, event: "signed_up" }),
+      signedUp: ({ userId }) => trackServerEvent({ userId, event: "signed_up" }),
     },
   });
 }
@@ -1610,9 +1558,7 @@ export function ssoAssertion(): SsoAssertionService {
       // the gate and the go-live checklist cannot disagree about whether a
       // way back in exists.
       hasLiveBreakGlass: async ({ organizationId }) => {
-        const bindings = await new PrismaSsoBreakGlassRepository(
-          prisma,
-        ).findAllForOrganization({
+        const bindings = await new PrismaSsoBreakGlassRepository(prisma).findAllForOrganization({
           organizationId,
         });
         const nowMs = Date.now();
@@ -1669,19 +1615,15 @@ export function ssoArrival(): SsoArrivalService {
       },
     },
     joinRequests: {
-      requestFromSsoArrival: (args) =>
-        joinRequestsService().requestFromSsoArrival(args),
+      requestFromSsoArrival: (args) => joinRequestsService().requestFromSsoArrival(args),
     },
     grants: {
       attachBindings: (args) => grantsLedgerWriter().attachBindings(args),
     },
     notifications: {
-      joinedAutomatically: (args) =>
-        organizationJoinNotifications().joinedAutomatically(args),
+      joinedAutomatically: (args) => organizationJoinNotifications().joinedAutomatically(args),
       announceSignup: (args) => {
-        void getApp()
-          .notifications.sendSlackSignupEvent(args)
-          .catch(captureException);
+        void getApp().notifications.sendSlackSignupEvent(args).catch(captureException);
       },
       startNurturing: (args) => fireSsoAutoAddNurturingCalls(args),
     },
@@ -1713,8 +1655,7 @@ export function databaseHooks(): BetterAuthDatabaseHooks {
     analytics: {
       // The same distinct id posthog-js identifies with client-side, so this
       // server event joins the browser person.
-      trackSignUp: ({ userId }) =>
-        trackServerEvent({ userId, event: "signed_up" }),
+      trackSignUp: ({ userId }) => trackServerEvent({ userId, event: "signed_up" }),
     },
     nurturing: {
       trackActivity: (args) => fireActivityTrackingNurturing(args),

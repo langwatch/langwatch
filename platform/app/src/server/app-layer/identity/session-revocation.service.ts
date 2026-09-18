@@ -44,10 +44,7 @@ export interface SessionRevocationRecordsPort {
   /** Ends every session this person holds. Answers how many rows went. */
   deleteAllForUser(args: { userId: string }): Promise<number>;
   /** Ends every session this person holds except the named one. */
-  deleteForUserExcept(args: {
-    userId: string;
-    keepSessionId: string;
-  }): Promise<number>;
+  deleteForUserExcept(args: { userId: string; keepSessionId: string }): Promise<number>;
   /** Ends exactly the named sessions. */
   deleteByIds(args: { ids: readonly string[] }): Promise<number>;
   /** Ends the session behind one token; 0 when it had already gone. */
@@ -69,10 +66,7 @@ export interface SessionRevocationCachePort {
    */
   readIndex(args: { userId: string }): Promise<readonly CachedSession[] | null>;
   /** Rewrites the index to exactly these sessions. */
-  writeIndex(args: {
-    userId: string;
-    sessions: readonly CachedSession[];
-  }): Promise<void>;
+  writeIndex(args: { userId: string; sessions: readonly CachedSession[] }): Promise<void>;
   /** Drops the index. */
   dropIndex(args: { userId: string }): Promise<void>;
   /** Drops the cached session behind each token. */
@@ -127,10 +121,7 @@ export class SessionRevocationService {
       );
     }
 
-    logger.info(
-      { userId, deleted: ended, requested: sessions.length },
-      "ended selected sessions",
-    );
+    logger.info({ userId, deleted: ended, requested: sessions.length }, "ended selected sessions");
     return { ended };
   }
 
@@ -152,9 +143,9 @@ export class SessionRevocationService {
       }
       await this.deps.cache.dropIndex({ userId });
 
-      const missed = (
-        await this.deps.records.findTokensForUser({ userId })
-      ).filter((token) => !cleared.has(token));
+      const missed = (await this.deps.records.findTokensForUser({ userId })).filter(
+        (token) => !cleared.has(token),
+      );
       if (missed.length > 0) {
         await this.deps.cache.dropSessions({ tokens: missed });
       }
@@ -228,10 +219,7 @@ export class SessionRevocationService {
       userId,
       keepSessionId,
     });
-    logger.info(
-      { userId, keepSessionId, deleted },
-      "ended every other session for a person",
-    );
+    logger.info({ userId, keepSessionId, deleted }, "ended every other session for a person");
   }
 
   /**
@@ -272,9 +260,7 @@ export class SessionRevocationService {
     try {
       const indexed = await this.deps.cache.readIndex({ userId });
       if (indexed !== null) {
-        const remaining = indexed.filter(
-          (session) => !doomedTokens.includes(session.token),
-        );
+        const remaining = indexed.filter((session) => !doomedTokens.includes(session.token));
         if (remaining.length > 0) {
           await this.deps.cache.writeIndex({ userId, sessions: remaining });
         } else {
@@ -297,17 +283,9 @@ export class SessionRevocationService {
   }
 
   /** A successful logout has removed both copies of the session. */
-  async revokeOne({
-    token,
-    userId,
-  }: {
-    token: string;
-    userId: string;
-  }): Promise<void> {
+  async revokeOne({ token, userId }: { token: string; userId: string }): Promise<void> {
     // Delete the row first so a concurrent lookup cannot refill the cleared cache.
-    const deletion = await Promise.allSettled([
-      this.deps.records.deleteByToken({ token }),
-    ]);
+    const deletion = await Promise.allSettled([this.deps.records.deleteByToken({ token })]);
     const cache = await Promise.allSettled([
       this.deps.cache.dropSessions({ tokens: [token] }),
       this.deps.cache.dropIndex({ userId }),

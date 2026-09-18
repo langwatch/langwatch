@@ -23,13 +23,7 @@ export class SsoCredentialPolicy {
     return new SsoCredentialPolicy(deps);
   }
 
-  async canSignIn({
-    userId,
-    email,
-  }: {
-    userId: string;
-    email: string;
-  }): Promise<boolean> {
+  async canSignIn({ userId, email }: { userId: string; email: string }): Promise<boolean> {
     const decision = await this.#deps.router.route({ identifier: email });
     if (decision.outcome !== "redirect_to_connection") return true;
 

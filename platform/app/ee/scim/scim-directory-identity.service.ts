@@ -5,10 +5,7 @@
  */
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import {
-  ScimConnectionNotFoundError,
-  ScimWriteOutsideConnectionError,
-} from "./errors";
+import { ScimConnectionNotFoundError, ScimWriteOutsideConnectionError } from "./errors";
 
 export class ScimDirectoryIdentityService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -52,8 +49,7 @@ export class ScimDirectoryIdentityService {
       connectionId,
     });
     const predecessor =
-      connection.migrationPhase === "FINALIZING" ||
-      connection.migrationPhase === "FINALIZED"
+      connection.migrationPhase === "FINALIZING" || connection.migrationPhase === "FINALIZED"
         ? connection.replacesConnectionId
         : null;
     await this.prisma.$transaction([
@@ -85,13 +81,7 @@ export class ScimDirectoryIdentityService {
   }
 
   /** DELETE forgets the person; deactivation keeps ownership for reactivation. */
-  async forget({
-    connectionId,
-    userId,
-  }: {
-    connectionId: string;
-    userId: string;
-  }): Promise<void> {
+  async forget({ connectionId, userId }: { connectionId: string; userId: string }): Promise<void> {
     await this.prisma.$transaction([
       this.prisma.scimExternalId.deleteMany({
         where: { connectionId, userId },
@@ -159,8 +149,7 @@ export class ScimDirectoryIdentityService {
       select: { id: true },
     });
     const predecessor =
-      connection.migrationPhase === "FINALIZING" ||
-      connection.migrationPhase === "FINALIZED"
+      connection.migrationPhase === "FINALIZING" || connection.migrationPhase === "FINALIZED"
         ? connection.replacesConnectionId
         : null;
     if (owners.some((owner) => owner.id !== predecessor)) {

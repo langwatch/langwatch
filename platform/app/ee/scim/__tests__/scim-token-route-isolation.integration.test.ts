@@ -133,9 +133,7 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         token: legacyToken,
         path: `/api/scim/v2/Users/${directUserId}`,
         method: "PATCH",
-        body: patch([
-          { op: "replace", value: { name: { givenName: "Taken" } } },
-        ]),
+        body: patch([{ op: "replace", value: { name: { givenName: "Taken" } } }]),
       });
 
       expect(await readForbiddenResponse(response)).toMatchObject({
@@ -200,9 +198,7 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
 
     expect(response.status).toBe(404);
     expect(await authoritySnapshot(first.organizationId)).toEqual(firstBefore);
-    expect(await authoritySnapshot(second.organizationId)).toEqual(
-      secondBefore,
-    );
+    expect(await authoritySnapshot(second.organizationId)).toEqual(secondBefore);
   });
 
   describe("given the grandfathered connection is still serving its own directory", () => {
@@ -211,9 +207,7 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       const globalUserBefore = await prisma.user.findUniqueOrThrow({
         where: { id: legacyUserId },
       });
-      const otherOrganizationBefore = await authoritySnapshot(
-        second.organizationId,
-      );
+      const otherOrganizationBefore = await authoritySnapshot(second.organizationId);
       const response = await requestWithToken({
         token: legacyToken,
         path: `/api/scim/v2/Users/${legacyUserId}`,
@@ -242,12 +236,10 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
           select: { name: true },
         }),
       ).resolves.toEqual({ name: "Still Serving" });
-      expect(
-        await prisma.user.findUniqueOrThrow({ where: { id: legacyUserId } }),
-      ).toEqual(globalUserBefore);
-      expect(await authoritySnapshot(second.organizationId)).toEqual(
-        otherOrganizationBefore,
+      expect(await prisma.user.findUniqueOrThrow({ where: { id: legacyUserId } })).toEqual(
+        globalUserBefore,
       );
+      expect(await authoritySnapshot(second.organizationId)).toEqual(otherOrganizationBefore);
       expect(await tokenLastUsedAt(first.legacyConnectionId)).not.toBeNull();
     });
   });
@@ -564,9 +556,7 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
-        ...(body === undefined
-          ? {}
-          : { "Content-Type": "application/scim+json" }),
+        ...(body === undefined ? {} : { "Content-Type": "application/scim+json" }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });

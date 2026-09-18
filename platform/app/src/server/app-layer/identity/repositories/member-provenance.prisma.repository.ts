@@ -47,10 +47,7 @@ export class PrismaMemberProvenanceRepository implements MemberProvenancePort {
     if (connections.length === 0) return [];
 
     const providerById = new Map(
-      connections.map((connection) => [
-        connection.id,
-        providerIdOf(connection.idpMetadata),
-      ]),
+      connections.map((connection) => [connection.id, providerIdOf(connection.idpMetadata)]),
     );
 
     const users = await this.prisma.user.findMany({
@@ -142,7 +139,5 @@ export class PrismaMemberProvenanceRepository implements MemberProvenancePort {
 function providerIdOf(metadata: unknown): string | null {
   if (typeof metadata !== "object" || metadata === null) return null;
   const providerId = (metadata as { providerId?: unknown }).providerId;
-  return typeof providerId === "string" && providerId.length > 0
-    ? providerId
-    : null;
+  return typeof providerId === "string" && providerId.length > 0 ? providerId : null;
 }

@@ -8,9 +8,7 @@ const logger = createLogger("langwatch:better-auth:registered-issuers");
 /** Fresh issuer reads fail closed at the request boundary. */
 export interface SsoIssuerDirectoryPort {
   /** The issuer one connection registered, or null when it registered none. */
-  findIssuerForConnection(args: {
-    connectionId: string;
-  }): Promise<string | null>;
+  findIssuerForConnection(args: { connectionId: string }): Promise<string | null>;
   findIssuerForDomain(args: { domain: string }): Promise<string | null>;
 }
 
@@ -89,8 +87,7 @@ export class RegisteredIssuers {
     try {
       const parsed = ssoRequestBody.safeParse(await request.clone().json());
       if (!parsed.success) return [];
-      const domain =
-        parsed.data.domain ?? extractEmailDomain(parsed.data.email ?? "");
+      const domain = parsed.data.domain ?? extractEmailDomain(parsed.data.email ?? "");
       if (!domain) return [];
       const issuer = await this.deps.issuers.findIssuerForDomain({
         domain: normalizeDomain(domain),
@@ -101,9 +98,7 @@ export class RegisteredIssuers {
     }
   }
 
-  private async issuerForConnection(
-    connectionId: string,
-  ): Promise<string | null> {
+  private async issuerForConnection(connectionId: string): Promise<string | null> {
     try {
       return await this.deps.issuers.findIssuerForConnection({ connectionId });
     } catch (error) {

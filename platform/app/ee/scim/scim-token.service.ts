@@ -38,9 +38,7 @@ function tokenPepper(): string {
     // Not a HandledError: nothing the caller did produced this, and nothing
     // they can do fixes it. It degrades to "unknown" with a trace id, which is
     // what an unconfigured deployment should look like.
-    throw new Error(
-      "CREDENTIALS_SECRET (or NEXTAUTH_SECRET) must be set to hash SCIM tokens",
-    );
+    throw new Error("CREDENTIALS_SECRET (or NEXTAUTH_SECRET) must be set to hash SCIM tokens");
   }
   return secret;
 }
@@ -121,10 +119,7 @@ export class ScimTokenService {
     private readonly deps: ScimTokenServiceDeps = {},
   ) {}
 
-  static create(
-    prisma: PrismaClient,
-    deps: ScimTokenServiceDeps = {},
-  ): ScimTokenService {
+  static create(prisma: PrismaClient, deps: ScimTokenServiceDeps = {}): ScimTokenService {
     return new ScimTokenService(prisma, deps);
   }
 
@@ -361,11 +356,7 @@ export class ScimTokenService {
    * Verifies a bearer token and returns the associated organization ID.
    * Updates lastUsedAt on successful verification.
    */
-  async verify({
-    token,
-  }: {
-    token: string;
-  }): Promise<{ organizationId: string } | null> {
+  async verify({ token }: { token: string }): Promise<{ organizationId: string } | null> {
     const scimToken = await this.findByToken(token);
 
     if (!scimToken) {
@@ -391,11 +382,7 @@ export class ScimTokenService {
    * list an administrator reads during a plan lapse does not show a refused
    * credential as recently used.
    */
-  async verifyEntitled({
-    token,
-  }: {
-    token: string;
-  }): Promise<ScimTokenEntitlement> {
+  async verifyEntitled({ token }: { token: string }): Promise<ScimTokenEntitlement> {
     const scimToken = await this.findByToken(token);
     if (!scimToken) {
       return { status: "invalid_token" };
@@ -489,10 +476,7 @@ export class ScimTokenService {
     const matches = await this.prisma.scimToken.findMany({
       where: {
         hashedToken: {
-          in: [
-            this.hashToken(token, "hmac-sha256"),
-            this.hashToken(token, "sha256"),
-          ],
+          in: [this.hashToken(token, "hmac-sha256"), this.hashToken(token, "sha256")],
         },
       },
       take: 2,
@@ -568,9 +552,6 @@ export class ScimTokenService {
     if (scheme === "sha256") {
       return crypto.createHash("sha256").update(token).digest("hex");
     }
-    return crypto
-      .createHmac("sha256", tokenPepper())
-      .update(token)
-      .digest("hex");
+    return crypto.createHmac("sha256", tokenPepper()).update(token).digest("hex");
   }
 }

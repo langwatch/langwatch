@@ -100,9 +100,7 @@ describe("the credential boundary on a deployment that issues its own passwords"
     it("defers credential authorization until the password proves the user", async () => {
       const routesToConnection = vi.fn().mockResolvedValue(true);
 
-      await expect(
-        submit({ policy: issuesOwnPasswords, routesToConnection }),
-      ).resolves.toEqual({
+      await expect(submit({ policy: issuesOwnPasswords, routesToConnection })).resolves.toEqual({
         refused: false,
       });
       expect(routesToConnection).not.toHaveBeenCalled();

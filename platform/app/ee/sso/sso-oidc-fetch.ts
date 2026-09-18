@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { DiscoveryError } from "@better-auth/sso";
 import { type Agent, fetch as undiciFetch } from "undici";
+
 import {
   type HostResolver,
   pinnedTo,
@@ -43,10 +44,7 @@ export function createSsoOidcFetch({
       dialableInternalOrigins,
     });
     if (!judged.ok) {
-      throw new DiscoveryError(
-        "discovery_private_host",
-        "oidc endpoint refused by egress policy",
-      );
+      throw new DiscoveryError("discovery_private_host", "oidc endpoint refused by egress policy");
     }
 
     const dispatcher = pinnedTo(judged.addresses);

@@ -1,7 +1,9 @@
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaClient } from "~/generated/prisma/client";
 import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
+
 import { PrismaSsoConnectionIssuers } from "../sso-connection-issuers.prisma.repository";
 import { migrationConnectionData } from "./sso-migration-evidence.fixture";
 
@@ -56,9 +58,7 @@ afterAll(async () => {
 
 describe("domain-scoped issuer trust", () => {
   it("follows the migration route and adds no trust for unknown or suspended domains", async () => {
-    expect(
-      await repository.findIssuerForDomain({ domain: "unknown.test" }),
-    ).toBeNull();
+    expect(await repository.findIssuerForDomain({ domain: "unknown.test" })).toBeNull();
     expect(await repository.findIssuerForDomain({ domain })).toBe(
       `https://${directId}.example.test`,
     );

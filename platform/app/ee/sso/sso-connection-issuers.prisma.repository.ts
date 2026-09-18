@@ -65,11 +65,7 @@ export class PrismaSsoConnectionIssuers implements IdentityConnectionIssuersPort
    * which the callback route does — and a wrong guess costs a stranger's
    * session.
    */
-  async providerIdForIssuer({
-    issuer,
-  }: {
-    issuer: string;
-  }): Promise<string | null> {
+  async providerIdForIssuer({ issuer }: { issuer: string }): Promise<string | null> {
     const rows = await this.rows();
     const matches = rows.filter((row) => row.issuer === issuer);
     if (matches.length === 1) return matches[0]?.providerId ?? null;
@@ -82,11 +78,7 @@ export class PrismaSsoConnectionIssuers implements IdentityConnectionIssuersPort
     return null;
   }
 
-  async registeredIssuerFor({
-    providerId,
-  }: {
-    providerId: string;
-  }): Promise<string | null> {
+  async registeredIssuerFor({ providerId }: { providerId: string }): Promise<string | null> {
     const rows = await this.rows();
     return rows.find((row) => row.providerId === providerId)?.issuer ?? null;
   }
@@ -138,11 +130,7 @@ export class PrismaSsoConnectionIssuers implements IdentityConnectionIssuersPort
     });
   }
 
-  async findIssuerForDomain({
-    domain,
-  }: {
-    domain: string;
-  }): Promise<string | null> {
+  async findIssuerForDomain({ domain }: { domain: string }): Promise<string | null> {
     const ownership = await this.prisma.ssoVerifiedDomain.findUnique({
       where: { domain },
       select: {
@@ -164,10 +152,7 @@ export class PrismaSsoConnectionIssuers implements IdentityConnectionIssuersPort
 
   private async rows(): Promise<Array<{ providerId: string; issuer: string }>> {
     const now = this.now();
-    if (
-      this.cached &&
-      now - this.cached.at < PrismaSsoConnectionIssuers.CACHE_TTL_MS
-    ) {
+    if (this.cached && now - this.cached.at < PrismaSsoConnectionIssuers.CACHE_TTL_MS) {
       return this.cached.rows;
     }
 

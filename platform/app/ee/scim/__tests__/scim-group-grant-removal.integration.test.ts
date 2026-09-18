@@ -25,9 +25,7 @@ const directoryId = `directory-${id}`;
 const groupGrantId = `group-grant-${id}`;
 let events: ReturnType<typeof createAuthzTestEventSourcing>;
 let groups: ScimGroupService;
-const collector = new AuthzCollectorService(
-  new GrantsAuthzReadRepository(prisma),
-);
+const collector = new AuthzCollectorService(new GrantsAuthzReadRepository(prisma));
 
 beforeEach(async () => {
   await prisma.organization.create({
@@ -113,9 +111,7 @@ describe("SCIM group access removal", () => {
         principal: { type: "user", id: userId },
         organizationId,
       });
-      expect(before.bindings.some(({ roleKey }) => roleKey === "admin")).toBe(
-        true,
-      );
+      expect(before.bindings.some(({ roleKey }) => roleKey === "admin")).toBe(true);
 
       if (operation === "delete") {
         await groups.deleteGroup({ scimResourceId: groupId, organizationId });
@@ -138,18 +134,13 @@ describe("SCIM group access removal", () => {
         organizationId,
       });
       expect(after.bindings.map(({ roleKey }) => roleKey)).toEqual(["viewer"]);
-      expect(
-        await prisma.grant.findUniqueOrThrow({ where: { id: manualId } }),
-      ).toMatchObject({
+      expect(await prisma.grant.findUniqueOrThrow({ where: { id: manualId } })).toMatchObject({
         revokedAt: null,
       });
       expect(
-        (await prisma.grant.findUniqueOrThrow({ where: { id: directoryId } }))
-          .revokedAt,
+        (await prisma.grant.findUniqueOrThrow({ where: { id: directoryId } })).revokedAt,
       ).not.toBeNull();
-      expect(
-        await prisma.groupMembership.count({ where: { groupId, userId } }),
-      ).toBe(0);
+      expect(await prisma.groupMembership.count({ where: { groupId, userId } })).toBe(0);
     },
   );
 });

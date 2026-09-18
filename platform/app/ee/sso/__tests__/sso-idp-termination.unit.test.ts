@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import {
-  emptySsoConnection,
-  type SsoConnectionState,
-} from "@langwatch/identity";
+import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -22,10 +19,7 @@ import {
   SSO_PROVIDER_CONFIG_SEAL,
   type SsoProviderConfigCipher,
 } from "../sso-provider-config";
-import {
-  createSsoSelfServeFixture,
-  InMemoryCredentials,
-} from "./support/sso-self-serve.fixture";
+import { createSsoSelfServeFixture, InMemoryCredentials } from "./support/sso-self-serve.fixture";
 
 /**
  * Terminating a customer's own identity provider (D09 — see
@@ -69,9 +63,7 @@ const IDP_METADATA = `<?xml version="1.0"?>
   </md:IDPSSODescriptor>
 </md:EntityDescriptor>`;
 
-function connection(
-  overrides: Partial<SsoConnectionState> = {},
-): SsoConnectionState {
+function connection(overrides: Partial<SsoConnectionState> = {}): SsoConnectionState {
   return {
     ...emptySsoConnection({ connectionId: CONNECTION }),
     organizationId: ORG,
@@ -145,9 +137,7 @@ describe("registering an identity provider", () => {
     });
 
     it("appends the well-known path to whatever path the issuer already carries", () => {
-      expect(
-        discoveryEndpointFor({ issuer: "https://login.example.com/t/acme/" }),
-      ).toBe(
+      expect(discoveryEndpointFor({ issuer: "https://login.example.com/t/acme/" })).toBe(
         "https://login.example.com/t/acme/.well-known/openid-configuration",
       );
     });
@@ -246,8 +236,7 @@ describe("registering an identity provider", () => {
           entryPoint: "https://login.acme.example/sso",
           entityId: "https://login.acme.example",
           metadataXml: null,
-          certificate:
-            "-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----",
+          certificate: "-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----",
         }),
       );
 
@@ -381,9 +370,7 @@ describe("registering an identity provider", () => {
       expect(row?.oidcConfig).not.toContain("secret_acme_live");
       expect(isSealedProviderConfig(row?.oidcConfig ?? "")).toBe(true);
       // And it is the real document underneath, not a lossy one.
-      expect(JSON.parse(sealing.open(row?.oidcConfig ?? "")).clientSecret).toBe(
-        "secret_acme_live",
-      );
+      expect(JSON.parse(sealing.open(row?.oidcConfig ?? "")).clientSecret).toBe("secret_acme_live");
     });
   });
 });
@@ -492,9 +479,7 @@ describe("how many identity providers an organization may register", () => {
         }),
       ).resolves.toMatchObject({ organizationId: ORG, createdBy: "usr_ana" });
 
-      const otherActor = await fixtureHolding(
-        null,
-      ).selfServe.registerConnection({
+      const otherActor = await fixtureHolding(null).selfServe.registerConnection({
         ...registration,
         actor: { userId: "usr_other" },
       });
@@ -551,8 +536,7 @@ describe("the engine's provider row", () => {
       expect(JSON.parse(row?.oidcConfig ?? "{}")).toMatchObject({
         clientId: "client_acme",
         clientSecret: "secret_acme",
-        discoveryEndpoint:
-          "https://login.acme.okta.com/.well-known/openid-configuration",
+        discoveryEndpoint: "https://login.acme.okta.com/.well-known/openid-configuration",
       });
     });
 
@@ -592,14 +576,8 @@ describe("the engine's provider row", () => {
         }),
       );
 
-      expect(rows.map((row) => row?.providerId)).toEqual([
-        "ssoconn_one",
-        "ssoconn_two",
-      ]);
-      expect(rows.map((row) => row?.organizationId)).toEqual([
-        "org_0",
-        "org_1",
-      ]);
+      expect(rows.map((row) => row?.providerId)).toEqual(["ssoconn_one", "ssoconn_two"]);
+      expect(rows.map((row) => row?.organizationId)).toEqual(["org_0", "org_1"]);
     });
   });
 
@@ -781,9 +759,7 @@ describe("what LangWatch is, to an identity provider", () => {
     expect(details.assertionConsumerServiceUrl).toBe(
       `${BASE_URL}/api/auth/sso/saml2/sp/acs/${CONNECTION}`,
     );
-    expect(details.redirectUrl).toBe(
-      `${BASE_URL}/api/auth/sso/callback/${CONNECTION}`,
-    );
+    expect(details.redirectUrl).toBe(`${BASE_URL}/api/auth/sso/callback/${CONNECTION}`);
     // One name for the whole deployment: LangWatch is one service provider
     // that talks to many identity providers.
     expect(details.entityId).toBe(`${BASE_URL}/api/auth/sso/saml2/sp`);
@@ -806,10 +782,7 @@ describe("metadata signing keys", () => {
     (kind) => {
       const metadataXml =
         kind === "missing"
-          ? IDP_METADATA.replace(
-              /<md:KeyDescriptor[\s\S]*?<\/md:KeyDescriptor>/,
-              "",
-            )
+          ? IDP_METADATA.replace(/<md:KeyDescriptor[\s\S]*?<\/md:KeyDescriptor>/, "")
           : kind === "encryption-only"
             ? IDP_METADATA.replace('use="signing"', 'use="encryption"')
             : IDP_METADATA.replace(CERTIFICATE, "not-a-certificate");
@@ -821,9 +794,7 @@ describe("metadata signing keys", () => {
           metadataXml,
           certificate: null,
         }),
-      ).toThrowError(
-        expect.objectContaining({ code: "sso_saml_metadata_invalid" }),
-      );
+      ).toThrowError(expect.objectContaining({ code: "sso_saml_metadata_invalid" }));
     },
   );
 
@@ -835,13 +806,8 @@ describe("metadata signing keys", () => {
       certificate: null,
       metadataXml: IDP_METADATA.replace(' use="signing"', ""),
     };
-    expect(validateSamlRegistration(registration).metadataXml).toBe(
-      registration.metadataXml,
-    );
-    const withoutKey = IDP_METADATA.replace(
-      /<md:KeyDescriptor[\s\S]*?<\/md:KeyDescriptor>/,
-      "",
-    );
+    expect(validateSamlRegistration(registration).metadataXml).toBe(registration.metadataXml);
+    const withoutKey = IDP_METADATA.replace(/<md:KeyDescriptor[\s\S]*?<\/md:KeyDescriptor>/, "");
     expect(
       validateSamlRegistration({
         ...registration,

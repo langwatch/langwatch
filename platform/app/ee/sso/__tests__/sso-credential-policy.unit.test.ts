@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import {
-  emptySsoConnection,
-  type RoutableConnection,
-} from "@langwatch/identity";
+import { emptySsoConnection, type RoutableConnection } from "@langwatch/identity";
 import { SignInRouterService } from "@langwatch/identity-server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -42,14 +39,12 @@ function build({ instanceFederation = false } = {}) {
       legacy: {
         findConnectionForDomain: async ({ domain }) =>
           !instanceFederation && domain === "company.test" ? connection : null,
-        listActiveConnections: async () =>
-          instanceFederation ? [] : [connection],
+        listActiveConnections: async () => (instanceFederation ? [] : [connection]),
       },
       connections: {
         findConnectionForDomain: async ({ domain }) =>
           !instanceFederation && domain === "company.test" ? connection : null,
-        listActiveConnections: async () =>
-          instanceFederation ? [] : [connection],
+        listActiveConnections: async () => (instanceFederation ? [] : [connection]),
       },
     },
     policy: {
@@ -57,9 +52,7 @@ function build({ instanceFederation = false } = {}) {
         defaultMethods: instanceFederation
           ? [{ id: "oidc", kind: "federated", connectionId: null }]
           : [{ id: "password", kind: "password", connectionId: null }],
-        localMethods: [
-          { id: "password", kind: "password", connectionId: null },
-        ],
+        localMethods: [{ id: "password", kind: "password", connectionId: null }],
         federationLicensed: true,
         selfHosted: true,
       }),
@@ -122,9 +115,7 @@ describe("SsoCredentialPolicy with the real router and recovery grants", () => {
   /** @scenario "An ungoverned personal address keeps its existing local sign-in route" */
   it("does not widen a company route to the user's personal address", async () => {
     const { policy } = build();
-    expect(
-      await policy.canSignIn({ userId: "holder", email: "alias@company.test" }),
-    ).toBe(false);
+    expect(await policy.canSignIn({ userId: "holder", email: "alias@company.test" })).toBe(false);
     expect(
       await policy.canSignIn({
         userId: "holder",
@@ -150,9 +141,7 @@ describe("SsoCredentialPolicy with the real router and recovery grants", () => {
     await grant();
     expect(holderIsEligible).toHaveBeenCalledTimes(1);
     holderIsEligible.mockResolvedValue(false);
-    expect(
-      await policy.canSignIn({ userId: "holder", email: "alias@company.test" }),
-    ).toBe(true);
+    expect(await policy.canSignIn({ userId: "holder", email: "alias@company.test" })).toBe(true);
     expect(holderIsEligible).toHaveBeenCalledTimes(1);
   });
 });

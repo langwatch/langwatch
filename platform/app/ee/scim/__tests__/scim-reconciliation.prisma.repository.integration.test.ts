@@ -1,5 +1,4 @@
 import { generate } from "@langwatch/ksuid";
-
 import { afterAll, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "~/generated/prisma/client";
@@ -24,11 +23,7 @@ afterAll(async () => {
 describe("directory-caused changes", () => {
   /** @scenario "Recent directory removals survive a full page of live grants" */
   it("orders by the later timestamp before capping, without duplicates or other tenants", async () => {
-    const grant = (
-      id: string,
-      occurredAt: number,
-      revokedAt: number | null = null,
-    ) => ({
+    const grant = (id: string, occurredAt: number, revokedAt: number | null = null) => ({
       id: `${organizationId}-${id}`,
       organizationId,
       principalType: "USER" as const,
@@ -42,9 +37,7 @@ describe("directory-caused changes", () => {
     });
     await prisma.grant.createMany({
       data: [
-        ...Array.from({ length: 50 }, (_, index) =>
-          grant(`active-${index}`, 1000 + index),
-        ),
+        ...Array.from({ length: 50 }, (_, index) => grant(`active-${index}`, 1000 + index)),
         grant("old-attachment-new-removal", 1, 3000),
         grant("new-attachment-older-removal", 4000, 2000),
         { ...grant("foreign", 9000), organizationId: otherOrganizationId },
@@ -73,9 +66,7 @@ describe("directory-caused changes", () => {
     expect(new Set(changes.map((change) => change.grantId)).size).toBe(50);
     expect(
       changes.some(
-        (change) =>
-          change.grantId.endsWith("foreign") ||
-          change.grantId.endsWith("manual"),
+        (change) => change.grantId.endsWith("foreign") || change.grantId.endsWith("manual"),
       ),
     ).toBe(false);
   });

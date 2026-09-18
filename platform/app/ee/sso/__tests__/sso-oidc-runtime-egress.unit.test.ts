@@ -1,9 +1,11 @@
+import { generateKeyPairSync, sign } from "node:crypto";
+
 import { sso } from "@better-auth/sso";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { generateKeyPairSync, sign } from "node:crypto";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
 import { createSsoOidcFetch, type OidcTransport } from "../sso-oidc-fetch";
 
 const app = "https://langwatch.example.test";
@@ -27,9 +29,7 @@ beforeAll(() => {
     ],
   };
   const issuedAt = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(
-    JSON.stringify({ alg: "RS256", kid: "key" }),
-  ).toString("base64url");
+  const header = Buffer.from(JSON.stringify({ alg: "RS256", kid: "key" })).toString("base64url");
   const payload = Buffer.from(
     JSON.stringify({
       iss: issuer,
@@ -139,16 +139,13 @@ function ceremony(blocked: Endpoint | null, blockedOrigin = privateOrigin) {
       .map((value) => value.split(";")[0])
       .join("; ");
     return auth.handler(
-      new Request(
-        `${app}/api/auth/sso/callback/connection?code=code&state=${state}`,
-        { headers: { cookie } },
-      ),
+      new Request(`${app}/api/auth/sso/callback/connection?code=code&state=${state}`, {
+        headers: { cookie },
+      }),
     );
   };
   const bounce = () =>
-    auth.handler(
-      new Request(`${app}/api/auth/sso/callback/connection?code=unsolicited`),
-    );
+    auth.handler(new Request(`${app}/api/auth/sso/callback/connection?code=unsolicited`));
   return { start, finish, bounce, fetchImpl, database, resolveHost };
 }
 
@@ -171,14 +168,8 @@ describe("the SSO plugin's runtime egress boundary", () => {
         const callback = await flow.finish(started);
         expect(callback.headers.get("location")).toContain("error=");
       }
-      expect(flow.resolveHost).toHaveBeenCalledWith(
-        new URL(blockedOrigin).hostname,
-      );
-      expect(
-        flow.fetchImpl.mock.calls.some(([url]) =>
-          url.startsWith(blockedOrigin),
-        ),
-      ).toBe(false);
+      expect(flow.resolveHost).toHaveBeenCalledWith(new URL(blockedOrigin).hostname);
+      expect(flow.fetchImpl.mock.calls.some(([url]) => url.startsWith(blockedOrigin))).toBe(false);
       expect(flow.database.session).toHaveLength(0);
     },
   );
@@ -191,13 +182,11 @@ describe("the SSO plugin's runtime egress boundary", () => {
     expect(callback.headers.get("location")).toBe(`${app}/dashboard`);
     expect(flow.database.session).toHaveLength(1);
     expect(
-      flow.fetchImpl.mock.calls.filter(
-        ([url]) => new URL(url).pathname === "/discovery",
-      ),
+      flow.fetchImpl.mock.calls.filter(([url]) => new URL(url).pathname === "/discovery"),
     ).toHaveLength(2);
-    expect(
-      new Set(flow.fetchImpl.mock.calls.map(([url]) => new URL(url).pathname)),
-    ).toEqual(new Set(endpoints.map((endpoint) => `/${endpoint}`)));
+    expect(new Set(flow.fetchImpl.mock.calls.map(([url]) => new URL(url).pathname))).toEqual(
+      new Set(endpoints.map((endpoint) => `/${endpoint}`)),
+    );
   });
   it.each([true, false])(
     "applies guarded discovery to IdP-initiated sign-in (public: %s)",
@@ -205,9 +194,7 @@ describe("the SSO plugin's runtime egress boundary", () => {
       const flow = ceremony(isPublic ? null : "discovery");
       const response = await flow.bounce();
       if (isPublic) {
-        expect(response.headers.get("location")).toContain(
-          `${issuer}/authorize`,
-        );
+        expect(response.headers.get("location")).toContain(`${issuer}/authorize`);
         expect(flow.fetchImpl).toHaveBeenCalledTimes(1);
       } else {
         expect(response.headers.get("location")).toContain("error=");

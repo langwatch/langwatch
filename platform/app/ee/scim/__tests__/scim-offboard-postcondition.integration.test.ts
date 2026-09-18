@@ -33,6 +33,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { bumpAuthzEpoch } from "~/server/app-layer/authz/epoch";
 import {
@@ -46,6 +47,7 @@ import { prisma } from "~/server/db";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { KSUID_RESOURCES } from "~/utils/constants";
+
 import { ScimDeprovisionService } from "../scim-deprovision.service";
 
 const namespace = `scimoff-${nanoid(8)}`;
@@ -61,14 +63,11 @@ const syncLifecycle = {
 } as never;
 
 function grantsService() {
-  return new GrantsService(
-    new LedgerAuthzGrantsRepository(prisma, grantsLedgerWriter()),
-    {
-      newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      bumpEpoch: bumpAuthzEpoch,
-      collectorFor: (reader) => new AuthzCollectorService(reader),
-    },
-  );
+  return new GrantsService(new LedgerAuthzGrantsRepository(prisma, grantsLedgerWriter()), {
+    newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    bumpEpoch: bumpAuthzEpoch,
+    collectorFor: (reader) => new AuthzCollectorService(reader),
+  });
 }
 
 async function seedMemberWithAccessEverywhere() {
@@ -251,9 +250,7 @@ describe("a directory deprovision, against real storage", () => {
         },
       });
       expect(membership).not.toBeNull();
-      expect(
-        await prisma.groupMembership.count({ where: { userId: USER } }),
-      ).toBe(1);
+      expect(await prisma.groupMembership.count({ where: { userId: USER } })).toBe(1);
       expect(before.isOrgMember).toBe(true);
     });
   });

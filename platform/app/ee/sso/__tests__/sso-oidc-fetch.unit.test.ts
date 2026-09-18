@@ -1,5 +1,6 @@
 import type { Agent } from "undici";
 import { describe, expect, it, vi } from "vitest";
+
 import { createSsoOidcFetch, type OidcTransport } from "../sso-oidc-fetch";
 
 const issuer = "https://registered-idp.example.test";
@@ -14,21 +15,18 @@ describe("runtime OIDC egress", () => {
     ["::ffff:127.0.0.1"],
     ["93.184.216.34", "10.0.0.1"],
     [],
-  ])(
-    "refuses nonpublic or empty DNS answers %j before transport",
-    async (...addresses) => {
-      const fetchImpl = vi.fn(async () => Response.json({}));
-      const fetch = createSsoOidcFetch({
-        dialableInternalOrigins: [],
-        resolveHost: async () => addresses,
-        fetchImpl,
-      });
-      await expect(fetch(`${issuer}/token`)).rejects.toThrow(
-        "oidc endpoint refused by egress policy",
-      );
-      expect(fetchImpl).not.toHaveBeenCalled();
-    },
-  );
+  ])("refuses nonpublic or empty DNS answers %j before transport", async (...addresses) => {
+    const fetchImpl = vi.fn(async () => Response.json({}));
+    const fetch = createSsoOidcFetch({
+      dialableInternalOrigins: [],
+      resolveHost: async () => addresses,
+      fetchImpl,
+    });
+    await expect(fetch(`${issuer}/token`)).rejects.toThrow(
+      "oidc endpoint refused by egress policy",
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 
   it("fails closed on DNS failure", async () => {
     const fetchImpl = vi.fn(async () => Response.json({}));
@@ -39,9 +37,7 @@ describe("runtime OIDC egress", () => {
       },
       fetchImpl,
     });
-    await expect(fetch(`${issuer}/jwks`)).rejects.toThrow(
-      "oidc endpoint refused by egress policy",
-    );
+    await expect(fetch(`${issuer}/jwks`)).rejects.toThrow("oidc endpoint refused by egress policy");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -75,9 +71,9 @@ describe("runtime OIDC egress", () => {
     await expect(fetch(`${issuer}/token`)).resolves.toMatchObject({
       status: 200,
     });
-    await expect(
-      fetch("https://another-idp.example.test/token"),
-    ).rejects.toThrow("oidc endpoint refused by egress policy");
+    await expect(fetch("https://another-idp.example.test/token")).rejects.toThrow(
+      "oidc endpoint refused by egress policy",
+    );
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 

@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import * as samlify from "samlify";
 import { generate } from "selfsigned";
 import { z } from "zod";
+
 import { createSessionGateHooks } from "~/server/better-auth/__tests__/support/session-gate";
 import { databaseHooks as configureDatabaseHooks } from "~/server/better-auth/config/database-hooks";
 import { models } from "~/server/better-auth/config/models";
@@ -12,6 +13,7 @@ import { CredentialSessionGuard } from "~/server/better-auth/credential-session-
 import type { BetterAuthDatabaseHooks } from "~/server/better-auth/hooks";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+
 import {
   identityStorageAdapter,
   sessionCallbackEvidence,
@@ -58,9 +60,7 @@ export async function createSigningIdentity() {
     privateKey: pem.private,
     signingCert: pem.cert,
     wantAuthnRequestsSigned: false,
-    singleSignOnService: [
-      { Binding: REDIRECT, Location: "https://idp.saml.test/sso" },
-    ],
+    singleSignOnService: [{ Binding: REDIRECT, Location: "https://idp.saml.test/sso" }],
   });
 }
 
@@ -163,10 +163,7 @@ export async function createSamlFixture(
   });
   const userIds: string[] = [];
 
-  async function createLocalUser(
-    emailVerified = true,
-    email = `member@${domain}`,
-  ) {
+  async function createLocalUser(emailVerified = true, email = `member@${domain}`) {
     const user = await prisma.user.create({
       data: {
         email,
@@ -212,23 +209,16 @@ export async function createSamlFixture(
         }),
       }),
     );
-    const url = new URL(
-      z.object({ url: z.string() }).parse(await started.json()).url,
-    );
+    const url = new URL(z.object({ url: z.string() }).parse(await started.json()).url);
     const request = await idp.parseLoginRequest(sp, "redirect", {
       query: Object.fromEntries(url.searchParams),
     });
-    const signed = await idp.createLoginResponse(
-      sp,
-      { extract: request.extract },
-      "post",
-      { email },
-    );
+    const signed = await idp.createLoginResponse(sp, { extract: request.extract }, "post", {
+      email,
+    });
     const samlResponse = tamper
       ? Buffer.from(
-          Buffer.from(signed.context, "base64")
-            .toString()
-            .replace(email, `other@${domain}`),
+          Buffer.from(signed.context, "base64").toString().replace(email, `other@${domain}`),
         ).toString("base64")
       : signed.context;
     const callback = await sessionCallbackEvidence().runWithScope(() =>
@@ -253,8 +243,7 @@ export async function createSamlFixture(
       .getSetCookie()
       .map((value) => value.split(";")[0])
       .join("; ");
-    const readSession = () =>
-      auth.api.getSession({ headers: new Headers({ cookie }) });
+    const readSession = () => auth.api.getSession({ headers: new Headers({ cookie }) });
     const session = await readSession();
     if (session?.user.id && !userIds.includes(session.user.id)) {
       userIds.push(session.user.id);

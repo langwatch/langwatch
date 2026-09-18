@@ -131,20 +131,17 @@ describe("given a request that is not about single sign-on", () => {
 it.each(["callbackURL", "redirectTo", "errorCallbackURL"])(
   "does not widen trust for %s without a provider",
   async (field) => {
-    const request = new Request(
-      "https://app.langwatch.test/api/auth/sign-in/sso",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          origin: "https://globex.okta.com",
-        },
-        body: JSON.stringify({
-          email: "sam@acme.com",
-          [field]: "https://globex.okta.com/return",
-        }),
+    const request = new Request("https://app.langwatch.test/api/auth/sign-in/sso", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://globex.okta.com",
       },
-    );
+      body: JSON.stringify({
+        email: "sam@acme.com",
+        [field]: "https://globex.okta.com/return",
+      }),
+    });
     expect(await allowlist.issuersForRequest(request)).toEqual([]);
     expect(request.bodyUsed).toBe(false);
   },
@@ -156,8 +153,6 @@ it("narrows a domain-first request to its resolved issuer", async () => {
     email: "sam@acme.com",
     callbackURL: "https://globex.okta.com/return",
   });
-  expect(await allowlist.issuersForRequest(request)).toEqual([
-    "https://acme.okta.com",
-  ]);
+  expect(await allowlist.issuersForRequest(request)).toEqual(["https://acme.okta.com"]);
   expect(findIssuerForDomain).toHaveBeenCalledWith({ domain: "acme.com" });
 });

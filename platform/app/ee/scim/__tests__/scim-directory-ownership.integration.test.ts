@@ -51,12 +51,7 @@ function projectionCommands(): AuthzGrantsCommandSenders {
     attachGrant: {
       send: async ({ organizationId, grant }) => {
         const role = roleFor(grant.roleKey);
-        if (
-          !role ||
-          grant.scope.type === "RESOURCE" ||
-          grant.scope.type === "PLATFORM"
-        )
-          return;
+        if (!role || grant.scope.type === "RESOURCE" || grant.scope.type === "PLATFORM") return;
         const principal = grant.principal;
         if (principal.type !== "user") return;
         await prisma.roleBinding.create({
@@ -230,12 +225,10 @@ describe("SCIM ownership without an external identifier", () => {
       request: scimCreateUserRequestSchema.parse(resource),
     });
 
-    expect(
-      await prisma.scimDirectoryUser.findMany({ where: { connectionId } }),
-    ).toEqual([{ organizationId, connectionId, userId: resource.id }]);
-    expect(await prisma.scimExternalId.count({ where: { connectionId } })).toBe(
-      0,
-    );
+    expect(await prisma.scimDirectoryUser.findMany({ where: { connectionId } })).toEqual([
+      { organizationId, connectionId, userId: resource.id },
+    ]);
+    expect(await prisma.scimExternalId.count({ where: { connectionId } })).toBe(0);
     expect(await reconciliation.countManagedPeople({ connectionIds })).toEqual(
       new Map([[connectionId, 1]]),
     );
@@ -268,9 +261,7 @@ describe("SCIM ownership without an external identifier", () => {
         patchRequest: activePatch(false),
       }),
     ).rejects.toMatchObject({ code: "scim_connection_not_found" });
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: resource.id } }),
-    ).toEqual(before);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: resource.id } })).toEqual(before);
   });
 
   /** @scenario "A directory can reactivate its person without an externalId" */
@@ -282,9 +273,7 @@ describe("SCIM ownership without an external identifier", () => {
       connectionId,
       patchRequest: activePatch(false),
     });
-    expect(
-      await prisma.scimDirectoryUser.count({ where: { connectionId } }),
-    ).toBe(1);
+    expect(await prisma.scimDirectoryUser.count({ where: { connectionId } })).toBe(1);
     // Model the membership-free state after a completed deprovision.
     await prisma.organizationUser.deleteMany({
       where: { userId: resource.id, organizationId },
@@ -368,9 +357,9 @@ describe("SCIM ownership without an external identifier", () => {
       userId: resource.id,
       externalId: "second-external",
     });
-    expect(
-      await directory.getUserId({ connectionId, externalId: "first-external" }),
-    ).toBe(resource.id);
+    expect(await directory.getUserId({ connectionId, externalId: "first-external" })).toBe(
+      resource.id,
+    );
     expect(await reconciliation.countManagedPeople({ connectionIds })).toEqual(
       new Map([[connectionId, 1]]),
     );
@@ -380,9 +369,7 @@ describe("SCIM ownership without an external identifier", () => {
     });
     await prisma.user.delete({ where: { id: resource.id } });
 
-    expect(await reconciliation.countManagedPeople({ connectionIds })).toEqual(
-      new Map(),
-    );
+    expect(await reconciliation.countManagedPeople({ connectionIds })).toEqual(new Map());
     expect(
       await provenance.directoryProvisioned({
         organizationId,
@@ -410,19 +397,11 @@ describe("SCIM inactive provisioning", () => {
       id: resource.id,
       active: false,
     });
-    expect(
-      await prisma.user.count({ where: { email: request.userName } }),
-    ).toBe(1);
+    expect(await prisma.user.count({ where: { email: request.userName } })).toBe(1);
     expect(await accessCounts(resource.id)).toEqual([0, 0, 0]);
-    expect(await prisma.department.count({ where: { organizationId } })).toBe(
-      0,
-    );
-    expect(await directory.manages({ connectionId, userId: resource.id })).toBe(
-      true,
-    );
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: resource.id } }),
-    ).toEqual(first);
+    expect(await prisma.department.count({ where: { organizationId } })).toBe(0);
+    expect(await directory.manages({ connectionId, userId: resource.id })).toBe(true);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: resource.id } })).toEqual(first);
   });
 
   /** @scenario "An inactive directory resource can be deleted without a membership" */
@@ -437,9 +416,9 @@ describe("SCIM inactive provisioning", () => {
     });
     if (isScimError(resource)) throw new Error(resource.detail);
 
-    await expect(
-      service.getUser({ organizationId, id: resource.id }),
-    ).resolves.toMatchObject({ active: false });
+    await expect(service.getUser({ organizationId, id: resource.id })).resolves.toMatchObject({
+      active: false,
+    });
     await expect(
       service.listUsers({
         organizationId,
@@ -457,9 +436,7 @@ describe("SCIM inactive provisioning", () => {
         connectionId,
       }),
     ).toBeNull();
-    expect(await directory.manages({ connectionId, userId: resource.id })).toBe(
-      false,
-    );
+    expect(await directory.manages({ connectionId, userId: resource.id })).toBe(false);
     expect(
       await directory.getUserId({
         connectionId,
@@ -485,8 +462,7 @@ describe("SCIM inactive provisioning", () => {
 
   /** @scenario "Deleting a former directory resource preserves access in other organizations" */
   it("forgets only directory ownership after the person has moved elsewhere", async () => {
-    const { resource, user, membership, session } =
-      await formerMemberWithSession();
+    const { resource, user, membership, session } = await formerMemberWithSession();
     await directory.remember({
       organizationId: otherOrganizationId,
       connectionId: otherConnectionId,
@@ -501,9 +477,7 @@ describe("SCIM inactive provisioning", () => {
         connectionId,
       }),
     ).toBeNull();
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: resource.id } }),
-    ).toEqual(user);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: resource.id } })).toEqual(user);
     expect(
       await prisma.organizationUser.findUniqueOrThrow({
         where: {
@@ -514,12 +488,8 @@ describe("SCIM inactive provisioning", () => {
         },
       }),
     ).toEqual(membership);
-    expect(
-      await prisma.session.findUniqueOrThrow({ where: { id: session.id } }),
-    ).toEqual(session);
-    expect(await directory.manages({ connectionId, userId: resource.id })).toBe(
-      false,
-    );
+    expect(await prisma.session.findUniqueOrThrow({ where: { id: session.id } })).toEqual(session);
+    expect(await directory.manages({ connectionId, userId: resource.id })).toBe(false);
     expect(
       await directory.getUserId({
         connectionId: otherConnectionId,
@@ -558,15 +528,12 @@ describe("SCIM inactive provisioning", () => {
       active: false,
     });
     expect(await accessCounts(resource.id)).toEqual([0, 0, 0]);
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: resource.id } }),
-    ).toEqual(first);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: resource.id } })).toEqual(first);
   });
 
   /** @scenario "Retained directory ownership cannot deactivate an account that has left the organization" */
   it("preserves an active former member's other organization and session", async () => {
-    const { resource, user, membership, session } =
-      await formerMemberWithSession();
+    const { resource, user, membership, session } = await formerMemberWithSession();
 
     expect(
       await service.createUser({
@@ -575,9 +542,7 @@ describe("SCIM inactive provisioning", () => {
         connectionId,
       }),
     ).toMatchObject({ id: resource.id, active: false });
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: resource.id } }),
-    ).toEqual(user);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: resource.id } })).toEqual(user);
     expect(
       await prisma.organizationUser.findUniqueOrThrow({
         where: {
@@ -588,13 +553,9 @@ describe("SCIM inactive provisioning", () => {
         },
       }),
     ).toEqual(membership);
-    expect(
-      await prisma.session.findUniqueOrThrow({ where: { id: session.id } }),
-    ).toEqual(session);
+    expect(await prisma.session.findUniqueOrThrow({ where: { id: session.id } })).toEqual(session);
     expect(await accessCounts(resource.id)).toEqual([0, 0, 0]);
-    expect(await directory.manages({ connectionId, userId: resource.id })).toBe(
-      true,
-    );
+    expect(await directory.manages({ connectionId, userId: resource.id })).toBe(true);
   });
 
   /** @scenario "Inactive provisioning cannot deactivate an unowned account in another organization" */
@@ -617,9 +578,7 @@ describe("SCIM inactive provisioning", () => {
         connectionId,
       }),
     ).toMatchObject({ id: user.id, active: false });
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
-    ).toEqual(user);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).toEqual(user);
     expect(
       await prisma.organizationUser.findUniqueOrThrow({
         where: {
@@ -631,8 +590,6 @@ describe("SCIM inactive provisioning", () => {
       }),
     ).toEqual(membership);
     expect(await accessCounts(user.id)).toEqual([0, 0, 0]);
-    expect(await directory.manages({ connectionId, userId: user.id })).toBe(
-      true,
-    );
+    expect(await directory.manages({ connectionId, userId: user.id })).toBe(true);
   });
 });

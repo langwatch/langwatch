@@ -1,5 +1,7 @@
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
+
 import type { PrismaClient, User } from "~/generated/prisma/client";
+
 import { sessionRevocation } from "../app-layer/identity/runtime";
 import type { SessionRevocationService } from "../app-layer/identity/session-revocation.service";
 
@@ -72,8 +74,7 @@ export class UserService {
     // "alice@acme.com" → "Alice@Acme.com" would (a) trigger an unneeded
     // session revocation and (b) desync the stored email from what
     // BetterAuth's signin lookup would find.
-    const normalizedEmail =
-      email !== undefined ? email.trim().toLowerCase() : undefined;
+    const normalizedEmail = email !== undefined ? email.trim().toLowerCase() : undefined;
 
     // Reject blank email after normalization. Without this, a whitespace-only
     // input like "   " becomes "" and persists an empty string into User.email
@@ -107,11 +108,7 @@ export class UserService {
     return updated;
   }
 
-  async getAccountInfo({
-    id,
-  }: {
-    id: string;
-  }): Promise<{ createdAt: Date } | null> {
+  async getAccountInfo({ id }: { id: string }): Promise<{ createdAt: Date } | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: { createdAt: true },
@@ -119,11 +116,7 @@ export class UserService {
     return user ? { createdAt: user.createdAt } : null;
   }
 
-  async getSsoStatus({
-    id,
-  }: {
-    id: string;
-  }): Promise<{ pendingSsoSetup: boolean }> {
+  async getSsoStatus({ id }: { id: string }): Promise<{ pendingSsoSetup: boolean }> {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: { pendingSsoSetup: true },

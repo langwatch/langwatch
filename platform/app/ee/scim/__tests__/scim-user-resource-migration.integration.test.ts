@@ -1,8 +1,10 @@
+import { readFile } from "node:fs/promises";
+
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { generate } from "@langwatch/ksuid";
-import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { expect, it } from "vitest";
+
 import { env } from "~/env.mjs";
 
 /** @scenario "Existing directory ownership backfills tenant resources without reactivating shared accounts" */
@@ -68,9 +70,7 @@ it("backfills distinct tenant resources and preserves historical account disable
       'SELECT "email", "deactivatedAt" IS NOT NULL AS disabled FROM "User" WHERE "id" = $1',
       ["disabled"],
     );
-    expect(sharedAccount.rows).toEqual([
-      { email: "Disabled@Example.test", disabled: true },
-    ]);
+    expect(sharedAccount.rows).toEqual([{ email: "Disabled@Example.test", disabled: true }]);
   } finally {
     await client.query("ROLLBACK");
     client.release();

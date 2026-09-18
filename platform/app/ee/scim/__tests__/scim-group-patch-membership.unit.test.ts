@@ -58,9 +58,7 @@ function parsePatch(operations: unknown[]) {
     Operations: operations,
   });
   if (!parsed.success) {
-    throw new Error(
-      `SCIM PATCH rejected at the schema: ${parsed.error.message}`,
-    );
+    throw new Error(`SCIM PATCH rejected at the schema: ${parsed.error.message}`);
   }
   return parsed.data;
 }
@@ -86,19 +84,13 @@ function createMockPrisma() {
     },
     scimDirectoryUser: {
       findMany: vi.fn(async ({ where }: { where: { userId: string } }) =>
-        where.userId === "foreign-user"
-          ? [{ connectionId: "foreign-directory" }]
-          : [],
+        where.userId === "foreign-user" ? [{ connectionId: "foreign-directory" }] : [],
       ),
     },
     organizationUser: {
       findMany: vi
         .fn()
-        .mockResolvedValue([
-          { userId: "user-1" },
-          { userId: "user-2" },
-          { userId: "user-3" },
-        ]),
+        .mockResolvedValue([{ userId: "user-1" }, { userId: "user-2" }, { userId: "user-3" }]),
     },
     group: {
       create: vi.fn().mockResolvedValue(GROUP),
@@ -147,9 +139,9 @@ describe("SCIM group PATCH membership", () => {
         "updateGroup",
         "deleteGroup",
       ] as const) {
-        await expect(
-          Reflect.apply(service[method], service, [{ organizationId }]),
-        ).rejects.toThrow(ZodError);
+        await expect(Reflect.apply(service[method], service, [{ organizationId }])).rejects.toThrow(
+          ZodError,
+        );
       }
       expect(prisma.group.findFirst).not.toHaveBeenCalled();
       expect(prisma.group.create).not.toHaveBeenCalled();
@@ -166,18 +158,14 @@ describe("SCIM group PATCH membership", () => {
     // touch membership.
     describe("when it replaces an unrelated attribute", () => {
       it("leaves the group's membership untouched", async () => {
-        await patchGroup([
-          { op: "replace", path: "externalId", value: "abc-123" },
-        ]);
+        await patchGroup([{ op: "replace", path: "externalId", value: "abc-123" }]);
 
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
         expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
       });
 
       it("says in the logs that it understood nothing", async () => {
-        await patchGroup([
-          { op: "replace", path: "externalId", value: "abc-123" },
-        ]);
+        await patchGroup([{ op: "replace", path: "externalId", value: "abc-123" }]);
 
         expect(warn).toHaveBeenCalledWith(
           expect.objectContaining({ groupId: "group-1" }),
@@ -188,9 +176,7 @@ describe("SCIM group PATCH membership", () => {
 
     describe("when it renames the group with no path", () => {
       it("renames it and leaves the membership untouched", async () => {
-        await patchGroup([
-          { op: "replace", value: { displayName: "Platform" } },
-        ]);
+        await patchGroup([{ op: "replace", value: { displayName: "Platform" } }]);
 
         expect(prisma.group.update).toHaveBeenCalledWith({
           where: { id: "group-1" },
@@ -202,9 +188,7 @@ describe("SCIM group PATCH membership", () => {
       // A rename that mentions no members is complete and supported. Warning on
       // it would fire on every ordinary Entra rename, which is most of them.
       it("does not warn, because it understood the operation", async () => {
-        await patchGroup([
-          { op: "replace", value: { displayName: "Platform" } },
-        ]);
+        await patchGroup([{ op: "replace", value: { displayName: "Platform" } }]);
 
         expect(warn).not.toHaveBeenCalled();
       });
@@ -212,9 +196,7 @@ describe("SCIM group PATCH membership", () => {
 
     describe("when it renames the group with a displayName path", () => {
       it("renames it and leaves the membership untouched", async () => {
-        await patchGroup([
-          { op: "replace", path: "displayName", value: "Platform" },
-        ]);
+        await patchGroup([{ op: "replace", path: "displayName", value: "Platform" }]);
 
         expect(prisma.group.update).toHaveBeenCalledWith({
           where: { id: "group-1" },
@@ -294,9 +276,7 @@ describe("SCIM group PATCH membership", () => {
     // would be removed.
     describe("when a member list holds entries with no usable id", () => {
       it("leaves the group's membership untouched", async () => {
-        await patchGroup([
-          { op: "replace", path: "members", value: [{ display: "Alice" }] },
-        ]);
+        await patchGroup([{ op: "replace", path: "members", value: [{ display: "Alice" }] }]);
 
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
       });
@@ -312,9 +292,7 @@ describe("SCIM group PATCH membership", () => {
       // types and lengths, and still names nobody — leaving every current
       // member outside the requested set, which is to say removed.
       it("leaves it untouched for a blank id", async () => {
-        await patchGroup([
-          { op: "replace", path: "members", value: [{ value: "  " }] },
-        ]);
+        await patchGroup([{ op: "replace", path: "members", value: [{ value: "  " }] }]);
 
         expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
         expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
@@ -440,59 +418,55 @@ describe("SCIM group PATCH membership", () => {
 
 describe("connection-owned group members", () => {
   /** @scenario "Group membership writes respect directory ownership" */
-  it.each([
-    "post",
-    "put",
-    "patch-add",
-    "patch-remove",
-    "patch-replace",
-    "delete",
-  ])("refuses foreign membership through %s before writing", async (verb) => {
-    const prisma = createMockPrisma();
-    const service = ScimGroupService.create({ prisma });
-    const target = {
-      organizationId: "org-1",
-      connectionId: "own-directory",
-      scimResourceId: GROUP.id,
-    };
-    const request = {
-      schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-      displayName: "Engineering",
-      members: [{ value: "foreign-user" }],
-    };
-    let operation: Promise<unknown>;
-    if (verb === "post") {
-      prisma.group.findFirst.mockResolvedValue(null);
-      operation = service.createGroup({ ...target, request });
-    } else if (verb === "put") {
-      operation = service.replaceGroup({ ...target, request });
-    } else if (verb === "delete") {
-      prisma.groupMembership.findMany.mockResolvedValue([
-        {
-          userId: "foreign-user",
-          user: { id: "foreign-user", email: null, name: null },
-        },
-      ]);
-      operation = service.deleteGroup(target);
-    } else {
-      let op = "add";
-      if (verb === "patch-remove") op = "remove";
-      if (verb === "patch-replace") op = "replace";
-      operation = service.updateGroup({
-        ...target,
-        patchRequest: parsePatch([
-          { op: "add", path: "members", value: [{ value: "user-3" }] },
-          { op, path: "members", value: [{ value: "foreign-user" }] },
-        ]),
+  it.each(["post", "put", "patch-add", "patch-remove", "patch-replace", "delete"])(
+    "refuses foreign membership through %s before writing",
+    async (verb) => {
+      const prisma = createMockPrisma();
+      const service = ScimGroupService.create({ prisma });
+      const target = {
+        organizationId: "org-1",
+        connectionId: "own-directory",
+        scimResourceId: GROUP.id,
+      };
+      const request = {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+        displayName: "Engineering",
+        members: [{ value: "foreign-user" }],
+      };
+      let operation: Promise<unknown>;
+      if (verb === "post") {
+        prisma.group.findFirst.mockResolvedValue(null);
+        operation = service.createGroup({ ...target, request });
+      } else if (verb === "put") {
+        operation = service.replaceGroup({ ...target, request });
+      } else if (verb === "delete") {
+        prisma.groupMembership.findMany.mockResolvedValue([
+          {
+            userId: "foreign-user",
+            user: { id: "foreign-user", email: null, name: null },
+          },
+        ]);
+        operation = service.deleteGroup(target);
+      } else {
+        let op = "add";
+        if (verb === "patch-remove") op = "remove";
+        if (verb === "patch-replace") op = "replace";
+        operation = service.updateGroup({
+          ...target,
+          patchRequest: parsePatch([
+            { op: "add", path: "members", value: [{ value: "user-3" }] },
+            { op, path: "members", value: [{ value: "foreign-user" }] },
+          ]),
+        });
+      }
+      await expect(operation).rejects.toMatchObject({
+        code: "scim_write_outside_connection",
       });
-    }
-    await expect(operation).rejects.toMatchObject({
-      code: "scim_write_outside_connection",
-    });
-    expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
-    expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
-    expect(prisma.group.create).not.toHaveBeenCalled();
-    expect(prisma.group.update).not.toHaveBeenCalled();
-    expect(prisma.group.delete).not.toHaveBeenCalled();
-  });
+      expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
+      expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.group.create).not.toHaveBeenCalled();
+      expect(prisma.group.update).not.toHaveBeenCalled();
+      expect(prisma.group.delete).not.toHaveBeenCalled();
+    },
+  );
 });

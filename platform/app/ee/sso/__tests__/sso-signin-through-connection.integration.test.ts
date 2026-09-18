@@ -31,21 +31,18 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createSsoOidcFetch } from "../sso-oidc-fetch";
-
 import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
 import {
   identityStorageTransactions,
   postgresTransactionOver,
 } from "~/server/app-layer/identity/identity-storage-transaction.adapter";
-import {
-  identityStorageAdapter,
-  ssoProvisionedUsers,
-} from "~/server/app-layer/identity/runtime";
+import { identityStorageAdapter, ssoProvisionedUsers } from "~/server/app-layer/identity/runtime";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
 import type { PasskeySignUpRegistration } from "~/server/better-auth/passkey-signup";
 import { prisma } from "~/server/db";
+
+import { createSsoOidcFetch } from "../sso-oidc-fetch";
 
 const BASE_URL = "http://localhost:3000";
 const SUITE = nanoid(8).toLowerCase();
@@ -93,9 +90,7 @@ async function mintIdToken(claims: Record<string, unknown>): Promise<{
     ["sign", "verify"],
   );
   const exported = await crypto.subtle.exportKey("jwk", publicKey);
-  const header = base64url(
-    JSON.stringify({ alg: "RS256", kid: "test", typ: "JWT" }),
-  );
+  const header = base64url(JSON.stringify({ alg: "RS256", kid: "test", typ: "JWT" }));
   const payload = base64url(JSON.stringify(claims));
   const signature = new Uint8Array(
     await crypto.subtle.sign(
@@ -254,10 +249,7 @@ afterAll(async () => {
   await prisma.ssoProvider.deleteMany({ where: { providerId: PROVIDER_ID } });
   const users = await prisma.user.findMany({
     where: {
-      OR: [
-        { email: { in: [EMAIL, MIGRATING_EMAIL] } },
-        { id: { in: createdUserIds } },
-      ],
+      OR: [{ email: { in: [EMAIL, MIGRATING_EMAIL] } }, { id: { in: createdUserIds } }],
     },
     select: { id: true },
   });
@@ -293,20 +285,15 @@ async function signInThroughConnection() {
       }),
     }),
   );
-  const authorize = new URL(
-    z.object({ url: z.string() }).parse(await started.json()).url,
-  );
+  const authorize = new URL(z.object({ url: z.string() }).parse(await started.json()).url);
   const state = authorize.searchParams.get("state");
 
   const callback = await auth.handler(
-    new Request(
-      `${BASE_URL}/api/auth/sso/callback/${PROVIDER_ID}?code=test-code&state=${state}`,
-      {
-        method: "GET",
-        redirect: "manual",
-        headers: { cookie: started.headers.get("set-cookie") ?? "" },
-      },
-    ),
+    new Request(`${BASE_URL}/api/auth/sso/callback/${PROVIDER_ID}?code=test-code&state=${state}`, {
+      method: "GET",
+      redirect: "manual",
+      headers: { cookie: started.headers.get("set-cookie") ?? "" },
+    }),
   );
   const location = callback.headers.get("location") ?? "";
 
@@ -324,23 +311,18 @@ describe("given a verified single sign-on connection", () => {
   describe("when somebody signs in through it", () => {
     /** @scenario "A sign-in through a connection completes" */
     it("signs them in, and does not refuse the adapter its transactions", async () => {
-      const { startedStatus, state, location, cookie, session } =
-        await signInThroughConnection();
+      const { startedStatus, state, location, cookie, session } = await signInThroughConnection();
 
       expect(startedStatus).toBe(200);
       expect(state).not.toBeNull();
-      expect(location).not.toContain(
-        "SSO_USER_RESOLUTION_REQUIRES_NATIVE_TRANSACTIONS",
-      );
+      expect(location).not.toContain("SSO_USER_RESOLUTION_REQUIRES_NATIVE_TRANSACTIONS");
       expect(location).not.toContain("error");
       expect(location).toBe(`${BASE_URL}/dashboard`);
       expect(cookie).not.toBe("");
 
       // Production's own `resolveUser` ran — the sign-in went through the
       // pre-link check rather than around it.
-      expect(decisionsAsked).toEqual([
-        { providerId: PROVIDER_ID, email: EMAIL },
-      ]);
+      expect(decisionsAsked).toEqual([{ providerId: PROVIDER_ID, email: EMAIL }]);
 
       expect(session?.user.email).toBe(EMAIL);
 
@@ -393,9 +375,7 @@ describe("given a verified single sign-on connection", () => {
         providerId: PROVIDER_ID,
         email: MIGRATING_EMAIL,
       });
-      expect(
-        await prisma.user.count({ where: { email: MIGRATING_EMAIL } }),
-      ).toBe(1);
+      expect(await prisma.user.count({ where: { email: MIGRATING_EMAIL } })).toBe(1);
       expect(
         await prisma.account.findMany({
           where: { userId: existing.id },
@@ -450,11 +430,7 @@ async function provisionedUser(label: string) {
   return { ...user, email: z.string().parse(user.email) };
 }
 
-async function assertProviderUser(
-  email: string,
-  subject: string,
-  emailVerified = true,
-) {
+async function assertProviderUser(email: string, subject: string, emailVerified = true) {
   const issuedAt = Math.floor(Date.now() / 1000);
   const minted = await mintIdToken({
     iss: IDP,
@@ -504,12 +480,8 @@ describe("given a member provisioned by the same SSO connection", () => {
 
       expect(result.location).toContain("error=");
       expect(result.session).toBeNull();
-      expect(await prisma.session.count({ where: { userId: user.id } })).toBe(
-        sessionsBefore,
-      );
-      expect(
-        await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
-      ).toMatchObject({
+      expect(await prisma.session.count({ where: { userId: user.id } })).toBe(sessionsBefore);
+      expect(await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).toMatchObject({
         email: user.email,
         deactivatedAt: null,
       });
@@ -540,9 +512,7 @@ describe("given a member provisioned by the same SSO connection", () => {
       provider: PROVIDER_ID,
       providerAccountId: subject,
     });
-    expect(
-      await prisma.user.findUnique({ where: { id: user.id } }),
-    ).toMatchObject({
+    expect(await prisma.user.findUnique({ where: { id: user.id } })).toMatchObject({
       email: user.email,
       emailVerified: false,
       name: "Provisioned profile",
@@ -551,9 +521,7 @@ describe("given a member provisioned by the same SSO connection", () => {
     const repeated = await signInThroughConnection();
     expect(repeated.location).toBe(`${BASE_URL}/dashboard`);
     expect(repeated.session?.user.id).toBe(user.id);
-    expect(
-      await prisma.user.findUnique({ where: { id: user.id } }),
-    ).toMatchObject({
+    expect(await prisma.user.findUnique({ where: { id: user.id } })).toMatchObject({
       email: user.email,
       emailVerified: false,
       name: "Provisioned profile",
@@ -619,10 +587,7 @@ describe("given a member provisioned by the same SSO connection", () => {
         data: { deactivatedAt: new Date() },
       });
     }
-    if (
-      failure === "verified-email" ||
-      failure === "attached-with-verification"
-    ) {
+    if (failure === "verified-email" || failure === "attached-with-verification") {
       await prisma.identifier.update({
         where: { id: `pending-email-${user.id}` },
         data: {
@@ -692,10 +657,7 @@ describe("given a member provisioned by the same SSO connection", () => {
       });
     }
     if (failure === "identifier-conflict" || failure === "own-identifier") {
-      const owner =
-        failure === "own-identifier"
-          ? user
-          : await provisionedUser("identifier-owner");
+      const owner = failure === "own-identifier" ? user : await provisionedUser("identifier-owner");
       await prisma.identifier.create({
         data: {
           id: `${failure}-${SUITE}`,
@@ -710,34 +672,22 @@ describe("given a member provisioned by the same SSO connection", () => {
         },
       });
     }
-    await assertProviderUser(
-      user.email,
-      subject,
-      failure !== "unverified-assertion",
-    );
+    await assertProviderUser(user.email, subject, failure !== "unverified-assertion");
     assertionAllowed = failure !== "refused-domain";
     try {
       const result = await signInThroughConnection();
       expect(result.session).toBeNull();
-      const error = new URL(result.location, BASE_URL).searchParams.get(
-        "error",
-      );
+      const error = new URL(result.location, BASE_URL).searchParams.get("error");
       expect(normalizeErrorCode(error)).toBe(
-        failure === "refused-domain"
-          ? "sso_domain_not_verified"
-          : "OAuthAccountNotLinked",
+        failure === "refused-domain" ? "sso_domain_not_verified" : "OAuthAccountNotLinked",
       );
       expect(
         await prisma.account.count({
           where: { userId: user.id, provider: PROVIDER_ID },
         }),
       ).toBe(0);
-      expect(await prisma.session.count({ where: { userId: user.id } })).toBe(
-        0,
-      );
-      expect(
-        await prisma.user.findUnique({ where: { id: user.id } }),
-      ).toMatchObject({
+      expect(await prisma.session.count({ where: { userId: user.id } })).toBe(0);
+      expect(await prisma.user.findUnique({ where: { id: user.id } })).toMatchObject({
         emailVerified: false,
       });
     } finally {
@@ -762,8 +712,7 @@ describe("given a member provisioned by the same SSO connection", () => {
         providerReference: {
           providerId: PROVIDER_ID,
           source: { type: "persisted", recordId: PROVIDER_ID },
-          authenticationConfigurationFingerprint:
-            "accepted-signed-configuration",
+          authenticationConfigurationFingerprint: "accepted-signed-configuration",
         },
       }),
     );

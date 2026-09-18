@@ -1,3 +1,9 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { PrismaClient, User } from "~/generated/prisma/client";
+import { CannotRemoveLastAdminError } from "~/server/app-layer/organizations/errors";
+
+import { ScimService } from "../scim.service";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * A directory may not deactivate the last administrator who can still sign in.
@@ -17,12 +23,6 @@
  * the same act `setMemberDisabled` already refuses by hand.
  */
 import { resourceStore } from "./scim-user-resource.fixture";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { PrismaClient, User } from "~/generated/prisma/client";
-import { CannotRemoveLastAdminError } from "~/server/app-layer/organizations/errors";
-
-import { ScimService } from "../scim.service";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
@@ -87,22 +87,15 @@ function createMockPrisma() {
     },
     roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
     ssoConnection: {
-      findFirst: vi.fn(
-        async ({ where }: { where: { id: string; organizationId: string } }) =>
-          where.id === "conn-okta" && where.organizationId === ORGANIZATION
-            ? { replacesConnectionId: null, migrationPhase: null }
-            : null,
+      findFirst: vi.fn(async ({ where }: { where: { id: string; organizationId: string } }) =>
+        where.id === "conn-okta" && where.organizationId === ORGANIZATION
+          ? { replacesConnectionId: null, migrationPhase: null }
+          : null,
       ),
       findMany: vi.fn(
-        async ({
-          where,
-        }: {
-          where: { id: { in: string[] }; organizationId: string };
-        }) =>
+        async ({ where }: { where: { id: { in: string[] }; organizationId: string } }) =>
           where.organizationId === ORGANIZATION
-            ? where.id.in
-                .filter((id) => id === "conn-entra")
-                .map((id) => ({ id }))
+            ? where.id.in.filter((id) => id === "conn-entra").map((id) => ({ id }))
             : [],
       ),
     },
@@ -122,9 +115,7 @@ function createMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: vi
-      .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
   } as unknown as PrismaClient;
   return { prisma, deactivate };
 }
@@ -203,9 +194,7 @@ describe("given an organization with another administrator who can sign in", () 
 describe("given somebody who is not an administrator", () => {
   it("is deactivated without the guard having an opinion", async () => {
     const { prisma } = createMockPrisma();
-    (
-      prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
-    ).mockResolvedValue({
+    (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
       userId: ADMIN,
       role: "MEMBER",
     });

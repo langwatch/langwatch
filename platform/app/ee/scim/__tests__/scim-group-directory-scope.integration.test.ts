@@ -47,10 +47,7 @@ describe("SCIM group directory scope", () => {
 
   afterEach(async () => {
     await cleanupTestRows(prisma, [
-      [
-        "group",
-        { organizationId: { in: [organizationId, otherOrganizationId] } },
-      ],
+      ["group", { organizationId: { in: [organizationId, otherOrganizationId] } }],
       ["organization", { id: { in: [organizationId, otherOrganizationId] } }],
     ]);
   });
@@ -148,9 +145,7 @@ describe("SCIM group directory scope", () => {
         }),
       ).resolves.toMatchObject({ externalId });
     }
-    expect(
-      await prisma.group.count({ where: { organizationId, externalId } }),
-    ).toBe(3);
+    expect(await prisma.group.count({ where: { organizationId, externalId } })).toBe(3);
     for (const [label, scimConnectionId] of [
       ["concrete", connectionA],
       ["legacy", null],

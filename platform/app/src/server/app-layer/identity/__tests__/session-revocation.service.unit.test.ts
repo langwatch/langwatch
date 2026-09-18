@@ -46,9 +46,7 @@ const sessionRow = ({
   sessionToken: `token-${id}`,
   userId,
   identifierId,
-  expires: new Date(
-    expired ? "2020-01-01T00:00:00.000Z" : "2027-01-01T00:00:00.000Z",
-  ),
+  expires: new Date(expired ? "2020-01-01T00:00:00.000Z" : "2027-01-01T00:00:00.000Z"),
 });
 
 const cached = (token: string): CachedSession => ({
@@ -86,8 +84,7 @@ const revocationOver = ({
     for (const row of doomed) rows.delete(row.id);
     return doomed.length;
   };
-  const rowsOf = (userId: string) =>
-    [...rows.values()].filter((row) => row.userId === userId);
+  const rowsOf = (userId: string) => [...rows.values()].filter((row) => row.userId === userId);
 
   const cache: SessionRevocationCachePort = {
     readIndex: async () => (cacheUnreachable ? refuseCache() : storedIndex),
@@ -106,14 +103,12 @@ const revocationOver = ({
   };
 
   const records: SessionRevocationRecordsPort = {
-    findTokensForUser: async ({ userId }) =>
-      rowsOf(userId).map((row) => row.sessionToken),
+    findTokensForUser: async ({ userId }) => rowsOf(userId).map((row) => row.sessionToken),
     findTokensForUserExcept: async ({ userId, keepSessionId }) =>
       rowsOf(userId)
         .filter((row) => row.id !== keepSessionId)
         .map((row) => row.sessionToken),
-    findTokenForSession: async ({ sessionId }) =>
-      rows.get(sessionId)?.sessionToken ?? null,
+    findTokenForSession: async ({ sessionId }) => rows.get(sessionId)?.sessionToken ?? null,
     findForIdentifier: async ({ userId, identifierId }) =>
       rowsOf(userId)
         .filter((row) => row.identifierId === identifierId)
@@ -121,8 +116,7 @@ const revocationOver = ({
           id,
           sessionToken,
         })),
-    deleteAllForUser: async ({ userId }) =>
-      remove((row) => row.userId === userId),
+    deleteAllForUser: async ({ userId }) => remove((row) => row.userId === userId),
     deleteForUserExcept: async ({ userId, keepSessionId }) =>
       remove((row) => row.userId === userId && row.id !== keepSessionId),
     deleteByIds: async ({ ids }) => {
@@ -148,10 +142,7 @@ const revocationOver = ({
 describe("caller-scoped session revocation", () => {
   it("clears selected tokens, drops the whole index, and reports actual rows ended", async () => {
     const stores = revocationOver({
-      sessions: [
-        sessionRow({ id: "selected" }),
-        sessionRow({ id: "survivor" }),
-      ],
+      sessions: [sessionRow({ id: "selected" }), sessionRow({ id: "survivor" })],
       index: [cached("token-selected"), cached("token-survivor")],
     });
 
@@ -186,19 +177,13 @@ describe("given a person with sessions in both stores", () => {
   describe("when every session is revoked and the cache lists none of them", () => {
     it("falls back to the session rows and clears the cached session behind each", async () => {
       const stores = revocationOver({
-        sessions: [
-          sessionRow({ id: "orphan-1" }),
-          sessionRow({ id: "orphan-2" }),
-        ],
+        sessions: [sessionRow({ id: "orphan-1" }), sessionRow({ id: "orphan-2" })],
         index: null,
       });
 
       await stores.service.revokeAll({ userId: "sam" });
 
-      expect(stores.droppedTokens).toEqual([
-        "token-orphan-1",
-        "token-orphan-2",
-      ]);
+      expect(stores.droppedTokens).toEqual(["token-orphan-1", "token-orphan-2"]);
       expect(stores.liveSessionIds()).toEqual([]);
     });
   });
@@ -234,9 +219,7 @@ describe("given a person with sessions in both stores", () => {
     it("completes without raising", async () => {
       const stores = revocationOver();
 
-      await expect(
-        stores.service.revokeAll({ userId: "nobody" }),
-      ).resolves.toBeUndefined();
+      await expect(stores.service.revokeAll({ userId: "nobody" })).resolves.toBeUndefined();
     });
   });
 
@@ -291,11 +274,7 @@ describe("given a person changing their password from one of several devices", (
           sessionRow({ id: "old-device" }),
           sessionRow({ id: "stolen" }),
         ],
-        index: [
-          cached("token-current"),
-          cached("token-old-device"),
-          cached("token-stolen"),
-        ],
+        index: [cached("token-current"), cached("token-old-device"), cached("token-stolen")],
       });
 
       await stores.service.revokeOthers({
@@ -504,9 +483,9 @@ describe("given somebody signing out of the browser they are reading in", () => 
       databaseUnreachable: true,
     });
 
-    await expect(
-      stores.service.revokeOne({ token: "token-here", userId: "sam" }),
-    ).rejects.toThrow("database unreachable");
+    await expect(stores.service.revokeOne({ token: "token-here", userId: "sam" })).rejects.toThrow(
+      "database unreachable",
+    );
     expect(stores.liveSessionIds()).toEqual(["here"]);
     expect(stores.droppedTokens).toEqual(["token-here"]);
     expect(stores.liveIndex()).toBeNull();

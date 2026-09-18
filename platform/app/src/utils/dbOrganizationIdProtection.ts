@@ -1,8 +1,10 @@
 import { z } from "zod";
+
 import {
   CLI_LOGIN_KEY_NAME_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
 } from "~/server/api-key/reserved-names";
+
 import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 /**
@@ -77,9 +79,7 @@ const READ_ACTIONS = new Set([
  * every bound below has to narrow before it reads.
  */
 const clauseField = (clause: unknown, key: string): unknown =>
-  clause && typeof clause === "object"
-    ? (clause as Record<string, unknown>)[key]
-    : undefined;
+  clause && typeof clause === "object" ? (clause as Record<string, unknown>)[key] : undefined;
 
 /**
  * Whether a clause names specific rows by id — either one, or a list of them.
@@ -115,11 +115,7 @@ const isSystemManagedKeyName = (value: unknown): boolean =>
 const isElapsedExpiryBound = (value: unknown): boolean => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const bound = value as Record<string, unknown>;
-  return (
-    Object.keys(bound).length === 2 &&
-    bound.not === null &&
-    bound.lte instanceof Date
-  );
+  return Object.keys(bound).length === 2 && bound.not === null && bound.lte instanceof Date;
 };
 
 /**
@@ -182,8 +178,7 @@ const isCliLoginKeySweep = (clause: unknown): boolean => {
     !!name &&
     typeof name === "object" &&
     Object.keys(name).length === 1 &&
-    (name as Record<string, unknown>).startsWith ===
-      CLI_LOGIN_KEY_NAME_PREFIX &&
+    (name as Record<string, unknown>).startsWith === CLI_LOGIN_KEY_NAME_PREFIX &&
     where.revokedAt === null &&
     isElapsedExpiryBound(where.expiresAt)
   );
@@ -269,8 +264,7 @@ const hasCompositeOrgKey = (clause: unknown): boolean => {
   if (!parsed.success) return false;
   return Object.entries(parsed.data).some(
     ([key, value]) =>
-      key.split("_").includes("organizationId") &&
-      organizationScopeSchema.safeParse(value).success,
+      key.split("_").includes("organizationId") && organizationScopeSchema.safeParse(value).success,
   );
 };
 
@@ -278,8 +272,7 @@ const hasCompositeOrgKey = (clause: unknown): boolean => {
 // id (a team or project id), so it resolves to exactly one organization.
 const hasInlineScope = (clause: any): boolean =>
   typeof clause?.scopeType === "string" &&
-  (typeof clause?.scopeId === "string" ||
-    isNonEmptyStringList(clause?.scopeId));
+  (typeof clause?.scopeId === "string" || isNonEmptyStringList(clause?.scopeId));
 
 const boundsToSingleOrg = (clause: any): boolean =>
   hasOrganizationId(clause) || hasRowId(clause) || hasCompositeOrgKey(clause);
@@ -299,8 +292,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
     // names belongs to exactly one organization.
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "inviteCode") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "inviteCode") === "string",
   },
   // Org-scoped RBAC + config models, audited to already carry a bounded
   // predicate (organizationId, a row id, a compound org key, a parent FK, or
@@ -320,8 +312,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // Without this the screen that answers it degraded to an unknown error, and
   // nobody could see a request they had made.
   JoinRequest: {
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "userId") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "userId") === "string",
   },
   // One row per SCIM request a customer's directory made (ADR-126). It
   // carries `organizationId`, and the surface that reads it is an
@@ -344,8 +335,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // guard is exactly right, and a bare `findMany()` over every tenant's
   // client secrets is what it must refuse.
   SsoCredential: {
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "connectionId") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "connectionId") === "string",
   },
   SsoConnectionRegistrationSlot: {},
   SsoActivationRecoveryReservation: {},
@@ -377,25 +367,19 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // `organizationId`. Reachable by that or by the connection itself, which
   // belongs to exactly one organization.
   ScimSyncState: {
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "connectionId") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "connectionId") === "string",
   },
   ScimUserResource: {},
   ScimDirectoryUser: {
     extraBound: ({ clause }) =>
       idPredicate(clauseField(clause, "connectionId")) ||
-      typeof clauseField(
-        clauseField(clause, "connectionId_userId"),
-        "connectionId",
-      ) === "string",
+      typeof clauseField(clauseField(clause, "connectionId_userId"), "connectionId") === "string",
   },
   ScimExternalId: {
     extraBound: ({ clause }) =>
       idPredicate(clauseField(clause, "connectionId")) ||
-      typeof clauseField(
-        clauseField(clause, "connectionId_externalId"),
-        "connectionId",
-      ) === "string",
+      typeof clauseField(clauseField(clause, "connectionId_externalId"), "connectionId") ===
+        "string",
   },
   RoleBinding: {
     // Reachable by its parent api key / group (each owned by one org) or by
@@ -467,8 +451,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // two opaque ids and two timestamps — platform bookkeeping, no customer data.
   GovernanceTenantHistory: {
     platformScopeActions: ["findMany"],
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "tenantId") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "tenantId") === "string",
   },
   // Digests of erased identifiers (ADR-128 §9). Same snapshot read, same
   // reasoning, and this table is the one place in the codebase that holds no
@@ -489,8 +472,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // a bare token would still cross tenants (the ApiKey hatch above scopes
     // its own widening the same way).
     extraBound: ({ clause, action }) =>
-      READ_ACTIONS.has(action) &&
-      typeof clauseField(clause, "token") === "string",
+      READ_ACTIONS.has(action) && typeof clauseField(clause, "token") === "string",
   },
   // ShareService's view accounting for resource grants (delivery-plan
   // decision 22). Keyed by grantId - a ledger-derived id, globally unique
@@ -542,8 +524,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       const budgetId = clauseField(clause, "budgetId");
       return (
         typeof budgetId === "string" ||
-        (budgetId != null &&
-          Array.isArray((budgetId as { in?: unknown }).in)) ||
+        (budgetId != null && Array.isArray((budgetId as { in?: unknown }).in)) ||
         clauseField(clause, "budgetId_bucketScopeId") !== undefined
       );
     },
@@ -552,8 +533,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // or the globally-unique installationId (webhook + mint paths). Spec:
   // specs/integrations/github-connection.feature.
   GithubInstallation: {
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "installationId") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "installationId") === "string",
   },
   // Pull requests discovered through that connection, and the per-branch
   // bookkeeping behind the lookup. Both are reached by organizationId, or by
@@ -573,8 +553,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // being replayed as an `updateMany` that rewrites every organization's
     // bookkeeping, or a `deleteMany` that erases it. The rows it reaches are
     // bookkeeping only: a repository name, a branch name and timestamps.
-    extraBound: ({ clause, action }) =>
-      action === "findMany" && isBranchRecheckSweep(clause),
+    extraBound: ({ clause, action }) => action === "findMany" && isBranchRecheckSweep(clause),
   },
 };
 
@@ -670,8 +649,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "Subscription",
 ];
 
-export const ORG_SCOPED_MODEL_NAMES: readonly string[] =
-  Object.keys(ORG_SCOPED_MODELS);
+export const ORG_SCOPED_MODEL_NAMES: readonly string[] = Object.keys(ORG_SCOPED_MODELS);
 
 /**
  * Every model that carries an organizationId column: the union of the guarded
@@ -699,10 +677,7 @@ const collectOrganizationIds = (where: any, acc: Set<string>): void => {
   }
 };
 
-const validateRecursive = (
-  where: any,
-  passes: (clause: any) => boolean,
-): boolean => {
+const validateRecursive = (where: any, passes: (clause: any) => boolean): boolean => {
   if (!where || typeof where !== "object") return false;
   if (passes(where)) return true;
   if (Array.isArray(where.AND)) {

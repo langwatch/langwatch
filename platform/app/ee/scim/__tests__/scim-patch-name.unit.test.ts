@@ -1,3 +1,8 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { PrismaClient, User } from "~/generated/prisma/client";
+
+import { ScimService } from "../scim.service";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * A PATCH that names one half of a name changes that half and nothing else.
@@ -12,11 +17,6 @@
  * Spec: specs/identity/scim-connection-sync.feature
  */
 import { resourceStore } from "./scim-user-resource.fixture";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { PrismaClient, User } from "~/generated/prisma/client";
-
-import { ScimService } from "../scim.service";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
@@ -77,22 +77,15 @@ function createMockPrisma() {
     },
     roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
     ssoConnection: {
-      findFirst: vi.fn(
-        async ({ where }: { where: { id: string; organizationId: string } }) =>
-          where.id === "conn-okta" && where.organizationId === ORGANIZATION
-            ? { replacesConnectionId: null, migrationPhase: null }
-            : null,
+      findFirst: vi.fn(async ({ where }: { where: { id: string; organizationId: string } }) =>
+        where.id === "conn-okta" && where.organizationId === ORGANIZATION
+          ? { replacesConnectionId: null, migrationPhase: null }
+          : null,
       ),
       findMany: vi.fn(
-        async ({
-          where,
-        }: {
-          where: { id: { in: string[] }; organizationId: string };
-        }) =>
+        async ({ where }: { where: { id: { in: string[] }; organizationId: string } }) =>
           where.organizationId === ORGANIZATION
-            ? where.id.in
-                .filter((id) => id === "conn-entra")
-                .map((id) => ({ id }))
+            ? where.id.in.filter((id) => id === "conn-entra").map((id) => ({ id }))
             : [],
       ),
     },
@@ -112,9 +105,7 @@ function createMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: vi
-      .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
   } as unknown as PrismaClient;
   return { prisma, update };
 }

@@ -7,8 +7,7 @@ import { ScimTokenService } from "../scim-token.service";
 
 function createMockPrisma() {
   return {
-    $transaction: async (operations: Promise<unknown>[]) =>
-      Promise.all(operations),
+    $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations),
     scimDirectoryUser: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     scimExternalId: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     scimToken: {
@@ -51,18 +50,14 @@ describe("ScimTokenService", () => {
   describe("when generating a token", () => {
     describe("given an organization id and one of its connections", () => {
       beforeEach(() => {
-        (
-          prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({
+        (prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
           id: "conn-okta",
         });
       });
 
       it("creates a token record with a hashed value", async () => {
         const mockToken = { id: "token-1", organizationId: "org-1" };
-        (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(
-          mockToken,
-        );
+        (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockToken);
 
         const result = await service.generate({
           organizationId: "org-1",
@@ -73,8 +68,7 @@ describe("ScimTokenService", () => {
         expect(result.token.length).toBe(64); // 32 bytes hex
         expect(result.tokenId).toBe("token-1");
 
-        const createCall = (prisma.scimToken.create as ReturnType<typeof vi.fn>)
-          .mock.calls[0]![0];
+        const createCall = (prisma.scimToken.create as ReturnType<typeof vi.fn>).mock.calls[0]![0];
         expect(createCall.data.organizationId).toBe("org-1");
         // What is stored is not the token. Asserted as properties rather than
         // by re-deriving the digest here: an expectation that recomputes the
@@ -97,9 +91,7 @@ describe("ScimTokenService", () => {
         // alone. Two organizations choosing the same supplied secret meant one
         // customer's directory provisioning and deleting another customer's
         // people, decided by whichever row the planner reached first.
-        (
-          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({
+        (prisma.scimToken.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
           id: "token-held-by-somebody-else",
         });
 
@@ -131,9 +123,7 @@ describe("ScimTokenService", () => {
         // token already hashes to; the insert did not trip the constraint,
         // and the verify lookup then matched two rows and let the planner
         // decide whose directory the caller was writing to.
-        (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(
-          { id: "token-1" },
-        );
+        (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "token-1" });
 
         await service.generate({
           organizationId: "org-1",
@@ -141,8 +131,8 @@ describe("ScimTokenService", () => {
           secret: "a-value-long-enough-to-be-accepted-here",
         });
 
-        const asked = (prisma.scimToken.findFirst as ReturnType<typeof vi.fn>)
-          .mock.calls[0]![0] as { where: { hashedToken: { in: string[] } } };
+        const asked = (prisma.scimToken.findFirst as ReturnType<typeof vi.fn>).mock
+          .calls[0]![0] as { where: { hashedToken: { in: string[] } } };
         expect(asked.where.hashedToken.in).toHaveLength(2);
         // Two distinct digests of the same value, not the same one twice.
         expect(new Set(asked.where.hashedToken.in).size).toBe(2);
@@ -171,9 +161,7 @@ describe("ScimTokenService", () => {
 
       it("stores the description when provided", async () => {
         const mockToken = { id: "token-1" };
-        (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(
-          mockToken,
-        );
+        (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockToken);
 
         await service.generate({
           organizationId: "org-1",
@@ -181,17 +169,14 @@ describe("ScimTokenService", () => {
           description: "Okta integration",
         });
 
-        const createCall = (prisma.scimToken.create as ReturnType<typeof vi.fn>)
-          .mock.calls[0]![0];
+        const createCall = (prisma.scimToken.create as ReturnType<typeof vi.fn>).mock.calls[0]![0];
         expect(createCall.data.description).toBe("Okta integration");
       });
 
       it("names the connection on the token and starts that connection's sync", async () => {
-        (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(
-          {
-            id: "token-1",
-          },
-        );
+        (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+          id: "token-1",
+        });
 
         const result = await service.generate({
           organizationId: "org-1",
@@ -199,8 +184,7 @@ describe("ScimTokenService", () => {
         });
 
         expect(result.connectionId).toBe("conn-okta");
-        const createCall = (prisma.scimToken.create as ReturnType<typeof vi.fn>)
-          .mock.calls[0]![0];
+        const createCall = (prisma.scimToken.create as ReturnType<typeof vi.fn>).mock.calls[0]![0];
         expect(createCall.data.connectionId).toBe("conn-okta");
         expect(syncLifecycle.tokenIssued).toHaveBeenCalledWith({
           organizationId: "org-1",
@@ -213,9 +197,7 @@ describe("ScimTokenService", () => {
     describe("given no connection", () => {
       /** @scenario A token cannot exist without a connection to belong to */
       it("refuses with scim_connection_required and writes nothing", async () => {
-        await expect(
-          service.generate({ organizationId: "org-1" }),
-        ).rejects.toMatchObject({
+        await expect(service.generate({ organizationId: "org-1" })).rejects.toMatchObject({
           code: "scim_connection_required",
           httpStatus: 422,
         });
@@ -227,9 +209,7 @@ describe("ScimTokenService", () => {
     describe("given a connection belonging to another organization", () => {
       /** @scenario A token cannot be issued against another organization's connection */
       it("refuses as not found, revealing nothing about the other organization", async () => {
-        (
-          prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(null);
+        (prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
         const refusal = await service
           .generate({ organizationId: "org-1", connectionId: "conn-elsewhere" })
@@ -244,9 +224,7 @@ describe("ScimTokenService", () => {
         // whole of `meta` rather than field by field, because a field added
         // later is exactly what would leak.
         const { meta } = refusal as { meta: Record<string, unknown> };
-        expect(Object.values(meta)).toEqual(
-          Object.values(meta).map(() => "conn-elsewhere"),
-        );
+        expect(Object.values(meta)).toEqual(Object.values(meta).map(() => "conn-elsewhere"));
         expect(prisma.scimToken.create).not.toHaveBeenCalled();
       });
     });
@@ -255,9 +233,7 @@ describe("ScimTokenService", () => {
   describe("when a connection is torn down", () => {
     /** @scenario "Tearing a connection down ends its tokens" */
     it("revokes only that connection's tokens and ends its sync", async () => {
-      (
-        prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ count: 2 });
+      (prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 2 });
 
       const result = await service.revokeForConnection({
         organizationId: "org-1",
@@ -280,10 +256,7 @@ describe("ScimTokenService", () => {
   describe("when verifying a token against the plan", () => {
     const getActivePlan = vi.fn();
     const planProvider = { getActivePlan };
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update("valid-token")
-      .digest("hex");
+    const hashedToken = crypto.createHash("sha256").update("valid-token").digest("hex");
 
     beforeEach(() => {
       getActivePlan.mockReset();
@@ -292,9 +265,7 @@ describe("ScimTokenService", () => {
 
     describe("when the token does not exist", () => {
       it("reports an invalid token without consulting the plan", async () => {
-        (
-          prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([]);
+        (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
         const result = await service.verifyEntitled({ token: "unknown" });
 
@@ -305,18 +276,14 @@ describe("ScimTokenService", () => {
 
     describe("when the token is valid and the organization is on Enterprise", () => {
       it("returns ok with the organization id", async () => {
-        (
-          prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([
+        (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
           {
             id: "token-1",
             organizationId: "org-1",
             hashedToken,
           },
         ]);
-        (
-          prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({});
+        (prisma.scimToken.updateMany as ReturnType<typeof vi.fn>).mockResolvedValue({});
         getActivePlan.mockResolvedValue({ type: "ENTERPRISE" });
 
         const result = await service.verifyEntitled({ token: "valid-token" });
@@ -328,9 +295,7 @@ describe("ScimTokenService", () => {
       });
 
       it("refuses a token whose connection is discarded", async () => {
-        (
-          prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([
+        (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
           {
             id: "token-1",
             organizationId: "org-1",
@@ -338,16 +303,12 @@ describe("ScimTokenService", () => {
             hashedToken,
           },
         ]);
-        (
-          prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({
+        (prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
           state: "DISCARDED",
         });
         getActivePlan.mockResolvedValue({ type: "ENTERPRISE" });
 
-        await expect(
-          service.verifyEntitled({ token: "valid-token" }),
-        ).resolves.toEqual({
+        await expect(service.verifyEntitled({ token: "valid-token" })).resolves.toEqual({
           status: "connection_not_writable",
           organizationId: "org-1",
           connectionId: "conn-discarded",
@@ -358,18 +319,14 @@ describe("ScimTokenService", () => {
 
     describe("when the token is valid but the plan has lapsed", () => {
       it("reports the plan as not entitled so the token cannot outlive Enterprise", async () => {
-        (
-          prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([
+        (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
           {
             id: "token-1",
             organizationId: "org-1",
             hashedToken,
           },
         ]);
-        (
-          prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({});
+        (prisma.scimToken.updateMany as ReturnType<typeof vi.fn>).mockResolvedValue({});
         getActivePlan.mockResolvedValue({ type: "FREE" });
 
         const result = await service.verifyEntitled({ token: "valid-token" });
@@ -385,9 +342,7 @@ describe("ScimTokenService", () => {
 
   describe("when listing an organization's tokens", () => {
     it("selects only the safe fields, never the stored hash", async () => {
-      (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(
-        [],
-      );
+      (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
       await service.list({ organizationId: "org-1" });
 
@@ -408,9 +363,7 @@ describe("ScimTokenService", () => {
   describe("when revoking a token", () => {
     describe("given the token belongs to the organization", () => {
       it("deletes it in a single scoped statement", async () => {
-        (
-          prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({ count: 1 });
+        (prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 1 });
 
         const result = await service.revoke({
           organizationId: "org-1",
@@ -426,9 +379,7 @@ describe("ScimTokenService", () => {
 
     describe("given the token id is unknown or from another organization", () => {
       it("answers not found", async () => {
-        (
-          prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({ count: 0 });
+        (prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 0 });
 
         await expect(
           service.revoke({ organizationId: "org-1", tokenId: "foreign" }),
@@ -440,23 +391,16 @@ describe("ScimTokenService", () => {
   describe("when verifying a token", () => {
     describe("given the token exists", () => {
       it("returns the organization ID and updates lastUsedAt", async () => {
-        const hashedToken = crypto
-          .createHash("sha256")
-          .update("valid-token")
-          .digest("hex");
+        const hashedToken = crypto.createHash("sha256").update("valid-token").digest("hex");
 
-        (
-          prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([
+        (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
           {
             id: "token-1",
             organizationId: "org-1",
             hashedToken,
           },
         ]);
-        (
-          prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({});
+        (prisma.scimToken.updateMany as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
         const result = await service.verify({ token: "valid-token" });
 
@@ -464,8 +408,7 @@ describe("ScimTokenService", () => {
         // A token minted before the pepper existed is still the credential
         // its identity provider is configured with, so the lookup has to ask
         // for the legacy digest as well as the current one.
-        const asked = (prisma.scimToken.findMany as ReturnType<typeof vi.fn>)
-          .mock.calls[0]![0] as {
+        const asked = (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
           where: { hashedToken: { in: string[] } };
         };
         expect(asked.where.hashedToken.in).toContain(hashedToken);
@@ -478,38 +421,27 @@ describe("ScimTokenService", () => {
 
     describe("given an administrator revokes the token mid-verification", () => {
       it("still answers the caller instead of failing on the vanished row", async () => {
-        (
-          prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([
+        (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
           {
             id: "token-1",
             organizationId: "org-1",
-            hashedToken: crypto
-              .createHash("sha256")
-              .update("valid-token")
-              .digest("hex"),
+            hashedToken: crypto.createHash("sha256").update("valid-token").digest("hex"),
           },
         ]);
         // What the revoke leaves behind: the row is gone by the time the use
         // is recorded, so the write matches nothing. A single-row `update`
         // would raise P2025 here and turn the race into a 500.
-        (
-          prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({ count: 0 });
+        (prisma.scimToken.updateMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 0 });
 
-        await expect(service.verify({ token: "valid-token" })).resolves.toEqual(
-          {
-            organizationId: "org-1",
-          },
-        );
+        await expect(service.verify({ token: "valid-token" })).resolves.toEqual({
+          organizationId: "org-1",
+        });
       });
     });
 
     describe("given the token does not exist", () => {
       it("returns null", async () => {
-        (
-          prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([]);
+        (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
         const result = await service.verify({ token: "invalid-token" });
 

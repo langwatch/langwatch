@@ -58,14 +58,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await cleanupTestRows(prisma, [
-    [
-      "scimUserResource",
-      { organizationId: { in: [organizationId, otherOrganizationId] } },
-    ],
-    [
-      "organizationUser",
-      { organizationId: { in: [organizationId, otherOrganizationId] } },
-    ],
+    ["scimUserResource", { organizationId: { in: [organizationId, otherOrganizationId] } }],
+    ["organizationUser", { organizationId: { in: [organizationId, otherOrganizationId] } }],
     ["user", { email: { contains: namespace.toLowerCase() } }],
     ["organization", { id: { in: [organizationId, otherOrganizationId] } }],
   ]);
@@ -94,12 +88,8 @@ describe("organization-owned SCIM user state", () => {
         },
       }),
     ).resolves.toMatchObject({ status: "409", scimType: "uniqueness" });
-    expect(
-      await prisma.scimUserResource.count({ where: { organizationId } }),
-    ).toBe(0);
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: userId } }),
-    ).toEqual(original);
+    expect(await prisma.scimUserResource.count({ where: { organizationId } })).toBe(0);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(original);
     expect(
       await prisma.organizationUser.count({
         where: { organizationId, userId },
@@ -145,29 +135,21 @@ describe("organization-owned SCIM user state", () => {
         },
       }),
     ).resolves.toMatchObject({ status: "409", scimType: "uniqueness" });
-    expect(await prisma.scimUserResource.findUniqueOrThrow({ where })).toEqual(
-      before,
-    );
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: second.id } }),
-    ).toEqual(second);
+    expect(await prisma.scimUserResource.findUniqueOrThrow({ where })).toEqual(before);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: second.id } })).toEqual(second);
     expect(
       await prisma.organizationUser.count({
         where: { organizationId, userId: second.id },
       }),
     ).toBe(1);
-    expect(await prisma.department.count({ where: { organizationId } })).toBe(
-      0,
-    );
+    expect(await prisma.department.count({ where: { organizationId } })).toBe(0);
     await expect(
       prisma.scimUserResource.update({
         where,
         data: { userName: alias.toUpperCase() },
       }),
     ).rejects.toMatchObject({ code: "P2002" });
-    await expect(
-      service.deleteUser({ id: userId, organizationId }),
-    ).resolves.toBeNull();
+    await expect(service.deleteUser({ id: userId, organizationId })).resolves.toBeNull();
     await expect(
       service.replaceUser({
         id: second.id,
@@ -253,12 +235,8 @@ describe("organization-owned SCIM user state", () => {
         where: { organizationId: otherOrganizationId, userId },
       }),
     ).toBe(1);
-    expect(await prisma.department.count({ where: { organizationId } })).toBe(
-      0,
-    );
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: userId } }),
-    ).toEqual(before);
+    expect(await prisma.department.count({ where: { organizationId } })).toBe(0);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toEqual(before);
     expect(
       await prisma.session.findMany({
         where: { userId },
@@ -286,9 +264,7 @@ describe("organization-owned SCIM user state", () => {
         where: { organizationId, userId },
       }),
     ).toBe(0);
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: userId } }),
-    ).toMatchObject({
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({
       deactivatedAt: disabledAt,
       email: userEmail,
       emailVerified: true,
@@ -314,9 +290,10 @@ describe("organization-owned SCIM user state", () => {
       },
     });
     if (isScimError(created)) throw new Error(created.detail);
-    await expect(
-      service.getUser({ organizationId, id: created.id }),
-    ).resolves.toMatchObject({ id: created.id, active: false });
+    await expect(service.getUser({ organizationId, id: created.id })).resolves.toMatchObject({
+      id: created.id,
+      active: false,
+    });
     await expect(
       service.listUsers({
         organizationId,
@@ -333,11 +310,10 @@ describe("organization-owned SCIM user state", () => {
       startIndex: 2,
       count: 1,
     });
-    if (isScimError(first) || isScimError(second))
-      throw new Error("Expected pages");
-    expect(
-      [...first.Resources, ...second.Resources].map((resource) => resource.id),
-    ).toEqual([userId, created.id].sort());
+    if (isScimError(first) || isScimError(second)) throw new Error("Expected pages");
+    expect([...first.Resources, ...second.Resources].map((resource) => resource.id)).toEqual(
+      [userId, created.id].sort(),
+    );
     expect(first.totalResults).toBe(2);
     const alias = `renamed-${email}`;
     await expect(
@@ -359,15 +335,14 @@ describe("organization-owned SCIM user state", () => {
         where: { organizationId, userId: created.id },
       }),
     ).toBe(0);
-    expect(
-      await prisma.user.findUniqueOrThrow({ where: { id: created.id } }),
-    ).toMatchObject({ deactivatedAt: null, email });
-    await expect(
-      service.deleteUser({ organizationId, id: created.id }),
-    ).resolves.toBeNull();
-    await expect(
-      service.getUser({ organizationId, id: created.id }),
-    ).resolves.toMatchObject({ status: "404" });
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: created.id } })).toMatchObject({
+      deactivatedAt: null,
+      email,
+    });
+    await expect(service.deleteUser({ organizationId, id: created.id })).resolves.toBeNull();
+    await expect(service.getUser({ organizationId, id: created.id })).resolves.toMatchObject({
+      status: "404",
+    });
     await expect(
       service.listUsers({ organizationId, filter: `userName eq "${alias}"` }),
     ).resolves.toMatchObject({ totalResults: 0 });

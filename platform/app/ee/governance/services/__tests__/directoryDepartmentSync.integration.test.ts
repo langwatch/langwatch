@@ -85,12 +85,7 @@ describe("Feature: directory departments land on the entities we already have", 
       },
     });
 
-    const member = async (
-      id: string,
-      name: string,
-      email: string,
-      verified: boolean,
-    ) => {
+    const member = async (id: string, name: string, email: string, verified: boolean) => {
       await prisma.user.create({
         data: { id, name, email, emailVerified: verified },
       });
@@ -100,12 +95,7 @@ describe("Feature: directory departments land on the entities we already have", 
     };
     await member(mariaUserId, "Maria Silva", `m.silva-${ns}@acme.test`, true);
     // Jonas never confirmed his address; his proof, if any, is the directory id.
-    await member(
-      jonasUserId,
-      "Jonas Bakker",
-      `j.bakker-${ns}@acme.test`,
-      false,
-    );
+    await member(jonasUserId, "Jonas Bakker", `j.bakker-${ns}@acme.test`, false);
 
     const at = new Date("2026-09-01T00:00:00.000Z");
     await prisma.ssoConnection.create({

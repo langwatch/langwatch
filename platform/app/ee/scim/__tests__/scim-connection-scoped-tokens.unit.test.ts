@@ -20,11 +20,7 @@ import { createHash } from "crypto";
  * would be a bug in the double; the queries themselves are one `where` each
  * and are asserted directly.
  */
-import {
-  emptyScimSync,
-  reduceScimSync,
-  type ScimSyncState,
-} from "@langwatch/identity";
+import { emptyScimSync, reduceScimSync, type ScimSyncState } from "@langwatch/identity";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScimSyncGuards } from "../scim-sync-guards";
@@ -65,8 +61,7 @@ function createStore(connections: { id: string; organizationId: string }[]) {
   return {
     tokens,
     prisma: {
-      $transaction: async (operations: Promise<unknown>[]) =>
-        Promise.all(operations),
+      $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations),
       scimDirectoryUser: {
         deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
@@ -112,27 +107,17 @@ function createStore(connections: { id: string; organizationId: string }[]) {
               // about the hash never being listed vacuous.
               .map((row) =>
                 select
-                  ? Object.fromEntries(
-                      Object.entries(row).filter(([field]) => select[field]),
-                    )
+                  ? Object.fromEntries(Object.entries(row).filter(([field]) => select[field]))
                   : row,
               ),
         ),
-        deleteMany: vi.fn(
-          async ({ where }: { where: Record<string, unknown> }) => {
-            const doomed = tokens.filter((row) => matches(row, where));
-            for (const row of doomed) tokens.splice(tokens.indexOf(row), 1);
-            return { count: doomed.length };
-          },
-        ),
+        deleteMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+          const doomed = tokens.filter((row) => matches(row, where));
+          for (const row of doomed) tokens.splice(tokens.indexOf(row), 1);
+          return { count: doomed.length };
+        }),
         updateMany: vi.fn(
-          async ({
-            where,
-            data,
-          }: {
-            where: Record<string, unknown>;
-            data: Partial<TokenRow>;
-          }) => {
+          async ({ where, data }: { where: Record<string, unknown>; data: Partial<TokenRow> }) => {
             const touched = tokens.filter((row) => matches(row, where));
             for (const row of touched) Object.assign(row, data);
             return { count: touched.length };
@@ -144,8 +129,7 @@ function createStore(connections: { id: string; organizationId: string }[]) {
           async ({ where }: { where: Record<string, unknown> }) =>
             connections.find(
               (connection) =>
-                connection.id === where.id &&
-                connection.organizationId === where.organizationId,
+                connection.id === where.id && connection.organizationId === where.organizationId,
             ) ?? null,
         ),
       },
@@ -199,18 +183,12 @@ describe("directory provisioning tokens", () => {
       expect(store.tokens[0]?.hashedToken).not.toBe(issued.token);
 
       const listed = await service.list({ organizationId: ORG });
-      expect(listed).toEqual([
-        expect.objectContaining({ connectionId: CONNECTION }),
-      ]);
+      expect(listed).toEqual([expect.objectContaining({ connectionId: CONNECTION })]);
       expect(JSON.stringify(listed)).not.toContain(issued.token);
-      expect(JSON.stringify(listed)).not.toContain(
-        store.tokens[0]?.hashedToken,
-      );
+      expect(JSON.stringify(listed)).not.toContain(store.tokens[0]?.hashedToken);
 
       // And it reaches exactly the connection it names.
-      await expect(
-        service.verifyEntitled({ token: issued.token }),
-      ).resolves.toMatchObject({
+      await expect(service.verifyEntitled({ token: issued.token })).resolves.toMatchObject({
         status: "ok",
         organizationId: ORG,
         connectionId: CONNECTION,
@@ -292,9 +270,7 @@ describe("directory provisioning tokens", () => {
       // The token stops being accepted — an unknown credential, which is
       // what the SCIM boundary turns into a refusal the directory can see,
       // rather than a call that succeeds and provisions nothing.
-      await expect(
-        service.verifyEntitled({ token: doomed.token }),
-      ).resolves.toEqual({
+      await expect(service.verifyEntitled({ token: doomed.token })).resolves.toEqual({
         status: "invalid_token",
       });
       // And the sync history says the connection's provisioning ended.
@@ -307,9 +283,7 @@ describe("directory provisioning tokens", () => {
       );
 
       // Every other connection's tokens are untouched.
-      await expect(
-        service.verifyEntitled({ token: survivor.token }),
-      ).resolves.toMatchObject({
+      await expect(service.verifyEntitled({ token: survivor.token })).resolves.toMatchObject({
         status: "ok",
         connectionId: OTHER_CONNECTION,
       });

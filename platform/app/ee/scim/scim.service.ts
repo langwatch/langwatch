@@ -14,10 +14,7 @@ import {
   TeamUserRole,
   type User,
 } from "~/generated/prisma/client";
-import {
-  type GrantsLedgerWriter,
-  grantsLedgerWriter,
-} from "~/server/app-layer/authz/ledger";
+import { type GrantsLedgerWriter, grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import { grantsService } from "~/server/app-layer/authz/runtime";
 import { lockActiveAdmins } from "~/server/app-layer/organizations/active-admin-lock";
@@ -30,18 +27,15 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 
 import { ScimDeprovisionService } from "./scim-deprovision.service";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
-import { assertScimOrganizationId } from "./scim-organization-scope";
-import { ScimUserResourceRepository } from "./scim-user-resource.prisma.repository";
 import { parseScimFilter, type ScimFilterTerm } from "./scim-filter";
 import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
-import {
-  reconcileScimGrants,
-  retireScimMembershipGrants,
-} from "./scim-grants.reconciler";
+import { reconcileScimGrants, retireScimMembershipGrants } from "./scim-grants.reconciler";
 import { mergeNameParts, namePartsIn } from "./scim-name";
+import { assertScimOrganizationId } from "./scim-organization-scope";
 import { resolveHighestRole } from "./scim-role-resolver";
 import { scimSyncLifecycle } from "./scim-sync.runtime";
 import type { ScimSyncLifecycle } from "./scim-sync.service";
+import { ScimUserResourceRepository } from "./scim-user-resource.prisma.repository";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
   type ScimCreateUserRequest,
@@ -306,12 +300,10 @@ export class ScimService {
    * `undefined` when the enterprise extension is absent so callers can tell
    * "not provided" from "explicitly cleared".
    */
-  private costCenterFromRequest(
-    request: ScimCreateUserRequest,
-  ): string | null | undefined {
-    const ext = (request as Record<string, unknown>)[
-      SCIM_ENTERPRISE_USER_SCHEMA
-    ] as { costCenter?: string | null } | undefined;
+  private costCenterFromRequest(request: ScimCreateUserRequest): string | null | undefined {
+    const ext = (request as Record<string, unknown>)[SCIM_ENTERPRISE_USER_SCHEMA] as
+      | { costCenter?: string | null }
+      | undefined;
     if (!ext || !("costCenter" in ext)) return undefined;
     return ext.costCenter ?? null;
   }
@@ -335,9 +327,7 @@ export class ScimService {
 
     if (operation.value != null && typeof operation.value === "object") {
       const value = operation.value as Record<string, unknown>;
-      const ext = value[SCIM_ENTERPRISE_USER_SCHEMA] as
-        | { costCenter?: string | null }
-        | undefined;
+      const ext = value[SCIM_ENTERPRISE_USER_SCHEMA] as { costCenter?: string | null } | undefined;
       if (ext && "costCenter" in ext) {
         return { present: true, value: ext.costCenter ?? null };
       }
@@ -374,10 +364,7 @@ export class ScimService {
           userId_organizationId: { userId: existingUser.id, organizationId },
         },
       });
-      const previous = await this.#resources.find(
-        organizationId,
-        existingUser.id,
-      );
+      const previous = await this.#resources.find(organizationId, existingUser.id);
       if (membership && !previous?.deletedAt) {
         return this.scimError({
           status: "409",
@@ -405,12 +392,7 @@ export class ScimService {
       try {
         await this.createMembership({ userId: user.id, organizationId });
       } catch (error) {
-        if (
-          !(
-            error instanceof PrismaClientKnownRequestError &&
-            error.code === "P2002"
-          )
-        )
+        if (!(error instanceof PrismaClientKnownRequestError && error.code === "P2002"))
           throw error;
         // A retried create still repairs the grant beside an existing membership.
       }
@@ -447,17 +429,10 @@ export class ScimService {
     userId: string | undefined,
     userName: string,
   ): Promise<ScimError | null> {
-    const holder = await this.#resources.findUserByName(
-      organizationId,
-      userName,
-    );
+    const holder = await this.#resources.findUserByName(organizationId, userName);
     const conflicting =
       (holder !== null && holder.id !== userId) ||
-      (await this.#resources.hasLegacyNameConflict(
-        organizationId,
-        userId,
-        userName,
-      ));
+      (await this.#resources.hasLegacyNameConflict(organizationId, userId, userName));
     return conflicting
       ? this.scimError({
           status: "409",
@@ -477,10 +452,7 @@ export class ScimService {
     try {
       return await this.#resources.save(input);
     } catch (error) {
-      if (
-        error instanceof PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof PrismaClientKnownRequestError && error.code === "P2002") {
         return this.scimError({
           status: "409",
           scimType: "uniqueness",
@@ -681,9 +653,7 @@ export class ScimService {
       this.prisma.user.count({ where: whereClause }),
     ]);
 
-    const resources = users.map((user) =>
-      this.toScimUser(user, user.scimUserResources[0]),
-    );
+    const resources = users.map((user) => this.toScimUser(user, user.scimUserResources[0]));
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
       totalResults: totalCount,
@@ -770,18 +740,13 @@ export class ScimService {
   }): Promise<ScimUser | ScimError> {
     assertScimOrganizationId(organizationId);
     const found = await this.findOrganizationUser(organizationId, id);
-    if (!found)
-      return this.scimError({ status: "404", detail: "User not found" });
+    if (!found) return this.scimError({ status: "404", detail: "User not found" });
     await this.directoryIdentity.assertWritable({
       organizationId,
       connectionId,
       userId: id,
     });
-    const conflict = await this.userNameConflict(
-      organizationId,
-      id,
-      request.userName,
-    );
+    const conflict = await this.userNameConflict(organizationId, id, request.userName);
     if (conflict) return conflict;
     const active = request.active !== false;
     if (!active && found.hasMembership) {
@@ -847,10 +812,7 @@ export class ScimService {
       return;
     }
     const activeAdmins = await lockActiveAdmins({ tx, organizationId });
-    if (
-      activeAdmins.some((admin) => admin.userId === userId) &&
-      activeAdmins.length <= 1
-    ) {
+    if (activeAdmins.some((admin) => admin.userId === userId) && activeAdmins.length <= 1) {
       throw error;
     }
   }
@@ -953,8 +915,7 @@ export class ScimService {
   }): Promise<ScimUser | ScimError> {
     assertScimOrganizationId(organizationId);
     const found = await this.findOrganizationUser(organizationId, id);
-    if (!found)
-      return this.scimError({ status: "404", detail: "User not found" });
+    if (!found) return this.scimError({ status: "404", detail: "User not found" });
     await this.directoryIdentity.assertWritable({
       organizationId,
       connectionId,
@@ -979,8 +940,7 @@ export class ScimService {
         path: operation.path,
         value: operation.value,
       });
-      if (nameParts)
-        name = mergeNameParts({ current: name, ...nameParts }) ?? name;
+      if (nameParts) name = mergeNameParts({ current: name, ...nameParts }) ?? name;
       if (operation.path === "userName" && typeof operation.value === "string")
         userName = operation.value;
       if (operation.value !== null && typeof operation.value === "object") {
@@ -1031,8 +991,7 @@ export class ScimService {
   }): Promise<ScimError | null> {
     assertScimOrganizationId(organizationId);
     const found = await this.findOrganizationUser(organizationId, id);
-    if (!found)
-      return this.scimError({ status: "404", detail: "User not found" });
+    if (!found) return this.scimError({ status: "404", detail: "User not found" });
     await this.directoryIdentity.assertWritable({
       organizationId,
       connectionId,
@@ -1076,9 +1035,7 @@ export class ScimService {
   }
 
   toScimUser(user: User, resource?: ScimUserResource | null): ScimUser {
-    const { givenName, familyName } = this.splitName(
-      (resource ? resource.name : user.name) ?? "",
-    );
+    const { givenName, familyName } = this.splitName((resource ? resource.name : user.name) ?? "");
     const userName = resource?.userName ?? user.email ?? "";
 
     return {
@@ -1107,9 +1064,7 @@ export class ScimService {
 
   private buildNameFromRequest(request: ScimCreateUserRequest): string {
     if (request.name) {
-      const parts = [request.name.givenName, request.name.familyName].filter(
-        Boolean,
-      );
+      const parts = [request.name.givenName, request.name.familyName].filter(Boolean);
       if (parts.length > 0) {
         return parts.join(" ");
       }
