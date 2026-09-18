@@ -6,7 +6,7 @@
  * @see ../../../../../../specs/instant-evals/instant-eval-pipeline.feature
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   fakes,

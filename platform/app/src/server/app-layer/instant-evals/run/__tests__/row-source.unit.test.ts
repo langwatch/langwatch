@@ -12,7 +12,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangWatchQLExecutionResult } from "~/server/analytics/lwql";
+import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";
 import {
   createInstantEvalRowSource,
   InstantEvalResultTruncatedError,
@@ -24,8 +24,8 @@ const CALLER = { id: "project-1", lwqlKey: "lwql-secret" };
 const SQL = "SELECT TraceId, eval(x, 'y') AS annoyed FROM analytics.traces";
 
 function execution(
-  overrides: Partial<LangWatchQLExecutionResult> = {},
-): LangWatchQLExecutionResult {
+  overrides: Partial<LangWatchQLQueryResult> = {},
+): LangWatchQLQueryResult {
   return {
     columns: [{ name: "TraceId", type: "String" }],
     rows: [{ TraceId: "t1" }],
@@ -35,7 +35,7 @@ function execution(
   };
 }
 
-function sourceOver(result: LangWatchQLExecutionResult) {
+function sourceOver(result: LangWatchQLQueryResult) {
   return createInstantEvalRowSource({
     executor: { execute: vi.fn(async () => result) },
     traceSource: {} as never,

@@ -48,7 +48,6 @@ import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent
 import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
-import type { InstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
@@ -57,6 +56,7 @@ import type { GithubInstallationsService } from "./github/github-installations.s
 import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
 import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
 import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import type { InstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
