@@ -22,13 +22,14 @@ import type {
   ShareLinkRow,
 } from "@langwatch/authz-server";
 import {
-  grantFactToCompatBinding,
   grantRowToFact,
   isBindingGrant,
   RESOURCE_KIND_TO_DB,
   SHARE_VISIBILITY_BY_PRINCIPAL_DB,
 } from "@langwatch/authz-server";
+
 import type { Prisma } from "~/generated/prisma/client";
+
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
 import { liveGrants, liveRoles } from "./live-rows";
 
@@ -413,21 +414,21 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     for (const holder of holders) {
       const grant = grantRowToFact(holder);
       if (!isBindingGrant(grant)) continue;
-      const binding = grantFactToCompatBinding({
-        grant,
-        organizationId,
-      });
-      if (binding.customRoleId == null) continue;
-      const entry = held.get(binding.customRoleId) ?? {
+      if (!grant.roleKey.startsWith("custom:")) continue;
+      const roleId = grant.roleKey.slice("custom:".length);
+      const entry = held.get(roleId) ?? {
         isMine: false,
         isForeign: false,
       };
-      if (binding.apiKeyId === apiKeyId) {
+      if (
+        grant.principal.type === "apiKey" &&
+        grant.principal.id === apiKeyId
+      ) {
         entry.isMine = true;
       } else {
         entry.isForeign = true;
       }
-      held.set(binding.customRoleId, entry);
+      held.set(roleId, entry);
     }
     return new Set(
       [...held.entries()]
@@ -453,15 +454,10 @@ function collectBindings<TRow extends BindingGrantRow>({
   for (const row of rows) {
     const grant = grantRowToFact(row);
     if (!isBindingGrant(grant)) continue;
-    const binding = grantFactToCompatBinding({
-      grant,
-      organizationId: row.organizationId,
-    });
     bindings.push({
-      role: binding.role,
-      customRoleId: binding.customRoleId,
-      scopeType: binding.scopeType,
-      scopeId: binding.scopeId,
+      roleKey: grant.roleKey,
+      scopeType: grant.scope.type,
+      scopeId: grant.scope.id,
       viaGroupId: viaGroupId(row),
     });
   }

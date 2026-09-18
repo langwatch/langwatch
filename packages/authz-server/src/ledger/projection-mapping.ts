@@ -3,10 +3,12 @@ import {
   STORED_PRINCIPAL_KIND,
 } from "@langwatch/authz";
 import type {
+  BindingRoleKey,
   StoredPrincipalKind,
   StoredScopeTier,
   TeamUserRole,
 } from "@langwatch/authz";
+
 import { BindingMissingError } from "../authz-grants.repository";
 import type {
   GrantEventSource,
@@ -248,7 +250,7 @@ export interface CompatBindingRowShape {
 type BindingGrant = GrantFact & {
   principal: { type: "user" | "group" | "apiKey"; id: string };
   scope: { type: "ORGANIZATION" | "TEAM" | "PROJECT"; id: string };
-  roleKey: string;
+  roleKey: BindingRoleKey;
 };
 
 /** Select binding facts from streams that also contain resource and platform grants. */
@@ -276,7 +278,8 @@ export function isBindingGrant(grant: GrantFact): grant is BindingGrant {
 
 /**
  * Map a binding fact to the existing API shape. Imported custom grants retain
- * their original built-in role; changing it would change their permissions.
+ * their original built-in role for API compatibility. Runtime authorization
+ * uses the canonical custom role key.
  * @throws BindingMissingError when the fact does not represent a role binding.
  */
 export function grantFactToCompatBinding({

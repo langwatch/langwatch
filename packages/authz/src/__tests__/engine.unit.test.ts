@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { AuthzEngine } from "../engine";
 import type {
   AuthzScopeRef,
@@ -72,8 +73,7 @@ const binding = (
   partial: Partial<CollectedBinding> &
     Pick<CollectedBinding, "scopeType" | "scopeId">,
 ): CollectedBinding => ({
-  role: "MEMBER",
-  customRoleId: null,
+  roleKey: "member",
   viaGroupId: null,
   ...partial,
 });
@@ -81,8 +81,8 @@ const binding = (
 describe("authz engine decide()", () => {
   describe("given an org admin binding and a project viewer binding", () => {
     const bindings = [
-      binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
-      binding({ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT }),
+      binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG }),
+      binding({ roleKey: "viewer", scopeType: "PROJECT", scopeId: PROJECT }),
     ];
     const grants = makeGrants({ bindings });
 
@@ -113,7 +113,7 @@ describe("authz engine decide()", () => {
   describe("given only a viewer binding on one project", () => {
     const grants = makeGrants({
       bindings: [
-        binding({ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT }),
+        binding({ roleKey: "viewer", scopeType: "PROJECT", scopeId: PROJECT }),
       ],
     });
 
@@ -159,8 +159,7 @@ describe("authz engine decide()", () => {
       const grants = makeGrants({
         bindings: [
           binding({
-            role: "CUSTOM",
-            customRoleId: "cr-1",
+            roleKey: "custom:cr-1",
             scopeType: "TEAM",
             scopeId: TEAM,
           }),
@@ -180,8 +179,7 @@ describe("authz engine decide()", () => {
       const grants = makeGrants({
         bindings: [
           binding({
-            role: "CUSTOM",
-            customRoleId: "cr-1",
+            roleKey: "custom:cr-1",
             scopeType: "ORGANIZATION",
             scopeId: ORG,
           }),
@@ -202,7 +200,11 @@ describe("authz engine decide()", () => {
     it("ADMIN at org scope grants everything", () => {
       const grants = makeGrants({
         bindings: [
-          binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
+          binding({
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
         ],
       });
       expect(
@@ -217,7 +219,11 @@ describe("authz engine decide()", () => {
     it("MEMBER at org scope grants only the org-member bag", () => {
       const grants = makeGrants({
         bindings: [
-          binding({ role: "MEMBER", scopeType: "ORGANIZATION", scopeId: ORG }),
+          binding({
+            roleKey: "member",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
         ],
       });
       expect(
@@ -243,7 +249,7 @@ describe("authz engine decide()", () => {
       const grants = makeGrants({
         organizationRole: "EXTERNAL",
         bindings: [
-          binding({ role: "MEMBER", scopeType: "TEAM", scopeId: TEAM }),
+          binding({ roleKey: "member", scopeType: "TEAM", scopeId: TEAM }),
         ],
       });
       expect(
@@ -267,8 +273,7 @@ describe("authz engine decide()", () => {
         organizationRole: "EXTERNAL",
         bindings: [
           binding({
-            role: "CUSTOM",
-            customRoleId: "cr-2",
+            roleKey: "custom:cr-2",
             scopeType: "TEAM",
             scopeId: TEAM,
           }),
@@ -288,7 +293,11 @@ describe("authz engine decide()", () => {
       const grants = makeGrants({
         organizationRole: "EXTERNAL",
         bindings: [
-          binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
+          binding({
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
         ],
       });
       expect(
@@ -306,8 +315,7 @@ describe("authz engine decide()", () => {
       const grants = makeGrants({
         bindings: [
           binding({
-            role: "CUSTOM",
-            customRoleId: "cr-empty",
+            roleKey: "custom:cr-empty",
             scopeType: "TEAM",
             scopeId: TEAM,
           }),
@@ -334,8 +342,7 @@ describe("authz engine decide()", () => {
       const grants = makeGrants({
         bindings: [
           binding({
-            role: "CUSTOM",
-            customRoleId: "cr-missing",
+            roleKey: "custom:cr-missing",
             scopeType: "TEAM",
             scopeId: TEAM,
           }),
@@ -357,7 +364,11 @@ describe("authz engine decide()", () => {
         organizationRole: null,
         isOrgMember: false,
         bindings: [
-          binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
+          binding({
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
         ],
       });
       const decision = engine.decide({
@@ -396,7 +407,11 @@ describe("authz engine decide()", () => {
       const decision = engine.decide({
         grants: nonMember({
           bindings: [
-            binding({ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT }),
+            binding({
+              roleKey: "admin",
+              scopeType: "PROJECT",
+              scopeId: PROJECT,
+            }),
           ],
         }),
         permission: "traces:view",
@@ -410,7 +425,7 @@ describe("authz engine decide()", () => {
       const decision = engine.decide({
         grants: nonMember({
           bindings: [
-            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
+            binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM }),
           ],
         }),
         permission: "traces:view",
@@ -427,7 +442,11 @@ describe("authz engine decide()", () => {
       const decision = engine.decide({
         grants: nonMember({
           bindings: [
-            binding({ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT }),
+            binding({
+              roleKey: "admin",
+              scopeType: "PROJECT",
+              scopeId: PROJECT,
+            }),
           ],
         }),
         permission: "traces:view",
@@ -545,14 +564,14 @@ describe("authz engine decideWithCeiling()", () => {
     organizationRole: null,
     isOrgMember: false,
     bindings: [
-      binding({ role: "MEMBER", scopeType: "PROJECT", scopeId: PROJECT }),
+      binding({ roleKey: "member", scopeType: "PROJECT", scopeId: PROJECT }),
     ],
   });
 
   describe("given an owner whose access was reduced to viewer", () => {
     const ownerGrants = makeGrants({
       bindings: [
-        binding({ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT }),
+        binding({ roleKey: "viewer", scopeType: "PROJECT", scopeId: PROJECT }),
       ],
     });
 
@@ -583,7 +602,7 @@ describe("authz engine decideWithCeiling()", () => {
   describe("given an owner who holds more than the key", () => {
     const ownerGrants = makeGrants({
       bindings: [
-        binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
+        binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG }),
       ],
     });
 
@@ -617,7 +636,7 @@ describe("authz engine decideWithCeiling()", () => {
       const ownerGrants = makeGrants({
         organizationRole: "EXTERNAL",
         bindings: [
-          binding({ role: "MEMBER", scopeType: "TEAM", scopeId: TEAM }),
+          binding({ roleKey: "member", scopeType: "TEAM", scopeId: TEAM }),
         ],
       });
       const decision = engine.decideWithCeiling({
@@ -650,7 +669,7 @@ describe("authz engine explain()", () => {
     const grants = makeGrants({
       bindings: [
         binding({
-          role: "VIEWER",
+          roleKey: "viewer",
           scopeType: "TEAM",
           scopeId: TEAM,
           viaGroupId: "group-9",
@@ -724,7 +743,7 @@ describe("authz engine explain()", () => {
       const decision = engine.decide({
         grants: disabled({
           bindings: [
-            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
+            binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM }),
           ],
         }),
         permission: "project:delete",
@@ -794,7 +813,7 @@ describe("authz engine explain()", () => {
           organizationRole: null,
           isOrgMember: false,
           bindings: [
-            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
+            binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM }),
           ],
         }),
         ownerGrants: disabled(),
@@ -813,7 +832,7 @@ describe("authz engine explain()", () => {
           organizationRole: null,
           isOrgMember: false,
           bindings: [
-            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
+            binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM }),
           ],
         }),
         ownerGrants: null,
@@ -830,7 +849,7 @@ describe("authz engine explain()", () => {
           isOrgMember: true,
           membershipDisabled: false,
           bindings: [
-            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
+            binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM }),
           ],
         }),
         permission: "project:delete",
@@ -839,4 +858,49 @@ describe("authz engine explain()", () => {
       expect(decision.allowed).toBe(true);
     });
   });
+});
+
+describe("migrated custom bindings", () => {
+  /** @scenario "Migrated custom bindings retain their permission restrictions" */
+  it.each(["ORGANIZATION", "TEAM", "PROJECT"] as const)(
+    "honors the custom role key at %s scope",
+    (scopeType) => {
+      const scopeIds = { ORGANIZATION: ORG, TEAM, PROJECT };
+      const grants = makeGrants({
+        bindings: [
+          binding({
+            roleKey: "custom:restricted",
+            scopeType,
+            scopeId: scopeIds[scopeType],
+          }),
+        ],
+        customRolePermissions: new Map([["restricted", ["traces:view"]]]),
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+      expect(
+        engine.decide({
+          grants,
+          permission: "project:delete",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+      const missingRole = {
+        ...grants,
+        customRolePermissions: new Map<string, readonly string[]>(),
+      };
+      expect(
+        engine.decide({
+          grants: missingRole,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+    },
+  );
 });

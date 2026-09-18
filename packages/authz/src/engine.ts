@@ -150,7 +150,7 @@ export class AuthzEngine {
     decision: AuthzDecision;
   }): string {
     const who = binding.viaGroupId ? ` (via group ${binding.viaGroupId})` : "";
-    const label = `${binding.customRoleId ? `custom:${binding.customRoleId}` : binding.role.toLowerCase()} @ ${binding.scopeType.toLowerCase()} ${binding.scopeId}${who}`;
+    const label = `${binding.roleKey} @ ${binding.scopeType.toLowerCase()} ${binding.scopeId}${who}`;
     const onChain = chain.some(
       (link) =>
         link.scopeType === binding.scopeType &&

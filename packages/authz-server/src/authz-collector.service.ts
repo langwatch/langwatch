@@ -9,11 +9,13 @@
 import type {
   AuthzPrincipalRef,
   AuthzScopeRef,
+  CollectedBinding,
   CollectedGrants,
   GrantAudience,
   ResourceGrant,
   ShareableResourceKind,
 } from "@langwatch/authz";
+
 import type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
@@ -443,14 +445,14 @@ function audienceForVisibility({
   }
 }
 
-function dedupeCustomRoleIds(
-  bindings: ReadonlyArray<{ customRoleId: string | null }>,
-): string[] {
-  return Array.from(
-    new Set(
-      [...bindings.map((binding) => binding.customRoleId)].filter(
-        (id): id is string => id != null,
-      ),
+function dedupeCustomRoleIds(bindings: readonly CollectedBinding[]): string[] {
+  return [
+    ...new Set(
+      bindings.flatMap(({ roleKey }) => {
+        if (!roleKey.startsWith("custom:")) return [];
+        const roleId = roleKey.slice("custom:".length);
+        return roleId.length > 0 ? [roleId] : [];
+      }),
     ),
-  );
+  ];
 }

@@ -82,9 +82,11 @@ export type ResourceGrant = {
   audience: GrantAudience;
 };
 
+/** Role keys currently enforced by organization, team, and project grants. */
+export type BindingRoleKey = "admin" | "member" | "viewer" | `custom:${string}`;
+
 export type CollectedBinding = {
-  role: TeamUserRole;
-  customRoleId: string | null;
+  roleKey: BindingRoleKey;
   scopeType: RoleBindingScopeType;
   scopeId: string;
   /** Present when the binding arrived via a group membership. */

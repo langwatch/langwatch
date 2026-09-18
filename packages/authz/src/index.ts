@@ -24,6 +24,7 @@ export type {
   AuthzGrantVia,
   AuthzPrincipalRef,
   AuthzScopeRef,
+  BindingRoleKey,
   CollectedBinding,
   CollectedGrants,
   GrantAudience,

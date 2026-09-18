@@ -56,8 +56,7 @@ export const binding = (
   partial: Partial<CollectedBinding> &
     Pick<CollectedBinding, "scopeType" | "scopeId">,
 ): CollectedBinding => ({
-  role: "MEMBER",
-  customRoleId: null,
+  roleKey: "member",
   viaGroupId: null,
   ...partial,
 });

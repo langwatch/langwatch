@@ -1,5 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { AuthzCollectorService } from "../authz-collector.service";
 import {
   type AuthzGrantsRepository,
@@ -423,7 +424,6 @@ describe("GrantsService.revoke", () => {
       expect(bumpEpoch).not.toHaveBeenCalled();
     });
   });
-
 });
 
 describe("GrantsService.update", () => {
@@ -629,8 +629,7 @@ describe("GrantsService.offboard", () => {
             makeReader({
               findUserBindings: vi.fn().mockResolvedValue([
                 {
-                  role: "MEMBER",
-                  customRoleId: null,
+                  roleKey: "member",
                   scopeType: "TEAM",
                   scopeId: TEAM,
                   viaGroupId: null,
@@ -662,8 +661,7 @@ describe("GrantsService.offboard", () => {
             findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
             findApiKeyBindings: vi.fn().mockResolvedValue([
               {
-                role: "ADMIN",
-                customRoleId: null,
+                roleKey: "admin",
                 scopeType: "PROJECT",
                 scopeId: PROJECT,
                 viaGroupId: null,

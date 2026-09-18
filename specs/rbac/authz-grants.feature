@@ -683,3 +683,10 @@ Feature: Authorization grants
     Given a fact delivered twice
     When it is handled
     Then exactly one audit row exists
+
+  @unit @regression
+  Scenario: Migrated custom bindings retain their permission restrictions
+    Given an organization, team or project binding retains ADMIN beside its customRoleId
+    When the custom role only grants traces:view
+    Then project:delete is denied
+    And a missing custom role fails closed

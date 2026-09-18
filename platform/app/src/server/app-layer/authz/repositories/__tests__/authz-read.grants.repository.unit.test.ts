@@ -1,6 +1,9 @@
+import { AuthzEngine } from "@langwatch/authz";
 import type { GrantRowShape } from "@langwatch/authz-server";
 import { describe, expect, it, vi } from "vitest";
+
 import type { Prisma } from "~/generated/prisma/client";
+
 import { GrantsAuthzReadRepository } from "../authz-read.grants.repository";
 
 /** Grants remain tenant-scoped, membership-gated, and private to their owner. */
@@ -129,15 +132,13 @@ describe("GrantsAuthzReadRepository", () => {
       });
       expect(bindings).toEqual([
         {
-          role: "ADMIN",
-          customRoleId: null,
+          roleKey: "admin",
           scopeType: "TEAM",
           scopeId: "team-1",
           viaGroupId: null,
         },
         {
-          role: "CUSTOM",
-          customRoleId: "role-9",
+          roleKey: "custom:role-9",
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: null,
@@ -145,7 +146,68 @@ describe("GrantsAuthzReadRepository", () => {
       ]);
     });
 
-    it("translates member and viewer keys onto their legacy roles", async () => {
+    /** @scenario "Migrated custom bindings retain their permission restrictions" */
+    it.each(["ORGANIZATION", "TEAM", "PROJECT"] as const)(
+      "collects the canonical custom key beside legacy ADMIN at %s scope",
+      async (scopeType) => {
+        const scopeIds = {
+          ORGANIZATION: "org-1",
+          TEAM: "team-1",
+          PROJECT: "project-1",
+        };
+        const repository = new GrantsAuthzReadRepository(
+          clientFor({
+            organizationUser: { findFirst: member() },
+            grant: {
+              findMany: vi.fn().mockResolvedValue([
+                grantRow({
+                  roleKey: "custom:restricted",
+                  legacyRole: "ADMIN",
+                  scopeType,
+                  scopeId: scopeIds[scopeType],
+                }),
+              ]),
+            },
+          }),
+        );
+        const bindings = await repository.findUserBindings({
+          userId: "alice",
+          organizationId: "org-1",
+        });
+        const grants = {
+          principal: { type: "user", id: "alice" } as const,
+          organizationId: "org-1",
+          organizationRole: "MEMBER" as const,
+          isOrgMember: true,
+          membershipDisabled: false,
+          bindings,
+          customRolePermissions: new Map([["restricted", ["traces:view"]]]),
+        };
+        const scope = {
+          type: "project",
+          id: "project-1",
+          teamId: "team-1",
+          organizationId: "org-1",
+        } as const;
+        const engine = new AuthzEngine();
+        expect(
+          engine.decide({ grants, permission: "traces:view", scope }).allowed,
+        ).toBe(true);
+        expect(
+          engine.decide({ grants, permission: "project:delete", scope })
+            .allowed,
+        ).toBe(false);
+        expect(
+          engine.decide({
+            grants: { ...grants, customRolePermissions: new Map() },
+            permission: "traces:view",
+            scope,
+          }).allowed,
+        ).toBe(false);
+      },
+    );
+
+    it("preserves member and viewer role keys", async () => {
       const repository = new GrantsAuthzReadRepository(
         clientFor({
           organizationUser: { findFirst: member() },
@@ -168,8 +230,8 @@ describe("GrantsAuthzReadRepository", () => {
             userId: "alice",
             organizationId: "org-1",
           })
-        ).map((binding) => binding.role),
-      ).toEqual(["MEMBER", "VIEWER"]);
+        ).map((binding) => binding.roleKey),
+      ).toEqual(["member", "viewer"]);
     });
 
     describe("when the user has left the organization", () => {
@@ -248,8 +310,7 @@ describe("GrantsAuthzReadRepository", () => {
           }),
         ).toEqual([
           {
-            role: "ADMIN",
-            customRoleId: null,
+            roleKey: "admin",
             scopeType: "TEAM",
             scopeId: "team-2",
             viaGroupId: null,
@@ -302,8 +363,7 @@ describe("GrantsAuthzReadRepository", () => {
       });
       expect(bindings).toEqual([
         {
-          role: "MEMBER",
-          customRoleId: null,
+          roleKey: "member",
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: "group-2",
@@ -367,8 +427,7 @@ describe("GrantsAuthzReadRepository", () => {
       });
       expect(bindings).toEqual([
         {
-          role: "VIEWER",
-          customRoleId: null,
+          roleKey: "viewer",
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: null,
@@ -892,7 +951,10 @@ describe("GrantsAuthzReadRepository", () => {
 
       expect(
         await repository.findProjectLineage({ projectId: "proj-1" }),
-      ).toEqual({ teamId: "team-1", organizationId: "org-1" });
+      ).toEqual({
+        teamId: "team-1",
+        organizationId: "org-1",
+      });
       expect(
         await repository.findProjectLineage({ projectId: "proj-ghost" }),
       ).toBeNull();
@@ -911,7 +973,9 @@ describe("GrantsAuthzReadRepository", () => {
 
       expect(
         await repository.findTeamOrganization({ teamId: "team-1" }),
-      ).toEqual({ organizationId: "org-1" });
+      ).toEqual({
+        organizationId: "org-1",
+      });
       expect(
         await repository.findTeamOrganization({ teamId: "team-ghost" }),
       ).toBeNull();

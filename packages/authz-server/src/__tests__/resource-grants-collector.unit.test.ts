@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { AuthzCollectorService } from "../authz-collector.service";
 import { makeReader } from "./support/authz-read.stub";
 import {
@@ -11,8 +12,7 @@ import {
 
 const customRoleBinding = [
   {
-    role: "CUSTOM" as const,
-    customRoleId: "cr-1",
+    roleKey: "custom:cr-1",
     scopeType: "PROJECT" as const,
     scopeId: PROJECT,
     viaGroupId: null,
