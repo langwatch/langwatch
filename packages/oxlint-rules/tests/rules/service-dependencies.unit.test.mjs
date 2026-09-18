@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { serviceDependenciesRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -44,6 +45,29 @@ describe("given a strict feature service module", () => {
   });
 
   describe("when it imports its own repository", () => {
+    /** @scenario "Module service ownership follows both process and server layouts" */
+    it.each([
+      "modules/agent/process",
+      "modules/agent/server",
+      "enterprise/modules/agent/process",
+      "enterprise/modules/agent/server",
+    ])("keeps local repositories and rejects peer repositories in %s", (owner) => {
+      const filename = `${owner}/src/services/agent.service.ts`;
+      const local = runRule(serviceDependenciesRule, {
+        code: 'import { AgentRepository } from "../repositories/agent.repository";',
+        cwd: workspace.cwd,
+        filename,
+      });
+      const foreign = runRule(serviceDependenciesRule, {
+        code: 'import { ProjectRepository } from "../../../../project/process/src/repositories/project.repository";',
+        cwd: workspace.cwd,
+        filename,
+      });
+
+      expect(local).toEqual([]);
+      expect(foreign.map((entry) => entry.messageId)).toEqual(["foreignRepository"]);
+    });
+
     /** @scenario "A service's own repository import is left alone" */
     it("reports nothing", () => {
       expect(report('import { AgentRepository } from "../repositories/agent.repository";')).toEqual(

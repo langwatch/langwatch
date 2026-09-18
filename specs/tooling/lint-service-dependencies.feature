@@ -26,3 +26,9 @@ Feature: The service-dependencies lint rule
     Given a service module that imports the global application accessor
     When the service-dependencies rule runs over it
     Then it reports globalApplication
+
+  @unit
+  Scenario: Module service ownership follows both process and server layouts
+    Given core and enterprise services in process and server module layouts
+    When each service imports its own repository and a peer module repository
+    Then only the peer repository import is reported

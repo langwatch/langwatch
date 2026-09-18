@@ -1,4 +1,5 @@
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
+
 import { defineRule } from "../define-rule.mjs";
 
 function serviceSubject(filename) {
@@ -8,7 +9,9 @@ function serviceSubject(filename) {
 
 function serviceOwnerRoot(filename, cwd) {
   const normalized = relative(cwd, filename).split(sep).join("/");
-  const feature = normalized.match(/^((?:enterprise\/)?modules\/[^/]+\/server)\/src\/services\//);
+  const feature = normalized.match(
+    /^((?:enterprise\/)?modules\/[^/]+\/(?:process|server))\/src\/services\//,
+  );
   if (feature) return resolve(cwd, feature[1]);
   const application = normalized.match(/^(apps\/(?:api|worker|ui)\/src\/[^/]+)\//);
   return application ? resolve(cwd, application[1]) : dirname(filename);
@@ -92,7 +95,9 @@ function foreignSubjectOf(node) {
     ?.replace(/\.[cm]?[jt]s$/, "");
   if (pathBase?.endsWith(".repository")) return pathBase.slice(0, -".repository".length);
 
-  const named = node.specifiers.find((specifier) => importedName(specifier)?.endsWith("Repository"));
+  const named = node.specifiers.find((specifier) =>
+    importedName(specifier)?.endsWith("Repository"),
+  );
   const name = named ? importedName(named) : undefined;
   return name ? name.slice(0, -"Repository".length) : undefined;
 }
