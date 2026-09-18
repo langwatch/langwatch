@@ -523,6 +523,7 @@ export const REAL_FACT_TABLES = [
   "trace_analytics_rollup",
   "evaluation_analytics",
   "evaluation_analytics_rollup",
+  "instant_eval_judgments",
 ] as const;
 
 /**
@@ -1331,6 +1332,37 @@ async function seedAnalyticsProjections({
       })),
     });
   }
+
+  // One judgement per seeded trace, per tenant: the judgments view reads this
+  // table, and an isolation assertion over a view whose table is empty proves
+  // nothing.
+  await admin.insert({
+    table: `${database}.instant_eval_judgments`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_TRACES_PER_WEEK).keys()].map((index) => ({
+          TenantId: tenant.tenantId,
+          RunId: `${tenant.tenantId}-instant-eval-run`,
+          TraceId: `${tenant.tenantId}-trace-${week}-${index}`,
+          QuestionId: "annoyed",
+          ThreadId: "",
+          SpanId: "",
+          Kind: "boolean",
+          Status: "judged",
+          Passed: index % 2,
+          Score: null,
+          Label: "",
+          Probability: 0.5 + index / 100,
+          Probabilities: "",
+          Error: "",
+          OccurredAt: seedWeekStart(week),
+          CreatedAt: seedWeekStart(week),
+          UpdatedAt: seedWeekStart(week),
+        })),
+      ),
+    ),
+  });
 
   for (const part of ROLLUP_MERGE_FIXTURE.evaluationParts) {
     await admin.insert({
