@@ -271,6 +271,14 @@ export async function openTab(name: RegExp) {
   const tab = screen.getByRole("tab", { name });
   await userEvent.click(tab);
   await waitFor(() => expect(tab).toHaveAttribute("aria-selected", "true"));
+  // A selected tab is not a filled panel. The panel's content lands in a later
+  // commit than the selection, so a caller that queries on the click's own tick
+  // can read an empty panel and fail on a row that is about to render. Waiting
+  // for the panel to hold something is what makes every caller's first query
+  // safe, rather than each one remembering to use an async query.
+  await waitFor(() => {
+    expect(screen.getByRole("tabpanel").textContent ?? "").not.toBe("");
+  });
 }
 
 beforeEach(() => {

@@ -38531,6 +38531,149 @@ If you encounter any hurdles or have questions, our support team is eager to ass
 
 ---
 
+# FILE: ./features/querying-your-data.mdx
+
+---
+title: Querying your data
+description: LangWatch answers two query languages, analytics SQL and the trace filter. One endpoint describes both, and the CLI runs either without a browser.
+---
+
+## Which language answers which question
+
+The trace filter finds traces. It is the language the Trace Explorer's search
+bar speaks, it returns whole traces with their spans and evaluations, and it
+reaches attribute keys, span events and evaluator verdicts.
+
+Analytics SQL (LangWatchQL) answers questions about many traces at once: a
+count, a rate, a percentile, any of them grouped or over time, and joins across
+views. It returns columns, not traces.
+
+| When you want | Use |
+| --- | --- |
+| The traces matching a condition, to read them | Trace filter |
+| A value of an attribute you send yourself | Trace filter |
+| Free text in the captured input or output | Trace filter |
+| A count, a sum, a rate or a percentile | Analytics SQL |
+| Anything grouped by model, evaluator, user or conversation | Analytics SQL |
+| Traces joined to their spans or evaluations | Analytics SQL |
+
+## One reference for both
+
+`GET /api/v1/query/reference` describes both languages in one payload: the SQL
+views and columns, the filter fields and syntax, worked examples in each, and
+the decision table above.
+
+Every example goes through the real validator and the real translator on every
+build, so a published example is never one the API would refuse on sight.
+
+Whether your key can run a given example is a separate question, and each
+example answers it. `available` is false when a column it reads is withheld
+from you, and `requires` says what it would take.
+
+```bash
+langwatch query reference
+langwatch query reference --section trace-filter
+langwatch query examples --tag cost
+```
+
+The reference carries no values from your project. Values change under you and
+reading them all is expensive, so they come from a separate call.
+
+```bash
+langwatch trace fields
+langwatch trace facets model --prefix gpt
+langwatch trace facets
+```
+
+`trace fields` lists what you can filter on. `trace facets` says what those
+fields hold in your project right now, which is the question to ask before
+guessing how a value is spelled.
+
+## Filtering traces
+
+Send the filter string as `filter` on `POST /api/traces/search`, or pass
+`--filter` to the CLI. It combines with the free-text query and the other
+options, so every condition you send has to hold.
+
+```bash
+langwatch trace search --filter "status:error AND model:gpt-*" --limit 20
+langwatch trace search --filter "trace.attribute.langwatch.user_id:alice"
+langwatch trace search --filter "evaluatorVerdict:fail" -q "refund"
+```
+
+Three namespaces reach arbitrary OpenTelemetry attributes:
+`trace.attribute.<key>`, `span.attribute.<key>` and `event.attribute.<key>`. The
+older `attribute.<key>` and `event.<key>` spellings still work.
+
+A filter naming a field the language does not have answers 422 and names both
+the offending field and the fields that exist.
+
+## Running analytics SQL
+
+```bash
+langwatch query "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces
+FROM analytics.traces
+WHERE OccurredAt >= subtractDays(now(), 7)
+GROUP BY day ORDER BY day"
+```
+
+The statement runs exactly as submitted. Filter on the dataset's time column, as
+every example does: without that predicate the read touches every partition your
+project has, including the cold ones.
+
+`--sql-file` reads the statement from a file, `--param key=value` binds a
+parameter the statement declares, and `--start` with `--end` fills the reserved
+period parameters.
+
+```bash
+langwatch query --sql-file report.sql --param days=30 -f json
+```
+
+## Exporting rows
+
+`--format jsonl` writes one JSON object per row and parses JSON-typed columns
+back into real values, which is the shape a training-data reader expects.
+`--format csv` writes a header row with RFC 4180 escaping. `--out` writes to a file.
+
+```bash
+langwatch query --sql-file export.sql --format jsonl --out train.jsonl
+```
+
+The query endpoint has no cursor of its own, so a result larger than one
+response pages through a predicate you write. Declare the two cursor parameters,
+order by the same two columns, and `--page-by keyset` rebinds them between pages
+without changing a character of your statement.
+
+```sql
+SELECT TraceId, OccurredAt, CapturedInput, CapturedOutput
+FROM analytics.traces
+WHERE OccurredAt >= subtractDays(now(), 7)
+  AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
+ORDER BY OccurredAt, TraceId
+LIMIT 1000
+```
+
+```bash
+langwatch query --sql-file export.sql --page-by keyset --format jsonl --out train.jsonl
+```
+
+## From an MCP client
+
+`discover_schema` answers the same two descriptions, as markdown: category
+`filters` for the trace filter, `lwql` for the analytics SQL, `all` for
+everything. `run_query` runs a statement and renders up to 50 rows as a table,
+saying how many the statement really returned. `search_traces` takes the same
+`filter` string the REST endpoint does.
+
+## Permissions
+
+Both query doors need `analytics:view`; the trace search and the facets endpoint
+need `traces:view`. A column your key cannot read is listed with
+`available: false` and names the permission it needs, rather than being hidden,
+so you can see what a wider key would reach.
+
+---
+
 # FILE: ./features/webhooks.mdx
 
 ---
@@ -67351,6 +67494,15 @@ openapi: "PUT /api/prompts/{id}/tags/{tag}"
 
 ---
 
+# FILE: ./api-reference/query/discover-both-query-languages.mdx
+
+---
+title: "Discover both query languages"
+openapi: "GET /api/v1/query/reference"
+---
+
+---
+
 # FILE: ./api-reference/query/discover-the-queryable-langwatchql-schema.mdx
 
 ---
@@ -68922,6 +69074,15 @@ openapi: 'POST /api/trace/{id}/share'
 ---
 title: 'Delete an existing public path for a trace'
 openapi: 'POST /api/trace/{id}/unshare'
+---
+
+---
+
+# FILE: ./api-reference/traces/discover-what-the-trace-filter-fields-ho.mdx
+
+---
+title: "Discover what the trace filter fields hold"
+openapi: "GET /api/traces/facets"
 ---
 
 ---

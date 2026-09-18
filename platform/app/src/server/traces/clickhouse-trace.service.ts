@@ -1084,6 +1084,14 @@ export class ClickHouseTraceService {
             );
           }
 
+          // A trace filter string, already compiled by the boundary that
+          // accepted it. One more condition on the same alias, so it narrows
+          // the legacy filters rather than replacing them.
+          if (options.filterWhere) {
+            filterConditions.push(options.filterWhere.sql);
+            Object.assign(filterParams, options.filterWhere.params);
+          }
+
           // The scroll's snapshot point. Pinned once, on the page that starts
           // the scroll, then carried by the cursor so every later page resolves
           // the same versions. Only the updated axis needs it — OccurredAt is

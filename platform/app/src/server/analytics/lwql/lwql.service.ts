@@ -516,6 +516,19 @@ export class LangWatchQLService {
   }
 
   /**
+   * The database every dataset name is qualified with.
+   *
+   * Published because the query reference assembles the same schema alongside a
+   * second query language, and the qualifier is a deployment fact only this
+   * service holds — `analytics` in production, a per-suite database under test.
+   * Re-deriving it at the reference would mean a document whose dataset names
+   * are unrunnable on exactly the deployments where it differs.
+   */
+  get database(): string {
+    return this.deps.database;
+  }
+
+  /**
    * Decides whether a statement may run for these permissions, without running
    * it — steps 2 and 3 of the order this file documents.
    *
@@ -572,7 +585,7 @@ export class LangWatchQLService {
       gatedColumns: lwqlGatedColumns({ protections, views: this.views }),
       // The positive form of the same permissions, which is what an app
       // function is gated on: it has no column for the withheld set to name.
-      heldPermissions: lwqlHeldPermissions({ protections }),
+      heldPermissions: [...lwqlHeldPermissions(protections)],
       defaultDatabase: this.deps.database,
     });
 
@@ -708,21 +721,27 @@ export class LangWatchQLService {
       this.deps.traceSource ?? createLangWatchQLAppFunctionTraceSource());
   }
 
-  private async executeValidated({
+  /**
+   * Step 4: the database call, and the one ceiling that is checked on what it
+   * returned rather than on what the application then put in it.
+   *
+   * Split from {@link executeValidated} because it is the half with no
+   * decisions left in it — the statement is settled, the scope is settled, and
+   * what comes back is rows.
+   */
+  private async runStatement({
     executor,
     projects,
-    protections,
     sql,
     validation,
     granularity,
   }: {
     readonly executor: LangWatchQLExecutor;
     readonly projects: readonly LangWatchQLCaller[];
-    readonly protections: Protections;
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
-  }): Promise<LangWatchQLQueryResult> {
+  }): Promise<Awaited<ReturnType<LangWatchQLExecutor["execute"]>>> {
     const executionParameters = executionParametersFor({
       validation,
       granularity,
@@ -757,6 +776,32 @@ export class LangWatchQLService {
     assertResultWithinByteCeiling({
       rows: execution.rows,
       maxResultBytes: this.limits.maxResultBytes,
+    });
+
+    return execution;
+  }
+
+  private async executeValidated({
+    executor,
+    projects,
+    protections,
+    sql,
+    validation,
+    granularity,
+  }: {
+    readonly executor: LangWatchQLExecutor;
+    readonly projects: readonly LangWatchQLCaller[];
+    readonly protections: Protections;
+    readonly sql: string;
+    readonly validation: ValidatedLangWatchQL;
+    readonly granularity: LangWatchQLGranularityResolution;
+  }): Promise<LangWatchQLQueryResult> {
+    const execution = await this.runStatement({
+      executor,
+      projects,
+      sql,
+      validation,
+      granularity,
     });
 
     // Step 5a: replace each app-function key with the value it names. Runs

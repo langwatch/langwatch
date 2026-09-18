@@ -283,7 +283,7 @@ export function describeLangWatchQLAppFunctions({
   protections: Protections;
   appFunctions?: readonly LangWatchQLAppFunctionDefinition[];
 }): readonly LangWatchQLSchemaAppFunction[] {
-  const held = new Set(lwqlHeldPermissions({ protections }));
+  const held = lwqlHeldPermissions(protections);
   return appFunctions.map((definition) => ({
     name: definition.name,
     signature: lwqlAppFunctionSignature(definition),

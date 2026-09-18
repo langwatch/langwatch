@@ -185,8 +185,9 @@ export const CAPABILITY_CATALOG = {
     noun: { singular: "analytics query", plural: "analytics" },
   },
   // The LangWatchQL door (`langwatch query <sql>`): a headless coding agent
-  // runs analytics SQL. The result is an aggregate addressed by the statement,
-  // so it re-runs from the stored query, same as `analytics`.
+  // runs analytics SQL, and `langwatch query reference` describes both query
+  // languages. The result is an aggregate addressed by the statement, so it
+  // re-runs from the stored query, same as `analytics`.
   query: {
     surface: "analytics",
     digestStrategy: "query-ref",
