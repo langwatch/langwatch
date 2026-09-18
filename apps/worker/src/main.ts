@@ -13,7 +13,7 @@ import { createServerApp } from "@langwatch/installed-modules/server";
 import { configureLogger, createLogger, loggerConfigurationFrom } from "@langwatch/observability";
 import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
 import { prometheusMetrics, startOtlpMetricsExport } from "@langwatch/observability/node";
-import { hostedRuntime, Server } from "@langwatch/process-server";
+import { Server } from "@langwatch/process-server";
 import { createProcessMembers, hostedMembers } from "@langwatch/process-stores";
 import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
 
@@ -67,8 +67,7 @@ export async function startWorker(): Promise<Server> {
     .boot();
 
   // Jobs drain before anything they call into is released.
-  server.with(hostedRuntime({ name: "worker runtime", runtime, drain: true }));
-  await server.listen();
+  await server.run(runtime);
   return server;
 }
 
