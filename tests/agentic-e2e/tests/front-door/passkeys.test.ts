@@ -63,11 +63,21 @@ test.describe("Passkeys", () => {
       // be offering one — the title says "Sign in faster next time" rather
       // than the two-step-only "Secure your account" wording.
       await expect(nudge).toContainText("Sign in faster next time");
+      // The dialog closes on the click and records the dismissal afterwards,
+      // so `not.toBeVisible()` is true a moment before the server knows. The
+      // next line is a full page load, which starts the offer's state over: if
+      // it lands first, the nudge is back, and the only symptom is that the
+      // click below hits a dialog instead of the button behind it.
+      const dismissed = page.waitForResponse((response) =>
+        response.url().includes("user.dismissSecureAccountNudge"),
+      );
       await page.getByRole("button", { name: "Not now" }).click();
       await expect(nudge).not.toBeVisible();
+      await dismissed;
 
       // ── #4: adding a passkey from settings ──
       await page.goto("/settings/security");
+      await expect(nudge).not.toBeVisible();
       await expect(page.getByTestId("passkeys-settings-section")).toBeVisible();
       await page.getByTestId("create-passkey").click();
       await expect(page.getByTestId("passkey-ceremony-dialog")).toBeVisible();
