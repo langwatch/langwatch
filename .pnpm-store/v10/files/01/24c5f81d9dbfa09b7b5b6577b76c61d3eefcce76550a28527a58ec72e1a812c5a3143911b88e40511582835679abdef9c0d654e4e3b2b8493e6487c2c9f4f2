@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BodyTextToDialogueStreamWithTimestamps = exports.BodyTextToDialogueMultiVoiceV1TextToDialoguePost = exports.BodyTextToDialogueMultiVoiceStreamingV1TextToDialogueStreamPost = exports.BodyTextToDialogueFullWithTimestamps = void 0;
+var BodyTextToDialogueFullWithTimestamps_1 = require("./BodyTextToDialogueFullWithTimestamps");
+Object.defineProperty(exports, "BodyTextToDialogueFullWithTimestamps", { enumerable: true, get: function () { return BodyTextToDialogueFullWithTimestamps_1.BodyTextToDialogueFullWithTimestamps; } });
+var BodyTextToDialogueMultiVoiceStreamingV1TextToDialogueStreamPost_1 = require("./BodyTextToDialogueMultiVoiceStreamingV1TextToDialogueStreamPost");
+Object.defineProperty(exports, "BodyTextToDialogueMultiVoiceStreamingV1TextToDialogueStreamPost", { enumerable: true, get: function () { return BodyTextToDialogueMultiVoiceStreamingV1TextToDialogueStreamPost_1.BodyTextToDialogueMultiVoiceStreamingV1TextToDialogueStreamPost; } });
+var BodyTextToDialogueMultiVoiceV1TextToDialoguePost_1 = require("./BodyTextToDialogueMultiVoiceV1TextToDialoguePost");
+Object.defineProperty(exports, "BodyTextToDialogueMultiVoiceV1TextToDialoguePost", { enumerable: true, get: function () { return BodyTextToDialogueMultiVoiceV1TextToDialoguePost_1.BodyTextToDialogueMultiVoiceV1TextToDialoguePost; } });
+var BodyTextToDialogueStreamWithTimestamps_1 = require("./BodyTextToDialogueStreamWithTimestamps");
+Object.defineProperty(exports, "BodyTextToDialogueStreamWithTimestamps", { enumerable: true, get: function () { return BodyTextToDialogueStreamWithTimestamps_1.BodyTextToDialogueStreamWithTimestamps; } });

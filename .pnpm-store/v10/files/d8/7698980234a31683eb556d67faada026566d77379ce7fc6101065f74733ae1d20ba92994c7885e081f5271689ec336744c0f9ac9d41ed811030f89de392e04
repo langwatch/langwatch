@@ -1,0 +1,112 @@
+export { emitWarningIfUnsupportedVersion, state } from "./emitWarningIfUnsupportedVersion";
+export { getLongPollPlugin } from "./longPollMiddleware";
+export { setCredentialFeature } from "./setCredentialFeature";
+export { setFeature } from "./setFeature";
+export { setTokenFeature } from "./setTokenFeature";
+export {
+  hostHeaderMiddleware,
+  hostHeaderMiddlewareOptions,
+  getHostHeaderPlugin,
+  resolveHostHeaderConfig,
+} from "./middleware-host-header/hostHeaderMiddleware";
+export {
+  HostHeaderInputConfig,
+  HostHeaderResolvedConfig,
+} from "./middleware-host-header/hostHeaderMiddleware";
+export {
+  loggerMiddleware,
+  loggerMiddlewareOptions,
+  getLoggerPlugin,
+} from "./middleware-logger/loggerMiddleware";
+export { recursionDetectionMiddlewareOptions } from "./middleware-recursion-detection/configuration";
+export { getRecursionDetectionPlugin } from "./middleware-recursion-detection/getRecursionDetectionPlugin";
+export { recursionDetectionMiddleware } from "./middleware-recursion-detection/recursionDetectionMiddleware";
+export { DEFAULT_UA_APP_ID, resolveUserAgentConfig } from "./middleware-user-agent/configurations";
+export {
+  UserAgentInputConfig,
+  UserAgentResolvedConfig,
+} from "./middleware-user-agent/configurations";
+export {
+  userAgentMiddleware,
+  getUserAgentMiddlewareOptions,
+  getUserAgentPlugin,
+} from "./middleware-user-agent/user-agent-middleware";
+export {
+  createDefaultUserAgentProvider,
+  defaultUserAgent,
+  crtAvailability,
+} from "./util-user-agent-node/defaultUserAgent";
+export {
+  DefaultUserAgentOptions,
+  PreviouslyResolved,
+} from "./util-user-agent-node/defaultUserAgent";
+export {
+  NODE_APP_ID_CONFIG_OPTIONS,
+  UA_APP_ID_ENV_NAME,
+  UA_APP_ID_INI_NAME,
+} from "./util-user-agent-node/nodeAppIdConfigOptions";
+export { fallback } from "./util-user-agent-browser/defaultUserAgent";
+export { createUserAgentStringParsingProvider } from "./util-user-agent-browser/createUserAgentStringParsingProvider";
+export { awsEndpointFunctions } from "./util-endpoints/aws";
+export { resolveEndpoint } from "./util-endpoints/resolveEndpoint";
+export {
+  resolveDefaultAwsRegionalEndpointsConfig,
+  toEndpointV1,
+} from "./util-endpoints/resolveDefaultAwsRegionalEndpointsConfig";
+export {
+  DefaultAwsRegionalEndpointsInputConfig,
+  DefaultAwsRegionalEndpointsResolvedConfig,
+} from "./util-endpoints/resolveDefaultAwsRegionalEndpointsConfig";
+export { isIpAddress } from "./util-endpoints/lib/isIpAddress";
+export { isVirtualHostableS3Bucket } from "./util-endpoints/lib/aws/isVirtualHostableS3Bucket";
+export { parseArn } from "./util-endpoints/lib/aws/parseArn";
+export {
+  partition,
+  setPartitionInfo,
+  useDefaultPartitionInfo,
+  getUserAgentPrefix,
+} from "./util-endpoints/lib/aws/partition";
+export { PartitionsInfo } from "./util-endpoints/lib/aws/partition";
+export { EndpointError } from "./util-endpoints/types/EndpointError";
+export {
+  EndpointObjectProperties,
+  EndpointObjectHeaders,
+  EndpointObject,
+  EndpointRuleObject,
+} from "./util-endpoints/types/EndpointRuleObject";
+export { ErrorRuleObject } from "./util-endpoints/types/ErrorRuleObject";
+export { RuleSetRules, TreeRuleObject } from "./util-endpoints/types/TreeRuleObject";
+export {
+  DeprecatedObject,
+  ParameterObject,
+  RuleSetObject,
+} from "./util-endpoints/types/RuleSetObject";
+export {
+  ReferenceObject,
+  FunctionObject,
+  FunctionArgv,
+  FunctionReturn,
+  ConditionObject,
+  Expression,
+  EndpointParams,
+  EndpointResolverOptions,
+  ReferenceRecord,
+  EvaluateOptions,
+} from "./util-endpoints/types/shared";
+export {
+  REGION_ENV_NAME,
+  REGION_INI_NAME,
+  NODE_REGION_CONFIG_OPTIONS,
+  NODE_REGION_CONFIG_FILE_OPTIONS,
+  resolveRegionConfig,
+} from "./region-config-resolver/awsRegionConfig";
+export { RegionInputConfig, RegionResolvedConfig } from "./region-config-resolver/awsRegionConfig";
+export {
+  stsRegionDefaultResolver,
+  warning as stsRegionWarning,
+} from "./region-config-resolver/stsRegionDefaultResolver";
+export {
+  getAwsRegionExtensionConfiguration,
+  resolveAwsRegionExtensionConfiguration,
+} from "./region-config-resolver/extensions";
+export { RegionExtensionRuntimeConfigType } from "./region-config-resolver/extensions";

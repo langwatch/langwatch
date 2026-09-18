@@ -1,0 +1,67 @@
+{
+  "name": "@openai/agents",
+  "repository": "https://github.com/openai/openai-agents-js",
+  "homepage": "https://openai.github.io/openai-agents-js/",
+  "version": "0.3.9",
+  "description": "The OpenAI Agents SDK is a lightweight yet powerful framework for building multi-agent workflows.",
+  "author": "OpenAI <support@openai.com>",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    },
+    "./realtime": {
+      "types": "./dist/realtime/index.d.ts",
+      "require": "./dist/realtime/index.js",
+      "import": "./dist/realtime/index.mjs"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "require": "./dist/utils/index.js",
+      "import": "./dist/utils/index.mjs"
+    }
+  },
+  "dependencies": {
+    "debug": "^4.4.0",
+    "openai": "^6",
+    "@openai/agents-openai": "0.3.9",
+    "@openai/agents-realtime": "0.3.9",
+    "@openai/agents-core": "0.3.9"
+  },
+  "keywords": [
+    "openai",
+    "agents",
+    "ai",
+    "agentic"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/debug": "^4.1.12",
+    "zod": "^3.25.40 || ^4.0"
+  },
+  "peerDependencies": {
+    "zod": "^3.25.40 || ^4.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "typesVersions": {
+    "*": {
+      "realtime": [
+        "dist/realtime/index.d.ts"
+      ],
+      "utils": [
+        "dist/utils/index.d.ts"
+      ]
+    }
+  },
+  "scripts": {
+    "prebuild": "tsx ../../scripts/embedMeta.ts",
+    "build": "tsc",
+    "build-check": "tsc --noEmit -p ./tsconfig.test.json",
+    "dist:check": "tsc --noEmit -p ./tsconfig.dist-check.json"
+  }
+}

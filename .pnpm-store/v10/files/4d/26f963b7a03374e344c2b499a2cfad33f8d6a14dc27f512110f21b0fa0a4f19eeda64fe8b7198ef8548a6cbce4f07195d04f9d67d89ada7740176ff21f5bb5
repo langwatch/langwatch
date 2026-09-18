@@ -1,0 +1,121 @@
+{
+  "name": "@aws-sdk/nested-clients",
+  "version": "3.997.42",
+  "description": "Nested clients for AWS SDK packages.",
+  "homepage": "https://github.com/aws/aws-sdk-js-v3/tree/main/packages/nested-clients",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "AWS SDK for JavaScript Team",
+    "url": "https://aws.amazon.com/sdk-for-javascript/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aws/aws-sdk-js-v3.git",
+    "directory": "packages/nested-clients"
+  },
+  "files": [
+    "./cognito-identity.d.ts",
+    "./cognito-identity.js",
+    "./signin.d.ts",
+    "./signin.js",
+    "./sso-oidc.d.ts",
+    "./sso-oidc.js",
+    "./sso.d.ts",
+    "./sso.js",
+    "./sts.d.ts",
+    "./sts.js",
+    "dist-*/**"
+  ],
+  "sideEffects": false,
+  "main": "./dist-cjs/index.js",
+  "module": "./dist-es/index.js",
+  "browser": {
+    "./dist-es/submodules/cognito-identity/runtimeConfig": "./dist-es/submodules/cognito-identity/runtimeConfig.browser",
+    "./dist-es/submodules/signin/runtimeConfig": "./dist-es/submodules/signin/runtimeConfig.browser",
+    "./dist-es/submodules/sso-oidc/runtimeConfig": "./dist-es/submodules/sso-oidc/runtimeConfig.browser",
+    "./dist-es/submodules/sso/runtimeConfig": "./dist-es/submodules/sso/runtimeConfig.browser",
+    "./dist-es/submodules/sts/runtimeConfig": "./dist-es/submodules/sts/runtimeConfig.browser"
+  },
+  "types": "./dist-types/index.d.ts",
+  "typesVersions": {
+    "<4.5": {
+      "dist-types/*": [
+        "dist-types/ts3.4/*"
+      ],
+      "*": [
+        "dist-types/ts3.4/submodules/*/index.d.ts"
+      ]
+    }
+  },
+  "react-native": {},
+  "exports": {
+    "./package.json": "./package.json",
+    "./sso-oidc": {
+      "types": "./dist-types/submodules/sso-oidc/index.d.ts",
+      "module": "./dist-es/submodules/sso-oidc/index.js",
+      "node": "./dist-cjs/submodules/sso-oidc/index.js",
+      "import": "./dist-es/submodules/sso-oidc/index.js",
+      "require": "./dist-cjs/submodules/sso-oidc/index.js"
+    },
+    "./sts": {
+      "types": "./dist-types/submodules/sts/index.d.ts",
+      "module": "./dist-es/submodules/sts/index.js",
+      "node": "./dist-cjs/submodules/sts/index.js",
+      "import": "./dist-es/submodules/sts/index.js",
+      "require": "./dist-cjs/submodules/sts/index.js"
+    },
+    "./signin": {
+      "types": "./dist-types/submodules/signin/index.d.ts",
+      "module": "./dist-es/submodules/signin/index.js",
+      "node": "./dist-cjs/submodules/signin/index.js",
+      "import": "./dist-es/submodules/signin/index.js",
+      "require": "./dist-cjs/submodules/signin/index.js"
+    },
+    "./cognito-identity": {
+      "types": "./dist-types/submodules/cognito-identity/index.d.ts",
+      "module": "./dist-es/submodules/cognito-identity/index.js",
+      "node": "./dist-cjs/submodules/cognito-identity/index.js",
+      "import": "./dist-es/submodules/cognito-identity/index.js",
+      "require": "./dist-cjs/submodules/cognito-identity/index.js"
+    },
+    "./sso": {
+      "types": "./dist-types/submodules/sso/index.d.ts",
+      "module": "./dist-es/submodules/sso/index.js",
+      "node": "./dist-cjs/submodules/sso/index.js",
+      "import": "./dist-es/submodules/sso/index.js",
+      "require": "./dist-cjs/submodules/sso/index.js"
+    }
+  },
+  "scripts": {
+    "build": "concurrently 'yarn:build:types' 'yarn:build:es' && yarn build:cjs",
+    "build:cjs": "node ../../scripts/compilation/inline",
+    "build:es": "premove dist-es && tsc -p tsconfig.es.json",
+    "build:include:deps": "yarn g:turbo run build -F=\"$npm_package_name\"",
+    "build:types": "premove dist-types && tsc -p tsconfig.types.json",
+    "build:types:downlevel": "downlevel-dts dist-types dist-types/ts3.4",
+    "clean": "premove dist-cjs dist-es dist-types",
+    "lint": "node ../../scripts/validation/submodules-linter.js",
+    "prebuild": "yarn lint",
+    "test": "yarn g:vitest run",
+    "test:watch": "yarn g:vitest watch"
+  },
+  "dependencies": {
+    "@aws-sdk/core": "^3.977.7",
+    "@aws-sdk/signature-v4-multi-region": "^3.996.44",
+    "@aws-sdk/types": "^3.974.3",
+    "@smithy/core": "^3.31.1",
+    "@smithy/fetch-http-handler": "^5.6.13",
+    "@smithy/node-http-handler": "^4.9.13",
+    "@smithy/types": "^4.16.1",
+    "tslib": "^2.6.2"
+  },
+  "devDependencies": {
+    "concurrently": "7.0.0",
+    "downlevel-dts": "0.10.1",
+    "premove": "4.0.0",
+    "typescript": "~6.0.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

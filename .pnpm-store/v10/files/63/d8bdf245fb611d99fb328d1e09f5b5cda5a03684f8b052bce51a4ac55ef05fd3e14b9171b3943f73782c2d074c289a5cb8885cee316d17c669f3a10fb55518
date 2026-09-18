@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.StreamTextToSpeechWithTimestampsRequest = exports.StreamTextToSpeechRequest = exports.BodyTextToSpeechFullWithTimestamps = exports.BodyTextToSpeechFull = void 0;
+var BodyTextToSpeechFull_1 = require("./BodyTextToSpeechFull");
+Object.defineProperty(exports, "BodyTextToSpeechFull", { enumerable: true, get: function () { return BodyTextToSpeechFull_1.BodyTextToSpeechFull; } });
+var BodyTextToSpeechFullWithTimestamps_1 = require("./BodyTextToSpeechFullWithTimestamps");
+Object.defineProperty(exports, "BodyTextToSpeechFullWithTimestamps", { enumerable: true, get: function () { return BodyTextToSpeechFullWithTimestamps_1.BodyTextToSpeechFullWithTimestamps; } });
+var StreamTextToSpeechRequest_1 = require("./StreamTextToSpeechRequest");
+Object.defineProperty(exports, "StreamTextToSpeechRequest", { enumerable: true, get: function () { return StreamTextToSpeechRequest_1.StreamTextToSpeechRequest; } });
+var StreamTextToSpeechWithTimestampsRequest_1 = require("./StreamTextToSpeechWithTimestampsRequest");
+Object.defineProperty(exports, "StreamTextToSpeechWithTimestampsRequest", { enumerable: true, get: function () { return StreamTextToSpeechWithTimestampsRequest_1.StreamTextToSpeechWithTimestampsRequest; } });

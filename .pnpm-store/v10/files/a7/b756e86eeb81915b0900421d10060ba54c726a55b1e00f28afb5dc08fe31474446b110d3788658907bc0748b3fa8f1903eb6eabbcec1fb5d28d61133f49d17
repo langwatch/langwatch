@@ -1,0 +1,146 @@
+{
+  "name": "@aws-sdk/core",
+  "version": "3.977.7",
+  "description": "Core functions & classes shared by multiple AWS SDK clients.",
+  "homepage": "https://github.com/aws/aws-sdk-js-v3/tree/main/packages-internal/core",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "AWS SDK for JavaScript Team",
+    "url": "https://aws.amazon.com/sdk-for-javascript/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aws/aws-sdk-js-v3.git",
+    "directory": "packages-internal/core"
+  },
+  "files": [
+    "./account-id-endpoint.d.ts",
+    "./account-id-endpoint.js",
+    "./client.d.ts",
+    "./client.js",
+    "./httpAuthSchemes.d.ts",
+    "./httpAuthSchemes.js",
+    "./protocols.d.ts",
+    "./protocols.js",
+    "./util.d.ts",
+    "./util.js",
+    "dist-*/**"
+  ],
+  "sideEffects": [
+    "./dist-es/submodules/client/util-endpoints/aws.js",
+    "./dist-cjs/submodules/client/util-endpoints/aws.js"
+  ],
+  "main": "./dist-cjs/index.js",
+  "module": "./dist-es/index.js",
+  "browser": {
+    "./dist-es/submodules/client/index.js": "./dist-es/submodules/client/index.browser.js",
+    "./dist-es/submodules/httpAuthSchemes/index.js": "./dist-es/submodules/httpAuthSchemes/index.browser.js"
+  },
+  "types": "./dist-types/index.d.ts",
+  "typesVersions": {
+    "<4.5": {
+      "dist-types/*": [
+        "dist-types/ts3.4/*"
+      ],
+      "*": [
+        "dist-types/ts3.4/submodules/*/index.d.ts"
+      ]
+    }
+  },
+  "react-native": {
+    "./dist-es/submodules/client/index.js": "./dist-es/submodules/client/index.native.js",
+    "./dist-es/submodules/httpAuthSchemes/index.js": "./dist-es/submodules/httpAuthSchemes/index.browser.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist-types/index.d.ts",
+      "module": "./dist-es/index.js",
+      "node": "./dist-cjs/index.js",
+      "import": "./dist-es/index.js",
+      "require": "./dist-cjs/index.js"
+    },
+    "./package.json": {
+      "module": "./package.json",
+      "node": "./package.json",
+      "import": "./package.json",
+      "require": "./package.json"
+    },
+    "./client": {
+      "types": "./dist-types/submodules/client/index.d.ts",
+      "react-native": "./dist-es/submodules/client/index.native.js",
+      "browser": "./dist-es/submodules/client/index.browser.js",
+      "module": "./dist-es/submodules/client/index.js",
+      "node": "./dist-cjs/submodules/client/index.js",
+      "import": "./dist-es/submodules/client/index.js",
+      "require": "./dist-cjs/submodules/client/index.js"
+    },
+    "./httpAuthSchemes": {
+      "types": "./dist-types/submodules/httpAuthSchemes/index.d.ts",
+      "react-native": "./dist-es/submodules/httpAuthSchemes/index.browser.js",
+      "browser": "./dist-es/submodules/httpAuthSchemes/index.browser.js",
+      "module": "./dist-es/submodules/httpAuthSchemes/index.js",
+      "node": "./dist-cjs/submodules/httpAuthSchemes/index.js",
+      "import": "./dist-es/submodules/httpAuthSchemes/index.js",
+      "require": "./dist-cjs/submodules/httpAuthSchemes/index.js"
+    },
+    "./account-id-endpoint": {
+      "types": "./dist-types/submodules/account-id-endpoint/index.d.ts",
+      "module": "./dist-es/submodules/account-id-endpoint/index.js",
+      "node": "./dist-cjs/submodules/account-id-endpoint/index.js",
+      "import": "./dist-es/submodules/account-id-endpoint/index.js",
+      "require": "./dist-cjs/submodules/account-id-endpoint/index.js"
+    },
+    "./protocols": {
+      "types": "./dist-types/submodules/protocols/index.d.ts",
+      "module": "./dist-es/submodules/protocols/index.js",
+      "node": "./dist-cjs/submodules/protocols/index.js",
+      "import": "./dist-es/submodules/protocols/index.js",
+      "require": "./dist-cjs/submodules/protocols/index.js"
+    },
+    "./util": {
+      "types": "./dist-types/submodules/util/index.d.ts",
+      "module": "./dist-es/submodules/util/index.js",
+      "node": "./dist-cjs/submodules/util/index.js",
+      "import": "./dist-es/submodules/util/index.js",
+      "require": "./dist-cjs/submodules/util/index.js"
+    }
+  },
+  "scripts": {
+    "benchmark:json": "npx tsx scripts/benchmark-json-serializer.ts",
+    "build": "concurrently 'yarn:build:types' 'yarn:build:es' && yarn build:cjs",
+    "build:cjs": "node ../../scripts/compilation/inline && premove ./dist-cjs/api-extractor-type-index.js",
+    "build:es": "premove dist-es && tsc -p tsconfig.es.json && premove ./dist-es/api-extractor-type-index.js",
+    "build:include:deps": "yarn g:turbo run build -F=\"$npm_package_name\"",
+    "build:types": "premove dist-types && premove dist-types tsconfig.types.tsbuildinfo && tsc -p tsconfig.types.json",
+    "build:types:downlevel": "downlevel-dts dist-types dist-types/ts3.4",
+    "clean": "premove dist-cjs dist-es dist-types",
+    "extract:docs": "api-extractor run --local",
+    "lint": "node ../../scripts/validation/submodules-linter.js",
+    "prebuild": "yarn lint",
+    "test": "yarn g:vitest run",
+    "test:watch": "yarn g:vitest watch",
+    "test:integration": "yarn g:vitest run -c vitest.config.integ.mts && yarn test:temp:retry",
+    "test:integration:watch": "yarn g:vitest watch -c vitest.config.integ.mts",
+    "test:temp:retry": "SMITHY_NEW_RETRIES_2026=true node ./integ/retry.integ.spec && AWS_NEW_RETRIES_2026=true node ./integ/retry.integ.spec && node ./integ/retry.integ.spec"
+  },
+  "dependencies": {
+    "@aws-sdk/types": "^3.974.3",
+    "@aws-sdk/xml-builder": "^3.972.38",
+    "@aws/lambda-invoke-store": "^0.3.0",
+    "@smithy/core": "^3.31.1",
+    "@smithy/signature-v4": "^5.6.12",
+    "@smithy/types": "^4.16.1",
+    "bowser": "^2.11.0",
+    "tslib": "^2.6.2"
+  },
+  "devDependencies": {
+    "@tsconfig/recommended": "1.0.1",
+    "concurrently": "7.0.0",
+    "downlevel-dts": "0.10.1",
+    "premove": "4.0.0",
+    "typescript": "~6.0.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

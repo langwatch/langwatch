@@ -1,0 +1,1 @@
+{"version":3,"file":"safeExecute.js","sourceRoot":"","sources":["../../src/utils/safeExecute.ts"],"names":[],"mappings":";;AAEA,kCAQC;AARM,KAAK,UAAU,WAAW,CAC/B,EAAW;IAEX,IAAI,CAAC;QACH,OAAO,CAAC,IAAI,EAAE,MAAM,EAAE,EAAE,CAAC,CAAC;IAC5B,CAAC;IAAC,OAAO,KAAK,EAAE,CAAC;QACf,OAAO,CAAC,KAAK,EAAE,IAAI,CAAC,CAAC;IACvB,CAAC;AACH,CAAC"}

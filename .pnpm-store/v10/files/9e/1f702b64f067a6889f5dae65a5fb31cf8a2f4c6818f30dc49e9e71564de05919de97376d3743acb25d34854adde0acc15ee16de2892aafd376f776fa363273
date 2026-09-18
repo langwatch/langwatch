@@ -1,0 +1,5 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BodyCreatePronunciationDictionariesV1StudioProjectsProjectIdPronunciationDictionariesPost = void 0;
+var BodyCreatePronunciationDictionariesV1StudioProjectsProjectIdPronunciationDictionariesPost_1 = require("./BodyCreatePronunciationDictionariesV1StudioProjectsProjectIdPronunciationDictionariesPost");
+Object.defineProperty(exports, "BodyCreatePronunciationDictionariesV1StudioProjectsProjectIdPronunciationDictionariesPost", { enumerable: true, get: function () { return BodyCreatePronunciationDictionariesV1StudioProjectsProjectIdPronunciationDictionariesPost_1.BodyCreatePronunciationDictionariesV1StudioProjectsProjectIdPronunciationDictionariesPost; } });

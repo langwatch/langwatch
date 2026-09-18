@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BodyStreamComposedMusicWithADetailedResponseV1MusicDetailedStreamPost = exports.BodyStreamComposedMusicV1MusicStreamPost = exports.BodyComposeMusicWithADetailedResponseV1MusicDetailedPost = exports.BodyComposeMusicV1MusicPost = void 0;
+var BodyComposeMusicV1MusicPost_1 = require("./BodyComposeMusicV1MusicPost");
+Object.defineProperty(exports, "BodyComposeMusicV1MusicPost", { enumerable: true, get: function () { return BodyComposeMusicV1MusicPost_1.BodyComposeMusicV1MusicPost; } });
+var BodyComposeMusicWithADetailedResponseV1MusicDetailedPost_1 = require("./BodyComposeMusicWithADetailedResponseV1MusicDetailedPost");
+Object.defineProperty(exports, "BodyComposeMusicWithADetailedResponseV1MusicDetailedPost", { enumerable: true, get: function () { return BodyComposeMusicWithADetailedResponseV1MusicDetailedPost_1.BodyComposeMusicWithADetailedResponseV1MusicDetailedPost; } });
+var BodyStreamComposedMusicV1MusicStreamPost_1 = require("./BodyStreamComposedMusicV1MusicStreamPost");
+Object.defineProperty(exports, "BodyStreamComposedMusicV1MusicStreamPost", { enumerable: true, get: function () { return BodyStreamComposedMusicV1MusicStreamPost_1.BodyStreamComposedMusicV1MusicStreamPost; } });
+var BodyStreamComposedMusicWithADetailedResponseV1MusicDetailedStreamPost_1 = require("./BodyStreamComposedMusicWithADetailedResponseV1MusicDetailedStreamPost");
+Object.defineProperty(exports, "BodyStreamComposedMusicWithADetailedResponseV1MusicDetailedStreamPost", { enumerable: true, get: function () { return BodyStreamComposedMusicWithADetailedResponseV1MusicDetailedStreamPost_1.BodyStreamComposedMusicWithADetailedResponseV1MusicDetailedStreamPost; } });

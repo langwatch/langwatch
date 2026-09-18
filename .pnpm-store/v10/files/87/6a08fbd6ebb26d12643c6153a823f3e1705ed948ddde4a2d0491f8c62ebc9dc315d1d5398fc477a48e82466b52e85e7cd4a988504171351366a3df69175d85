@@ -1,0 +1,337 @@
+// src/integrations/vitest/reporter.ts
+import fs from "fs";
+import path from "path";
+import chalk from "chalk";
+
+// src/config/env.ts
+import { z } from "zod/v4";
+
+// src/config/log-levels.ts
+var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
+  LogLevel2["ERROR"] = "ERROR";
+  LogLevel2["WARN"] = "WARN";
+  LogLevel2["INFO"] = "INFO";
+  LogLevel2["DEBUG"] = "DEBUG";
+  return LogLevel2;
+})(LogLevel || {});
+var LOG_LEVELS = Object.values(LogLevel);
+
+// src/config/env.ts
+var envSchema = z.object({
+  /**
+   * LangWatch API key for event reporting.
+   * If not provided, events will not be sent to LangWatch.
+   */
+  LANGWATCH_API_KEY: z.string().optional(),
+  /**
+   * LangWatch endpoint URL for event reporting.
+   * Defaults to the production LangWatch endpoint.
+   */
+  LANGWATCH_ENDPOINT: z.string().url().optional().default("https://app.langwatch.ai"),
+  /**
+   * Disables simulation report info messages when set to any truthy value.
+   * Useful for CI/CD environments or when you want cleaner output.
+   */
+  SCENARIO_DISABLE_SIMULATION_REPORT_INFO: z.string().optional().transform((val) => Boolean(val)),
+  /**
+   * Node environment - affects logging and behavior.
+   * Defaults to 'development' if not specified.
+   */
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  /**
+   * Case-insensitive log level for the scenario package.
+   * Defaults to 'info' if not specified.
+   */
+  LOG_LEVEL: z.string().toUpperCase().pipe(z.nativeEnum(LogLevel)).optional().default("INFO" /* INFO */),
+  /**
+   * Scenario batch run ID.
+   * If not provided, a random ID will be generated.
+   */
+  SCENARIO_BATCH_RUN_ID: z.string().optional()
+});
+function getEnv() {
+  return envSchema.parse(process.env);
+}
+
+// src/utils/logger.ts
+var Logger = class _Logger {
+  constructor(context) {
+    this.context = context;
+  }
+  context;
+  /**
+   * Creates a logger with context (e.g., class name)
+   */
+  static create(context) {
+    return new _Logger(context);
+  }
+  /**
+   * Returns the current log level from environment.
+   * Uses a getter for clarity and idiomatic usage.
+   */
+  get LOG_LEVEL() {
+    return getEnv().LOG_LEVEL;
+  }
+  /**
+   * Returns the index of the given log level in the LOG_LEVELS array.
+   * @param level - The log level to get the index for.
+   * @returns The index of the log level in the LOG_LEVELS array.
+   */
+  getLogLevelIndexFor(level) {
+    return LOG_LEVELS.indexOf(level);
+  }
+  /**
+   * Checks if logging should occur based on LOG_LEVEL env var
+   */
+  shouldLog(level) {
+    const currentLevelIndex = this.getLogLevelIndexFor(this.LOG_LEVEL);
+    const requestedLevelIndex = this.getLogLevelIndexFor(level);
+    return currentLevelIndex >= 0 && requestedLevelIndex <= currentLevelIndex;
+  }
+  formatMessage(message) {
+    return this.context ? `[${this.context}] ${message}` : message;
+  }
+  error(message, data) {
+    if (this.shouldLog("ERROR" /* ERROR */)) {
+      const formattedMessage = this.formatMessage(message);
+      if (data) {
+        console.error(formattedMessage, data);
+      } else {
+        console.error(formattedMessage);
+      }
+    }
+  }
+  warn(message, data) {
+    if (this.shouldLog("WARN" /* WARN */)) {
+      const formattedMessage = this.formatMessage(message);
+      if (data) {
+        console.warn(formattedMessage, data);
+      } else {
+        console.warn(formattedMessage);
+      }
+    }
+  }
+  info(message, data) {
+    if (this.shouldLog("INFO" /* INFO */)) {
+      const formattedMessage = this.formatMessage(message);
+      if (data) {
+        console.info(formattedMessage, data);
+      } else {
+        console.info(formattedMessage);
+      }
+    }
+  }
+  debug(message, data) {
+    if (this.shouldLog("DEBUG" /* DEBUG */)) {
+      const formattedMessage = this.formatMessage(message);
+      if (data) {
+        console.log(formattedMessage, data);
+      } else {
+        console.log(formattedMessage);
+      }
+    }
+  }
+};
+
+// src/integrations/vitest/reporter.ts
+var logger = Logger.create("integrations:vitest:reporter");
+function getProjectRoot() {
+  return process.cwd();
+}
+var projectRoot = getProjectRoot();
+var logDir = path.join(projectRoot, ".scenario");
+if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
+function getLogFilePath(testId) {
+  return path.join(logDir, `${testId}.log`);
+}
+function getFullTestName(task) {
+  let name = task.name;
+  let parent = task.suite;
+  while (parent) {
+    name = `${parent.name} > ${name}`;
+    parent = parent.suite;
+  }
+  return name;
+}
+function formatContentForLogging(content) {
+  if (typeof content !== "string") {
+    return "[Non-text content]";
+  }
+  if (/^[A-Za-z0-9+/]+=*$/.test(content) && content.length > 50) {
+    return "[Binary data]";
+  }
+  try {
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) {
+      const hasBinaryData = parsed.some(
+        (part) => part?.type === "file" && part?.data && typeof part.data === "string" && /^[A-Za-z0-9+/]+=*$/.test(part.data) && part.data.length > 50
+      );
+      if (hasBinaryData) {
+        return "[Content with binary data]";
+      }
+    }
+  } catch {
+  }
+  return content.length > 100 ? `${content.slice(0, 100)}...` : content;
+}
+function indent(str, n = 2) {
+  return str.replace(/^/gm, " ".repeat(n));
+}
+var VitestReporter = class {
+  results = [];
+  async onTestCaseResult(test) {
+    const fullName = getFullTestName(test);
+    const filePath = getLogFilePath(test.id);
+    if (!fs.existsSync(filePath)) {
+      logger.warn(
+        `No log file found ${filePath} for test ${fullName}`,
+        test.id
+      );
+      return;
+    }
+    const lines = fs.readFileSync(filePath, "utf-8").split("\n").filter(Boolean);
+    const events = lines.map((line) => JSON.parse(line));
+    const runs = /* @__PURE__ */ new Map();
+    for (const event of events) {
+      const runId = event.scenarioRunId ?? "unknown";
+      if (!runs.has(runId)) runs.set(runId, []);
+      runs.get(runId).push(event);
+    }
+    for (const [runId, runEvents] of Array.from(runs.entries())) {
+      const started = runEvents.find(
+        (e) => e.type === "SCENARIO_RUN_STARTED"
+      );
+      const finished = runEvents.find(
+        (e) => e.type === "SCENARIO_RUN_FINISHED"
+      );
+      const messages = runEvents.filter(
+        (e) => e.type === "SCENARIO_MESSAGE_SNAPSHOT"
+      );
+      this.results.push({
+        name: started?.metadata?.name ?? fullName,
+        status: finished?.status ?? "UNKNOWN",
+        duration: started && finished ? finished.timestamp - started.timestamp : 0,
+        reasoning: finished?.results?.reasoning,
+        criteria: finished?.results ? `Success Criteria: ${finished.results.metCriteria?.length ?? 0}/${(finished.results.metCriteria?.length ?? 0) + (finished.results.unmetCriteria?.length ?? 0)}` : void 0
+      });
+      console.log(
+        `
+--- Scenario Run: ${started?.metadata?.name ?? runId} ---`
+      );
+      if (started) {
+        console.log(`Description: ${started.metadata?.description ?? ""}`);
+      }
+      if (messages.length) {
+        console.log("Chat log:\n");
+        let lastMessageCount = 0;
+        for (const msg of messages) {
+          const allMessages = msg.messages ?? [];
+          for (const m of allMessages.slice(lastMessageCount)) {
+            const role = m.role;
+            if (role.toLowerCase() === "assistant" && "toolCalls" in m && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+              for (const toolCall of m.toolCalls) {
+                const functionName = toolCall.function.name;
+                let parsedJson = "";
+                try {
+                  parsedJson = JSON.stringify(
+                    JSON.parse(toolCall.function.arguments),
+                    null,
+                    2
+                  );
+                } catch {
+                  parsedJson = toolCall.function.arguments;
+                }
+                const role2 = chalk.magenta(`ToolCall(${functionName}):`);
+                console.log(`${role2}:
+
+${indent(parsedJson)}
+`);
+              }
+              continue;
+            }
+            let roleLabel = role;
+            if (role.toLowerCase() === "user") roleLabel = chalk.green("User");
+            else if (role.toLowerCase() === "agent")
+              roleLabel = chalk.cyan("Agent");
+            else if (role.toLowerCase() === "assistant")
+              if (Array.isArray(m.content) && typeof m.content.at(0) === "object" && m.content.at(0)?.type === "tool-call")
+                roleLabel = chalk.cyan("ToolCall");
+              else roleLabel = chalk.cyan("Assistant");
+            else if (role.toLowerCase() === "tool") {
+              roleLabel = chalk.magenta("ToolResult");
+              let parsedJson = "";
+              try {
+                parsedJson = JSON.stringify(JSON.parse(m.content), null, 2);
+              } catch {
+                parsedJson = m.content;
+              }
+              console.log(`${roleLabel}:
+
+${indent(parsedJson)}
+`);
+              continue;
+            } else roleLabel = chalk.yellow(role);
+            console.log(`${roleLabel}: ${formatContentForLogging(m.content)}`);
+          }
+          lastMessageCount = allMessages.length;
+        }
+      }
+      if (finished) {
+        console.log("--- Verdict ---");
+        console.log(`Status: ${finished.status}`);
+        if (finished.results) {
+          console.log(`Verdict: ${finished.results.verdict}`);
+          if (finished.results.reasoning)
+            console.log(`Reasoning: ${finished.results.reasoning}`);
+          if (finished.results.metCriteria?.length)
+            console.log(
+              `Met criteria: ${finished.results.metCriteria.join(", ")}`
+            );
+          if (finished.results.unmetCriteria?.length)
+            console.log(
+              `Unmet criteria: ${finished.results.unmetCriteria.join(", ")}`
+            );
+          if (finished.results.error)
+            console.log(`Error: ${finished.results.error}`);
+        }
+      }
+      console.log("-----------------------------\n");
+    }
+    fs.unlinkSync(filePath);
+  }
+  async onTestRunEnd() {
+    if (this.results.length === 0) return;
+    const total = this.results.length;
+    const passed = this.results.filter((r) => r.status === "SUCCESS").length;
+    const failed = this.results.filter((r) => r.status !== "SUCCESS").length;
+    const successRate = (passed / total * 100).toFixed(1);
+    console.log();
+    console.log(chalk.bold.cyan("=== Scenario Test Report ==="));
+    console.log(`Total Scenarios: ${total}`);
+    console.log(
+      passed > 0 ? chalk.green(`Passed: ${passed}`) : `Passed: ${passed}`
+    );
+    console.log(
+      failed > 0 ? chalk.red(`Failed: ${failed}`) : `Failed: ${failed}`
+    );
+    console.log(`Success Rate: ${chalk.bold(`${successRate}%`)}`);
+    this.results.forEach((r, i) => {
+      const statusColor = r.status === "SUCCESS" ? chalk.green : chalk.red;
+      console.log();
+      console.log(
+        `${i + 1}. ${r.name} - ${statusColor(r.status)} in ${(r.duration / 1e3).toFixed(2)}s`
+      );
+      if (r.reasoning) {
+        console.log(chalk.greenBright("  Reasoning: ") + r.reasoning);
+      }
+      if (r.criteria) {
+        console.log(chalk.bold("  " + r.criteria));
+      }
+    });
+    console.log();
+  }
+};
+var reporter_default = VitestReporter;
+export {
+  reporter_default as default
+};

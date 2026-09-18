@@ -1,0 +1,41 @@
+import type * as ElevenLabs from "../../api/index";
+import * as core from "../../core";
+import type * as serializers from "../index";
+import { AgentCallLimits } from "./AgentCallLimits";
+import { AgentTestingSettings } from "./AgentTestingSettings";
+import { AgentTrustContext } from "./AgentTrustContext";
+import { AgentWorkspaceOverridesInput } from "./AgentWorkspaceOverridesInput";
+import { AnalysisProperty } from "./AnalysisProperty";
+import { AnalysisScope } from "./AnalysisScope";
+import { AuthSettings } from "./AuthSettings";
+import { ConversationInitiationClientDataConfigInput } from "./ConversationInitiationClientDataConfigInput";
+import { EvaluationSettingsInput } from "./EvaluationSettingsInput";
+import { GuardrailsV1Input } from "./GuardrailsV1Input";
+import { Llm } from "./Llm";
+import { PrivacyConfigInput } from "./PrivacyConfigInput";
+import { SentimentAnalysisSettings } from "./SentimentAnalysisSettings";
+import { TopicDiscoverySettings } from "./TopicDiscoverySettings";
+import { WidgetConfig } from "./WidgetConfig";
+export declare const AgentPlatformSettingsRequestModel: core.serialization.ObjectSchema<serializers.AgentPlatformSettingsRequestModel.Raw, ElevenLabs.AgentPlatformSettingsRequestModel>;
+export declare namespace AgentPlatformSettingsRequestModel {
+    interface Raw {
+        evaluation?: EvaluationSettingsInput.Raw | null;
+        widget?: WidgetConfig.Raw | null;
+        data_collection?: Record<string, AnalysisProperty.Raw> | null;
+        data_collection_scopes?: Record<string, AnalysisScope.Raw> | null;
+        overrides?: ConversationInitiationClientDataConfigInput.Raw | null;
+        workspace_overrides?: AgentWorkspaceOverridesInput.Raw | null;
+        testing?: AgentTestingSettings.Raw | null;
+        archived?: boolean | null;
+        guardrails?: GuardrailsV1Input.Raw | null;
+        summary_language?: string | null;
+        auto_translate_transcript_to_app_language?: boolean | null;
+        auth?: AuthSettings.Raw | null;
+        call_limits?: AgentCallLimits.Raw | null;
+        privacy?: PrivacyConfigInput.Raw | null;
+        trust_context?: AgentTrustContext.Raw | null;
+        analysis_llm?: Llm.Raw | null;
+        topic_discovery?: TopicDiscoverySettings.Raw | null;
+        sentiment_analysis?: SentimentAnalysisSettings.Raw | null;
+    }
+}

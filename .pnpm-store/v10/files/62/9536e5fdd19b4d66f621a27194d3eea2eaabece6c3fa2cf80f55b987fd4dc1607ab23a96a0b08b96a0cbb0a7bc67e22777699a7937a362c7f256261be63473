@@ -1,0 +1,45 @@
+name: OSSF Scorecard Analysis
+
+# **What it does**: Runs OSSF Scorecard analysis on the repository and uploads the results.
+# **Why we have it**: Security scanning.
+
+on:
+    branch_protection_rule:
+    push:
+        branches:
+            - main
+        paths-ignore:
+            - "docs/**"
+            - "*.md"
+    schedule:
+        #        ┌───────────── minute (0 - 59)
+        #        │  ┌───────────── hour (0 - 23)
+        #        │  │ ┌───────────── day of the month (1 - 31)
+        #        │  │ │ ┌───────────── month (1 - 12 or JAN-DEC)
+        #        │  │ │ │ ┌───────────── day of the week (0 - 6 or SUN-SAT)
+        #        │  │ │ │ │
+        #        │  │ │ │ │
+        #        │  │ │ │ │
+        #        *  * * * *
+        - cron: "21 17 * * 0"
+    # Allows this workflow to be run manually from the Actions tab
+    workflow_dispatch:
+
+# This allows a subsequently queued workflow run to interrupt previous runs
+concurrency:
+    group: "${{ github.workflow }}-${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    analysis:
+        name: OSSF Scorecard Analysis
+        permissions:
+            contents: read
+            id-token: write
+            security-events: write
+        uses: fastify/workflows/.github/workflows/reusable-ossf-scorecard.yml@ef591e2186785d5ab36b9fe6a79c7ce2f1d94e57 #v7.0.0
+        with:
+            publish_results: true

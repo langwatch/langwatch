@@ -1,0 +1,111 @@
+{
+  "name": "@openai/agents-core",
+  "repository": "https://github.com/openai/openai-agents-js",
+  "homepage": "https://openai.github.io/openai-agents-js/",
+  "version": "0.3.9",
+  "description": "The OpenAI Agents SDK is a lightweight yet powerful framework for building multi-agent workflows.",
+  "author": "OpenAI <support@openai.com>",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    },
+    "./model": {
+      "types": "./dist/model.d.ts",
+      "require": "./dist/model.js",
+      "import": "./dist/model.mjs"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "require": "./dist/utils/index.js",
+      "import": "./dist/utils/index.mjs"
+    },
+    "./extensions": {
+      "types": "./dist/extensions/index.d.ts",
+      "require": "./dist/extensions/index.js",
+      "import": "./dist/extensions/index.mjs"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "require": "./dist/types/index.js",
+      "import": "./dist/types/index.mjs"
+    },
+    "./_shims": {
+      "workerd": {
+        "types": "./dist/shims/shims-workerd.d.ts",
+        "require": "./dist/shims/shims-workerd.js",
+        "import": "./dist/shims/shims-workerd.mjs"
+      },
+      "browser": {
+        "types": "./dist/shims/shims-browser.d.ts",
+        "require": "./dist/shims/shims-browser.js",
+        "import": "./dist/shims/shims-browser.mjs"
+      },
+      "node": {
+        "types": "./dist/shims/shims-node.d.ts",
+        "require": "./dist/shims/shims-node.js",
+        "import": "./dist/shims/shims-node.mjs"
+      },
+      "types": "./dist/shims/shims.d.ts",
+      "require": "./dist/shims/shims.js",
+      "import": "./dist/shims/shims.mjs"
+    }
+  },
+  "keywords": [
+    "openai",
+    "agents",
+    "ai",
+    "agentic"
+  ],
+  "license": "MIT",
+  "optionalDependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2"
+  },
+  "dependencies": {
+    "debug": "^4.4.0",
+    "openai": "^6"
+  },
+  "peerDependencies": {
+    "zod": "^3.25.40 || ^4.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "model": [
+        "dist/model.d.ts"
+      ],
+      "utils": [
+        "dist/utils/index.d.ts"
+      ],
+      "extensions": [
+        "dist/extensions/index.d.ts"
+      ],
+      "types": [
+        "dist/types/index.d.ts"
+      ],
+      "_shims": [
+        "dist/shims/shims-node.d.ts"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.12",
+    "zod": "^3.25.40 || ^4.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prebuild": "tsx ../../scripts/embedMeta.ts",
+    "build": "tsc",
+    "build-check": "tsc --noEmit -p ./tsconfig.test.json",
+    "dist:check": "tsc --noEmit -p ./tsconfig.dist-check.json"
+  }
+}

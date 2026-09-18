@@ -1,0 +1,7 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BodyUpdatePronunciationDictionaryV1PronunciationDictionariesPronunciationDictionaryIdPatch = exports.BodyAddAPronunciationDictionaryV1PronunciationDictionariesAddFromRulesPost = void 0;
+var BodyAddAPronunciationDictionaryV1PronunciationDictionariesAddFromRulesPost_1 = require("./BodyAddAPronunciationDictionaryV1PronunciationDictionariesAddFromRulesPost");
+Object.defineProperty(exports, "BodyAddAPronunciationDictionaryV1PronunciationDictionariesAddFromRulesPost", { enumerable: true, get: function () { return BodyAddAPronunciationDictionaryV1PronunciationDictionariesAddFromRulesPost_1.BodyAddAPronunciationDictionaryV1PronunciationDictionariesAddFromRulesPost; } });
+var BodyUpdatePronunciationDictionaryV1PronunciationDictionariesPronunciationDictionaryIdPatch_1 = require("./BodyUpdatePronunciationDictionaryV1PronunciationDictionariesPronunciationDictionaryIdPatch");
+Object.defineProperty(exports, "BodyUpdatePronunciationDictionaryV1PronunciationDictionariesPronunciationDictionaryIdPatch", { enumerable: true, get: function () { return BodyUpdatePronunciationDictionaryV1PronunciationDictionariesPronunciationDictionaryIdPatch_1.BodyUpdatePronunciationDictionaryV1PronunciationDictionariesPronunciationDictionaryIdPatch; } });

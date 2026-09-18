@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UpdateAgentRequest = exports.RunAgentTestsRequestModel = exports.BodySimulatesAConversationV1ConvaiAgentsAgentIdSimulateConversationPost = exports.BodySimulatesAConversationStreamV1ConvaiAgentsAgentIdSimulateConversationStreamPost = exports.BodyDuplicateAgentV1ConvaiAgentsAgentIdDuplicatePost = exports.BodyCreateAgentV1ConvaiAgentsCreatePost = void 0;
+var BodyCreateAgentV1ConvaiAgentsCreatePost_1 = require("./BodyCreateAgentV1ConvaiAgentsCreatePost");
+Object.defineProperty(exports, "BodyCreateAgentV1ConvaiAgentsCreatePost", { enumerable: true, get: function () { return BodyCreateAgentV1ConvaiAgentsCreatePost_1.BodyCreateAgentV1ConvaiAgentsCreatePost; } });
+var BodyDuplicateAgentV1ConvaiAgentsAgentIdDuplicatePost_1 = require("./BodyDuplicateAgentV1ConvaiAgentsAgentIdDuplicatePost");
+Object.defineProperty(exports, "BodyDuplicateAgentV1ConvaiAgentsAgentIdDuplicatePost", { enumerable: true, get: function () { return BodyDuplicateAgentV1ConvaiAgentsAgentIdDuplicatePost_1.BodyDuplicateAgentV1ConvaiAgentsAgentIdDuplicatePost; } });
+var BodySimulatesAConversationStreamV1ConvaiAgentsAgentIdSimulateConversationStreamPost_1 = require("./BodySimulatesAConversationStreamV1ConvaiAgentsAgentIdSimulateConversationStreamPost");
+Object.defineProperty(exports, "BodySimulatesAConversationStreamV1ConvaiAgentsAgentIdSimulateConversationStreamPost", { enumerable: true, get: function () { return BodySimulatesAConversationStreamV1ConvaiAgentsAgentIdSimulateConversationStreamPost_1.BodySimulatesAConversationStreamV1ConvaiAgentsAgentIdSimulateConversationStreamPost; } });
+var BodySimulatesAConversationV1ConvaiAgentsAgentIdSimulateConversationPost_1 = require("./BodySimulatesAConversationV1ConvaiAgentsAgentIdSimulateConversationPost");
+Object.defineProperty(exports, "BodySimulatesAConversationV1ConvaiAgentsAgentIdSimulateConversationPost", { enumerable: true, get: function () { return BodySimulatesAConversationV1ConvaiAgentsAgentIdSimulateConversationPost_1.BodySimulatesAConversationV1ConvaiAgentsAgentIdSimulateConversationPost; } });
+var RunAgentTestsRequestModel_1 = require("./RunAgentTestsRequestModel");
+Object.defineProperty(exports, "RunAgentTestsRequestModel", { enumerable: true, get: function () { return RunAgentTestsRequestModel_1.RunAgentTestsRequestModel; } });
+var UpdateAgentRequest_1 = require("./UpdateAgentRequest");
+Object.defineProperty(exports, "UpdateAgentRequest", { enumerable: true, get: function () { return UpdateAgentRequest_1.UpdateAgentRequest; } });

@@ -1,0 +1,10 @@
+import type { OtlpHttpConfiguration } from './configuration/otlp-http-configuration';
+import type { ISerializer } from '@opentelemetry/otlp-transformer';
+import type { IOtlpExportDelegate } from './otlp-export-delegate';
+import { type ExporterMetrics } from './ExporterMetrics';
+export declare function createOtlpFetchExportDelegate<Internal, Response>(options: OtlpHttpConfiguration, serializer: ISerializer<Internal, Response>, metrics: ExporterMetrics<Internal>): IOtlpExportDelegate<Internal>;
+/**
+ * @deprecated Use {@link createOtlpFetchExportDelegate} instead. Modern browsers use `fetch` with `keepAlive: true` when `sendBeacon` is used. Use a `fetch` polyfill that mimics this behavior to keep using `sendBeacon`.
+ */
+export declare function createOtlpSendBeaconExportDelegate<Internal, Response>(options: OtlpHttpConfiguration, serializer: ISerializer<Internal, Response>, metrics: ExporterMetrics<Internal>): IOtlpExportDelegate<Internal>;
+//# sourceMappingURL=otlp-browser-http-export-delegate.d.ts.map

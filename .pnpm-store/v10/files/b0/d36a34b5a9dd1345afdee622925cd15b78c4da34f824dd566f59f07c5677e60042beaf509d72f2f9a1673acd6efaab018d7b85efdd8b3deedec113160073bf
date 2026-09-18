@@ -1,0 +1,1 @@
+export { fromProcess } from "./fromProcess";

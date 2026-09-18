@@ -1,0 +1,84 @@
+"use strict";
+/*
+ * Copyright The OpenTelemetry Authors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FixedSizeExemplarReservoirBase = void 0;
+const api_1 = require("@opentelemetry/api");
+class ExemplarBucket {
+    value = 0;
+    attributes = {};
+    timestamp = [0, 0];
+    spanId;
+    traceId;
+    _offered = false;
+    offer(value, timestamp, attributes, ctx) {
+        this.value = value;
+        this.timestamp = timestamp;
+        this.attributes = attributes;
+        const spanContext = api_1.trace.getSpanContext(ctx);
+        if (spanContext && (0, api_1.isSpanContextValid)(spanContext)) {
+            this.spanId = spanContext.spanId;
+            this.traceId = spanContext.traceId;
+        }
+        this._offered = true;
+    }
+    collect(pointAttributes) {
+        if (!this._offered)
+            return null;
+        const currentAttributes = this.attributes;
+        // filter attributes
+        for (const key in pointAttributes) {
+            if (Object.prototype.hasOwnProperty.call(pointAttributes, key) &&
+                pointAttributes[key] === currentAttributes[key]) {
+                delete currentAttributes[key];
+            }
+        }
+        const retVal = {
+            filteredAttributes: currentAttributes,
+            value: this.value,
+            timestamp: this.timestamp,
+            spanId: this.spanId,
+            traceId: this.traceId,
+        };
+        this.attributes = {};
+        this.value = 0;
+        this.timestamp = [0, 0];
+        this.spanId = undefined;
+        this.traceId = undefined;
+        this._offered = false;
+        return retVal;
+    }
+}
+class FixedSizeExemplarReservoirBase {
+    _reservoirStorage;
+    _size;
+    constructor(size) {
+        this._size = size;
+        this._reservoirStorage = new Array(size);
+        for (let i = 0; i < this._size; i++) {
+            this._reservoirStorage[i] = new ExemplarBucket();
+        }
+    }
+    maxSize() {
+        return this._size;
+    }
+    /**
+     * Resets the reservoir
+     */
+    reset() { }
+    collect(pointAttributes) {
+        const exemplars = [];
+        for (const storageItem of this._reservoirStorage) {
+            const res = storageItem.collect(pointAttributes);
+            if (res !== null) {
+                exemplars.push(res);
+            }
+        }
+        this.reset();
+        return exemplars;
+    }
+}
+exports.FixedSizeExemplarReservoirBase = FixedSizeExemplarReservoirBase;
+//# sourceMappingURL=ExemplarReservoir.js.map

@@ -1,0 +1,39 @@
+{
+  "name": "@anthropic-ai/claude-code",
+  "version": "2.1.228",
+  "bin": {
+    "claude": "bin/claude.exe"
+  },
+  "scripts": {
+    "postinstall": "node install.cjs",
+    "prepare": "node -e \"if (!process.env.AUTHORIZED) { console.error('ERROR: Direct publishing is not allowed.\\nPlease see the release workflow documentation to publish this package.'); process.exit(1); }\""
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "type": "module",
+  "author": "Anthropic <support@anthropic.com>",
+  "license": "SEE LICENSE IN README.md",
+  "description": "Use Claude, Anthropic's AI assistant, right from your terminal. Claude can understand your codebase, edit files, run terminal commands, and handle entire workflows for you.",
+  "homepage": "https://github.com/anthropics/claude-code",
+  "bugs": {
+    "url": "https://github.com/anthropics/claude-code/issues"
+  },
+  "dependencies": {},
+  "optionalDependencies": {
+    "@anthropic-ai/claude-code-darwin-arm64": "2.1.228",
+    "@anthropic-ai/claude-code-darwin-x64": "2.1.228",
+    "@anthropic-ai/claude-code-linux-x64": "2.1.228",
+    "@anthropic-ai/claude-code-linux-arm64": "2.1.228",
+    "@anthropic-ai/claude-code-linux-x64-musl": "2.1.228",
+    "@anthropic-ai/claude-code-linux-arm64-musl": "2.1.228",
+    "@anthropic-ai/claude-code-win32-x64": "2.1.228",
+    "@anthropic-ai/claude-code-win32-arm64": "2.1.228"
+  },
+  "files": [
+    "bin/claude.exe",
+    "install.cjs",
+    "cli-wrapper.cjs",
+    "sdk-tools.d.ts"
+  ]
+}

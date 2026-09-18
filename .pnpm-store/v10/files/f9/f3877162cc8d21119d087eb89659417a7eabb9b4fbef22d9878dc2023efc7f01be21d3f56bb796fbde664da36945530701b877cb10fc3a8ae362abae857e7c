@@ -1,0 +1,7 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BodyEditServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysApiKeyIdPatch = exports.BodyCreateServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysPost = void 0;
+var BodyCreateServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysPost_1 = require("./BodyCreateServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysPost");
+Object.defineProperty(exports, "BodyCreateServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysPost", { enumerable: true, get: function () { return BodyCreateServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysPost_1.BodyCreateServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysPost; } });
+var BodyEditServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysApiKeyIdPatch_1 = require("./BodyEditServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysApiKeyIdPatch");
+Object.defineProperty(exports, "BodyEditServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysApiKeyIdPatch", { enumerable: true, get: function () { return BodyEditServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysApiKeyIdPatch_1.BodyEditServiceAccountApiKeyV1ServiceAccountsServiceAccountUserIdApiKeysApiKeyIdPatch; } });

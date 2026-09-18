@@ -1,0 +1,58 @@
+{
+  "name": "@smithy/types",
+  "version": "4.17.0",
+  "homepage": "https://github.com/smithy-lang/smithy-typescript/tree/main/packages/types",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "AWS Smithy Team",
+    "email": "",
+    "url": "https://smithy.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smithy-lang/smithy-typescript.git",
+    "directory": "packages/types"
+  },
+  "files": [
+    "dist-*/**"
+  ],
+  "sideEffects": false,
+  "main": "./dist-cjs/index.js",
+  "module": "./dist-es/index.js",
+  "types": "./dist-types/index.d.ts",
+  "typesVersions": {
+    "<=4.5": {
+      "dist-types/*": [
+        "dist-types/ts3.4/*"
+      ]
+    }
+  },
+  "publishConfig": {
+    "directory": ".release/package"
+  },
+  "scripts": {
+    "build": "concurrently 'yarn:build:types' 'yarn:build:es:cjs'",
+    "build:es:cjs": "node ../../scripts/compilation/es_cjs.js",
+    "build:types": "premove dist-types && yarn g:tsc -p tsconfig.types.json",
+    "build:types:downlevel": "premove dist-types/ts3.4 && downlevel-dts dist-types dist-types/ts3.4 && node scripts/downlevel",
+    "clean": "premove dist-cjs dist-es dist-types",
+    "extract:docs": "api-extractor run --local",
+    "stage-release": "premove .release && yarn pack && mkdir ./.release && tar zxvf ./package.tgz --directory ./.release && rm ./package.tgz",
+    "test": "yarn g:tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "tslib": "^2.6.2"
+  },
+  "devDependencies": {
+    "concurrently": "7.0.0",
+    "downlevel-dts": "0.10.1",
+    "premove": "4.0.0",
+    "typedoc": "0.23.23"
+  },
+  "typedoc": {
+    "entryPoint": "src/index.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

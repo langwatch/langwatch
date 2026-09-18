@@ -1,0 +1,116 @@
+{
+  "name": "@hono/node-server",
+  "version": "2.0.10",
+  "description": "Node.js Adapter for Hono",
+  "main": "dist/index.mjs",
+  "type": "module",
+  "types": "dist/index.d.mts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./serve-static": {
+      "import": {
+        "types": "./dist/serve-static.d.mts",
+        "default": "./dist/serve-static.mjs"
+      },
+      "require": {
+        "types": "./dist/serve-static.d.cts",
+        "default": "./dist/serve-static.cjs"
+      }
+    },
+    "./utils/*": {
+      "import": {
+        "types": "./dist/utils/*.d.mts",
+        "default": "./dist/utils/*.mjs"
+      },
+      "require": {
+        "types": "./dist/utils/*.d.cts",
+        "default": "./dist/utils/*.cjs"
+      }
+    },
+    "./conninfo": {
+      "import": {
+        "types": "./dist/conninfo.d.mts",
+        "default": "./dist/conninfo.mjs"
+      },
+      "require": {
+        "types": "./dist/conninfo.d.cts",
+        "default": "./dist/conninfo.cjs"
+      }
+    }
+  },
+  "typesVersions": {
+    "*": {
+      ".": [
+        "./dist/index.d.mts"
+      ],
+      "serve-static": [
+        "./dist/serve-static.d.mts"
+      ],
+      "utils/*": [
+        "./dist/utils/*.d.mts"
+      ],
+      "conninfo": [
+        "./dist/conninfo.d.mts"
+      ]
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/honojs/node-server.git"
+  },
+  "homepage": "https://github.com/honojs/node-server",
+  "author": "Yusuke Wada <yusuke@kamawada.com> (https://github.com/yusukebe)",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@hono/eslint-config": "^1.0.1",
+    "@types/node": "^20.10.0",
+    "@types/supertest": "^2.0.12",
+    "@types/ws": "^8.18.1",
+    "@whatwg-node/fetch": "^0.9.14",
+    "eslint": "^9.10.0",
+    "hono": "^4.12.8",
+    "np": "^11.2.1",
+    "prettier": "^3.2.4",
+    "publint": "^0.3.18",
+    "supertest": "^7.2.2",
+    "tsdown": "^0.20.3",
+    "typescript": "^5.3.2",
+    "vitest": "^4.0.18",
+    "ws": "^8.19.0"
+  },
+  "peerDependencies": {
+    "hono": "^4"
+  },
+  "scripts": {
+    "test": "vitest",
+    "build": "tsdown --external hono",
+    "watch": "tsdown --watch",
+    "postbuild": "publint",
+    "prerelease": "pnpm run build && pnpm run test --run",
+    "release": "np --no-publish",
+    "lint": "eslint src test",
+    "lint:fix": "eslint src test --fix",
+    "format": "prettier --check \"src/**/*.{js,ts}\" \"test/**/*.{js,ts}\"",
+    "format:fix": "prettier --write \"src/**/*.{js,ts}\" \"test/**/*.{js,ts}\""
+  }
+}

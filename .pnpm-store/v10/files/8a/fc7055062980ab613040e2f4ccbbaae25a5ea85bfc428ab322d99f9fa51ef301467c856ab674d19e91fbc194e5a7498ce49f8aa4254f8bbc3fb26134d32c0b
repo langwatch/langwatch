@@ -1,0 +1,1 @@
+{"version":3,"file":"handoffPrompt.mjs","sourceRoot":"","sources":["../../src/extensions/handoffPrompt.ts"],"names":[],"mappings":"AAAA;;;GAGG;AACH,MAAM,CAAC,MAAM,yBAAyB,GAAG;oiBAC2f,CAAC;AAEriB;;;;;GAKG;AACH,MAAM,UAAU,6BAA6B,CAAC,MAAc;IAC1D,OAAO,GAAG,yBAAyB,OAAO,MAAM,EAAE,CAAC;AACrD,CAAC"}

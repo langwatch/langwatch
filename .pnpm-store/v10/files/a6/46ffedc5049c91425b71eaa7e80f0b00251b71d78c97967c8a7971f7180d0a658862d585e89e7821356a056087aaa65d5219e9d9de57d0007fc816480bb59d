@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.VoiceRemixRequestModel = exports.VoiceDesignRequestModel = exports.VoiceDesignRequest = exports.BodyCreateANewVoiceFromVoicePreviewV1TextToVoicePost = void 0;
+var BodyCreateANewVoiceFromVoicePreviewV1TextToVoicePost_1 = require("./BodyCreateANewVoiceFromVoicePreviewV1TextToVoicePost");
+Object.defineProperty(exports, "BodyCreateANewVoiceFromVoicePreviewV1TextToVoicePost", { enumerable: true, get: function () { return BodyCreateANewVoiceFromVoicePreviewV1TextToVoicePost_1.BodyCreateANewVoiceFromVoicePreviewV1TextToVoicePost; } });
+var VoiceDesignRequest_1 = require("./VoiceDesignRequest");
+Object.defineProperty(exports, "VoiceDesignRequest", { enumerable: true, get: function () { return VoiceDesignRequest_1.VoiceDesignRequest; } });
+var VoiceDesignRequestModel_1 = require("./VoiceDesignRequestModel");
+Object.defineProperty(exports, "VoiceDesignRequestModel", { enumerable: true, get: function () { return VoiceDesignRequestModel_1.VoiceDesignRequestModel; } });
+var VoiceRemixRequestModel_1 = require("./VoiceRemixRequestModel");
+Object.defineProperty(exports, "VoiceRemixRequestModel", { enumerable: true, get: function () { return VoiceRemixRequestModel_1.VoiceRemixRequestModel; } });

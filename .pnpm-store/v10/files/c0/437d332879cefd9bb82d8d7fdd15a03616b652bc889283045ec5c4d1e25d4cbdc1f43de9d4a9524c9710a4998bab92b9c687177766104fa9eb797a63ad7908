@@ -1,0 +1,53 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    commit-message:
+      # Prefix all commit messages with "chore: "
+      prefix: "chore"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    commit-message:
+      # Prefix all commit messages with "chore: "
+      prefix: "chore"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    versioning-strategy: "increase-if-necessary"
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+    ignore:
+      # TODO: remove ignore until neostandard support ESLint 10
+      - dependency-name: "eslint"
+      - dependency-name: "neostandard"
+      - dependency-name: "@stylistic/*"
+    open-pull-requests-limit: 10
+    groups:
+      # Production dependencies with breaking changes
+      dependencies:
+        dependency-type: "production"
+      # ESLint related dependencies
+      dev-dependencies-eslint:
+        patterns:
+          - "eslint"
+          - "neostandard"
+          - "@stylistic/*"
+      # TypeScript related dependencies
+      dev-dependencies-typescript:
+        patterns:
+          - "@types/*"
+          - "tstyche"
+          - "typescript"

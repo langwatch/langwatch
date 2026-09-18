@@ -1,0 +1,39 @@
+import type * as ElevenLabs from "../index";
+export interface AgentPlatformSettingsRequestModel {
+    /** Settings for evaluation */
+    evaluation?: ElevenLabs.EvaluationSettingsInput;
+    /** Configuration for the widget */
+    widget?: ElevenLabs.WidgetConfig;
+    /** Data collection settings */
+    dataCollection?: Record<string, ElevenLabs.AnalysisProperty>;
+    /** Scope per data collection item ID. Missing keys default to conversation scope. */
+    dataCollectionScopes?: Record<string, ElevenLabs.AnalysisScope>;
+    /** Additional overrides for the agent during conversation initiation */
+    overrides?: ElevenLabs.ConversationInitiationClientDataConfigInput;
+    /** Workspace overrides for the agent */
+    workspaceOverrides?: ElevenLabs.AgentWorkspaceOverridesInput;
+    /** Testing configuration for the agent */
+    testing?: ElevenLabs.AgentTestingSettings;
+    /** Whether the agent is archived */
+    archived?: boolean;
+    /** Guardrails configuration for the agent */
+    guardrails?: ElevenLabs.GuardrailsV1Input;
+    /** Language for all conversation analysis outputs (summaries, titles, evaluation rationales, data collection rationales). If not set, the language will be inferred from the conversation. Must be one of the supported conversation languages. */
+    summaryLanguage?: string;
+    /** When enabled, a conversation transcript is automatically translated to the viewer's application language when they open the transcript page. If not set or false, transcripts are shown in their original language unless the viewer manually selects a translation. */
+    autoTranslateTranscriptToAppLanguage?: boolean;
+    /** Settings for authentication */
+    auth?: ElevenLabs.AuthSettings;
+    /** Call limits for the agent */
+    callLimits?: ElevenLabs.AgentCallLimits;
+    /** Privacy settings for the agent */
+    privacy?: ElevenLabs.PrivacyConfigInput;
+    /** The trust context in which the agent operates. */
+    trustContext?: ElevenLabs.AgentTrustContext;
+    /** Default LLM model for post-call analysis (evaluation and data collection) */
+    analysisLlm?: ElevenLabs.Llm;
+    /** Per-agent topic discovery configuration */
+    topicDiscovery?: ElevenLabs.TopicDiscoverySettings;
+    /** Per-agent post-call sentiment analysis configuration */
+    sentimentAnalysis?: ElevenLabs.SentimentAnalysisSettings;
+}

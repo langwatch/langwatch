@@ -1,0 +1,120 @@
+# DO NOT EDIT MANUALLY - Managed by Fern Replay
+version: "1.0"
+generations:
+  - commit_sha: c316672d7fc9d3bf902b633226969929adad0dca
+    tree_hash: 7a55b1b0966aea398ee376ff3b62947618dda98b
+    timestamp: 2026-05-20T07:39:27.879Z
+    cli_version: unknown
+    generator_versions: {}
+  - commit_sha: c3a35abc58cb2069932026a430af4dacd1a77375
+    tree_hash: 2650cfcd8cacddeea3bfc801dcd4122976446e87
+    timestamp: 2026-05-26T13:58:18.906Z
+    cli_version: unknown
+    generator_versions:
+      fernapi/fern-typescript-sdk: 3.36.0
+  - commit_sha: d93a154a0453a9207a0a9f62d22b67f914897d4f
+    tree_hash: e07fc750f93805fbe67ee57942fc2ddc75e21dbc
+    timestamp: 2026-06-01T12:01:15.436Z
+    cli_version: unknown
+    generator_versions:
+      fernapi/fern-typescript-sdk: 3.36.0
+  - commit_sha: 88f9d53b433a2abb81defb87be32d83286aa8b2b
+    tree_hash: cbe7e351aad61e09afbf9ebab7d239a34331894d
+    timestamp: 2026-06-08T11:45:36.549Z
+    cli_version: unknown
+    generator_versions:
+      fernapi/fern-typescript-sdk: 3.36.0
+  - commit_sha: 1efa29310047ae0da58846785a41722a6e7db756
+    tree_hash: 0433e6ee83e8aa6c85f4abcadd43ee456260c8b5
+    timestamp: 2026-06-15T07:53:50.719Z
+    cli_version: unknown
+    generator_versions:
+      fernapi/fern-typescript-sdk: 3.71.4
+  - commit_sha: d4c3cd6446a5ea75f7a099685fb76dd3e1bb6e7a
+    tree_hash: 325c22fdd899a09cc7a802053525c7d906bdab1e
+    timestamp: 2026-06-23T08:36:42.433Z
+    cli_version: unknown
+    generator_versions:
+      fernapi/fern-typescript-sdk: 3.57.1
+  - commit_sha: db6cac60a3dbf75908dc7750a534b4562274be7b
+    tree_hash: f563e7cddb9a82a0b01fad1a6e123e23ec20f310
+    timestamp: 2026-06-30T07:44:36.446Z
+    cli_version: unknown
+    generator_versions:
+      fernapi/fern-typescript-sdk: 3.57.1
+  - commit_sha: 2fbf3ff9dc11851670706a9931307551241da576
+    tree_hash: 669300f2307ec1e14994463568263f8bb9868b07
+    timestamp: 2026-07-07T10:00:24.614Z
+    cli_version: unknown
+    generator_versions:
+      fernapi/fern-typescript-sdk: 3.57.1
+  - commit_sha: 7947e4c61657afc2ca65632d9a6e7de90bcce2a9
+    tree_hash: 3c2e430fd7a5110d443d7c0f7bcbbfb3f9f4731a
+    timestamp: 2026-07-09T07:36:51.201Z
+    cli_version: unknown
+    generator_versions:
+      fernapi/fern-typescript-sdk: 3.57.1
+  - commit_sha: ba1ca4fda05eb4c81e6159f00abc7f4ca5e0d938
+    tree_hash: dcb5a006f2a96462ac3d3923add1a65a8afa3c39
+    timestamp: 2026-07-13T08:23:27.782Z
+    cli_version: unknown
+    generator_versions:
+      fernapi/fern-typescript-sdk: 3.57.1
+current_generation: ba1ca4fda05eb4c81e6159f00abc7f4ca5e0d938
+patches:
+  - id: patch-f50f1558
+    content_hash: sha256:5a09c3db02b795ab544221e13bf2681e7f9bb43c07e8cd96ac063a405dc3a2c6
+    original_commit: f50f1558f741e331dd3949ded57771c012ef27ab
+    original_message: Add missing methods and test (#399)
+    original_author: Paul Asjes <paul.asjes@elevenlabs.io>
+    base_generation: ba1ca4fda05eb4c81e6159f00abc7f4ca5e0d938
+    files:
+      - tests/unit/wrapper/music.test.ts
+    patch_content: |
+      diff --git a/tests/unit/wrapper/music.test.ts b/tests/unit/wrapper/music.test.ts
+      new file mode 100644
+      index 00000000..733d6344
+      --- /dev/null
+      +++ b/tests/unit/wrapper/music.test.ts
+      @@ -0,0 +1,19 @@
+      +import { describe, it, expect } from "@jest/globals";
+      +import { MusicClient } from "../../../src/api/resources/music/client/Client";
+      +import { Music } from "../../../src/wrapper/music";
+      +
+      +function getPublicMethods(proto: object): string[] {
+      +    return Object.getOwnPropertyNames(proto).filter(
+      +        (name) => name !== "constructor" && !name.startsWith("_"),
+      +    );
+      +}
+      +
+      +describe("Music wrapper", () => {
+      +    it("exposes all public methods of the generated MusicClient", () => {
+      +        const clientMethods = getPublicMethods(MusicClient.prototype);
+      +        const wrapperMethods = getPublicMethods(Music.prototype);
+      +
+      +        const missing = clientMethods.filter((m) => !wrapperMethods.includes(m));
+      +        expect(missing).toEqual([]);
+      +    });
+      +});
+    theirs_snapshot:
+      tests/unit/wrapper/music.test.ts: |
+        import { describe, it, expect } from "@jest/globals";
+        import { MusicClient } from "../../../src/api/resources/music/client/Client";
+        import { Music } from "../../../src/wrapper/music";
+
+        function getPublicMethods(proto: object): string[] {
+            return Object.getOwnPropertyNames(proto).filter(
+                (name) => name !== "constructor" && !name.startsWith("_"),
+            );
+        }
+
+        describe("Music wrapper", () => {
+            it("exposes all public methods of the generated MusicClient", () => {
+                const clientMethods = getPublicMethods(MusicClient.prototype);
+                const wrapperMethods = getPublicMethods(Music.prototype);
+
+                const missing = clientMethods.filter((m) => !wrapperMethods.includes(m));
+                expect(missing).toEqual([]);
+            });
+        });
+    user_owned: true

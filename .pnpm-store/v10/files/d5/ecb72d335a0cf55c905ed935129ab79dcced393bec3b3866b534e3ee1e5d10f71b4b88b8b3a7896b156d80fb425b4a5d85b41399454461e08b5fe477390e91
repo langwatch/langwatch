@@ -1,0 +1,61 @@
+{
+  "name": "@smithy/signature-v4",
+  "version": "5.7.0",
+  "description": "A standalone implementation of the AWS Signature V4 request signing algorithm",
+  "homepage": "https://github.com/smithy-lang/smithy-typescript/tree/main/packages/signature-v4",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "AWS SDK for JavaScript Team",
+    "url": "https://aws.amazon.com/sdk-for-javascript/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smithy-lang/smithy-typescript.git",
+    "directory": "packages/signature-v4"
+  },
+  "files": [
+    "dist-*/**"
+  ],
+  "sideEffects": false,
+  "main": "./dist-cjs/index.js",
+  "module": "./dist-es/index.js",
+  "types": "./dist-types/index.d.ts",
+  "typesVersions": {
+    "<4.5": {
+      "dist-types/*": [
+        "dist-types/ts3.4/*"
+      ]
+    }
+  },
+  "publishConfig": {
+    "directory": ".release/package"
+  },
+  "scripts": {
+    "build": "concurrently 'yarn:build:types' 'yarn:build:es:cjs'",
+    "build:es:cjs": "node ../../scripts/compilation/es_cjs.js",
+    "build:types": "premove dist-types && yarn g:tsc -p tsconfig.types.json",
+    "build:types:downlevel": "premove dist-types/ts3.4 && downlevel-dts dist-types dist-types/ts3.4",
+    "clean": "premove dist-cjs dist-es dist-types",
+    "extract:docs": "api-extractor run --local",
+    "stage-release": "premove .release && yarn pack && mkdir ./.release && tar zxvf ./package.tgz --directory ./.release && rm ./package.tgz",
+    "test": "yarn g:vitest run",
+    "test:watch": "yarn g:vitest watch"
+  },
+  "dependencies": {
+    "@smithy/core": "^3.32.0",
+    "@smithy/types": "^4.17.0",
+    "tslib": "^2.6.2"
+  },
+  "devDependencies": {
+    "concurrently": "7.0.0",
+    "downlevel-dts": "0.10.1",
+    "premove": "4.0.0",
+    "typedoc": "0.23.23"
+  },
+  "typedoc": {
+    "entryPoint": "src/index.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,1 @@
+{"version":3,"file":"promise.d.mts","sourceRoot":"","sources":["../../../src/_vendor/zod-to-json-schema/parsers/promise.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,aAAa,EAAE,MAAM,QAAQ,CAAC;AACvC,OAAO,EAAE,eAAe,EAAY,wBAAoB;AACxD,OAAO,EAAE,IAAI,EAAE,oBAAgB;AAE/B,wBAAgB,eAAe,CAC7B,GAAG,EAAE,aAAa,EAClB,IAAI,EAAE,IAAI,EACV,eAAe,EAAE,OAAO,GACvB,eAAe,GAAG,SAAS,CAE7B"}

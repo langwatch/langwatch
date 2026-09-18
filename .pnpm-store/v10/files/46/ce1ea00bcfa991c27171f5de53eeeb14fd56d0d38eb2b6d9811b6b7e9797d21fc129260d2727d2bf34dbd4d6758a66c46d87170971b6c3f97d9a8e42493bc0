@@ -1,0 +1,12 @@
+export { SignatureV4 } from "./SignatureV4";
+export { ALGORITHM_IDENTIFIER, ALGORITHM_IDENTIFIER_V4A, ALGORITHM_QUERY_PARAM, ALWAYS_UNSIGNABLE_HEADERS, AMZ_DATE_HEADER, AMZ_DATE_QUERY_PARAM, AUTH_HEADER, CREDENTIAL_QUERY_PARAM, DATE_HEADER, EVENT_ALGORITHM_IDENTIFIER, EXPIRES_QUERY_PARAM, GENERATED_HEADERS, HOST_HEADER, KEY_TYPE_IDENTIFIER, MAX_CACHE_SIZE, MAX_PRESIGNED_TTL, PROXY_HEADER_PATTERN, REGION_SET_PARAM, SEC_HEADER_PATTERN, SHA256_HEADER, SIGNATURE_HEADER, SIGNATURE_QUERY_PARAM, SIGNED_HEADERS_QUERY_PARAM, TOKEN_HEADER, TOKEN_QUERY_PARAM, UNSIGNABLE_PATTERNS, UNSIGNED_PAYLOAD, } from "./constants";
+export { getCanonicalHeaders } from "./getCanonicalHeaders";
+export { getCanonicalQuery } from "./getCanonicalQuery";
+export { getPayloadHash } from "./getPayloadHash";
+export { moveHeadersToQuery } from "./moveHeadersToQuery";
+export { prepareRequest } from "./prepareRequest";
+export { clearCredentialCache, createScope, getSigningKey } from "./credentialDerivation";
+export { SignatureV4Base, type SignatureV4Init, type SignatureV4CryptoInit } from "./SignatureV4Base";
+export { hasHeader } from "./headerUtil";
+export { signatureV4aContainer } from "./signature-v4a-container";
+export type { OptionalSigV4aSigner } from "./signature-v4a-container";

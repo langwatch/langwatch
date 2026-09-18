@@ -1,0 +1,46 @@
+{
+  "name": "@openai/agents-openai",
+  "repository": "https://github.com/openai/openai-agents-js",
+  "homepage": "https://openai.github.io/openai-agents-js/",
+  "version": "0.3.9",
+  "description": "The OpenAI Agents SDK is a lightweight yet powerful framework for building multi-agent workflows.",
+  "author": "OpenAI <support@openai.com>",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "dependencies": {
+    "debug": "^4.4.0",
+    "openai": "^6",
+    "@openai/agents-core": "0.3.9"
+  },
+  "keywords": [
+    "openai",
+    "agents",
+    "ai",
+    "agentic"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "zod": "^3.25.40 || ^4.0"
+  },
+  "devDependencies": {
+    "@ai-sdk/provider": "^1.1.3",
+    "@types/debug": "^4.1.12",
+    "zod": "^3.25.40 || ^4.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prebuild": "tsx ../../scripts/embedMeta.ts",
+    "build": "tsc",
+    "build-check": "tsc --noEmit -p ./tsconfig.test.json",
+    "dist:check": "tsc --noEmit -p ./tsconfig.dist-check.json"
+  }
+}

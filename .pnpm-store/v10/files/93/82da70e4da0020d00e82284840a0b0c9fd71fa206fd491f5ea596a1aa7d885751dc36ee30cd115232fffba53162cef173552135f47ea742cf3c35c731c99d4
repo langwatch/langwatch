@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BodyUpdateDocumentV1ConvaiKnowledgeBaseDocumentationIdPatch = exports.BodyMoveEntityToFolderV1ConvaiKnowledgeBaseDocumentIdMovePost = exports.BodyCreateUrlDocumentV1ConvaiKnowledgeBaseUrlPost = exports.BodyCreateTextDocumentV1ConvaiKnowledgeBaseTextPost = exports.BodyCreateFolderV1ConvaiKnowledgeBaseFolderPost = exports.BodyBulkMoveEntitiesToFolderV1ConvaiKnowledgeBaseBulkMovePost = void 0;
+var BodyBulkMoveEntitiesToFolderV1ConvaiKnowledgeBaseBulkMovePost_1 = require("./BodyBulkMoveEntitiesToFolderV1ConvaiKnowledgeBaseBulkMovePost");
+Object.defineProperty(exports, "BodyBulkMoveEntitiesToFolderV1ConvaiKnowledgeBaseBulkMovePost", { enumerable: true, get: function () { return BodyBulkMoveEntitiesToFolderV1ConvaiKnowledgeBaseBulkMovePost_1.BodyBulkMoveEntitiesToFolderV1ConvaiKnowledgeBaseBulkMovePost; } });
+var BodyCreateFolderV1ConvaiKnowledgeBaseFolderPost_1 = require("./BodyCreateFolderV1ConvaiKnowledgeBaseFolderPost");
+Object.defineProperty(exports, "BodyCreateFolderV1ConvaiKnowledgeBaseFolderPost", { enumerable: true, get: function () { return BodyCreateFolderV1ConvaiKnowledgeBaseFolderPost_1.BodyCreateFolderV1ConvaiKnowledgeBaseFolderPost; } });
+var BodyCreateTextDocumentV1ConvaiKnowledgeBaseTextPost_1 = require("./BodyCreateTextDocumentV1ConvaiKnowledgeBaseTextPost");
+Object.defineProperty(exports, "BodyCreateTextDocumentV1ConvaiKnowledgeBaseTextPost", { enumerable: true, get: function () { return BodyCreateTextDocumentV1ConvaiKnowledgeBaseTextPost_1.BodyCreateTextDocumentV1ConvaiKnowledgeBaseTextPost; } });
+var BodyCreateUrlDocumentV1ConvaiKnowledgeBaseUrlPost_1 = require("./BodyCreateUrlDocumentV1ConvaiKnowledgeBaseUrlPost");
+Object.defineProperty(exports, "BodyCreateUrlDocumentV1ConvaiKnowledgeBaseUrlPost", { enumerable: true, get: function () { return BodyCreateUrlDocumentV1ConvaiKnowledgeBaseUrlPost_1.BodyCreateUrlDocumentV1ConvaiKnowledgeBaseUrlPost; } });
+var BodyMoveEntityToFolderV1ConvaiKnowledgeBaseDocumentIdMovePost_1 = require("./BodyMoveEntityToFolderV1ConvaiKnowledgeBaseDocumentIdMovePost");
+Object.defineProperty(exports, "BodyMoveEntityToFolderV1ConvaiKnowledgeBaseDocumentIdMovePost", { enumerable: true, get: function () { return BodyMoveEntityToFolderV1ConvaiKnowledgeBaseDocumentIdMovePost_1.BodyMoveEntityToFolderV1ConvaiKnowledgeBaseDocumentIdMovePost; } });
+var BodyUpdateDocumentV1ConvaiKnowledgeBaseDocumentationIdPatch_1 = require("./BodyUpdateDocumentV1ConvaiKnowledgeBaseDocumentationIdPatch");
+Object.defineProperty(exports, "BodyUpdateDocumentV1ConvaiKnowledgeBaseDocumentationIdPatch", { enumerable: true, get: function () { return BodyUpdateDocumentV1ConvaiKnowledgeBaseDocumentationIdPatch_1.BodyUpdateDocumentV1ConvaiKnowledgeBaseDocumentationIdPatch; } });

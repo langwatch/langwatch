@@ -1,0 +1,7 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DubbingSegmentUpdateRequest = exports.DubbingSegmentCreateRequest = void 0;
+var DubbingSegmentCreateRequest_1 = require("./DubbingSegmentCreateRequest");
+Object.defineProperty(exports, "DubbingSegmentCreateRequest", { enumerable: true, get: function () { return DubbingSegmentCreateRequest_1.DubbingSegmentCreateRequest; } });
+var DubbingSegmentUpdateRequest_1 = require("./DubbingSegmentUpdateRequest");
+Object.defineProperty(exports, "DubbingSegmentUpdateRequest", { enumerable: true, get: function () { return DubbingSegmentUpdateRequest_1.DubbingSegmentUpdateRequest; } });

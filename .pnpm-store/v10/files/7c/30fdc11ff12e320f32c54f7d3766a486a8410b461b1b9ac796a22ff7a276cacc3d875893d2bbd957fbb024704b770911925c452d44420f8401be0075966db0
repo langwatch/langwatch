@@ -1,0 +1,19 @@
+name: Lock Threads
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: lock
+
+permissions:
+  contents: read
+
+jobs:
+  lock-threads:
+    permissions:
+      issues: write
+      pull-requests: write
+    uses: fastify/workflows/.github/workflows/lock-threads.yml@2073dc8e1f9e172bf42daa3843c9dbd31af1e8cb # v6.0.0

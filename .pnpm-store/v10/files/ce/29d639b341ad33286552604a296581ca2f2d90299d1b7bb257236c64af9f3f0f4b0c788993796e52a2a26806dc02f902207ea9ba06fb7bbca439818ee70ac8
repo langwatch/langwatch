@@ -1,0 +1,9 @@
+import { Reporter, TestCase } from 'vitest/node';
+
+declare class VitestReporter implements Reporter {
+    private results;
+    onTestCaseResult(test: TestCase): Promise<void>;
+    onTestRunEnd(): Promise<void>;
+}
+
+export { VitestReporter as default };

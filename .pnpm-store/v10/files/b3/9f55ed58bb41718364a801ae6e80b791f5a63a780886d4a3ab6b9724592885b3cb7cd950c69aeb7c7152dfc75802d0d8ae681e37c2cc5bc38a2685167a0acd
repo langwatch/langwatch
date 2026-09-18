@@ -1,0 +1,11 @@
+echo "Error: claude native binary not installed." >&2
+echo "" >&2
+echo "Either postinstall did not run (--ignore-scripts, some pnpm configs)" >&2
+echo "or the platform-native optional dependency was not downloaded" >&2
+echo "(--omit=optional)." >&2
+echo "" >&2
+echo "Run the postinstall manually (adjust path for local vs global install):" >&2
+echo "  node node_modules/@anthropic-ai/claude-code/install.cjs" >&2
+echo "" >&2
+echo "Or reinstall without --ignore-scripts / --omit=optional." >&2
+exit 1
