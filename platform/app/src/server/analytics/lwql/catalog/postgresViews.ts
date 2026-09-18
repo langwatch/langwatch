@@ -62,4 +62,7 @@ export const LWQL_POSTGRES_CATALOG: readonly LangWatchQLViewDefinition[] = [
     skip: LWQL_POSTGRES_SKIPPED_MODELS,
     overrides: LWQL_POSTGRES_ALL_OVERRIDES,
   }),
-].sort((a, b) => a.name.localeCompare(b.name));
+  // Locale-independent: `localeCompare` orders by the runtime's default locale,
+  // which can vary the order of these ASCII identifiers across environments —
+  // a plain codepoint comparison sorts the same everywhere.
+].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));

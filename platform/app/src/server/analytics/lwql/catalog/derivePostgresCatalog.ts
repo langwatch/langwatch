@@ -247,9 +247,10 @@ const SECRET_SUFFIX =
  * `hash`, `key`, `keys`, `hashes`, `secrets`, `passwords` or `credentials`
  * without ending in `id` (so `s3AccessKeyId` is stripped by the contains rule,
  * `customKeys` by the suffix rule, while `parentId` and `promptTokens` survive
- * — `tokens` is a count, not a credential) — is never exposed. Person emails
- * (`email`, or a name ending in `Email`) are never exposed; a `userId`-like
- * column stays, as an opaque id.
+ * — `tokens` is a count, not a credential) — is never exposed. Person emails —
+ * any name *containing* `email` (`email`, `reviewer_email`,
+ * `notificationEmails`, `emailAddress`), not just an exact match or `Email`
+ * suffix — are never exposed; a `userId`-like column stays, as an opaque id.
  */
 export function isStrippedByDefault(name: string): string | undefined {
   const lower = name.toLowerCase();
@@ -257,9 +258,7 @@ export function isStrippedByDefault(name: string): string | undefined {
   if (SECRET_SUFFIX.test(lower) && !lower.endsWith("id")) {
     return "secret material, never exposed";
   }
-  if (name === "email" || /Email$/.test(name)) {
-    return "person email, never exposed";
-  }
+  if (lower.includes("email")) return "person email, never exposed";
   return undefined;
 }
 
@@ -693,22 +692,27 @@ function deriveKeyColumns({
   model,
   scope,
   aliasByColumn,
-  fanOut,
+  isFannedOut,
 }: {
   model: PrismaModel;
   scope: TenantScope;
   aliasByColumn: ReadonlyMap<string, string>;
-  fanOut: boolean;
+  isFannedOut: boolean;
 }): string[] {
   const pkExposed = model.primaryKey.map((keyField) =>
     exposedKeyName({ model, keyField, scope, aliasByColumn }),
   );
-  return [...(fanOut ? [TENANT_COLUMN] : []), ...pkExposed].filter(
+  return [...(isFannedOut ? [TENANT_COLUMN] : []), ...pkExposed].filter(
     (key, index, all) => all.indexOf(key) === index,
   );
 }
 
-/** Derives one model's view definition, applying its override. */
+/**
+ * Scope resolves before columns build: {@link resolveColumn} needs
+ * `scope.consumedField` to leave the field the tenant path already consumes
+ * out of the exposed columns, so a project/team/organization id is never
+ * exposed twice under two names.
+ */
 function deriveModel({
   model,
   override,
@@ -719,7 +723,7 @@ function deriveModel({
   context: TenantResolveContext;
 }): DerivedPostgresView {
   const scope = resolveTenantScope(model, override, context);
-  const fanOut = scope.kind !== "project";
+  const isFannedOut = scope.kind !== "project";
   const aliasByColumn = aliasMap(override);
 
   const { columns, skipColumns } = buildColumns({
@@ -728,16 +732,22 @@ function deriveModel({
     override,
     aliasByColumn,
   });
-  const keyColumns = deriveKeyColumns({ model, scope, aliasByColumn, fanOut });
+  const keyColumns = deriveKeyColumns({
+    model,
+    scope,
+    aliasByColumn,
+    isFannedOut,
+  });
 
   const name = override.name ?? postgresDatasetName(model.name);
-  const grain = override.grain ?? defaultGrain({ fanOut, scope, keyColumns });
+  const grain =
+    override.grain ?? defaultGrain({ isFannedOut, scope, keyColumns });
   const exposedNames = new Set(columns.map((column) => column.name));
   const timeColumn =
     override.timeColumn ?? defaultTimeColumn({ columns, keyColumns });
   const joinKeys = override.joinKeys ?? defaultJoinKeys(columns);
 
-  assertOverride({ name, override, exposedNames });
+  assertOverride({ name, model, override, exposedNames });
 
   return {
     name,
@@ -762,15 +772,15 @@ function deriveModel({
 
 /** The grain sentence: a fan-out row appears once per project, a plain one not. */
 function defaultGrain({
-  fanOut,
+  isFannedOut,
   scope,
   keyColumns,
 }: {
-  fanOut: boolean;
+  isFannedOut: boolean;
   scope: TenantScope;
   keyColumns: readonly string[];
 }): string {
-  if (!fanOut) return `one row per ${keyColumns.join(", ")}`;
+  if (!isFannedOut) return `one row per ${keyColumns.join(", ")}`;
   return (
     `one row per (${keyColumns.join(", ")}); ` +
     `${fanOutRowSentence(scope.kind)} appears once per project`
@@ -819,15 +829,39 @@ function defaultJoinKeys(
 /** Refuses an override annotation naming a column the view does not expose. */
 function assertOverride({
   name,
+  model,
   override,
   exposedNames,
 }: {
   name: string;
+  model: PrismaModel;
   override: PostgresDatasetOverride;
   exposedNames: ReadonlySet<string>;
 }): void {
   assertReAdmitReasons(name, override);
   assertAnnotationsExposed(name, override, exposedNames);
+  assertSkipColumnsExist(name, model, override);
+}
+
+/** Every `skipColumns` key names a real source column, or the view is refused. */
+function assertSkipColumnsExist(
+  name: string,
+  model: PrismaModel,
+  override: PostgresDatasetOverride,
+): void {
+  const sourceColumns = new Set(
+    model.fields
+      .filter((field) => field.kind !== "relation")
+      .map((field) => field.columnName),
+  );
+  for (const column of Object.keys(override.skipColumns ?? {})) {
+    if (!sourceColumns.has(column)) {
+      throw new Error(
+        `lwql postgres catalog: view "${name}" skipColumns names "${column}", ` +
+          `which is not a source column of ${model.name}`,
+      );
+    }
+  }
 }
 
 /** Every `reAdmit` entry carries a non-empty reason, or the view is refused. */

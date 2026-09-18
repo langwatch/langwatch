@@ -115,12 +115,19 @@ const FIELD_RE =
  * Drops a trailing `//` line comment while respecting `"..."` strings, so a
  * comment on a field line is ignored without truncating a `@default("a//b")`.
  * `///` doc lines are consumed before this runs, so only `//` reaches here.
+ *
+ * A `\"` inside the string is an escaped quote, not its close — skipping the
+ * character after a backslash keeps a `//` inside `@default("a\"//b")` from
+ * being misread as a comment start once the escaped quote has been walked
+ * past.
  */
 function stripLineComment(line: string): string {
   let inString = false;
   for (let i = 0; i < line.length - 1; i++) {
     const char = line[i];
-    if (char === '"') {
+    if (inString && char === "\\") {
+      i++;
+    } else if (char === '"') {
       inString = !inString;
     } else if (!inString && char === "/" && line[i + 1] === "/") {
       return line.slice(0, i);
@@ -204,7 +211,7 @@ interface ParseState {
   readonly rawModels: RawModel[];
   readonly enums: PrismaEnum[];
   model: RawModel | undefined;
-  modelIgnored: boolean;
+  isModelIgnored: boolean;
   enumCurrent: { name: string; values: string[] } | undefined;
   pendingDocs: string[];
 }
@@ -214,7 +221,13 @@ interface ParseState {
  * what follows. Returns `true` when the line was one of those (nothing left
  * for the caller to do with it).
  */
-function consumeDocOrBlankLine(trimmed: string, state: ParseState): boolean {
+function consumeDocOrBlankLine({
+  trimmed,
+  state,
+}: {
+  trimmed: string;
+  state: ParseState;
+}): boolean {
   if (trimmed.startsWith("///")) {
     state.pendingDocs.push(docLine(trimmed));
     return true;
@@ -226,8 +239,19 @@ function consumeDocOrBlankLine(trimmed: string, state: ParseState): boolean {
   return false;
 }
 
-/** A line inside `enum X { ... }`: closes the enum, or records a value. */
-function parseEnumLine(line: string, state: ParseState): void {
+/**
+ * `pendingDocs` clears unconditionally here, on every line of the block: a
+ * `///` line above an enum value is parsed like any other doc comment, but
+ * {@link PrismaEnum} carries no per-value documentation, so it is discarded
+ * rather than attached to anything.
+ */
+function parseEnumLine({
+  line,
+  state,
+}: {
+  line: string;
+  state: ParseState;
+}): void {
   const enumCurrent = state.enumCurrent;
   if (!enumCurrent) return;
   if (line === "}") {
@@ -241,11 +265,15 @@ function parseEnumLine(line: string, state: ParseState): void {
 }
 
 /** A `@@map`/`@@id`/`@@ignore` block-attribute line inside a model. */
-function applyModelAttributeLine(
-  line: string,
-  model: RawModel,
-  state: ParseState,
-): void {
+function applyModelAttributeLine({
+  line,
+  model,
+  state,
+}: {
+  line: string;
+  model: RawModel;
+  state: ParseState;
+}): void {
   const mapMatch = /@@map\("([^"]*)"\)/.exec(line);
   if (mapMatch?.[1]) {
     model.tableName = mapMatch[1];
@@ -257,16 +285,20 @@ function applyModelAttributeLine(
       .map((name) => name.trim())
       .filter(Boolean);
   }
-  if (/@@ignore\b/.test(line)) state.modelIgnored = true;
+  if (/@@ignore\b/.test(line)) state.isModelIgnored = true;
   state.pendingDocs = [];
 }
 
 /** A field-declaration line inside a model, added unless `@ignore`d. */
-function applyModelFieldLine(
-  line: string,
-  model: RawModel,
-  state: ParseState,
-): void {
+function applyModelFieldLine({
+  line,
+  model,
+  state,
+}: {
+  line: string;
+  model: RawModel;
+  state: ParseState;
+}): void {
   const parsed = parseFieldLine(line, state.pendingDocs.join("\n"));
   state.pendingDocs = [];
   if (!parsed || parsed.isIgnored) return;
@@ -277,24 +309,36 @@ function applyModelFieldLine(
 }
 
 /** A line inside `model X { ... }`: closing brace, `@@` attribute, or field. */
-function parseModelLine(line: string, state: ParseState): void {
+function parseModelLine({
+  line,
+  state,
+}: {
+  line: string;
+  state: ParseState;
+}): void {
   const model = state.model;
   if (!model) return;
   if (line === "}") {
-    if (!state.modelIgnored) state.rawModels.push(model);
+    if (!state.isModelIgnored) state.rawModels.push(model);
     state.model = undefined;
     state.pendingDocs = [];
     return;
   }
   if (line.startsWith("@@")) {
-    applyModelAttributeLine(line, model, state);
+    applyModelAttributeLine({ line, model, state });
     return;
   }
-  applyModelFieldLine(line, model, state);
+  applyModelFieldLine({ line, model, state });
 }
 
 /** A top-level line: opens a `model` or `enum` block, otherwise is ignored. */
-function startModelOrEnum(line: string, state: ParseState): void {
+function startModelOrEnum({
+  line,
+  state,
+}: {
+  line: string;
+  state: ParseState;
+}): void {
   const modelStart = /^model\s+(\w+)\s*\{/.exec(line);
   if (modelStart?.[1]) {
     state.model = {
@@ -304,7 +348,7 @@ function startModelOrEnum(line: string, state: ParseState): void {
       primaryKey: [],
       fields: [],
     };
-    state.modelIgnored = false;
+    state.isModelIgnored = false;
     state.pendingDocs = [];
     return;
   }
@@ -329,39 +373,42 @@ export function parsePrismaSchema(text: string): PrismaManifest {
     rawModels: [],
     enums: [],
     model: undefined,
-    modelIgnored: false,
+    isModelIgnored: false,
     enumCurrent: undefined,
     pendingDocs: [],
   };
 
   for (const rawLine of text.split("\n")) {
     const trimmed = rawLine.trim();
-    if (consumeDocOrBlankLine(trimmed, state)) continue;
+    if (consumeDocOrBlankLine({ trimmed, state })) continue;
 
     const line = stripLineComment(trimmed).trimEnd();
 
     if (state.enumCurrent) {
-      parseEnumLine(line, state);
+      parseEnumLine({ line, state });
       continue;
     }
     if (state.model) {
-      parseModelLine(line, state);
+      parseModelLine({ line, state });
       continue;
     }
-    startModelOrEnum(line, state);
+    startModelOrEnum({ line, state });
   }
 
-  return buildManifest(state.rawModels, state.enums);
+  return buildManifest({ rawModels: state.rawModels, enums: state.enums });
 }
 
 /**
  * Resolves every raw field's {@link PrismaFieldKind} against the full set of
  * model and enum names collected during the scan, producing the final manifest.
  */
-function buildManifest(
-  rawModels: readonly RawModel[],
-  enums: readonly PrismaEnum[],
-): PrismaManifest {
+function buildManifest({
+  rawModels,
+  enums,
+}: {
+  rawModels: readonly RawModel[];
+  enums: readonly PrismaEnum[];
+}): PrismaManifest {
   const modelNames = new Set(rawModels.map((entry) => entry.name));
   const enumNames = new Set(enums.map((entry) => entry.name));
 
@@ -371,7 +418,7 @@ function buildManifest(
     documentation: entry.documentation,
     primaryKey: entry.primaryKey,
     fields: entry.fields.map((field) =>
-      resolveField(field, modelNames, enumNames),
+      resolveField({ field, modelNames, enumNames }),
     ),
   }));
 
@@ -379,11 +426,15 @@ function buildManifest(
 }
 
 /** Resolves one raw field's {@link PrismaFieldKind} and attaches `relation` when applicable. */
-function resolveField(
-  field: RawField,
-  modelNames: ReadonlySet<string>,
-  enumNames: ReadonlySet<string>,
-): PrismaField {
+function resolveField({
+  field,
+  modelNames,
+  enumNames,
+}: {
+  field: RawField;
+  modelNames: ReadonlySet<string>;
+  enumNames: ReadonlySet<string>;
+}): PrismaField {
   const kind = resolveKind({ field, modelNames, enumNames });
   return {
     name: field.name,

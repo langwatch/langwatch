@@ -43,6 +43,7 @@ model Project {
   secretKey String   @ignore
   /// The owning colour choice.
   color     Color?
+  label     String   @default("a\\"//b") @map("value_column")
 }
 
 model Membership {
@@ -90,6 +91,13 @@ describe("given an inline Prisma schema", () => {
 
     it("defaults the column name to the field name", () => {
       expect(field(team, "id")?.columnName).toBe("id");
+    });
+
+    it("does not mistake a // inside an escaped-quote string for a comment", () => {
+      // `@default("a\"//b")` embeds an escaped quote followed by `//`; a parser
+      // that toggles in-string state on every `"` (escaped or not) would read
+      // this `//` as a comment start and truncate the line before `@map`.
+      expect(field(project, "label")?.columnName).toBe("value_column");
     });
   });
 
