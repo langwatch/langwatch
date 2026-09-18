@@ -280,3 +280,19 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     When it runs as the restricted identity
     Then the server's query log holds the submitted text byte for byte, comment included
     And the column carries the text the call was given, which is what the application judges
+
+  @unit
+  Scenario: A conversation past the judge's budget is cut through the bounded renderer, keeping both ends
+    Given an eval over a conversation far longer than the judge's budget
+    When the statement is hydrated
+    Then the text sent keeps the close of the conversation
+    And it keeps the opening of the conversation
+    And it names how many turns were dropped from the middle
+    And the cell reports itself truncated
+
+  @unit
+  Scenario: A conversation inside the judge's budget is sent whole and not marked truncated
+    Given an eval over a conversation smaller than the judge's budget
+    When the statement is hydrated
+    Then the whole conversation is sent
+    And the cell does not report itself truncated

@@ -206,7 +206,6 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Given a conversation far longer than the classifier's state cap
     When it is judged
     Then it is cut to what the questions leave of the state
-    And the cut keeps the opening of the conversation
     And the verdict comes back with the row marked truncated
     And the row is judged rather than skipped
 

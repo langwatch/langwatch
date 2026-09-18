@@ -102,11 +102,13 @@ Expect a long conversation to cost more than a bounded one would, up to roughly
 four times on the longest threads. Read the estimate before the run: it prices
 the rows as they actually are.
 
-A conversation past that ceiling is still judged. It is cut to fit, the row
-comes back marked truncated, and the cut keeps the opening. If what you are
-asking about is how a conversation *ended*, write the statement yourself with
-`conversation_bounded`, which keeps both ends and writes a marker naming how
-many turns it dropped from the middle:
+A conversation past that ceiling is still judged. It is cut to fit and the row
+comes back marked truncated, and the cut keeps the opening and the close and
+writes a marker naming how many turns went from the middle, so a question about
+how a conversation ended reads the ending.
+
+To set the budget yourself rather than take the judge's, write the statement
+with `conversation_bounded`, which cuts the same way at the size you name:
 
 ```sql
 eval(conversation_bounded(m.ConversationId, 8000, ''), 'the customer left angry') AS q1

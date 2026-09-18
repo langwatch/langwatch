@@ -265,7 +265,7 @@ describe("given an unbounded conversation larger than the judge takes", () => {
       // What `--target threads` now sends: `conversation(ConversationId)` with
       // no budget of its own, so a thread longer than the classifier's state
       // arrives here whole and the budget is the only thing that cuts it.
-      const conversation = `START${"a".repeat(400_000)}END`;
+      const conversation = "a".repeat(400_000);
       let sentState = "";
       endpoint()
         .intercept({ path: "/v1/systemone", method: "POST" })
@@ -294,13 +294,11 @@ describe("given an unbounded conversation larger than the judge takes", () => {
         instantEvalTextBudget({ questions: [QUESTION] }) ?? 0,
       );
 
-      // Which end survives, pinned because it decides what the judge reads.
-      // This cut keeps the opening and drops the close, and writes no marker
-      // saying so. `conversation_bounded` is the opposite: it keeps both ends
-      // and names how many turns went missing. A question about how a
-      // conversation ended is therefore worth asking of a bounded transcript.
-      expect(sentState.startsWith("START")).toBe(true);
-      expect(sentState.endsWith("END")).toBe(false);
+      // This is the last-resort cut, for a text that reaches the classifier
+      // already over budget. A conversation never arrives here that way: the
+      // hydration stage re-renders one through the bounded renderer first,
+      // which keeps both ends and names the turns it dropped
+      // (../../../../analytics/lwql/appFunctions/hydration/evaluate.ts).
     });
 
     /** @scenario "A conversation inside the judge's state cap is sent whole and not marked truncated" */
