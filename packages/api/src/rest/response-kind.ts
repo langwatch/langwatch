@@ -5,6 +5,7 @@
  */
 import type { StatusCode } from "hono/utils/http-status";
 
+import { readableByteStream } from "./byte-stream.ts";
 import { declined, type Declined } from "./response.ts";
 
 /**
@@ -68,10 +69,14 @@ export type RestBytesProducer<Produces extends string | readonly string[] = stri
   ): RestAnswer<"bytes">;
   /** Bytes still arriving. `byteLength` is published when the store knows it. */
   stream(
-    stream: ReadableStream,
+    stream: ReadableStream | AsyncIterable<Uint8Array>,
     options: Readonly<{
       mediaType: ProducedMediaType<Produces>;
+      status?: StatusCode;
+      onCancel?: (reason: unknown) => void | Promise<void>;
       byteLength?: number;
+      headers?: Readonly<Record<string, string>>;
+      disposition?: "inline" | "attachment";
       filename?: string;
       cacheSeconds?: number;
     }>,
@@ -168,10 +173,13 @@ function answer<Kind extends RestResponseKind>(
  * backslash and control character taken out, so a filename cannot write a
  * second header field.
  */
-function disposition(filename: string): Record<string, string> {
+function disposition(
+  filename: string,
+  kind: "inline" | "attachment" = "inline",
+): Record<string, string> {
   const safe = filename.replace(/["\\]/g, "").replace(/[^\x20-\x7e]/g, "");
 
-  return safe === "" ? {} : { "Content-Disposition": `inline; filename="${safe}"` };
+  return safe === "" ? {} : { "Content-Disposition": `${kind}; filename="${safe}"` };
 }
 
 /**
@@ -211,16 +219,17 @@ const BYTES_PRODUCER: RestBytesProducer = Object.freeze({
   stream(stream, options) {
     return answer(
       "bytes",
-      200,
+      options.status ?? 200,
       {
+        ...options.headers,
         "Content-Type": options.mediaType,
         ...(options.byteLength === undefined
           ? {}
           : { "Content-Length": String(options.byteLength) }),
-        ...disposition(options.filename ?? ""),
+        ...disposition(options.filename ?? "", options.disposition),
         ...caching(options.cacheSeconds),
       },
-      { form: "stream", stream },
+      { form: "stream", stream: readableByteStream(stream, options.onCancel) },
     );
   },
   storedAt(url, options) {

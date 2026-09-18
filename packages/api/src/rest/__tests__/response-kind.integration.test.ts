@@ -12,7 +12,7 @@ import { z } from "zod";
 import { publicRoute } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
-import type { RestEvent } from "../response-kind.ts";
+import { producerFor, type RestEvent } from "../response-kind.ts";
 import { createRestRuntime } from "../runtime.ts";
 
 const VERSION = "2026-09-08";
@@ -104,6 +104,18 @@ const objects = defineRestRouter(ObjectApi)
     response.storedAt(`https://store.example/${input.id}?signature=abc`, { seconds: 300 }),
   )
 
+  .get("/refused-stream", "refusedStream")
+  .withAccess(publicRoute({ reason: "the family's own door is tested elsewhere" }))
+  .withResponse("bytes", { produces: "application/json" })
+  .handle(({ response }) =>
+    response.stream(
+      (async function* () {
+        yield new TextEncoder().encode('{"error":"provider refused"}');
+      })(),
+      { status: 401, mediaType: "application/json", headers: { "X-Provider": "test" } },
+    ),
+  )
+
   .get("/events", "watchObjects")
   .withAccess(publicRoute({ reason: "the family's own door is tested elsewhere" }))
   .withResponse("sse", {})
@@ -186,6 +198,52 @@ function proxyApp(): Hono {
 }
 
 describe("given a route that declares the bytes kind", () => {
+  it("preserves an async byte source's status, metadata and body", async () => {
+    const response = await objectsApp().request("/api/v1/objects/refused-stream");
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("content-type")).toBe("application/json");
+    expect(response.headers.get("x-provider")).toBe("test");
+    await expect(response.json()).resolves.toEqual({ error: "provider refused" });
+  });
+
+  it("pulls async bytes on demand and closes their iterator on cancellation", async () => {
+    let produced = 0;
+    let closed = false;
+
+    async function* chunks() {
+      try {
+        for (let index = 0; index < 100; index += 1) {
+          produced += 1;
+          yield new Uint8Array([index]);
+        }
+      } finally {
+        closed = true;
+      }
+    }
+
+    const producer = producerFor("bytes");
+
+    if (!("stream" in producer)) {
+      throw new Error("Expected byte producer");
+    }
+
+    const answer = producer.stream(chunks(), { mediaType: "application/octet-stream" });
+
+    if (answer.body.form !== "stream") {
+      throw new Error("Expected stream answer");
+    }
+
+    const reader = answer.body.stream.getReader();
+    const first = await reader.read();
+
+    expect(first.value).toEqual(new Uint8Array([0]));
+    expect(produced).toBeLessThanOrEqual(2);
+    await reader.cancel();
+    expect(closed).toBe(true);
+    expect(produced).toBeLessThanOrEqual(2);
+  });
+
   /** @scenario "A route that declares bytes answers with the bytes it produced" */
   it("answers with the bytes, their length and a quoted disposition", async () => {
     const response = await objectsApp().request("/api/v1/objects/avatar/object-1");
