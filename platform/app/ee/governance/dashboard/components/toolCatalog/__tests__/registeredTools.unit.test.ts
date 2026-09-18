@@ -20,6 +20,7 @@ import {
   billingForTool,
   buildRegisteredToolCards,
   type RegisteredTool,
+  VENDOR_UNKNOWN,
   vendorForTool,
 } from "../registeredTools";
 
@@ -120,7 +121,7 @@ describe("given a registered tool", () => {
 
     /** @scenario "The catalog says who makes pi and how it is paid for" */
     it.each(offeredKinds)("names who makes %s", (kind) => {
-      expect(vendorForTool(assistant(kind))).not.toBe("Vendor not recorded");
+      expect(vendorForTool(assistant(kind))).not.toBe(VENDOR_UNKNOWN);
     });
 
     /** @scenario "The catalog says who makes pi and how it is paid for" */

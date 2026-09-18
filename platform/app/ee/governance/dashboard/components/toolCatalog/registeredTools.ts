@@ -106,8 +106,14 @@ const PROVIDER_VENDOR: Record<string, string> = {
   cloudflare: "Cloudflare",
 };
 
-/** Said when the registry does not tell us who makes a tool. */
-const VENDOR_UNKNOWN = "Vendor not recorded";
+/**
+ * Said when the registry does not tell us who makes a tool.
+ *
+ * Exported so a test can assert a tool did NOT fall back here without copying
+ * the wording. A copy passes the moment this string is reworded, which is
+ * silently the same as not checking at all.
+ */
+export const VENDOR_UNKNOWN = "Vendor not recorded";
 
 /** What an organization's own internal tool is attributed to. */
 const VENDOR_IN_HOUSE = "In-house";
