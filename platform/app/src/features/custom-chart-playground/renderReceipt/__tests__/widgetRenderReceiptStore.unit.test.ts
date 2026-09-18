@@ -88,6 +88,7 @@ describe("listWidgetRenderReceipts", () => {
 
 describe("buildWidgetRenderResult", () => {
   describe("when one widget id is asked for", () => {
+    /** @scenario Langy reads one widget's receipt with its markup */
     it("includes markup by default and renders capturedAt as an ISO string", () => {
       const receipts = {
         w1: makeReceipt({
@@ -114,6 +115,7 @@ describe("buildWidgetRenderResult", () => {
   });
 
   describe("when no widget id is asked for", () => {
+    /** @scenario Langy lists every widget on the open dashboard without markup */
     it("lists every widget on the dashboard without markup", () => {
       const receipts = {
         w1: makeReceipt({ widgetId: "w1", widgetName: "A" }),

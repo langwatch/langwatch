@@ -18,22 +18,21 @@
  */
 
 import { Box, Text } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 import { useDashboardRefreshedAt } from "~/components/analytics/useDashboardAutoRefresh";
-import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useColorMode } from "~/components/ui/color-mode";
 import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 
 import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
-import type { ChartFrameRenderReceipt } from "./bridge/frameBridge";
 import { FrameDiagnosticBadge } from "./FrameDiagnosticBadge";
 import { declaredParamDefaults } from "./paramsSnapshot";
-import { useWidgetRenderReceiptStore } from "./renderReceipt/widgetRenderReceiptStore";
+import { useWidgetRenderReceiptPublisher } from "./renderReceipt/useWidgetRenderReceiptPublisher";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
 import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
 import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
 import { useFrameDiagnostic } from "./useFrameDiagnostic";
+import { useWidgetTimeWindow } from "./useWidgetTimeWindow";
 
 export interface DashboardWidgetFrameProps {
   readonly id: string;
@@ -59,21 +58,9 @@ export function DashboardWidgetFrame({
   widgetName,
 }: DashboardWidgetFrameProps) {
   const { colorMode } = useColorMode();
-  const { period } = usePeriodSelector();
   const refreshedAt = useDashboardRefreshedAt();
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
-
-  // Epoch milliseconds, not the `Date` objects `usePeriodSelector` hands
-  // back: two `Date`s for the same instant are never `Object.is`-equal, so a
-  // dependency built on them would re-run the query on every render — the
-  // same reasoning `LangWatchQLDashboardWidget` applies to its own run hook.
-  const timeWindow = useMemo(
-    () => ({
-      start: period.startDate.getTime(),
-      end: period.endDate.getTime(),
-    }),
-    [period.startDate, period.endDate],
-  );
+  const timeWindow = useWidgetTimeWindow();
 
   // A row this build never wrote — an old shape, a hand-edited one — fails
   // safeParse and degrades to an empty file with no queries rather than
@@ -128,34 +115,14 @@ export function DashboardWidgetFrame({
     resetKey: definition.code,
   });
 
-  // The render receipt — what the frame actually painted — is kept per widget
-  // so an off-screen agent (Langy) can read this card through
-  // `dashboard.getWidgetRender`. It exists only while this card is mounted, so
-  // it is dropped when the card leaves the grid.
-  const publishReceipt = useWidgetRenderReceiptStore((state) => state.publish);
-  const removeReceipt = useWidgetRenderReceiptStore((state) => state.remove);
-  const onRenderReceipt = useCallback(
-    (receipt: ChartFrameRenderReceipt) => {
-      publishReceipt({
-        ...receipt,
-        widgetId: id,
-        widgetName,
-        dashboardId,
-        theme: dashboardContext.theme,
-        timeWindow: dashboardContext.timeWindow,
-        capturedAt: Date.now(),
-      });
-    },
-    [
-      publishReceipt,
-      id,
-      widgetName,
-      dashboardId,
-      dashboardContext.theme,
-      dashboardContext.timeWindow,
-    ],
-  );
-  useEffect(() => () => removeReceipt(id), [id, removeReceipt]);
+  // Publish render receipts and clean up on unmount.
+  const onRenderReceipt = useWidgetRenderReceiptPublisher({
+    id,
+    widgetName,
+    dashboardId,
+    theme: dashboardContext.theme,
+    timeWindow: dashboardContext.timeWindow,
+  });
 
   if (!parsed.success) {
     return (

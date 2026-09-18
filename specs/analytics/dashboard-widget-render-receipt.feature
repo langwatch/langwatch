@@ -57,3 +57,21 @@ Feature: A dashboard widget reports what it rendered so the agent can see it
     When the agent calls dashboard.getWidgetRender
     Then the dispatch is refused with langy_ui_no_browser
     And nothing is answered from saved state, because a receipt exists only in an open tab
+
+  @integration
+  Scenario: An oversized render receipt is clamped and flagged
+    When the frame posts markup larger than the receipt size cap
+    Then the receipt markup is truncated to the cap
+    And the receipt's markupTruncated flag is set to true
+
+  @integration
+  Scenario: A malformed render receipt is dropped
+    When the frame posts a message with an invalid status or malformed markup
+    Then the malformed message is discarded
+    And the host never receives an invalid receipt
+
+  @integration
+  Scenario: Rapid render receipts are throttled to the latest
+    When the frame posts multiple receipts in quick succession
+    Then the host throttles to at most one receipt per 100ms
+    And the delivered receipt carries the latest payload
