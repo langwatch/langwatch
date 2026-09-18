@@ -303,7 +303,28 @@ SecurityHeaders.strict()).route("/api", api).route("/", spa)` — middleware
 runs before routing on every request; `/` is a route, not a fallback,
 because longest prefix wins; `.use`/`.route` are internal (boot() writes
 the composition, prefixes stay library constants, no app code ever holds
-the mux). `SinglePageApp` serves the bundle side. **The mux is backed by
+the mux). **The pieces are tiny classes, legible at their constructor
+sites** (ruled 2026-09-18, superseding the SinglePageApp name):
+
+```ts
+const bundle = BrowserBundle.create({
+  dist,
+  publicConfig,
+  sessionReader,                       // Caller | null, document requests only
+  security: SecurityHeaders.strict().withContentSecurityPolicy(csp),
+});
+const api = ApiForward.create({ api: mountedApi, fallback: bundle });
+const handler = RequestPreamble.create({
+  clientAddress: ClientAddress.fromTrustedProxies(trustedProxyConfig),
+  security: SecurityHeaders.strict(),
+  next: api,
+});
+```
+
+`ApiForward` IS the /api front (tRPC/REST split inside it, bundle as its
+fallback); `BrowserBundle` serves the bundle side; `RequestPreamble` is the
+unconditional preamble as a class. The fluent mux above and these
+constructor sites are one design — the mux composes them. **The mux is backed by
 Hono internally** (ruled 2026-09-18): the framework's `/api` surface is
 already a Hono app, so the mount is a native sub-app and one router tree
 serves the request end to end, with Hono owning the HTTP edge cases a
@@ -322,10 +343,11 @@ failed. Inside `/api` the framework's canonical-error middleware remains
 the handler for everything it reaches; the mux boundary catches only what
 escapes or precedes it, answering in the same envelope shape. **The code's
 physical shape matches**: concept-named directories — `hosting/` (HttpMux,
-SinglePageApp), `policy/` (SecurityHeaders, ContentSecurityPolicy,
-ClientAddress) — at most three classes each, composition by constructor,
-helpers inside the class file they serve; a fourth class in a directory
-means the concept is wrongly cut. **Each expose member sets up only the base**: headers and
+ApiForward, BrowserBundle), `policy/` (SecurityHeaders,
+ContentSecurityPolicy, ClientAddress, RequestPreamble) — tiny classes, tens
+of lines each, composition by constructor, helpers inside the class file
+they serve; a directory growing past a few classes means the concept is
+wrongly cut. **Each expose member sets up only the base**: headers and
 general security, as named CLASSES from `@langwatch/api`, never inline
 data — `SecurityHeaders.strict()` (the floor no surface drops below; `.with`/
 `.merge` overlay, `.without` is the loud exception), `ContentSecurityPolicy
