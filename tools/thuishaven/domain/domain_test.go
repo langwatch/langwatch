@@ -277,6 +277,24 @@ func validCHIdentifier(s string) bool {
 	return true
 }
 
+// @scenario "a tunneled stack signs in through its public origin"
+func TestOverlayCarriesPublicURLOnlyOnAuthLines(t *testing.T) {
+	st := Stack{Slug: "portless", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.portless.langwatch.localhost"},
+		{Name: "gateway"}, {Name: "nlp"},
+	}, PublicURL: "https://box.example.ts.net:8443"}
+	env := st.OverlayEnv()
+	if got := valueOf(env, "BASE_HOST"); got != st.PublicURL {
+		t.Errorf("BASE_HOST = %q, want the public URL %q", got, st.PublicURL)
+	}
+	if got := valueOf(env, "NEXTAUTH_URL"); got != st.PublicURL {
+		t.Errorf("NEXTAUTH_URL = %q, want the public URL %q", got, st.PublicURL)
+	}
+	if got := valueOf(env, "LANGWATCH_ENDPOINT"); got != "https://app.portless.langwatch.localhost" {
+		t.Errorf("LANGWATCH_ENDPOINT = %q, want the local app URL unchanged", got)
+	}
+}
+
 func TestOverlayEmitsHavenSeedLangwatchAPIKey(t *testing.T) {
 	st := Stack{Slug: "portless", APIPort: 1, Services: []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}}}
 	if valueOf(st.OverlayEnv(), "HAVEN_SEED_LANGWATCH_API_KEY") != "" {
