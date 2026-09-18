@@ -77,6 +77,7 @@ describe("given a classifier that answers", () => {
         });
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "the customer wrote in again",
         questions: [QUESTION],
       });
@@ -112,6 +113,7 @@ describe("given a classifier that is rate limiting", () => {
         .reply(200, ANSWER);
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "text",
         questions: [QUESTION],
       });
@@ -131,7 +133,11 @@ describe("given a classifier that is rate limiting", () => {
         .intercept({ path: "/v1/systemone", method: "POST" })
         .reply(200, ANSWER);
 
-      await classifier().classify({ text: "text", questions: [QUESTION] });
+      await classifier().classify({
+        projectId: "project-1",
+        text: "text",
+        questions: [QUESTION],
+      });
 
       expect(waits).toEqual([30_000]);
     });
@@ -150,6 +156,7 @@ describe("given a classifier that is rate limiting", () => {
         .times(5);
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "text",
         questions: [QUESTION],
       });
@@ -180,6 +187,7 @@ describe("given a text the classifier refuses as too large", () => {
         });
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "x".repeat(400),
         questions: [QUESTION],
       });
@@ -199,6 +207,7 @@ describe("given a text the classifier refuses as too large", () => {
         .times(2);
 
       const judgement = await classifier().classify({
+        projectId: "project-1",
         text: "x".repeat(400),
         questions: [QUESTION],
       });
@@ -221,7 +230,11 @@ describe("given a classifier that refuses the credential", () => {
         });
 
       await expect(
-        classifier().classify({ text: "text", questions: [QUESTION] }),
+        classifier().classify({
+          projectId: "project-1",
+          text: "text",
+          questions: [QUESTION],
+        }),
       ).rejects.toBeInstanceOf(InstantEvalClassifierUnavailableError);
       expect(attempts).toBe(1);
     });

@@ -1,10 +1,11 @@
 /**
  * The run's counters, folded from its own events.
  *
- * A state projection rather than a fold over ClickHouse, because what it
- * maintains is one Postgres row a caller polls every three seconds, and the
- * state-projection contract is exactly that: load, apply, store, no event-log
- * recovery read and no cache hook.
+ * A state projection, because what it maintains is one row a caller polls
+ * every three seconds, and the state-projection contract is exactly that:
+ * load, apply, store, no event-log recovery read and no cache hook. The row
+ * lives in ClickHouse, in `instant_eval_runs`, a replacing table keyed by the
+ * tenant and the run.
  *
  * It folds counters and nothing else. The run's definition, its name, its
  * statement, its questions and its row limit, is written once by the service
@@ -33,7 +34,7 @@ import {
 } from "../schemas/constants";
 import type { InstantEvalProcessingEvent } from "../schemas/events";
 
-/** The status a run reports, in the spelling the Prisma enum uses. */
+/** The status a run reports, in the spelling the row stores. */
 export type InstantEvalRunProjectedStatus =
   | "QUEUED"
   | "PLANNING"

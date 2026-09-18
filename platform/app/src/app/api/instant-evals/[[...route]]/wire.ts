@@ -1,7 +1,7 @@
 /**
  * What the Instant Evals family answers, and how the stored row becomes it.
  *
- * The wire shape is deliberately not the Postgres row. Three columns never
+ * The wire shape is deliberately not the stored row. Three columns never
  * reach a caller in their stored spelling: `status` is published lowercase
  * because that is what every other v1 family publishes, `rowLimit` is
  * published as `limit` because that is the word the request uses, and the
@@ -15,15 +15,13 @@
 
 import { z } from "zod";
 
-import type {
-  InstantEvalRun,
-  InstantEvalRunStatus,
-} from "~/generated/prisma/client";
 import {
   INSTANT_EVAL_JUDGMENT_STATUSES,
   type InstantEvalJudgment,
 } from "~/server/app-layer/instant-evals/run";
+import type { InstantEvalRunRow } from "~/server/app-layer/instant-evals/run/instant-eval-run.repository";
 import { readInstantEvalRunQuestions } from "~/server/app-layer/instant-evals/run/questions";
+import type { InstantEvalRunProjectedStatus } from "~/server/event-sourcing/pipelines/instant-eval-processing/projections/instantEvalRun.stateProjection";
 import { instantEvalParametersSchema } from "./schemas";
 
 /** The statuses a run reports, lowercase. */
@@ -217,7 +215,7 @@ const RUN_WIRE_STATUS = {
   FAILED: "failed",
   CANCELLED: "cancelled",
 } as const satisfies Record<
-  InstantEvalRunStatus,
+  InstantEvalRunProjectedStatus,
   (typeof INSTANT_EVAL_RUN_WIRE_STATUSES)[number]
 >;
 
@@ -243,12 +241,14 @@ export function toInstantEvalJudgmentWire(
 }
 
 /** One run, as a caller reads it. */
-export function toInstantEvalRunWire(row: InstantEvalRun): InstantEvalRunWire {
+export function toInstantEvalRunWire(
+  row: InstantEvalRunRow,
+): InstantEvalRunWire {
   return {
     id: row.id,
     name: row.name,
     sql: row.sql,
-    parameters: (row.parameters ?? {}) as InstantEvalRunWire["parameters"],
+    parameters: row.parameters as InstantEvalRunWire["parameters"],
     questions: readInstantEvalRunQuestions(row.questions).map((question) => ({
       id: question.id,
       function: question.function,
@@ -261,8 +261,8 @@ export function toInstantEvalRunWire(row: InstantEvalRun): InstantEvalRunWire {
     total: row.total,
     progress: row.progress,
     matched: row.matched,
-    matchedByQuestion: (row.matchedByQuestion ??
-      {}) as InstantEvalRunWire["matchedByQuestion"],
+    matchedByQuestion:
+      row.matchedByQuestion as InstantEvalRunWire["matchedByQuestion"],
     failed: row.failed,
     skipped: row.skipped,
     tokens: row.tokens,

@@ -21,6 +21,11 @@ statement is never rewritten; §2 is how a job pages without breaking that),
 [ADR-022](022-event-log-source-of-truth.md) (the event log the run folds its
 counters from).
 
+**Amended 2026-09-18:** the run row moved from a Prisma model to a ClickHouse
+replacing table (§5), the `Cost` row was replaced by the
+`InstantEvalSpendRecorder` port (§8), and the classifier limiter counts tokens
+rather than requests (§9).
+
 **Behavioural contract:**
 [specs/instant-evals/instant-eval-api.feature](../../../specs/instant-evals/instant-eval-api.feature),
 [specs/instant-evals/instant-eval-pipeline.feature](../../../specs/instant-evals/instant-eval-pipeline.feature),
@@ -56,11 +61,15 @@ calibrated probability, belongs to a job with a total and a progress, and runs
 on the platform's own key. Four mismatches, each of which would mean a column or
 a nullable field on a table that every trace's evaluations already write to.
 
-So: a Prisma `InstantEvalRun` row for the state a caller polls, and one
-ClickHouse row per verdict in `instant_eval_judgments`. An opt-in mirror into
-`evaluation_runs`, so the existing `evaluations.passed` and `evaluations.label`
-trace filters work over a run's results, is a later change and is not in this
-one.
+So: one ClickHouse row per run in `instant_eval_runs` for the state a caller
+polls, and one ClickHouse row per verdict in `instant_eval_judgments`. The run
+row was a Prisma model in the first draft of this change and moved before the
+change shipped: the judgements it explains are in ClickHouse, the experiment
+run it is modelled on keeps its state in ClickHouse (`experiment_runs`), and a
+row a worker rewrites once per page has no reason to sit in the transactional
+store beside the project. An opt-in mirror into `evaluation_runs`, so the
+existing `evaluations.passed` and `evaluations.label` trace filters work over a
+run's results, is a later change and is not in this one.
 
 ### 2. The input is the same statement, wrapped rather than rewritten
 
@@ -186,8 +195,31 @@ The service writes the definition once, when it accepts the run, so a caller can
 read the run back the instant they are handed its id rather than when a worker
 catches up. The state projection writes the counters and its own checkpoint, and
 never touches the definition, so a replay rebuilds what the run found without
-rewriting what it was asked. The projection's write is an `updateMany`, so a run
-somebody deleted stops rather than reappearing.
+rewriting what it was asked.
+
+`instant_eval_runs` is a `ReplacingMergeTree` keyed by `(TenantId, RunId)`,
+exactly as `experiment_runs` is, so every write is a whole row and the latest
+version wins. That shapes the projection's write: it reads the row the service
+wrote, lays the counters and the checkpoint over it, and inserts the whole row
+again. A run somebody deleted has no row to read, so the write is a no-op and
+the run stops rather than reappearing, which is what the Prisma draft's
+`updateMany` gave.
+
+The version column is `WrittenAt`, the writer's clock at the insert, not the
+business `UpdatedAt`. The run's `requested` event carries the service's own
+`now`, taken before the row was inserted, so a projection write versioned by
+the event's time would lose the merge to the definition row and the counters
+would never show. A write clock is monotone across both writers, which is the
+one property the merge needs; `UpdatedAt` stays the business time the wire
+reports. Every read collapses to the latest `WrittenAt` through the IN-tuple
+pattern, because the merge is eventual.
+
+The table is not time-partitioned. It holds one row per run, a running run is
+polled by its key every few seconds, and a project's runs are listed with no
+time bound, so a partition would turn every one of those reads into a scan
+across every partition and a flagged cold scan. It keeps the indefinite
+retention default its judgements keep, since a run deleted on a timer would
+leave verdicts nothing explains.
 
 ### 6. No judged text, and no token count, is kept on a judgement
 
@@ -221,10 +253,37 @@ conversations is a real answer to a real question and costs a quarter of a
 dollar at the shipped rate, so a customer can find out whether the feature
 works without buying anything first.
 
-One `Cost` row per run at finish, carrying our cost and the customer's price
-beside it. Metering through Stripe and the three-dollar free budget are
-specified in the PRD and implemented after the founders talk, which is a
-scheduling decision rather than an open design question.
+One spend record per run at finish, and one per synchronous query, through the
+`InstantEvalSpendRecorder` port
+(`app-layer/instant-evals/instant-eval-spend.recorder.ts`): the project, the
+run when there is one, the input tokens, the requests, our cost, the customer's
+price and when it happened. The recorder that meters it against the customer's
+budget belongs to the gateway spend pipeline and binds there; the default
+binding logs the record and meters nothing. The first draft wrote a `Cost` row
+in Postgres instead, and it was dropped before shipping because the spend
+pipeline is where every other metered spend already lands and a second ledger
+would have to be reconciled against it. The cost and the price also stay on the
+run's own row, so `status` and `results` show them without a ledger read.
+
+### 9. The classifier is paced in tokens, not requests
+
+The classifier's ceiling is token-bound: the September 2026 bench sustained
+about 315k input tokens a second whether that was five hundred small
+conversations or ten large ones. The shared Redis bucket from ADR-136 therefore
+holds input tokens, refilled at `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND`
+(default 300,000) with two seconds of burst, and every classification takes its
+estimated input tokens, text plus questions, the same estimate the token budget
+sizes the request with. A second bucket per tenant, refilled at
+`INSTANT_EVAL_TENANT_TOKENS_PER_SECOND` (default half the global rate), is one
+project's share of the ceiling, so a hundred-thousand-row run cannot hold every
+other project's synchronous query behind it. Both buckets are debited in one
+Lua call or neither is. The local fallback for an unreachable Redis is in
+tokens too.
+
+With the bucket as the governor, the in-flight ceiling only has to be high
+enough that the bucket, not the number of open requests, is what a page waits
+on. It is 128 for both the synchronous path and a run's page; at about 250 ms a
+call, thirty-two in flight could never have reached the bucket's rate.
 
 ## Consequences
 
@@ -238,6 +297,10 @@ scheduling decision rather than an open design question.
   statement carries the caller's own time bound, so the scan it drives is
   bounded; `instant_eval_judgments` is in `TIME_PARTITIONED_TABLES` so every
   read of the results bounds `CreatedAt` as well.
+- The run row's two writers share one replacing row, so the projection's
+  write is a read then an insert rather than an update, and a replay that
+  rewrites the counters re-inserts the definition with them. The definition is
+  a few kilobytes, once per page, which is nothing beside the page itself.
 - `instant_eval_stalled` is a code recorded on a row rather than thrown. Nothing
   raises it, because by the time it is known there is no request to refuse, so
   the orphan check in `features/errors/logic/__tests__/codes.unit.test.ts`

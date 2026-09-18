@@ -86,6 +86,8 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Given a run that has judged two pages
     When the fold runs
     Then the run row holds the progress, the matches per question, the failures, the skips and the tokens
+    And the row lives in ClickHouse beside the judgements, keyed by the tenant and the run
+    And the fold lays the counters over the definition the service wrote without rewriting it
 
   @unit
   Scenario: A statement with one row per span pages by the trace and the span
@@ -176,9 +178,9 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     When the judgements are read
     Then no column holds the text that was judged
 
-  @integration
-  Scenario: A finished run records what it cost in one row
+  @unit
+  Scenario: A finished run reports its spend once
     Given a run that judged a thousand texts
     When it finishes
-    Then exactly one cost row is written for the run
+    Then exactly one spend record is reported for the run
     And it carries our cost, the customer price and the tokens

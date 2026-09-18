@@ -728,11 +728,11 @@ export class LangWatchQLService {
     });
 
     if (judging) {
-      await recordInstantEvalCost({
+      await recordInstantEvalSpend({
         projectId: project.id,
         usage: hydration.evalUsage,
         classifier: judging.classifier(),
-        recordCost: judging.recordCost,
+        recordSpend: judging.recordSpend,
       });
     }
     return hydration;
@@ -1014,16 +1014,16 @@ export async function closeLangWatchQLService(): Promise<void> {
  * the logs, not a reason to refuse a caller a result they have already been
  * charged for.
  */
-async function recordInstantEvalCost({
+async function recordInstantEvalSpend({
   projectId,
   usage,
   classifier,
-  recordCost,
+  recordSpend,
 }: {
   projectId: string;
   usage: LangWatchQLEvalUsage | undefined;
   classifier: InstantEvalClassifier;
-  recordCost: LangWatchQLInstantEvalSupport["recordCost"];
+  recordSpend: LangWatchQLInstantEvalSupport["recordSpend"];
 }): Promise<void> {
   if (!usage || usage.inputTokens <= 0) return;
   const costUsd = instantEvalCostUsd({
@@ -1031,17 +1031,18 @@ async function recordInstantEvalCost({
     pricing: classifier.pricing,
   });
   try {
-    await recordCost({
+    await recordSpend({
       projectId,
       inputTokens: usage.inputTokens,
       requests: usage.requests,
       costUsd,
       priceUsd: instantEvalPriceUsd({ costUsd, pricing: classifier.pricing }),
+      occurredAt: new Date(),
     });
   } catch (error) {
     logger.error(
       { projectId, error },
-      "Instant Evals cost row could not be written",
+      "Instant Evals spend could not be recorded",
     );
   }
 }

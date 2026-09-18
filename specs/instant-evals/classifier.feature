@@ -14,7 +14,11 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     customer key. A deployment with no key gets the null implementation, which answers
     every question as skipped rather than failing the query.
   - Requests are metered by a Redis token bucket shared by every pod, because the quota
-    belongs to the platform's key and not to a process.
+    belongs to the platform's key and not to a process. The bucket holds input tokens,
+    not requests: the classifier's ceiling is token-bound, and a classification takes
+    the tokens it is about to send, text and questions together. A second bucket per
+    tenant is one project's share of the deployment's rate, so one large run cannot
+    hold every other project's query behind it.
 
   Background:
     Given a deployment configured with a classifier key
@@ -158,16 +162,27 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Permits are taken from one bucket shared by every pod
-    Given a bucket with capacity for two hundred requests
-    When two callers ask for permits at once
-    Then the bucket is decremented once per permit granted
+  Scenario: A classification takes its estimated tokens from one bucket shared by every pod
+    Given a global bucket refilling at three hundred thousand tokens a second
+    And a classification estimated at four thousand two hundred tokens
+    When it takes its tokens
+    Then the global bucket is debited by four thousand two hundred
+    And the tenant's own bucket is debited by the same amount
+    And both are debited in one atomic call, or neither is
 
   @unit
-  Scenario: An empty bucket refills at the configured rate
-    Given an empty bucket refilling at one hundred a second
-    When half a second passes
-    Then fifty permits are available
+  Scenario: An empty bucket refills at the configured token rate
+    Given a global bucket drained by two tenants
+    When a third asks for thirty thousand tokens
+    Then it waits about a tenth of a second at three hundred thousand a second
+    And the wait is what makes the tokens available
+
+  @unit
+  Scenario: A tenant that has spent its share waits while another tenant does not
+    Given a tenant that has drained its own bucket
+    When another tenant asks for tokens
+    Then the other tenant is granted them immediately
+    And the first tenant waits for its own bucket to refill
 
   @unit
   Scenario: The bucket never fills past its capacity
@@ -176,8 +191,8 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Then at most its capacity is available
 
   @unit
-  Scenario: A Redis that cannot be reached falls back to a local rate
+  Scenario: A Redis that cannot be reached falls back to a local token rate
     Given Redis refusing every call
-    When permits are asked for
+    When tokens are asked for
     Then they are granted at the local fallback rate
     And the query still runs

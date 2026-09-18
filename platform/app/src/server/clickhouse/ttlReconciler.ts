@@ -250,6 +250,15 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_INSTANT_EVAL_JUDGMENTS_TTL_DAYS",
     hardcodedDefault: 49,
   },
+  // The run's own row keeps the same indefinite default as its judgements: a
+  // run deleted on a timer would leave verdicts nothing explains.
+  {
+    table: "instant_eval_runs",
+    ttlColumn: "CreatedAt",
+    retentionTTLColumn: "CreatedAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_INSTANT_EVAL_RUNS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
 ] as const;
 
 function parseNonNegativeInt(value: string, label: string): number {

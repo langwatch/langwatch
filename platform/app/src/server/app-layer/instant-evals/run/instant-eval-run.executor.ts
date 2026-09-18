@@ -2,8 +2,8 @@
  * The run's three steps, as the pipeline's port over them.
  *
  * This is where the pieces meet: the run's own row says what to run, the row
- * source runs it, the judgements go to ClickHouse, and what it cost is recorded
- * once at the end. The pipeline sees none of that, it holds the topology and
+ * source runs it, the judgements go to ClickHouse, and what it spent is
+ * recorded once at the end. The pipeline sees none of that, it holds the topology and
  * calls three methods.
  *
  * ## Why the judgements are written here and not by a projection
@@ -37,7 +37,7 @@ import type {
 import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
 import { instantEvalCostUsd, instantEvalPriceUsd } from "../classifier/pricing";
-import type { InstantEvalCostRecorder } from "../instant-eval-cost.recorder";
+import type { InstantEvalSpendRecorder } from "../instant-eval-spend.recorder";
 import { watchForCancellation } from "./cancellation-watch";
 import { InstantEvalRunNotFoundError } from "./errors";
 import type { InstantEvalJudgmentsRepository } from "./instant-eval-judgments.repository";
@@ -82,7 +82,7 @@ export interface InstantEvalRunExecutorDependencies {
   readonly judgments: InstantEvalJudgmentsRepository;
   readonly rowSource: InstantEvalRowSource;
   readonly classifier: () => InstantEvalClassifier;
-  readonly costRecorder: InstantEvalCostRecorder;
+  readonly spendRecorder: InstantEvalSpendRecorder;
   /** Where the run reads the project's own query capability from. */
   readonly projectKey: (projectId: string) => Promise<string | null>;
   /** Classifications one page keeps in flight. */
@@ -315,26 +315,27 @@ async function finishRun(
     pricing: classifier.pricing,
   });
 
-  // A run that judged no row writes no cost row: a row of zero is one a
+  // A run that judged no row records no spend: a record of zero is one a
   // customer has to read and dismiss.
   //
-  // A write that fails is rethrown rather than logged and forgotten. The
-  // finish intent is the outbox's, so a throw here is retried, and the write
-  // is addressed by the run id so a retry lands on the same row instead of
-  // billing twice. Swallowing it would let the run record itself finished
-  // with the ledger permanently short by one row and no way left to notice.
+  // A recorder that fails is rethrown rather than logged and forgotten. The
+  // finish intent is the outbox's, so a throw here is retried, and the record
+  // names the run so a recorder that keeps one can land the retry on the same
+  // record instead of billing twice. Swallowing it would let the run record
+  // itself finished with the spend filed nowhere and no way left to notice.
   if (inputTokens > 0) {
-    await deps.costRecorder.recordCost({
+    await deps.spendRecorder.recordSpend({
       projectId,
+      runId,
       inputTokens,
       requests,
       costUsd,
       priceUsd,
-      runId,
+      occurredAt: new Date(deps.now?.() ?? Date.now()),
     });
     logger.debug(
       { projectId, runId, outcome, costUsd, priceUsd },
-      "Instant Eval run cost recorded",
+      "Instant Eval run spend recorded",
     );
   }
 

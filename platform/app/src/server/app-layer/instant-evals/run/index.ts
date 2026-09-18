@@ -24,14 +24,14 @@ import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { instantEvalsEnabled } from "../access";
 import { getInstantEvalClassifier } from "../classifier";
-import { PrismaInstantEvalCostRecorder } from "../instant-eval-cost.recorder";
+import type { InstantEvalSpendRecorder } from "../instant-eval-spend.recorder";
 import {
   createInstantEvalCancellations,
   type InstantEvalCancellationRedis,
 } from "./cancellation";
 import type { InstantEvalJudgmentsRepository } from "./instant-eval-judgments.repository";
 import { createInstantEvalRunExecutor } from "./instant-eval-run.executor";
-import { PrismaInstantEvalRunRepository } from "./instant-eval-run.repository";
+import type { InstantEvalRunRepository } from "./instant-eval-run.repository";
 import {
   type InstantEvalRunCommands,
   InstantEvalRunService,
@@ -41,11 +41,13 @@ import { createInstantEvalRowSource } from "./row-source";
 /**
  * Classifications one page keeps in flight.
  *
- * The same thirty-two the synchronous path uses, and for the same reason: the
- * global limiter paces the deployment, so this is one page's share of it rather
- * than the provider's quota.
+ * The same hundred and twenty-eight the synchronous path uses, and for the
+ * same reason: the token bucket paces the deployment, and this only has to be
+ * high enough that the bucket, not the number of open requests, is what a page
+ * waits on. At about 250 ms a call, thirty-two in flight could never reach the
+ * bucket's rate on ordinary texts.
  */
-const INSTANT_EVAL_PAGE_CONCURRENCY = 32;
+const INSTANT_EVAL_PAGE_CONCURRENCY = 128;
 
 /** The project's own query capability, or null when it has none. */
 async function callerFor(projectId: string) {
@@ -80,21 +82,26 @@ function cancellations() {
  * Called by the registry while the application container is being built, so it
  * resolves nothing at call time that is not available yet: every dependency it
  * names is either a module-level client, a function it defers, or a repository
- * the composition root already built. The judgements store is the third kind:
- * ClickHouse is reached through a repository the App hands out, never through a
- * client this module resolves.
+ * the composition root already built. The two stores are the third kind:
+ * ClickHouse is reached through repositories the App hands out, never through
+ * a client this module resolves, and the spend recorder is whatever the root
+ * bound.
  */
 export function createInstantEvalRunPortFromEnv({
+  runs,
   judgments,
+  spend,
 }: {
+  runs: InstantEvalRunRepository;
   judgments: InstantEvalJudgmentsRepository;
+  spend: InstantEvalSpendRecorder;
 }) {
   return createInstantEvalRunExecutor({
-    runs: new PrismaInstantEvalRunRepository(prisma),
+    runs,
     judgments,
     rowSource: createInstantEvalRowSource(),
     classifier: getInstantEvalClassifier,
-    costRecorder: new PrismaInstantEvalCostRecorder(prisma),
+    spendRecorder: spend,
     projectKey: async (projectId) =>
       (await callerFor(projectId))?.lwqlKey ?? null,
     maxConcurrency: INSTANT_EVAL_PAGE_CONCURRENCY,
@@ -108,7 +115,7 @@ let cached: InstantEvalRunService | null = null;
 /** The process-wide run service, built from the environment on first use. */
 export function getInstantEvalRunService(): InstantEvalRunService {
   cached ??= new InstantEvalRunService({
-    runs: new PrismaInstantEvalRunRepository(prisma),
+    runs: getApp().instantEvals.runs,
     judgments: getApp().instantEvals.judgments,
     rowSource: createInstantEvalRowSource(),
     query: getLangWatchQLService(),
