@@ -1025,6 +1025,18 @@ Drawers are URL-routed singletons with a navigation stack, opened through the
 host capability, registered through the declaration. One tRPC client for the
 whole browser.
 
+A surface too wide for a typed hook calls a procedure by PATH through the
+shell's `UiRpc`, and the answer is published under the key the typed hook
+would have written, so the two never hold two versions of one read. **A
+`queryFn` never re-enters the query cache under the key it is resolving**
+(measured 2026-09-18): joining the fetch in flight for that key joins the
+caller's own, so the function awaits the promise it is itself supposed to
+resolve. The request answers 200 and the query stays pending for the life of
+the document — the failure that left 99 of 126 addresses drawing a spinner
+over a workspace graph that had already arrived. The hazard is the re-entry,
+not the shared key; a `queryFn` calling the transport under a `trpcQueryKey`
+is the normal shape. specs/ui/by-path-dispatch.feature.
+
 ### 10.1 Shared browser machinery (ruled 2026-09-18)
 
 The browser mirrors the process grammar, adapted rather than copied — when a
