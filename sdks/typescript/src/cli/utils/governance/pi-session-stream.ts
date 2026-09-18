@@ -175,10 +175,10 @@ export interface PiSessionStream {
   /**
    * The events this file has gained since the last call, in file order.
    *
-   * Empty, and never an error, for: a file that does not exist yet (pi defers
-   * its first write to the first assistant reply), a file nothing has appended
-   * to, a file whose first line is not a session header, and a pass that
-   * arrived with only half a line of new bytes on disk.
+   * Empty, and never an error, for: a file that does not exist yet (it appears
+   * some way into the run, and a command line pi refuses produces none at all),
+   * a file nothing has appended to, a file whose first line is not a session
+   * header, and a pass that arrived with only half a line of new bytes on disk.
    */
   read(path: string): Promise<PiTurnEvent[]>;
   /**

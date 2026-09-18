@@ -259,9 +259,10 @@ async function sessionFilesTouchedSince({
         offered.add(file);
       }
     } catch {
-      // Not written yet, or gone. Both are ordinary: pi defers its first write
-      // until the first assistant reply, so an absent file is the normal state
-      // at the start of a run.
+      // Not written yet, or gone. Both are ordinary: the file appears some way
+      // into the run rather than at the instant pi starts, and a command line
+      // pi refuses never produces one at all, so an absent file is the normal
+      // state early on.
     }
   }
   // The shared walker yields newest-name-first, which is what a caller

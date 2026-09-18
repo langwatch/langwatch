@@ -6,11 +6,19 @@ Feature: pi session capture
   per event. Rows are of several kinds, and only the assistant's replies carry a
   model, a provider and a cost.
 
-  Two things about that file shape what capture may assume. pi holds the opening
-  of a session in memory and creates the file only when the first assistant
-  reply arrives, so a session abandoned before that leaves no file at all. And
-  once the file exists it only ever grows: later runs append, and the bytes
-  already written do not change.
+  Two things about that file shape what capture may assume. The file may not be
+  there when capture looks, and its absence is ordinary rather than a fault: pi
+  refuses some command lines before a session exists at all, and on the ones it
+  accepts the file appears at some point after the process starts rather than at
+  the instant it does. And once the file exists it only ever grows: later runs
+  append, and the bytes already written do not change.
+
+  What must NOT be assumed is the reverse — that a session with no assistant
+  reply leaves no file. This description used to say pi held the opening in
+  memory until the first reply. It does not. Measured on pi 0.85.1: a run that
+  failed on the provider's 401, with no assistant turn anywhere, still wrote a
+  1165-byte file holding the session header, a model row and a thinking-level
+  row. Any reasoning of the form "no reply, so no file" is unsound.
 
   LangWatch reads that file while pi runs. It does not load anything into pi's
   process, because a capture path that lives inside pi can hang or crash the
@@ -104,7 +112,7 @@ Feature: pi session capture
 
   @unit
   Scenario: A session abandoned before pi wrote anything records nothing and reports no error
-    Given a pi session the user quit before the first assistant reply, for which pi wrote no file
+    Given a pi session for which no file exists on disk
     When capture runs
     Then no session is recorded and no error is raised
 

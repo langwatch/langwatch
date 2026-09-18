@@ -350,10 +350,16 @@ export function parsePiSessionFile(content: string): PiSession {
  * Read and parse a session file, or return null when there is nothing to read.
  *
  * Null covers both "pi has not written this session yet" and "we could not read
- * it". pi defers the first write until the first assistant reply (ADR-132 §2),
- * so a session the user abandoned before then leaves no file at all — the
- * common case, and an ordinary one. A permission error is rarer and equally not
- * worth failing the user's coding session over, so it takes the same exit.
+ * it". A run that ends very early can leave nothing on disk, and a run pi
+ * refuses outright — an unknown flag exits 1 before a session exists — leaves
+ * nothing either, so an absent file is ordinary rather than a fault. A
+ * permission error is rarer and equally not worth failing the user's coding
+ * session over, so it takes the same exit.
+ *
+ * What is NOT true, and was written here, is that pi holds the file back until
+ * the first assistant reply. Measured on 0.85.1, a run that failed on a
+ * provider 401 with no assistant turn still wrote a 1165-byte file. Nothing
+ * here may infer "no reply" from "no file", or the reverse.
  *
  * Null and {@link EMPTY_SESSION} say different things and both are silent: null
  * is "no file", an empty `rows` is "a file with nothing in it yet".

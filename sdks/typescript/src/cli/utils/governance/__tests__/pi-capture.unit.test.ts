@@ -340,7 +340,7 @@ function recordingFetch() {
  * - A build that throws never reaches any assertion, so "records nothing" would
  *   pass vacuously if the awaited call were the only thing under test.
  */
-describe("given a pi session the user quit before the first assistant reply", () => {
+describe("given a pi session that left no file on disk", () => {
   describe("when capture runs", () => {
     /** @scenario "A session abandoned before pi wrote anything records nothing and reports no error" */
     it("posts nothing and reports no error when pi never created the sessions directory", async () => {

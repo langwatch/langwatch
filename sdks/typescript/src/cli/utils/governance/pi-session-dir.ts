@@ -40,9 +40,8 @@
  * than `~`, and pi honours that.
  *
  * Resolution reads; it never creates. The returned directory may not exist,
- * which is the normal state of a session pi has not written yet (pi defers the
- * first write until the first assistant reply), and the caller treats an
- * absent directory the same way it treats an absent file.
+ * which is the normal state before pi has written a session there, and the
+ * caller treats an absent directory the same way it treats an absent file.
  *
  * Every failure resolves rather than throwing: a settings file that is missing,
  * unreadable, not an object, or holds the wrong type for `sessionDir` falls
