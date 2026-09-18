@@ -97,7 +97,7 @@ function questionFrom(draft: QuestionDraft): InstantEvalQuestionInput {
     );
   }
   const base = {
-    instructions: draft.instructions!,
+    instructions: draft.instructions,
     ...(draft.id === undefined ? {} : { id: draft.id }),
   };
 

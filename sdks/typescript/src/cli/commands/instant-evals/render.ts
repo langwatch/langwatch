@@ -237,7 +237,7 @@ export function printSample({
   }
 
   for (const row of rows) {
-    const traceId = String(row.TraceId ?? "");
+    const traceId = typeof row.TraceId === "string" ? row.TraceId : "";
     console.log();
     console.log(`  ${chalk.bold("Trace")} ${chalk.green(traceId)}`);
     for (const judgment of judgments.filter(

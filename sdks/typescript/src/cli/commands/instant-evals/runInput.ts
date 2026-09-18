@@ -82,9 +82,9 @@ export function readLast(raw: string): number {
       `Invalid --last value: ${raw} (a window is written as a number and a unit, for example 7d, 24h, 30m or 2w)`,
     );
   }
-  const amount = Number(match![1]);
+  const amount = Number(match[1]);
   if (amount <= 0) refuse(`Invalid --last value: ${raw} (it has to be positive)`);
-  return amount * DURATION_UNITS[match![2]!.toLowerCase()]!;
+  return amount * DURATION_UNITS[match[2]!.toLowerCase()]!;
 }
 
 /** The window the line asked for, as two instants, or nothing. */
@@ -118,7 +118,7 @@ function readInstant(raw: string, flag: string): string {
       `Invalid ${flag} value: ${raw} (write an ISO 8601 timestamp, or epoch milliseconds)`,
     );
   }
-  return new Date(ms!).toISOString();
+  return new Date(ms).toISOString();
 }
 
 function readLimit(raw: string | undefined): number {
