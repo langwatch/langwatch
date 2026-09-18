@@ -6,8 +6,8 @@ Feature: Langy authors saved workbench charts and places them on dashboards
   looks, without a human ever opening the workbench
 
   Issue: #6712, epic #6582 slice 5. Builds on the saved-chart persistence and
-  REST surface (#6582 slices 1 and 4, specs/analytics/lwql-saved-charts.feature)
-  and on running a saved chart by id (#6631, specs/analytics/lwql-workbench.feature).
+  REST surface (#6582 slices 1 and 4, specs/lwql/saved-charts.feature)
+  and on running a saved chart by id (#6631, specs/lwql/workbench.feature).
 
   Scope of this slice. A saved workbench chart has always been a record with no
   address: `create` wrote a row, and nothing after it could ever set that row's
@@ -276,13 +276,13 @@ Feature: Langy authors saved workbench charts and places them on dashboards
 #   another project's dashboard is refused, and nothing is written; Scenario:
 #   A specification the chart policy refuses is refused over the API, and
 #   nothing is written — the latter already lives in
-#   specs/analytics/lwql-saved-charts.feature and is not re-stated here)
+#   specs/lwql/saved-charts.feature and is not re-stated here)
 #
 # AC5 "tenant scoping holds on every new verb — get/update/delete/run/place/
 #    unplace against another project's chart id all answer not-found"
 #   → the `get`/`update`/`delete` half is already bound in
-#     specs/analytics/lwql-saved-charts.feature and not re-stated here; `run`
-#     is already bound in specs/analytics/lwql-workbench.feature. The two verbs
+#     specs/lwql/saved-charts.feature and not re-stated here; `run`
+#     is already bound in specs/lwql/workbench.feature. The two verbs
 #     genuinely new to this slice are placement:
 #   → Scenario: Placing a chart onto another project's dashboard is refused,
 #     and nothing is written
@@ -357,6 +357,6 @@ Feature: Langy authors saved workbench charts and places them on dashboards
 # Deliberately NOT in this feature file: dashboard *rendering* of a placed
 # workbench chart (widget selection, granularity-aware execution, the
 # coarsened-from notice) — that shipped under #6631/S2 and is bound in
-# specs/analytics/lwql-workbench.feature and the widget-level unit suites
+# specs/lwql/workbench.feature and the widget-level unit suites
 # alongside it. Running a saved chart by id, and its tenancy and governance
 # scenarios, are likewise already bound there and are not re-stated here.

@@ -6,7 +6,7 @@
  * `INSTANT_EVAL_CLASSIFIER` to.
  *
  * @see ../access.ts
- * @see specs/analytics/lwql-eval-functions.feature
+ * @see specs/lwql/eval-functions.feature
  */
 
 import { describe, expect, it } from "vitest";

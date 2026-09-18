@@ -76,8 +76,10 @@ import { migrateUp } from "../../../clickhouse/goose";
 import { lwqlTenantCapability } from "../capability";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
+  isPostgresResident,
   type LangWatchQLPostgresMapping,
   type LangWatchQLViewDefinition,
+  lwqlPhysicalColumn,
   lwqlPostgresViews,
 } from "../catalog/types";
 import {
@@ -523,6 +525,8 @@ export const REAL_FACT_TABLES = [
   "trace_analytics_rollup",
   "evaluation_analytics",
   "evaluation_analytics_rollup",
+  "coding_agent_sessions",
+  "coding_agent_session_events",
 ] as const;
 
 /**
@@ -1057,7 +1061,214 @@ async function seedRealFactRows({
     ),
   });
 
+  await admin.insert({
+    table: `${database}.coding_agent_sessions`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        TenantId: tenant.tenantId,
+        SessionId: `${tenant.tenantId}-coding-session-${week}`,
+        SessionKeySource: "session_id",
+        Version: "1",
+        StartedAt: seedWeekStart(week),
+        UpdatedAt: seedWeekStart(week),
+        Agent: "claude_code",
+        AgentVersion: "1.0.0",
+        TraceIds: [`${tenant.tenantId}-trace-${week}-0`],
+        FinalRequestId: `${tenant.tenantId}-final-request-${week}`,
+        UserId: `${tenant.tenantId}-end-user`,
+        TerminalType: "tmux",
+        Entrypoint: "cli",
+        ModelCalls: 3,
+        ToolCalls: 5,
+        SubAgents: 0,
+        Prompts: 2,
+        PromptChars: 480,
+        ResponseChars: 900,
+        CostUsd: 0.42,
+        AgentReportedCostUsd: 0.4,
+        Title: `${SEEDED_CONTENT.simulationMessage}/${tenant.tenantId}`,
+      })),
+    ),
+  });
+
+  await admin.insert({
+    table: `${database}.coding_agent_session_events`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        TenantId: tenant.tenantId,
+        SessionId: `${tenant.tenantId}-coding-session-${week}`,
+        TimeUnixMs: seedWeekStart(week),
+        RecordId: `${tenant.tenantId}-coding-event-${week}`.padEnd(64, "0"),
+        EventKind: "model_call",
+        Agent: "claude_code",
+        SessionKeySource: "session_id",
+        TraceId: `${tenant.tenantId}-trace-${week}-0`,
+        SpanId: `${tenant.tenantId}-span-${week}-0`,
+        QuerySource: "repl_main_thread",
+        RequestId: `${tenant.tenantId}-final-request-${week}`,
+        Model: SEEDED_DIMENSION_ATTRIBUTE.value,
+        InputTokens: 100,
+        OutputTokens: 20,
+        CostUsd: 0.05,
+      })),
+    ),
+  });
+
+  // The one `claude_code.tool` span `coding_tool_results` reads, plus the
+  // `api_request_body` log record its LEFT join can find. Seeded here (not in
+  // the generic sweep below) because the two rows must correlate by TraceId,
+  // not merely both exist.
+  const toolTraceId = (tenantId: string) => `${tenantId}-tool-trace-0`;
+  await admin.command({ query: `SYSTEM STOP MERGES ${database}.log_records` });
+  await admin.command({ query: `TRUNCATE TABLE ${database}.log_records` });
+  await admin.insert({
+    table: `${database}.stored_spans`,
+    format: "JSONEachRow",
+    values: tenants.map((tenant) => ({
+      ProjectionId: `${tenant.tenantId}/tool-span`,
+      TenantId: tenant.tenantId,
+      TraceId: toolTraceId(tenant.tenantId),
+      SpanId: `${tenant.tenantId}-tool-span-0`,
+      Sampled: 1,
+      StartTime: seedWeekStart(SEED_WEEK_COUNT - 1),
+      EndTime: seedWeekStart(SEED_WEEK_COUNT - 1),
+      DurationMs: 40,
+      SpanName: "claude_code.tool",
+      SpanKind: 3,
+      ServiceName: "api",
+      ScopeName: "langwatch",
+      ResourceAttributes: {},
+      // Same captured-content keys every other seeded span carries: a bare
+      // `LIMIT 1` with no `ORDER BY` elsewhere in this suite is free to read
+      // this row first, and it must satisfy the same content assertions.
+      SpanAttributes: {
+        "langwatch.input": SEEDED_CONTENT.spanInput,
+        "langwatch.output": SEEDED_CONTENT.spanOutput,
+      },
+      Cost: 0,
+    })),
+  });
+  await admin.insert({
+    table: `${database}.log_records`,
+    format: "JSONEachRow",
+    values: tenants.map((tenant) => ({
+      TenantId: tenant.tenantId,
+      CorrelationTraceId: toolTraceId(tenant.tenantId),
+      TimeUnixMs: seedWeekStart(SEED_WEEK_COUNT - 1),
+      RecordId: `${tenant.tenantId}-tool-log-record`.padEnd(64, "0"),
+      EventName: "api_request_body",
+      CorrelationSpanId: `${tenant.tenantId}-tool-span-0`,
+      ProviderSessionId: `${tenant.tenantId}-coding-session-${SEED_WEEK_COUNT - 1}`,
+      AttributesJson: JSON.stringify({
+        body: JSON.stringify({
+          messages: [
+            {
+              content: [
+                {
+                  type: "tool_result",
+                  tool_use_id: `${tenant.tenantId}-tool-span-0`,
+                  content: SEEDED_CONTENT.spanOutput,
+                },
+              ],
+            },
+          ],
+        }),
+      }),
+    })),
+  });
+
+  await seedRemainingDerivedSourceTables({ admin, database, tenants });
   await seedAnalyticsProjections({ admin, database, tenants, weeks });
+}
+
+/**
+ * ClickHouse-resident source tables the catalog reads that carry no
+ * hand-crafted fixture above and no `AggregateFunction` column — a plain
+ * `ReplacingMergeTree` where "the isolation proof has a tenant-a row and a
+ * tenant-b row" is the whole ask. One row per tenant, the physical tenant
+ * column set (usually `TenantId`, `stored_objects` uses `project_id`),
+ * everything else left to ClickHouse's own column defaults.
+ *
+ * Deliberately generic and driven off {@link LWQL_VIEW_CATALOG} rather than a
+ * second hand-maintained table list: a table the catalog starts reading is
+ * covered here automatically, the way it already is by
+ * {@link runShippedMigrations}. The two `AggregateFunction`-bearing tables
+ * (`gateway_budget_scope_totals`, `simulation_run_metrics_rollup`) are
+ * excluded — no plain `INSERT` can populate an aggregate-state column, so
+ * they get their own `*State()` seed below.
+ */
+const AGGREGATING_SOURCE_TABLES = new Set([
+  "gateway_budget_scope_totals",
+  "simulation_run_metrics_rollup",
+]);
+
+async function seedRemainingDerivedSourceTables({
+  admin,
+  database,
+  tenants,
+}: {
+  admin: ClickHouseClient;
+  database: string;
+  tenants: readonly LangWatchQLTenantFixture[];
+}): Promise<void> {
+  const alreadySeeded = new Set([
+    ...REAL_FACT_TABLES,
+    "log_records",
+    ...AGGREGATING_SOURCE_TABLES,
+  ]);
+
+  const remaining = new Set(
+    LWQL_VIEW_CATALOG.filter((view) => !isPostgresResident(view))
+      .map((view) => view.sourceTable)
+      .filter((table) => !alreadySeeded.has(table)),
+  );
+
+  // Truncated first: a reused container carries whatever a previous run of
+  // this same seed inserted, and re-seeding on top of untouched rows collides
+  // two identical-key physical rows into the dedup views' output — the
+  // `ReplacingMergeTree` only collapses them on a background merge, which
+  // this suite never waits for.
+  for (const table of [...remaining, ...AGGREGATING_SOURCE_TABLES]) {
+    await admin.command({ query: `SYSTEM STOP MERGES ${database}.${table}` });
+    await admin.command({ query: `TRUNCATE TABLE ${database}.${table}` });
+  }
+
+  for (const table of remaining) {
+    const view = LWQL_VIEW_CATALOG.find(
+      (candidate) => candidate.sourceTable === table,
+    )!;
+    const tenantColumn = lwqlPhysicalColumn(view, "TenantId");
+    await admin.insert({
+      table: `${database}.${table}`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) => ({
+        [tenantColumn]: tenant.tenantId,
+      })),
+    });
+  }
+
+  // `gateway_budget_scope_totals` and `simulation_run_metrics_rollup`:
+  // AggregatingMergeTree tables whose non-key columns are `AggregateFunction`
+  // states — only reachable through the matching `*State()` combinator, never
+  // a plain scalar `INSERT`.
+  for (const tenant of tenants) {
+    await admin.command({
+      query:
+        `INSERT INTO ${database}.gateway_budget_scope_totals ` +
+        `(TenantId, Scope, ScopeId, Window, BudgetId, PeriodStart, SpendUSD, TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite, RequestCount, UpdatedAt, SpendNanoUSD) ` +
+        `SELECT '${tenant.tenantId}', 'project', '${tenant.tenantId}', 'day', 'budget-1', now64(3), ` +
+        `sumState(toDecimal64(1.5, 6)), sumState(toUInt64(100)), sumState(toUInt64(20)), sumState(toUInt64(5)), sumState(toUInt64(3)), countState(), now64(3), sumState(toInt64(1500000000))`,
+    });
+    await admin.command({
+      query:
+        `INSERT INTO ${database}.simulation_run_metrics_rollup ` +
+        `(TenantId, ScenarioRunId, TraceId, TotalCost, RoleCosts, RoleLatencies, OccurredAt, PartitionMonth) ` +
+        `SELECT '${tenant.tenantId}', '${tenant.tenantId}-sim-rollup', '${tenant.tenantId}-trace-rollup', ` +
+        `argMaxState(toFloat64(0.5), now64(3)), argMaxState(map('assistant', 0.5), now64(3)), argMaxState(map('assistant', 120.0), now64(3)), maxState(now64(3)), toUInt32(202601)`,
+    });
+  }
 }
 
 /**

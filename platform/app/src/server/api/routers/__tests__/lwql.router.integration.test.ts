@@ -7,7 +7,7 @@
  * named code, so a caller who skips the availability question gets the same
  * answer.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: specs/lwql/workbench.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,7 +18,6 @@ const { mockFeatureFlagIsEnabled, mockExecute, deployment } = vi.hoisted(
       columns: [],
       rows: [],
       statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
-      truncated: false,
       diagnostics: [],
     }),
     /** Whether this deployment has a LangWatchQL identity to run queries as. */

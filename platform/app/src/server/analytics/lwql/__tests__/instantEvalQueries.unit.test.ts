@@ -7,7 +7,7 @@
  * artifact to inspect rather than a call sequence to verify.
  *
  * @see ../lwql.service.ts
- * @see specs/analytics/lwql-eval-functions.feature
+ * @see specs/lwql/eval-functions.feature
  */
 
 import { describe, expect, it } from "vitest";

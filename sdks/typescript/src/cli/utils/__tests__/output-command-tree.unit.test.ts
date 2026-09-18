@@ -172,7 +172,6 @@ describe("the real command tree", () => {
       // Interactive / credential flows: prompts, not documents.
       ["login", "interactive credential flow"],
       ["logout", "interactive credential flow"],
-      ["whoami", "interactive credential flow"],
       // The output contract covers commands that return a platform document.
       // This one reports what it wrote to the local machine, so there is no
       // document for `--json` to carry.

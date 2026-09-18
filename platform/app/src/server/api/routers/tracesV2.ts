@@ -34,6 +34,7 @@ import {
   extractFreeTextTerms,
   translateFilterToClickHouse,
 } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
@@ -1170,6 +1171,7 @@ export const tracesV2Router = createTRPCRouter({
         pageSize: input.pageSize,
         cursor: input.cursor,
         filterWhere: buildFilterWhere(input),
+        hiddenOrigins: explorerHiddenOrigins(input.query),
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
         ),
@@ -1213,6 +1215,7 @@ export const tracesV2Router = createTRPCRouter({
         pageSize: input.pageSize,
         cursor: input.cursor,
         filterWhere: buildFilterWhere(input),
+        hiddenOrigins: explorerHiddenOrigins(input.query),
         contentTerms: contentSearchTermsForViewer({
           terms: extractFreeTextTerms(input.query ?? ""),
           protections,
@@ -1279,6 +1282,7 @@ export const tracesV2Router = createTRPCRouter({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         filterWhere: buildFilterWhere(input),
+        hiddenOrigins: explorerHiddenOrigins(input.query),
       });
     }),
 
@@ -1299,6 +1303,7 @@ export const tracesV2Router = createTRPCRouter({
         timeRange: input.timeRange,
         since: input.since,
         filterWhere: buildFilterWhere(input),
+        hiddenOrigins: explorerHiddenOrigins(input.query),
       });
       return { count };
     }),

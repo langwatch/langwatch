@@ -24,7 +24,7 @@
  * render time, which is also what keeps a chart saved by a member with wider
  * protections from disclosing anything to one with narrower protections.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  * @see ../lwql/lwql.service.ts — the other half of the gate
  */
 
@@ -391,7 +391,8 @@ export class SavedWorkbenchChartService {
     const chart = await this.getById({ id, projectId });
 
     return this.deps.lwql.execute({
-      project,
+      // A saved chart runs against the one project it lives in.
+      projects: [project],
       protections,
       sql: chart.definition.sql,
       parameters: chart.definition.parameters,

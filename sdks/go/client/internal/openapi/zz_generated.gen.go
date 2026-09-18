@@ -13524,6 +13524,7 @@ const (
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeCancelled         PostLangyControlFramesJSONBodyFrames2ErrorCode = "cancelled"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeCommandRefused    PostLangyControlFramesJSONBodyFrames2ErrorCode = "command_refused"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeExecFailed        PostLangyControlFramesJSONBodyFrames2ErrorCode = "exec_failed"
+	PostLangyControlFramesJSONBodyFrames2ErrorCodeKeyRefused        PostLangyControlFramesJSONBodyFrames2ErrorCode = "key_refused"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeNotFound          PostLangyControlFramesJSONBodyFrames2ErrorCode = "not_found"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodePathRefused       PostLangyControlFramesJSONBodyFrames2ErrorCode = "path_refused"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodePermissionDenied  PostLangyControlFramesJSONBodyFrames2ErrorCode = "permission_denied"
@@ -13539,6 +13540,8 @@ func (e PostLangyControlFramesJSONBodyFrames2ErrorCode) Valid() bool {
 	case PostLangyControlFramesJSONBodyFrames2ErrorCodeCommandRefused:
 		return true
 	case PostLangyControlFramesJSONBodyFrames2ErrorCodeExecFailed:
+		return true
+	case PostLangyControlFramesJSONBodyFrames2ErrorCodeKeyRefused:
 		return true
 	case PostLangyControlFramesJSONBodyFrames2ErrorCodeNotFound:
 		return true
@@ -13885,6 +13888,21 @@ const (
 func (e PollLangyControlSession200JSONResponseBodyFrames2Call6Tool) Valid() bool {
 	switch e {
 	case LocalLs:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PollLangyControlSession200JSONResponseBodyFrames2Call7Tool.
+const (
+	LocalLangwatchEnv PollLangyControlSession200JSONResponseBodyFrames2Call7Tool = "local_langwatch_env"
+)
+
+// Valid indicates whether the value is a known member of the PollLangyControlSession200JSONResponseBodyFrames2Call7Tool enum.
+func (e PollLangyControlSession200JSONResponseBodyFrames2Call7Tool) Valid() bool {
+	switch e {
+	case LocalLangwatchEnv:
 		return true
 	default:
 		return false
@@ -14394,32 +14412,32 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds2) Valid() bool {
 
 // Defines values for PostApiV1Query200JSONResponseBodyDiagnosticsCode.
 const (
+	APPFUNCTIONRESULTTRUNCATED PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_RESULT_TRUNCATED"
 	APPFUNCTIONUNRESOLVEDKEYS  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_UNRESOLVED_KEYS"
 	APPFUNCTIONVALUETRUNCATED  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_VALUE_TRUNCATED"
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
-	INSTANTEVALSKIPPED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INSTANT_EVAL_SKIPPED"
 	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
+	MULTIPROJECTRESULT         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
 	POSSIBLEFANOUT             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
-	RESULTTRUNCATED            PostApiV1Query200JSONResponseBodyDiagnosticsCode = "RESULT_TRUNCATED"
 	UNBOUNDEDTIMERANGE         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "UNBOUNDED_TIME_RANGE"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1Query200JSONResponseBodyDiagnosticsCode enum.
 func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	switch e {
+	case APPFUNCTIONRESULTTRUNCATED:
+		return true
 	case APPFUNCTIONUNRESOLVEDKEYS:
 		return true
 	case APPFUNCTIONVALUETRUNCATED:
 		return true
 	case INCOMPLETECOMPARISONPERIOD:
 		return true
-	case INSTANTEVALSKIPPED:
-		return true
 	case MISSINGTIMEBUCKETS:
 		return true
-	case POSSIBLEFANOUT:
+	case MULTIPROJECTRESULT:
 		return true
-	case RESULTTRUNCATED:
+	case POSSIBLEFANOUT:
 		return true
 	case UNBOUNDEDTIMERANGE:
 		return true
@@ -14428,129 +14446,108 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates.
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "costs"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesInput  GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "input"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesOutput GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "output"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingJson GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding = "json"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingText GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding = "text"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesCosts:
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingJson:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesInput:
-		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesOutput:
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingText:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit.
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "<nil>"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs          GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "ms"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens      GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss     GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens/s"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD         GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "USD"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates = "costs"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesInput  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates = "input"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesOutput GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates = "output"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil:
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesCosts:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs:
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesInput:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens:
-		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss:
-		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD:
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesOutput:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding.
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsEncodingJson GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding = "json"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsEncodingText GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding = "text"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindSpan   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "span"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindThread GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "thread"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindTrace  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "trace"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsEncodingJson:
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindSpan:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsEncodingText:
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindThread:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindTrace:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsGates.
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyFunctionsGates = "costs"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesInput  GetApiV1QuerySchema200JSONResponseBodyFunctionsGates = "input"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesOutput GetApiV1QuerySchema200JSONResponseBodyFunctionsGates = "output"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates = "costs"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesInput  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates = "input"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesOutput GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates = "output"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyFunctionsGates enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsGates) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesCosts:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesCosts:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesInput:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesInput:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesOutput:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesOutput:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind.
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindSpan   GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "span"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindText   GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "text"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindThread GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "thread"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindTrace  GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "trace"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitLessThannil GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "<nil>"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitMs          GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "ms"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokens      GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokenss     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens/s"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitUSD         GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "USD"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindSpan:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitLessThannil:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindText:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitMs:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindThread:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokens:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindTrace:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokenss:
 		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsKind.
-const (
-	Eval       GetApiV1QuerySchema200JSONResponseBodyFunctionsKind = "eval"
-	Extraction GetApiV1QuerySchema200JSONResponseBodyFunctionsKind = "extraction"
-)
-
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyFunctionsKind enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsKind) Valid() bool {
-	switch e {
-	case Eval:
-		return true
-	case Extraction:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitUSD:
 		return true
 	default:
 		return false
@@ -16444,8 +16441,9 @@ type PostApiAgentCacheByNameClaimJSONBody struct {
 
 // PostApiAnalyticsJSONBody defines parameters for PostApiAnalytics.
 type PostApiAnalyticsJSONBody struct {
-	EndDate float32 `json:"endDate"`
-	Filters *struct {
+	EndDate        float32   `json:"endDate"`
+	ExcludeOrigins *[]string `json:"excludeOrigins,omitempty"`
+	Filters        *struct {
 		AnnotationsHasAnnotation             PostApiAnalyticsJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation"`
 		EvaluationsEvaluatorId               PostApiAnalyticsJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id"`
 		EvaluationsEvaluatorIdGuardrailsOnly PostApiAnalyticsJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only"`
@@ -17352,8 +17350,9 @@ type PostApiAnalytics403JSONResponseBody struct {
 
 // PostApiAnalyticsTimeseriesJSONBody defines parameters for PostApiAnalyticsTimeseries.
 type PostApiAnalyticsTimeseriesJSONBody struct {
-	EndDate PostApiAnalyticsTimeseriesJSONBody_EndDate `json:"endDate"`
-	Filters *struct {
+	EndDate        PostApiAnalyticsTimeseriesJSONBody_EndDate `json:"endDate"`
+	ExcludeOrigins *[]string                                  `json:"excludeOrigins,omitempty"`
+	Filters        *struct {
 		AnnotationsHasAnnotation             *PostApiAnalyticsTimeseriesJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation,omitempty"`
 		EvaluationsEvaluatorId               *PostApiAnalyticsTimeseriesJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id,omitempty"`
 		EvaluationsEvaluatorIdGuardrailsOnly *PostApiAnalyticsTimeseriesJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only,omitempty"`
@@ -20277,6 +20276,7 @@ type PostApiGatewayV1VirtualKeysJSONBody struct {
 	Name            string                                          `json:"name"`
 	PrincipalUserId *string                                         `json:"principal_user_id,omitempty"`
 	Purpose         *PostApiGatewayV1VirtualKeysJSONBodyPurpose     `json:"purpose,omitempty"`
+	RevealOnce      *bool                                           `json:"reveal_once,omitempty"`
 	RoutingMode     *PostApiGatewayV1VirtualKeysJSONBodyRoutingMode `json:"routing_mode,omitempty"`
 	RoutingPolicyId *string                                         `json:"routing_policy_id,omitempty"`
 	Scopes          *[]struct {
@@ -23831,9 +23831,10 @@ type PostApiTeamsByIdMembersJSONBodyRole string
 // PostApiTracesSearchJSONBody defines parameters for PostApiTracesSearch.
 type PostApiTracesSearchJSONBody struct {
 	// DateField Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation.
-	DateField *PostApiTracesSearchJSONBodyDateField `json:"dateField,omitempty"`
-	EndDate   PostApiTracesSearchJSONBody_EndDate   `json:"endDate"`
-	Filters   *struct {
+	DateField      *PostApiTracesSearchJSONBodyDateField `json:"dateField,omitempty"`
+	EndDate        PostApiTracesSearchJSONBody_EndDate   `json:"endDate"`
+	ExcludeOrigins *[]string                             `json:"excludeOrigins,omitempty"`
+	Filters        *struct {
 		AnnotationsHasAnnotation             *PostApiTracesSearchJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation,omitempty"`
 		EvaluationsEvaluatorId               *PostApiTracesSearchJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id,omitempty"`
 		EvaluationsEvaluatorIdGuardrailsOnly *PostApiTracesSearchJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only,omitempty"`
@@ -25477,6 +25478,7 @@ type PostLangyControlFramesJSONBodyFrames0 struct {
 		GitBranch       *string `json:"gitBranch,omitempty"`
 		GitDirty        *bool   `json:"gitDirty,omitempty"`
 		GitRemote       *string `json:"gitRemote,omitempty"`
+		GitRepository   *bool   `json:"gitRepository,omitempty"`
 		Name            string  `json:"name"`
 		NodeVersion     *string `json:"nodeVersion,omitempty"`
 		Os              string  `json:"os"`
@@ -25668,13 +25670,26 @@ type PollLangyControlSession200JSONResponseBodyFrames2Call1Tool string
 // PollLangyControlSession200JSONResponseBodyFrames2Call2 defines parameters for PollLangyControlSession.
 type PollLangyControlSession200JSONResponseBodyFrames2Call2 struct {
 	Params struct {
-		Edits []struct {
-			NewText string `json:"newText"`
-			OldText string `json:"oldText"`
-		} `json:"edits"`
-		Path string `json:"path"`
+		Edits []PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item `json:"edits"`
+		Path  string                                                                         `json:"path"`
 	} `json:"params"`
 	Tool PollLangyControlSession200JSONResponseBodyFrames2Call2Tool `json:"tool"`
+}
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 struct {
+	NewText string `json:"newText"`
+	OldText string `json:"oldText"`
+}
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 struct {
+	Append string `json:"append"`
+}
+
+// PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item struct {
+	union json.RawMessage
 }
 
 // PollLangyControlSession200JSONResponseBodyFrames2Call2Tool defines parameters for PollLangyControlSession.
@@ -25734,6 +25749,17 @@ type PollLangyControlSession200JSONResponseBodyFrames2Call6 struct {
 
 // PollLangyControlSession200JSONResponseBodyFrames2Call6Tool defines parameters for PollLangyControlSession.
 type PollLangyControlSession200JSONResponseBodyFrames2Call6Tool string
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call7 defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call7 struct {
+	Params struct {
+		Path *string `json:"path,omitempty"`
+	} `json:"params"`
+	Tool PollLangyControlSession200JSONResponseBodyFrames2Call7Tool `json:"tool"`
+}
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call7Tool defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call7Tool string
 
 // PollLangyControlSession200JSONResponseBody_Frames_2_Call defines parameters for PollLangyControlSession.
 type PollLangyControlSession200JSONResponseBody_Frames_2_Call struct {
@@ -25832,6 +25858,7 @@ type RegisterLangyControlSessionJSONBody struct {
 		GitBranch       *string `json:"gitBranch,omitempty"`
 		GitDirty        *bool   `json:"gitDirty,omitempty"`
 		GitRemote       *string `json:"gitRemote,omitempty"`
+		GitRepository   *bool   `json:"gitRepository,omitempty"`
 		Name            string  `json:"name"`
 		NodeVersion     *string `json:"nodeVersion,omitempty"`
 		Os              string  `json:"os"`
@@ -25898,6 +25925,7 @@ type ApproveLangyControlRequestJSONBody struct {
 		GitBranch       *string `json:"gitBranch,omitempty"`
 		GitDirty        *bool   `json:"gitDirty,omitempty"`
 		GitRemote       *string `json:"gitRemote,omitempty"`
+		GitRepository   *bool   `json:"gitRepository,omitempty"`
 		Name            string  `json:"name"`
 		NodeVersion     *string `json:"nodeVersion,omitempty"`
 		Os              string  `json:"os"`
@@ -26155,23 +26183,20 @@ type PostApiV1QueryJSONBody_TimeWindow_Start struct {
 // PostApiV1Query200JSONResponseBodyDiagnosticsCode defines parameters for PostApiV1Query.
 type PostApiV1Query200JSONResponseBodyDiagnosticsCode string
 
-// GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates string
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding string
 
-// GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit string
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates string
 
-// GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding string
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind string
 
-// GetApiV1QuerySchema200JSONResponseBodyFunctionsGates defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyFunctionsGates string
+// GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates string
 
-// GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind string
-
-// GetApiV1QuerySchema200JSONResponseBodyFunctionsKind defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyFunctionsKind string
+// GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit string
 
 // ListRunPlansParams defines parameters for ListRunPlans.
 type ListRunPlansParams struct {
@@ -64306,6 +64331,68 @@ func (t *PostLangyControlFramesJSONBody_Frames_Item) UnmarshalJSON(b []byte) err
 	return err
 }
 
+// AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as a PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0() (PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0, error) {
+	var body PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 overwrites any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as a PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1() (PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1, error) {
+	var body PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 overwrites any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPollLangyControlSession200JSONResponseBodyFrames2Call0 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call as a PollLangyControlSession200JSONResponseBodyFrames2Call0
 func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call) AsPollLangyControlSession200JSONResponseBodyFrames2Call0() (PollLangyControlSession200JSONResponseBodyFrames2Call0, error) {
 	var body PollLangyControlSession200JSONResponseBodyFrames2Call0
@@ -64478,6 +64565,32 @@ func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) FromPollLangy
 
 // MergePollLangyControlSession200JSONResponseBodyFrames2Call6 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call6
 func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) MergePollLangyControlSession200JSONResponseBodyFrames2Call6(v PollLangyControlSession200JSONResponseBodyFrames2Call6) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPollLangyControlSession200JSONResponseBodyFrames2Call7 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call as a PollLangyControlSession200JSONResponseBodyFrames2Call7
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call) AsPollLangyControlSession200JSONResponseBodyFrames2Call7() (PollLangyControlSession200JSONResponseBodyFrames2Call7, error) {
+	var body PollLangyControlSession200JSONResponseBodyFrames2Call7
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPollLangyControlSession200JSONResponseBodyFrames2Call7 overwrites any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call as the provided PollLangyControlSession200JSONResponseBodyFrames2Call7
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) FromPollLangyControlSession200JSONResponseBodyFrames2Call7(v PollLangyControlSession200JSONResponseBodyFrames2Call7) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePollLangyControlSession200JSONResponseBodyFrames2Call7 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call7
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) MergePollLangyControlSession200JSONResponseBodyFrames2Call7(v PollLangyControlSession200JSONResponseBodyFrames2Call7) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -94396,7 +94509,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
-		Secret     string `json:"secret"`
+		// Preview With `reveal_once`: the key's display prefix, safe to show in place of the secret.
+		Preview *string `json:"preview,omitempty"`
+
+		// RevealId With `reveal_once`: the id that serves the secret once, through the app.
+		RevealId *string `json:"reveal_id,omitempty"`
+
+		// Secret The secret, absent when `reveal_once` was set.
+		Secret     *string `json:"secret,omitempty"`
 		VirtualKey struct {
 			Config        interface{} `json:"config,omitempty"`
 			CreatedAt     time.Time   `json:"created_at"`
@@ -106176,7 +106296,6 @@ type PostApiV1QueryResponse struct {
 			RowsRead     float32 `json:"rowsRead"`
 			RowsReturned float32 `json:"rowsReturned"`
 		} `json:"statistics"`
-		Truncated bool `json:"truncated"`
 	}
 	JSON400 *struct {
 		Error struct {
@@ -106258,15 +106377,28 @@ type GetApiV1QuerySchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		Database string `json:"database"`
-		Datasets []struct {
+		AppFunctions []struct {
+			Available   bool                                                       `json:"available"`
+			Cap         int                                                        `json:"cap"`
+			Description string                                                     `json:"description"`
+			Encoding    GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding `json:"encoding"`
+			ExampleSql  string                                                     `json:"exampleSql"`
+			Gates       []GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates  `json:"gates"`
+			KeyKind     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind  `json:"keyKind"`
+			Name        string                                                     `json:"name"`
+			Returns     string                                                     `json:"returns"`
+			Signature   string                                                     `json:"signature"`
+		} `json:"appFunctions"`
+		Database  string   `json:"database"`
+		Functions []string `json:"functions"`
+		Views     []struct {
 			Columns []struct {
-				Available   bool                                                         `json:"available"`
-				Description string                                                       `json:"description"`
-				Gates       []GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates `json:"gates"`
-				Name        string                                                       `json:"name"`
-				Type        string                                                       `json:"type"`
-				Unit        *GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit   `json:"unit"`
+				Available   bool                                                      `json:"available"`
+				Description string                                                    `json:"description"`
+				Gates       []GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates `json:"gates"`
+				Name        string                                                    `json:"name"`
+				Type        string                                                    `json:"type"`
+				Unit        *GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit   `json:"unit"`
 			} `json:"columns"`
 			Description string   `json:"description"`
 			ExampleSql  string   `json:"exampleSql"`
@@ -106275,20 +106407,7 @@ type GetApiV1QuerySchemaResponse struct {
 			JoinKeys    []string `json:"joinKeys"`
 			Name        string   `json:"name"`
 			TimeColumn  string   `json:"timeColumn"`
-		} `json:"datasets"`
-		Functions []struct {
-			Available   bool                                                    `json:"available"`
-			Cap         int                                                     `json:"cap"`
-			Description string                                                  `json:"description"`
-			Encoding    GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding `json:"encoding"`
-			ExampleSql  string                                                  `json:"exampleSql"`
-			Gates       []GetApiV1QuerySchema200JSONResponseBodyFunctionsGates  `json:"gates"`
-			KeyKind     GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind  `json:"keyKind"`
-			Kind        GetApiV1QuerySchema200JSONResponseBodyFunctionsKind     `json:"kind"`
-			Name        string                                                  `json:"name"`
-			Returns     string                                                  `json:"returns"`
-			Signature   string                                                  `json:"signature"`
-		} `json:"functions"`
+		} `json:"views"`
 	}
 	JSON400 *struct {
 		Error struct {
@@ -118327,7 +118446,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
-			Secret     string `json:"secret"`
+			// Preview With `reveal_once`: the key's display prefix, safe to show in place of the secret.
+			Preview *string `json:"preview,omitempty"`
+
+			// RevealId With `reveal_once`: the id that serves the secret once, through the app.
+			RevealId *string `json:"reveal_id,omitempty"`
+
+			// Secret The secret, absent when `reveal_once` was set.
+			Secret     *string `json:"secret,omitempty"`
 			VirtualKey struct {
 				Config        interface{} `json:"config,omitempty"`
 				CreatedAt     time.Time   `json:"created_at"`
@@ -132149,7 +132275,6 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 				RowsRead     float32 `json:"rowsRead"`
 				RowsReturned float32 `json:"rowsReturned"`
 			} `json:"statistics"`
-			Truncated bool `json:"truncated"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -132257,15 +132382,28 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Database string `json:"database"`
-			Datasets []struct {
+			AppFunctions []struct {
+				Available   bool                                                       `json:"available"`
+				Cap         int                                                        `json:"cap"`
+				Description string                                                     `json:"description"`
+				Encoding    GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding `json:"encoding"`
+				ExampleSql  string                                                     `json:"exampleSql"`
+				Gates       []GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates  `json:"gates"`
+				KeyKind     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind  `json:"keyKind"`
+				Name        string                                                     `json:"name"`
+				Returns     string                                                     `json:"returns"`
+				Signature   string                                                     `json:"signature"`
+			} `json:"appFunctions"`
+			Database  string   `json:"database"`
+			Functions []string `json:"functions"`
+			Views     []struct {
 				Columns []struct {
-					Available   bool                                                         `json:"available"`
-					Description string                                                       `json:"description"`
-					Gates       []GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates `json:"gates"`
-					Name        string                                                       `json:"name"`
-					Type        string                                                       `json:"type"`
-					Unit        *GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit   `json:"unit"`
+					Available   bool                                                      `json:"available"`
+					Description string                                                    `json:"description"`
+					Gates       []GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates `json:"gates"`
+					Name        string                                                    `json:"name"`
+					Type        string                                                    `json:"type"`
+					Unit        *GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit   `json:"unit"`
 				} `json:"columns"`
 				Description string   `json:"description"`
 				ExampleSql  string   `json:"exampleSql"`
@@ -132274,20 +132412,7 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 				JoinKeys    []string `json:"joinKeys"`
 				Name        string   `json:"name"`
 				TimeColumn  string   `json:"timeColumn"`
-			} `json:"datasets"`
-			Functions []struct {
-				Available   bool                                                    `json:"available"`
-				Cap         int                                                     `json:"cap"`
-				Description string                                                  `json:"description"`
-				Encoding    GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding `json:"encoding"`
-				ExampleSql  string                                                  `json:"exampleSql"`
-				Gates       []GetApiV1QuerySchema200JSONResponseBodyFunctionsGates  `json:"gates"`
-				KeyKind     GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind  `json:"keyKind"`
-				Kind        GetApiV1QuerySchema200JSONResponseBodyFunctionsKind     `json:"kind"`
-				Name        string                                                  `json:"name"`
-				Returns     string                                                  `json:"returns"`
-				Signature   string                                                  `json:"signature"`
-			} `json:"functions"`
+			} `json:"views"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

@@ -32,7 +32,7 @@
  * module.
  *
  * @see ./catalog.ts — what each function is
- * @see ../../../../../specs/analytics/lwql-app-functions.feature
+ * @see ../../../../../specs/lwql/app-functions.feature
  */
 
 import { InstantEvalClassifierUnavailableError } from "~/server/app-layer/instant-evals/errors";

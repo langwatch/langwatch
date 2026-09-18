@@ -101,7 +101,7 @@ export const hydrate = (input: {
   signal?: AbortSignal;
 }) =>
   hydrateLangWatchQLAppFunctions({
-    projectId: "project-a",
+    projectIds: ["project-a"],
     protections: PROTECTIONS,
     limits: input.limits ?? LIMITS,
     ...input,

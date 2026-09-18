@@ -14,7 +14,7 @@
  * unprovisioned singleton answers the control case below rather than a
  * database.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: specs/lwql/workbench.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

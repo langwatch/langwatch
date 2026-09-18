@@ -125,6 +125,12 @@ const registry = {
       "Declare each as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
     ],
   },
+  lwql_result_too_large: {
+    tips: [
+      "Read `meta.maxResultBytes`; the response exceeded that byte ceiling",
+      "Select fewer columns, or a smaller LIMIT, so the result fits under the cap",
+    ],
+  },
   lwql_granularity_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the parameter whose declaration was refused",
@@ -843,6 +849,25 @@ const registry = {
   },
   langy_worker_restarting: {
     tips: ["An update interrupted this reply; resend the message"],
+  },
+
+  // ---- guided onboarding ----
+  guided_onboarding_path_unknown: {
+    tips: [
+      "Use one of the paths in meta.knownPaths: llmops, coding, gateway or governance",
+    ],
+  },
+
+  // ---- one-time secret reveal ----
+  secret_already_revealed: {
+    tips: [
+      "The reveal id was already read and the secret is gone; create a new key with `langwatch virtual-keys create --reveal-once` when the value was not saved",
+    ],
+  },
+  secret_reveal_expired: {
+    tips: [
+      "A reveal id serves its secret for 24 hours after the key is created; create a new key with `langwatch virtual-keys create --reveal-once` when the value was not saved",
+    ],
   },
 
   // ---- licensing ----

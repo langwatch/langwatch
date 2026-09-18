@@ -244,8 +244,19 @@ const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "upstream_forbidden",
 ]);
 
+/**
+ * A rate limit, as the proxy's status fallback names it and as the providers
+ * name it in their own bodies: OpenAI and Azure OpenAI answer a 429 with
+ * `rate_limit_exceeded`, Anthropic with `rate_limit_error`, Google with
+ * `RESOURCE_EXHAUSTED`. The proxy carries the provider's code as the typed
+ * reason when the body has one, so the status fallback alone misses most
+ * real rate limits.
+ */
 const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
   "upstream_rate_limited",
+  "rate_limit_exceeded",
+  "rate_limit_error",
+  "RESOURCE_EXHAUSTED",
 ]);
 
 const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
@@ -382,6 +393,11 @@ const presentations = {
     title: "The time window has to be a date and time",
     describe: () =>
       "Declare dashboard_context_period_start and dashboard_context_period_end as DateTime, for example {dashboard_context_period_start:DateTime}, and run the query again.",
+  },
+  lwql_result_too_large: {
+    title: "This result is too large to return",
+    describe: () =>
+      "The answer is bigger than one response can carry. Select fewer columns, or use a smaller LIMIT, and run it again.",
   },
   // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
   // either `"declared-type"` or `"step-value"`, but the three doors that can
@@ -633,7 +649,7 @@ const presentations = {
     // The function's own error text rides on `meta.message` for the CLI and
     // the run drawer's envelope; relayed prose is never rendered here.
     describe: () =>
-      "The decorated function raised an error. The process logs carry the stack, and the run shows what it said.",
+      "The decorated function raised an error, or answered with something the platform cannot read. The process logs carry the stack, and the run shows what it said.",
   },
   agent_disconnected: {
     title: "The agent disconnected mid-call",
@@ -2031,6 +2047,17 @@ const presentations = {
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
     },
   },
+  // ---- one-time secret reveal ----
+  // Both say the same thing to do, because the reader's next move is the
+  // same either way: the value is gone, so a new key is the only way to one.
+  secret_already_revealed: {
+    title: "This key was shown once and cannot be shown again",
+    describe: () => "Create a new key if you did not save it.",
+  },
+  secret_reveal_expired: {
+    title: "This key can no longer be shown",
+    describe: () => "Create a new key if you did not save it.",
+  },
   scenario_field_unknown: {
     // The names are our own identifiers, not free text: the editor shows the
     // refused name beside the ones the suite declares so the typo is visible.
@@ -3377,6 +3404,11 @@ const presentations = {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
   },
+  guided_onboarding_path_unknown: {
+    title: "That onboarding path doesn't exist",
+    describe: () =>
+      "Pick one of Evals & LLM Ops, Coding Agent Tracking, Gateway or Governance.",
+  },
   github_not_connected: {
     title: "GitHub is not connected",
     describe: () =>
@@ -3686,7 +3718,7 @@ const presentations = {
         return "The model provider refused this key or its permissions. Check the credential configured for this model.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
-        return "The model provider is rate-limiting these calls. Wait a moment and try again.";
+        return "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
         return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";

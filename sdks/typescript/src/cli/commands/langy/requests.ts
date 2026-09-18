@@ -108,14 +108,40 @@ const quiet = (command: string, args: string[], cwd: string): string | null => {
 };
 
 /** The lockfile that says which package manager the folder uses. */
+/** The file's text, or nothing when it is not there or cannot be read. */
+function readText(file: string): string {
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * uv owns a Python folder when its lock file is there, when `pyproject.toml`
+ * carries a `[tool.uv]` table, or when the virtual environment was made by
+ * uv: its `pyvenv.cfg` carries a `uv = <version>` line. The last one matters
+ * most, because a venv uv made has no pip in it, so every pip spelling fails
+ * there while `uv add` works.
+ */
+function uvOwns(root: string): boolean {
+  if (fs.existsSync(path.join(root, "uv.lock"))) return true;
+  if (/^\[tool\.uv[\].]/m.test(readText(path.join(root, "pyproject.toml")))) {
+    return true;
+  }
+  return /^uv\s*=/m.test(readText(path.join(root, ".venv", "pyvenv.cfg")));
+}
+
 export function packageManagerOf(root: string): string | undefined {
+  // uv wins over every other signal: a folder with a JS lockfile beside its
+  // Python project still installs the Python package through uv.
+  if (uvOwns(root)) return "uv";
   const lockfiles: Array<[string, string]> = [
     ["pnpm-lock.yaml", "pnpm"],
     ["yarn.lock", "yarn"],
     ["bun.lockb", "bun"],
     ["bun.lock", "bun"],
     ["package-lock.json", "npm"],
-    ["uv.lock", "uv"],
     ["poetry.lock", "poetry"],
     ["Pipfile.lock", "pipenv"],
     ["requirements.txt", "pip"],
@@ -134,8 +160,12 @@ export function packageManagerOf(root: string): string | undefined {
  * shares its folder, the skill just learns less about it.
  */
 export function describeWorkspace(root: string): WorkspaceInfo {
-  const inside = quiet("git", ["rev-parse", "--is-inside-work-tree"], root);
-  const isRepository = inside === "true";
+  // rev-parse fails the same way when git is missing and when the folder is
+  // not a repository; only with git present does the failure say "not a repository".
+  const gitPresent = quiet("git", ["--version"], root) !== null;
+  const isRepository =
+    gitPresent &&
+    quiet("git", ["rev-parse", "--is-inside-work-tree"], root) === "true";
   const branch = isRepository
     ? quiet("git", ["rev-parse", "--abbrev-ref", "HEAD"], root)
     : null;
@@ -151,6 +181,7 @@ export function describeWorkspace(root: string): WorkspaceInfo {
   return {
     root,
     name: path.basename(root),
+    ...(gitPresent ? { gitRepository: isRepository } : {}),
     ...(branch ? { gitBranch: branch } : {}),
     ...(remote ? { gitRemote: remote } : {}),
     ...(status === null ? {} : { gitDirty: status !== "" }),
@@ -263,6 +294,12 @@ export function hasDeviceSession(): boolean {
 /**
  * Signs in when the machine has no device session, then resolves the
  * credentials. The login is the standard flow, called rather than repeated.
+ *
+ * The device session comes before a key in the environment or the folder's
+ * .env: a control request is addressed to the person who asked, and the
+ * project key Langy writes into the folder carries no person, so it lists
+ * nothing and can approve nothing. A key in the environment is still the
+ * credential when the machine has no login, which is how a script signs in.
  */
 export async function ensureSignedIn({
   login,
@@ -275,7 +312,10 @@ export async function ensureSignedIn({
     );
     await login({ device: true });
   }
-  const credentials = await resolveCredentials();
+  const credentials = await resolveCredentials({ preferSession: true });
+  if (credentials.source === "session") {
+    console.log(chalk.gray(loginLine()));
+  }
   return {
     apiKey: credentials.apiKey,
     endpoint: credentials.endpoint,
@@ -283,6 +323,33 @@ export async function ensureSignedIn({
       ? {}
       : { projectId: credentials.projectId }),
   };
+}
+
+/**
+ * The one line that says who the command acts as: the person and their
+ * organization, as the login recorded them. A request is addressed to the
+ * person and answered on the request's own project, so no project and no
+ * --project belong in this line.
+ */
+const nonEmpty = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
+export function loginLine(): string {
+  let cfg: ReturnType<typeof loadConfig> | undefined;
+  try {
+    cfg = loadConfig();
+  } catch {
+    cfg = undefined;
+  }
+  const person = nonEmpty(cfg?.user?.name) ?? nonEmpty(cfg?.user?.email);
+  const organization = nonEmpty(cfg?.organization?.name);
+  if (person && organization) {
+    return `Using your login as ${person} at ${organization}.`;
+  }
+  if (person) return `Using your login as ${person}.`;
+  return "Using your login.";
 }
 
 const requestTitle = (
@@ -588,7 +655,10 @@ function refusalText(body: unknown): string | undefined {
     code?: unknown;
   };
   if (Array.isArray(tips)) {
-    const lines = tips.filter((t): t is string => typeof t === "string" && t !== "");
+    const lines = tips
+      .filter((t): t is string => typeof t === "string" && t.trim() !== "")
+      .map((t) => t.trim())
+      .map((t) => (/[.!?]$/.test(t) ? t : `${t}.`));
     if (lines.length > 0) return lines.join(" ");
   }
   if (typeof message === "string" && message !== "" && message !== code) {

@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { memo, type ReactNode, useEffect } from "react";
 import { Outlet } from "react-router";
+import { GuidedOnboardingHost } from "~/features/guided-onboarding/tour/GuidedOnboardingHost";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LangySidecar } from "./components/LangyPanel";
@@ -134,6 +135,9 @@ function LangyShiftedRoot({
         {children}
       </Box>
       {showLangy && <LangySidecarConnected />}
+      {/* The guided onboarding tour and its handoff to the panel live wherever
+          the panel does. Spec: specs/features/onboarding/guided-tour.feature */}
+      {showLangy && <GuidedOnboardingHost />}
     </>
   );
 }

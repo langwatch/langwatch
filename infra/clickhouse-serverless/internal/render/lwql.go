@@ -6,9 +6,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
+
+// lwqlTenantPredicateTemplate and lwqlKeyMapSelfFilterTemplate are the tenant
+// row filter and the key map's self-filter, single-sourced across languages
+// (ADR-101). The same two files are mirrored as string constants in the app's
+// accessModel.ts, and a TypeScript parity test fails when either side drifts —
+// so this chart-rendered filter and the row policy the app self-provisions on a
+// BYO server can never diverge into "zero rows" or "over-broad rows".
+//
+//go:embed lwqlTenantPredicate.sql
+var lwqlTenantPredicateTemplate string
+
+//go:embed lwqlKeyMapSelfFilter.sql
+var lwqlKeyMapSelfFilterTemplate string
+
+// renderLWQLPredicate substitutes the {placeholder} slots of a single-sourced
+// predicate template. Every value is a fixed identifier or a validated database
+// name, so it only assembles text and adds no escaping of its own.
+func renderLWQLPredicate(template string, substitutions map[string]string) string {
+	rendered := strings.TrimSpace(template)
+	for name, value := range substitutions {
+		rendered = strings.ReplaceAll(rendered, "{"+name+"}", value)
+	}
+	return rendered
+}
 
 // lwqlCatalogJSON is the manifest that is the single source of truth for the
 // Go side of the LangWatchQL access model. It is embedded rather than read at
@@ -25,6 +50,21 @@ var lwqlCatalogJSON []byte
 type lwqlCatalog struct {
 	SourceTables []string `json:"sourceTables"`
 	ViewNames    []string `json:"viewNames"`
+	// TenantColumns overrides the project column a source table's row filter
+	// is applied to, keyed by table name. Optional and sparse: only tables
+	// whose column is not the default "TenantId" appear (stored_objects carries
+	// "project_id"). An absent table, an absent map, and an empty value all
+	// mean the default, so an older manifest renders exactly as before.
+	TenantColumns map[string]string `json:"tenantColumns"`
+	// SourceColumns is the exact column set the restricted identity is granted
+	// on each source table, keyed by table name — mirroring the app's
+	// column-scoped grants (catalogStatements.ts lwqlSourceColumnGrants) so the
+	// chart-rendered SaaS role reads only the columns the catalog exposes, not
+	// every column of the fact table. Sparse: a table absent here (every
+	// PostgreSQL-engine *_pg bridge table, whose whole column list IS the
+	// exposed surface) takes the whole-object GRANT SELECT instead, so an older
+	// manifest with no map renders exactly as before.
+	SourceColumns map[string][]string `json:"sourceColumns"`
 }
 
 // lwqlSourceTables is the fixed set of tables the langwatch_lwql user may read,
@@ -41,8 +81,10 @@ type lwqlCatalog struct {
 // own SELECT grant. Grant only, no filter: the views are SQL SECURITY INVOKER,
 // so every read through them hits the source tables' row filters above.
 var (
-	lwqlSourceTables []string
-	lwqlViewNames    []string
+	lwqlSourceTables  []string
+	lwqlViewNames     []string
+	lwqlTenantColumns map[string]string
+	lwqlSourceColumns map[string][]string
 )
 
 func init() {
@@ -55,6 +97,38 @@ func init() {
 	}
 	lwqlSourceTables = catalog.SourceTables
 	lwqlViewNames = catalog.ViewNames
+	lwqlTenantColumns = catalog.TenantColumns
+	lwqlSourceColumns = catalog.SourceColumns
+}
+
+// lwqlTenantColumnFor is the project column a source table's row filter applies
+// to: the manifest override when one is set, and the default "TenantId"
+// otherwise. Keeping the default here is what lets a manifest carry only the
+// tables that differ and every other table render unchanged.
+func lwqlTenantColumnFor(table string) string {
+	if col, ok := lwqlTenantColumns[table]; ok && col != "" {
+		return col
+	}
+	return "TenantId"
+}
+
+// lwqlSourceGrant is the SELECT grant for one source table: column-scoped
+// (`GRANT SELECT(`col`, …) ON db.table`) when the manifest lists the columns
+// the catalog exposes on it, and whole-object (`GRANT SELECT ON db.table`)
+// otherwise. Absent from the map means "grant the whole object" — the shape the
+// PostgreSQL-engine bridge tables need, whose whole column list is the exposed
+// surface. Columns are backtick-quoted to match the app's grants and to carry
+// any dotted nested-column name unambiguously.
+func lwqlSourceGrant(db, table string) string {
+	cols, ok := lwqlSourceColumns[table]
+	if !ok || len(cols) == 0 {
+		return fmt.Sprintf("GRANT SELECT ON %s.%s", db, table)
+	}
+	quoted := make([]string, len(cols))
+	for i, col := range cols {
+		quoted[i] = "`" + col + "`"
+	}
+	return fmt.Sprintf("GRANT SELECT(%s) ON %s.%s", strings.Join(quoted, ", "), db, table)
 }
 
 // lwqlUsersFile is users.d/lwql.yaml: the restricted profile beside its only
@@ -157,26 +231,40 @@ func renderLWQL(input *config.Input, usersD, configD string) error {
 		return fmt.Errorf("lwql: database name is not a plain identifier: %q", db)
 	}
 
-	// One fixed tenant filter for every source table. The tenant is supplied
-	// per query by custom_api_key_hash, never baked in here — nothing is
-	// per-tenant, so this string is identical on every node and every tenant.
-	tenantFilter := fmt.Sprintf(
-		"TenantId IN (SELECT any(TenantId) FROM %s.lwql_api_key_tenant_map "+
-			"WHERE KeyHash = getSetting('custom_api_key_hash') HAVING uniqExact(TenantId) = 1)",
-		db,
-	)
+	// The tenant filter is rendered per source table because the project column
+	// it filters on is per table: almost every source names it "TenantId", but
+	// one (stored_objects) carries "project_id" and its filter must name that or
+	// it would police the wrong column. The tenant SET itself is still supplied
+	// per query by custom_api_key_hash (a comma-joined set of the caller's
+	// per-project key hashes) and never baked in — only the column varies, and
+	// only for the tables the manifest overrides. `tenantId` is the key map's
+	// own column and stays "TenantId" regardless of the source column.
+	tenantFilterFor := func(table string) string {
+		return renderLWQLPredicate(lwqlTenantPredicateTemplate, map[string]string{
+			"tenantColumn":  lwqlTenantColumnFor(table),
+			"tenantId":      "TenantId",
+			"keyHash":       "KeyHash",
+			"keyMap":        fmt.Sprintf("%s.lwql_api_key_tenant_map", db),
+			"tenantSetting": "custom_api_key_hash",
+		})
+	}
+	keyMapSelfFilter := renderLWQLPredicate(lwqlKeyMapSelfFilterTemplate, map[string]string{
+		"keyHash":       "KeyHash",
+		"tenantSetting": "custom_api_key_hash",
+	})
 
 	// Grants: the lwql_* wildcard (reaches the key map and any lwql_-prefixed
 	// object), plus one explicit SELECT per source table and per view.
 	grants := []string{fmt.Sprintf("GRANT SELECT ON %s.lwql_*", db)}
-	// Row filters: the key map keyed directly on the query setting, then the
-	// shared tenant filter on every source table.
+	// Row filters: the key map keyed on set membership of the query setting (it
+	// governs the very subquery the tenant filter runs against, so it must be
+	// the same set test), then the shared tenant filter on every source table.
 	tableFilters := map[string]lwqlRowFilter{
-		"lwql_api_key_tenant_map": {Filter: "KeyHash = getSetting('custom_api_key_hash')"},
+		"lwql_api_key_tenant_map": {Filter: keyMapSelfFilter},
 	}
 	for _, table := range lwqlSourceTables {
-		grants = append(grants, fmt.Sprintf("GRANT SELECT ON %s.%s", db, table))
-		tableFilters[table] = lwqlRowFilter{Filter: tenantFilter}
+		grants = append(grants, lwqlSourceGrant(db, table))
+		tableFilters[table] = lwqlRowFilter{Filter: tenantFilterFor(table)}
 	}
 	for _, view := range lwqlViewNames {
 		grants = append(grants, fmt.Sprintf("GRANT SELECT ON %s.%s", db, view))
@@ -283,6 +371,16 @@ func lwqlRestrictedProfile() lwqlProfile {
 		MaxRowsToRead:               1_000_000_000,
 		MaxBytesToRead:              10_000_000_000,
 		ReadOverflowMode:            "throw",
+		// Backstop for the row cap the app's TypeScript validator and service
+		// already enforce: a static LIMIT above 10,000 is refused there and a
+		// bare statement gets it appended, but LIMIT {n:UInt64} (a bound
+		// parameter) is not a value that check can read. Pinning the same
+		// ceiling here means such a query still cannot return more rows/bytes
+		// than the cap — mirrors LWQL_MAX_RESULT_ROWS / LWQL_MAX_RESULT_BYTES
+		// in the app repo's limits.ts.
+		MaxResultRows:      10_000,
+		MaxResultBytes:     8_000_000,
+		ResultOverflowMode: "throw",
 		Constraints: lwqlConstraints{
 			CustomAPIKeyHash:            lwqlConstraint{ChangeableInReadonly: &empty},
 			MaxExecutionTime:            constEmpty,
@@ -292,6 +390,9 @@ func lwqlRestrictedProfile() lwqlProfile {
 			MaxRowsToRead:               constEmpty,
 			MaxBytesToRead:              constEmpty,
 			ReadOverflowMode:            constEmpty,
+			MaxResultRows:               constEmpty,
+			MaxResultBytes:              constEmpty,
+			ResultOverflowMode:          constEmpty,
 		},
 	}
 }
@@ -307,6 +408,9 @@ type lwqlProfile struct {
 	MaxRowsToRead               int64           `yaml:"max_rows_to_read"`
 	MaxBytesToRead              int64           `yaml:"max_bytes_to_read"`
 	ReadOverflowMode            string          `yaml:"read_overflow_mode"`
+	MaxResultRows               int64           `yaml:"max_result_rows"`
+	MaxResultBytes              int64           `yaml:"max_result_bytes"`
+	ResultOverflowMode          string          `yaml:"result_overflow_mode"`
 	Constraints                 lwqlConstraints `yaml:"constraints"`
 }
 
@@ -321,6 +425,9 @@ type lwqlConstraints struct {
 	MaxRowsToRead               lwqlConstraint `yaml:"max_rows_to_read"`
 	MaxBytesToRead              lwqlConstraint `yaml:"max_bytes_to_read"`
 	ReadOverflowMode            lwqlConstraint `yaml:"read_overflow_mode"`
+	MaxResultRows               lwqlConstraint `yaml:"max_result_rows"`
+	MaxResultBytes              lwqlConstraint `yaml:"max_result_bytes"`
+	ResultOverflowMode          lwqlConstraint `yaml:"result_overflow_mode"`
 }
 
 // lwqlConstraint carries exactly one of const / changeable_in_readonly. The

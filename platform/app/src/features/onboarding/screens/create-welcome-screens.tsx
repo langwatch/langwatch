@@ -182,6 +182,9 @@ const RoleScreen: React.FC = () => {
   );
 };
 
+/** The takeover phases are drawn by GuidedTakeover, outside the card. */
+const TakeoverScreen: React.FC = () => null;
+
 interface IntroScreensProps {
   flow: OnboardingFlowConfig;
 }
@@ -226,6 +229,29 @@ export const useCreateWelcomeScreens = ({
         heading: "Let's tailor your experience",
         subHeading: "What best describes you?",
         component: RoleScreen,
+      },
+      // The guided takeover renders itself full-bleed; these entries only
+      // give the flow its indices, headings included for the page title.
+      [OnboardingScreenIndex.HELLO]: {
+        id: "hello",
+        required: true,
+        heading: "Hello",
+        component: TakeoverScreen,
+        widthVariant: "full",
+      },
+      [OnboardingScreenIndex.VALUE]: {
+        id: "value",
+        required: true,
+        heading: "What to set up",
+        component: TakeoverScreen,
+        widthVariant: "full",
+      },
+      [OnboardingScreenIndex.PROVIDER]: {
+        id: "provider",
+        required: true,
+        heading: "Connect a provider",
+        component: TakeoverScreen,
+        widthVariant: "full",
       },
     }),
     [],

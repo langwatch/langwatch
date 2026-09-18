@@ -7,7 +7,7 @@
  * unparseable or the table wrong would be reporting a guard that is not there.
  *
  * @see ../../appFunctions/evalCatalog.ts
- * @see specs/analytics/lwql-eval-functions.feature
+ * @see specs/lwql/eval-functions.feature
  */
 import { describe, expect, it } from "vitest";
 

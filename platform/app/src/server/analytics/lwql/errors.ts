@@ -186,6 +186,50 @@ export class LangWatchQLProvisioningIncompleteError extends HandledError {
 }
 
 /**
+ * The finished result is larger than the byte ceiling the API serialises.
+ *
+ * A hard refusal rather than a silent cut: a JSON body that looks whole but is
+ * missing its tail is the worse failure for an analytics caller, so the result
+ * is refused outright and the caller told how to bring it under the cap — fewer
+ * columns, or a smaller `LIMIT`. The row cap is enforced separately, by the
+ * `LIMIT` the service appends to a bare statement; this is the ceiling a query
+ * can still exceed inside that row count when its columns are wide.
+ *
+ * `customer` fault, 413: nothing the platform did causes it and the caller can
+ * act on it, so it earns no incident.
+ */
+export class LangWatchQLResultTooLargeError extends HandledError {
+  declare readonly code: "lwql_result_too_large";
+
+  constructor(
+    /** The byte ceiling the result exceeded — the caller's target to get under. */
+    maxResultBytes: number,
+    /**
+     * The raw ClickHouse error, present when this was raised from the
+     * server's own `max_result_rows` / `max_result_bytes` backstop
+     * (TOO_MANY_ROWS_OR_BYTES) rather than the post-fetch byte check — carried
+     * for the operator's logs and never relayed to the caller.
+     */
+    options: { reasons?: readonly Error[] } = {},
+  ) {
+    super(
+      "lwql_result_too_large",
+      "The result is larger than this API returns in one response.",
+      {
+        httpStatus: 413,
+        fault: "customer",
+        // Named consumer: the agent that wrote the SQL, which needs the cap it
+        // overshot to decide how much to narrow the query by.
+        meta: { maxResultBytes },
+        ...remediation("lwql_result_too_large"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLResultTooLargeError";
+  }
+}
+
+/**
  * The query declares a bound parameter the request supplied no value for.
  *
  * Caught at the gateway rather than left to the database: ClickHouse answers a

@@ -186,6 +186,41 @@ export async function assertActorCanManageAllScopes(
 }
 
 /**
+ * Create gate for a caller that speaks for one project (the public REST
+ * door). A key scoped to nothing but the caller's own project needs
+ * `virtualKeys:create` there and nothing more: issuing a project's own keys
+ * is the day job of anyone driving the gateway from it, and the Langy session
+ * key holds `create` while `manage` is withheld from it on purpose, since
+ * `manage` implies `rotate` (see `langyPermissionPolicy.ts`). Every other
+ * shape, an organization or team scope, another project, or several scopes
+ * at once, still needs `virtualKeys:manage` on every scope requested, the
+ * same fail-closed intersection as {@link assertActorCanManageAllScopes}.
+ */
+export async function assertActorCanCreateScopes(
+  ctx: ActorContext,
+  { scopes, callerProjectId }: { scopes: Scope[]; callerProjectId: string },
+): Promise<void> {
+  const [only] = scopes;
+  const ownProjectOnly =
+    scopes.length === 1 &&
+    only !== undefined &&
+    only.scopeType === "PROJECT" &&
+    only.scopeId === callerProjectId;
+  if (!ownProjectOnly) {
+    return assertActorCanManageAllScopes(ctx, scopes);
+  }
+  if (ctx.actor.kind === "session" && !ctx.actor.session) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
+  }
+  if (!(await actorHasPermissionAtScope(ctx, only, "virtualKeys:create"))) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `permission_denied: virtualKeys:create at ${scopeLabel(only)}`,
+    });
+  }
+}
+
+/**
  * Update / rotate / delete gate: require the op permission on at least one
  * of the key's existing scopes. Throws FORBIDDEN when the caller holds it
  * on none of them.

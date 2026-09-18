@@ -20,9 +20,9 @@ object that cannot follow that pattern, and §4 says why.
 content rather than the preview).
 
 **Behavioural contract:**
-[specs/analytics/lwql-app-functions.feature](../../../specs/analytics/lwql-app-functions.feature),
+[specs/lwql/app-functions.feature](../../../specs/lwql/app-functions.feature),
 and for the eval functions
-[specs/analytics/lwql-eval-functions.feature](../../../specs/analytics/lwql-eval-functions.feature)
+[specs/lwql/eval-functions.feature](../../../specs/lwql/eval-functions.feature)
 plus [specs/instant-evals/classifier.feature](../../../specs/instant-evals/classifier.feature).
 
 ## Context

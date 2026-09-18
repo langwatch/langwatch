@@ -27,12 +27,14 @@ const SCHEMA_PATH = "/api/v1/query/schema";
 /**
  * The door is shut to an anonymous caller.
  *
- * A regression suite for a real hole: the routes were first declared with
- * `handlerManagedAuth`, which applies NO middleware — it is a declaration that
- * the HANDLER authenticates. The handlers never did. They read the project off
- * a context nothing had populated, so every anonymous call reached the service
- * and died on `project.id` of `undefined`: a 500 where a 401 belonged, and
- * `analytics:view` enforced nowhere.
+ * A regression suite for a real hole. The door is `handlerManagedAuth` — it
+ * fans any key out across the projects it can read, which no route-level policy
+ * chain can express (#8085) — so it must prepend its OWN auth middleware
+ * ({@link createUnifiedKeyAuthMiddleware}) and actually apply it. It once did
+ * not: declared handler-managed with the handlers reading the project off a
+ * context nothing populated, every anonymous call reached the service and died
+ * on `project.id` of `undefined` — a 500 where a 401 belonged. These pin that
+ * the middleware is present and refuses before any handler runs.
  *
  * Driven through the real mounted app rather than a stub, because the hole was
  * that a declared policy installed nothing — and only the assembled app can

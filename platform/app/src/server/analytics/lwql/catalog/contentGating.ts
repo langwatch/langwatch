@@ -17,7 +17,7 @@
  * always the copy.
  *
  * @see ../../../data-privacy/dropKeyCatalog.ts — the source of truth
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import {

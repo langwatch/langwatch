@@ -3,9 +3,11 @@ import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { AskChip } from "./AskChip";
+import { ContinueLine, useConversationOpen } from "./ContinueLine";
 import { useHomeDevState } from "./dev/homeDevState";
 import { HeroAskField } from "./HeroAskField";
 import "./homeHeroScroll.css";
+import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import { OnboardAgentPill } from "./OnboardAgentPill";
 import { useProjectReach } from "./useProjectReach";
 import { WelcomeHeader } from "./WelcomeHeader";
@@ -42,6 +44,58 @@ const ASK_MEASURE = "680px";
  * grow under the reader as that answer arrived.
  */
 const ASK_ROW_MIN_HEIGHT = "26px";
+
+/**
+ * The height the field holds at hero size (CommandBarInput: a 16px line
+ * inside 16px of padding each way, plus the box's border), which the
+ * continue line takes over so the column never moves when a conversation
+ * opens or closes.
+ */
+const CONTINUE_SLOT_HEIGHT = "58px";
+
+/**
+ * The hero's one field, or the way back into the conversation that is open.
+ *
+ * The field starts conversations and the panel's composer continues them, the
+ * same rule the lantern keeps: while a conversation is open the slot holds
+ * the continue line at the field's height, so nothing under it moves and
+ * nothing typed on the home starts a second conversation.
+ */
+function HeroField({
+  canAsk,
+  isNewProject,
+  devState,
+}: {
+  canAsk: boolean;
+  isNewProject: boolean;
+  devState: ReturnType<typeof useHomeDevState>;
+}) {
+  const { conversationOpen, stalled, continueInLangy } =
+    useConversationOpen(devState);
+  if (canAsk && conversationOpen) {
+    return (
+      <Box
+        width="full"
+        height={CONTINUE_SLOT_HEIGHT}
+        display="flex"
+        justifyContent="center"
+      >
+        <ContinueLine stalled={stalled} onContinue={continueInLangy} />
+      </Box>
+    );
+  }
+  return (
+    <HeroAskField
+      placeholder={
+        canAsk
+          ? isNewProject
+            ? "Ask Langy how to get started, or search"
+            : "Ask Langy, search, or jump to anything"
+          : "Search, or jump to anything"
+      }
+    />
+  );
+}
 
 export function LangyHomeHero() {
   const devState = useHomeDevState();
@@ -81,6 +135,7 @@ export function LangyHomeHero() {
       });
 
   const askLangy = useLangyStore((s) => s.askLangy);
+  const { conversationOpen } = useConversationOpen(devState);
 
   return (
     <VStack align="center" gap={{ base: 5, md: 6 }} width="full">
@@ -96,14 +151,10 @@ export function LangyHomeHero() {
       </Box>
 
       <VStack align="center" gap={3} width="full" maxWidth={ASK_MEASURE}>
-        <HeroAskField
-          placeholder={
-            canAsk
-              ? isNewProject
-                ? "Ask Langy how to get started, or search"
-                : "Ask Langy, search, or jump to anything"
-              : "Search, or jump to anything"
-          }
+        <HeroField
+          canAsk={canAsk}
+          isNewProject={isNewProject}
+          devState={devState}
         />
 
         {/* TWO TIERS, not one wrapping row.
@@ -135,7 +186,15 @@ export function LangyHomeHero() {
             alignItems="center"
             justifyContent="center"
           >
-            <HStack gap={2} flexWrap="wrap" justify="center">
+            {/* Hidden in place while a conversation is open, never unmounted:
+                the panel has its own follow-ups, and the row keeps its exact
+                height so the column does not breathe when the panel does. */}
+            <HStack
+              gap={2}
+              flexWrap="wrap"
+              justify="center"
+              visibility={conversationOpen ? "hidden" : "visible"}
+            >
               {canAsk
                 ? suggestions.map((suggestion) => (
                     <AskChip
@@ -151,6 +210,7 @@ export function LangyHomeHero() {
           {!leadWithOnboarding && reachKnown ? (
             <OnboardAgentPill onAskLangy={canAsk ? askLangy : undefined} />
           ) : null}
+          <GuidedOnboardingOffer space="project" />
         </VStack>
 
         {!canAsk ? (

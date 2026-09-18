@@ -14,7 +14,7 @@
  * ceilings and failure paths are in `./hydrateLimits.unit.test.ts`.
  *
  * @see ../hydrate.ts
- * @see specs/analytics/lwql-app-functions.feature
+ * @see specs/lwql/app-functions.feature
  */
 import { describe, expect, it } from "vitest";
 
