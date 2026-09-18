@@ -5,12 +5,13 @@
  */
 
 import { Box, Button, HStack, Progress, Separator, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { nowInstant } from "@langwatch/time";
 import numeral from "numeral";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { formatCost } from "./presentation.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import type { BatchRunSummary } from "./batch-runs-sidebar.tsx";
-import { nowInstant } from "@langwatch/time";
+import { formatCost } from "./presentation.tsx";
 
 type BatchSummaryFooterProps = {
   /** Run summary data */

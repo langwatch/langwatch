@@ -1,6 +1,6 @@
-import { CanonicalLogAdapter } from "../canonical-log.service.ts";
 import type { LogRedaction } from "../../app/log.members.ts";
 import type { CanonicalLogRecordRepository } from "../../repositories/canonical-log-record.repository.ts";
+import { CanonicalLogAdapter } from "../canonical-log.service.ts";
 import { LogService } from "../log.service.ts";
 
 /** The log service over the real preparation adapter, for tests that drive it. */

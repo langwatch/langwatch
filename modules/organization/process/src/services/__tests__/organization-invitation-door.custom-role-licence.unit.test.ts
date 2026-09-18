@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 /**
  * @vitest-environment node
  *
@@ -5,7 +6,6 @@
  * @see specs/features/enterprise-feature-guards.feature
  */
 import type { OrganizationCaller } from "@langwatch/organization-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
 import type {

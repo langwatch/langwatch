@@ -1,34 +1,37 @@
-import type {
-  AuthzApi,
-  AuthzAttachBindingsInput,
-  AuthzAttachBindingsOutput,
-  AuthzAttachResourceGrantInput,
-  AuthzCaller,
-  AuthzChangeBindingRoleInput,
-  AuthzDefineRoleInput,
-  AuthzDeleteRoleInput,
-  AuthzGrantsService,
-  AuthzOffboardMemberInput,
-  AuthzPermission,
-  AuthzRevokeBindingsInput,
-  AuthzRevokeBindingsWhereInput,
-  AuthzRevokeBindingsWhereOutput,
-  AuthzRevokeResourceGrantsInput,
-  AuthzService,
-  EffectivePermissions,
+import {
+  AuthzApi as AuthzApiToken,
+  authzServerConfig,
+  type AuthzApi,
+  type AuthzAttachBindingsInput,
+  type AuthzAttachBindingsOutput,
+  type AuthzAttachResourceGrantInput,
+  type AuthzCaller,
+  type AuthzChangeBindingRoleInput,
+  type AuthzDefineRoleInput,
+  type AuthzDeleteRoleInput,
+  type AuthzGrantsService,
+  type AuthzOffboardMemberInput,
+  type AuthzPermission,
+  type AuthzRevokeBindingsInput,
+  type AuthzRevokeBindingsWhereInput,
+  type AuthzRevokeBindingsWhereOutput,
+  type AuthzRevokeResourceGrantsInput,
+  type AuthzService,
+  type EffectivePermissions,
+  type AuthzServerConfig,
 } from "@langwatch/authz-contract";
-import { AuthzApi as AuthzApiToken } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
+
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
+import { KsuidAuthzBindingIdAdapter } from "../services/authz-binding-id.service.ts";
 import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";
+import { EventingAuthzCommandDispatcherAdapter } from "../services/authz-grants-command-dispatcher.service.ts";
 import {
   PostgresAuthzAdapter,
   type AuthzPipeline,
   type PostgresAuthzAdapterOptions,
 } from "./postgres-authz.build.ts";
-import { KsuidAuthzBindingIdAdapter } from "../services/authz-binding-id.service.ts";
-import { EventingAuthzCommandDispatcherAdapter } from "../services/authz-grants-command-dispatcher.service.ts";
 
 /**
  * Private server-side compatibility seam for callers whose legacy operations
@@ -56,14 +59,15 @@ export type AuthzInfrastructure = Omit<PostgresAuthzAdapterOptions, "repositorie
 export type AuthzSetup = FeatureSetup<
   Readonly<{}>,
   MembersRead<typeof AuthzApp.reads>,
-  undefined
-> &
-  Readonly<{ repositories: AuthzRepositories }>;
+  AuthzServerConfig,
+  AuthzRepositories
+>;
 
 /** The composed callable authorization boundary. */
 export class AuthzApp implements AuthzApi {
   static readonly contract = AuthzApiToken;
   static readonly dependencies = {} as const;
+  static readonly config = authzServerConfig;
   /**
    * `redis` is read rather than optional: the permission cache's epoch
    * counter lives on it, and every process installing AuthZ opens Redis
@@ -80,19 +84,24 @@ export class AuthzApp implements AuthzApi {
    */
   #dispatcher: EventingAuthzCommandDispatcherAdapter | undefined;
   #pipeline: AuthzPipeline | undefined;
+  #demoProjectId: string | undefined;
 
   private constructor(
     permissions: AuthzService,
     grants: AuthzGrantsService,
-    eventing?: Readonly<{
-      pipeline: AuthzPipeline;
-      dispatcher: EventingAuthzCommandDispatcherAdapter;
-    }>,
+    options: Readonly<{
+      demoProjectId?: string | undefined;
+      eventing?: Readonly<{
+        pipeline: AuthzPipeline;
+        dispatcher: EventingAuthzCommandDispatcherAdapter;
+      }>;
+    }> = {},
   ) {
     this.#permissions = permissions;
     this.#grants = grants;
-    this.#pipeline = eventing?.pipeline;
-    this.#dispatcher = eventing?.dispatcher;
+    this.#pipeline = options.eventing?.pipeline;
+    this.#dispatcher = options.eventing?.dispatcher;
+    this.#demoProjectId = options.demoProjectId;
   }
 
   /**
@@ -117,14 +126,20 @@ export class AuthzApp implements AuthzApi {
   static create(setup: AuthzSetup): AuthzApp {
     const dispatcher = EventingAuthzCommandDispatcherAdapter.create();
     const bindingIds = KsuidAuthzBindingIdAdapter.create();
+    const config = authzRuntimeConfig(setup.config);
     const built = PostgresAuthzAdapter.create({
       database: setup.members.prisma,
       redis: setup.members.redis,
       dispatcher,
       newBindingId: () => bindingIds.newBindingId(),
       repositories: setup.repositories,
+      cacheEnabled: config.cacheEnabled,
+      demoProjectId: config.demoProjectId,
     }).build();
-    return new AuthzApp(built.authz, built.grants, { pipeline: built.pipeline, dispatcher });
+    return new AuthzApp(built.authz, built.grants, {
+      demoProjectId: config.demoProjectId(),
+      eventing: { pipeline: built.pipeline, dispatcher },
+    });
   }
 
   /**
@@ -140,9 +155,16 @@ export class AuthzApp implements AuthzApi {
    * composition root. This keeps every API client on the same authorization
    * and grants graph as the legacy transport collaborators.
    */
-  static fromServices(input: { permissions: AuthzService; grants: AuthzGrantsService }): AuthzApp {
-    return new AuthzApp(input.permissions, input.grants);
+  static fromServices(input: {
+    permissions: AuthzService;
+    grants: AuthzGrantsService;
+    config?: AuthzServerConfig | undefined;
+  }): AuthzApp {
+    return new AuthzApp(input.permissions, input.grants, {
+      demoProjectId: input.config?.demoProjectId,
+    });
   }
+  isDemoProject: AuthzApi["isDemoProject"] = ({ projectId }) => this.#demoProjectId === projectId;
   async effectivePermissionsFor(
     input: Readonly<{ projectId?: string; organizationId?: string }>,
     by: AuthzCaller,
@@ -240,4 +262,14 @@ export class AuthzApp implements AuthzApi {
   updateBinding: AuthzApi["updateBinding"] = (a) => this.#grants.updateBinding(a);
   deleteBinding: AuthzApi["deleteBinding"] = (a) => this.#grants.deleteBinding(a);
   applyMemberBindings: AuthzApi["applyMemberBindings"] = (a) => this.#grants.applyMemberBindings(a);
+}
+
+function authzRuntimeConfig(config: AuthzServerConfig): {
+  cacheEnabled: () => boolean;
+  demoProjectId: () => string | undefined;
+} {
+  return {
+    cacheEnabled: () => config.epochCacheEnabled,
+    demoProjectId: () => config.demoProjectId,
+  };
 }

@@ -1,18 +1,20 @@
-import { Temporal } from "@langwatch/time";
+import { usdDisplayString } from "@langwatch/gateway-contract";
 /**
  * Per-virtual-key spend, read from the cost path, not the budget ledger:
  * that only holds rows for keys with a budget, so it $0.00s uncapped keys
  * and double-counts doubly-capped ones. RMT deduped via argMax(UpdatedAt).
  */
 import { createLogger } from "@langwatch/observability";
+import { Temporal } from "@langwatch/time";
 
-import { type GatewayClickHouseResolver,
+import {
+  type GatewayClickHouseResolver,
   type GatewaySpendWindow,
   type GatewayTraceRow,
   type GatewayUsageBucket,
   type GatewayVirtualKeySpendRow,
-  type GatewayVirtualKeySpend } from "../../app/gateway.members.ts";
-import { usdDisplayString } from "@langwatch/gateway-contract";
+  type GatewayVirtualKeySpend,
+} from "../../app/gateway.members.ts";
 
 const TRACE_SUMMARIES_TABLE = "trace_summaries";
 const VK_ATTRIBUTE = "langwatch.virtual_key_id";
@@ -24,8 +26,7 @@ export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpend 
     return new GatewayVirtualKeySpendRepository(resolveClient);
   }
 
-  constructor(private readonly resolveClient: GatewayClickHouseResolver) {
-  }
+  constructor(private readonly resolveClient: GatewayClickHouseResolver) {}
 
   /**
    * Spend per key over a window, summed across given project tenants

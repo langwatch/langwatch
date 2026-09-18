@@ -8,13 +8,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import numeral from "numeral";
-import { useDebounceValue } from "usehooks-ts";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { RenderInputOutput } from "@langwatch/trace-browser/surfaces/render-input-output";
 import { SpanDuration } from "@langwatch/trace-browser/surfaces/span-details";
-import { RedactedField } from "../redacted-field.tsx";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { ExecutionState } from "@langwatch/workflow-contract";
+import numeral from "numeral";
+import { useDebounceValue } from "usehooks-ts";
+
+import { RedactedField } from "../redacted-field.tsx";
 
 interface OutputPanelProps {
   executionState?: ExecutionState;

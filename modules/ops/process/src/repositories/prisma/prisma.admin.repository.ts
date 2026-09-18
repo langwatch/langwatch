@@ -1,11 +1,12 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, toDate } from "@langwatch/time";
+
 import {
   ImpersonationRepository,
   type ImpersonationTarget,
   type ImpersonationWindow,
 } from "../../services/impersonation.service.ts";
-import { fromDate, toDate } from "@langwatch/time";
 
 export type AdminDatabase = PrismaClient;
 

@@ -1,11 +1,12 @@
-import type { Command, CommandHandler } from "@langwatch/eventing";
-import { defineCommandSchema } from "@langwatch/eventing";
 import {
   type EvaluationProcessingEvent,
   EXECUTE_EVALUATION_COMMAND_TYPE,
   executeEvaluationCommandDataSchema,
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import { defineCommandSchema } from "@langwatch/eventing";
+
 import { type EvaluationExecutionIntent } from "../app/evaluation.members.ts";
 
 const schema = defineCommandSchema(

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { MAX_RETENTION_DAYS } from "@langwatch/data-retention-contract";
+import { describe, expect, it } from "vitest";
+
 import { resolvePlatformDefaultRetentionDays } from "../data-retention.config.ts";
 
 describe("resolvePlatformDefaultRetentionDays", () => {

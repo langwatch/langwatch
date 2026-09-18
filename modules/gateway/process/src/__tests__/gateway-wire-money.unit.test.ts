@@ -4,14 +4,14 @@
  * @see specs/ai-gateway/public-rest-api.feature
  */
 
-import { describe, expect, it } from "vitest";
-import { Prisma } from "@langwatch/prisma-client/generated";
 import {
   decimalUsdToNanoUsd,
   nanoUsdToDecimalString,
   usdDisplayString,
   usdToNanoUsd,
 } from "@langwatch/gateway-contract";
+import { Prisma } from "@langwatch/prisma-client/generated";
+import { describe, expect, it } from "vitest";
 
 /**
  * The value a customer reported on `GET /virtual-keys/{id}/spend`: 45

@@ -8,6 +8,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnalyticsAggregation, FilterField } from "@langwatch/analytics-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import {
   deleteMigratedTenantRows,
   startMigratedClickHouse,

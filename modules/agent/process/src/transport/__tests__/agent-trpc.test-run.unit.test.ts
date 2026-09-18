@@ -5,6 +5,7 @@
 import type { AgentApi, AgentTestRunResult } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+
 import { agentTrpcTransport } from "../agent.trpc.ts";
 import { agentTrpcCaller } from "./agent-trpc.fixture.ts";
 

@@ -1,12 +1,12 @@
 import { Badge, HStack } from "@chakra-ui/react";
-import type { MouseEvent, ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PopoverAnchor,
   PopoverBody,
   PopoverContent,
   PopoverRoot,
 } from "@langwatch/design-system/popover";
+import type { MouseEvent, ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Beta indicator badge with hover/focus popover. Can wrap content or stand alone.

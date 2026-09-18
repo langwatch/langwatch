@@ -7,9 +7,8 @@
 
 import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
 
-import { analyticsApi, type SavedChartSummary } from "./analytics-api.ts";
-
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
+import { analyticsApi, type SavedChartSummary } from "./analytics-api.ts";
 
 /** The definition a save writes, assembled from what is on screen. */
 export interface WorkbenchChartDraft {

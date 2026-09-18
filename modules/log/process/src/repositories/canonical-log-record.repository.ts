@@ -1,4 +1,5 @@
 import type { CanonicalTraceLogRecord } from "@langwatch/log-contract";
+
 import { CanonicalLogRecordAppendRepository } from "./canonical-log-record-append.repository.ts";
 
 /**

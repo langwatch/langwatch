@@ -10,26 +10,27 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { parseAutomationFiltersWire } from "@langwatch/automation-contract";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type TimeInput,
   differenceInMinutes,
   differenceInSeconds,
   toEpochMs,
 } from "@langwatch/time";
-import { parseAutomationFiltersWire } from "@langwatch/automation-contract";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
-import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
-import { type TriggerActionParams } from "../../../overview/index.ts";
-import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { OPERATOR_LABELS, TIME_PERIOD_LABELS } from "./draft-model.ts";
-import { CLIENT_PROVIDERS } from "./client-providers.ts";
+
 import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
 import { api } from "../../../../behavior/automation-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
+import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
 import { formatTimeAgo } from "../../../../model/relative-time.ts";
+import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
+import { type TriggerActionParams } from "../../../overview/index.ts";
+import { CLIENT_PROVIDERS } from "./client-providers.ts";
+import { OPERATOR_LABELS, TIME_PERIOD_LABELS } from "./draft-model.ts";
 
 interface ViewAutomationDrawerProps {
   automationId: string;

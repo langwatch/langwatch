@@ -2,6 +2,7 @@ import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
 } from "@langwatch/coding-agent-contract";
+
 import { CodingAgentSessionRepository } from "../coding-agent-session.repository.ts";
 import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
 

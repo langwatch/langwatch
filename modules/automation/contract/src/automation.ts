@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { triggerActionSchema, triggerKindSchema, triggerSchema } from "./trigger.ts";
 import type { Trigger, TriggerAction, TriggerKind } from "./trigger.ts";
 

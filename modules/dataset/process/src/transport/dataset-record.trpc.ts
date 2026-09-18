@@ -5,11 +5,7 @@
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import {
-  DatasetApi,
-  DatasetNotFoundError,
-  datasetRecordTrpc,
-} from "@langwatch/dataset-contract";
+import { DatasetApi, DatasetNotFoundError, datasetRecordTrpc } from "@langwatch/dataset-contract";
 
 /**
  * The editor asks for a wider window than the 5 MB default (~3 rows of

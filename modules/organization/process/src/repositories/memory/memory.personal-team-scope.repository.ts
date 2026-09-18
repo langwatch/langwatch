@@ -1,4 +1,5 @@
 import { RoleBindingScopeType } from "@langwatch/organization-contract";
+
 import type { PersonalTeamScopeReader } from "../../services/personal-team-scope.service.ts";
 import type { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 
@@ -6,7 +7,9 @@ import type { MemoryOrganizationDatabase } from "./memory.organization.database.
 export class MemoryPersonalTeamScopeRepository implements PersonalTeamScopeReader {
   private constructor(private readonly memory: MemoryOrganizationDatabase) {}
 
-  static create(options: { memory: MemoryOrganizationDatabase }): MemoryPersonalTeamScopeRepository {
+  static create(options: {
+    memory: MemoryOrganizationDatabase;
+  }): MemoryPersonalTeamScopeRepository {
     return new MemoryPersonalTeamScopeRepository(options.memory);
   }
 

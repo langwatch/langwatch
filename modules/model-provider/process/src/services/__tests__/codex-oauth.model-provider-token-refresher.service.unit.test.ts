@@ -1,10 +1,11 @@
+import { CodexAuthError, type CodexTokenKeys } from "@langwatch/model-provider-contract";
 /**
  * The Codex device-code auth engine against a scripted issuer (spec:
  * specs/model-providers/codex-account-provider.feature). The fetch seam is
  * the network boundary; everything inside the service is real.
  */
 import { describe, expect, it } from "vitest";
-import { CodexAuthError, type CodexTokenKeys } from "@langwatch/model-provider-contract";
+
 import { CodexAccountService } from "../codex-oauth.model-provider-token-refresher.service.ts";
 
 /** A minimal unsigned JWT with the OpenAI auth claim, base64url-encoded. */

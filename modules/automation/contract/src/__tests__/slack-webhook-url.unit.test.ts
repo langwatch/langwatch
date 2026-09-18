@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { isSlackWebhookUrl, slackActionParamsSchema } from "../index.ts";
 
 describe("Slack webhook URLs", () => {

@@ -6,6 +6,7 @@
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { Trace } from "@langwatch/trace-contract";
+
 import type { AnnotationTrace } from "../model/annotation-row.ts";
 
 /** The project every borrowed procedure is scoped to. */

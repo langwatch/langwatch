@@ -1,14 +1,15 @@
 import { Button } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { SearchX } from "lucide-react";
 import { useEffect } from "react";
-import { Link } from "@langwatch/browser-host/link";
-import { HandledErrorState } from "../../elements/studio-host/errors.tsx";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import OptimizationStudio from "../optimization_studio/optimization-studio.tsx";
+
 import { useLoadWorkflow } from "../../../behavior/optimization_studio/use-load-workflow.ts";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { _useWorkflowStore, useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { HandledErrorState } from "../../elements/studio-host/errors.tsx";
+import OptimizationStudio from "../optimization_studio/optimization-studio.tsx";
 import { useStudioHostBinding } from "../studio-host/binding.ts";
 
 export default function Studio() {

@@ -5,15 +5,16 @@ import type {
   PersistedProcessInstance,
   ProcessStore,
 } from "@langwatch/eventing";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 import {
   WebhookEndpointNotFoundError,
   type WebhookEndpointHealth,
 } from "@langwatch/webhook-contract";
+
 import {
   type EndpointStreamState,
   WEBHOOK_DELIVERY_PROCESS_NAME,
 } from "../rules/webhook-delivery-contract.rules.ts";
-import { Temporal, toDate, type Instant } from "@langwatch/time";
 
 /** The last-hour window the rate figures aggregate over. */
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -64,8 +65,7 @@ interface EndpointStreamRead {
  * is the endpoint's own, at organization scope, so this is one read.
  */
 export class WebhookHealthService {
-  private constructor(private readonly deps: WebhookHealthDeps) {
-  }
+  private constructor(private readonly deps: WebhookHealthDeps) {}
 
   static create(deps: WebhookHealthDeps): WebhookHealthService {
     return new WebhookHealthService(deps);

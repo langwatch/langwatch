@@ -1,9 +1,10 @@
 import { Card, Heading, HStack, IconButton } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUpRight } from "lucide-react";
+
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { analyticsMetrics } from "../../model/analytics-registry.ts";
 import { Link } from "../elements/analytics-link.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
 
 export const LLMSummary = () => {

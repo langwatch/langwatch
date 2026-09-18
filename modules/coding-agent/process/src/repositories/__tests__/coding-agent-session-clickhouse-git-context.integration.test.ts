@@ -4,19 +4,21 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { randomUUID } from "node:crypto";
+
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
-import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
-import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
-import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-trace-session.repository.ts";
-import { SessionMetricSeriesClickHouseRepository } from "../clickhouse/clickhouse.session-metric-series.repository.ts";
+
 import { session } from "../../__tests__/fixtures/coding-agent.fixture.ts";
+import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
+import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
+import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-trace-session.repository.ts";
+import { SessionMetricSeriesClickHouseRepository } from "../clickhouse/clickhouse.session-metric-series.repository.ts";
 
 const clickHouseUrl = testClickHouseUrl();
 

@@ -33,8 +33,8 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
   },
 }));
 
-import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing.tsx";
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing.tsx";
 import { NavigationShell } from "../navigation-shell.tsx";
 
 const teamA = {

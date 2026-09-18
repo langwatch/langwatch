@@ -1,9 +1,3 @@
-/**
- * The identity of a recorded verdict is what `event_log` orders on, and that
- * table is a ReplacingMergeTree. Two rows sharing an identity become one row.
- * @see specs/experiments-v3/execution-backend.feature - Verdict Identity
- */
-import { describe, expect, it } from "vitest";
 import {
   createTenantId,
   type Command,
@@ -11,14 +5,21 @@ import {
   type CommandHandlerResult,
   type Event,
 } from "@langwatch/eventing";
-import {
-  RecordEvaluatorResultCommand,
-  RecordTargetResultCommand,
-} from "../clickhouse.experiment-run-processing.repository.ts";
+/**
+ * The identity of a recorded verdict is what `event_log` orders on, and that
+ * table is a ReplacingMergeTree. Two rows sharing an identity become one row.
+ * @see specs/experiments-v3/execution-backend.feature - Verdict Identity
+ */
+import { describe, expect, it } from "vitest";
+
 import type {
   EvaluatorResultEventData,
   TargetResultEventData,
 } from "../../../eventing/experiment-run-events.process.ts";
+import {
+  RecordEvaluatorResultCommand,
+  RecordTargetResultCommand,
+} from "../clickhouse.experiment-run-processing.repository.ts";
 
 const TENANT = createTenantId("project_test");
 const RUN = "bold-jolly-bee";

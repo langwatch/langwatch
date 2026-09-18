@@ -1,8 +1,8 @@
 import { Alert, Box, Button, Code, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { Popover } from "@langwatch/design-system/popover";
 import { useState } from "react";
 import { LuExternalLink, LuKeyRound, LuSettings } from "react-icons/lu";
-import { Popover } from "@langwatch/design-system/popover";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 
 interface SecretsIndicatorProps {
   projectId: string;

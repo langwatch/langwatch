@@ -3,11 +3,11 @@
 import { Box, HStack, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { Menu as MenuIcon, Settings as SettingsIcon, X } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+
 import type { NavigationShellReadyState } from "../../behavior/use-navigation-shell-state.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import type { ProductId } from "../../model/products.ts";
-import { ProductSwitcherMenu } from "./product-switcher-menu.tsx";
 import { LogoIcon } from "../elements/logo-icon.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
@@ -15,6 +15,7 @@ import { AppHeaderUserMenu } from "./app-header-user-menu.tsx";
 import { OrganizationSelect } from "./organization-select.tsx";
 import { ProductScopeControl } from "./product-scope-control.tsx";
 import { SidebarContent } from "./product-sidebar.tsx";
+import { ProductSwitcherMenu } from "./product-switcher-menu.tsx";
 
 const LOGO_HEIGHT = 24;
 

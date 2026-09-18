@@ -4,12 +4,12 @@
  * Field editor uses shared FieldTypeSelect UI; picked type writes back through node.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Component } from "@langwatch/workflow-contract";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Component } from "@langwatch/workflow-contract";
 import { FieldsDefinition } from "../../ui/sections/workflow-base-properties-panel.tsx";
 import { _useWorkflowStore } from "../use-workflow-store.ts";
 

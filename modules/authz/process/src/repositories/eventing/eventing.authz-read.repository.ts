@@ -6,6 +6,8 @@ import type {
   RoleBindingScopeType,
   ShareableResourceKind,
 } from "@langwatch/authz-contract";
+import { type Instant, fromDate } from "@langwatch/time";
+
 import {
   AuthzReadRepository,
   type AuthzDatabase,
@@ -19,7 +21,6 @@ import {
   SHARE_VISIBILITY_BY_PRINCIPAL_DB,
 } from "../prisma/prisma.authz-grant.mapper.ts";
 import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
-import { type Instant, fromDate } from "@langwatch/time";
 
 const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
 

@@ -1,7 +1,4 @@
-import type {
-  SqsCredentialMode,
-  WebhookDestinationKind,
-} from "@langwatch/webhook-contract";
+import type { SqsCredentialMode, WebhookDestinationKind } from "@langwatch/webhook-contract";
 
 export type WebhookUrlProblemCode = "invalid_url" | "scheme" | "host" | "port" | "credentials";
 

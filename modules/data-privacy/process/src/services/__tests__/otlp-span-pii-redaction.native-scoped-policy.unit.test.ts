@@ -1,5 +1,3 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
 import {
   EMPTY_AUDIENCE,
   type PiiLevel,
@@ -7,6 +5,8 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 
 /** The analysis-service batch call the strict level escalates to. */
@@ -15,8 +15,9 @@ type BatchClearPIIFunction = (
   options: Record<string, unknown>,
 ) => Promise<(string | null)[]>;
 
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createTenantId } from "@langwatch/eventing";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
 
 const TENANT = createTenantId("project-web-app");

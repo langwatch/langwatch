@@ -2,11 +2,9 @@
  * @vitest-environment node
  */
 import { newEvaluatorId } from "@langwatch/evaluator-contract";
-import {
-  ModelNotConfiguredError,
-  type ModelProviderApi,
-} from "@langwatch/model-provider-contract";
+import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { createEvaluatorTestApp, testModelResolution } from "./evaluator.fixture.ts";
 
 /** A program a code evaluator can actually run. */

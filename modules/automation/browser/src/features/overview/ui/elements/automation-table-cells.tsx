@@ -4,12 +4,13 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
-import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
-import type { TriggerActionParams } from "../../model/trigger-action-params.ts";
-import { HelpCircle, Plus } from "lucide-react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
+import { HelpCircle, Plus } from "lucide-react";
+
 import { readableDate } from "../../../../model/display-formatters.ts";
+import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
+import type { TriggerActionParams } from "../../model/trigger-action-params.ts";
 
 const OPERATOR_LABELS: Record<string, string> = {
   gt: "greater than",

@@ -5,6 +5,7 @@
  * row when this package declares that datastore.
  */
 import { describe, expect, it } from "vitest";
+
 import { MemoryTopicRepositories } from "../memory/memory.topic.repositories.ts";
 import type { TopicRepositories } from "../topic.repositories.ts";
 
@@ -82,8 +83,9 @@ describe.each(backends)("given the $name topic backend", ({ create }) => {
       await expect(
         repositories.topics.findNamesByIds({ projectId: PROJECT_ID, ids: ["topic-1"] }),
       ).resolves.toEqual(new Map());
-      await expect(repositories.topics.findClusteringStatus({ projectId: PROJECT_ID })).resolves
-        .toEqual({ projection: null });
+      await expect(
+        repositories.topics.findClusteringStatus({ projectId: PROJECT_ID }),
+      ).resolves.toEqual({ projection: null });
       await expect(
         repositories.topics.findClusteringRunHistory({ projectId: PROJECT_ID }),
       ).resolves.toEqual([]);

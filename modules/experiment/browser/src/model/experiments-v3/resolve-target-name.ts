@@ -1,4 +1,5 @@
 import type { api } from "@langwatch/browser-trpc/workflow-api";
+
 import type { TargetConfig } from "./types.ts";
 
 type TrpcUtils = ReturnType<typeof api.useUtils>;

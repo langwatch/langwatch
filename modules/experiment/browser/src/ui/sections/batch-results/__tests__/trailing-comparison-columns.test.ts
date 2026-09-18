@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { trailingComparisonColumns } from "../single-run-table.tsx";
+
 import type {
   BatchComparisonColumn,
   BatchTargetColumn,
 } from "../../batch-evaluation-results.types.ts";
+import { trailingComparisonColumns } from "../single-run-table.tsx";
 
 const targetColumn = (id: string): BatchTargetColumn => ({
   id,

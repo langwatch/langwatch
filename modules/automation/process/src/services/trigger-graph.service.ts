@@ -1,28 +1,30 @@
+import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type {
   AutomationPersistCapBreach,
   GraphTriggerEvaluationReason,
   GraphTriggerEvaluationResult,
   GraphTriggerSweepCandidate,
 } from "@langwatch/automation-contract";
-import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
-import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
+import type { Instant } from "@langwatch/time";
+
 import type {
   AutomationDispatchError,
   AutomationGraphNotifier,
   AutomationLogger,
   AutomationHeartbeat,
-  AutomationSlackBotTokenDecryptor,AutomationClock
+  AutomationSlackBotTokenDecryptor,
+  AutomationClock,
 } from "../app/automation.members.ts";
-import { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
 import { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
+import { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
+import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
+import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { AutomationRunawaySignals } from "./automation-runaway-signals.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
 import { RunawayContainmentService } from "./runaway-containment.service.ts";
-import type { Instant } from "@langwatch/time";
 
 /** Private graph-alert collaborator, assembled once with Automation's service. */
 export class AutomationGraphService {

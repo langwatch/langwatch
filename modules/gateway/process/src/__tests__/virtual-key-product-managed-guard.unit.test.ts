@@ -4,13 +4,12 @@
  * them, but that was presentation only — the service let every mutation through.
  */
 
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 import { PostgresVirtualKeyAdapter } from "../testing.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";

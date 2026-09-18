@@ -5,6 +5,7 @@
  */
 
 import { Box, type BoxProps, Field, HStack, Text, VStack } from "@chakra-ui/react";
+
 import type { SlugValidation } from "../../model/dataset-slug-validation.ts";
 import { CopyValueButton } from "../elements/copy-value-button.tsx";
 import { SlugChangeWarningAlert } from "../elements/slug-change-warning-alert.tsx";

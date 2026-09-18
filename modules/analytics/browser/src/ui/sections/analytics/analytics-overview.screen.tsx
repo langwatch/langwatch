@@ -13,18 +13,19 @@ import {
 } from "@chakra-ui/react";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { BarChart2 } from "react-feather";
+
+import { analyticsApi } from "../../../behavior/analytics-api.ts";
+import { useFilterParams } from "../../../behavior/use-filter-params.ts";
+import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import { Link } from "../../../ui/elements/analytics-link.tsx";
+import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
 } from "../../../ui/sections/documents-counts-table.tsx";
-import { UserMetrics } from "../../../ui/sections/user-metrics.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
-import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { LLMMetrics } from "../../../ui/sections/llm-metrics.tsx";
-import { Link } from "../../../ui/elements/analytics-link.tsx";
-import { useFilterParams } from "../../../behavior/use-filter-params.ts";
-import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { analyticsApi } from "../../../behavior/analytics-api.ts";
+import { UserMetrics } from "../../../ui/sections/user-metrics.tsx";
 
 function AnalyticsContent() {
   const host = useAnalyticsHost();

@@ -1,7 +1,21 @@
-import type { InviteLanding, SignUpVerificationResult } from "./front-door.responses.ts";
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type { BrowserSession, VerifiedBrowserSession } from "./browser-session.ts";
+import type { InviteLanding, SignUpVerificationResult } from "./front-door.responses.ts";
+
+/**
+ * The subject carried by an unexpired CLI access bearer. The device-session
+ * store remains Auth-owned; peers receive only the caller facts they need.
+ */
+export type CliAccessSession = Readonly<{
+  userId: string;
+  organizationId: string;
+  clientInfo?: Readonly<{
+    deviceLabel?: string | undefined;
+    hostname?: string | undefined;
+  }>;
+}>;
 
 /**
  * Everything the auth module does for a caller: the signed-in browser session,
@@ -14,13 +28,20 @@ export interface AuthApi {
    * an impersonation starts/stops against; a process with no sign-in door
    * composed answers null, so callers are anonymous rather than failing.
    */
-  tryVerifyBrowserSession(input: {
-    headers: Headers;
-  }): Promise<VerifiedBrowserSession | null>;
+  tryVerifyBrowserSession(input: { headers: Headers }): Promise<VerifiedBrowserSession | null>;
   /** A missing, revoked, expired, or unusable session resolves to null. */
   tryResolveBrowserSession(input: {
     verified: VerifiedBrowserSession | null;
   }): Promise<BrowserSession | null>;
+  /** Resolves an unexpired CLI device-session bearer, or no caller. */
+  findCliAccessSession(input: {
+    authorization: string | null | undefined;
+  }): Promise<CliAccessSession | null>;
+  /** Severs the presented CLI bearer and its owner index entry. */
+  revokeCliAccessToken(input: {
+    authorization: string | null | undefined;
+    userId: string;
+  }): Promise<void>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   revokeBrowserSession(input: { sessionId: string }): Promise<void>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
@@ -38,9 +59,7 @@ export interface AuthApi {
   /** Mails a fresh confirmation link. Asking twice sends twice. */
   requestSignUpVerification(input: Readonly<{ email: string }>): Promise<void>;
   /** Spends a confirmation link and answers the address it confirmed. */
-  completeSignUpVerification(
-    input: Readonly<{ token: string }>,
-  ): Promise<SignUpVerificationResult>;
+  completeSignUpVerification(input: Readonly<{ token: string }>): Promise<SignUpVerificationResult>;
   /**
    * The invitation behind a code. Missing and revoked both raise `invite_not_found`
    * to prevent code guessing; expired raises `invite_expired` for recovery (D11).

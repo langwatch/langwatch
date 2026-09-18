@@ -4,9 +4,10 @@
  * materialiser. Covers specs/model-providers/google-agent-platform.feature.
  */
 
-import { describe, expect, it } from "vitest";
 import type { ModelProvider } from "@langwatch/gateway-contract";
-import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter.ts";
+import { describe, expect, it } from "vitest";
+
+import { GatewayConfigAssemblyAdapter } from "../app/gateway-config-assembly.composition.ts";
 
 const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
 import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";

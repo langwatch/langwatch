@@ -1,15 +1,16 @@
-/**
- * What a run's scope plans: which rows it touches, which columns it runs, what
- * each cell carries, and the order the cells come out in.
- * @see specs/experiments-v3/execution-backend.feature
- */
-import { describe, expect, it } from "vitest";
 import type {
   EvaluationsV3State,
   EvaluatorConfig,
   ExecutionScope,
   TargetConfig,
 } from "@langwatch/experiment-contract";
+/**
+ * What a run's scope plans: which rows it touches, which columns it runs, what
+ * each cell carries, and the order the cells come out in.
+ * @see specs/experiments-v3/execution-backend.feature
+ */
+import { describe, expect, it } from "vitest";
+
 import { ExperimentCellPlanService } from "../experiment-cell-plan.service.ts";
 
 const cellPlan = ExperimentCellPlanService.create();
@@ -88,11 +89,8 @@ const comparisonTarget = {
   },
 } as unknown as TargetConfig;
 
-const plan = (
-  state: PlanState,
-  datasetRows: Record<string, unknown>[],
-  scope: ExecutionScope,
-) => cellPlan.generateCells({ state, datasetRows, scope });
+const plan = (state: PlanState, datasetRows: Record<string, unknown>[], scope: ExecutionScope) =>
+  cellPlan.generateCells({ state, datasetRows, scope });
 
 describe("given a run scope over a dataset", () => {
   describe("when the rows it may touch are resolved", () => {

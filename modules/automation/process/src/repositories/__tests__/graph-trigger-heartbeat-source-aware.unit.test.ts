@@ -4,17 +4,18 @@
  * pair per tick -- trace queries `trace_analytics`, eval queries `evaluation_analytics`.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalyticsMetricSource } from "@langwatch/analytics-contract";
+import type { TriggerSummary } from "@langwatch/automation-contract";
+import { type Instant, Temporal } from "@langwatch/time";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   type GraphTriggerHeartbeatDeps,
   type ClickHouseClient,
   GraphTriggerHeartbeatService,
 } from "../../services/graph-trigger-heartbeat.service.ts";
-import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { GraphTriggerSentRepository } from "../graph-trigger-sent.repository.ts";
 import { HeartbeatTriggerRepository, SilentAutomationLogger } from "./support/heartbeat.fakes.ts";
-import { type Instant, Temporal } from "@langwatch/time";
 
 const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
 const TriggerKind = { ALERT: "ALERT" } as const;

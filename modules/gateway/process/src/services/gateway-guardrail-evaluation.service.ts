@@ -4,11 +4,15 @@
  * as-guardrail monitor in the same project, and that monitor carries the check run here too.
  */
 
-import { createLogger } from "@langwatch/observability";
-import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
-import type { GatewayGuardrailDirection, GuardrailWireDirection } from "@langwatch/gateway-contract";
-import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
 import type { EvaluatorTypes, SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type {
+  GatewayGuardrailDirection,
+  GuardrailWireDirection,
+} from "@langwatch/gateway-contract";
+import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
+import { createLogger } from "@langwatch/observability";
+
+import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
 
 const logger = createLogger("langwatch:gateway:guardrail-evaluation");
 

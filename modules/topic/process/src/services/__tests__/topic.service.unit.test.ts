@@ -1,13 +1,14 @@
+import { Temporal, type Instant } from "@langwatch/time";
 import type { TopicClusteringRunHistoryEntry, Topic } from "@langwatch/topic-contract";
-import { TopicService } from "../topic.service.ts";
+import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
+
+import type { TopicClusteringScheduleReader } from "../../app/topic.app.ts";
 import type {
   TopicClusteringStatusRecord,
   TopicRepository,
 } from "../../repositories/topic.repository.ts";
-import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
-import { Temporal, type Instant } from "@langwatch/time";
-import type { TopicClusteringScheduleReader } from "../../app/topic.app.ts";
+import { TopicService } from "../topic.service.ts";
 
 class FakeTopicRepository implements TopicRepository {
   async findAll(): Promise<Topic[]> {

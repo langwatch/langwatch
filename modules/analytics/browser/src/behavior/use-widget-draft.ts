@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
 
 interface WidgetDraftSeed {
@@ -8,10 +9,7 @@ interface WidgetDraftSeed {
 }
 
 /** Cheap at this scale: a widget's queries are a handful of small objects. */
-function queriesEqual(
-  a: DashboardWidgetQuery[],
-  b: DashboardWidgetQuery[],
-): boolean {
+function queriesEqual(a: DashboardWidgetQuery[], b: DashboardWidgetQuery[]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 

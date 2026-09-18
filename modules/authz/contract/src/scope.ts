@@ -3,7 +3,12 @@
  * Pure geometry over a scope reference: the binding scopes that can answer
  * at it, its organization, and whether an audience covers the caller.
  */
-import type { AuthzScopeRef, CollectedGrants, GrantAudience, RoleBindingScopeType } from "./authz.ts";
+import type {
+  AuthzScopeRef,
+  CollectedGrants,
+  GrantAudience,
+  RoleBindingScopeType,
+} from "./authz.ts";
 
 /** One link of a scope chain: a binding scope that can grant at the scope. */
 export type ScopeChainLink = {

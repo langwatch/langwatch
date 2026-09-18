@@ -1,7 +1,8 @@
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { ModelProviderWorkflowStudioDslService } from "../workflow-studio-dsl.service.ts";
 
 function signatureNode(llmValue: unknown) {

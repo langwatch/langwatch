@@ -1,13 +1,18 @@
-import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
+import {
+  type AppendStore,
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "@langwatch/eventing";
+import { Temporal, toDate } from "@langwatch/time";
+
+import { normalizeDurationMs } from "./experiment-run-duration.process.ts";
 import {
   type EvaluatorResultEvent,
   evaluatorResultEventSchema,
   type TargetResultEvent,
   targetResultEventSchema,
 } from "./experiment-run-events.process.ts";
-import { normalizeDurationMs } from "./experiment-run-duration.process.ts";
 import { ExperimentRunIds } from "./experiment-run-id.process.ts";
-import { Temporal, toDate } from "@langwatch/time";
 
 /**
  * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an

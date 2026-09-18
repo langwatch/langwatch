@@ -9,22 +9,19 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo } from "react";
-import { Calendar, Edit2, Eye, Filter, MoreVertical, Trash, TrendingUp, Zap } from "react-feather";
-import { FilterDisplay } from "../../ui/elements/filter-display.tsx";
-import { ClampedText } from "../../ui/elements/clamped-text.tsx";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  AutomationsLayout,
-  type AutomationSection,
-} from "../../ui/sections/automations-layout.tsx";
-import { Link } from "../../ui/elements/automation-link.tsx";
+import type { WireOf } from "@langwatch/api/web";
+import { RUNAWAY_PAUSE_REASON, type TriggerAction } from "@langwatch/automation-contract";
 import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { AutomationHistory } from "../../features/overview/ui/elements/automation-history.tsx";
-import { AutomationUseCaseStrip } from "../../features/overview/ui/elements/automation-use-case-strip.tsx";
+import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";
+import { useMemo } from "react";
+import { Calendar, Edit2, Eye, Filter, MoreVertical, Trash, TrendingUp, Zap } from "react-feather";
+
+import { CLIENT_PROVIDERS } from "../../features/authoring/ui/sections/client-providers.ts";
 import { type TriggerActionParams } from "../../features/overview/model/trigger-action-params.ts";
+import { AutomationHistory } from "../../features/overview/ui/elements/automation-history.tsx";
 import {
   AlertRuleCell,
   AlertSubjectCell,
@@ -38,19 +35,24 @@ import {
   SectionHeader,
   TableShell,
 } from "../../features/overview/ui/elements/automation-table-cells.tsx";
-import { RUNAWAY_PAUSE_REASON, type TriggerAction } from "@langwatch/automation-contract";
-import { CLIENT_PROVIDERS } from "../../features/authoring/ui/sections/client-providers.ts";
-import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";
-import type { WireOf } from "@langwatch/api/web";
+import { AutomationUseCaseStrip } from "../../features/overview/ui/elements/automation-use-case-strip.tsx";
+import { Link } from "../../ui/elements/automation-link.tsx";
+import { ClampedText } from "../../ui/elements/clamped-text.tsx";
+import { FilterDisplay } from "../../ui/elements/filter-display.tsx";
+import {
+  AutomationsLayout,
+  type AutomationSection,
+} from "../../ui/sections/automations-layout.tsx";
 
 /** A monitor as the browser holds one: the wire carries its instants as strings. */
 type Monitor = WireOf<StoredMonitor>;
-import { useAutomationHost } from "../../model/automation-host.ts";
-import { useOrganizationTeamProject } from "../../behavior/automation-session.ts";
-import { useAutomationToaster } from "../../behavior/automation-feedback.ts";
-import { api, type RouterOutputs } from "../../behavior/automation-api.ts";
-import { formatTimeAgo } from "../../model/relative-time.ts";
 import { toEpochMs } from "@langwatch/time";
+
+import { api, type RouterOutputs } from "../../behavior/automation-api.ts";
+import { useAutomationToaster } from "../../behavior/automation-feedback.ts";
+import { useOrganizationTeamProject } from "../../behavior/automation-session.ts";
+import { useAutomationHost } from "../../model/automation-host.ts";
+import { formatTimeAgo } from "../../model/relative-time.ts";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 

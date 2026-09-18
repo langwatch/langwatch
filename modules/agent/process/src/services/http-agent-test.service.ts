@@ -1,9 +1,3 @@
-import type { TraceApi } from "@langwatch/trace-contract";
-import { type WorkflowApi,
-  LATEST_SPEC_VERSION,
-  type BaseComponent,
-  type Field,
-  type StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   buildHttpNodeParameters,
   type HttpAgentTestInput,
@@ -11,9 +5,18 @@ import {
   type HttpHeader,
   type HttpProxyResult,
 } from "@langwatch/agent-contract";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { generate } from "@langwatch/ksuid";
+import type { TraceApi } from "@langwatch/trace-contract";
+import {
+  type WorkflowApi,
+  LATEST_SPEC_VERSION,
+  type BaseComponent,
+  type Field,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
+
 import {
   buildAgentTestTrace,
   buildTraceparentHeader,

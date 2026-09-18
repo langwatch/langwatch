@@ -4,9 +4,10 @@
 
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
 import type { Field } from "@langwatch/workflow-contract";
-import type { LocalPromptConfig, FieldMapping as StoreFieldMapping } from "./types.ts";
+
 import { convertFromUIMapping } from "./field-mapping-converters.ts";
 import { type PromptOutputField, toTargetOutputFields } from "./target-output-fields.ts";
+import type { LocalPromptConfig, FieldMapping as StoreFieldMapping } from "./types.ts";
 
 /**
  * Parameters required to create prompt editor callbacks.

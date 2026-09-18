@@ -19,9 +19,7 @@ const CDN_SCRIPTS_BEFORE_CHARTS_LIB = [
   "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
   "https://unpkg.com/recharts@2.15.4/umd/Recharts.js",
 ];
-const CDN_SCRIPTS_AFTER_CHARTS_LIB = [
-  "https://unpkg.com/@babel/standalone@7.29.8/babel.min.js",
-];
+const CDN_SCRIPTS_AFTER_CHARTS_LIB = ["https://unpkg.com/@babel/standalone@7.29.8/babel.min.js"];
 
 /**
  * Embeds `source` as a JS string literal safe to inline in a `<script>`
@@ -53,13 +51,9 @@ export function buildSrcdoc(code: string): string {
     "    border: 1px solid #fecaca; border-radius: 6px; padding: 8px; margin: 0;",
     "  }",
     "</style>",
-    ...CDN_SCRIPTS_BEFORE_CHARTS_LIB.map(
-      (src) => `<script src="${src}" crossorigin></script>`,
-    ),
+    ...CDN_SCRIPTS_BEFORE_CHARTS_LIB.map((src) => `<script src="${src}" crossorigin></script>`),
     `<script>${buildChartsLibScript()}</script>`,
-    ...CDN_SCRIPTS_AFTER_CHARTS_LIB.map(
-      (src) => `<script src="${src}" crossorigin></script>`,
-    ),
+    ...CDN_SCRIPTS_AFTER_CHARTS_LIB.map((src) => `<script src="${src}" crossorigin></script>`),
     "</head><body>",
     '<div id="lw-root"></div>',
     '<pre id="lw-compile-error"></pre>',

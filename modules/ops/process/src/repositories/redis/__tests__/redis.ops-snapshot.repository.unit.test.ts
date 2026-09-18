@@ -1,16 +1,17 @@
-import { describe, expect, it } from "vitest";
-import {
-  LEASE_TTL_SECONDS,
-  SNAPSHOT_LEASE_KEY,
-  RedisOpsSnapshotRepository,
-} from "../redis.ops-snapshot.repository.ts";
-import type { OpsSnapshotRedis } from "../../../app/ops.app.ts";
 import {
   type LiveSnapshot,
   tryParseDetailSnapshot,
   tryParseLiveSnapshot,
   SNAPSHOT_VERSION,
 } from "@langwatch/ops-contract";
+import { describe, expect, it } from "vitest";
+
+import type { OpsSnapshotRedis } from "../../../app/ops.app.ts";
+import {
+  LEASE_TTL_SECONDS,
+  SNAPSHOT_LEASE_KEY,
+  RedisOpsSnapshotRepository,
+} from "../redis.ops-snapshot.repository.ts";
 
 /**
  * A Redis stand-in covering exactly the commands the repository issues, with

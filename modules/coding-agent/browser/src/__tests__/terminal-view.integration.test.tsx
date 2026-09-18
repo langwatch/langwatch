@@ -3,10 +3,11 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+
 import { type TurnDivider } from "../trace/terminal-session-scrollback.ts";
 import { statusLineCostLabel, TerminalView } from "../trace/terminal-view.tsx";
 

@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   MAX_PARAMETER_NAME_LENGTH,
   MAX_RUN_PARAMETER_KEYS,
@@ -6,8 +5,10 @@ import {
   runNoteSchema,
   runParameterValuesSchema,
 } from "@langwatch/scenario-contract";
-import { suiteKindSchema } from "./suite.kind.ts";
+import { z } from "zod";
+
 import { MAX_PLAN_NAME_LENGTH } from "./plan-name.ts";
+import { suiteKindSchema } from "./suite.kind.ts";
 import { suiteScopeSchema } from "./suite.scope.ts";
 
 export const RUN_ALL_SUITE_LABEL = "managed:run-all";

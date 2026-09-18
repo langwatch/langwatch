@@ -1,10 +1,6 @@
-import type { Node } from "@xyflow/react";
-import { useShallow } from "zustand/react/shallow";
-import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index.ts";
-import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
-import { OutputsSection } from "@langwatch/prompt-browser/outputs-section";
-import { VariablesSection } from "@langwatch/prompt-browser-kit/variables";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { VariablesSection } from "@langwatch/prompt-browser-kit/variables";
+import { OutputsSection } from "@langwatch/prompt-browser/outputs-section";
 import type {
   AgentComponent,
   Component,
@@ -15,9 +11,15 @@ import type {
   PromptingTechnique,
   Retriever,
 } from "@langwatch/workflow-contract";
+import type { Node } from "@xyflow/react";
+import { useShallow } from "zustand/react/shallow";
+
+import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index.ts";
+import { useGetDatasetData } from "../../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { LiquidConditionEditor } from "../../../elements/code/liquid-condition-editor.tsx";
 import { InsideDrawerProvider } from "../../../elements/studio-drawer-footer.tsx";
+import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
 import { CodePropertiesPanel as WorkflowCodePropertiesPanel } from "../../properties/workflow-code-properties-panel.tsx";
 import { EndPropertiesPanel as WorkflowEndPropertiesPanel } from "../../properties/workflow-end-properties-panel.tsx";
 import { EntryPointPropertiesPanel as WorkflowEntryPointPropertiesPanel } from "../../properties/workflow-entry-point-properties-panel.tsx";
@@ -38,7 +40,6 @@ import { AgentPropertiesPanel } from "../properties/agent-properties-panel.tsx";
 import { BasePropertiesPanel, PropertySectionTitle } from "../properties/base-properties-panel.tsx";
 import { CustomPropertiesPanel } from "../properties/custom-properties-panel.tsx";
 import { EvaluatorPropertiesPanel } from "../properties/evaluator-properties-panel.tsx";
-import { useGetDatasetData } from "../../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { SignaturePromptEditorBridge } from "./signature-prompt-editor-bridge.tsx";
 import { StudioDrawerWrapper } from "./studio-drawer-wrapper.tsx";
 

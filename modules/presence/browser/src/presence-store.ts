@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import type { PresenceEvent, PresenceSession } from "@langwatch/presence-contract";
+import { create } from "zustand";
 
 interface PresenceState {
   /** The current user's own sessionId, so callers can filter themselves out. */

@@ -1,4 +1,5 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type { CodexTokenKeys } from "./codex-account.ts";
 import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";
 import type {
@@ -23,6 +24,7 @@ import type {
   ModelProviderExecution,
   ModelProviderExecutionParameters,
   ModelProviderExecutionPrepareInput,
+  ModelProviderStructuredGenerationInput,
   ModelProviderListOrganizationInput,
   ModelProviderListProjectInput,
   ModelProviderResolution,
@@ -120,6 +122,24 @@ export interface ModelProviderStoredCredentialProbeRequest {
   readonly provider: string;
   readonly customBaseUrl?: string;
 }
+
+/** The browser playground request, including the project whose provider it drives. */
+export interface ModelProviderPlaygroundRequest {
+  readonly projectId: string;
+  readonly model: string;
+  readonly systemPrompt?: string | null;
+  readonly messages: readonly unknown[];
+}
+
+export type ModelProviderPlaygroundStatus = 200 | 400 | 401;
+
+/** A transport-neutral completion stream; the process REST adapter frames it as a Response. */
+export interface ModelProviderPlaygroundCompletion {
+  readonly status: ModelProviderPlaygroundStatus;
+  readonly mediaType: "text/plain" | "application/json";
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: AsyncIterable<Uint8Array>;
+}
 /** Codex step 1: the device code the browser shows, and how often to poll. */
 export interface ModelProviderCodexDeviceSignIn {
   readonly userCode: string;
@@ -165,6 +185,12 @@ export interface ModelProviderApi {
   prepareExecution(
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters>;
+  /** Resolves a feature's configured model and returns schema-validated structured data. */
+  generateStructured(input: ModelProviderStructuredGenerationInput): Promise<unknown>;
+  /** Streams one browser playground completion through the configured execution proxy. */
+  runPlaygroundCompletion(
+    input: ModelProviderPlaygroundRequest,
+  ): Promise<ModelProviderPlaygroundCompletion>;
   upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider>;
   /**
    * The write a project credential makes, which names no person to attribute

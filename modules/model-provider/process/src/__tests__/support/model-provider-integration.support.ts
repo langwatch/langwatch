@@ -2,15 +2,21 @@
  * Shared real-Postgres fixtures for the model-provider integration suites.
  */
 import { randomBytes } from "node:crypto";
+
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type {
+  ModelDefaultScope,
+  ModelProvider,
+  ModelProviderApiKeyValidation,
+  ModelProviderCredentialVerdict,
+} from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createLogger } from "@langwatch/observability";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   type PaginatedProjects,
   type Project,
@@ -19,18 +25,14 @@ import {
   type ProjectNamesByIdsInput,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import { TestProjectApi } from "./test-project-api.ts";
-import type {
-  ModelDefaultScope,
-  ModelProvider,
-  ModelProviderApiKeyValidation,
-  ModelProviderCredentialVerdict,
-} from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+
 import {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
 } from "../../app/model-provider.members.ts";
 import { PrefixedModelProviderIdAdapter } from "../../services/prefixed.model-provider-id.service.ts";
+import { TestProjectApi } from "./test-project-api.ts";
 
 export const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

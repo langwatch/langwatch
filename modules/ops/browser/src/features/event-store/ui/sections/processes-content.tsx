@@ -1,11 +1,12 @@
 import { Center, Spinner, VStack } from "@chakra-ui/react";
+
 import { api } from "../../../../behavior/ops-api.ts";
+import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
 import { ProcessFleetStrip } from "../blocks/process-fleet-strip.tsx";
 import { ProcessFleetCard } from "../elements/process-fleet-card.tsx";
-import { ProcessRecentActions } from "./process-recent-actions-panel.tsx";
 import { ProcessInstanceDrawer } from "./process-instance-drawer.tsx";
 import { ProcessInstancesDrawer } from "./process-instances-drawer.tsx";
-import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
+import { ProcessRecentActions } from "./process-recent-actions-panel.tsx";
 
 /** Strip→structure→detail. Both drawers addressed here (each own query key; still
  * shareable). */

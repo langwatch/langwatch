@@ -1,16 +1,16 @@
+import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache.ts";
-import { GithubHostService } from "../github-host.service.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubBranchCheckRow,
   NullGithubPullRequestsRepository,
 } from "../../repositories/github-pull-requests.repository.ts";
-import { GithubInstallationAccessService } from "../github-installation-access.service.ts";
-import { GithubBranchMappingService } from "../github-branch-mapping.service.ts";
 import { GithubBranchMaintenanceService } from "../github-branch-maintenance.service.ts";
-import { Temporal, type Instant } from "@langwatch/time";
+import { GithubBranchMappingService } from "../github-branch-mapping.service.ts";
+import { GithubHostService } from "../github-host.service.ts";
+import { GithubInstallationAccessService } from "../github-installation-access.service.ts";
 
 const NOW = Date.UTC(2026, 5, 1);
 const DAY = 24 * 60 * 60 * 1000;

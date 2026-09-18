@@ -5,6 +5,7 @@
  * joins as a second row when this package declares that datastore.
  */
 import { describe, expect, it } from "vitest";
+
 import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzBindingRepository } from "../memory/memory.authz-binding.repository.ts";

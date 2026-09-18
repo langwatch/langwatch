@@ -1,7 +1,8 @@
-import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
+import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, type Instant } from "@langwatch/time";
+
 import {
   ModelProviderProjectScopeService,
   type ModelProviderProjectSystemContext,

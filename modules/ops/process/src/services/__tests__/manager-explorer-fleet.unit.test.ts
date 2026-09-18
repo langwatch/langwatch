@@ -1,14 +1,12 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { ManagerExplorerService } from "../manager-explorer.service.ts";
-import { MemoryProcessAuditRepository } from "../../repositories/memory/memory.process-audit.repository.ts";
+
+import type { OpsEventingIntrospection, OpsProcessManagerMetadata } from "../../app/ops.app.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
+import { MemoryProcessAuditRepository } from "../../repositories/memory/memory.process-audit.repository.ts";
 import { MemoryProcessOpsRepository } from "../../repositories/memory/memory.process-ops.repository.ts";
 import type { ProcessNameCounts } from "../../repositories/process/process-ops.repository.ts";
-import type {
-  OpsEventingIntrospection,
-  OpsProcessManagerMetadata,
-} from "../../app/ops.app.ts";
+import { ManagerExplorerService } from "../manager-explorer.service.ts";
 
 function fakeStore(): ProcessStore {
   return {

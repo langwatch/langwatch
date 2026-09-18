@@ -2,11 +2,12 @@
  * A project's saved views, and who may touch them. Two rules carry weight here.
  */
 
-import { describe, expect, it } from "vitest";
 import {
   SavedViewNotFoundError,
   SavedViewReorderUnknownIdsError,
 } from "@langwatch/dashboard-contract";
+import { describe, expect, it } from "vitest";
+
 import { SavedViewService } from "../saved-view.service.ts";
 
 type Call = { method: string } & Record<string, unknown>;

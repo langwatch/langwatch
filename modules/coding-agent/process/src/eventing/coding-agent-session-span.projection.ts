@@ -4,8 +4,9 @@ import {
   LOGS_ONLY_AGENT_IDS,
   detectCodingAgent,
 } from "@langwatch/coding-agent-contract";
-import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+
+import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
 import {
   type CodingAgentSessionData,
   CodingAgentSessionStateProjection,

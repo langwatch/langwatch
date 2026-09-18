@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
 
 import { ModelProviderLegacyMigrationService } from "../model-provider-legacy-migration.service.ts";
 

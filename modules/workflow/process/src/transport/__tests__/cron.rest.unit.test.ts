@@ -5,11 +5,7 @@
  * the process: one shared-secret door, and the two literal addresses the
  * running CronJob already curls.
  */
-import {
-  createRestRuntime,
-  type RestErrorHandler,
-  type RestIdentity,
-} from "@langwatch/api/rest";
+import { createRestRuntime, type RestErrorHandler, type RestIdentity } from "@langwatch/api/rest";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -96,12 +92,12 @@ describe("the studio's NLP Lambda sweep", () => {
       expect(declaration.addressing).toBe("literal");
       expect(declaration.v1Twin).toBe(false);
       const addresses: unknown[] = declaration.routes.map(
-        (route: { method: string; path: string; credential?: string; access?: { kind: string } }) => [
-          route.method,
-          route.path,
-          route.credential,
-          route.access?.kind,
-        ],
+        (route: {
+          method: string;
+          path: string;
+          credential?: string;
+          access?: { kind: string };
+        }) => [route.method, route.path, route.credential, route.access?.kind],
       );
 
       expect(addresses).toEqual([

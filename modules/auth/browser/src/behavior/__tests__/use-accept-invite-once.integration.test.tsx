@@ -3,7 +3,6 @@
  * @regression @integration - issue #3324: single accept-invite call under StrictMode
  */
 import "@testing-library/jest-dom/vitest";
-
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

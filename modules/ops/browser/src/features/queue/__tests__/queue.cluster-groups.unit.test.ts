@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { clusterGroups, middleEllipsis, splitIndexedSuffix } from "../../../index.ts";
 
 const TRACE =

@@ -1,5 +1,6 @@
 import { Heading } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+
 import { BlobStoreContent } from "./blob-store-content.tsx";
 
 /**

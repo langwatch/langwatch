@@ -1,4 +1,5 @@
 import type { SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
+
 import type { GatewaySpendState } from "../eventing/gateway-spend.projection.ts";
 
 export const SPEND_GROUP_BY_KEYS = [

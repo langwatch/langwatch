@@ -20,8 +20,8 @@ vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
-import { AuthCard } from "../auth-card.tsx";
 import { FrontDoorShell } from "../../sections/front-door-shell.tsx";
+import { AuthCard } from "../auth-card.tsx";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const castleSnakeSource = readFileSync(join(here, "..", "castle-snake.tsx"), "utf8");

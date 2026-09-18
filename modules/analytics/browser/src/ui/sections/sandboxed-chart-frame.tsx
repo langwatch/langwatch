@@ -7,6 +7,12 @@
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { ChartFrameExecuteQuery, ChartFrameLogEntry } from "../../behavior/frame-bridge.ts";
+import { createFrameBridge } from "../../behavior/frame-bridge.ts";
+import {
+  FRAME_RESTART_MAX_ATTEMPTS,
+  useFrameAutoRestart,
+} from "../../behavior/use-frame-auto-restart.ts";
 import type {
   ChartFrameDashboardContext,
   ChartFrameParamsSnapshot,
@@ -15,13 +21,7 @@ import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
 } from "../../model/dashboard-widget/bridge-protocol.ts";
-import type { ChartFrameExecuteQuery, ChartFrameLogEntry } from "../../behavior/frame-bridge.ts";
-import { createFrameBridge } from "../../behavior/frame-bridge.ts";
 import { buildSrcdoc } from "../../model/dashboard-widget/build-srcdoc.ts";
-import {
-  FRAME_RESTART_MAX_ATTEMPTS,
-  useFrameAutoRestart,
-} from "../../behavior/use-frame-auto-restart.ts";
 
 export interface SandboxedChartFrameProps {
   /** The widget's React/TSX source. The frame re-mounts whenever this changes. */

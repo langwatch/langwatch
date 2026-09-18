@@ -1,40 +1,39 @@
-import { PeerComparisonCell, peerComparisonSentence } from "./peer-comparison-cell.tsx";
-import { percentileStats } from "./percentile.ts";
-import { PullRequestStatusBadge } from "./pull-request-status-badge.tsx";
-import { SortableColumnHeader } from "./sortable-column-header.tsx";
-import { derivePullRequestStatus, type PullRequestStatus } from "./pull-request-status.ts";
-import { usePullRequestSort } from "./pull-request-sort.ts";
 import { Button, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
+import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import { GitHubIcon } from "@langwatch/design-system/icons";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Menu } from "@langwatch/design-system/menu";
+import { Pagination } from "@langwatch/design-system/pagination";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { nowInstant } from "@langwatch/time";
 import { GitPullRequest, MoreVertical } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { LuLink } from "react-icons/lu";
 
-import { GitHubIcon } from "@langwatch/design-system/icons";
-import { Menu } from "@langwatch/design-system/menu";
-import { ListTable } from "@langwatch/design-system/list-table";
-import { Pagination } from "@langwatch/design-system/pagination";
-import { SearchInput } from "@langwatch/design-system/search-input";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
-
 import { Link } from "./activity-link.tsx";
-import { codingAgentApi as api, type CodingAgentApiMap } from "./coding-agent-api.ts";
 import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";
+import { codingAgentApi as api, type CodingAgentApiMap } from "./coding-agent-api.ts";
 import { useCodingAgentRouter } from "./coding-agent-router.ts";
 import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip.tsx";
-import { nowInstant } from "@langwatch/time";
 import { formatLastUpdate } from "./last-update.ts";
 import { NoDataInfoBlock } from "./no-data-info-block.tsx";
+import { PeerComparisonCell, peerComparisonSentence } from "./peer-comparison-cell.tsx";
+import { percentileStats } from "./percentile.ts";
 import { computeRelativeWindow, PeriodSelector } from "./period-selector.tsx";
-import { PullRequestDetailDrawer } from "./pull-request-detail-drawer.tsx";
 import {
   decodePullRequestRef,
   encodePullRequestRef,
   PULL_REQUEST_QUERY_KEY,
 } from "./pull-request-detail-address.ts";
-import type { Period, PeriodMode } from "./session-filters.ts";
+import { PullRequestDetailDrawer } from "./pull-request-detail-drawer.tsx";
+import { usePullRequestSort } from "./pull-request-sort.ts";
 import type { PullRequestSortColumn, PullRequestSortState } from "./pull-request-sort.ts";
+import { PullRequestStatusBadge } from "./pull-request-status-badge.tsx";
+import { derivePullRequestStatus, type PullRequestStatus } from "./pull-request-status.ts";
+import type { Period, PeriodMode } from "./session-filters.ts";
+import { SortableColumnHeader } from "./sortable-column-header.tsx";
 
 /**
  * What a pull request cost in assistant usage over its whole lifetime, across

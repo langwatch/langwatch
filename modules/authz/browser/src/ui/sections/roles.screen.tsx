@@ -21,12 +21,17 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ShieldUser } from "lucide-react";
 import { useState } from "react";
 import { Eye, Plus, Shield, Users } from "react-feather";
+
 import { authzApi } from "../../behavior/authz-api.ts";
-import { AUTHZ_MANAGE_PERMISSION, type AuthzHostApi, useAuthzHost } from "../../model/authz-host.ts";
+import {
+  AUTHZ_MANAGE_PERMISSION,
+  type AuthzHostApi,
+  useAuthzHost,
+} from "../../model/authz-host.ts";
 import { BUILTIN_ROLE_CARDS, builtinRoleGrantedPermissions } from "../../model/builtin-roles.ts";
-import { EnterpriseUpsell } from "../elements/enterprise-upsell.tsx";
 import { PermissionViewer } from "../blocks/permission-viewer.tsx";
 import { RoleCard } from "../blocks/role-card.tsx";
+import { EnterpriseUpsell } from "../elements/enterprise-upsell.tsx";
 import { RoleFormDialog, type RoleFormData } from "./role-form-dialog.tsx";
 
 // Permission list cast; wire carries strings; registry filters unrecognised.
@@ -75,13 +80,7 @@ export default function RolesScreen() {
   return <RolesManagement organizationId={organizationId} host={host} />;
 }
 
-function RolesManagement({
-  organizationId,
-  host,
-}: {
-  organizationId: string;
-  host: AuthzHostApi;
-}) {
+function RolesManagement({ organizationId, host }: { organizationId: string; host: AuthzHostApi }) {
   const { open, onOpen, onClose } = useDisclosure();
   const { open: editOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
   const { open: viewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();

@@ -2,6 +2,7 @@
 // copied as they stood; cells inside fill in as they execute.
 // @see specs/experiments-v3/run-board-snapshot.feature
 import { describe, expect, it } from "vitest";
+
 import type { TargetConfig } from "../../../experiment-workbench.ts";
 import type { BoardResults } from "../build-execution-request.ts";
 import { planBoardCarryOver } from "../build-execution-request.ts";

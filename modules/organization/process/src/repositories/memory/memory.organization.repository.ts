@@ -7,6 +7,7 @@ import {
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,
@@ -110,9 +111,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     if (existing) return { workspace: existing, created: false };
 
     const displayLabel =
-      input.workspace.displayName?.trim() ||
-      input.workspace.displayEmail?.split("@")[0] ||
-      "user";
+      input.workspace.displayName?.trim() || input.workspace.displayEmail?.split("@")[0] || "user";
     const now = toDate(nowInstant());
     const team: MemoryTeamRow = {
       id: input.resources.teamId,

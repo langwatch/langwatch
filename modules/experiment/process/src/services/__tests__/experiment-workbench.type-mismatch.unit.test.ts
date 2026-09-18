@@ -1,12 +1,13 @@
+import { ExperimentTypeMismatchError } from "@langwatch/experiment-contract";
 /**
  * Type check in repository; service relays refusal consistently.
  * @see specs/experiments-v3/workbench-versioning.feature
  */
 import { HandledError } from "@langwatch/handled-error";
-import { ExperimentTypeMismatchError } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
-import { ExperimentWorkbenchService } from "../experiment-workbench.service.ts";
+
 import type { ExperimentRepository } from "../../repositories/experiment.repository.ts";
+import { ExperimentWorkbenchService } from "../experiment-workbench.service.ts";
 
 /** Minimally valid so `parseWorkbenchState` clears before the repository's
  *  own row-type refusal is reached. */

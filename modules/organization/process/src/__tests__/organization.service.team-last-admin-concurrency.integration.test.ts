@@ -1,7 +1,4 @@
-import type {
-  AuthzAccessBinding,
-  AuthzApi,
-} from "@langwatch/authz-contract";
+import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 /**
  * @vitest-environment node
  *

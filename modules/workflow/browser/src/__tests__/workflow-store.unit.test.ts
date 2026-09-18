@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
+
 import {
   removeInvalidEdges,
   store as storeCreator,

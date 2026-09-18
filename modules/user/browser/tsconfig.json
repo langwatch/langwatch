@@ -16,7 +16,9 @@
       "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
       "@langwatch/coding-agent-contract": ["../../coding-agent/contract/src/index.ts"],
       "@langwatch/coding-agent-browser": ["../../coding-agent/web/src/index.ts"],
-      "@langwatch/coding-agent-browser/surfaces/activity": ["../../coding-agent/web/src/activity.ts"],
+      "@langwatch/coding-agent-browser/surfaces/activity": [
+        "../../coding-agent/web/src/activity.ts"
+      ],
       "@langwatch/enterprise-governance-contract": [
         "../../../enterprise/modules/governance/contract/src/index.ts"
       ],
@@ -65,6 +67,9 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
@@ -72,9 +77,6 @@
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

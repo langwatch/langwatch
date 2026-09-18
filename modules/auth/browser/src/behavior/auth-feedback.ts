@@ -4,6 +4,7 @@
  */
 
 import { useCallback } from "react";
+
 import { useOptionalAuthHost } from "../model/auth-host.ts";
 
 export type AuthErrorToastOptions = {

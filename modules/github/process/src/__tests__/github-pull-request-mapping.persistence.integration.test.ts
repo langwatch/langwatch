@@ -2,8 +2,10 @@
  * @vitest-environment node
  */
 import { generateKeyPairSync } from "crypto";
-import { GithubApp, PostgresGithubRepositories } from "@langwatch/github-process";
+
 import { type GithubPullRequestEvent, type GithubApi } from "@langwatch/github-contract";
+import { GithubApp, PostgresGithubRepositories } from "@langwatch/github-process";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -13,15 +15,15 @@ import {
 } from "@langwatch/prisma-client";
 import { type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { fromDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
+
 import {
   TestOrganizationService,
   TestProjectService,
 } from "../services/__tests__/fixtures/github-services.fixture.ts";
-import { fromDate } from "@langwatch/time";
-import { createLogger } from "@langwatch/observability";
+import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

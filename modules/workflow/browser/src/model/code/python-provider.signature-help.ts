@@ -1,7 +1,8 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable, Position } from "monaco-editor";
-import { PYTHON_BUILTIN_BY_NAME, type PyMember } from "./python-stdlib.ts";
+
 import { scanImports } from "./python-provider.shared.ts";
+import { PYTHON_BUILTIN_BY_NAME, type PyMember } from "./python-stdlib.ts";
 
 /**
  * Pop the parameter-hint widget when the user opens a call expression.

@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
+
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
 describe("PrismaOrganizationRepository settings", () => {

@@ -1,9 +1,10 @@
 import type { AlertType, SlackPayload } from "@langwatch/automation-contract";
+import type { TraceRecord } from "@langwatch/trace-contract";
+
 import type {
   WebhookDeliveryRequest,
   WebhookSendResult,
 } from "./http/http.webhook-delivery.channel.ts";
-import type { TraceRecord } from "@langwatch/trace-contract";
 
 /** Outbound provider calls. Automation owns when and what to send; the process
  * adapter owns SDKs, HTTP policy, mail rendering members, and secrets. */

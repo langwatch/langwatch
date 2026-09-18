@@ -6,6 +6,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   batchRunPath,
   scenarioEditorPath,

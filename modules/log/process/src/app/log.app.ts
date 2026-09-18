@@ -1,18 +1,21 @@
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 import {
   LogApi,
-  logServerConfigSchema,
+  LOG_DEFAULT_READ_LIMIT,
+  LOG_DEFAULT_RETENTION_DAYS,
+  logConfig,
   type CanonicalTraceLogRecord,
   type LogApi as LogApiContract,
   type LogPiiRedactionLevel,
   type LogPreparation,
   type LogServerConfig,
 } from "@langwatch/log-contract";
-import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
+
 import type { LogClickHouseClientResolver } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
 import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
 import { NullCanonicalLogRecordRepository } from "../repositories/null/null.canonical-log-record.repository.ts";
+import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
 import { LogService } from "../services/log.service.ts";
 
 export type LogInfrastructure = Readonly<{
@@ -25,7 +28,7 @@ type LogSetup = FeatureSetup<LogDependencies, LogInfrastructure, LogServerConfig
 /** The process-owned Log capability over private preparation and persistence services. */
 export class LogApp implements LogApiContract {
   static readonly contract = LogApi;
-  static readonly configSchema = logServerConfigSchema;
+  static readonly config = logConfig;
   static readonly dependencies: LogDependencies = { dataPrivacy: DataPrivacyApi };
 
   readonly #service: LogService;
@@ -34,12 +37,12 @@ export class LogApp implements LogApiContract {
     this.#service = service;
   }
 
-  static create({ dependencies, members, config }: LogSetup): LogApp {
+  static create({ dependencies, members }: LogSetup): LogApp {
     const repository = members.resolveClient
       ? ClickHouseCanonicalLogRecordRepository.create({
           resolveClient: members.resolveClient,
-          defaultRetentionDays: config.defaultRetentionDays,
-          defaultReadLimit: config.defaultReadLimit,
+          defaultRetentionDays: LOG_DEFAULT_RETENTION_DAYS,
+          defaultReadLimit: LOG_DEFAULT_READ_LIMIT,
         })
       : NullCanonicalLogRecordRepository.create();
     const service = LogService.create({

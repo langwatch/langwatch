@@ -1,5 +1,6 @@
 import { Box, Combobox, HStack, Portal } from "@chakra-ui/react";
 import { Check, Plus, Search } from "lucide-react";
+
 import type { ProjectPickGroup, ProjectPickItem } from "../../model/project-pick-items.ts";
 import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
@@ -72,7 +73,6 @@ function ProjectSearchHeader() {
       <HStack gap={2} color="fg.muted">
         <Search size={14} aria-hidden />
         <Combobox.Input
-          
           aria-label="Search projects"
           placeholder="Search projects"
           height="28px"

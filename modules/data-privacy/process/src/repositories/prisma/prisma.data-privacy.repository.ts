@@ -8,6 +8,7 @@ import {
 } from "@langwatch/data-privacy-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { Prisma } from "@langwatch/prisma-client/generated";
+
 import type { DataPrivacyPolicyRepository } from "../data-privacy.repository.ts";
 
 export class PrismaDataPrivacyPolicyRepository

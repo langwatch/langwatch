@@ -9,6 +9,7 @@ import {
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
+
 import {
   type CodingAgentSessionData,
   CodingAgentSessionStateProjection,

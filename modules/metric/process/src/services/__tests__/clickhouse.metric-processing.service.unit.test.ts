@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { point } from "../../app/__tests__/metric.fixture.ts";
-import { ClickhouseMetricProcessingRepository } from "../../repositories/clickhouse/clickhouse.metric-processing.repository.ts";
 import { ClickHouseMetricDataPointAppendRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import type { MetricClickHouseClient } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { MetricDataPointClickHouseRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point.repository.ts";
+import { ClickhouseMetricProcessingRepository } from "../../repositories/clickhouse/clickhouse.metric-processing.repository.ts";
 
 function client(overrides: Partial<MetricClickHouseClient> = {}): MetricClickHouseClient {
   return {

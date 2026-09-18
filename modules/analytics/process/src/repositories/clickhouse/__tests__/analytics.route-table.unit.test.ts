@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.ts";
 
 describe("Analytics timeseries route table", () => {

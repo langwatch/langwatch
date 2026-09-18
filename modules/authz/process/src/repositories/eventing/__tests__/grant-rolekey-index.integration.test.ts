@@ -1,5 +1,7 @@
 /** @vitest-environment node */
 
+import { randomUUID } from "node:crypto";
+
 /**
  * API-key permission checks must not table-scan Grant. Assert rows examined
  * via planner, not index names.
@@ -7,8 +9,8 @@
 import type { AuthzPrincipalRef } from "@langwatch/authz-contract";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { EventingAuthzReadRepository } from "../eventing.authz-read.repository.ts";
 

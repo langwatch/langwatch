@@ -1,19 +1,20 @@
 import { Box, Link as ChakraLink, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { keepPreviousData } from "@tanstack/react-query";
-import type { ReactNode } from "react";
-import { LuCircleX } from "react-icons/lu";
-import { toEpochMs } from "@langwatch/time";
-import type { RecentItem, RecentItemType } from "../../../../behavior/home-api.ts";
-import { homeApi } from "../../../../behavior/home-api.ts";
-import NextLink from "../../../../ui/elements/app-link.tsx";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import {
   featureIcons,
   recentItemTypeToFeature,
 } from "@langwatch/navigation-browser/surfaces/command-bar";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { toEpochMs } from "@langwatch/time";
+import { keepPreviousData } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { LuCircleX } from "react-icons/lu";
+
+import type { RecentItem, RecentItemType } from "../../../../behavior/home-api.ts";
+import { homeApi } from "../../../../behavior/home-api.ts";
+import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import NextLink from "../../../../ui/elements/app-link.tsx";
 import { HomeCard } from "./home-card.tsx";
 import { HOME_SECTION_GAP, HomeSectionHeader } from "./home-section-header.tsx";
-import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**
  * Get icon for entity type using shared featureIcons config

@@ -1,5 +1,5 @@
-import type { TenantSource } from "@langwatch/system-migrations";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { TenantSource } from "@langwatch/system-migrations";
 
 /** Tenants for USER-rooted migration pass are users walked in id order.
  * Same paging contract as organization source. */

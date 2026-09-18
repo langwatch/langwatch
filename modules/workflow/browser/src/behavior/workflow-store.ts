@@ -1,4 +1,17 @@
 import {
+  generateWorkflowEdgeId,
+  LlmConfigInputTypes,
+  type BaseComponent,
+  type Component,
+  type Entry,
+  type Field,
+  LATEST_SPEC_VERSION,
+  type StudioWorkflow,
+  hasDSLChanged,
+  findLowestAvailableName,
+  nameToId,
+} from "@langwatch/workflow-contract";
+import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
@@ -8,13 +21,6 @@ import {
   type Node,
   type NodeChange,
 } from "@xyflow/react";
-import { generateWorkflowEdgeId, LlmConfigInputTypes,
-  type BaseComponent,
-  type Component,
-  type Entry,
-  type Field,
-  LATEST_SPEC_VERSION,
-  type StudioWorkflow,hasDSLChanged,findLowestAvailableName,nameToId } from "@langwatch/workflow-contract";
 const snakeCaseToPascalCase = (value: string) =>
   value
     .split("_")

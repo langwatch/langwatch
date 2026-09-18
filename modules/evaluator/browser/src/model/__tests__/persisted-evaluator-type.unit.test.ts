@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { isPersistedEvaluatorType } from "../persisted-evaluator-type.ts";
 
 describe("isPersistedEvaluatorType", () => {

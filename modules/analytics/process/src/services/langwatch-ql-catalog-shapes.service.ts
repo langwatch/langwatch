@@ -5,6 +5,7 @@
  */
 
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
+
 import type { FieldProtection } from "../rules/lwql-field-protection.rules.ts";
 
 /**

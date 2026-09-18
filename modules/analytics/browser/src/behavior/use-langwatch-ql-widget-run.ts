@@ -4,9 +4,9 @@
  * sequence number; only a resolution carrying the latest one is kept, so a straggler is dropped.
  */
 
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { useEffect, useRef, useState } from "react";
 
-import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { analyticsApi } from "./analytics-api.ts";
 
 export interface UseLangWatchQLWidgetRunInput {

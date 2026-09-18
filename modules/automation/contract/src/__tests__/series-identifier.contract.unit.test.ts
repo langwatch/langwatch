@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { findSeriesIdentifier } from "../graph-alert.ts";
 
 describe("findSeriesIdentifier", () => {

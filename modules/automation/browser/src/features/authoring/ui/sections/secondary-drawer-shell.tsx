@@ -1,7 +1,7 @@
 import { Button, Heading, HStack, Spacer } from "@chakra-ui/react";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { Drawer } from "@langwatch/design-system/drawer";
 
 // Chakra v3's Drawer accepts xs|sm|md|lg|xl|full but not 2xl. Use `full`
 // for the expanded width — it pins the drawer to the viewport which is

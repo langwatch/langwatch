@@ -1,44 +1,32 @@
 /**
- * Builds UserInfrastructure from members and dependencies. Composition moved
- * here from hand-composition in deleted apps/api/features/user/user.composition.ts.
+ * What this process still hands `UserApp` by hand. Every entry that refuses
+ * names what it would need; `user.members.ts` names the module each
+ * unanswered capability belongs to.
  */
-import type { AuthApi } from "@langwatch/auth-contract";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 import { UserCapabilityUnavailableError } from "@langwatch/user-contract";
 import { hash, compare } from "bcrypt";
 
 import { PrismaUserOrganizationDirectoryRepository } from "../repositories/prisma/prisma.user-organization-directory.repository.ts";
-import type { UserAppConfig, UserInfrastructure } from "./user.app.ts";
+import type { UserInfrastructure } from "./user.members.ts";
 
 /** What this process hands `UserApp` at boot. */
 export function buildUserInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
-  config: UserAppConfig;
-  dependencies: {
-    auth: AuthApi;
-    organizations: OrganizationApi;
-    projects: ProjectApi;
-  };
+  organizations: OrganizationApi;
 }): UserInfrastructure {
-  const { prisma, redis, config, dependencies } = input;
+  const { prisma, redis, organizations } = input;
 
   return {
-    // The issuer a credential account row is stored under is a persisted
-    // format, `local:credential` — what `BetterAuthAccountQueriesAdapter
-    // .issuerForProviderId("credential")` evaluates to. Restated as a literal
-    // since a module may not value-import another module's server package (ADR-134).
-    credentialIssuer: "local:credential",
     avatarStorage: {
       store: () =>
         Promise.reject(
-          unavailable(
-            "stored-object application, so it cannot store an uploaded avatar",
-          ),
+          unavailable("stored-object application, so it cannot store an uploaded avatar"),
         ),
     },
     avatarObjects: {
@@ -51,11 +39,6 @@ export function buildUserInfrastructure(input: {
     // of a rotation run through it, and the credential service (the only
     // holder of a stored hash) is built over it by the installer.
     passwords: new BcryptPasswordHasher(),
-    deployment: {
-      authProvider: () => dependencies.auth.resolveAuthProvider(),
-      offersPasskeys: () => config.passkeysEnabled,
-      findBaseUrl: () => config.baseUrl,
-    },
     rateLimit: new RedisUserRateLimiter(redis).check,
     // The product-analytics sink is the deployment's. Absent, and silent on
     // purpose: an analytics write has never been allowed to fail a request.
@@ -80,17 +63,14 @@ export function buildUserInfrastructure(input: {
     cliCredentials: {
       revokeForUser: () =>
         Promise.reject(
-          unavailable(
-            "Enterprise governance service, so it cannot revoke this user's CLI tokens",
-          ),
+          unavailable("Enterprise governance service, so it cannot revoke this user's CLI tokens"),
         ),
     },
     organizations: organizationDirectory({
       directory: PrismaUserOrganizationDirectoryRepository.create(prisma),
-      organizations: dependencies.organizations,
+      organizations,
     }),
-    projects: {
-      findById: ({ projectId }) => dependencies.projects.findIdentity(projectId),
+    governanceProjects: {
       // The organization's hidden governance project is minted by Enterprise
       // governance, which this process does not compose. Absent is the
       // honest answer and the one the module already handles.
@@ -109,9 +89,7 @@ export function buildUserInfrastructure(input: {
           unavailable("Enterprise gateway governance, so it holds no personal gateway keys"),
         ),
       checkBudget: () =>
-        Promise.reject(
-          unavailable("Enterprise gateway budget store, so it cannot check a budget"),
-        ),
+        Promise.reject(unavailable("Enterprise gateway budget store, so it cannot check a budget")),
     },
     budgetRequests: {
       sendBudgetIncreaseRequest: () =>
@@ -119,15 +97,6 @@ export function buildUserInfrastructure(input: {
           unavailable(
             "mail gateway with a public base URL, so it cannot send the budget increase request",
           ),
-        ),
-    },
-    // The identifier ledger's email-verification ceremony. No package owns
-    // an adapter from this module's declared reads to the identity
-    // application's ceremony yet.
-    verification: {
-      completeEmailVerification: () =>
-        Promise.reject(
-          unavailable("identity verification ceremony, so it cannot complete a verification"),
         ),
     },
     // The spend rollup behind `/api/me/usage`. Enterprise governance owns
@@ -143,9 +112,9 @@ export function buildUserInfrastructure(input: {
 }
 
 /**
- * One person's own verified organization membership and the two ledger
- * reads `/me` renders (support contact, first project). Membership check and
- * settings read go through the SAME organization application every other member call uses.
+ * The two ledger reads `/me` renders (support contact, first project) and the
+ * administrator a budget request goes to. The settings read goes through the
+ * SAME organization application every other member call uses.
  */
 function organizationDirectory(options: {
   directory: PrismaUserOrganizationDirectoryRepository;
@@ -154,7 +123,6 @@ function organizationDirectory(options: {
   const { directory, organizations } = options;
 
   return {
-    isMember: ({ userId, organizationId }) => organizations.isMember({ userId, organizationId }),
     findSupportContact: async ({ organizationId }) => {
       const settings = await organizations.getSettings({ organizationId });
       if (settings.supportContact) return settings.supportContact;

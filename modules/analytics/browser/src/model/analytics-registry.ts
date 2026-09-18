@@ -1,8 +1,6 @@
+import { filterFieldsEnum } from "@langwatch/analytics-contract";
 import { z } from "zod";
 
-import { formatMilliseconds } from "./format-milliseconds.ts";
-import { formatMoney } from "./format-money.ts";
-import { filterFieldsEnum } from "@langwatch/analytics-contract";
 import {
   type AggregationTypes,
   type AnalyticsGroup,
@@ -17,6 +15,8 @@ import {
   pipelineFieldsEnum,
   sharedFiltersInputSchema,
 } from "./analytics-vocabulary.ts";
+import { formatMilliseconds } from "./format-milliseconds.ts";
+import { formatMoney } from "./format-money.ts";
 
 const numericMetricDefaults: Pick<AnalyticsMetric, "format" | "allowedAggregations"> = {
   format: "0.[0]a",

@@ -1,9 +1,10 @@
 import { Box, HStack, SimpleGrid } from "@chakra-ui/react";
+
+import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { ChartCard } from "../../../ui/elements/chart-card.tsx";
+import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { CustomGraph, type CustomGraphInput } from "../../../ui/sections/custom-graph.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
-import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
-import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

@@ -7,7 +7,6 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 
 import { organizationApiScopeSchema } from "./organization.trpc-schemas.ts";
-import { organizationTeamAccessSchema, organizationTeamSchema } from "./team.ts";
 import {
   teamMemberRemovedSchema,
   teamWithProjectsSchema,
@@ -21,6 +20,7 @@ import {
   teamApiTeamScopeSchema,
   teamApiUpdateInputSchema,
 } from "./team.trpc-schemas.ts";
+import { organizationTeamAccessSchema, organizationTeamSchema } from "./team.ts";
 
 export const teamTrpc = defineTrpcContract("team")
   .query("getBySlug")

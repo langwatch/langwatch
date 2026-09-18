@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+
 import {
   dataPrivacyConfigSchema,
   DATA_PRIVACY_SCOPE_TYPES,

@@ -1,10 +1,11 @@
 import { Separator, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
-import { parseSnippet } from "./codegen/snippets.ts";
+
 import { usePublicEnv } from "../../../behavior/use-public-env.ts";
 import { useActiveProject } from "../active-project-context.tsx";
 import { CodePreview } from "./code-preview.tsx";
+import { parseSnippet } from "./codegen/snippets.ts";
 
 export function OpenTelemetrySetup(): React.ReactElement {
   const { project } = useActiveProject();

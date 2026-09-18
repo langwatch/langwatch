@@ -1,19 +1,20 @@
 import { Box, Button, Field, Heading, HStack, Input, Spinner, VStack } from "@chakra-ui/react";
+import type { HttpTestErrorExplanation } from "@langwatch/agent-contract/http-test";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
-import {
-  AgentHttpEditorTabs,
-  type RenderScenarioMappingsInput,
-  type RenderAgentVariablesInput,
-} from "./agent-http-editor-tabs.tsx";
-import { HttpMethodSelector } from "../elements/http-method-selector.tsx";
+
 import {
   useHttpAgentEditor,
   HTTP_FIXED_VARIABLE_IDS,
   type HttpAgentEditorOptions,
 } from "../../behavior/use-http-agent-editor.ts";
-import type { HttpTestErrorExplanation } from "@langwatch/agent-contract/http-test";
+import { HttpMethodSelector } from "../elements/http-method-selector.tsx";
+import {
+  AgentHttpEditorTabs,
+  type RenderScenarioMappingsInput,
+  type RenderAgentVariablesInput,
+} from "./agent-http-editor-tabs.tsx";
 
 export interface AgentHttpEditorDrawerProps extends HttpAgentEditorOptions {
   onGoBack?: () => void;

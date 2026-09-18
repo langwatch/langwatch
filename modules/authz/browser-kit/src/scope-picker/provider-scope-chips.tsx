@@ -1,4 +1,5 @@
 import { Badge, HStack, Link, Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   Boxes,
   Building2,
@@ -10,8 +11,6 @@ import {
   Users,
   UsersRound,
 } from "lucide-react";
-
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 // Scope kinds chip renders; mirrors Prisma enum or picker/badge-only.
 export type ProviderScopeType =

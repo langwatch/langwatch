@@ -3,21 +3,22 @@
  * pair, with variable-mapping sources ordered target-first.
  */
 
-import { useCallback } from "react";
-import { useShallow } from "zustand/react/shallow";
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
 import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-browser-kit/variables";
-import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
-import type { EvaluatorConfig, TargetConfig } from "../../model/experiments-v3/types.ts";
-import { isComparisonEvaluator } from "../../model/experiments-v3/types.ts";
+import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
+
 import { createEvaluatorEditorCallbacks } from "../../model/experiments-v3/evaluator-editor-callbacks.ts";
 import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../../model/experiments-v3/field-mapping-converters.ts";
-import { toComparisonConfig } from "@langwatch/experiment-contract";
+import type { EvaluatorConfig, TargetConfig } from "../../model/experiments-v3/types.ts";
+import { isComparisonEvaluator } from "../../model/experiments-v3/types.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**

@@ -1,8 +1,6 @@
-import type { AuthzPrincipalRef, AuthzScopeRef, Authorized } from "./authz.ts";
+import type { Instant } from "@langwatch/time";
+
 import type { AuthzScopeLineageInput, AuthzScopeLineageResult } from "./authz-scope-lineage.ts";
-import type { PermissionScopeArg, TierOfScopeArg } from "./declaration.ts";
-import type { AuthzPermission } from "./registry.ts";
-import type { BindingScopeTier } from "./vocabulary.ts";
 import type {
   AuthzAccessBreakdownInput,
   AuthzAccessBreakdownOutput,
@@ -48,7 +46,10 @@ import type {
   AuthzTeamMemberBinding,
   PermissionDecision,
 } from "./authz.queries.ts";
-import type { Instant } from "@langwatch/time";
+import type { AuthzPrincipalRef, AuthzScopeRef, Authorized } from "./authz.ts";
+import type { PermissionScopeArg, TierOfScopeArg } from "./declaration.ts";
+import type { AuthzPermission } from "./registry.ts";
+import type { BindingScopeTier } from "./vocabulary.ts";
 
 /**
  * The complete portable read and decision capability. Concrete server

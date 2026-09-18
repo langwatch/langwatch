@@ -1,14 +1,5 @@
 import { Box, Button, HStack, Input, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
-import { useCallback, useRef, useState } from "react";
-import type {
-  CustomModelEntry,
-  MultimodalInput,
-  SupportedParameter,
-} from "@langwatch/model-provider-contract";
-import { customModelEntrySchema, multimodalInputValues } from "@langwatch/model-provider-contract";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { fieldErrorsFromZodIssues } from "../../model/zod-field-errors.ts";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -18,6 +9,16 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import type {
+  CustomModelEntry,
+  MultimodalInput,
+  SupportedParameter,
+} from "@langwatch/model-provider-contract";
+import { customModelEntrySchema, multimodalInputValues } from "@langwatch/model-provider-contract";
+import { useCallback, useRef, useState } from "react";
+
+import { fieldErrorsFromZodIssues } from "../../model/zod-field-errors.ts";
 
 /**
  * Optional sampling parameters the popover renders. `max_tokens` is

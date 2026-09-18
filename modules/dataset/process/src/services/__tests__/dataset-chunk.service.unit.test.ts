@@ -1,14 +1,15 @@
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment node
  * The s3_jsonl chunk mutations: each case asserts the counter write lands on
  * the TRANSACTIONAL repository (ADR-032 Decision 9, I-COUNT), not the root one.
  */
 import { describe, expect, it } from "vitest";
-import type { DatasetColumns } from "@langwatch/dataset-contract";
+
 import type { DatasetStorage } from "../../app/dataset.app.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
-import { DatasetChunkService } from "../dataset-chunk.service.ts";
 import { type DatasetMutationRecord } from "../../rules/dataset-chunk-lines.rules.ts";
+import { DatasetChunkService } from "../dataset-chunk.service.ts";
 
 type Update = { id: string; content: Record<string, unknown>; transactional: boolean };
 

@@ -4,6 +4,7 @@
  */
 import { BindingMissingError, DuplicateBindingError } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   ACTOR,
   auditRows,

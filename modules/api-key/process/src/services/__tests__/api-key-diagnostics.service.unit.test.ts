@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { ApiKeyDiagnosticsAdapter } from "../api-key-diagnostics.service.ts";
 
 describe("ApiKeyDiagnosticsAdapter", () => {

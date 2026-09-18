@@ -4,13 +4,14 @@
  * Spec: modules/workflow/specs/workflow-service.feature.
  */
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import { generate } from "@langwatch/ksuid";
 import {
   parseStudioWorkflow,
   WorkflowVersionRequiredError,
   type CopyStudioWorkflowCommand,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { generate } from "@langwatch/ksuid";
+
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 
 export type WorkflowStudioCopyServiceOptions = {

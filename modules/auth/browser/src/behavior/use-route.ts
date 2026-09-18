@@ -3,6 +3,7 @@
  */
 
 import { useMemo } from "react";
+
 import { useAuthHost } from "../model/auth-host.ts";
 
 /** The query string, as `next/navigation` handed it over. */

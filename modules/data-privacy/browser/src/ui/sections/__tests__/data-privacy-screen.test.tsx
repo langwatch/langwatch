@@ -19,6 +19,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   DataPrivacyHostApi,
   DataPrivacyHostProvider,

@@ -196,8 +196,7 @@ const refuseNonAdminPrivilegedMint = async ({
   isService: boolean;
   assignedToUserId?: string | undefined;
 }): Promise<void> => {
-  const assignedToAnother =
-    !isService && !!assignedToUserId && assignedToUserId !== caller.userId;
+  const assignedToAnother = !isService && !!assignedToUserId && assignedToUserId !== caller.userId;
   const owner = keyOwner({ isService, assignedToUserId, callerUserId: caller.userId });
 
   if (owner !== null && !assignedToAnother) return;

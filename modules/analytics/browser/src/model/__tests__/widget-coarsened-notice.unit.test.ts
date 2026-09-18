@@ -5,9 +5,8 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { describe, expect, it } from "vitest";
-
 import { LWQL_GRANULARITY_MAX_BUCKETS } from "@langwatch/analytics-contract";
+import { describe, expect, it } from "vitest";
 
 import { widgetCoarsenedNotice } from "../widget-coarsened-notice.ts";
 

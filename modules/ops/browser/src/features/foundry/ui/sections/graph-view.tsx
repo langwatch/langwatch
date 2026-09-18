@@ -1,3 +1,7 @@
+import { Box, HStack, Text } from "@chakra-ui/react";
+import { useColorMode } from "@langwatch/design-system/color-mode";
+
+import "@xyflow/react/dist/style.css";
 import {
   Background,
   Controls,
@@ -9,9 +13,7 @@ import {
   ReactFlow,
 } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
-import "@xyflow/react/dist/style.css";
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { useColorMode } from "@langwatch/design-system/color-mode";
+
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { SPAN_TYPE_COLORS, SPAN_TYPE_ICONS, type SpanConfig } from "../../model/foundry-types.ts";
 

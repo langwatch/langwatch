@@ -1,9 +1,9 @@
+import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 /**
  * The time-bucket rules: whether the periods a bucketed answer compares cover
  * the same span, and whether any bucket is missing from the axis.
  */
 import { Temporal, type Instant } from "@langwatch/time";
-import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 
 import type { LangWatchQLDiagnosticsInput } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
 

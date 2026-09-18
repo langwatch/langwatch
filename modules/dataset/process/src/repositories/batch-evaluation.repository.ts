@@ -1,7 +1,4 @@
-import type {
-  BatchEvaluationRecord,
-  BatchEvaluationSummary,
-} from "@langwatch/dataset-contract";
+import type { BatchEvaluationRecord, BatchEvaluationSummary } from "@langwatch/dataset-contract";
 
 /**
  * The batch-evaluation rows an experiment's runs are summarised by. They sit

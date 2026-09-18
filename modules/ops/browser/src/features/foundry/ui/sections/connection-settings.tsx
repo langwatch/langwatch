@@ -1,6 +1,7 @@
 import { Box, Flex, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
+
 import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
 import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
 

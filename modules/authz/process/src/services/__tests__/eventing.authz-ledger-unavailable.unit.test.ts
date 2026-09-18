@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  AuthzGrantsCommandDispatcher,
-  type AuthzGrantsCommandSenders,
-  AuthzLedgerUnavailableError,
-} from "../authz-grants-command-dispatcher.service.ts";
+
 import {
   ACTOR,
   ORG_ID,
   binding,
   harness,
 } from "../../eventing/__tests__/support/eventing.authz-ledger-fork.harness.ts";
+import {
+  AuthzGrantsCommandDispatcher,
+  type AuthzGrantsCommandSenders,
+  AuthzLedgerUnavailableError,
+} from "../authz-grants-command-dispatcher.service.ts";
 
 class RecoveringDispatcher extends AuthzGrantsCommandDispatcher {
   readonly commandsCall = vi.fn();

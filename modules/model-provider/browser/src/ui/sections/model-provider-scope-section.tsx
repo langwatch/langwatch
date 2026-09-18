@@ -1,4 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
+import { ProviderScopeChips, ScopeChipPicker } from "@langwatch/authz-browser-kit/scope-picker";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 
 import type {
   ModelProviderScopeType,
@@ -6,9 +8,7 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../behavior/use-model-provider-form.ts";
-import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { SmallLabel } from "../elements/small-label.tsx";
-import { ProviderScopeChips,ScopeChipPicker } from "@langwatch/authz-browser-kit/scope-picker";
 
 const SCOPE_DESCRIPTION_SINGLE: Record<ModelProviderScopeType, string> = {
   PROJECT: "Only this project can use this provider.",

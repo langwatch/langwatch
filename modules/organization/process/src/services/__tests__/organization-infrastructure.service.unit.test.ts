@@ -8,7 +8,6 @@ import {
   type AuthzRevokeBindingsInput,
   type AuthzRevokeBindingsWhereInput,
 } from "@langwatch/authz-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
@@ -21,7 +20,9 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
+
 import type {
   GroupIdentity,
   PersonalWorkspaceIdentity,

@@ -1,7 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { AutomationClock } from "../../app/automation.members.ts";
-import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
 import { AutomationTraceTriggerCatalogueService } from "../../services/automation-trace-trigger-catalogue.service.ts";
+import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
 
 /**
  * The one table this read touches, named here and nowhere above it.

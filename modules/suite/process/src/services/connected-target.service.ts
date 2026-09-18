@@ -13,9 +13,11 @@ import {
   parseConnectedReference,
 } from "@langwatch/agent-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
-import { type RunActor,
+import {
+  type RunActor,
   parseScenarioParameterDefinitions,
-  type ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+  type ScenarioParameterDefinition,
+} from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 
 /** What this module reads about an agent, and nothing more. */

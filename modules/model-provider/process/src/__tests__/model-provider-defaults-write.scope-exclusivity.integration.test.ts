@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 /**
  * Real-Postgres coverage for the one-config-per-scope invariant on ModelDefaultConfig writes,
  * and the handled errors it raises instead of leaking plain 500s (customer report: duplicate
@@ -6,14 +8,13 @@
  * @see specs/model-providers/model-default-config-cascade.feature
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+
+import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderDefaultsWriteService } from "../services/model-provider-defaults-write.service.ts";
 import { ModelProviderResolutionService } from "../services/model-provider-resolution.service.ts";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
-import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
-import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import {
   DB_URL,
   PrismaProjects,

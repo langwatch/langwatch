@@ -5,6 +5,7 @@ import {
 } from "@langwatch/log-contract";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { describe, expect, it } from "vitest";
+
 import { RecordCanonicalLogCommand } from "../../eventing/log.intent.ts";
 
 const TENANT_ID = "project_record_canonical_log";

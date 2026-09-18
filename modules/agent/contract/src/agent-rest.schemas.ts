@@ -1,7 +1,8 @@
 import { z } from "zod";
+
+import { connectedParameterDefinitionSchema } from "./config/connected.ts";
 import { agentTypeSchema } from "./config/index.ts";
 import { CONNECTED_AGENT_NOT_SELECTABLE_REASONS } from "./connected-agent.selectable.ts";
-import { connectedParameterDefinitionSchema } from "./config/connected.ts";
 import { connectedAgentInstanceSchema } from "./connected-agent.view.ts";
 
 export const agentRestParamsSchema = z.object({

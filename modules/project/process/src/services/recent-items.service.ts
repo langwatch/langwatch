@@ -1,6 +1,7 @@
-import type { RecentItemsRepository } from "../repositories/recent-items.repository.ts";
 import type { RecentItem } from "@langwatch/project-contract";
 import { toDate, type Instant } from "@langwatch/time";
+
+import type { RecentItemsRepository } from "../repositories/recent-items.repository.ts";
 import {
   ACTION_TO_TYPE_MAP,
   ENTITY_ID_EXTRACTORS,

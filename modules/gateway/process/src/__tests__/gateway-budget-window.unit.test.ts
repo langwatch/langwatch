@@ -1,7 +1,6 @@
+import { GatewayWindow } from "@langwatch/gateway-contract";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
-
-import { GatewayWindow } from "@langwatch/gateway-contract";
 
 describe("budget window math", () => {
   describe("nextResetAt()", () => {

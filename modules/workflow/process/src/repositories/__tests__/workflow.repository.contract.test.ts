@@ -1,3 +1,4 @@
+import type { WorkflowDsl } from "@langwatch/workflow-contract";
 /**
  * @vitest-environment node
  * The contract every workflow backend answers the same way, run against
@@ -5,7 +6,7 @@
  * Postgres backend joins as a second row when this package declares that datastore.
  */
 import { describe, expect, it } from "vitest";
-import type { WorkflowDsl } from "@langwatch/workflow-contract";
+
 import { MemoryWorkflowRepositories } from "../memory/memory.workflow.repositories.ts";
 import type { WorkflowRepositories } from "../workflow-repositories.registry.ts";
 

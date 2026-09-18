@@ -5,7 +5,6 @@
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 
-import { evaluatorSchema, evaluatorWithFieldsSchema } from "./evaluator.ts";
 import {
   evaluatorApiCopyInputSchema,
   evaluatorApiCreateInputSchema,
@@ -23,6 +22,7 @@ import {
   evaluatorSyncFromSourceSchema,
   evaluatorWorkflowFieldsSchema,
 } from "./evaluator.schemas.ts";
+import { evaluatorSchema, evaluatorWithFieldsSchema } from "./evaluator.ts";
 
 export const evaluatorTrpc = defineTrpcContract("evaluators")
   /** Every evaluator in the project, with the fields its type derives. */

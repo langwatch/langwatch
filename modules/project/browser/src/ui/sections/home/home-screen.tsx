@@ -1,19 +1,17 @@
 import { Box, Container, chakra, Grid, HStack, Skeleton, Spacer, VStack } from "@chakra-ui/react";
 import { LuCalendarClock } from "react-icons/lu";
+
 // The page's serif display voice (Sentient) is declared in langy-theme.css.
 // Imported HERE, not just via Langy components, so the greeting, banner, and
 // recents headings render the real face on every home — including the one
 // where no Langy surface mounts.
 import "@langwatch/langy-browser/surfaces/langy-theme.css";
-import {
-  BriefingMockSwitcher,
-  HomeBriefingSection,
-  SetupHairline,
-} from "./briefing/index.ts";
 import { homeApi } from "../../../behavior/home-api.ts";
-import { DocsGuides } from "./components/docs-guides.tsx";
-import { HomeStateSwitcher } from "./components/dev/home-state-switcher.tsx";
+import { useProjectHomeHost } from "../../../model/project-home-host.ts";
+import { BriefingMockSwitcher, HomeBriefingSection, SetupHairline } from "./briefing/index.ts";
 import { chartVariantFor, useHomeDevState } from "./components/dev/home-dev-state.ts";
+import { HomeStateSwitcher } from "./components/dev/home-state-switcher.tsx";
+import { DocsGuides } from "./components/docs-guides.tsx";
 import { HomeFortune } from "./components/home-fortune.tsx";
 import { HomePageBanners } from "./components/home-page-banners.tsx";
 import { LangyHomeHero } from "./components/langy-home-hero.tsx";
@@ -24,7 +22,6 @@ import { TracesOverview } from "./components/traces-overview.tsx";
 import { useHomeComposition } from "./components/use-home-composition.ts";
 import { useProjectReach } from "./components/use-project-reach.ts";
 import { WelcomeHeader } from "./components/welcome-header.tsx";
-import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 
 /**
  * The application shell is not this page's — chrome layout draws it. A

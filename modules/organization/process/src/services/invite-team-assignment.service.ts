@@ -9,9 +9,9 @@ import {
   TeamNotInOrganizationError,
   TeamUserRole,
 } from "@langwatch/organization-contract";
+
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import {
   type CreateInvitesInviteInput,
   type InviteAssignableRoles,
@@ -19,6 +19,7 @@ import {
   type ResolvedInviteTeams,
   type TeamAssignmentInput,
 } from "../rules/invite-contracts.rules.ts";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 
 export class InviteTeamAssignmentService {
   static create(deps: InviteServiceDependencies): InviteTeamAssignmentService {

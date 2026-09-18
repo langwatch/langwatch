@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { ModelProvider } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
+
 import { MemoryModelProviderRepositories } from "../memory.model-provider.repositories.ts";
 import { MemoryRoutingHandleConflictError } from "../memory.model-provider.repository.ts";
 

@@ -1,8 +1,9 @@
-import { nowInstant } from "@langwatch/time";
 import { Box, Button, Flex, Heading, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { nowInstant } from "@langwatch/time";
 import { Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Drawer } from "@langwatch/design-system/drawer";
+
 import { useExecutionStore } from "../../behavior/execution.store.ts";
 import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
 import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";

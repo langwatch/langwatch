@@ -17,10 +17,11 @@ import {
 } from "@chakra-ui/react";
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
 import type { ApiKeyRole, ApiKeyTrpcRoleBinding } from "@langwatch/api-key-contract";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Select } from "@langwatch/design-system/select";
+import type { Instant } from "@langwatch/time";
 import { useEffect, useMemo, useState } from "react";
+
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import {
   earliestCustomExpiration,
@@ -38,7 +39,7 @@ import {
   PermissionCounter,
   type PermissionSelection,
 } from "../blocks/permission-category-list.tsx";
-import type { Instant } from "@langwatch/time";
+import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
 
 type MyBindings = {
   data: { scopeType: string; scopeId: string; role: ApiKeyRole }[] | undefined;

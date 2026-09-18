@@ -1,5 +1,4 @@
 import { HandledError, type SerializedHandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
 import {
   MASKED_KEY_PLACEHOLDER,
   findModelProviderDefinition,
@@ -14,6 +13,8 @@ import {
   type ModelProviderApi,
   type ModelProviderUncheckedReason,
 } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
+
 import {
   ModelProviderCredentialProbe,
   type ModelProviderEgress,

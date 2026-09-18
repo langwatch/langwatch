@@ -1,4 +1,3 @@
-import { readableDate } from "../../../../model/ops-formatters.ts";
 import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { useMemo, useRef, useState } from "react";
@@ -12,6 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import { readableDate } from "../../../../model/ops-formatters.ts";
 
 const COLORS = {
   staged: { stroke: "#06b6d4", fill: "#06b6d4" },

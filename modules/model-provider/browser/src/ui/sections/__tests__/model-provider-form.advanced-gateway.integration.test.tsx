@@ -87,8 +87,8 @@ vi.mock("../../../behavior/model-provider-api.ts", () => {
   };
 });
 
-import { EditModelProviderForm } from "../model-provider-form.tsx";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
 
 function renderForm() {
   return renderWithModelProviderHost(

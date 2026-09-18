@@ -1,29 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AwsClientConfig, AwsClientConfigInput } from "@langwatch/aws-client";
 import { WEBHOOK_SIGNATURE_HEADER, type WebhookDispatchRateLimiter } from "@langwatch/egress";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { WebhookDispatchRequest } from "../../app/webhook.app.ts";
+import type {
+  SqsDestinationConfig,
+  SqsWebhookSender,
+} from "../../channels/sqs/sqs.webhook-destination.channel.ts";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
 import {
   SQS_MAX_MESSAGE_BYTES,
-  type SqsDestinationConfig,
   SqsWebhookDestinationAdapter,
 } from "../sqs.webhook-destination.service.ts";
-import type { WebhookDispatchRequest } from "../../app/webhook.app.ts";
 
-// The queue client and the rate limiter are the two boundaries; everything
+// The queue channel and the rate limiter are the two boundaries; everything
 // else in these tests is the real envelope, the real signature and the real
 // classification.
 const limitMock = vi.fn<WebhookDispatchRateLimiter["limit"]>();
 const rateLimiter: WebhookDispatchRateLimiter = { limit: limitMock };
-
-/** Builds a client config the way the process would, minus the socket pool. */
-const awsClientConfig = (input: AwsClientConfigInput): AwsClientConfig => ({
-  ...(input.region ? { region: input.region } : {}),
-  ...(input.disableSdkRetries ? { maxAttempts: 1 } : {}),
-  requestHandler: {} as never,
-});
-
-const clientFor = (config: SqsDestinationConfig) =>
-  SqsWebhookDestinationAdapter.clientFor({ config, awsClientConfig });
 
 const QUEUE_URL = "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-dev-billing-webhooks";
 
@@ -51,18 +44,24 @@ function request(overrides: Partial<WebhookDispatchRequest> = {}): WebhookDispat
   };
 }
 
-/** A fake queue client that records what it was asked to send. */
+/** A fake queue channel that records what it was asked to send. */
 function fakeQueue(behavior?: { rejectWith?: unknown }) {
   const sent: Record<string, unknown>[] = [];
-  const client = {
-    send: vi.fn(async (command: { input: Record<string, unknown> }) => {
-      if (behavior?.rejectWith) throw behavior.rejectWith;
-      sent.push(command.input);
-      return { MessageId: "msg-abc-123" };
-    }),
-    destroy: vi.fn(),
+  const channel: SqsWebhookSender = {
+    send: vi.fn(
+      async (message: { config: SqsDestinationConfig; body: string; attributes: unknown }) => {
+        if (behavior?.rejectWith) throw behavior.rejectWith;
+        sent.push({
+          QueueUrl: message.config.queueUrl,
+          MessageBody: message.body,
+          MessageAttributes: message.attributes,
+        });
+        return "msg-abc-123";
+      },
+    ),
+    invalidate: vi.fn(),
   };
-  return { sent, client };
+  return { sent, channel };
 }
 
 describe("SqsWebhookDestinationAdapter", () => {
@@ -81,16 +80,15 @@ describe("SqsWebhookDestinationAdapter", () => {
   describe("given a batch of envelopes", () => {
     /** @scenario A queue message carries the same bytes as the HTTP body */
     it("puts the exact HTTP body on the queue with no wrapper around it", async () => {
-      const { sent, client } = fakeQueue();
+      const { sent, channel } = fakeQueue();
       const destination = SqsWebhookDestinationAdapter.create({
         config: {
-          awsClientConfig,
+          channel,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        createClient: () => client as never,
       });
 
       await destination.send(request());
@@ -107,16 +105,15 @@ describe("SqsWebhookDestinationAdapter", () => {
 
     /** @scenario Signature, delivery id and attempt ride as message attributes */
     it("carries the signature, delivery id and attempt under their header names", async () => {
-      const { sent, client } = fakeQueue();
+      const { sent, channel } = fakeQueue();
       const destination = SqsWebhookDestinationAdapter.create({
         config: {
-          awsClientConfig,
+          channel,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        createClient: () => client as never,
       });
 
       await destination.send(request({ attempt: 3 }));
@@ -133,16 +130,15 @@ describe("SqsWebhookDestinationAdapter", () => {
 
     /** @scenario Signature, delivery id and attempt ride as message attributes */
     it("marks a test fire under its own header name", async () => {
-      const { sent, client } = fakeQueue();
+      const { sent, channel } = fakeQueue();
       const destination = SqsWebhookDestinationAdapter.create({
         config: {
-          awsClientConfig,
+          channel,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        createClient: () => client as never,
       });
 
       await destination.send(request({ isTestFire: true }));
@@ -153,16 +149,15 @@ describe("SqsWebhookDestinationAdapter", () => {
 
     /** @scenario A queue delivery is recorded with no response status */
     it("answers success with a message id and no status", async () => {
-      const { client } = fakeQueue();
+      const { channel } = fakeQueue();
       const destination = SqsWebhookDestinationAdapter.create({
         config: {
-          awsClientConfig,
+          channel,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        createClient: () => client as never,
       });
 
       const result = await destination.send(request());
@@ -179,16 +174,15 @@ describe("SqsWebhookDestinationAdapter", () => {
   describe("when the batch is larger than one message can carry", () => {
     /** @scenario A batch too large for one queue message is refused terminally */
     it("refuses terminally and names the batch-size control", async () => {
-      const { client, sent } = fakeQueue();
+      const { channel, sent } = fakeQueue();
       const destination = SqsWebhookDestinationAdapter.create({
         config: {
-          awsClientConfig,
+          channel,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        createClient: () => client as never,
       });
 
       const result = await destination.send(
@@ -215,24 +209,29 @@ describe("SqsWebhookDestinationAdapter", () => {
   });
 
   describe("when the organization is at its hourly dispatch cap", () => {
-    /** @scenario Both destinations answer to the same hourly dispatch cap */
-    it("backs off rather than writing to the queue", async () => {
+    function cappedDestination() {
       limitMock.mockResolvedValue({
         allowed: false,
         remaining: 0,
         resetAt: Date.now() + 60_000,
       } as never);
-      const { client, sent } = fakeQueue();
+      const { channel, sent } = fakeQueue();
       const destination = SqsWebhookDestinationAdapter.create({
         config: {
-          awsClientConfig,
+          channel,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        createClient: () => client as never,
       });
+
+      return { destination, sent };
+    }
+
+    /** @scenario Both destinations answer to the same hourly dispatch cap */
+    it("backs off rather than writing to the queue", async () => {
+      const { destination, sent } = cappedDestination();
 
       await expect(destination.send(request())).rejects.toMatchObject({
         retryable: true,
@@ -244,22 +243,7 @@ describe("SqsWebhookDestinationAdapter", () => {
     });
 
     it("exempts a test fire, exactly as the HTTPS transport does", async () => {
-      limitMock.mockResolvedValue({
-        allowed: false,
-        remaining: 0,
-        resetAt: Date.now() + 60_000,
-      } as never);
-      const { client, sent } = fakeQueue();
-      const destination = SqsWebhookDestinationAdapter.create({
-        config: {
-          awsClientConfig,
-          rateLimiter,
-          queueUrl: QUEUE_URL,
-          accessKeyId: "AKIA1",
-          secretAccessKey: "s3cr3t",
-        },
-        createClient: () => client as never,
-      });
+      const { destination, sent } = cappedDestination();
 
       const result = await destination.send(request({ isTestFire: true }));
 
@@ -321,20 +305,19 @@ describe("SqsWebhookDestinationAdapter", () => {
     });
 
     it("returns the classified verdict rather than throwing", async () => {
-      const { client } = fakeQueue({
+      const { channel } = fakeQueue({
         rejectWith: Object.assign(new Error("queue is gone"), {
           name: "QueueDoesNotExist",
         }),
       });
       const destination = SqsWebhookDestinationAdapter.create({
         config: {
-          awsClientConfig,
+          channel,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        createClient: () => client as never,
       });
 
       const result = await destination.send(request());
@@ -342,67 +325,6 @@ describe("SqsWebhookDestinationAdapter", () => {
       expect(result.verdict).toBe("terminal");
       expect(result.status).toBeNull();
       expect(result.error).toContain("QueueDoesNotExist");
-    });
-  });
-
-  /**
-   * A cached client holds a credential provider that has ALREADY resolved, so what happens to
-   * that cache decides whether a customer's repair reaches us. The customer corrects the role's
-   * trust policy or the key's permissions on their own side, and we are never told.
-   */
-  describe("given a cached queue client", () => {
-    beforeEach(() => SqsWebhookDestinationAdapter.resetClientCache());
-    afterEach(() => SqsWebhookDestinationAdapter.resetClientCache());
-
-    describe("when the identity we send with is refused", () => {
-      /** @scenario A repaired credential takes effect without a restart */
-      it("drops the cached client so the next delivery asks for credentials again", async () => {
-        const config = {
-          queueUrl: QUEUE_URL,
-          roleArn: "arn:aws:iam::381491922238:role/langwatch-webhook-producer",
-          externalId: "lw-abc",
-        };
-        const first = clientFor(config);
-        expect(clientFor(config)).toBe(first);
-
-        const { client } = fakeQueue({
-          rejectWith: Object.assign(new Error("not authorized to AssumeRole"), {
-            name: "AccessDenied",
-          }),
-        });
-        await SqsWebhookDestinationAdapter.create({
-          config: { ...config, awsClientConfig, rateLimiter },
-          createClient: () => client as never,
-        }).send(request());
-
-        expect(clientFor(config)).not.toBe(first);
-      });
-    });
-
-    describe("when the failure says nothing about the identity", () => {
-      /** @scenario A repaired credential takes effect without a restart */
-      it("keeps the cached client", async () => {
-        const config = {
-          queueUrl: QUEUE_URL,
-          accessKeyId: "AKIA1",
-          secretAccessKey: "s3cr3t",
-        };
-        const first = clientFor(config);
-
-        const { client } = fakeQueue({
-          rejectWith: Object.assign(new Error("slow down"), {
-            name: "ThrottlingException",
-          }),
-        });
-        await SqsWebhookDestinationAdapter.create({
-          config: { ...config, awsClientConfig, rateLimiter },
-          createClient: () => client as never,
-        }).send(request());
-
-        // Rebuilding on a throttle would re-assume the role on every delivery,
-        // which is the cost the cache exists to avoid.
-        expect(clientFor(config)).toBe(first);
-      });
     });
   });
 });
@@ -463,54 +385,5 @@ describe("queue URL admission", () => {
       ok: false,
       problem: "shape",
     });
-  });
-});
-
-describe("the queue client", () => {
-  afterEach(() => SqsWebhookDestinationAdapter.resetClientCache());
-
-  /**
-   * A client per delivery would re-assume the role on every attempt, because
-   * the assumed session is cached inside the provider instance, and would pay
-   * a TLS handshake per delivery on a torn-down connection pool.
-   */
-  it("is reused for the same queue and credentials", () => {
-    const config = {
-      queueUrl: QUEUE_URL,
-      accessKeyId: "AKIA1",
-      secretAccessKey: "s3cr3t",
-    };
-    expect(clientFor(config)).toBe(clientFor({ ...config }));
-  });
-
-  it("is rebuilt when a credential rotates, so it never authenticates as the old identity", () => {
-    const first = clientFor({
-      queueUrl: QUEUE_URL,
-      accessKeyId: "AKIA1",
-      secretAccessKey: "s3cr3t",
-    });
-    const rotated = clientFor({
-      queueUrl: QUEUE_URL,
-      accessKeyId: "AKIA1",
-      secretAccessKey: "rotated",
-    });
-    const otherRole = clientFor({
-      queueUrl: QUEUE_URL,
-      roleArn: "arn:aws:iam::381491922238:role/other",
-    });
-    expect(rotated).not.toBe(first);
-    expect(otherRole).not.toBe(first);
-  });
-
-  it("takes its region from the queue URL rather than a second setting", async () => {
-    const client = clientFor({
-      queueUrl: QUEUE_URL,
-      accessKeyId: "AKIA1",
-      secretAccessKey: "s3cr3t",
-    });
-    await expect(client.config.region()).resolves.toBe("eu-central-1");
-    // The delivery ladder above is already counting attempts, so the SDK must
-    // not add its own underneath it.
-    expect(await client.config.maxAttempts()).toBe(1);
   });
 });

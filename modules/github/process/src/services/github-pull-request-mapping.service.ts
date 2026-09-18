@@ -1,6 +1,6 @@
 import type { GithubPullRequest, GithubPullRequestEvent } from "@langwatch/github-contract";
-
 import { toDate } from "@langwatch/time";
+
 import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,

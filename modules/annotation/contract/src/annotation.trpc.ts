@@ -7,6 +7,7 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
+import { annotationQueueItemSchema } from "./annotation-queue.schemas.ts";
 import {
   annotationQueueDetailSchema,
   annotationQueueItemsDeletedSchema,
@@ -20,8 +21,6 @@ import {
   annotationOptimizedQueuesSchema,
   annotationQueueItemWithTraceSchema,
 } from "./annotation-review.schemas.ts";
-import { annotationQueueItemSchema } from "./annotation-queue.schemas.ts";
-import { annotationSchema } from "./annotation.schemas.ts";
 import {
   annotationApiAnnotationScopeSchema,
   annotationApiByTraceIdInputSchema,
@@ -38,6 +37,7 @@ import {
   annotationApiQueueListInputSchema,
   annotationApiUpdateInputSchema,
 } from "./annotation-trpc.schemas.ts";
+import { annotationSchema } from "./annotation.schemas.ts";
 
 /** A badge count, for the reviewer's own work and for the Inbox. */
 export const annotationCountSchema = z.object({ count: z.number() });

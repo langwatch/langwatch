@@ -1,3 +1,4 @@
+import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
 /**
  * @vitest-environment node
  * @unit
@@ -6,7 +7,7 @@
  * @see specs/coding-agent/session-git-context.feature
  */
 import { describe, expect, it } from "vitest";
-import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
+
 import { MemorySessionContextMemoRepository } from "../memory/memory.session-context-memo.repository.ts";
 
 const DAY = 24 * 60 * 60 * 1000;

@@ -5,6 +5,7 @@ import {
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { ModelProviderEgress } from "../../app/model-provider.members.ts";
 import { HttpModelProviderCredentialProbeAdapter } from "../http.model-provider-credential-probe.service.ts";
 

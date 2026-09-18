@@ -1,3 +1,11 @@
+import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
+import {
+  type EvaluationRunData,
+  EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_PROCESSING_EVENT_TYPES,
+  EVALUATION_REPORTED_EVENT_TYPE,
+  type EvaluationProcessingEvent,
+} from "@langwatch/evaluation-contract";
 import {
   type AppendStore,
   defineAggregate,
@@ -8,12 +16,7 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { type EvaluationRunData,
-  EVALUATION_COMPLETED_EVENT_TYPE,
-  EVALUATION_PROCESSING_EVENT_TYPES,
-  EVALUATION_REPORTED_EVENT_TYPE,
-  type EvaluationProcessingEvent } from "@langwatch/evaluation-contract";
-import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
+
 import {
   type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
@@ -22,8 +25,8 @@ import {
   EvaluationAnalyticsRollupMapProjection,
   type EvaluationAnalyticsRollupRow,
 } from "../eventing/evaluation-analytics-rollup.projection.ts";
-import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
+import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
 import { EvaluationCommandAdapter } from "./evaluation-command.service.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;

@@ -1,9 +1,11 @@
 import { randomBytes } from "node:crypto";
+
 import {
   IdentityVerificationExpiredError,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
+
 import type { SignUpVerificationTokenRepository } from "../repositories/signup-verification.repository.ts";
 
 /**

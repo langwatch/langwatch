@@ -44,6 +44,28 @@ export const organizationWeb = defineWebModule("organization")
    * What another module may mount. annotation reads the feature gate;
    * project mounts the department picker.
    */
+  .withDrawers({
+    createProject: {
+      load: async () => ({
+        default: (await import("./ui/sections/create-project-drawer.tsx")).CreateProjectDrawer,
+      }),
+    },
+    editProject: {
+      load: async () => ({
+        default: (await import("./ui/sections/edit-project-drawer.tsx")).EditProjectDrawer,
+      }),
+    },
+    createTeam: {
+      load: async () => ({
+        default: (await import("./ui/sections/create-team-drawer.tsx")).CreateTeamDrawer,
+      }),
+    },
+    inviteMember: {
+      load: async () => ({
+        default: (await import("./ui/sections/invite-member-drawer.tsx")).InviteMemberDrawer,
+      }),
+    },
+  })
   .publishSurfaces({
     "surfaces/personal-workspace-features": {
       load: () => import("./behavior/personal-workspace-features-api.ts"),

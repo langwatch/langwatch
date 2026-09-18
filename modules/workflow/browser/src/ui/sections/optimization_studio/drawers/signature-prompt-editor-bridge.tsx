@@ -1,20 +1,20 @@
-import type { Edge, Node } from "@xyflow/react";
-import { useUpdateNodeInternals } from "@xyflow/react";
-import { useCallback, useMemo } from "react";
-import { useShallow } from "zustand/react/shallow";
-
-import { PromptEditorDrawer } from "@langwatch/prompt-browser/surfaces/prompt-editor-drawer";
-import type { FieldMapping } from "@langwatch/prompt-browser-kit/variables";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
+import type { FieldMapping } from "@langwatch/prompt-browser-kit/variables";
 import { nodeDataToLocalPromptConfig } from "@langwatch/prompt-browser/llm-prompt-config-utils";
-import { useSmartSetNode } from "../../../../behavior/use-smart-set-node.ts";
-import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
+import { PromptEditorDrawer } from "@langwatch/prompt-browser/surfaces/prompt-editor-drawer";
 import {
   type Component,
   type Field,
   fieldSchema,
   type Signature,
 } from "@langwatch/workflow-contract";
+import type { Edge, Node } from "@xyflow/react";
+import { useUpdateNodeInternals } from "@xyflow/react";
+import { useCallback, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
+
+import { useSmartSetNode } from "../../../../behavior/use-smart-set-node.ts";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
   applyMappingChange,
   buildAvailableSources,

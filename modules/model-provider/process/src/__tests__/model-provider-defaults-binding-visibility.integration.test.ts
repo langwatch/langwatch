@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 /**
  * Real-Postgres coverage for Default Models read visibility when a member's project
  * access comes from ROLE BINDINGS only (org-scope MEMBER + team-scope MEMBER, no legacy
@@ -6,13 +8,12 @@
  * @see specs/model-providers/role-based-default-models.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { ModelProviderDefaultsService } from "../services/model-provider-defaults.service.ts";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
-import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderDefaultsService } from "../services/model-provider-defaults.service.ts";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,

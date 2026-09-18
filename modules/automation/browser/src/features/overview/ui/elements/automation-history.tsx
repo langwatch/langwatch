@@ -1,7 +1,5 @@
 import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { TriggerKind } from "@langwatch/automation-contract";
-import { AlertTriangle, Calendar, CheckCircle, Zap } from "lucide-react";
-import { useMemo } from "react";
 import {
   type Instant,
   Temporal,
@@ -10,6 +8,8 @@ import {
   toDate,
   toEpochMs,
 } from "@langwatch/time";
+import { AlertTriangle, Calendar, CheckCircle, Zap } from "lucide-react";
+import { useMemo } from "react";
 
 export type AutomationActivityFire = {
   id: string;

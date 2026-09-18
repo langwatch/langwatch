@@ -53,10 +53,7 @@ const chartNotFoundResponse: Record<404, RouteResponse> = {
  * been found switched on for it. The runtime has already refused a path naming
  * another project, so this guard is the only one left for a route to run.
  */
-async function projectFor(input: {
-  app: DashboardApi;
-  scope: { id: string };
-}): Promise<string> {
+async function projectFor(input: { app: DashboardApi; scope: { id: string } }): Promise<string> {
   // Asked through the application rather than evaluated here: it is the one
   // place the flag is read, so this boundary and the workbench's cannot drift.
   if (!(await input.app.isWorkbenchEnabled({ projectId: input.scope.id }))) {

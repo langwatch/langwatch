@@ -8,15 +8,7 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import {
-  type ClickHouseExperimentRunResultRecord,
-  ExperimentRunResultStorageMapProjection,
-} from "../../eventing/experiment-run-result-storage.projection.ts";
-import {
-  type ExperimentRunStateData,
-  ExperimentRunStateFoldProjection,
-} from "../../eventing/experiment-run-state.projection.ts";
-import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "../../rules/experiment-run-event-types.rules.ts";
+
 import {
   type EvaluatorResultEventData,
   evaluatorResultEventDataSchema,
@@ -30,19 +22,28 @@ import {
   type TraceMetricsComputedEventData,
   traceMetricsComputedEventDataSchema,
 } from "../../eventing/experiment-run-events.process.ts";
+import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
 import { makeExperimentRunKey } from "../../eventing/experiment-run-key.process.ts";
+import {
+  type ClickHouseExperimentRunResultRecord,
+  ExperimentRunResultStorageMapProjection,
+} from "../../eventing/experiment-run-result-storage.projection.ts";
+import {
+  type ExperimentRunStateData,
+  ExperimentRunStateFoldProjection,
+} from "../../eventing/experiment-run-state.projection.ts";
+import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "../../rules/experiment-run-event-types.rules.ts";
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
+import type { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
+import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
+import { MemoryExperimentIdLookupRepository } from "../memory/memory.experiment-id-lookup.repository.ts";
+import { MemoryExperimentRunStateRepository } from "../memory/memory.experiment-run-state.repository.ts";
 import {
   ClickhouseExperimentClickHouseRepository,
   type ExperimentEventingClickHouseResolver,
 } from "./clickhouse.experiment-clickhouse.repository.ts";
 import { ClickHouseExperimentIdLookupRepository } from "./clickhouse.experiment-id-lookup.repository.ts";
-import { MemoryExperimentIdLookupRepository } from "../memory/memory.experiment-id-lookup.repository.ts";
-import type { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
 import { ClickHouseExperimentRunStateRepository } from "./clickhouse.experiment-run-state.repository.ts";
-import { MemoryExperimentRunStateRepository } from "../memory/memory.experiment-run-state.repository.ts";
-import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
-import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
 
 /**
  * All experiment-run-processing commands defined from event data schemas.
@@ -187,7 +188,9 @@ export class ExperimentEventingAdapter {
     clickhouseEnabled: boolean;
   }): ExperimentEventingAdapter {
     return new ExperimentEventingAdapter(
-      input.clickhouseEnabled ? ClickhouseExperimentClickHouseRepository.create(input.resolveClient) : null,
+      input.clickhouseEnabled
+        ? ClickhouseExperimentClickHouseRepository.create(input.resolveClient)
+        : null,
     );
   }
 
@@ -215,7 +218,9 @@ export class ExperimentEventingAdapter {
     });
   }
 
-  static pipeline(deps: ClickhouseExperimentRunProcessingRepository): ExperimentRunProcessingPipeline {
+  static pipeline(
+    deps: ClickhouseExperimentRunProcessingRepository,
+  ): ExperimentRunProcessingPipeline {
     const builder = definePipeline<ExperimentRunProcessingEvent>({
       name: "experiment_run_processing",
       aggregate: defineAggregate({

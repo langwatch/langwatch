@@ -58,9 +58,7 @@ export interface AnnotationQueueItemRepository {
   countAssignedItems(input: AnnotationQueueItemCaller): Promise<number>;
   findMemberQueuePendingCounts(
     input: AnnotationQueueItemCaller,
-  ): Promise<
-    readonly Readonly<{ id: string; name: string; slug: string; pendingCount: number }>[]
-  >;
+  ): Promise<readonly Readonly<{ id: string; name: string; slug: string; pendingCount: number }>[]>;
   deleteQueueItems(input: DeleteAnnotationQueueItemsInput): Promise<number>;
   markQueueItemDone(input: MarkAnnotationQueueItemDoneInput): Promise<AnnotationQueueItem>;
   findQueueItemsByUser(input: ListQueueItemsByUserInput): Promise<AnnotationQueueItemsPage>;

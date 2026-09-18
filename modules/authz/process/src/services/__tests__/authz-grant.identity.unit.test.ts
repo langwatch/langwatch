@@ -1,5 +1,6 @@
 import { getEnvironment, setEnvironment } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
+
 import { AuthzGrantIdentity } from "../authz-grant-identity.service.ts";
 
 const ORG = "org_acme";
@@ -66,9 +67,9 @@ describe("grant identity", () => {
     it("ignores sub-second differences in business time", () => {
       // KSUID timestamps are second-precision; a retry landing in the same
       // second as the original command derives the same id.
-      expect(
-        AuthzGrantIdentity.deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 500 }),
-      ).toBe(AuthzGrantIdentity.deriveGrantId(base));
+      expect(AuthzGrantIdentity.deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 500 })).toBe(
+        AuthzGrantIdentity.deriveGrantId(base),
+      );
     });
   });
 

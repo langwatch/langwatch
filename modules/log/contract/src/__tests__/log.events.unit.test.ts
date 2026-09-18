@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+
 import { logEventEnvelopeSchema } from "../log.events.ts";
 
 const envelope = {

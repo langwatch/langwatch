@@ -1,10 +1,10 @@
-import { TraceApi } from "@langwatch/trace-contract";
-import { generate } from "@langwatch/ksuid";
-import { type AgentCallSignal,
+import {
+  type AgentCallSignal,
   AgentApi,
   type AgentWorkflowInput,
   type UpdateAgentWorkflowConfigInput,
-  agentServerConfigSchema,
+  agentServerConfig,
+  type AgentServerConfig,
   linkedWorkflowId,
   type Agent,
   type AgentWithFields,
@@ -39,29 +39,32 @@ import { type AgentCallSignal,
   type AgentCallInput,
   type AgentCallContext,
   type DispatchAgent,
-  type DispatchCall } from "@langwatch/agent-contract";
+  type DispatchCall,
+} from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
+import { generate } from "@langwatch/ksuid";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
 import { ScenarioApi } from "@langwatch/scenario-contract";
+import type { Instant } from "@langwatch/time";
+import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import type { FeatureSetup } from "@langwatch/kernel";
-import type { Instant } from "@langwatch/time";
-import { z } from "zod";
+
 import type { AgentRepositories } from "../repositories/agent.repositories.ts";
 import { agentPlatformUrl } from "../rules/agent-platform-url.rules.ts";
 import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
-import { AgentService } from "../services/agent.service.ts";
 import { AgentCopyService } from "../services/agent-copy.service.ts";
-import { ConnectedAgentService } from "../services/connected-agent.service.ts";
+import { AgentService } from "../services/agent.service.ts";
 import {
   ConnectedAgentPresenceService,
   type AgentPresence,
 } from "../services/connected-agent-presence.service.ts";
-import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
+import { ConnectedAgentService } from "../services/connected-agent.service.ts";
+import type { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 
 /**
  * The app's KSUID resource for a call's thread id (`KSUID_RESOURCES.THREAD`).
@@ -70,12 +73,16 @@ import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
  */
 const THREAD_KSUID_RESOURCE = "thread";
 
-const agentAppConfigSchema = z.object({
-  publicBaseUrl: z.url(),
-  connected: agentServerConfigSchema.nullable(),
-  httpTesting: z.boolean().optional(),
-});
-export type AgentAppConfig = z.infer<typeof agentAppConfigSchema>;
+/**
+ * Shapes restated rather than imported from `@langwatch/process-stores`: a
+ * module depends on contracts. `publicBaseUrl` is the process's own fact,
+ * absent where the deployment named no `BASE_HOST`.
+ */
+type AgentMembers = Readonly<{
+  redis: RedisConnection;
+  publicBaseUrl: string | undefined;
+}>;
+
 /**
  * The relay behind connected agents runs on the process's own `redis` member.
  * A deployment that named no Redis refuses at boot naming this module, rather
@@ -83,14 +90,14 @@ export type AgentAppConfig = z.infer<typeof agentAppConfigSchema>;
  */
 type AgentSetup = FeatureSetup<
   typeof AgentApp.dependencies,
-  MembersRead<typeof AgentApp.reads>,
-  AgentAppConfig,
+  AgentMembers,
+  AgentServerConfig,
   AgentRepositories
 >;
 
 export class AgentApp implements AgentApi {
   static readonly contract = AgentApi;
-  static readonly configSchema = agentAppConfigSchema;
+  static readonly config = agentServerConfig;
   static readonly dependencies = {
     apiKeys: ApiKeyApi,
     auditLog: AuditLogApi,
@@ -101,11 +108,13 @@ export class AgentApp implements AgentApi {
     users: UserApi,
     workflows: WorkflowApi,
   };
-  static readonly reads = reads("redis");
+  /** Both names are from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["redis", "publicBaseUrl"] as const;
 
   readonly #agents: AgentService;
   readonly #copies: AgentCopyService;
   readonly #connected: ConnectedAgentService | undefined;
+  /** No process supplies HTTP-based agent testing yet; see the batch-a handoff. */
   readonly #httpTesting: HttpAgentTestService | undefined;
   readonly #auditLog: AuditLogApi;
   readonly #permissions: AuthzApi;
@@ -116,47 +125,34 @@ export class AgentApp implements AgentApi {
   readonly #publicBaseUrl: string;
   readonly #relayMaxPayloadMb: number | undefined;
 
-  private constructor({
-    repositories,
-    dependencies,
-    members,
-    config,
-    resources,
-  }: AgentSetup) {
+  private constructor({ repositories, dependencies, members, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
     this.#copies = AgentCopyService.create(repositories.agents, dependencies.workflows);
-    this.#publicBaseUrl = config.publicBaseUrl;
-    this.#relayMaxPayloadMb = config.connected?.relayMaxPayloadMb;
+    this.#publicBaseUrl = members.publicBaseUrl ?? "";
+    this.#relayMaxPayloadMb = config.relayMaxPayloadMb;
     this.#auditLog = dependencies.auditLog;
     this.#permissions = dependencies.permissions;
     this.#projects = dependencies.projects;
     this.#scenarios = dependencies.scenarios;
     this.#users = dependencies.users;
     this.#workflows = dependencies.workflows;
-    this.#httpTesting = config.httpTesting
-      ? HttpAgentTestService.create({
-          workflows: dependencies.workflows,
-          traces: dependencies.traces,
-        })
-      : void 0;
+    this.#httpTesting = void 0;
 
-    if (config.connected) {
-      const connected = ConnectedAgentService.create({
-        agents: this.#agents,
-        apiKeys: dependencies.apiKeys,
-        authz: dependencies.permissions,
-        projects: dependencies.projects,
-        redis: members.redis,
-        config: config.connected,
-        publicBaseUrl: config.publicBaseUrl,
-      });
-      this.#connected = connected;
-      resources.ownService({
-        name: "agent-connections",
-        start: () => connected.start(),
-        stop: () => connected.close(),
-      });
-    }
+    const connected = ConnectedAgentService.create({
+      agents: this.#agents,
+      apiKeys: dependencies.apiKeys,
+      authz: dependencies.permissions,
+      projects: dependencies.projects,
+      redis: members.redis,
+      config,
+      publicBaseUrl: this.#publicBaseUrl,
+    });
+    this.#connected = connected;
+    resources.ownService({
+      name: "agent-connections",
+      start: () => connected.start(),
+      stop: () => connected.close(),
+    });
   }
 
   static create(setup: AgentSetup): AgentApp {

@@ -3,6 +3,7 @@
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
+
 import { PrismaEvaluatorRepository } from "../prisma.evaluator.repository.ts";
 
 /** Only the `evaluator` delegate this repository declares is stood in for. */

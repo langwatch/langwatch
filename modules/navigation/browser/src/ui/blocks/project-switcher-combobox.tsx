@@ -1,6 +1,7 @@
 import { Button, Combobox, Text } from "@chakra-ui/react";
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
+
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import {
   type ProjectPickGroup,

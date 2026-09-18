@@ -1,15 +1,16 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
+import { modelProviders } from "@langwatch/model-provider-contract";
+
 import {
   findModelProviderById,
   isResolvableProviderId,
   useAllModelProvidersList,
 } from "../../behavior/use-all-model-providers-list.ts";
 import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings.ts";
-import { modelProviders } from "@langwatch/model-provider-contract";
 import { EditModelProviderForm } from "./model-provider-form.tsx";
-import { Drawer } from "@langwatch/design-system/drawer";
 
 type EditModelProviderDrawerProps = {
   projectId?: string;

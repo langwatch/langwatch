@@ -1,6 +1,10 @@
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { TenantDirectory } from "@langwatch/clickhouse-client";
-import { TenantDirectoryService, type TenantOwnershipReader } from "../../services/tenant-directory.service.ts";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+
+import {
+  TenantDirectoryService,
+  type TenantOwnershipReader,
+} from "../../services/tenant-directory.service.ts";
 
 export type TenantDirectoryClient = PrismaClient | Prisma.TransactionClient;
 

@@ -13,7 +13,7 @@ import {
   type GithubRepositoryRef,
   type GithubTurnToken,
   type GithubServerConfig,
-  githubServerConfigSchema,
+  githubConfig,
   type GithubRepository,
 } from "@langwatch/github-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -21,7 +21,9 @@ import {
   OrganizationApi,
   type OrganizationApi as OrganizationApiContract,
 } from "@langwatch/organization-contract";
+import { reads, type ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
+import { Secret } from "@langwatch/secrets";
 
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
 import {
@@ -144,13 +146,7 @@ export interface GithubAppTokenCache {
 
 export type GithubInfrastructure = Readonly<{
   redis: GithubRedisConnection | null;
-  /**
-   * Signs the install-state token. The same raw value as the platform's
-   * stored-secret key, but a second config claim on its env var is refused
-   * (the secret module already owns `CREDENTIALS_SECRET`), so the process
-   * hands this module the resolved value directly as a supply.
-   */
-  signingKey: string;
+  secrets: ProcessMembers["secrets"];
 }>;
 
 type GithubSetup = FeatureSetup<
@@ -222,10 +218,14 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
 
 /** The process-owned GitHub capability; provider and persistence stay private. */
 export class GithubApp implements GithubApiContract {
-  static readonly reads = ["redis"] as const;
+  static readonly reads = reads("redis", "secrets");
   static readonly contract = GithubApi;
   static readonly dependencies = { organizations: OrganizationApi, projects: ProjectApi };
-  static readonly configSchema = githubServerConfigSchema;
+  static readonly config = githubConfig;
+  static readonly secrets = {
+    privateKey: Secret.load("GITHUB_LANGY_PRIVATE_KEY", { optional: true }),
+    webhookSecret: Secret.load("GITHUB_LANGY_WEBHOOK_SECRET", { optional: true }),
+  } as const;
 
   readonly #service: GithubApiContract;
 
@@ -369,10 +369,12 @@ export class GithubApp implements GithubApiContract {
         project: dependencies.projects,
         config: {
           appId: config.appId ?? "",
-          privateKey: config.privateKey ?? "",
+          privateKey: members.secrets.find("GITHUB_LANGY_PRIVATE_KEY") ?? "",
           appSlug: config.appSlug ?? "",
-          webhookSecret: config.webhookSecret ?? "",
-          signingKey: config.signingKey ?? "",
+          webhookSecret: members.secrets.find("GITHUB_LANGY_WEBHOOK_SECRET") ?? "",
+          // Shares the deployment's one CREDENTIALS_SECRET with the secret
+          // module — both read it, neither owns it exclusively.
+          signingKey: members.secrets.find("CREDENTIALS_SECRET") ?? "",
         },
         ...(config.host === undefined ? {} : { hostConfig: { host: config.host } }),
       }),

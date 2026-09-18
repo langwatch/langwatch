@@ -59,7 +59,6 @@ import type {
   AutomationTraceFilterCompiler,
   AutomationWebhookStoredParams,
 } from "../app/automation.app.ts";
-import type { AutomationService } from "./automation.service.ts";
 import {
   extractCheckKeys,
   notifyingActionOr,
@@ -71,6 +70,7 @@ import {
 } from "../rules/automation-authoring.rules.ts";
 import { buildRetryAfterMessage } from "../rules/retry-after-message.rules.ts";
 import type { AutomationRulesService } from "./automation-rules.service.ts";
+import type { AutomationService } from "./automation.service.ts";
 
 /**
  * The app's KSUID resource for a trigger row (`KSUID_RESOURCES.TRIGGER`). The
@@ -117,10 +117,7 @@ export class AutomationAuthoringService {
   }
 
   /** One automation as the browser reads it, or null when the project has none. */
-  async findRedactedById(input: {
-    triggerId: string;
-    projectId: string;
-  }): Promise<Trigger | null> {
+  async findRedactedById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
     const trigger = await this.collaborators.automation.findById(input);
 
     // Never return the encrypted bot token to the browser (ADR-041).
@@ -189,7 +186,9 @@ export class AutomationAuthoringService {
   }
 
   /** The Slack conversations a bot token can see, for the channel picker. */
-  async listSlackChannels(input: AutomationApiListSlackChannelsInput): Promise<SlackChannelListing> {
+  async listSlackChannels(
+    input: AutomationApiListSlackChannelsInput,
+  ): Promise<SlackChannelListing> {
     const token = await this.resolveSlackBotToken({
       typed: input.botToken,
       automationId: input.automationId,
@@ -373,7 +372,10 @@ export class AutomationAuthoringService {
    * graph alert and report use their own SSOT builders to stay byte-identical
    * to the dashboard path, since drift silently breaks whichever writer loses.
    */
-  async save(args: { input: AutomationApiUpsertInput; author: AutomationAuthor }): Promise<Trigger> {
+  async save(args: {
+    input: AutomationApiUpsertInput;
+    author: AutomationAuthor;
+  }): Promise<Trigger> {
     const { input, author } = args;
     const isGraphAlert = !!input.customGraphId;
     const isReport = !isGraphAlert && !!input.report;
@@ -655,9 +657,7 @@ export class AutomationAuthoringService {
         projectId: input.projectId,
         ...data,
         ...(cadence !== "unchanged" ? { notificationCadence: cadence.cadence } : {}),
-        ...(input.traceDebounceMs !== undefined
-          ? { traceDebounceMs: input.traceDebounceMs }
-          : {}),
+        ...(input.traceDebounceMs !== undefined ? { traceDebounceMs: input.traceDebounceMs } : {}),
       });
     }
 

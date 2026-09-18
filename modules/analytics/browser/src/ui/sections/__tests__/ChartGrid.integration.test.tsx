@@ -8,15 +8,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import type { ReactNode } from "react";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import { CHART_GRID_DRAG_HANDLE_CLASS, ChartGrid } from "../chart-grid";
 
@@ -30,10 +23,8 @@ const COLUMN_PX = 86;
 const ROW_PX = 100;
 const GAP_PX = 16;
 
-const cardWidthPx = (colSpan: number) =>
-  colSpan * COLUMN_PX + (colSpan - 1) * GAP_PX;
-const cardHeightPx = (rowSpan: number) =>
-  rowSpan * ROW_PX + (rowSpan - 1) * GAP_PX;
+const cardWidthPx = (colSpan: number) => colSpan * COLUMN_PX + (colSpan - 1) * GAP_PX;
+const cardHeightPx = (rowSpan: number) => rowSpan * ROW_PX + (rowSpan - 1) * GAP_PX;
 
 const place = ({
   graphId,
@@ -49,24 +40,13 @@ const place = ({
   rowSpan,
 });
 
-function Card({
-  id,
-  withIframe = false,
-}: {
-  id: string;
-  withIframe?: boolean;
-}) {
+function Card({ id, withIframe = false }: { id: string; withIframe?: boolean }) {
   return (
     <div data-testid={`card-${id}`} style={{ height: "100%" }}>
-      <div
-        className={CHART_GRID_DRAG_HANDLE_CLASS}
-        data-testid={`handle-${id}`}
-      >
+      <div className={CHART_GRID_DRAG_HANDLE_CLASS} data-testid={`handle-${id}`}>
         {id}
       </div>
-      {withIframe ? (
-        <iframe title={`body-${id}`} data-testid={`iframe-${id}`} />
-      ) : null}
+      {withIframe ? <iframe title={`body-${id}`} data-testid={`iframe-${id}`} /> : null}
     </div>
   );
 }
@@ -78,16 +58,13 @@ function mount({
   placements: ChartGridPlacement[];
   withIframe?: boolean;
 }) {
-  const onPlacementsCommit =
-    vi.fn<(placements: ChartGridPlacement[]) => void>();
+  const onPlacementsCommit = vi.fn<(placements: ChartGridPlacement[]) => void>();
   const view = render(
     <ChartGrid
       placements={placements}
       onPlacementsCommit={onPlacementsCommit}
       width={GRID_WIDTH_PX}
-      renderCard={({ graphId }) => (
-        <Card id={graphId} withIframe={withIframe} />
-      )}
+      renderCard={({ graphId }) => <Card id={graphId} withIframe={withIframe} />}
     />,
     { wrapper: Wrapper },
   );
@@ -96,15 +73,13 @@ function mount({
 
 const gridItemOf = (element: HTMLElement): HTMLElement => {
   const item = element.closest(".react-grid-item");
-  if (!(item instanceof HTMLElement))
-    throw new Error("card is not inside a grid item");
+  if (!(item instanceof HTMLElement)) throw new Error("card is not inside a grid item");
   return item;
 };
 
 const resizeHandleOf = (item: HTMLElement): HTMLElement => {
   const handle = item.querySelector(".react-resizable-handle");
-  if (!(handle instanceof HTMLElement))
-    throw new Error("grid item has no resize handle");
+  if (!(handle instanceof HTMLElement)) throw new Error("grid item has no resize handle");
   return handle;
 };
 
@@ -138,9 +113,7 @@ function drag({
   });
 }
 
-const committed = (
-  spy: ReturnType<typeof vi.fn<(p: ChartGridPlacement[]) => void>>,
-) => {
+const committed = (spy: ReturnType<typeof vi.fn<(p: ChartGridPlacement[]) => void>>) => {
   const last = spy.mock.calls.at(-1)?.[0];
   if (!last) throw new Error("nothing was committed");
   return Object.fromEntries(last.map((p) => [p.graphId, p]));
@@ -164,11 +137,7 @@ beforeAll(() => {
 });
 afterAll(() => {
   if (offsetParentDescriptor) {
-    Object.defineProperty(
-      HTMLElement.prototype,
-      "offsetParent",
-      offsetParentDescriptor,
-    );
+    Object.defineProperty(HTMLElement.prototype, "offsetParent", offsetParentDescriptor);
   }
 });
 

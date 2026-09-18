@@ -53,6 +53,7 @@ import {
   type UpdateOrganizationSettingsInput,
   type UpdateOrganizationSettingsResult,
 } from "@langwatch/organization-contract";
+
 import type {
   GroupIdentity,
   OrganizationSettingsSecret,
@@ -167,10 +168,10 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   /** The stored row, decrypted: the cipher is this service's dependency, not the repository's. */
-  private decryptSettings(stored: {
+  private decryptSettings(stored: { s3Endpoint: string | null; s3AccessKeyId: string | null }): {
     s3Endpoint: string | null;
     s3AccessKeyId: string | null;
-  }): { s3Endpoint: string | null; s3AccessKeyId: string | null } {
+  } {
     return {
       s3Endpoint: stored.s3Endpoint ? this.settingsSecrets.decrypt(stored.s3Endpoint) : null,
       s3AccessKeyId: stored.s3AccessKeyId
@@ -195,8 +196,8 @@ export class OrganizationService extends OrganizationServiceContract {
     const parsed = updateOrganizationSettingsInputSchema.parse(input);
     const wasSharingEnabled =
       parsed.traceSharingEnabled === false
-        ? (await this.repository.findStoredSettings(parsed.organizationId))
-            ?.traceSharingEnabled === true
+        ? (await this.repository.findStoredSettings(parsed.organizationId))?.traceSharingEnabled ===
+          true
         : false;
     await this.repository.updateSettings({
       ...parsed,

@@ -1,3 +1,4 @@
+import type { FeatureSetup } from "@langwatch/kernel";
 import {
   NotificationService as NotificationApi,
   type NotificationService as NotificationApiContract,
@@ -5,7 +6,8 @@ import {
   type Notification,
   type NotificationRecentQuery,
 } from "@langwatch/notification-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import { Secret } from "@langwatch/secrets";
+
 import type { NotificationRepositories } from "../repositories/notification.repositories.ts";
 import { NotificationService } from "../services/notification.service.ts";
 
@@ -19,6 +21,13 @@ type NotificationSetup = FeatureSetup<
 export class NotificationApp implements NotificationApiContract {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
+  /** Never read here; the outbound mail gateway resolves each on first send. */
+  static readonly secrets = {
+    sendgrid: Secret.load("SENDGRID_API_KEY", { optional: true }),
+    smtpUrl: Secret.load("SMTP_URL", { optional: true }),
+    smtpPassword: Secret.load("SMTP_PASSWORD", { optional: true }),
+    resend: Secret.load("RESEND_API_KEY", { optional: true }),
+  } as const;
 
   #notifications: NotificationService;
 

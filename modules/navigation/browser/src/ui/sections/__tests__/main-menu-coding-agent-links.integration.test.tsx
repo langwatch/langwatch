@@ -4,11 +4,12 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Temporal, nowInstant } from "@langwatch/time";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Temporal, nowInstant } from "@langwatch/time";
-import { WithStubNavigationHost } from "../../../testing.tsx";
+
 import type { NavigationProject } from "../../../model/navigation-host.ts";
+import { WithStubNavigationHost } from "../../../testing.tsx";
 import { MainMenuSections } from "../main-menu.tsx";
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({

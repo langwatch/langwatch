@@ -106,7 +106,7 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .procedure("update")
   .withPermission("organization:manage")
   .handle(async ({ app, input }) => {
-    // The form round-trips every S3 field, so absent here means "clear it"  - 
+    // The form round-trips every S3 field, so absent here means "clear it"  -
     // though `updateSettings` treats absent as "leave alone" for `s3Bucket`.
     await app.updateSettings({
       organizationId: input.organizationId,
@@ -212,7 +212,7 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .handle(async ({ app, input, actor }, person) => {
     const caller = callerOf(actor, person);
     // The whole orchestration - personal-workspace assertion, shared-team
-    // scoping, seat classification, the Enterprise gate for custom roles  - 
+    // scoping, seat classification, the Enterprise gate for custom roles  -
     // lives in the service, so the REST surface runs the same rules.
     const { teamsLeftWithoutAdmin } = await app.changeMemberRole(
       {

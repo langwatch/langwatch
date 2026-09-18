@@ -1,8 +1,9 @@
 /** Tenant purge must clean all rows keyed to it, including non-cascading authorization tables. */
 
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
+
 import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organization-membership.repository.ts";
 
 const ORGANIZATION_ID = "org_acme";

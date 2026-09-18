@@ -1,13 +1,7 @@
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel";
-import type {
-  AnalyticsFeedbacksResult,
-  AnalyticsFilterOption,
-  AnalyticsReadInput,
-  AnalyticsTimeseriesInput,
-  AnalyticsTimeseriesResult,
-  AnalyticsTopDocumentsResult,
-} from "./analytics.timeseries.ts";
+import { moduleApi } from "@langwatch/kernel/module-api";
+import type { Instant } from "@langwatch/time";
+
 import type {
   AnalyticsEvaluationReadInput,
   AnalyticsEvaluationRollupAppendBatchInput,
@@ -23,6 +17,39 @@ import type {
   LangWatchQLSchema,
   LangWatchQLValidationInput,
 } from "./analytics.lwql.ts";
+import type {
+  AnalyticsFeedbacksResult,
+  AnalyticsFilterOption,
+  AnalyticsReadInput,
+  AnalyticsTimeseriesInput,
+  AnalyticsTimeseriesResult,
+  AnalyticsTopDocumentsResult,
+} from "./analytics.timeseries.ts";
+import type {
+  DashboardWidgetDefinition,
+  DashboardWidgetQuery,
+} from "./dashboard-widget-definition.ts";
+
+/** A persisted custom-chart-playground widget, parsed from its CustomGraph row. */
+export interface DashboardWidget {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly definition: DashboardWidgetDefinition;
+  readonly createdAt: Instant;
+  readonly updatedAt: Instant;
+  readonly dashboardId: string | null;
+  readonly gridColumn: number;
+  readonly gridRow: number;
+  readonly colSpan: number;
+  readonly rowSpan: number;
+}
+
+/** The author-editable part of one widget definition. */
+export interface DashboardWidgetDefinitionInput {
+  readonly code: string;
+  readonly queries: readonly DashboardWidgetQuery[];
+}
 
 /** The callable analytics capability shared by process peers. */
 export interface AnalyticsApi {
@@ -42,6 +69,8 @@ export interface AnalyticsApi {
     readonly subkey?: string;
     readonly filters?: Record<string, unknown>;
   }): Promise<AnalyticsFilterOption[]>;
+  /** Refuses the dashboard-widget surface while its project rollout is disabled. */
+  assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
   upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void>;
   upsertEvaluationAnalyticsBatch(input: AnalyticsEvaluationUpsertInput[]): Promise<void>;
   findEvaluationAnalytics(input: AnalyticsEvaluationReadInput): Promise<{
@@ -59,10 +88,7 @@ export interface AnalyticsApi {
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
   /** What one signed-in member may see of a project's content and spend. */
-  resolveProtections(input: {
-    userId: string;
-    projectId: string;
-  }): Promise<LangWatchQLProtections>;
+  resolveProtections(input: { userId: string; projectId: string }): Promise<LangWatchQLProtections>;
   /**
    * What an API key may see of a project's content and spend — the same
    * question {@link resolveProtections} answers for a signed-in member, asked
@@ -74,8 +100,6 @@ export interface AnalyticsApi {
   }): Promise<LangWatchQLProtections>;
   /** The deep link back to the Workbench editor for a saved chart in this project. */
   savedWorkbenchChartPlatformUrl(input: { projectSlug: string }): string;
-  /** The deep link back to the dashboards list for a playground widget in this project. */
-  dashboardWidgetPlatformUrl(input: { projectSlug: string }): string;
   /**
    * The restricted tenant identity a member's own statement runs as, together
    * with their protections. Refuses with `project_not_found` when the project

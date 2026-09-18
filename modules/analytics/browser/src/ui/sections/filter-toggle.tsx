@@ -5,12 +5,12 @@
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { X } from "react-feather";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { X } from "react-feather";
 
-import { countFilters, type FilterParam } from "../../model/analytics-filter-params.ts";
-import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";
+import type { FilterField } from "../../model/analytics-filter-definition.ts";
+import { countFilters, type FilterParam } from "../../model/analytics-filter-params.ts";
 import { FilterIconWithBadge } from "./filter-icon-with-badge.tsx";
 
 export function FilterToggle({ defaultShowFilters = false }: { defaultShowFilters?: boolean }) {

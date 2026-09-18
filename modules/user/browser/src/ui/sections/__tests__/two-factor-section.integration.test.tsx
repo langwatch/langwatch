@@ -6,6 +6,7 @@
 
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
 import { TwoFactorSection } from "../two-factor-section.tsx";
 

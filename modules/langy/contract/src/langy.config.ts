@@ -1,5 +1,5 @@
 import { Config, type ConfigOf } from "@langwatch/config";
-import { Secret } from "@langwatch/secrets";
+import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 /**

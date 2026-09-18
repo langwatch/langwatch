@@ -8,32 +8,39 @@ import {
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
   TeamMembershipNotFoundError,
-  TeamNotFoundError,CustomRoleNotAssignableError,
+  TeamNotFoundError,
+  CustomRoleNotAssignableError,
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
   MemberNotFoundError,
-  OrganizationSlugTakenError
+  OrganizationSlugTakenError,
 } from "@langwatch/organization-contract";
-import type { Organization, OrganizationIntent, PrismaClient, User } from "@langwatch/prisma-client/generated";
+import type {
+  Organization,
+  OrganizationIntent,
+  PrismaClient,
+  User,
+} from "@langwatch/prisma-client/generated";
 import {
   OrganizationUserRole,
   Prisma,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
+
 import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository.ts";
+import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
 
 /** The two shared read helpers this repository leans on. Stateless; the client rides each call. */
 const personalTeamScope = PrismaPersonalTeamScopeRepository.create();
 const effectiveTeamAdmins = PrismaEffectiveTeamAdminsRepository.create();
+import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
 import {
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "../../rules/member-role-constraints.rules.ts";
-import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,

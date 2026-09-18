@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette, useCommandBar } from "@langwatch/navigation-browser/surfaces/command-bar";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * The command palette mounted inline; shared by home and governance overview.

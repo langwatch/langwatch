@@ -5,7 +5,11 @@ export * from "./templating/engine.ts";
 export * from "./templating/example-context.ts";
 export * from "./templating/markdown.ts";
 export * from "./templating/render-email.ts";
-export type { SlackPayload, SlackRenderDefaults, RenderedSlack } from "./templating/render-slack.ts";
+export type {
+  SlackPayload,
+  SlackRenderDefaults,
+  RenderedSlack,
+} from "./templating/render-slack.ts";
 export { renderTriggerSlack } from "./templating/render-slack.ts";
 export * from "./templating/render-webhook-body.ts";
 export * from "./templating/render-with-fallback.ts";

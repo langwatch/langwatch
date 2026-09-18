@@ -1,5 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { AutomationClock } from "../../app/automation.members.ts";
+import { AutomationSettlementLedgerService } from "../../services/automation-settlement-ledger.service.ts";
+import type { AutomationPersistCapRedis } from "../../services/persist-cap.service.ts";
 import type {
   AutomationSettlementBreach,
   AutomationSettlementPersistCap,
@@ -7,8 +10,6 @@ import type {
 import { PrismaEmailSuppressionRepository } from "./prisma.email-suppression.repository.ts";
 import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
 import { PrismaWebhookDeliveryRepository } from "./prisma.webhook-delivery.repository.ts";
-import { AutomationSettlementLedgerService } from "../../services/automation-settlement-ledger.service.ts";
-import type { AutomationPersistCapRedis } from "../../services/persist-cap.service.ts";
 
 /** The four tables settlement's ledger touches, named here and nowhere above it. */
 export type AutomationSettlementLedgerDatabase = Pick<

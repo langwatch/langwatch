@@ -24,11 +24,7 @@ export interface CliDeviceSessionRepository {
    * deactivation sweep walks this index, so its expiry is bumped to the
    * longest-lived member on every mint: it must outlive every token it names.
    */
-  indexTokens(input: {
-    indexKey: string;
-    memberKeys: string[];
-    ttlMs: number;
-  }): Promise<void>;
+  indexTokens(input: { indexKey: string; memberKeys: string[]; ttlMs: number }): Promise<void>;
 
   /** Removes one token key from a user's index. */
   removeFromIndex(input: { indexKey: string; memberKey: string }): Promise<void>;

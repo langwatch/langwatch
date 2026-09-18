@@ -4,15 +4,16 @@
  */
 
 import { Badge, Button, Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { UiSlot } from "@langwatch/browser-host/slots";
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
-import { UiSlot } from "@langwatch/browser-host/slots";
+
 import { githubApi } from "../../behavior/github-api.ts";
+import { useGithubHost } from "../../model/github-host.ts";
 import {
   GITHUB_ERROR_QUERY_KEY,
   githubInstallAddress,
 } from "../../model/github-install-address.ts";
-import { useGithubHost } from "../../model/github-host.ts";
 import { GithubInstallationRow } from "../elements/github-installation-row.tsx";
 
 export default function IntegrationsScreen() {

@@ -1,4 +1,5 @@
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
+
 import { evaluationPassed } from "./evaluation-status.ts";
 
 /**

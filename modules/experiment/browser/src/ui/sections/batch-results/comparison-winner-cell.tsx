@@ -4,15 +4,14 @@
  */
 
 import { Badge, Box, HStack, Portal, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useRef, useState } from "react";
-
-import { useEscapeKey } from "./presentation.tsx";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
+import { useCallback, useRef, useState } from "react";
 
 import type {
   BatchComparisonColumn,
   BatchComparisonVerdict,
 } from "../batch-evaluation-results.types.ts";
+import { useEscapeKey } from "./presentation.tsx";
 
 /** Collapsed cell height cap. Long reasoning is faded out beyond this. */
 const CELL_MAX_HEIGHT = 140;

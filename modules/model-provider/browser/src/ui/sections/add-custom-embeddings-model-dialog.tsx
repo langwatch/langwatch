@@ -1,9 +1,4 @@
 import { Button, HStack, Input, VStack } from "@chakra-ui/react";
-import { useCallback, useRef, useState } from "react";
-import type { CustomModelEntry } from "@langwatch/model-provider-contract";
-import { customModelEntrySchema } from "@langwatch/model-provider-contract";
-import { fieldErrorsFromZodIssues } from "../../model/zod-field-errors.ts";
-import { SmallLabel } from "../elements/small-label.tsx";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -13,6 +8,12 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
+import { customModelEntrySchema } from "@langwatch/model-provider-contract";
+import { useCallback, useRef, useState } from "react";
+
+import { fieldErrorsFromZodIssues } from "../../model/zod-field-errors.ts";
+import { SmallLabel } from "../elements/small-label.tsx";
 
 type AddCustomEmbeddingsModelDialogProps = {
   open: boolean;

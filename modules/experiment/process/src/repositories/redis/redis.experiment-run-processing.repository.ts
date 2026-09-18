@@ -1,17 +1,18 @@
 import { RedisCachedFoldStore } from "@langwatch/eventing";
 import type { Cluster, Redis } from "ioredis";
-import {
-  ExperimentEventingAdapter,
-  type ExperimentRunProcessingPipeline,
-} from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
+
+import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
+import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
+import { ExperimentRunStateStore } from "../../eventing/experiment-run-state.store.ts";
 import {
   ClickhouseExperimentClickHouseRepository,
   type ExperimentEventingClickHouseResolver,
 } from "../clickhouse/clickhouse.experiment-clickhouse.repository.ts";
-import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
+import {
+  ExperimentEventingAdapter,
+  type ExperimentRunProcessingPipeline,
+} from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunStateRepository } from "../clickhouse/clickhouse.experiment-run-state.repository.ts";
-import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
-import { ExperimentRunStateStore } from "../../eventing/experiment-run-state.store.ts";
 
 /**
  * The Redis keyspace the experiment-run fold's read-through cache occupies.

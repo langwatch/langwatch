@@ -8,12 +8,13 @@ import type {
   RetentionPolicySnapshot,
   ScopeAssignment,
 } from "@langwatch/data-retention-contract";
+
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
-import type { DataRetentionService } from "./data-retention.service.ts";
 import type {
   DataRetentionPolicyService,
   RetentionActor,
 } from "./data-retention-policy.service.ts";
+import type { DataRetentionService } from "./data-retention.service.ts";
 import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
 
 export type DataRetentionSnapshotServiceOptions = Readonly<{

@@ -2,12 +2,12 @@ import type { AuthzApi, ApiKeyPermissionScope } from "@langwatch/authz-contract"
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 
-import { PrismaGatewayTransactionAdapter } from "../adapters/postgres.gateway-transaction.adapter.ts";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { PrismaGatewayTransactionAdapter } from "./postgres.gateway-transaction.ts";
+import { PrismaGatewayAdapter } from "./prisma.gateway.composition.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { GatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";

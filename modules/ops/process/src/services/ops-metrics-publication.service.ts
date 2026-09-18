@@ -5,6 +5,7 @@
  */
 
 import * as os from "node:os";
+
 import { createLogger } from "@langwatch/observability";
 import { SNAPSHOT_VERSION } from "@langwatch/ops-contract";
 import type {
@@ -13,11 +14,12 @@ import type {
   OpsSnapshotService,
   QueueInfo,
 } from "@langwatch/ops-contract";
+import { nowInstant } from "@langwatch/time";
+
 import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
 import type { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
 import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:metrics-publication");
 

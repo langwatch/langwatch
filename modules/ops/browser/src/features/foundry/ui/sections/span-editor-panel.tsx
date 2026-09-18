@@ -12,10 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { AttributeEditor } from "../elements/attribute-editor.tsx";
-import { LLMSpanEditor } from "./llm-span-editor.tsx";
-import { PromptSpanEditor } from "./prompt-span-editor.tsx";
-import { RAGSpanEditor } from "./rag-span-editor.tsx";
+
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import {
   SPAN_TYPE_ICONS,
@@ -24,6 +21,10 @@ import {
   type SpanInputOutput,
   type SpanType,
 } from "../../model/foundry-types.ts";
+import { AttributeEditor } from "../elements/attribute-editor.tsx";
+import { LLMSpanEditor } from "./llm-span-editor.tsx";
+import { PromptSpanEditor } from "./prompt-span-editor.tsx";
+import { RAGSpanEditor } from "./rag-span-editor.tsx";
 
 /** What a span payload reads as in the textarea: text verbatim, anything else as JSON. */
 function spanPayloadText(payload: SpanInputOutput | undefined): string {

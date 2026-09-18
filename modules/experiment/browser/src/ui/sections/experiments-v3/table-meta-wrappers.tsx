@@ -3,11 +3,11 @@
  * These keep column definitions stable by avoiding closures over dynamic data.
  */
 import { Checkbox } from "@chakra-ui/react";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { HeaderContext } from "@tanstack/react-table";
 
 import type { TableMeta, TableRowData } from "../../../model/experiments-v3/types.ts";
-import { toComparisonConfig } from "@langwatch/experiment-contract";
 import { ComparisonCell } from "./comparison-cell.tsx";
 import { TargetCellContent } from "./TargetSection/target-cell.tsx";
 import { TargetHeader } from "./TargetSection/target-header.tsx";

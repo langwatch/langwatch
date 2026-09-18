@@ -1,4 +1,5 @@
 import type { Liquid, Template } from "liquidjs";
+
 import { createSandboxedLiquid } from "./sandboxed-liquid.ts";
 
 /**

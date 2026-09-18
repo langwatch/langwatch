@@ -1,5 +1,6 @@
 import { githubRepositoryRefSchema } from "@langwatch/github-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 
 import {
   GithubInstallationsRepository,
@@ -7,7 +8,6 @@ import {
   type GithubRepositoryRef,
   type UpsertGithubInstallationInput,
 } from "../github-installations.repository.ts";
-import { fromDate } from "@langwatch/time";
 
 function parseRepositories(value: Prisma.JsonValue | null): GithubRepositoryRef[] | null {
   if (!Array.isArray(value)) {

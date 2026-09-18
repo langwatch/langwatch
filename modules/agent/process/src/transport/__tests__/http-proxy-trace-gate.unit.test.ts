@@ -1,12 +1,13 @@
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi, RecordCapturedSpanInput } from "@langwatch/trace-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import type { TraceApi, RecordCapturedSpanInput } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { createHttpProxyCaller } from "./http-proxy.fixture.ts";
 import { z } from "zod";
+
+import { createHttpProxyCaller } from "./http-proxy.fixture.ts";
 
 type Recorded = RecordCapturedSpanInput;
 

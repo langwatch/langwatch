@@ -121,9 +121,9 @@ export type {
   StudioLambdaFleetFields,
 } from "./rules/nlp-lambda-config.rules.ts";
 export type { NlpLambdaStreamInvoke, NlpLambdaStreamChunk } from "./app/workflow.app.ts";
-export { AwsNlpLambdaStreamInvokeAdapter } from "./adapters/aws.nlp-lambda-stream-invoke.adapter.ts";
-export { AwsNlpLambdaArnResolverAdapter } from "./adapters/aws.nlp-lambda-arn-resolver.adapter.ts";
+export { AwsNlpLambdaStreamInvokeChannel } from "./channels/aws/aws.nlp-lambda-stream-invoke.channel.ts";
+export { AwsNlpLambdaArnResolverChannel } from "./channels/aws/aws.nlp-lambda-arn-resolver.channel.ts";
 export {
-  LambdaWorkflowStudioStreamAdapter,
+  LambdaWorkflowStudioStreamChannel,
   type LambdaWorkflowStudioStreamOptions,
-} from "./adapters/lambda.workflow-studio-stream.adapter.ts";
+} from "./channels/aws/aws.lambda-workflow-studio-stream.channel.ts";

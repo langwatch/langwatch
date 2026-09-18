@@ -1,8 +1,4 @@
-import {
-  DuplicateBindingError,
-  type AuthzApi,
-} from "@langwatch/authz-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { DuplicateBindingError, type AuthzApi } from "@langwatch/authz-contract";
 import {
   GroupRoleNotAssignableError,
   GroupRoleScopeError,
@@ -10,16 +6,18 @@ import {
   type OrganizationGroup,
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+
 import type {
   GroupIdentity,
   PersonalWorkspaceIdentity,
   TeamIdentity,
 } from "../../app/organization.members.ts";
-import type { OrganizationRepository } from "../organization.repository.ts";
-import type { GroupRepository } from "../group.repository.ts";
-import type { TeamRepository } from "../team.repository.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
+import type { GroupRepository } from "../group.repository.ts";
+import type { OrganizationRepository } from "../organization.repository.ts";
+import type { TeamRepository } from "../team.repository.ts";
 
 const group: OrganizationGroup = {
   id: "group_1",

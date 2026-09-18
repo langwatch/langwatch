@@ -4,8 +4,8 @@
  * drops non-winning rows and silently misses an id lookup against them (#5380).
  */
 
-import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
 import type { WireOf } from "@langwatch/api/web";
+import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
 
 /** A listed provider as the browser holds one: its instants are ISO strings. */
 export type ModelProviderListRow = WireOf<ModelProviderListEntry>;

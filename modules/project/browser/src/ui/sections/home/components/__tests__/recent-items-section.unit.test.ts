@@ -4,6 +4,7 @@
  * See specs/home/recent-items-ui.feature.
  */
 import { describe, expect, it } from "vitest";
+
 import type { RecentItem } from "../../../../../behavior/home-api.ts";
 import { groupItemsByType } from "../recent-items-section.tsx";
 

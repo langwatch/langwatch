@@ -5,6 +5,7 @@
 
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
+
 import { UNKNOWN_ERROR_DESCRIPTION } from "../../model/describe-error.ts";
 
 const HAIRLINE =

@@ -7,11 +7,9 @@
 import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import { api } from "../../behavior/personal-workspace-api.ts";
-import {
-  usePersonalWorkspaceHost,
-  type HeldPasskey,
-} from "../../model/personal-workspace-host.ts";
+import { usePersonalWorkspaceHost, type HeldPasskey } from "../../model/personal-workspace-host.ts";
 import { providerDisplayName } from "../../model/sign-in-methods.ts";
 
 /** One line: what a way in is called, and what it says about it. */
@@ -43,7 +41,10 @@ export function SignInMethodsSummary() {
 
   useEffect(() => {
     if (password.isError) {
-      host.failed({ error: password.error, fallbackTitle: "Couldn't tell whether you have a password" });
+      host.failed({
+        error: password.error,
+        fallbackTitle: "Couldn't tell whether you have a password",
+      });
     }
   }, [password.isError, password.error, host]);
 

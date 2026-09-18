@@ -1,19 +1,21 @@
-import { type AgentCallSignal,
+import {
+  type AgentCallSignal,
   AgentSessionUnknownError,
   type InstanceNudge,
-  instanceNudgeSchema } from "@langwatch/agent-contract";
+  instanceNudgeSchema,
+} from "@langwatch/agent-contract";
 /**
  * The watches this pod holds on connected-agent instances: one subscription per instance,
  * refreshed by every poll and expired when the polls stop.
  */
-
 import { createLogger } from "@langwatch/observability";
+import type { Unsubscribe } from "@langwatch/redis-client/session-state";
+
 import {
   instanceMetaKey,
   pendingKey,
   instanceChannel,
 } from "../rules/connected-agent-keys.rules.ts";
-import type { Unsubscribe } from "@langwatch/redis-client/session-state";
 import type { AgentSessionService, SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:instance-watch");

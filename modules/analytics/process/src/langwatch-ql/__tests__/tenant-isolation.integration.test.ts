@@ -5,8 +5,9 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
+
 import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
+import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,

@@ -1,6 +1,6 @@
-import { createLogger } from "@langwatch/observability";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
 import { AnalyticsTripwire } from "@langwatch/analytics-contract";
+import { createLogger } from "@langwatch/observability";
 
 const tolerance = 0.001;
 const logger = createLogger("langwatch:analytics:tripwire");

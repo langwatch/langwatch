@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useActivityTracker } from "../../behavior/use-activity-tracker.ts";
-import { registerCommandBarControl } from "../../behavior/command-bar-control.ts";
+
 import { CommandBarContext } from "../../behavior/command-bar-context.ts";
+import { registerCommandBarControl } from "../../behavior/command-bar-control.ts";
+import { useActivityTracker } from "../../behavior/use-activity-tracker.ts";
 import { getIsMac } from "../../model/command-platform.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { CommandBar } from "./command-bar.tsx";

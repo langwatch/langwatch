@@ -1,14 +1,15 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * The tier-effective inline row bound: loadExecutionData refuses rows above
  * the plan's experimentInlineRowsMax even when a transport schema let them
  * through, and loads rows at the tier. Free 1000, paid 2000, enterprise 4000.
  */
 import { describe, expect, it } from "vitest";
-import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { AgentApi } from "@langwatch/agent-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { PromptApi } from "@langwatch/prompt-contract";
+
 import {
   ExperimentExecutionDataService,
   type ExperimentWorkflowDsl,

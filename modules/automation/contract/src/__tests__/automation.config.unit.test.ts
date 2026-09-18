@@ -1,10 +1,13 @@
-import { InvalidRuntimeConfigError, RuntimeConfig } from "@langwatch/config";
+import { ConfigParseError, parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { automationServerConfigDefinition } from "../automation.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "automation", definition: automationServerConfigDefinition, source })
-    .value;
+import { automationServerConfig } from "../automation.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({
+    owners: [{ name: "automation", config: automationServerConfig }],
+    environment,
+  }).automation;
 
 describe("automation server configuration", () => {
   describe("given a deployment overrides no ceiling", () => {
@@ -23,10 +26,8 @@ describe("automation server configuration", () => {
   describe("given a ceiling is not a positive whole number", () => {
     /** @scenario "An unreadable switch is refused instead of read as off" */
     it("refuses the boot rather than running on a silent default", () => {
-      expect(() => read({ TRIGGER_EMAIL_HOURLY_CAP: "many" })).toThrow(InvalidRuntimeConfigError);
-      expect(() => read({ TRIGGER_PERSIST_DAILY_CAP_FREE: "0" })).toThrow(
-        InvalidRuntimeConfigError,
-      );
+      expect(() => read({ TRIGGER_EMAIL_HOURLY_CAP: "many" })).toThrow(ConfigParseError);
+      expect(() => read({ TRIGGER_PERSIST_DAILY_CAP_FREE: "0" })).toThrow(ConfigParseError);
     });
   });
 });

@@ -7,6 +7,7 @@ import {
   type ScopeAssignment,
 } from "@langwatch/data-retention-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
+
 import type { DataRetentionRepository } from "../data-retention.repository.ts";
 
 const retentionRowSelect = {

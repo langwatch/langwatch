@@ -6,6 +6,7 @@ import {
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
+
 import type { PinnedTraceRepository } from "../pinned-trace.repository.ts";
 
 /** Private persistence for trace pin annotations owned by Data Retention. */

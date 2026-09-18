@@ -1,11 +1,12 @@
-import { moduleApi } from "@langwatch/kernel";
-import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from "./authz.ts";
+import { moduleApi } from "@langwatch/kernel/module-api";
+import type { Instant } from "@langwatch/time";
+
 import type * as Binding from "./authz.binding-management.ts";
 import type * as Commands from "./authz.commands.ts";
 import type * as Queries from "./authz.queries.ts";
+import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from "./authz.ts";
 import type { AuthzPermission } from "./registry.ts";
 import type { BindingScopeTier } from "./vocabulary.ts";
-import type { Instant } from "@langwatch/time";
 
 export interface AuthzCaller {
   readonly id: string;
@@ -23,6 +24,8 @@ export type EffectivePermissions =
  * receiving its services, repositories, or transport adapters.
  */
 export interface AuthzApi {
+  /** Whether this is the configured shared demo project. */
+  isDemoProject(input: { projectId: string }): boolean;
   effectivePermissionsFor(
     input: Readonly<{ projectId?: string; organizationId?: string }>,
     by: AuthzCaller,

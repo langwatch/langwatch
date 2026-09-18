@@ -1,6 +1,7 @@
 import type { GithubInstallStatePayload, GithubPullRequestEvent } from "@langwatch/github-contract";
 import type { Instant } from "@langwatch/time";
-export interface GithubInfrastructure {  githubBranchDemand: GithubBranchDemand;
+export interface GithubInfrastructure {
+  githubBranchDemand: GithubBranchDemand;
   githubBranchMaintenance: GithubBranchMaintenance;
   githubHost: GithubHost;
   githubInstallResponse: GithubInstallResponse;
@@ -39,7 +40,6 @@ export interface GithubBranchMaintenance {
   pruneStaleBranchLinkage(): Promise<{ branchChecks: number }>;
 }
 
-
 export interface GithubHost {
   getHost(): string;
   getApiBase(): string;
@@ -49,12 +49,10 @@ export interface GithubHost {
   normalize(repositoryHost: string): string;
 }
 
-
 export interface GithubInstallResponse {
   successHtml(login: string): string;
   errorHtml(message: string): string;
 }
-
 
 export interface GithubInstallState {
   getTtlMs(): number;
@@ -64,18 +62,13 @@ export interface GithubInstallState {
   verify(token: string | null | undefined): GithubInstallStatePayload | null;
 }
 
-
 export interface GithubProjectActivity {
   /** The organization an active project belongs to; throws when there is none. */
   getOrganizationId(projectId: string): Promise<string>;
 
   /** Stamps a project as having just had a coding-agent pull request mapped. */
-  touchCodingAgentPullRequestSeen(input: {
-    projectId: string;
-    at: Instant;
-  }): Promise<void>;
+  touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void>;
 }
-
 
 export interface GithubPullRequestEventParser {
   parse(payload: unknown): GithubPullRequestEvent | null;

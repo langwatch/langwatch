@@ -56,17 +56,18 @@ import {
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
+import type { Instant } from "@langwatch/time";
+
 import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
+import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { AuthzBindingReaderService } from "./authz-binding-reader.service.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
 import { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service.ts";
-import { AuthzScopeLineageService } from "./authz-scope-lineage.service.ts";
 import { AuthzIdDecisionsService } from "./authz-id-decisions.service.ts";
 import { AuthzPermissionGateService } from "./authz-permission-gate.service.ts";
-import type { Instant } from "@langwatch/time";
+import { AuthzScopeLineageService } from "./authz-scope-lineage.service.ts";
 
 const decisions = createLogger("langwatch:authz:decisions");
 

@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * Real Postgres. Three rules narrow a key's provider bundle: routing policy, allowlist, and
@@ -6,20 +8,16 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { GatewayConfigAssemblyAdapter } from "../app/gateway-config-assembly.composition.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
-
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
+import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
-
-import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter.ts";
-import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
-import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;

@@ -5,14 +5,12 @@
  */
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../../rules/experiment-run-event-types.rules.ts";
-import type {
-  EvaluatorResultEvent,
-  TargetResultEvent,
-} from "../experiment-run-events.process.ts";
+import type { EvaluatorResultEvent, TargetResultEvent } from "../experiment-run-events.process.ts";
 import { ExperimentRunResultStorageMapProjection } from "../experiment-run-result-storage.projection.ts";
 
 const TENANT = createTenantId("project_test");

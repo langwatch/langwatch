@@ -18,9 +18,7 @@ export function useSpendSortParam(): {
 } {
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("sort");
-  const sortBy: SpendSortField = isSpendSortField(requested)
-    ? requested
-    : "spend";
+  const sortBy: SpendSortField = isSpendSortField(requested) ? requested : "spend";
   const setSortBy = (next: SpendSortField) =>
     setSearchParams(
       (prev) => {

@@ -1,4 +1,4 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -17,7 +17,12 @@ export const nlpLambdaFleetSchema = z.object({
 
 export type NlpLambdaFleetFields = z.infer<typeof nlpLambdaFleetSchema>;
 
-const lambdaFleetLeaf = z
+/**
+ * Parses the raw `LANGWATCH_NLP_LAMBDA_CONFIG` secret string (a
+ * classified handle, never a config leaf — ADR-132) into a fleet, once
+ * the composition root has resolved it through the secrets chain.
+ */
+export const nlpLambdaFleetFromSecret = z
   .string()
   .optional()
   .transform((raw, ctx) => {
@@ -47,22 +52,15 @@ const lambdaFleetLeaf = z
     return fields.data;
   });
 
-export const workflowServerConfigDefinition = RuntimeConfig.define({
-  nlpLambdaFleet: Config.value(lambdaFleetLeaf, { env: "LANGWATCH_NLP_LAMBDA_CONFIG" }),
+export const workflowConfig = Config.define((c) => ({
   /** How long a code block may run inside the engine, as the engine reads it. */
-  codeBlockTimeoutSeconds: Config.value(z.string().optional(), {
-    env: "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS",
-  }),
+  codeBlockTimeoutSeconds: c.env("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", z.string().optional()),
   /** Above this many bytes a payload is staged rather than sent inline. */
-  stagingThresholdBytes: Config.value(z.string().optional(), {
-    env: "LANGEVALS_STAGING_THRESHOLD_BYTES",
-  }),
-  stagingTtlSeconds: Config.value(z.string().optional(), { env: "LANGEVALS_STAGING_TTL_SECONDS" }),
-});
+  stagingThresholdBytes: c.env("LANGEVALS_STAGING_THRESHOLD_BYTES", z.string().optional()),
+  stagingTtlSeconds: c.env("LANGEVALS_STAGING_TTL_SECONDS", z.string().optional()),
+}));
 
-export type WorkflowServerConfig = ConfigValue<typeof workflowServerConfigDefinition>;
-
-export const workflowServerConfigSchema = compileRuntimeConfig(workflowServerConfigDefinition);
+export type WorkflowServerConfig = ConfigOf<typeof workflowConfig>;
 
 /** All a browser learns: whether this deployment can execute a workflow. */
 export const workflowWebConfigSchema = z.strictObject({ nlp: z.boolean() });

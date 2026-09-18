@@ -1,9 +1,3 @@
-/**
- * Phase 2: what a comparison judges, what it waits for, and what it refuses to
- * judge — for both the chip-style evaluator and the column-style target.
- * @see specs/experiments-v3/comparison-error-handling.feature
- */
-import { describe, expect, it } from "vitest";
 import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
@@ -12,12 +6,19 @@ import {
   type ExecutionCell,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
+/**
+ * Phase 2: what a comparison judges, what it waits for, and what it refuses to
+ * judge — for both the chip-style evaluator and the column-style target.
+ * @see specs/experiments-v3/comparison-error-handling.feature
+ */
+import { describe, expect, it } from "vitest";
+
 import {
   ExperimentComparisonPlanService,
   type VariantEvaluatorScore,
 } from "../experiment-comparison-plan.service.ts";
 import type { LoadedEvaluators } from "../experiment-execution-data.service.ts";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 type PlanState = Pick<
   EvaluationsV3State,

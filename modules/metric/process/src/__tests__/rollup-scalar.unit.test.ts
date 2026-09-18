@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { affectedRollupBuckets, buildMetricRollups } from "@langwatch/metric-contract";
+import { describe, expect, it } from "vitest";
+
 import { point } from "../app/__tests__/metric.fixture.ts";
 
 describe("gauge and sum rollups", () => {

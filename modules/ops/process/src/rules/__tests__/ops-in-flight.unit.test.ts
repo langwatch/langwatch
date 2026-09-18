@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { type InFlightCounts, totalInFlight } from "../ops-in-flight.rules.ts";
 
 function queue(overrides: Partial<InFlightCounts> = {}): InFlightCounts {

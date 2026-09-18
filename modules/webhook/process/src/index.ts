@@ -130,7 +130,6 @@ export type {
   AwsClientConfigResolver,
   SqsDestinationConfig,
 } from "./services/sqs.webhook-destination.service.ts";
-export type {
-  SqsQueueUrlInspection,
-  SqsQueueUrlProblem,
-} from "./rules/sqs-queue-url.rules.ts";
+export { SqsWebhookDestinationChannel } from "./channels/sqs/sqs.webhook-destination.channel.ts";
+export type { SqsWebhookSender } from "./channels/sqs/sqs.webhook-destination.channel.ts";
+export type { SqsQueueUrlInspection, SqsQueueUrlProblem } from "./rules/sqs-queue-url.rules.ts";

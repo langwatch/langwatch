@@ -5,11 +5,11 @@
  */
 
 import { Container, HStack, VStack } from "@chakra-ui/react";
-import type { PropsWithChildren } from "react";
 import { SmallLabel } from "@langwatch/design-system/small-label";
+import type { PropsWithChildren } from "react";
 
-import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { MenuLink } from "../elements/analytics-menu-link.tsx";
 import { AnalyticsHeader, type AnalyticsHeaderProps } from "./analytics-header.tsx";
 import { CustomDashboardsSection } from "./custom-dashboards-section.tsx";

@@ -1,6 +1,7 @@
+import { docsUrl } from "@langwatch/config/docs-url";
+
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
-import { docsUrl } from "@langwatch/config/docs-url";
 import { AgentActionsMenu } from "./agent-actions-menu.tsx";
 
 /**

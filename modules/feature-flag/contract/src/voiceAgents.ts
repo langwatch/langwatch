@@ -1,5 +1,5 @@
-import { VOICE_AGENTS_FLAG_KEY } from "./voiceAgents.message.ts";
 import type { FeatureFlagApi } from "./feature-flag.api.ts";
+import { VOICE_AGENTS_FLAG_KEY } from "./voiceAgents.message.ts";
 
 /**
  * For server callers; client code imports from `./voiceAgents.message`

@@ -9,13 +9,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { WebhookEventType,RouterOutputs } from "../../../../behavior/gateway-api.ts";
-import { Copy } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { Copy } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+import type { WebhookEventType, RouterOutputs } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import {
   WEBHOOK_DESTINATION_LABELS,

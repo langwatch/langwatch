@@ -6,12 +6,12 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
-import { githubPullRequestRefSchema, githubRepositoryRefSchema } from "./github.ts";
 import {
   githubConnectionStatusSchema,
   githubDisconnectResultSchema,
   githubPullRequestLiveStatusesSchema,
 } from "./github.connection.ts";
+import { githubPullRequestRefSchema, githubRepositoryRefSchema } from "./github.ts";
 
 /** The organization a connection is read or written against. */
 const organizationScopeSchema = z.object({ organizationId: z.string() });

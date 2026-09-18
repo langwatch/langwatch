@@ -1,14 +1,15 @@
-import { useCallback } from "react";
-import type { Output } from "@langwatch/prompt-browser/llm-config-popover";
-import { LLMConfigField } from "@langwatch/prompt-browser/llm-config-field";
 import {
   allModelOptions,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { useOrganizationTeamProject } from "../../../../../behavior/studio-host/use-organization-team-project.ts";
-import { useWorkflowStore } from "../../../../../behavior/use-workflow-store.ts";
+import { LLMConfigField } from "@langwatch/prompt-browser/llm-config-field";
+import type { Output } from "@langwatch/prompt-browser/llm-config-popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { normalizeWorkflowLlmConfig } from "@langwatch/workflow-contract";
+import { useCallback } from "react";
+
+import { useOrganizationTeamProject } from "../../../../../behavior/studio-host/use-organization-team-project.ts";
+import { useWorkflowStore } from "../../../../../behavior/use-workflow-store.ts";
 
 type OptimizationStudioLLMConfigFieldProps = {
   llmConfig: LLMConfig;

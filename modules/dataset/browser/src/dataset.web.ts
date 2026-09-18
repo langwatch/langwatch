@@ -20,6 +20,13 @@ export const datasetWeb = defineWebModule("dataset")
       load: () => import("./ui/sections/dataset-editor.screen.tsx"),
     },
   })
+  .withDrawers({
+    selectDataset: {
+      load: async () => ({
+        default: (await import("./ui/sections/select-dataset-drawer.tsx")).SelectDatasetDrawer,
+      }),
+    },
+  })
   /**
    * What another module may mount. workflow and experiment open the
    * dataset drawers and editor table; prompt, trace and workflow preview

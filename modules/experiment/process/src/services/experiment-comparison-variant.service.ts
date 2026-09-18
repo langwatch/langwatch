@@ -14,6 +14,7 @@ import {
   type TargetConfig,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
+
 import {
   evaluatorScoresBlock,
   pickOutputPath,
@@ -23,8 +24,8 @@ import {
   type ComparisonSetupSkip,
   type ComparisonSkipReason,
 } from "../eventing/experiment-comparison-skip.process.ts";
-import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:comparison-variants");
 

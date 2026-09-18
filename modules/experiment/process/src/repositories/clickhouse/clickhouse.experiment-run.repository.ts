@@ -1,4 +1,3 @@
-import type { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import type {
   ExperimentRun,
   ExperimentRunAggregate,
@@ -14,15 +13,17 @@ import {
   experimentRunTargetSchema,
   experimentRunWithItemsSchema,
 } from "@langwatch/experiment-contract";
+import { nowInstant, toEpochMs } from "@langwatch/time";
+import type { z } from "zod";
+
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
-import { nowInstant,toEpochMs } from "@langwatch/time";
+import type { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import {
   buildDedupedRunItemsWhere,
   computeOccurredAtRangeForRuns,
   OCCURRED_AT_BUFFER_MS,
   WARN_OLD_RUN_AGE_MS,
 } from "./clickhouse.experiment-run.mapper.ts";
-import type { z } from "zod";
 
 type QueryResult = { json<T>(): Promise<T[]> };
 type ExperimentClickHouseClient = {
@@ -744,9 +745,7 @@ function mapRunWithItems(run: RunRow, items: ItemRow[], projectId: string): Expe
   });
 }
 
-function parseTargets(
-  value: string,
-): z.infer<typeof experimentRunTargetSchema>[] | null {
+function parseTargets(value: string): z.infer<typeof experimentRunTargetSchema>[] | null {
   try {
     const parsed: unknown = JSON.parse(value);
     const targets = experimentRunTargetSchema.array().safeParse(parsed);

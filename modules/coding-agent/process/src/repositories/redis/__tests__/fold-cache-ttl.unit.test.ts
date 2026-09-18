@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { buildTestCodingAgentProcessingPipeline } from "../../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 
 describe("coding-agent Eventing fold cache", () => {

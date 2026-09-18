@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { coerceEvaluatorScalar } from "../index.ts";
 
 describe("evaluator input coercion", () => {

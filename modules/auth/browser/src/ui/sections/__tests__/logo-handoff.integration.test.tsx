@@ -16,8 +16,8 @@ vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
-import { AuthCard } from "../../elements/auth-card.tsx";
 import { _resetEntranceForTests } from "../../../model/entrance.ts";
+import { AuthCard } from "../../elements/auth-card.tsx";
 import { FrontDoorShell } from "../front-door-shell.tsx";
 import { _resetLogoHandoffForTests } from "../logo-handoff.tsx";
 

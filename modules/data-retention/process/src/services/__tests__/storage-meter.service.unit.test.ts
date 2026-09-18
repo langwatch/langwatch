@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-contract/retention-tables";
 import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-contract/retention-tables";
+import { describe, expect, it, vi } from "vitest";
+
 import { StorageMeterService } from "../storage-meter.service.ts";
 
 /** The process's one ClickHouse client, stood in for by its `query`. */

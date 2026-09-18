@@ -1,11 +1,12 @@
+import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { AutomationEmailCapRepository } from "../../repositories/automation-email-cap.repository.ts";
 import {
   AutomationEmailCapService,
   type ConsumeDailyEmailCapInput,
   type ConsumeHourlyEmailCapInput,
 } from "../../services/email-cap.service.ts";
-import type { AutomationEmailCapRepository } from "../../repositories/automation-email-cap.repository.ts";
-import { Temporal } from "@langwatch/time";
 
 // The package accepts the members connection explicitly. This holder
 // keeps the test's Redis-vs-memory choice local without a process-global App.
@@ -188,7 +189,10 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         const incr = vi.fn().mockResolvedValue(1);
         // SET NX: first call wins ("OK"), retry loses (null). The retry must
         // GET the current count instead of INCR-ing it again.
-        const set = vi.fn().mockResolvedValueOnce("claimed").mockResolvedValueOnce("already-claimed");
+        const set = vi
+          .fn()
+          .mockResolvedValueOnce("claimed")
+          .mockResolvedValueOnce("already-claimed");
         redisMock.connection = makeStore({
           claim: set,
           findValue: vi.fn().mockResolvedValue("1"),
@@ -521,7 +525,10 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
     describe("when the SAME dispatch is retried (claim already won)", () => {
       it("re-reads the counter via GET without a second INCRBY", async () => {
         const incrby = vi.fn().mockResolvedValue(4);
-        const set = vi.fn().mockResolvedValueOnce("claimed").mockResolvedValueOnce("already-claimed");
+        const set = vi
+          .fn()
+          .mockResolvedValueOnce("claimed")
+          .mockResolvedValueOnce("already-claimed");
         redisMock.connection = makeStore({
           claim: set,
           findValue: vi.fn().mockResolvedValue("4"),

@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
 import type {

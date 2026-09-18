@@ -3,10 +3,12 @@
  * Azure Blob credentials across every auth mode (issue #6087).
  */
 import { describe, expect, it } from "vitest";
+
 import {
   AzureBackendMisconfiguredError,
   type AzureBlobCredentialsConfig,
-  type AzureInjectedIdentity,AzureBlobCredentialsAdapter
+  type AzureInjectedIdentity,
+  AzureBlobCredentialsAdapter,
 } from "../azure-blob-credentials.service.ts";
 const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 

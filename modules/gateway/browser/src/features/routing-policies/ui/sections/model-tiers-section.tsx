@@ -1,7 +1,7 @@
 import { Box, Code, Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { type Control, useWatch } from "react-hook-form";
 
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { api } from "../../../../behavior/gateway-api.ts";
 import {
   MODEL_TIER_PRESETS,
@@ -9,7 +9,6 @@ import {
   type ModelTier,
   modelTierRequestSnippet,
 } from "../../model/model-tier-presets.ts";
-
 import type { RoutingPolicyFormValues } from "../../model/routing-policy-form.ts";
 
 /**

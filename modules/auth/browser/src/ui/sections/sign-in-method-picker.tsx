@@ -3,14 +3,16 @@ import { Alert, Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
 import { useState } from "react";
+
 import { useOptionalAuthHost } from "../../model/auth-host.ts";
-import { signInMethodActionLabel } from "../../model/method-labels.ts";
-import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
-import "../elements/auth-front-door.css";
 import { MONO_FONT } from "../../model/front-door-theme.ts";
+import { signInMethodActionLabel } from "../../model/method-labels.ts";
+
+import "../elements/auth-front-door.css";
+import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
 import { MethodButton } from "../elements/method-button.tsx";
-import { PasskeySignInButton } from "./passkey-sign-in-button.tsx";
 import { SignInMethodIcon } from "../elements/sign-in-method-icon.tsx";
+import { PasskeySignInButton } from "./passkey-sign-in-button.tsx";
 
 /**
  * A dev stack rarely has social credentials mounted, hiding the social rail

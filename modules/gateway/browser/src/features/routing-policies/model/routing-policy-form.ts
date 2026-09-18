@@ -1,3 +1,4 @@
+import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
 /**
  * Routing-policy form schema and mappings between stored and editor formats.
  * Pure functions: testable without React/network/JSX.
@@ -5,7 +6,6 @@
 import { z } from "zod";
 
 import { validateModelAliasesAgainstBoundProviders } from "../../../model/virtual-key-alias-validation.ts";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
 import { isModelTier, MODEL_TIERS, type ModelTier } from "./model-tier-presets.ts";
 
 /** The four dimensions a restriction rule can target. */

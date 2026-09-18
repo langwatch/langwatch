@@ -29,8 +29,7 @@ export class TestProjectApi implements ProjectApi {
   findSummaryById: ProjectApi["findSummaryById"] = (projectId) =>
     this.overrides.findSummaryById?.(projectId) ?? Promise.resolve(null);
 
-  findById: ProjectApi["findById"] = (id) =>
-    this.overrides.findById?.(id) ?? Promise.resolve(null);
+  findById: ProjectApi["findById"] = (id) => this.overrides.findById?.(id) ?? Promise.resolve(null);
 
   getOrganizationId: ProjectApi["getOrganizationId"] = (projectId) =>
     this.overrides.getOrganizationId?.(projectId) ?? this.unimplemented("getOrganizationId");

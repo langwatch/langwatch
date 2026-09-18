@@ -1,27 +1,28 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { memo } from "react";
-import { LuChevronRight, LuClock, LuTriangleRight, LuZap } from "react-icons/lu";
-import {
-  CostStatsTooltip,
-  LatencyStatsTooltip,
-} from "../../../elements/batch-results/metric-stats-tooltip.tsx";
-import {
-  getPassRateGradientColor,
-  PassRateCircle,
-} from "@langwatch/design-system/pass-rate-indicator";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { PassRateCoverageChip } from "../../../elements/shared/pass-rate-coverage-chip.tsx";
-import { passRateCoverage } from "../../../../model/shared/pass-rate-coverage.ts";
-import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
-import { useEvaluatorNames } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";
-import type { EvaluatorConfig } from "../../../../model/experiments-v3/types.ts";
-import type { TargetAggregate } from "@langwatch/experiment-contract";
-import { formatPassRate } from "@langwatch/experiment-contract";
 import {
   formatCost,
   formatLatency,
   formatScore,
 } from "@langwatch/design-system/metric-value-formatters";
+import {
+  getPassRateGradientColor,
+  PassRateCircle,
+} from "@langwatch/design-system/pass-rate-indicator";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
+import type { TargetAggregate } from "@langwatch/experiment-contract";
+import { formatPassRate } from "@langwatch/experiment-contract";
+import { memo } from "react";
+import { LuChevronRight, LuClock, LuTriangleRight, LuZap } from "react-icons/lu";
+
+import { useEvaluatorNames } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";
+import type { EvaluatorConfig } from "../../../../model/experiments-v3/types.ts";
+import { passRateCoverage } from "../../../../model/shared/pass-rate-coverage.ts";
+import {
+  CostStatsTooltip,
+  LatencyStatsTooltip,
+} from "../../../elements/batch-results/metric-stats-tooltip.tsx";
+import { PassRateCoverageChip } from "../../../elements/shared/pass-rate-coverage-chip.tsx";
 
 type TargetSummaryProps = {
   aggregates: TargetAggregate;

@@ -3,8 +3,9 @@
  * (avoids org table reads on flags without age rules).
  */
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
-import { beforeEach, describe, expect, it } from "vitest";
 import { Temporal } from "@langwatch/time";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
 
 const FLAG = "ops_es_causality_loop_guard_disabled";

@@ -4,6 +4,7 @@
  * `packages/prisma-client/prisma/schema.prisma` and moves with it.
  */
 import type { Instant } from "@langwatch/time";
+
 import type { GatewayBudgetScopeType, GatewayBudgetWindow } from "./gateway.budget.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */

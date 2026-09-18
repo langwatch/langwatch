@@ -28,10 +28,7 @@ export abstract class VirtualKeyAuthorizationRepository {
     organizationId: string;
     projectIds: string[];
   }): Promise<string[]>;
-  abstract findVirtualKeyScopes(input: {
-    virtualKeyId: string;
-    organizationId: string;
-  }): Promise<{
+  abstract findVirtualKeyScopes(input: { virtualKeyId: string; organizationId: string }): Promise<{
     traceProjectId: string | null;
     scopes: { scopeType: string; scopeId: string }[];
   } | null>;

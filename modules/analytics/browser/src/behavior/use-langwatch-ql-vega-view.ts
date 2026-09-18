@@ -4,9 +4,6 @@
  * every exit path calls `finalize()` — a dropped view leaks Vega's global listeners.
  */
 
-import { type RefObject, useEffect, useRef, useState } from "react";
-import embed, { type EmbedOptions, type Result } from "vega-embed";
-
 import {
   buildLangWatchQLVegaSpec,
   type LangWatchQLVegaSpecBuild,
@@ -17,6 +14,8 @@ import {
   type LangWatchQLDataset,
   type VegaValidationError,
 } from "@langwatch/analytics-contract/visualization";
+import { type RefObject, useEffect, useRef, useState } from "react";
+import embed, { type EmbedOptions, type Result } from "vega-embed";
 
 export type LangWatchQLVegaViewStatus = "idle" | "embedding" | "ready" | "failed";
 

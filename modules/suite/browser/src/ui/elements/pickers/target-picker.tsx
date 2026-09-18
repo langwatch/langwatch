@@ -5,11 +5,11 @@
  */
 
 import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { AlertTriangle, Plus, X } from "lucide-react";
-import type { SuiteTarget, SuiteTargetType } from "@langwatch/suite-contract";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { SuiteTarget, SuiteTargetType } from "@langwatch/suite-contract";
+import { AlertTriangle, Plus, X } from "lucide-react";
 
 export interface TargetPickerTarget {
   name: string;

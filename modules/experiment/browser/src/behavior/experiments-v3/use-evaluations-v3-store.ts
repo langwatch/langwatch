@@ -1,7 +1,3 @@
-import isDeepEqual from "fast-deep-equal";
-import debounce from "lodash-es/debounce";
-import { temporal } from "zundo";
-import { create, type StateCreator } from "zustand";
 import {
   isWorkbenchActionKind,
   WORKBENCH_ACTIONS,
@@ -25,6 +21,12 @@ import {
   normalizeEvaluators,
   normalizeTargets,
 } from "@langwatch/experiment-contract";
+import { nowInstant } from "@langwatch/time";
+import isDeepEqual from "fast-deep-equal";
+import debounce from "lodash-es/debounce";
+import { temporal } from "zundo";
+import { create, type StateCreator } from "zustand";
+
 import {
   createInitialResults,
   createInitialState,
@@ -36,7 +38,6 @@ import {
   isComparisonEvaluator,
   type TargetConfig,
 } from "../../model/experiments-v3/types.ts";
-import { nowInstant } from "@langwatch/time";
 
 // ============================================================================
 // Helper Functions

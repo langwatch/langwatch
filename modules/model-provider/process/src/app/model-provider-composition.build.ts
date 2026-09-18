@@ -1,11 +1,12 @@
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
 /**
  * Builds ModelProviderInfrastructure (previously hand-composed) from redis
  * and config. Two intentional branches: managed is always Unmanaged (core
  * may not import Enterprise); spans is always undefined (no untyped peer).
  */
 import { nanoid } from "nanoid";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
+
 import {
   CodexAccountService,
   CodexOAuthModelProviderTokenRefresherAdapter,
@@ -17,8 +18,11 @@ import { SsrfModelProviderEgressAdapter } from "../services/ssrf.model-provider-
 import { UnmanagedModelProviderGatewayAdapter } from "../services/unmanaged.model-provider-gateway.service.ts";
 import { VercelAiModelTranslationAdapter } from "../services/vercel-ai.model-translation.service.ts";
 import { WindowedModelProviderConnectionRateLimiterAdapter } from "../services/windowed.model-provider-connection-rate-limiter.service.ts";
+import type {
+  ModelProviderBuildConfig,
+  ModelProviderInfrastructure,
+} from "./model-provider.app.ts";
 import { ModelProviderRateLimit } from "./model-provider.members.ts";
-import type { ModelProviderAppConfig, ModelProviderInfrastructure } from "./model-provider.app.ts";
 
 /**
  * Connection-test limiter counter over process Redis with per-call window/max (organization
@@ -55,7 +59,7 @@ class RedisModelProviderRateLimit extends ModelProviderRateLimit {
 /** What this process hands `ModelProviderApp` at boot. */
 export function buildModelProviderInfrastructure(input: {
   members: Readonly<{ redis: RedisConnection }>;
-  config: ModelProviderAppConfig;
+  config: ModelProviderBuildConfig;
   dependencies: Readonly<{ projects: ProjectApi }>;
 }): ModelProviderInfrastructure {
   const { members, config, dependencies } = input;

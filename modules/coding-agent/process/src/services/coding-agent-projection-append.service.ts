@@ -1,5 +1,6 @@
-import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
+import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
+
 import type { CodingAgentSessionEventRecord } from "../eventing/coding-agent-session-events.projection.ts";
 import type { CodingAgentTraceSessionRecord } from "../eventing/coding-agent-trace-sessions.projection.ts";
 import type { SessionMetricSeriesRecord } from "../eventing/session-metric-series.projection.ts";

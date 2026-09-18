@@ -1,13 +1,6 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
+
 import { createAgentCommandSchema, updateAgentCommandSchema } from "./agent.commands.ts";
-import {
-  agentApiAgentInputSchema,
-  agentApiAgentReferenceInputSchema,
-  agentApiCopyRequestSchema,
-  agentApiProjectInputSchema,
-  agentApiPushToCopiesInputSchema,
-  agentApiTestTurnInputSchema,
-} from "./agent.schemas.ts";
 import {
   agentCascadeArchiveSchema,
   agentCopyCreatedSchema,
@@ -20,6 +13,14 @@ import {
   relatedAgentEntitiesSchema,
   agentWithLegacyCopyCountSchema,
 } from "./agent.queries.ts";
+import {
+  agentApiAgentInputSchema,
+  agentApiAgentReferenceInputSchema,
+  agentApiCopyRequestSchema,
+  agentApiProjectInputSchema,
+  agentApiPushToCopiesInputSchema,
+  agentApiTestTurnInputSchema,
+} from "./agent.schemas.ts";
 import { agentSchema, agentWithFieldsSchema } from "./agent.ts";
 
 export const agentTrpc = defineTrpcContract("agents")

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
+
 import type { TopicClusteringRepository } from "../../repositories/topic-clustering.repository.ts";
+import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
 
 /**
  * Unit tests for the ADR-051 legacy-project schedule seed. Only the

@@ -1,6 +1,7 @@
-import { nowInstant } from "@langwatch/time";
 import { Badge, Button, Card, HStack, Spacer, Spinner, Table, Text } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import { useMemo } from "react";
+
 import { api } from "../../../../behavior/ops-api.ts";
 
 /** Anomalous tenants: spiked enqueue rate or trace dominance (rate breaker, fingerprint
@@ -43,8 +44,8 @@ export function AnomaliesCard() {
         </HStack>
         {hasError && (
           <Text paddingX={4} paddingBottom={3} color="red.500" textStyle="xs">
-            Could not load anomalies. Redis may be unavailable. Retrying every 30s. Do NOT
-            interpret this as &ldquo;all clear&rdquo;.
+            Could not load anomalies. Redis may be unavailable. Retrying every 30s. Do NOT interpret
+            this as &ldquo;all clear&rdquo;.
           </Text>
         )}
         {hasAny && (

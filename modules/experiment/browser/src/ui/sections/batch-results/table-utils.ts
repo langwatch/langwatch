@@ -2,6 +2,7 @@
  * Shared utilities for batch evaluation result tables
  */
 import type { SystemStyleObject } from "@chakra-ui/react";
+
 import { getImageUrl } from "./presentation.tsx";
 
 export {

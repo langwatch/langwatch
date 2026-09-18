@@ -4,8 +4,8 @@
  * Phase 2 comparison cells read.
  */
 
-import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/observability";
+import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   isComparisonEvaluator,
   type EvaluationsV3State,
@@ -13,14 +13,15 @@ import {
   type ESBatchEvaluationTarget,
   type ExecutionCell,
 } from "@langwatch/experiment-contract";
-import type { ExperimentService } from "./experiment.service.ts";
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
 import type { SeededTargetOutput } from "./experiment-cell-plan.service.ts";
 import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
-import { nowInstant } from "@langwatch/time";
+import type { ExperimentService } from "./experiment.service.ts";
 
 /**
  * Where a workbench cell's evaluator result is reported as an evaluation.

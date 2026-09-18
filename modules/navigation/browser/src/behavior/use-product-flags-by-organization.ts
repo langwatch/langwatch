@@ -1,5 +1,5 @@
-import { navigationApi } from "./navigation-api.ts";
 import type { ProductId } from "../model/products.ts";
+import { navigationApi } from "./navigation-api.ts";
 
 /**
  * How long a flag answer is trusted before it is asked again: 5 minutes,

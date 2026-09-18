@@ -1,10 +1,11 @@
 import { Box, chakra, Grid, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { LangyPanelSurface } from "@langwatch/langy-browser/surfaces/asaplangy";
+import { nowInstant } from "@langwatch/time";
 import { motion } from "motion/react";
 import { type MouseEvent, useEffect, useRef, useState } from "react";
-import { LangyPanelSurface } from "@langwatch/langy-browser/surfaces/asaplangy";
-import type { StatusCell } from "../types.ts";
+
 import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
-import { nowInstant } from "@langwatch/time";
+import type { StatusCell } from "../types.ts";
 
 /**
  * The project's numbers, reframed as status, on the SAME Langy surface as

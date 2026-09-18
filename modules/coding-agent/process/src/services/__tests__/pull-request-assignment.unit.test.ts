@@ -4,6 +4,7 @@
  * @see modules/coding-agent/specs/session-git-context.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   CodingAgentPullRequestAssignmentService,
   type AssignablePullRequest,

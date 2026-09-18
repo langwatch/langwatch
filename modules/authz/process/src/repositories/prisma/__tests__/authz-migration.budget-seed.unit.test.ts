@@ -5,6 +5,7 @@
  * links. Assert guard as SQL.
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
 import { PrismaAuthzMigrationRepository } from "../prisma.authz-migration.repository.ts";
 
 const ORG = "org_acme";

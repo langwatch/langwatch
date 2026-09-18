@@ -27,6 +27,7 @@ import {
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
 import type { PinnedTraceRepository } from "../repositories/pinned-trace.repository.ts";
 import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";

@@ -1,13 +1,17 @@
+import { Temporal, type Instant } from "@langwatch/time";
 /**
  * Tests endpoint registry contract: admission, enable/disable, rotation, auto-disable.
  */
-import { WebhookEndpointNotFoundError, WebhookEndpointValidationError } from "@langwatch/webhook-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import {
+  WebhookEndpointNotFoundError,
+  WebhookEndpointValidationError,
+} from "@langwatch/webhook-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { WebhookEndpointRuntime } from "../webhook-endpoint.repository.ts";
+
+import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import { MemoryWebhookDatabase } from "../memory/memory.webhook-database.ts";
 import { MemoryWebhookEndpointRepository } from "../memory/memory.webhook-endpoint.repository.ts";
-import type { WebhookId,WebhookSecret } from "../../app/webhook.app.ts";
+import type { WebhookEndpointRuntime } from "../webhook-endpoint.repository.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const OTHER_ORGANIZATION_ID = "organization-2";
@@ -62,13 +66,16 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
 
       expect(endpoint.status).toBe("ACTIVE");
       expect(secret).toMatch(/^whsec_/);
-      expect(await repository.getSigningSecret({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id })).toBe(
-        secret,
-      );
+      expect(
+        await repository.getSigningSecret({
+          organizationId: ORGANIZATION_ID,
+          endpointId: endpoint.id,
+        }),
+      ).toBe(secret);
       expect(await repository.getAll({ organizationId: ORGANIZATION_ID })).toHaveLength(1);
-      await expect(
-        repository.getAll({ organizationId: OTHER_ORGANIZATION_ID }),
-      ).resolves.toEqual([]);
+      await expect(repository.getAll({ organizationId: OTHER_ORGANIZATION_ID })).resolves.toEqual(
+        [],
+      );
     });
 
     it("rejects a URL that does not use https", async () => {
@@ -148,14 +155,20 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
         enabledEvents: ["gateway.request.completed"],
       });
 
-      const disabled = await repository.disable({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id });
+      const disabled = await repository.disable({
+        organizationId: ORGANIZATION_ID,
+        endpointId: endpoint.id,
+      });
       expect(disabled.status).toBe("DISABLED");
       expect(disabled.disabledReason).toBe("manual");
       await expect(
         repository.findDeliverable({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id }),
       ).resolves.toBeNull();
 
-      const enabled = await repository.enable({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id });
+      const enabled = await repository.enable({
+        organizationId: ORGANIZATION_ID,
+        endpointId: endpoint.id,
+      });
       expect(enabled.status).toBe("ACTIVE");
       expect(enabled.disabledReason).toBeNull();
       await expect(
@@ -192,7 +205,10 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
         now: start.add({ hours: 73 }),
       });
 
-      const status = await repository.health({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id });
+      const status = await repository.health({
+        organizationId: ORGANIZATION_ID,
+        endpointId: endpoint.id,
+      });
       expect(status.status).toBe("DISABLED");
       expect(status.disabledReason).toBe("auto_failures_72h");
 
@@ -242,7 +258,10 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
         now: start.add({ hours: 73 }),
       });
 
-      const status = await repository.health({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id });
+      const status = await repository.health({
+        organizationId: ORGANIZATION_ID,
+        endpointId: endpoint.id,
+      });
       expect(status.status).toBe("ACTIVE");
     });
   });

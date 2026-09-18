@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
 import type { AgentInputBinding, CodeAgentConfig, Field } from "@langwatch/agent-contract";
-import { computeBestMatchMappings, isScenarioMappingValid } from "@langwatch/scenario-contract";
-import type { AgentBrowser } from "../model/agent-client.ts";
 import {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "@langwatch/agent-contract/code-config";
+import { computeBestMatchMappings, isScenarioMappingValid } from "@langwatch/scenario-contract";
+import { useEffect, useState } from "react";
+
+import type { AgentBrowser } from "../model/agent-client.ts";
 
 const DEFAULT_INPUTS: Field[] = [{ identifier: "input", type: "str" }];
 const DEFAULT_OUTPUTS: Field[] = [{ identifier: "output", type: "str" }];

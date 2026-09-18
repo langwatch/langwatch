@@ -1,5 +1,6 @@
-import type { GithubPullRequestsRepository } from "../repositories/github-pull-requests.repository.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
+
+import type { GithubPullRequestsRepository } from "../repositories/github-pull-requests.repository.ts";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,

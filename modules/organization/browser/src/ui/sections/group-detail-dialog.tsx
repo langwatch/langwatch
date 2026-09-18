@@ -10,15 +10,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Search, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
-import type { TeamUserRole } from "../../model/prisma-types.ts";
+import { Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
 import { api } from "../../behavior/organization-api.ts";
+import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import type { TeamUserRole } from "../../model/prisma-types.ts";
+import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import {
   BindingInputRow,
   type BindingInputRowHandle,
@@ -27,7 +29,6 @@ import {
   SourceBadge,
   scopeTypeLabel,
 } from "./group-binding-input-row.tsx";
-import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 
 type Group = RouterOutputs["group"]["listAll"][number];
 type PendingAddition = { userId: string; label: string; image: string | null };

@@ -1,4 +1,5 @@
 import { Badge, Box, Card, HStack, Table, Text } from "@chakra-ui/react";
+
 import type { ProjectionHealthRow } from "../../model/projection-health.ts";
 
 function ProjectionRow({ row }: { row: ProjectionHealthRow }) {

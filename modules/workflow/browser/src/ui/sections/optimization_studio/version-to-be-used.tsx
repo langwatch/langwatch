@@ -1,20 +1,20 @@
 import { Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
-import { Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
-import { useFormContext } from "react-hook-form";
-import { useDebounceCallback } from "usehooks-ts";
-
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import { AISparklesLoader } from "@langwatch/model-provider-browser/ai-sparkles-loader";
 import {
   allModelOptions,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { SmallLabel } from "@langwatch/design-system/small-label";
-import { InputGroup } from "@langwatch/design-system/input-group";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
+import { useFormContext } from "react-hook-form";
+import { useDebounceCallback } from "usehooks-ts";
+
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { useVersionState } from "./history.tsx";
 
 export const VersionToBeUsed = () => {

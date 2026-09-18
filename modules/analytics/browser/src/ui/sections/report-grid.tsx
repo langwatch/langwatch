@@ -8,10 +8,7 @@ interface ReportGridProps {
   projectId: string;
   dashboardId?: string;
   onGraphDelete: (graphId: string) => void;
-  onGraphGranularityChange?: (input: {
-    graphId: string;
-    granularitySeconds: number;
-  }) => void;
+  onGraphGranularityChange?: (input: { graphId: string; granularitySeconds: number }) => void;
   onGraphsPlacementChange: (placements: ChartGridPlacement[]) => void;
   deletingGraphId: string | null;
 }

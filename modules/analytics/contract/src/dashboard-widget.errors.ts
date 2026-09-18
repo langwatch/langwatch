@@ -49,7 +49,6 @@ export class CustomGraphWritesDisabledForPlaygroundError extends HandledError {
   }
 }
 
-
 /**
  * A widget in another project earns this too, on purpose: the answer must
  * not let a caller tell "not yours" from "never existed" — same reasoning
@@ -89,4 +88,3 @@ export class DashboardWidgetDefinitionInvalidError extends HandledError {
     this.name = "DashboardWidgetDefinitionInvalidError";
   }
 }
-

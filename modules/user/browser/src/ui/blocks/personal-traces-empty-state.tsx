@@ -4,6 +4,7 @@
 import { Box, chakra, Flex, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Bot, KeyRound, Webhook } from "lucide-react";
 import type React from "react";
+
 import { Link } from "../elements/personal-link.tsx";
 
 /**

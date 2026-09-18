@@ -6,8 +6,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvaluatorGraph } from "../evaluator.app.ts";
 import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
+import type { EvaluatorGraph } from "../evaluator.app.ts";
 import {
   createEvaluatorTestApp,
   testEvaluatorGraph,
@@ -16,11 +16,13 @@ import {
 
 const graph = testEvaluatorGraph;
 
-function anApp(options: {
-  permits?: (projectId: string) => boolean;
-  ports?: EvaluatorGraph;
-  repository?: MemoryEvaluatorRepository;
-} = {}) {
+function anApp(
+  options: {
+    permits?: (projectId: string) => boolean;
+    ports?: EvaluatorGraph;
+    repository?: MemoryEvaluatorRepository;
+  } = {},
+) {
   const ports = options.ports ?? graph();
   const permissions = testEvaluatorPermissions(options.permits ?? (() => true));
   const composed = createEvaluatorTestApp({

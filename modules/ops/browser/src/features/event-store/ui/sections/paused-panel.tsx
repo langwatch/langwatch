@@ -1,9 +1,10 @@
 import type { DashboardData } from "@langwatch/ops-contract";
-import { ParkedGroupsView } from "../blocks/parked-groups-view.tsx";
-import { PausedCard as PausedCardView } from "./paused-card.tsx";
+
+import { api } from "../../../../behavior/ops-api.ts";
 import { Link } from "../../../../ui/elements/ops-link.tsx";
 import { usePausedSchedules } from "../../behavior/use-paused-schedules.ts";
-import { api } from "../../../../behavior/ops-api.ts";
+import { ParkedGroupsView } from "../blocks/parked-groups-view.tsx";
+import { PausedCard as PausedCardView } from "./paused-card.tsx";
 
 export function PausedCard({
   parkedTenants,

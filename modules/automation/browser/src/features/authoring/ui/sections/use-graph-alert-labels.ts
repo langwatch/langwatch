@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
+
 import { api } from "../../../../behavior/automation-api.ts";
+import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
 
 // Resolve human-facing graph name and series display label from saved JSON; returns null when
 // graph is loading, unselected, or stored series key no longer matches.

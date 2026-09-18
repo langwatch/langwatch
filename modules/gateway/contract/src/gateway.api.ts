@@ -3,7 +3,7 @@
  * call, plus the one budget-resolution read the spend graph makes. Replaces
  * the abstract `GatewayService` — an interface plus its token, not a class.
  */
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
 
 import type {

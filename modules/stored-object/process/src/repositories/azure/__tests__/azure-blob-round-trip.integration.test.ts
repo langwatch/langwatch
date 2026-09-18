@@ -5,11 +5,15 @@
  */
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
+
 import { TieredBlobStore } from "@langwatch/group-queue/operational";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { StoredObjectsTelemetry } from "#app/stored-object.members";
 import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
+import type { StoredObjectsRepository } from "#repositories/stored-objects.repository";
+import type { StoredObject } from "#rules/stored-object-row.rules";
 import {
   StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
@@ -17,9 +21,6 @@ import {
 } from "#services/stored-object-destination-policy.service";
 import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 import { StoredObjectsService } from "#services/stored-objects.service";
-import type { StoredObject } from "#rules/stored-object-row.rules";
-import type { StoredObjectsRepository } from "#repositories/stored-objects.repository";
-import type { StoredObjectsTelemetry } from "#app/stored-object.members";
 
 const ACCOUNT = "lwacct";
 const CONTAINER = "stored-objects";

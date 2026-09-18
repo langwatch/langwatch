@@ -1,26 +1,23 @@
 import "@testing-library/jest-dom/vitest";
-
 // @vitest-environment jsdom
 /**
  * The row the judge ran and could not settle, end to end across every surface that
  * reads a verdict.
  */
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-
-import { buildPairwiseComparisons } from "../../batch-evaluation-results.pairwise.ts";
-import { ComparisonWinnerCell, resolveWinner } from "../comparison-winner-cell.tsx";
 import { buildCsvData, buildCsvHeaders } from "../../batch-evaluation-results.csv.ts";
+import { buildPairwiseComparisons } from "../../batch-evaluation-results.pairwise.ts";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
 } from "../../batch-evaluation-results.types.ts";
 import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
+import { ComparisonWinnerCell, resolveWinner } from "../comparison-winner-cell.tsx";
 import { WinRateChart } from "../win-rate-chart.tsx";
 
 /** What select_best_compare stores when its two passes disagree. */

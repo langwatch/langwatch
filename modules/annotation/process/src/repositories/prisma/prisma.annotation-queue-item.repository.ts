@@ -5,9 +5,10 @@ import {
   type AnnotationQueuePendingCount,
   type AnnotationQueueWithItems,
 } from "@langwatch/annotation-contract";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
+
 import type {
   AnnotationQueueItemCaller,
   AnnotationQueueItemOrganizationScope,

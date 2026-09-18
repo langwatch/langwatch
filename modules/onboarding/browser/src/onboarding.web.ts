@@ -24,6 +24,10 @@ export const onboardingWeb = defineWebModule("onboarding")
       path: "/onboarding/:team/project",
       load: () => import("./ui/sections/onboarding/project.screen.tsx"),
     },
+    /** The in-project setup guide; the application's table owns the address. */
+    "pages/[project]/setup": {
+      load: () => import("./ui/sections/onboarding/setup.screen.tsx"),
+    },
   })
   /**
    * What another module may mount. trace mounts the SDK setup panels and
@@ -58,7 +62,9 @@ export const onboardingWeb = defineWebModule("onboarding")
     "surfaces/onboarding-mesh-background": {
       load: () => import("./ui/elements/onboarding-mesh-background.tsx"),
     },
-    "surfaces/platform-grid": { load: () => import("./ui/sections/observability/platform-grid.tsx") },
+    "surfaces/platform-grid": {
+      load: () => import("./ui/sections/observability/platform-grid.tsx"),
+    },
     "surfaces/via-claude-code-screen": {
       load: () => import("./ui/sections/via-claude-code-screen.tsx"),
     },

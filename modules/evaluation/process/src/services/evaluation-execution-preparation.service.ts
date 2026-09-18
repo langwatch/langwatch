@@ -4,8 +4,9 @@ import {
   type ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
-import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
+import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
+
 import {
   type EvaluationAzureSafetyCredentials,
   type EvaluationSettingsRecovery,

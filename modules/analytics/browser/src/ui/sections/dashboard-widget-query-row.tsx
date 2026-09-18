@@ -18,17 +18,17 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Play, Trash2 } from "lucide-react";
-import type { DashboardWidgetQuery } from "../../model/dashboard-widget-definition.ts";
-import { formatNumber } from "../../model/format.ts";
 
-import { DashboardWidgetCodeEditor } from "./dashboard-widget-code-editor.tsx";
-import { DashboardWidgetQueryParamsEditor } from "./dashboard-widget-query-params-editor.tsx";
-import { DashboardWidgetQueryResultView } from "./dashboard-widget-query-result-view.tsx";
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 import {
   type EditableQueryName,
   useEditableQueryName,
 } from "../../behavior/use-editable-query-name.ts";
+import type { DashboardWidgetQuery } from "../../model/dashboard-widget-definition.ts";
+import { formatNumber } from "../../model/format.ts";
+import { DashboardWidgetCodeEditor } from "./dashboard-widget-code-editor.tsx";
+import { DashboardWidgetQueryParamsEditor } from "./dashboard-widget-query-params-editor.tsx";
+import { DashboardWidgetQueryResultView } from "./dashboard-widget-query-result-view.tsx";
 
 /** The one-line "683 rows · 53ms" (or error) a collapsed row shows without expanding. */
 function runSummary(run: QueryLastRun | undefined): string | null {

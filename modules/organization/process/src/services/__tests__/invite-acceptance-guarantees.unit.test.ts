@@ -1,3 +1,4 @@
+import { InviteNotFoundError, InviteNotReadyError } from "@langwatch/organization-contract";
 /**
  * @see modules/organization/specs/invitations.feature
  * The four guarantees `InviteAcceptanceService.applyInvite` makes about what an accepted
@@ -5,7 +6,7 @@
  * than a mocked Prisma client.
  */
 import { describe, expect, it } from "vitest";
-import { InviteNotFoundError, InviteNotReadyError } from "@langwatch/organization-contract";
+
 import { InviteAcceptanceService } from "../invite-acceptance.service.ts";
 import {
   FakeAuthzGrantsService,

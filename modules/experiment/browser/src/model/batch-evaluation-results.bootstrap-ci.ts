@@ -3,8 +3,9 @@
  * zero, so a normal interval is misleading at these sample sizes.
  */
 
-import { mulberry32 } from "./random.mulberry32.ts";
 import { quantile } from "@langwatch/experiment-contract";
+
+import { mulberry32 } from "./random.mulberry32.ts";
 
 /** Resamples per interval. Matches the score bootstrap for the same reason. */
 const DEFAULT_SAMPLES = 1000;

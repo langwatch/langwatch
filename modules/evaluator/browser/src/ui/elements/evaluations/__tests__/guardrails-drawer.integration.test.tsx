@@ -3,10 +3,11 @@
  * @see specs/monitors/guardrails-drawer.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Evaluator } from "@langwatch/evaluator-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Evaluator } from "@langwatch/evaluator-contract";
+
 import { clearGuardrailsDrawerState, GuardrailsDrawer } from "../guardrails-drawer.tsx";
 
 const mockCloseDrawer = vi.fn();

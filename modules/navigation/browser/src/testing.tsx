@@ -1,6 +1,7 @@
 /** Stub host for tests; built from partial reading with fail-closed defaults */
 
 import type { ReactNode } from "react";
+
 import {
   NavigationHost,
   NavigationHostProvider,

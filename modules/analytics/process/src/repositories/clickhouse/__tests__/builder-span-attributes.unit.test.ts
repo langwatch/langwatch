@@ -5,8 +5,9 @@
  * @see specs/analytics/clickhouse-memory-safety.feature (Layer 1: @unit scenarios)
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 

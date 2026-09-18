@@ -1,8 +1,9 @@
 // A regex pattern (ADR-129) that never compiles matches nothing, so storing it would leave the
 // operator believing a model is trusted when the gate always says no — the save must be refused.
 
-import { describe, expect, it } from "vitest";
 import { ModelProviderSkipPermissionsPatternInvalidError } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
+
 import { ModelProviderCommandService } from "../model-provider-command.service.ts";
 
 function serviceWith(

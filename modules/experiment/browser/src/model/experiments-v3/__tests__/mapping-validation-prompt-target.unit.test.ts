@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { TargetConfig } from "@langwatch/experiment-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   getTargetMissingMappings,
   getUsedFields,

@@ -3,6 +3,7 @@
  */
 
 import { isLegacyCustomModels, type CustomModelEntry } from "@langwatch/model-provider-contract";
+
 import type { ModelProviderCredentialCipher } from "../app/model-provider.members.ts";
 
 // ============================================================================

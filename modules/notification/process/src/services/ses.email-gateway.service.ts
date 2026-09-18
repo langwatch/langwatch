@@ -6,6 +6,7 @@ import {
   SendRawEmailCommand,
 } from "@aws-sdk/client-ses";
 import { createLogger } from "@langwatch/observability";
+
 import {
   type EmailContent,
   EmailGateway,

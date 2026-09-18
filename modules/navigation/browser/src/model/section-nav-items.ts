@@ -1,3 +1,4 @@
+import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import {
   Bot,
   Brain,
@@ -17,8 +18,6 @@ import {
   Webhook,
   Zap,
 } from "lucide-react";
-
-import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 
 /**
  * The Gateway and Governance section navigations as data: both the legacy

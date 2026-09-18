@@ -1,23 +1,15 @@
-import { moduleApi } from "@langwatch/kernel";
 import type { Dataset } from "@langwatch/dataset-contract";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
 import type { StudioWorkflow, WorkflowWithVersion } from "@langwatch/workflow-contract";
+
 import type {
-  ExperimentPublishedMonitor,
-  ExperimentUpdateFrame,
-} from "./experiment.responses.ts";
-import type { ExperimentRunLookupInput } from "./experiment.rest.ts";
+  ExperimentDspyStep,
+  ExperimentDspyStepLookup,
+  ExperimentDspyStepSummary,
+  ExperimentDspyStepsLookup,
+} from "./experiment-dspy.ts";
 import type { DSPyRunsSummary } from "./experiment-legacy.ts";
-import type {
-  Experiment,
-  ExperimentLookup,
-  ExperimentPage,
-  ExperimentPageInput,
-  ExperimentSlugLookup,
-  ExperimentType,
-  FindOrCreateWorkflowExperimentInput,
-  SaveExperimentInput,
-} from "./experiment.ts";
 import type {
   CompleteExperimentRunInput,
   ExperimentRun,
@@ -32,12 +24,6 @@ import type {
   StartExperimentRunInput,
 } from "./experiment-run.ts";
 import type {
-  ExperimentDspyStep,
-  ExperimentDspyStepLookup,
-  ExperimentDspyStepSummary,
-  ExperimentDspyStepsLookup,
-} from "./experiment-dspy.ts";
-import type {
   CommitWorkbenchVersionInput,
   CreateEvaluationsV3Input,
   GetWorkbenchStateInput,
@@ -49,6 +35,18 @@ import type {
   WorkbenchStateView,
   WorkbenchVersionsPage,
 } from "./experiment-workbench-version.ts";
+import type { ExperimentPublishedMonitor, ExperimentUpdateFrame } from "./experiment.responses.ts";
+import type { ExperimentRunLookupInput } from "./experiment.rest.ts";
+import type {
+  Experiment,
+  ExperimentLookup,
+  ExperimentPage,
+  ExperimentPageInput,
+  ExperimentSlugLookup,
+  ExperimentType,
+  FindOrCreateWorkflowExperimentInput,
+  SaveExperimentInput,
+} from "./experiment.ts";
 
 /**
  * The credential a workbench write arrived on, as the attribution rule reads
@@ -239,9 +237,7 @@ export interface ExperimentApi {
    * never covered. `copy` reads a SECOND project - the source - so it is
    * probed before anything is read from it.
    */
-  mayManageEvaluations(
-    input: Readonly<{ actorId: string; projectId: string }>,
-  ): Promise<boolean>;
+  mayManageEvaluations(input: Readonly<{ actorId: string; projectId: string }>): Promise<boolean>;
   /**
    * The project's own model cost rules, in the shape the pricing cascade
    * reads. The optimizer log prices every call it stores against them.

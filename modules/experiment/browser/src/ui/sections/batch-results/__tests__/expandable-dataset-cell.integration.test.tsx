@@ -1,10 +1,8 @@
 import "@testing-library/jest-dom/vitest";
-
 /**
  * Dataset values collapse behind a fade and expand on click, like other cells.
  * @vitest-environment jsdom
  */
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

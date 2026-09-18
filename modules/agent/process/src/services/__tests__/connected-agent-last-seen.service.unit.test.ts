@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it, vi } from "vitest";
+
 import type { AgentService } from "../agent.service.ts";
 import { ConnectedAgentLastSeenService } from "../connected-agent-last-seen.service.ts";
 

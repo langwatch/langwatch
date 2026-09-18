@@ -1,8 +1,8 @@
 import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
-import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
 import { MemoryCodingAgentSessionEventRepository } from "./memory.coding-agent-session-event.repository.ts";
 import { MemoryCodingAgentSessionRepository } from "./memory.coding-agent-session.repository.ts";
 import { MemoryCodingAgentTraceSessionRepository } from "./memory.coding-agent-trace-session.repository.ts";
+import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
 import { MemorySessionMetricSeriesRepository } from "./memory.session-metric-series.repository.ts";
 
 /** The "memory" tier: every coding-agent row the app is tested without a store. */

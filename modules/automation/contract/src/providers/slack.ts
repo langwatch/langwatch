@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import type { PreviewEnvelope, SharedDef } from "../provider-types.ts";
 
 export const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;

@@ -1,23 +1,22 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import { GatewayWindow } from "@langwatch/gateway-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Postgres+ClickHouse: spend isn't multiplied across covering budgets; rolling window.
  * Spec: specs/ai-gateway/budgets.feature
  */
 import { nowInstant, toDate } from "@langwatch/time";
-import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
-import { GatewayWindow } from "@langwatch/gateway-contract";
-import { GatewayUsageService } from "../services/gateway-usage.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
+import { GatewayUsageService } from "../services/gateway-usage.service.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+
 import type { GroundShift } from "../model/ground-palette.ts";
 import {
   easeInOutCubic,

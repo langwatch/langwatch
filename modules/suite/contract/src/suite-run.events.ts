@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { SUITE_RUN_EVENT_TYPES, SUITE_RUN_EVENT_VERSIONS } from "./suite-run.constants.ts";
 
 const suiteRunEventSchema = z.object({
@@ -91,9 +92,7 @@ export const suiteRunItemRegradedEventDataSchema = z.object({
   status: z.string(),
   verdict: z.string().optional(),
 });
-export type SuiteRunItemRegradedEventData = z.infer<
-  typeof suiteRunItemRegradedEventDataSchema
->;
+export type SuiteRunItemRegradedEventData = z.infer<typeof suiteRunItemRegradedEventDataSchema>;
 
 export const SuiteRunItemRegradedEventSchema = z.object({
   ...suiteRunEventSchema.shape,
@@ -101,9 +100,7 @@ export const SuiteRunItemRegradedEventSchema = z.object({
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_REGRADED),
   data: suiteRunItemRegradedEventDataSchema,
 });
-export type SuiteRunItemRegradedEvent = z.infer<
-  typeof SuiteRunItemRegradedEventSchema
->;
+export type SuiteRunItemRegradedEvent = z.infer<typeof SuiteRunItemRegradedEventSchema>;
 
 /**
  * Union of all suite run processing event types.

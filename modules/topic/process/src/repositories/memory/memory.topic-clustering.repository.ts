@@ -64,7 +64,10 @@ export class MemoryTopicClusteringRepository extends TopicClusteringRepository {
     take: number;
   }): Promise<{ id: string }[]> {
     return Promise.resolve(
-      this.page(params, (project) => project.topicIndex.length > 0 || project.seedTopics.length > 0),
+      this.page(
+        params,
+        (project) => project.topicIndex.length > 0 || project.seedTopics.length > 0,
+      ),
     );
   }
 
@@ -93,7 +96,9 @@ export class MemoryTopicClusteringRepository extends TopicClusteringRepository {
     matches: (project: MemoryClusteringProject) => boolean,
   ): { id: string }[] {
     return [...this.store.clustering.entries()]
-      .filter(([id, project]) => matches(project) && (params.afterId === null || id > params.afterId))
+      .filter(
+        ([id, project]) => matches(project) && (params.afterId === null || id > params.afterId),
+      )
       .map(([id]) => id)
       .toSorted()
       .slice(0, params.take)

@@ -1,4 +1,5 @@
 import { type Mock, type Mocked, vi } from "vitest";
+
 import type { AuthzReadRepository } from "../../authz-read.repository.ts";
 
 /**

@@ -7,7 +7,6 @@
  */
 
 import { Button, HStack, Stack, Text } from "@chakra-ui/react";
-
 import {
   type LangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,

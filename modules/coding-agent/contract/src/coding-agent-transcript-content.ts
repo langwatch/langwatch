@@ -1,4 +1,5 @@
 import { isReplyTextPart } from "@langwatch/trace-contract";
+
 import { isInjectedContextOnly, systemReminderText } from "./coding-agent-transcript-context.ts";
 
 const RECOVERED_REPLY_MATCH_CHARS = 200;

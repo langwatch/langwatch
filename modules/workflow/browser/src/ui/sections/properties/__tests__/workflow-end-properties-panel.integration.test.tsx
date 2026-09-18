@@ -2,10 +2,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { End } from "@langwatch/workflow-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { End } from "@langwatch/workflow-contract";
 
 const mockSetNode = vi.fn();
 let mockEdges: { id: string; source: string; target: string; targetHandle?: string }[] = [];

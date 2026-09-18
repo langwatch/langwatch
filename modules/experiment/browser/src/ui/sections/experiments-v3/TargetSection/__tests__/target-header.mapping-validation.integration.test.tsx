@@ -35,15 +35,8 @@ vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-import { TargetHeader } from "../target-header.tsx";
 import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { PromptTemplateFieldsContext } from "../../../../../behavior/experiments-v3/use-prompt-template-fields.ts";
-import type {
-  DatasetReference,
-  EvaluatorConfig,
-  TargetConfig,
-} from "../../../../../model/experiments-v3/types.ts";
-import { DEFAULT_TEST_DATA_ID } from "../../../../../model/experiments-v3/types.ts";
 import {
   evaluatorHasMissingMappings,
   extractFieldsFromContent,
@@ -53,6 +46,13 @@ import {
   targetHasMissingMappings,
   validateWorkbench,
 } from "../../../../../model/experiments-v3/mapping-validation.ts";
+import type {
+  DatasetReference,
+  EvaluatorConfig,
+  TargetConfig,
+} from "../../../../../model/experiments-v3/types.ts";
+import { DEFAULT_TEST_DATA_ID } from "../../../../../model/experiments-v3/types.ts";
+import { TargetHeader } from "../target-header.tsx";
 
 const createTestDataset = (
   id: string = DEFAULT_TEST_DATA_ID,

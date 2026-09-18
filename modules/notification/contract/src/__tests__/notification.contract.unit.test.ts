@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+
 import { createNotificationCommandSchema, notificationSchema } from "../index.ts";
 
 describe("Notification contract", () => {

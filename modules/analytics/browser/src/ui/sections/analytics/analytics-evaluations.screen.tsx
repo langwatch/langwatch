@@ -1,13 +1,14 @@
 import { Alert, Box, Card, GridItem, Heading, HStack, SimpleGrid, Text } from "@chakra-ui/react";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";
+
+import { analyticsApi } from "../../../behavior/analytics-api.ts";
+import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import { Link } from "../../../ui/elements/analytics-link.tsx";
+import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { CustomGraph, type CustomGraphInput } from "../../../ui/sections/custom-graph.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
-import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
-import { Link } from "../../../ui/elements/analytics-link.tsx";
-import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { analyticsApi } from "../../../behavior/analytics-api.ts";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

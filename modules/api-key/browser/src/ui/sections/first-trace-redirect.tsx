@@ -5,6 +5,7 @@
 
 import { HStack, Icon, Spinner, Text } from "@chakra-ui/react";
 import { CheckCircle2 } from "lucide-react";
+
 import { useFirstTraceWatch } from "../../behavior/use-first-trace-watch.ts";
 
 export function FirstTraceRedirect() {

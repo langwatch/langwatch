@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
 import type {

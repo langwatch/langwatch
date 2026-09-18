@@ -3,9 +3,10 @@
  * from features not yet split. Segment names are load-bearing for React Query cache.
  */
 
-import type { userTrpc, identityTrpc } from "@langwatch/user-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
+import type { userTrpc, identityTrpc } from "@langwatch/user-contract";
+
 import type { AiToolEntry } from "../model/ai-tool-catalog.ts";
 
 /** An acknowledgement, for the writes whose only answer is that they happened. */

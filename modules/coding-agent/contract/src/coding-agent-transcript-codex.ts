@@ -1,11 +1,12 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { emitSystemPrompt } from "./coding-agent-transcript-state.ts";
-import { isInjectedContextOnly } from "./coding-agent-transcript-context.ts";
+
 import {
   extractedOutputText,
   isSameRecoveredReply,
   parsedChatMessages,
 } from "./coding-agent-transcript-content.ts";
+import { isInjectedContextOnly } from "./coding-agent-transcript-context.ts";
+import { emitSystemPrompt } from "./coding-agent-transcript-state.ts";
 import type { RenderedToolCall, SpanEntryAccumulator } from "./coding-agent-transcript-state.ts";
 import { modelOf } from "./coding-agent-transcript-value.ts";
 

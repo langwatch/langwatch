@@ -3,6 +3,7 @@ import type { DataPrivacyAudienceOptions } from "@langwatch/data-privacy-contrac
 import { Select } from "@langwatch/design-system/select";
 import { Eye, Shield, User, UserLock, Users } from "lucide-react";
 import { useMemo } from "react";
+
 import {
   ALL_MEMBERS_VALUE,
   applyAudienceSelection,

@@ -16,10 +16,10 @@ import type {
   GatewayBudgetWindow,
   GatewayBudgetScopeType,
   GatewayBudgetCheckInput,
-  GatewayBudgetCheckResult
+  GatewayBudgetCheckResult,
 } from "@langwatch/gateway-contract";
-import type { Instant } from "@langwatch/time";
 import type { ProjectIdentity, TraceDestinationProject } from "@langwatch/project-contract";
+import type { Instant } from "@langwatch/time";
 
 export type ArchiveBudgetInput = ArchiveGatewayBudgetInput;
 export type BudgetCheckInput = GatewayBudgetCheckInput;

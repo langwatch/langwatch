@@ -4,18 +4,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+
+import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in.ts";
 import { authApi as api } from "../../behavior/auth-api.ts";
-import Link from "../elements/router-link.tsx";
+
 import "../elements/auth-front-door.css";
-import { SHAPE } from "../../model/front-door-theme.ts";
 import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled.ts";
 import { useRetryCountdown } from "../../behavior/use-retry-countdown.ts";
-import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in.ts";
 import { describeRemainingWait } from "../../model/credential-sign-in.ts";
+import { SHAPE } from "../../model/front-door-theme.ts";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import { EmailPill } from "../elements/email-pill.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field.tsx";
 import { PasswordInput } from "../elements/password-input.tsx";
+import Link from "../elements/router-link.tsx";
 
 const credentialSchema = z.object({
   // Blank when the address arrived settled from the address step; the field

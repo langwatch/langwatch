@@ -1,4 +1,36 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
+import type { AnnotationQueueItem, AnnotationQueueListedItem } from "./annotation-queue.schemas.ts";
+import type {
+  AnnotationQueueCaller,
+  AnnotationQueueConfiguration,
+  AnnotationQueueScope,
+  QueueAnnotationTracesInput,
+} from "./annotation-queue.types.ts";
+import type {
+  AnnotationQueueDetail,
+  AnnotationQueueListEntry,
+  AnnotationQueuePendingCount,
+  AnnotationQueueRecord,
+} from "./annotation-response.schemas.ts";
+import type { CreateUnattributedAnnotationInput } from "./annotation-rest.schemas.ts";
+import type {
+  AnnotationOptimizedQueues,
+  AnnotationQueueItemWithTrace,
+  AnnotationWithFullUser,
+  AnnotationWithUserSummary,
+} from "./annotation-review.schemas.ts";
+import type {
+  AnnotationReviewCreateInput,
+  AnnotationReviewDeleteInput,
+  AnnotationReviewOptimizedQueuesInput,
+  AnnotationReviewUpdateInput,
+} from "./annotation-review.types.ts";
+import type {
+  AnnotationScore,
+  AnnotationScoreName,
+  UpsertAnnotationScoreInput,
+} from "./annotation-score.schemas.ts";
 import type {
   Annotation,
   AnnotationByIdInput,
@@ -13,37 +45,6 @@ import type {
   ToggleAnnotationScoreInput,
   UpdateAnnotationInput,
 } from "./annotation.schemas.ts";
-import type {
-  AnnotationScore,
-  AnnotationScoreName,
-  UpsertAnnotationScoreInput,
-} from "./annotation-score.schemas.ts";
-import type { AnnotationQueueItem, AnnotationQueueListedItem } from "./annotation-queue.schemas.ts";
-import type {
-  AnnotationQueueDetail,
-  AnnotationQueueListEntry,
-  AnnotationQueuePendingCount,
-  AnnotationQueueRecord,
-} from "./annotation-response.schemas.ts";
-import type {
-  AnnotationQueueCaller,
-  AnnotationQueueConfiguration,
-  AnnotationQueueScope,
-  QueueAnnotationTracesInput,
-} from "./annotation-queue.types.ts";
-import type {
-  AnnotationOptimizedQueues,
-  AnnotationQueueItemWithTrace,
-  AnnotationWithFullUser,
-  AnnotationWithUserSummary,
-} from "./annotation-review.schemas.ts";
-import type {
-  AnnotationReviewCreateInput,
-  AnnotationReviewDeleteInput,
-  AnnotationReviewOptimizedQueuesInput,
-  AnnotationReviewUpdateInput,
-} from "./annotation-review.types.ts";
-import type { CreateUnattributedAnnotationInput } from "./annotation-rest.schemas.ts";
 
 /** Flat operations peers may call after the annotation app is composed. */
 export interface AnnotationApi {

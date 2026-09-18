@@ -1,5 +1,4 @@
 import "@testing-library/jest-dom/vitest";
-
 /**
  * Integration tests for BatchRunsSidebar component
  * @vitest-environment jsdom
@@ -8,6 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { type BatchRunSummary, BatchRunsSidebar } from "../batch-runs-sidebar.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (

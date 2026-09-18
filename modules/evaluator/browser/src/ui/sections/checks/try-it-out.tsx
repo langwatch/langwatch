@@ -12,43 +12,45 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { readableDate } from "../../../model/display-formatters.ts";
+import {
+  PeriodSelector,
+  usePeriodSelector,
+} from "@langwatch/analytics-browser-kit/period-selector";
+import { useFilterParams } from "@langwatch/analytics-browser/surfaces/filter-params";
+import { FilterSidebar } from "@langwatch/analytics-browser/surfaces/filter-sidebar";
+import { FilterToggle } from "@langwatch/analytics-browser/surfaces/filter-toggle";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
+import { formatMoney } from "@langwatch/design-system/format-money";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { Money } from "@langwatch/design-system/type-utils";
+import {
+  type Evaluators,
+  evaluatorsSchema,
+  type SingleEvaluationResult,
+  getEvaluatorDefinitions,
+} from "@langwatch/evaluator-contract";
+import { HoverableBigText } from "@langwatch/workflow-browser/hoverable-big-text";
+import { RedactedField } from "@langwatch/workflow-browser/redacted-field";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { useFilterParams } from "@langwatch/analytics-browser/surfaces/filter-params";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import {
-  type Evaluators,
-  evaluatorsSchema,
-  type SingleEvaluationResult,getEvaluatorDefinitions
-} from "@langwatch/evaluator-contract";
+
+import { readableDate } from "../../../model/display-formatters.ts";
+import { evaluationStatusColor } from "../../../model/evaluation-status.ts";
 import {
   buildPreconditionTraceDataFromTrace,
   checkEvaluatorRequiredFields,
   evaluatePreconditions,
 } from "../../../model/evaluations/preconditions.ts";
 import type { CheckPreconditions } from "../../../model/evaluations/types.ts";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { formatMoney } from "@langwatch/design-system/format-money";
-import type { Money } from "@langwatch/design-system/type-utils";
-import { FilterSidebar } from "@langwatch/analytics-browser/surfaces/filter-sidebar";
-import { FilterToggle } from "@langwatch/analytics-browser/surfaces/filter-toggle";
-import { HoverableBigText } from "@langwatch/workflow-browser/hoverable-big-text";
-import {
-  PeriodSelector,
-  usePeriodSelector,
-} from "@langwatch/analytics-browser-kit/period-selector";
-import { InputGroup } from "@langwatch/design-system/input-group";
-import { RedactedField } from "@langwatch/workflow-browser/redacted-field";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
-import { evaluationStatusColor } from "../../../model/evaluation-status.ts";
 
 type RunRequestState = "idle" | "paused" | "running";
 
@@ -407,7 +409,9 @@ export function TryItOut({
                     let resultDetailsCell: React.ReactNode = null;
                     if (runningResult) {
                       if (resultDetails) {
-                        resultDetailsCell = <HoverableBigText lineClamp={3}>{resultDetails}</HoverableBigText>;
+                        resultDetailsCell = (
+                          <HoverableBigText lineClamp={3}>{resultDetails}</HoverableBigText>
+                        );
                       } else if (runningResult.status === "loading") {
                         resultDetailsCell = "";
                       } else {
@@ -605,9 +609,7 @@ export function TryItOut({
                           <Table.Cell color={color} maxWidth="250px">
                             {resultDetailsCell}
                           </Table.Cell>
-                          <Table.Cell maxWidth="120px">
-                            {costCellContent}
-                          </Table.Cell>
+                          <Table.Cell maxWidth="120px">{costCellContent}</Table.Cell>
                         </Table.Row>
                       </Tooltip>
                     );

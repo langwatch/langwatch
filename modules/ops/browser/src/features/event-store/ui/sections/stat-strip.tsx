@@ -1,9 +1,10 @@
 import { HStack } from "@chakra-ui/react";
 import { LATENCY_SAMPLE_SIZE, type DashboardData } from "@langwatch/ops-contract";
-import { RedisStatTile } from "../elements/redis-stat-tile.tsx";
-import { formatCount, formatMs, formatRate } from "../../../../model/ops-formatters.ts";
+
 import { api } from "../../../../behavior/ops-api.ts";
+import { formatCount, formatMs, formatRate } from "../../../../model/ops-formatters.ts";
 import { LinkedStat } from "../elements/linked-stat.tsx";
+import { RedisStatTile } from "../elements/redis-stat-tile.tsx";
 
 /** Percentiles measured over sample count (rolling, not time window); width varies
  * with throughput. */

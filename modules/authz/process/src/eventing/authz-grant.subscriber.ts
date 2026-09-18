@@ -9,12 +9,13 @@ import {
 } from "@langwatch/authz-contract";
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { AuthzGrantsEvent } from "./authz-grant.events.ts";
 import { Temporal } from "@langwatch/time";
+
 import {
   type AuthzAuditRow,
   AuthzAuditTrailStore,
 } from "../repositories/authz-audit-trail.repository.ts";
+import type { AuthzGrantsEvent } from "./authz-grant.events.ts";
 
 export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
 export const AUTHZ_AUDIT_VERBS = [

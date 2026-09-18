@@ -1,5 +1,6 @@
-import { useMemo } from "react";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import { useMemo } from "react";
+
 import { useNavigationHost } from "../model/navigation-host.ts";
 import { PRODUCTS, type ProductId } from "../model/products.ts";
 

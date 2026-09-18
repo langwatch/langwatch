@@ -7,6 +7,7 @@ import { Input } from "@chakra-ui/react";
 import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+
 import { useAuthorizeHost } from "../../model/authorize-host.ts";
 
 export function CopyInput(

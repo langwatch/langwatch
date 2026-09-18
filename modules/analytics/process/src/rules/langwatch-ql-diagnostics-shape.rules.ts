@@ -4,9 +4,10 @@
  * The rules themselves are the `langwatch-ql-*-diagnostics` services.
  */
 import type { Instant } from "@langwatch/time";
-import type { LangWatchQLColumn } from "../services/langwatch-ql-executor.service.ts";
+
 import type { LangWatchQLResultLimits } from "../repositories/langwatch-ql-executor.repository.ts";
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
+import type { LangWatchQLColumn } from "../services/langwatch-ql-executor.service.ts";
 import type {
   AcceptedLangWatchQL,
   LangWatchQLQueryBlock,

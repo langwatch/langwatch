@@ -5,6 +5,7 @@
  */
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
+
 import {
   type GatewayAudit,
   type AppendGatewayAuditInput,
@@ -60,8 +61,7 @@ export class PrismaGatewayAuditRepository implements GatewayAudit {
     return new PrismaGatewayAuditRepository(database);
   }
 
-  constructor(private readonly prisma: GatewayAuditDatabase) {
-  }
+  constructor(private readonly prisma: GatewayAuditDatabase) {}
 
   async append(
     input: AppendGatewayAuditInput,

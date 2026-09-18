@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { RedisSchedulerWakeRepository as RedisSchedulerWakeAdapter } from "../repositories/redis/redis.scheduler-wake.repository.ts";
 
 describe("RedisSchedulerWakeAdapter", () => {

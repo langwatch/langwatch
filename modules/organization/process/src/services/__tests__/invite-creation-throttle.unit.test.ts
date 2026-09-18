@@ -8,12 +8,12 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { OrganizationInvitations } from "../../app/organization.members.ts";
 import {
   InviteCreationThrottleService,
   INVITE_CREATION_WINDOW_SECONDS,
 } from "../invite-creation-throttle.service.ts";
 import { OrganizationInvitationDoorService } from "../organization-invitation-door.service.ts";
-import type { OrganizationInvitations } from "../../app/organization.members.ts";
 import { FakeInviteRateLimit } from "./support/invite-fakes.ts";
 
 // The registry's free/enterprise invitesCreatedPerHour, stated literally: a

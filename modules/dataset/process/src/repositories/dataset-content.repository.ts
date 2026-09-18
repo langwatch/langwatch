@@ -1,5 +1,6 @@
-import type { DatasetRow } from "./dataset.repository.ts";
 import type { Instant, TimeInput } from "@langwatch/time";
+
+import type { DatasetRow } from "./dataset.repository.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type DatasetJsonObject = { [Key in string]?: DatasetJsonValue };
@@ -94,11 +95,7 @@ export interface DatasetContentRepository {
     content: DatasetContentUpdate;
   }): Promise<DatasetRow>;
   deletePendingUpload(input: { id: string; projectId: string }): Promise<number>;
-  failIfProcessing(input: {
-    id: string;
-    projectId: string;
-    statusError: string;
-  }): Promise<number>;
+  failIfProcessing(input: { id: string; projectId: string; statusError: string }): Promise<number>;
   claimForProcessing(input: { id: string; projectId: string }): Promise<number>;
   markProcessingRedriven(input: { id: string; projectId: string }): Promise<number>;
   findStaleProcessing(input: { projectId: string; olderThan: Instant }): Promise<DatasetRow[]>;
@@ -106,10 +103,7 @@ export interface DatasetContentRepository {
     projectId: string;
     stagingKey: string;
   }): Promise<DatasetRow | null>;
-  findStalePendingUploads(input: {
-    projectId: string;
-    olderThan: Instant;
-  }): Promise<DatasetRow[]>;
+  findStalePendingUploads(input: { projectId: string; olderThan: Instant }): Promise<DatasetRow[]>;
   findAllSlugs(input: { projectId: string }): Promise<{ slug: string }[]>;
   findPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
     datasets: (DatasetRow & { _count: { datasetRecords: number } })[];

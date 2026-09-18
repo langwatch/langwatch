@@ -10,12 +10,12 @@ import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ApiKeyApp } from "../../app/api-key.app.ts";
-import { AGENT_SANDBOX_KEY_REAP_PROCESS_NAME } from "../agent-sandbox-key-reap.process.ts";
-import { CLI_LOGIN_KEY_REAP_PROCESS_NAME } from "../cli-login-key-reap.process.ts";
-import { MemoryApiKeyRepositories } from "../../repositories/memory/memory.api-key.repositories.ts";
 import { apiKeyServer } from "../../api-key.server.ts";
+import type { ApiKeyApp } from "../../app/api-key.app.ts";
+import { MemoryApiKeyRepositories } from "../../repositories/memory/memory.api-key.repositories.ts";
+import { AGENT_SANDBOX_KEY_REAP_PROCESS_NAME } from "../agent-sandbox-key-reap.process.ts";
 import { apiKeyEventing } from "../api-key.pipeline.ts";
+import { CLI_LOGIN_KEY_REAP_PROCESS_NAME } from "../cli-login-key-reap.process.ts";
 
 /** The sandbox sweep never calls into the app, so a stand-in proves nothing there. */
 const unusedApp = undefined as unknown as ApiKeyApp;
@@ -45,10 +45,7 @@ function installed(participation: "produce" | "consume" = "consume") {
 }
 
 /** The scheduled intent one process manager runs, as the declaration built it. */
-function reapIntentOf(
-  definition: ReturnType<typeof installed>["definition"],
-  processName: string,
-) {
+function reapIntentOf(definition: ReturnType<typeof installed>["definition"], processName: string) {
   const process = definition.processManagers.get(processName);
   expect(process, `the sweep declared no "${processName}" process manager`).toBeDefined();
   return process!.config.intents!.reap!.run;

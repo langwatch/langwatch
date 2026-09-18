@@ -1,3 +1,4 @@
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 /**
  * Operator writes reach explicit registry entries and the kill switches the
  * live pipeline graph advertises, and nothing else.
@@ -5,11 +6,13 @@
  */
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import type {
   OpsEventingIntrospection,
-  OpsKillSwitchDescriptor,OpsApp,OpsCapability
+  OpsKillSwitchDescriptor,
+  OpsApp,
+  OpsCapability,
 } from "../ops.app.ts";
 import { createOpsTestApp } from "./ops.fixture.ts";
 

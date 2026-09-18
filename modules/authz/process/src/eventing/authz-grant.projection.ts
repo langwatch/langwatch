@@ -13,6 +13,8 @@ import type {
   MapProjectionDefinition,
   ProjectionStoreContext,
 } from "@langwatch/eventing";
+import { type Instant, Temporal } from "@langwatch/time";
+
 import {
   type GrantRowShape,
   PRINCIPAL_TO_DB,
@@ -28,7 +30,6 @@ import type {
   RoleDeletedEvent,
   RolePermissionsChangedEvent,
 } from "./authz-grant.events.ts";
-import { type Instant, Temporal } from "@langwatch/time";
 
 export type GrantProjectionWrite =
   | { kind: "grant.upsert"; row: GrantRowShape }

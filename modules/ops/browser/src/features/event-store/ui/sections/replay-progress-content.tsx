@@ -1,4 +1,3 @@
-import { nowInstant, toEpochMs } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -14,18 +13,20 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
+
+import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
+import { Link } from "../../../../ui/elements/ops-link.tsx";
+import { useReplayStatus } from "../../behavior/use-replay-status.ts";
 import { parseActiveProjections } from "../../model/replay-presentation.ts";
 import { CowboyAnimation } from "../elements/cowboy-animation.tsx";
 import { PhaseTimeline } from "../elements/phase-timeline.tsx";
 import { replayStateColor } from "../elements/replay-state-badge.tsx";
-import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
-import { Link } from "../../../../ui/elements/ops-link.tsx";
-import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { useReplayStatus } from "../../behavior/use-replay-status.ts";
-import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
-import { api } from "../../../../behavior/ops-api.ts";
 
 const MESH_PULSE_CSS = `
   @keyframes meshPulse {

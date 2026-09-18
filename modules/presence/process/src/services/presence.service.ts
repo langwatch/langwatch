@@ -12,9 +12,10 @@ import {
   type PresenceUpdateInput,
 } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { nowInstant } from "@langwatch/time";
+
 import type { PresenceBroadcast, PresenceDiagnostics } from "../app/presence.app.ts";
 import type { PresenceRepository } from "../repositories/presence.repository.ts";
-import { nowInstant } from "@langwatch/time";
 
 export const PRESENCE_TTL_SECONDS = 30;
 

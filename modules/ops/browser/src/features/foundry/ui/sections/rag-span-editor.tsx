@@ -1,5 +1,6 @@
 import { Box, Button, Flex, Input, Text, Textarea } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
+
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import type { RAGContext, SpanConfig } from "../../model/foundry-types.ts";
 

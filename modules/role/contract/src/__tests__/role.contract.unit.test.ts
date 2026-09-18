@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+
 import { roleCreateSchema, roleSchema, roleUpdateSchema } from "../index.ts";
 
 describe("role contract", () => {

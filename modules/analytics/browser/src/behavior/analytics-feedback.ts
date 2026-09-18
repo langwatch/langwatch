@@ -5,6 +5,7 @@
  */
 
 import { useCallback } from "react";
+
 import { useAnalyticsHost } from "../model/analytics-host.ts";
 
 export type AnalyticsErrorToastOptions = {

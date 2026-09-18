@@ -5,13 +5,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { GithubPullRequestStatusCacheRepository } from "../github-pull-request-status-cache.repository.ts";
-import { MemoryGithubDatabase } from "../memory/memory.github.database.ts";
 import { MemoryGithubPullRequestStatusCacheRepository } from "../memory/memory.github-pull-request-status-cache.repository.ts";
+import { MemoryGithubDatabase } from "../memory/memory.github.database.ts";
 
 const ORGANIZATION = "organization-1";
 const REF = { repositoryHost: "github.com", repositoryFullName: "acme/widgets", prNumber: 7 };
 
-const backends: readonly Readonly<{ name: string; create: () => GithubPullRequestStatusCacheRepository }>[] = [
+const backends: readonly Readonly<{
+  name: string;
+  create: () => GithubPullRequestStatusCacheRepository;
+}>[] = [
   {
     name: "memory",
     create: () =>

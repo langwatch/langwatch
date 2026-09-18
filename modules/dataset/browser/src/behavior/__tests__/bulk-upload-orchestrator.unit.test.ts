@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { DatasetNameConflictError } from "../direct-upload.ts";
+
 import {
   runWithConcurrency,
   type UploadSingleFileDeps,
   uploadSingleFile,
 } from "../bulk-upload-orchestrator.ts";
+import { DatasetNameConflictError } from "../direct-upload.ts";
 
 const deferred = () => {
   let resolve!: () => void;

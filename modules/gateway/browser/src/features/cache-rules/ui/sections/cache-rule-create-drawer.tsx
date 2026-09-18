@@ -1,11 +1,10 @@
 import { Button, HStack, Spacer } from "@chakra-ui/react";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { useState } from "react";
 
-import { Drawer } from "@langwatch/design-system/drawer";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
 import { api } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback.ts";
-
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
 import {
   CacheRuleForm,
   type CacheRuleFormComplaint,

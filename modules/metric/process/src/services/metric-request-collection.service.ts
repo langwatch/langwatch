@@ -1,17 +1,17 @@
-import { createLogger } from "@langwatch/observability";
 import type {
   CanonicalMetricDataPoint,
   MetricApi,
   MetricDataPointPreparation,
 } from "@langwatch/metric-contract";
-import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
-import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
-import { getLangWatchTracer } from "langwatch";
+import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
   piiRedactionLevelSchema,
   type RecordMetricCorrelationCommandData,
 } from "@langwatch/trace-contract";
+import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
+import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
+import { getLangWatchTracer } from "langwatch";
 
 /**
  * Every field optional, all the way down.

@@ -1,4 +1,5 @@
 import type { Instant } from "@langwatch/time";
+
 import type { StoredBrowserSession } from "../auth-session.repository.ts";
 
 /** One confirmation token, exactly as the row holds it. */

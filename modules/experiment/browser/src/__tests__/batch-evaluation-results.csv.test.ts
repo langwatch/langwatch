@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   buildCsvData,
   buildCsvHeaders,

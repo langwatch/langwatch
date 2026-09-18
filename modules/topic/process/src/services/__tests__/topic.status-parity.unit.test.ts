@@ -1,16 +1,17 @@
+import { Temporal, type Instant } from "@langwatch/time";
 import type {
   TopicClusteringRunHistoryEntry,
   TopicClusteringStatus,
 } from "@langwatch/topic-contract";
+import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
-import { Temporal, type Instant } from "@langwatch/time";
+
 import type { TopicClusteringScheduleReader } from "../../app/topic.app.ts";
 import type {
   TopicClusteringStatusRecord,
   TopicRepository,
 } from "../../repositories/topic.repository.ts";
 import { TopicService } from "../topic.service.ts";
-import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 
 const NOW = 1_800_000_000_000;
 const PROJECT_ID = "project-1";

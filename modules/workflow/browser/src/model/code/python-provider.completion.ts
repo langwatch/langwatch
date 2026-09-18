@@ -1,13 +1,6 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable, IRange, languages, Position } from "monaco-editor";
-import {
-  PYTHON_BUILTINS,
-  PYTHON_KEYWORDS,
-  PYTHON_STDLIB_MODULE_BY_NAME,
-  PYTHON_STDLIB_MODULE_NAMES,
-  type PyMember,
-  type PyModule,
-} from "./python-stdlib.ts";
+
 import {
   ATTR_ACCESS,
   type ContractRef,
@@ -17,6 +10,14 @@ import {
   INSERT_AS_SNIPPET,
   scanImports,
 } from "./python-provider.shared.ts";
+import {
+  PYTHON_BUILTINS,
+  PYTHON_KEYWORDS,
+  PYTHON_STDLIB_MODULE_BY_NAME,
+  PYTHON_STDLIB_MODULE_NAMES,
+  type PyMember,
+  type PyModule,
+} from "./python-stdlib.ts";
 
 function itemKind(monaco: Monaco, kind: PyMember["kind"]): languages.CompletionItemKind {
   switch (kind) {

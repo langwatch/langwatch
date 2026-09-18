@@ -8,15 +8,11 @@ import {
   UserPasswordAlreadySetError,
   UserPasswordAuthUnavailableError,
 } from "@langwatch/user-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../../repositories/user.repositories.ts";
-import {
-  createUserTestApp,
-  createUserTestAuth,
-  TEST_CREDENTIAL_ISSUER,
-} from "./user.fixture.ts";
+import { createUserTestApp, createUserTestAuth, TEST_CREDENTIAL_ISSUER } from "./user.fixture.ts";
 
 const SELF = { email: "sam@acme.com" };
 
@@ -131,13 +127,7 @@ describe("setting a first password", () => {
   describe("given a deployment that federates", () => {
     it("refuses, because the password does not live here", async () => {
       const app = createUserTestApp({
-        members: {
-          deployment: {
-            authProvider: vi.fn(async () => "auth0"),
-            offersPasskeys: () => false,
-            findBaseUrl: () => null,
-          },
-        },
+        dependencies: { auth: createUserTestAuth("auth0") },
       });
       const created = await app.createCredentialUser({
         name: "Sam",

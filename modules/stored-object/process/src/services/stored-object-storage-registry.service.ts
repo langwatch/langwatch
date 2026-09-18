@@ -1,15 +1,17 @@
 import type { Readable } from "node:stream";
+
 import {
   getStoredObjectStorageScheme,
   redactStoredObjectStorageUri,
   type StoredObjectStorageScheme,
 } from "@langwatch/stored-object-contract";
-import { StoredObjectStorageRepository } from "../repositories/stored-object-storage.repository.ts";
+
 import type {
   StoredObjectStorageDriver,
   StoredObjectStorageDriverFactory,
 } from "#repositories/stored-object-blob.repository";
 
+import { StoredObjectStorageRepository } from "../repositories/stored-object-storage.repository.ts";
 
 /**
  * Provider-neutral scheme dispatch owned by Stored Objects.

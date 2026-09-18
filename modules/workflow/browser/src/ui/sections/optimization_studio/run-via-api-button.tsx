@@ -1,15 +1,14 @@
 import { Button } from "@chakra-ui/react";
+import type { WorkflowField } from "@langwatch/workflow-contract";
 import { Terminal } from "react-feather";
 
-import { type ApiSnippetTab, GenerateApiSnippetDialog } from "../generate-api-snippet-dialog.tsx";
-import { DataSourcePicker } from "../../elements/run-via-api/data-source-picker.tsx";
 import {
   buildRunSnippet,
   type RunSnippetDataSource,
 } from "../../../model/run-via-api/run-snippets.ts";
+import { DataSourcePicker } from "../../elements/run-via-api/data-source-picker.tsx";
+import { type ApiSnippetTab, GenerateApiSnippetDialog } from "../generate-api-snippet-dialog.tsx";
 import { useRunViaApiTabs } from "../run-via-api/use-run-via-api-tabs.ts";
-
-import type { WorkflowField } from "@langwatch/workflow-contract";
 
 /**
  * Shows how to trigger this workflow's evaluation from CI or scripts, via the

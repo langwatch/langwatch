@@ -1,7 +1,4 @@
-import type {
-  BatchEvaluationRecord,
-  BatchEvaluationSummary,
-} from "@langwatch/dataset-contract";
+import type { BatchEvaluationRecord, BatchEvaluationSummary } from "@langwatch/dataset-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 
 import type { BatchEvaluationRepository } from "../batch-evaluation.repository.ts";

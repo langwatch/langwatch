@@ -1,16 +1,17 @@
+import { nowInstant } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { UsageStatsErrorReporter, UsageStatsTelemetryClient } from "../../index.ts";
+
 import {
   type UsageStatsCollector,
   type UsageStatsOrganization,
   type UsageStatsReport,
 } from "../../app/ops.app.ts";
+import type { UsageStatsErrorReporter, UsageStatsTelemetryClient } from "../../index.ts";
 import { UsageStatsOrganizationRepository } from "../../repositories/observe/usage-stats.repository.ts";
 import {
   AnomalyWorkerContributionAdapter,
   UsageStatsWorkerContributionAdapter,
 } from "../ops-worker-contribution.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = vi.hoisted(() => ({
   debug: vi.fn(),

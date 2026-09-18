@@ -2,6 +2,7 @@ import type {
   AnalyticsFilterValue as FilterParam,
   FilterField,
 } from "@langwatch/analytics-contract";
+
 import type {
   FilterConditionBuilder,
   FilterConditionOptions,

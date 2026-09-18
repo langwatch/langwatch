@@ -1,6 +1,7 @@
-import { CostReferenceType, CostType, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { generate } from "@langwatch/ksuid";
+import { CostReferenceType, CostType, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
+
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../../eventing/topic-clustering.process.ts";
 import {
   TopicClusteringRepository,

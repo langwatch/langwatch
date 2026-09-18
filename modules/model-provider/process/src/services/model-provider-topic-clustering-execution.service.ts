@@ -1,7 +1,4 @@
-import type {
-  ModelProviderExecution,
-  ModelProviderApi,
-} from "@langwatch/model-provider-contract";
+import type { ModelProviderExecution, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { TopicClusteringModels } from "@langwatch/topic-contract";
 
 const CLUSTERING_LLM_FEATURE_KEY = "analytics.topic_clustering_llm";

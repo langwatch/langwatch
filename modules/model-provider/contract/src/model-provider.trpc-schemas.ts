@@ -4,8 +4,13 @@
  * can send unknown keys without tightening one to match the other into a validation error.
  */
 import { z } from "zod";
+
 import { MODEL_ROLES } from "./catalog/model-feature-registry.ts";
 import { customModelUpdateInputSchema } from "./custom-model.ts";
+import {
+  modelProviderListEntrySchema,
+  type ModelProviderListEntry,
+} from "./model-provider-list-entry.ts";
 import {
   modelProviderScopeTypeSchema,
   modelProviderTestConnectionInputSchema,
@@ -13,10 +18,6 @@ import {
   ROUTING_HANDLE_RULE,
 } from "./model-provider.ts";
 import type { ModelDefaultEffective } from "./model-provider.ts";
-import {
-  modelProviderListEntrySchema,
-  type ModelProviderListEntry,
-} from "./model-provider-list-entry.ts";
 
 /**
  * The scope-assignment shape the clients send — deliberately not the

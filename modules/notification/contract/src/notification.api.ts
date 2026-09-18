@@ -1,4 +1,5 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type {
   CreateNotificationCommand,
   Notification,

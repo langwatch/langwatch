@@ -1,10 +1,11 @@
-import { createLogger } from "@langwatch/observability";
 import type {
   AutomationEvaluationActivityContext,
   AutomationEvaluationSubscriberEvent,
 } from "@langwatch/automation-contract";
-import type { AutomationGraphActivity } from "../app/automation.members.ts";
+import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+
+import type { AutomationGraphActivity } from "../app/automation.members.ts";
 
 const logger = createLogger("langwatch:automation:graph-trigger-activity-subscriber");
 

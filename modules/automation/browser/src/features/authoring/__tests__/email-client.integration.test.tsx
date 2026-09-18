@@ -13,6 +13,7 @@ import {
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import type { ConfigFormCtx } from "../../../model/provider-types.ts";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
@@ -41,6 +42,7 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
 }));
 
 import type { EmailPreview } from "@langwatch/automation-contract";
+
 import emailClient, { type EmailSlice } from "../ui/sections/email.client.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

@@ -1,6 +1,7 @@
 /** Address to route pattern converter; host provides address, tests compare to pattern */
 
 import { describe, expect, it } from "vitest";
+
 import { projectNavItemAt, projectNavItems, toProjectRoutePattern } from "../project-nav-items.ts";
 
 describe("given an address inside the reader's project", () => {

@@ -1,9 +1,9 @@
+import type { FrameworkKey, PlatformKey } from "../../../../model/observability/types.ts";
+import type { Docs, IconData } from "../../../../model/shared/types.ts";
+import { iconWithLabel, singleIcon, themedIcon } from "../../../../model/shared/types.ts";
 import { FlowiseSetup } from "../../../elements/observability/flowise-setup.tsx";
 import { LangflowSetup } from "../langflow-setup.tsx";
 import { OpenTelemetrySetup } from "../open-telemetry-setup.tsx";
-import type { Docs, IconData } from "../../../../model/shared/types.ts";
-import { iconWithLabel, singleIcon, themedIcon } from "../../../../model/shared/types.ts";
-import type { FrameworkKey, PlatformKey } from "../../../../model/observability/types.ts";
 import goAnthropicSource from "./snippets/go/anthropic.snippet.go?raw";
 import goAzureSource from "./snippets/go/azure.snippet.go?raw";
 import goBedrockSource from "./snippets/go/bedrock.snippet.go?raw";

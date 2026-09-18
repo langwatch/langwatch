@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/navigation.web.ts",
+      "types": "./dist/navigation.web.d.ts",
+      "default": "./src/navigation.web.ts"
+    },
     "./chrome": {
       "types": "./dist/ui/index.d.ts",
       "default": "./src/ui/index.ts"
@@ -33,12 +38,13 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "next-themes": "catalog:",
     "react-error-boundary": "catalog:",

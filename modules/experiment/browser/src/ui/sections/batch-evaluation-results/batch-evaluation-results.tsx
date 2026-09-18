@@ -12,21 +12,33 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Link } from "@langwatch/browser-host/link";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { ExternalImage } from "@langwatch/design-system/external-image";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { EvaluatorResultChip } from "@langwatch/evaluator-browser/evaluator-result-chip";
+import type { Experiment } from "@langwatch/experiment-contract";
+import { nowInstant } from "@langwatch/time";
+import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
+import type { Project } from "@langwatch/workflow-contract";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
-import type { Experiment } from "@langwatch/experiment-contract";
-import type { Project } from "@langwatch/workflow-contract";
-import { EvaluatorResultChip } from "@langwatch/evaluator-browser/evaluator-result-chip";
-import { ExternalImage } from "@langwatch/design-system/external-image";
-import { Link } from "@langwatch/browser-host/link";
+
+import {
+  RUN_COLORS,
+  useMultiRunData,
+} from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
+import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
+import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
+import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences.ts";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
+import { isRunFinished } from "../../../model/batch-evaluation-results.run-state.ts";
 import { describeCellFailure } from "../../../model/experiments-v3/cell-failure.ts";
-import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
-import { useDrawer } from "@langwatch/browser-host/drawer";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { PageLayout } from "@langwatch/design-system/page-layout";
 import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
+import { downloadCsv } from "../batch-evaluation-results.csv.ts";
 import {
   transformBatchEvaluationData,
   type BatchEvaluationData,
@@ -41,18 +53,7 @@ import {
 } from "../batch-results/batch-evaluation-results-table.tsx";
 import { type BatchRunSummary, BatchRunsSidebar } from "../batch-results/batch-runs-sidebar.tsx";
 import { ComparisonCharts } from "../batch-results/comparison-charts.tsx";
-import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
-import { downloadCsv } from "../batch-evaluation-results.csv.ts";
-import { isRunFinished } from "../../../model/batch-evaluation-results.run-state.ts";
-import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
-import {
-  RUN_COLORS,
-  useMultiRunData,
-} from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
-import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences.ts";
 import { useResultsGrouping } from "../use-results-grouping.ts";
-import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
-import { nowInstant } from "@langwatch/time";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -284,7 +285,9 @@ export function BatchEvaluationResults({
   // Sort chronologically so fallback "Run #N" numbering is stable
   const runNameMap = useMemo(() => {
     const map: Record<string, string | React.ReactNode> = {};
-    const sorted = [...sidebarRuns].toSorted((a, b) => a.timestamps.createdAt - b.timestamps.createdAt);
+    const sorted = [...sidebarRuns].toSorted(
+      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
+    );
     sorted.forEach((run, index) => {
       map[run.runId] = getRunDisplayName({
         commitMessage: run.workflowVersion?.commitMessage,

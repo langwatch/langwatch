@@ -38,16 +38,12 @@ export function resolveShellRoute({
   const isPersonalScopeRoute =
     !isSettingsRoute &&
     !isOrgScopedProduct &&
-    (isPersonalScope ||
-      isPathUnder({ pathname, base: "/me" }) ||
-      isOnOwnPersonalProject);
+    (isPersonalScope || isPathUnder({ pathname, base: "/me" }) || isOnOwnPersonalProject);
   const activeProductId = isSettingsRoute
     ? null
     : ((isPersonalScopeRoute ? "me" : addressedProductId) ?? "llm-ops");
   const isOrgScopeRoute =
-    isOrgScope ||
-    isSettingsRoute ||
-    isOrganizationScopedProduct(activeProductId);
+    isOrgScope || isSettingsRoute || isOrganizationScopedProduct(activeProductId);
 
   return {
     isSettingsRoute,

@@ -1,3 +1,4 @@
+import { CYCLIC_WINDOWS, GatewayWindow } from "@langwatch/gateway-contract";
 /**
  * @see specs/ai-gateway/budgets.feature
  * Cycles roll from `cycleAnchorAt`, not the calendar, in UTC epoch math so
@@ -5,7 +6,6 @@
  */
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
-import { CYCLIC_WINDOWS, GatewayWindow } from "@langwatch/gateway-contract";
 
 const iso = (at: Instant) => toDate(at).toISOString();
 

@@ -1,11 +1,12 @@
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
+
+import type { PersistedEvaluationsV3State } from "../experiment-workbench-persistence.ts";
 import {
   parseWorkbenchState,
   repairWorkbenchState,
   stripWorkbenchResults,
 } from "../experiment-workbench-version.ts";
-import type { PersistedEvaluationsV3State } from "../experiment-workbench-persistence.ts";
 
 const state = (
   overrides: Partial<PersistedEvaluationsV3State> = {},

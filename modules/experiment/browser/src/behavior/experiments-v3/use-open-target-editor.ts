@@ -2,31 +2,32 @@
  * Hook to open the target editor drawer with proper flow callbacks.
  */
 
-import { useCallback } from "react";
-import { useShallow } from "zustand/react/shallow";
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-browser-kit/variables";
-import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
+
 import { DRAWER_WIDTH } from "../../model/experiments-v3/constants.ts";
+import { createEvaluatorEditorCallbacks } from "../../model/experiments-v3/evaluator-editor-callbacks.ts";
+import {
+  convertFromUIMapping,
+  convertToUIMapping,
+} from "../../model/experiments-v3/field-mapping-converters.ts";
+import { createPromptEditorCallbacks } from "../../model/experiments-v3/prompt-editor-callbacks.ts";
 import type { FieldMapping, TargetConfig } from "../../model/experiments-v3/types.ts";
 import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../../model/experiments-v3/types.ts";
-import { createEvaluatorEditorCallbacks } from "../../model/experiments-v3/evaluator-editor-callbacks.ts";
 import { buildTargetAvailableSources } from "./target-available-sources.ts";
-import { useResolveTargetName } from "./use-resolve-target-name.ts";
-import {
-  convertFromUIMapping,
-  convertToUIMapping,
-} from "../../model/experiments-v3/field-mapping-converters.ts";
-import { toComparisonConfig } from "@langwatch/experiment-contract";
-import { createPromptEditorCallbacks } from "../../model/experiments-v3/prompt-editor-callbacks.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
+import { useResolveTargetName } from "./use-resolve-target-name.ts";
 
 /**
  * Convert target mappings for a specific dataset to UI format.

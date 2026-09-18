@@ -1,21 +1,19 @@
+import type { GithubPullRequestLiveStatus as ContractLiveStatus } from "@langwatch/github-contract";
 /**
  * Live pull-request status.
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { GithubInstallationsService } from "./github-installations.service.ts";
-import type {
-  GithubAppTokenCache,
-  GithubPullRequestSummary,
-} from "../app/github.app.ts";
+import { Temporal, toDate, toEpochMs, type Instant } from "@langwatch/time";
+
+import type { GithubAppTokenCache, GithubPullRequestSummary } from "../app/github.app.ts";
+import type { GithubPullRequestStatusCacheRepository } from "../repositories/github-pull-request-status-cache.repository.ts";
 import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
 } from "../repositories/github-pull-requests.repository.ts";
-import type { GithubPullRequestStatusCacheRepository } from "../repositories/github-pull-request-status-cache.repository.ts";
-import { Temporal, toDate, toEpochMs, type Instant } from "@langwatch/time";
-import type { GithubPullRequestLiveStatus as ContractLiveStatus } from "@langwatch/github-contract";
+import type { GithubInstallationsService } from "./github-installations.service.ts";
 
 const logger = createLogger("langwatch:github:pull-request-status");
 

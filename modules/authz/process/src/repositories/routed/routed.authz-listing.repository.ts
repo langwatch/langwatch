@@ -6,6 +6,7 @@ import type {
   AuthzTeamMemberBinding,
   RoleBindingScopeType,
 } from "@langwatch/authz-contract";
+
 import { AuthzListingRepository } from "../authz-listing.repository.ts";
 import type { AuthzDatabase, AuthzReadHeadSelector } from "../authz-read.repository.ts";
 import { EventingAuthzListingRepository } from "../eventing/eventing.authz-listing.repository.ts";

@@ -1,6 +1,6 @@
+import type { FeatureSetup } from "@langwatch/kernel";
 /** The secret feature application shared by all transports. */
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   RESERVED_PROJECT_SECRET_NAMES,
   SecretApi,
@@ -13,6 +13,7 @@ import {
   type SecretCaller,
   type UpdateSecretInput,
 } from "@langwatch/secret-contract";
+
 import type { SecretRepositories } from "../repositories/secret.repositories.ts";
 import { SecretService } from "../services/secret.service.ts";
 
@@ -83,7 +84,6 @@ export class SecretApp implements SecretApiContract {
     return this.#secrets.update({ ...input, actorId: by.id });
   }
 }
-
 
 export interface SecretEncryption {
   encrypt(value: string): string;

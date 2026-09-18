@@ -12,10 +12,7 @@ import { featureByKey } from "@langwatch/model-provider-contract";
 import { generateText } from "ai";
 import { createPatch } from "diff";
 
-import type {
-  WorkflowAiCall,
-  WorkflowCommitMessageModel,
-} from "../app/workflow.app.ts";
+import type { WorkflowAiCall, WorkflowCommitMessageModel } from "../app/workflow.app.ts";
 import {
   WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY,
   WORKFLOW_COMMIT_MESSAGE_PATCH_FILE,

@@ -1,7 +1,8 @@
+import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
+
 import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { EventingAuthzReadRepository } from "../eventing.authz-read.repository.ts";
-import { fromDate } from "@langwatch/time";
 
 /**
  * Grants-head adapter contract: answers stay legacy-compatible (membership

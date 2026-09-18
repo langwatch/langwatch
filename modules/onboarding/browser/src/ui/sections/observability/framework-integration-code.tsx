@@ -1,7 +1,8 @@
 import type React from "react";
-import { useCodegen } from "./codegen/index.ts";
+
 import type { FrameworkKey, PlatformKey } from "../../../model/observability/types.ts";
 import { CodePreview } from "./code-preview.tsx";
+import { useCodegen } from "./codegen/index.ts";
 
 export function FrameworkIntegrationCode({
   platform,

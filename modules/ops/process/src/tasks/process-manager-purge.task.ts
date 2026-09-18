@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
+
 import type {
   ProcessManagerPurgeRepository,
   ProcessManagerPurgeTarget,
@@ -113,15 +114,7 @@ async function drain({
  * where a zero window is every dispatched and consumed row in both tables and
  * a zero batch size deletes nothing while reporting success.
  */
-function wholeNumber({
-  name,
-  value,
-  min,
-}: {
-  name: string;
-  value: number;
-  min: number;
-}): void {
+function wholeNumber({ name, value, min }: { name: string; value: number; min: number }): void {
   if (!Number.isSafeInteger(value) || value < min) {
     throw new Error(`${name} must be a whole number of at least ${min}; nothing was deleted`);
   }

@@ -1,4 +1,5 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type { StoredObjectDeliveryAudience } from "./audiences.ts";
 import type { StoredObjectId, StoredObjectProjectId } from "./ids.ts";
 import type {
@@ -8,17 +9,17 @@ import type {
 } from "./metadata.ts";
 import type { StoredObjectReference } from "./references.ts";
 import type {
-  StoredObjectsConfirmUploadInput,
-  StoredObjectsCreateUploadInput,
-  StoredObjectsCreateUploadOutput,
-} from "./uploads.ts";
-import type {
   StoredObjectsDeleteInput,
   StoredObjectsDeleteOutput,
   StoredObjectsGetInput,
   StoredObjectsGetOutput,
 } from "./stored-object.commands.ts";
 import type { StoredObjectHead } from "./stored-object.trpc.ts";
+import type {
+  StoredObjectsConfirmUploadInput,
+  StoredObjectsCreateUploadInput,
+  StoredObjectsCreateUploadOutput,
+} from "./uploads.ts";
 
 export type StoredObjectByteStream = AsyncIterable<Uint8Array>;
 export type StoredObjectByteSource = Uint8Array | StoredObjectByteStream;

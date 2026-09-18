@@ -13,9 +13,10 @@ import {
   type TeamUserRole as AuthzTeamUserRole,
   roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
-import { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { type Instant, Temporal, nowInstant, toDate } from "@langwatch/time";
+
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import {
@@ -28,9 +29,9 @@ import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
 import { liveGrants } from "../repositories/eventing/eventing.authz-live-rows.mapper.ts";
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
-import { AUTHZ_AUDIT_ACTION_PREFIX, type AuthzAuditVerb } from "./authz-grant.subscriber.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
-import { type Instant, Temporal, nowInstant, toDate } from "@langwatch/time";
+import { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
+import { AUTHZ_AUDIT_ACTION_PREFIX, type AuthzAuditVerb } from "./authz-grant.subscriber.ts";
 
 const logger = createLogger("langwatch:authz:ledger");
 

@@ -1,4 +1,3 @@
-import { nowInstant } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -12,17 +11,20 @@ import {
   Table,
   Text,
 } from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
+import type { GroupInfo } from "@langwatch/ops-contract";
+import { nowInstant } from "@langwatch/time";
 import { MoreVertical, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { GroupInfo } from "@langwatch/ops-contract";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
-import { Menu } from "@langwatch/design-system/menu";
 
-import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
-import { GroupDetailDrawer } from "./group-detail-drawer.tsx";
-import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
+import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { grafanaGroupLogsUrl, grafanaGroupTracesUrl } from "../../../../model/grafana-links.ts";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
+import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
 import {
   classifyGroup,
   describeNextRun,
@@ -33,10 +35,7 @@ import {
 } from "../../model/queue-pipeline-utils.ts";
 import { type StatusFilter } from "../../model/queue-types.ts";
 import { GroupStateBadge } from "../elements/queue-group-state-badge.tsx";
-import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
-
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
+import { GroupDetailDrawer } from "./group-detail-drawer.tsx";
 const GROUPS_VIEWPORT_HEIGHT = 480;
 const GROUPS_ROW_HEIGHT = 36;
 

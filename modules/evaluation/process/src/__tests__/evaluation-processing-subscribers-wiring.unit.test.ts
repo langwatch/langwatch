@@ -1,14 +1,15 @@
-import type { FoldProjectionStore, TriggerContext } from "@langwatch/eventing";
-import { createTenantId } from "@langwatch/eventing";
 import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
-import { describe, expect, it, vi } from "vitest";
-import { createEvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
-import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
-import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,
 } from "@langwatch/evaluation-contract";
+import type { FoldProjectionStore, TriggerContext } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
+import { describe, expect, it, vi } from "vitest";
+
+import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
+import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
+import { createEvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 import type {
@@ -16,6 +17,7 @@ import type {
   EvaluationProcessingEvent,
   EvaluationRunData,
 } from "@langwatch/evaluation-contract";
+
 import { createEvaluationStartedEvent } from "./eventing/fixtures/evaluation-events.fixtures.ts";
 
 const tenantId = createTenantId("project-wiring");

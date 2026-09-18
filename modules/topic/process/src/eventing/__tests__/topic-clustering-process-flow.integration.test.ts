@@ -7,6 +7,7 @@ import {
   ProcessManagerService,
 } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
+
 import type { TopicClusteringProcessingEvent } from "../../services/topic-events.service.ts";
 import type {
   TopicClusteringDispatchDeps,

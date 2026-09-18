@@ -1,7 +1,6 @@
 /**
  * What a browser installs when it installs automation: the automations
- * family's four tabs. `/automations/activity` and `/unsubscribe` are not
- * declared — no matching section, and no anchor — see the handoff.
+ * family's four tabs, plus the one-click unsubscribe an email link opens.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
@@ -41,5 +40,9 @@ export const automationWeb = defineWebModule("automation").withScreens({
     path: "/:project/automations/schedules",
     within: "project",
     load: automationTab("schedules"),
+  },
+  /** Reached from an email link, outside the project chrome. */
+  "pages/unsubscribe": {
+    load: () => import("./ui/sections/unsubscribe-screen.tsx"),
   },
 });

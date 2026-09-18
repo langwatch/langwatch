@@ -1,5 +1,5 @@
-import type { OrganizationUserRole } from "./prisma-types.ts";
 import type { TeamRoleValue } from "./member-role-constraints.ts";
+import type { OrganizationUserRole } from "./prisma-types.ts";
 
 /**
  * What one invitation is, before anything renders it. Lives here rather

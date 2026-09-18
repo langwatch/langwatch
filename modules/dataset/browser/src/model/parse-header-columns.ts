@@ -2,12 +2,15 @@
  * dedupeHeaders + renameReservedColumns so normalize honors columnTypes by index.
  */
 
-import Papa from "papaparse";
-import { type DatasetColumnType, type DatasetConfirmColumns,
+import {
+  type DatasetColumnType,
+  type DatasetConfirmColumns,
   dedupeHeaders,
   detectFileFormat,
   type FileFormat,
-  renameReservedColumns } from "@langwatch/dataset-contract";
+  renameReservedColumns,
+} from "@langwatch/dataset-contract";
+import Papa from "papaparse";
 
 /**
  * How many leading bytes of the file to read for the header. A header row /

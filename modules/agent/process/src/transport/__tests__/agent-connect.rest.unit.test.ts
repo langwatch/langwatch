@@ -1,23 +1,24 @@
-/**
- * @vitest-environment node
- * @see specs/agents/connected-agents.feature
- */
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import {
+  AgentRegisterRefusedError,
+  type AgentApi,
+  type AgentConnectRegisterOutput,
+} from "@langwatch/agent-contract";
 import {
   bindRestMiddleware,
   createRestRuntime,
   type RestCaller,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import {
-  AgentRegisterRefusedError,
-  type AgentApi,
-  type AgentConnectRegisterOutput,
-} from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
+/**
+ * @vitest-environment node
+ * @see specs/agents/connected-agents.feature
+ */
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
+
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
 import { agentRestErrorHandler } from "../agent.rest.ts";
 
@@ -28,7 +29,8 @@ vi.mock("@langwatch/observability", async (original) => {
     ...actual,
     createLogger: (name: string) => {
       const logger = actual.createLogger(name);
-      if (name.startsWith("langwatch:api")) vi.spyOn(logger, "error").mockImplementation(outputLog.error);
+      if (name.startsWith("langwatch:api"))
+        vi.spyOn(logger, "error").mockImplementation(outputLog.error);
       return logger;
     },
   };
@@ -69,7 +71,9 @@ function buildApi({
     }),
   );
   return {
-    hono: { request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init) },
+    hono: {
+      request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init),
+    },
     framesSpy,
   };
 }
@@ -105,7 +109,12 @@ describe("registerConnectedAgentInstance", () => {
     ["environment_invalid", 422],
     ["protocol_invalid", 422],
   ] as const)("maps the %s refusal to HTTP %i", async (code, status) => {
-    const refusedFrame = { type: "refused" as const, protocol: 1 as const, code, message: "Refused" };
+    const refusedFrame = {
+      type: "refused" as const,
+      protocol: 1 as const,
+      code,
+      message: "Refused",
+    };
     const app = createApiFixture<AgentApi>({
       registerConnectedAgentInstance: async () => {
         throw new AgentRegisterRefusedError({ reason: code, message: "Refused" });
@@ -137,7 +146,9 @@ describe("registerConnectedAgentInstance", () => {
       instanceToken: "token_one",
     };
     const { hono } = buildApi({
-      application: createApiFixture<AgentApi>({ registerConnectedAgentInstance: async () => answer }),
+      application: createApiFixture<AgentApi>({
+        registerConnectedAgentInstance: async () => answer,
+      }),
     });
 
     const response = await hono.request("/api/v1/agents/connect/register", {

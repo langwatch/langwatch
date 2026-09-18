@@ -10,22 +10,22 @@ import {
   USD_DISPLAY_STRING_FORMAT,
   type GatewaySpendEnvelope,
 } from "@langwatch/gateway-contract";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { generate } from "@langwatch/ksuid";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
-import { GatewaySpendCursorAdapter } from "../adapters/gateway-spend-cursor.adapter.ts";
+import { GatewaySpendCursorAdapter } from "../rules/gateway-spend-cursor.rules.ts";
 import {
   GatewaySpendFiltersAdapter,
   SPEND_SUMMARY_STATUS_DESCRIPTION,
   spendFilterQueryShape,
   spendSummaryStatusFilter,
-} from "../adapters/gateway-spend-filters.adapter.ts";
+} from "../rules/gateway-spend-filters.rules.ts";
 import {
   GatewaySpendGroupingAdapter,
   MAX_GROUP_BY_KEYS,
-} from "../adapters/gateway-spend-grouping.adapter.ts";
+} from "../rules/gateway-spend-grouping.rules.ts";
 import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
 import {
   SPEND_BUCKETS,

@@ -8,14 +8,18 @@ import type {
   AutomationNotificationDelivery,
   AutomationProjectDirectory,
 } from "../../app/automation.members.ts";
+import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
+import {
+  AutomationSlackSecretsService,
+  AutomationSlackBotTokenDecryptorService,
+  type AutomationSecretCrypto,
+} from "../../services/automation-slack-secrets.service.ts";
+import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
+import type { AutomationEmailCapService } from "../../services/email-cap.service.ts";
+import { PostgresAutomationGraphDeliveryAdapter } from "./prisma.automation-graph-delivery.repository.ts";
 import { PrismaCustomGraphRepository } from "./prisma.custom-graph.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "./prisma.graph-trigger-sent.repository.ts";
 import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
-import type { AutomationEmailCapService } from "../../services/email-cap.service.ts";
-import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
-import { PostgresAutomationGraphDeliveryAdapter } from "./prisma.automation-graph-delivery.repository.ts";
-import { AutomationSlackSecretsService, AutomationSlackBotTokenDecryptorService, type AutomationSecretCrypto } from "../../services/automation-slack-secrets.service.ts";
-import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
 
 // Restricted Pick of PrismaClient; containment rule — PrismaClient named only
 // here and in the adapter.
@@ -68,7 +72,9 @@ export class PostgresAutomationGraphActivityAdapter {
       analytics: input.analytics,
       delivery: input.delivery,
       webhooks: AutomationWebhookSecretsService.create(input.crypto),
-      slackTokens: new AutomationSlackBotTokenDecryptorService(AutomationSlackSecretsService.create(input.crypto)),
+      slackTokens: new AutomationSlackBotTokenDecryptorService(
+        AutomationSlackSecretsService.create(input.crypto),
+      ),
       emailCaps: input.emailCaps,
       logger: input.logger,
       dispatchErrors: input.dispatchErrors,

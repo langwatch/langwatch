@@ -1,5 +1,3 @@
-import type { MigrationPassSummary, TenantMigrationRecord } from "@langwatch/system-migrations";
-import { describe, expect, it, vi } from "vitest";
 import {
   MigrationDrainProofRequiresMigratedError,
   MigrationEnrollmentCloudOnlyError,
@@ -8,6 +6,9 @@ import {
   MigrationRunRequiresEnrollmentError,
   MigrationUnknownError,
 } from "@langwatch/ops-contract";
+import type { MigrationPassSummary, TenantMigrationRecord } from "@langwatch/system-migrations";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   type SystemMigrationEnrollmentStore,
   SystemMigrationsService,

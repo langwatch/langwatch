@@ -1,15 +1,15 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 
-import { InviteLanding } from "../../ui/sections/invite-landing.tsx";
-import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
-import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { signOut } from "../../behavior/auth-client.tsx";
-import { useRouter } from "../../behavior/use-route.ts";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import { useAcceptInviteOnce } from "../../behavior/use-accept-invite-once.ts";
+import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
+import { useRequiredSession } from "../../behavior/use-required-session.ts";
+import { useRouter } from "../../behavior/use-route.ts";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { InviteLanding } from "../../ui/sections/invite-landing.tsx";
 import { LoadingScreen } from "../../ui/sections/loading-screen.tsx";
 import { SetupLayout } from "../../ui/sections/setup-layout.tsx";
-import { useAcceptInviteOnce } from "../../behavior/use-accept-invite-once.ts";
-import { useRequiredSession } from "../../behavior/use-required-session.ts";
 
 /** Invitation link landing; shows inviter, guides sign-in/up or confirms sign-in. */
 export default function Accept() {

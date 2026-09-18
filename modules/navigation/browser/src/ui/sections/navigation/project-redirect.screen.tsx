@@ -4,6 +4,7 @@
  */
 
 import { useEffect } from "react";
+
 import { useNavigationHost } from "../../../model/navigation-host.ts";
 
 /** How long a reader waits for a project before they are sent to the root. */

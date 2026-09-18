@@ -1,16 +1,17 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../../rules/experiment-run-event-types.rules.ts";
-import type { ExperimentRunProcessingEvent } from "../experiment-run-events.process.ts";
 import {
   isEvaluatorResultEvent,
   isExperimentRunCompletedEvent,
   isExperimentRunStartedEvent,
   isTargetResultEvent,
 } from "../experiment-run-event-guards.process.ts";
+import type { ExperimentRunProcessingEvent } from "../experiment-run-events.process.ts";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

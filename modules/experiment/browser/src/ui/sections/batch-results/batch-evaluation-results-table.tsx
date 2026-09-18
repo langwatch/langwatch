@@ -2,7 +2,6 @@
  * BatchEvaluationResultsTable - Main table component for batch evaluation results
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Columns3, HelpCircle, ListTree, Rows3, SlidersHorizontal } from "lucide-react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   PopoverArrow,
@@ -13,6 +12,14 @@ import {
 } from "@langwatch/design-system/popover";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Columns3, HelpCircle, ListTree, Rows3, SlidersHorizontal } from "lucide-react";
+
+import type { ResultField } from "../../../behavior/use-result-display-preferences.ts";
+import type {
+  BatchDatasetColumn,
+  BatchEvaluationData,
+  ComparisonRunData,
+} from "../batch-evaluation-results.types.ts";
 import { ComparisonTable } from "./comparison-table.tsx";
 import type {
   DescribeBatchCellFailure,
@@ -22,12 +29,6 @@ import type {
 } from "./presentation.tsx";
 import { SingleRunTable } from "./single-run-table.tsx";
 import { DEFAULT_ROW_HEIGHT, ROW_HEIGHT_OPTIONS, type RowHeight } from "./table-utils.ts";
-import type {
-  BatchDatasetColumn,
-  BatchEvaluationData,
-  ComparisonRunData,
-} from "../batch-evaluation-results.types.ts";
-import type { ResultField } from "../../../behavior/use-result-display-preferences.ts";
 
 type BatchEvaluationResultsTableProps = {
   /** Transformed batch evaluation data (single run mode) */

@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { type JsonObjectNode, visitJsonObjects } from "../vega-lite-structure.ts";
 
 /** Wraps `inner` in `depth` nested arrays: depth 3 → `[[[inner]]]`. */

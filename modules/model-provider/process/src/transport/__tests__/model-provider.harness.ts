@@ -1,9 +1,9 @@
+import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * What a mounted model-provider declaration runs on in a test: the runtime's
  * process members, and a real app over a gateway stub and a probe stub.
  */
 import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
-import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type {
   ModelProviderApi,
   ModelProviderCredentialVerdict,
@@ -11,15 +11,15 @@ import type {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
-import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
-import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderApp } from "../../app/model-provider.app.ts";
+import { ModelProviderCredentialProbe } from "../../app/model-provider.members.ts";
+import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import {
   CodexAccountService,
   type CodexDeviceCode,
   type CodexPollResult,
 } from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
-import { ModelProviderCredentialProbe } from "../../app/model-provider.members.ts";
 
 /** What a mount reads off the request: who is calling. */
 export type ModelProviderTrpcTestContext = { actor: { id: string } };
@@ -173,6 +173,7 @@ function forwarded(app: ModelProviderApp): ModelProviderApi {
     findRowServingModel: (...args) => app.findRowServingModel(...args),
     getExecutionProviders: (...args) => app.getExecutionProviders(...args),
     prepareExecution: (...args) => app.prepareExecution(...args),
+    runPlaygroundCompletion: (...args) => app.runPlaygroundCompletion(...args),
     upsert: (...args) => app.upsert(...args),
     upsertUnattributed: (...args) => app.upsertUnattributed(...args),
     delete: (...args) => app.delete(...args),

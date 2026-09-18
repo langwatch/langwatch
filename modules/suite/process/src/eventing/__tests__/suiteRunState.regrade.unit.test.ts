@@ -1,16 +1,14 @@
-import { describe, expect, it } from "vitest";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import {
-  SUITE_RUN_EVENT_TYPES,
-  SUITE_RUN_EVENT_VERSIONS,
-} from "@langwatch/suite-contract";
+import { SUITE_RUN_EVENT_TYPES, SUITE_RUN_EVENT_VERSIONS } from "@langwatch/suite-contract";
 import type {
   SuiteRunItemCompletedEvent,
   SuiteRunItemRegradedEvent,
   SuiteRunProcessingEvent,
   SuiteRunStartedEvent,
 } from "@langwatch/suite-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   type SuiteRunStateData,
   SuiteRunStateFoldProjection,
@@ -148,11 +146,7 @@ describe("suiteRunState fold projection, regrade", () => {
 
   describe("when the suite run is still in progress", () => {
     it("moves the counts and leaves the status alone", () => {
-      const state = fold([
-        startedEvent(3),
-        completedEvent("run-1"),
-        regradedEvent(),
-      ]);
+      const state = fold([startedEvent(3), completedEvent("run-1"), regradedEvent()]);
 
       expect(state.FailedCount).toBe(1);
       expect(state.CompletedCount).toBe(0);

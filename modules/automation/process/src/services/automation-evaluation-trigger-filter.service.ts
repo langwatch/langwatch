@@ -1,4 +1,7 @@
-import type { AutomationEvaluationQueryClassification,AutomationEvaluationTriggerFilter } from "../app/automation.members.ts";
+import type {
+  AutomationEvaluationQueryClassification,
+  AutomationEvaluationTriggerFilter,
+} from "../app/automation.members.ts";
 
 /**
  * Automation-owned answer to whether a trigger needs an evaluation-terminal
@@ -12,8 +15,7 @@ export class AutomationEvaluationTriggerFilterService implements AutomationEvalu
     return new AutomationEvaluationTriggerFilterService(traces);
   }
 
-  private constructor(private readonly traces: AutomationEvaluationQueryClassification) {
-  }
+  private constructor(private readonly traces: AutomationEvaluationQueryClassification) {}
 
   readsEvaluations(input: {
     filters: Record<string, unknown>;

@@ -2,6 +2,7 @@ import type { IntentContext, IntentExecutor, IntentSpec } from "@langwatch/event
 import { defineCommand } from "@langwatch/eventing";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   CLUSTERING_ERROR_CODES,
   ClusteringError,
@@ -17,7 +18,6 @@ import {
   type TopicClusteringSkipReason,
 } from "@langwatch/topic-contract";
 import { z } from "zod";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:topic-clustering:process-effects");
 

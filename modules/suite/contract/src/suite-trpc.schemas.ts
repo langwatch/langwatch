@@ -12,9 +12,9 @@ import {
 import { z } from "zod";
 
 import { MAX_PLAN_NAME_LENGTH } from "./plan-name.ts";
-import { runPlanConfigSchema, suiteSchema, suiteTargetSchema } from "./suite.ts";
 import { SUITE_KINDS } from "./suite.kind.ts";
 import { suiteScopeSchema } from "./suite.scope.ts";
+import { runPlanConfigSchema, suiteSchema, suiteTargetSchema } from "./suite.ts";
 
 const projectShape = { projectId: z.string() };
 const suiteIdShape = { ...projectShape, id: z.string() };

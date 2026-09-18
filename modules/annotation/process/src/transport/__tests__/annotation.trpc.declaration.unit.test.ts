@@ -7,9 +7,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+
 import { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
 import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
 import { annotationScoreTrpcTransport } from "../annotation-score.trpc.ts";

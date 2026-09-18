@@ -1,13 +1,12 @@
 import { Box, Button, Code, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
 
-import { Dialog } from "@langwatch/design-system/dialog";
-
 import { usePersonalDeployment } from "../../behavior/personal-workspace-session.ts";
+import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 import { InstallCliCard } from "../blocks/install-cli-card.tsx";
 import { TileIcon } from "../elements/tile-icon.tsx";
-import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 
 interface Props {
   displayName: string;

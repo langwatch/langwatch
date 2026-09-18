@@ -4,6 +4,7 @@
  * Spec: modules/api-key/specs/api-key.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { loginKeyExpiresAt } from "../api-key.session-ceiling.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

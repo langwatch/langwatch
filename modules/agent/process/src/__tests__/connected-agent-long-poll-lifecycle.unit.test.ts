@@ -1,5 +1,3 @@
-import type { AgentService } from "../services/agent.service.ts";
-import { createConnectedAgentFixture,createLongPollFixture } from "./connected-agent.fixture.ts";
 /**
  * The rest of the HTTP long-poll transport's lifecycle: a call answered through the frames
  * (ADR-128, "Transport").
@@ -10,12 +8,15 @@ import {
   PRESENCE_TTL_SECONDS,
   PROTOCOL_VERSION,
 } from "@langwatch/agent-contract";
-import { describe, expect, it, vi } from "vitest";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { describe, expect, it, vi } from "vitest";
+
+import type { AgentService } from "../services/agent.service.ts";
 import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
+import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import { AgentSessionService } from "../services/connected-agent-session.service.ts";
-import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
+import { createConnectedAgentFixture, createLongPollFixture } from "./connected-agent.fixture.ts";
 
 const projectId = "project_poll_lifecycle";
 const instanceId = "inst_poll_lifecycle";

@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   allLitellmModels,
   getAllModels,
@@ -12,6 +11,7 @@ import {
   getParameterConstraints,
   modelProviders,
 } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
 
 describe("Registry Model Access", () => {
   describe("when getting all models", () => {

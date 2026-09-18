@@ -1,6 +1,8 @@
 /** Audit period window: narrowed copy without router; `now` as parameter. */
 
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import {
   auditPeriodLabel,
   auditPeriodQuery,
@@ -8,7 +10,6 @@ import {
   isAuditPeriodPresetKey,
   readAuditPeriod,
 } from "../audit-period.ts";
-import { Temporal } from "@langwatch/time";
 
 const NOW = Temporal.Instant.from("2026-03-04T15:20:00.000Z");
 

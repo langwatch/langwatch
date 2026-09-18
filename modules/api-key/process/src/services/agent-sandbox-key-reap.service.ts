@@ -1,8 +1,8 @@
 import { AGENT_SANDBOX_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
-import { nowInstant, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 

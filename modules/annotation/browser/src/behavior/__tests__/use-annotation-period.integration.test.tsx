@@ -5,8 +5,9 @@
 
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { useAnnotationPeriod } from "../use-annotation-period.ts";
+
 import type { AnnotationPeriodReading } from "../../model/annotation-period.ts";
+import { useAnnotationPeriod } from "../use-annotation-period.ts";
 
 function Probe({
   query,

@@ -5,6 +5,7 @@
  */
 
 import { Heading, Text, VStack } from "@chakra-ui/react";
+
 import { BrowserSessionsSection } from "../browser-sessions-section.tsx";
 import { PersonalApiKeysSummary } from "../personal-api-keys-summary.tsx";
 import { ProfileDetailsSection } from "../profile-details-section.tsx";
@@ -15,9 +16,7 @@ export default function ProfileScreen() {
     <VStack gap={6} width="full" align="start">
       <VStack align="start" gap={1}>
         <Heading as="h2">Profile</Heading>
-        <Text color="fg.muted">
-          Who you are here, how you get in, and where you are signed in.
-        </Text>
+        <Text color="fg.muted">Who you are here, how you get in, and where you are signed in.</Text>
       </VStack>
 
       <ProfileDetailsSection />

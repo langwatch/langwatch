@@ -1,10 +1,10 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
-import { InviteService } from "../invite.service.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
+import { InviteService } from "../invite.service.ts";
 
 /**
  * Over-seated orgs refuse new invites until a disabled member frees a seat.

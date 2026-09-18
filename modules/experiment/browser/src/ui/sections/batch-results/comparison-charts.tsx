@@ -15,8 +15,6 @@ import {
   YAxis,
 } from "recharts";
 
-import { ComparisonLeaderboardChart } from "./comparison-leaderboard-chart.tsx";
-import { ChartTooltip, RUN_COLORS } from "./presentation.tsx";
 import {
   axisLabelProps,
   buildAxisLabels,
@@ -31,6 +29,8 @@ import type {
   ComparisonRunData,
 } from "../batch-evaluation-results.types.ts";
 import { useResultsGrouping } from "../use-results-grouping.ts";
+import { ComparisonLeaderboardChart } from "./comparison-leaderboard-chart.tsx";
+import { ChartTooltip, RUN_COLORS } from "./presentation.tsx";
 import { WinRateChart } from "./win-rate-chart.tsx";
 
 /** Metric types that can be displayed */

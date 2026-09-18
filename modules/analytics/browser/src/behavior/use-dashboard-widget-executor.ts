@@ -4,28 +4,26 @@
  * button) share one validation gate, so a query runs identically either way.
  */
 
-import { useCallback, useMemo, useState } from "react";
-
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { nowInstant } from "@langwatch/time";
+import { useCallback, useMemo, useState } from "react";
 
-import { analyticsApi } from "./analytics-api.ts";
-import { createLangWatchQLExecute } from "./lwql-execute.ts";
-import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
-import { readHandledError } from "../model/handled-error.ts";
 import {
   type DashboardWidgetQuery,
   validateDashboardWidgetQueryParams,
 } from "../model/dashboard-widget-definition.ts";
-
 import type {
   ChartFrameDashboardContext,
   ChartQueryError,
   ChartQueryResult,
 } from "../model/dashboard-widget/bridge-protocol.ts";
 import { toChartQueryResult } from "../model/dashboard-widget/bridge-protocol.ts";
+import { readHandledError } from "../model/handled-error.ts";
+import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
+import { analyticsApi } from "./analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "./frame-bridge.ts";
+import { createLangWatchQLExecute } from "./lwql-execute.ts";
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
@@ -69,14 +67,12 @@ export function useDashboardWidgetExecutor(
     return { start: end - 24 * 60 * 60 * 1000, end };
   });
   const pageWindow = overrides?.timeWindow ?? mountWindow;
-  const granularitySeconds =
-    overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  const granularitySeconds = overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
   const execute = useMemo(
     () =>
       createLangWatchQLExecute({
         transport: {
-          mutate: (input, options) =>
-            utils.client.analytics.lwql.query.mutate(input, options),
+          mutate: (input, options) => utils.client.analytics.lwql.query.mutate(input, options),
         },
         projectId,
       }),
@@ -168,10 +164,7 @@ export function useDashboardWidgetExecutor(
     [recordRun, runValidated],
   );
 
-  const params: Pick<
-    ChartFrameDashboardContext,
-    "timeWindow" | "granularitySeconds"
-  > = useMemo(
+  const params: Pick<ChartFrameDashboardContext, "timeWindow" | "granularitySeconds"> = useMemo(
     () => ({
       timeWindow: { start: pageWindow.start, end: pageWindow.end },
       granularitySeconds,

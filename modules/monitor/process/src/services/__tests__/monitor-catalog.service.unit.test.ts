@@ -6,7 +6,10 @@
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
 
-import { createMonitorTestApp, createMonitorTestRepositories } from "../../app/__tests__/monitor.fixture.ts";
+import {
+  createMonitorTestApp,
+  createMonitorTestRepositories,
+} from "../../app/__tests__/monitor.fixture.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import { MonitorCatalogService } from "../monitor-catalog.service.ts";
 

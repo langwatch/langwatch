@@ -3,6 +3,7 @@
  */
 
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
+
 import type { ComparisonEvaluatorConfig, LocalEvaluatorConfig } from "./types.ts";
 
 /**

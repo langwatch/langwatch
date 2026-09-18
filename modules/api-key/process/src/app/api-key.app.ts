@@ -30,7 +30,7 @@ import {
   type ApiKeySelectionInput,
   type RevokeApiKeyInput,
   type ApiKeyCallerReadInput,
-  apiKeyServerConfigSchema,
+  apiKeyServerConfig,
   type ApiKeyServerConfig,
 } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -38,8 +38,9 @@ import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
-import { ApiKeyTokenAdapter } from "../repositories/memory/memory.api-key-token.repository.ts";
+
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
+import { ApiKeyTokenAdapter } from "../repositories/memory/memory.api-key-token.repository.ts";
 import { ApiKeyBindingIdAdapter } from "../services/api-key-binding-id.service.ts";
 import { ApiKeyDiagnosticsAdapter } from "../services/api-key-diagnostics.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
@@ -99,7 +100,7 @@ export class ApiKeyApp implements ApiKeyApi {
     projects: ProjectApi,
   };
 
-  static readonly configSchema = apiKeyServerConfigSchema;
+  static readonly config = apiKeyServerConfig;
 
   static create(setup: ApiKeySetup): ApiKeyApp {
     const authorization = setup.dependencies.authorization;
@@ -543,4 +544,3 @@ export class ApiKeyApp implements ApiKeyApi {
     return this.#service.isOrgAdmin({ userId: by.id, organizationId });
   }
 }
-

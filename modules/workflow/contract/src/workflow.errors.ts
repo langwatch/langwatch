@@ -1,3 +1,5 @@
+import { HandledError } from "@langwatch/handled-error";
+
 export class WorkflowNotFoundError extends Error {
   readonly code = "workflow_not_found" as const;
   constructor(
@@ -56,20 +58,21 @@ export class WorkflowExecutionFailedError extends HandledError {
 }
 
 /** A dispatched Studio LLM node must name its model. */
-export class LlmModelNotSetError extends Error {
+export class LlmModelNotSetError extends HandledError {
+  declare readonly code: "llm_model_not_set";
   readonly cause = "LLM_MODEL_NOT_SET" as const;
 
   constructor(nodeName?: string) {
-    super(
-      `LLM node ${
-        nodeName ? `"${nodeName}" ` : ""
-      }has no model selected. Open the node and choose a model.`,
-    );
+    const message = `LLM node ${
+      nodeName ? `"${nodeName}" ` : ""
+    }has no model selected. Open the node and choose a model.`;
+    super("llm_model_not_set", message, {
+      httpStatus: 422,
+      fault: "customer",
+    });
     this.name = "LlmModelNotSetError";
   }
 }
-import { HandledError } from "@langwatch/handled-error";
-
 /**
  * The deployment asked for the studio's Lambda sweep and composed no fleet
  * for it to run against. Named rather than an empty report: "nothing was

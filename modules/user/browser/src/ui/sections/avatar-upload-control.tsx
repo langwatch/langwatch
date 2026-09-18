@@ -1,14 +1,17 @@
 import { Box, Button, Center, HStack } from "@chakra-ui/react";
-import { Info, Pencil } from "lucide-react";
-import { useRef, useState } from "react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Info, Pencil } from "lucide-react";
+import { useRef, useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
-import { usePersonalToaster, useShowErrorToast } from "../../behavior/personal-workspace-feedback.ts";
+import {
+  usePersonalToaster,
+  useShowErrorToast,
+} from "../../behavior/personal-workspace-feedback.ts";
 import { useCurrentUser } from "../../behavior/personal-workspace-session.ts";
-import { processAvatarImage } from "../../model/process-avatar-image.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
+import { processAvatarImage } from "../../model/process-avatar-image.ts";
 import { UserAvatar } from "../elements/user-avatar.tsx";
 
 const FORMAT_HINT = "PNG, JPG, WEBP or GIF, up to 8 MB. Cropped to a square.";

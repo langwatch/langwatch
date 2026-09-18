@@ -3,10 +3,8 @@ import {
   type ModelDefaultScope,
   type ModelProvider,
 } from "@langwatch/model-provider-contract";
-import type {
-  ModelProviderRecord,
-  ModelProviderRepository,
-} from "../model-provider.repository.ts";
+
+import type { ModelProviderRecord, ModelProviderRepository } from "../model-provider.repository.ts";
 import {
   byCreatedAtAscending,
   matchesAnyScope,

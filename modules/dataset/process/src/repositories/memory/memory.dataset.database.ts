@@ -54,9 +54,7 @@ export class MemoryDatasetDatabase {
   }
 
   removeDataset(projectId: string, id: string): boolean {
-    const index = this.#datasets.findIndex(
-      (row) => row.projectId === projectId && row.id === id,
-    );
+    const index = this.#datasets.findIndex((row) => row.projectId === projectId && row.id === id);
     if (index === -1) return false;
 
     this.#datasets.splice(index, 1);

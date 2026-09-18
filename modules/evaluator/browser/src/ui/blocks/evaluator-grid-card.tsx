@@ -2,12 +2,12 @@
  * One evaluator in the grid, with its "Use via API" dialog attached.
  */
 
+import type { WireOf } from "@langwatch/api/web";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { toEpochMs } from "@langwatch/time";
-import type { WireOf } from "@langwatch/api/web";
 import { useState } from "react";
 
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { EvaluatorApiUsageDialog } from "./evaluator-api-usage-dialog.tsx";
 import { EvaluatorCard, type EvaluatorCardProps } from "./evaluator-card.tsx";
 

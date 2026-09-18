@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { nowInstant } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   clusterTopicsForProject,
   fetchTracesFromClickHouse,

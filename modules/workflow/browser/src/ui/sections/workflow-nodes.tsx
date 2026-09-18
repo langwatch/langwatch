@@ -1,5 +1,7 @@
 import { Box, Button, Circle, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { Component, ComponentType, Field, LLMConfig } from "@langwatch/workflow-contract";
 import {
   Handle,
   type Node,
@@ -12,10 +14,8 @@ import React, { forwardRef, type Ref, useEffect, useMemo } from "react";
 import { useDragLayer } from "react-dnd";
 import { Copy, MoreHorizontal, Trash2 } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
-import { Menu } from "@langwatch/design-system/menu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
-import type { Component, ComponentType, Field, LLMConfig } from "@langwatch/workflow-contract";
 import { GATE_FIELD, showsTemporaryGate } from "../../model/control-flow.ts";
 import { hasUnsavedChanges } from "../../model/unsaved-changes.ts";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";

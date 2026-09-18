@@ -1,11 +1,12 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { Settings2 } from "lucide-react";
 import { TriggerAction } from "@langwatch/automation-contract";
+import { Settings2 } from "lucide-react";
+
 import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
+import { useConfigComplete, useConfigurationSummary } from "./automation-selectors.ts";
+import { useAutomationStore } from "./automation-store.ts";
 import { CLIENT_PROVIDERS, type AutomationProviderRegistry } from "./client-providers.ts";
 import type { ConditionSource } from "./draft-model.ts";
-import { useAutomationStore } from "./automation-store.ts";
-import { useConfigComplete, useConfigurationSummary } from "./automation-selectors.ts";
 
 /** The active channel card is tinted with the preset's list-page accent. */
 const ACCENT_FOR_SOURCE: Record<ConditionSource, string> = {

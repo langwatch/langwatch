@@ -9,8 +9,8 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DatasetTabs } from "../dataset-tabs.tsx";
 import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { DatasetTabs } from "../dataset-tabs.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

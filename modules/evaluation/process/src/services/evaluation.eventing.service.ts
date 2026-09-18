@@ -1,13 +1,14 @@
-import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
+import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
+
+import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsRollupRow } from "../eventing/evaluation-analytics-rollup.projection.ts";
-import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
-import { EvaluationAnalyticsRollupStore } from "../eventing/evaluation-rollup.store.ts";
 import { EvaluationAnalyticsStore } from "../eventing/evaluation-attributes.store.ts";
+import { EvaluationAnalyticsRollupStore } from "../eventing/evaluation-rollup.store.ts";
 import { EvaluationRunStore } from "../eventing/evaluation-run.store.ts";
+import type { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
 
 export interface EvaluationEventingStores {
   readonly evalRunStore: FoldProjectionStore<EvaluationRunData>;

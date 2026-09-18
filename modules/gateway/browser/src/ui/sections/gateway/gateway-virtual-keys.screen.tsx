@@ -1,5 +1,3 @@
-import { readableDate } from "../../../model/readable-date.ts";
-import { toEpochMs } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -14,6 +12,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { ProviderScopeChips } from "@langwatch/authz-browser-kit/scope-picker";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { toEpochMs } from "@langwatch/time";
 import {
   Ban,
   Bird,
@@ -30,11 +35,13 @@ import {
   Zap,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+
+import { api } from "../../../behavior/gateway-api.ts";
+import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { resolveTracesHrefForKey } from "../../../features/virtual-keys/model/traces-href-for-key.ts";
-import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
-import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
+import { isExpired } from "../../../features/virtual-keys/model/virtual-key-expiration.ts";
 import {
   VirtualKeyBudgetBar,
   type VirtualKeyBudgetBarValue,
@@ -42,17 +49,11 @@ import {
 import { VirtualKeyCreateDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-create-drawer.tsx";
 import { VirtualKeyEditDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
-import { isExpired } from "../../../features/virtual-keys/model/virtual-key-expiration.ts";
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit/scope-picker";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
+import { readableDate } from "../../../model/readable-date.ts";
+import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
-import { Menu } from "@langwatch/design-system/menu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
-import { api } from "../../../behavior/gateway-api.ts";
-import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
 /** Deep link from a key's spend to its Usage view over the same window. */
 function usageHrefForKey(virtualKeyId: string): string {

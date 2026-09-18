@@ -1,12 +1,13 @@
 import { formatQueryParams } from "@clickhouse/client/dist/common";
-import { Temporal } from "@langwatch/time";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
+import { METRIC_ROLLUP_INTERVAL_MS } from "@langwatch/metric-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi, type Mock } from "vitest";
-import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-point.repository.ts";
+
+import { point } from "../../../app/__tests__/metric.fixture.ts";
 import type { MetricClickHouseClient } from "../clickhouse.metric-data-point-append.repository.ts";
 import { MetricDataPointMapper } from "../clickhouse.metric-data-point.mapper.ts";
-import { METRIC_ROLLUP_INTERVAL_MS } from "@langwatch/metric-contract";
-import { point } from "../../../app/__tests__/metric.fixture.ts";
+import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-point.repository.ts";
 
 type InsertCall = { table: string; values: readonly unknown[] };
 

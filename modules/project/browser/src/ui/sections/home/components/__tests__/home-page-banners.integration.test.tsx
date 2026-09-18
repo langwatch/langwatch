@@ -26,7 +26,6 @@ vi.mock("@langwatch/langy-browser/surfaces/asaplangy", () => ({
   SERIF: "serif",
 }));
 
-import { HomePageBanners } from "../home-page-banners.tsx";
 import {
   ProjectHomeHostProvider,
   ProjectHomeHost,
@@ -37,6 +36,7 @@ import {
   type ProjectHomeProject,
   type ProjectHomeUser,
 } from "../../../../../model/project-home-host.ts";
+import { HomePageBanners } from "../home-page-banners.tsx";
 
 // The automations banner navigates through the host on CTA click. One shared
 // spy so a test can assert WHERE the click went, not just that it went.

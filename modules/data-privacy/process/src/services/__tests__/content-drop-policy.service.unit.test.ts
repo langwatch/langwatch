@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
-
 import {
   compileAttributePatterns,
   EMPTY_AUDIENCE,
   type Disposition,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import { describe, expect, it } from "vitest";
+
 import { ContentDropPolicyService } from "../content-drop-policy.service.ts";
 
 const service = ContentDropPolicyService.create();
@@ -132,7 +132,10 @@ describe("stripDroppedAttributes", () => {
       expect(next["app.internal.token"]).toBeUndefined();
       expect(next["app.public.label"]).toBe("ok");
       expect(droppedCount).toBe(2);
-      expect(droppedAttributeKeys.toSorted()).toEqual(["app.internal.session", "app.internal.token"]);
+      expect(droppedAttributeKeys.toSorted()).toEqual([
+        "app.internal.session",
+        "app.internal.token",
+      ]);
     });
   });
 

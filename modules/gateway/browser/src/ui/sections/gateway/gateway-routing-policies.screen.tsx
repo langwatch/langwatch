@@ -1,23 +1,23 @@
 import { Box, Button, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import { docsUrl } from "@langwatch/config/docs-url";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Lightbulb, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import { api } from "../../../behavior/gateway-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { useRoutingPolicyMutations } from "../../../features/routing-policies/behavior/use-routing-policy-mutations.ts";
 import {
   RoutingPoliciesTable,
   type RoutingPolicyRow,
   type RoutingPolicyScopeLevel,
 } from "../../../features/routing-policies/ui/blocks/routing-policies-table.tsx";
-import { useRoutingPolicyMutations } from "../../../features/routing-policies/behavior/use-routing-policy-mutations.ts";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import { useGatewayHost } from "../../../model/gateway-host.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
-import { useGatewayHost } from "../../../model/gateway-host.ts";
-import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
-import { api } from "../../../behavior/gateway-api.ts";
-import { docsUrl } from "@langwatch/config/docs-url";
+import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
 /**
  * Routing policy editor uses drawer registry (drawer.open=routingPolicy), not its own query key.

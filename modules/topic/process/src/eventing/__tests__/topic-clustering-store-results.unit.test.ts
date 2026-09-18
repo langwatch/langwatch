@@ -3,6 +3,7 @@
  * Deleted ES dual-write; AssignTopic queue is now the only path.
  */
 import { describe, expect, it } from "vitest";
+
 import { storeResults } from "../topic-clustering-runner.intent.ts";
 import { fakeRunnerDeps } from "./topic-clustering-runner.fixture.ts";
 

@@ -1,14 +1,15 @@
 /** @vitest-environment node */
 
+import { Temporal } from "@langwatch/time";
 /**
  * Write projection store: safety properties (occurredAt guards, compat heads).
  * Assert raw-SQL guards as SQL.
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz-grant.migration.ts";
+
 import type { GrantProjectionWrite } from "../../../eventing/authz-grant.projection.ts";
+import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz-grant.migration.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
-import { Temporal } from "@langwatch/time";
 
 const ORG = "org_acme";
 

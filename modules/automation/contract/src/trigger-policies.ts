@@ -1,6 +1,7 @@
+import { type Instant, Temporal } from "@langwatch/time";
+
 import { CADENCE_WINDOW_MS, type NotificationCadence } from "./cadences.ts";
 import type { TriggerAction } from "./trigger.ts";
-import { type Instant, Temporal } from "@langwatch/time";
 
 export const NOTIFY_TRIGGER_ACTIONS = new Set<TriggerAction>([
   "SEND_EMAIL",

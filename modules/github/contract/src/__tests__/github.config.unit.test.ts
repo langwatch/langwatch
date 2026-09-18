@@ -1,9 +1,13 @@
-import { InvalidRuntimeConfigError, RuntimeConfig } from "@langwatch/config";
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { githubServerConfigDefinition } from "../github.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "github", definition: githubServerConfigDefinition, source }).value;
+import { githubConfig } from "../github.config.ts";
+
+const read = (source: Record<string, string | undefined>) =>
+  parseProcessConfig({
+    owners: [{ name: "github", config: githubConfig }],
+    environment: source,
+  }).github;
 
 describe("github server configuration", () => {
   describe("given a deployment connected a GitHub App", () => {
@@ -13,18 +17,9 @@ describe("github server configuration", () => {
         {
           appId: "12345",
           host: "github.acme.test",
-          privateKey: undefined,
           appSlug: undefined,
-          webhookSecret: undefined,
         },
       );
-    });
-  });
-
-  describe("given the private key is exported blank", () => {
-    /** @scenario "An unreadable switch is refused instead of read as off" */
-    it("refuses the boot rather than reading it as no connection", () => {
-      expect(() => read({ GITHUB_LANGY_PRIVATE_KEY: "" })).toThrow(InvalidRuntimeConfigError);
     });
   });
 });

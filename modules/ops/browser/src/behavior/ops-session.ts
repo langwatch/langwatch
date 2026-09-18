@@ -2,6 +2,7 @@
  * isLoading stays as false for backward compat. */
 
 import { useMemo } from "react";
+
 import { useOpsHost } from "../model/ops-host.ts";
 
 export type OpsScope = { kind: "none" } | { kind: "platform" };

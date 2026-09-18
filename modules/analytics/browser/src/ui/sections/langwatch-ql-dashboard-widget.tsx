@@ -5,19 +5,17 @@
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
+import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
 import { useMemo } from "react";
 
-import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
-import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
-
 import { useLangWatchQLWidgetRun } from "../../behavior/use-langwatch-ql-widget-run.ts";
 import { widgetCoarsenedNotice } from "../../model/widget-coarsened-notice.ts";
-import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
-
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { LazyLangWatchQLWidgetChart } from "./lazy-langwatch-ql-widget-chart.tsx";
+import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
 
 /**
  * The default datapoint step for a widget whose chart declares the granularity

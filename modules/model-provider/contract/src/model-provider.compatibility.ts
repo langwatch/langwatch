@@ -1,8 +1,13 @@
 import { z } from "zod";
+
 import { modelCatalogEntrySchema, getAllModels } from "./catalog/model-catalog.ts";
 import { customModelEntrySchema, type CustomModelEntry } from "./custom-model.ts";
 import { getParameterConstraints, parameterConstraintsSchema } from "./model-provider-registry.ts";
-import { modelProviderScopeSchema, type Model, type ModelProviderSummary } from "./model-provider.ts";
+import {
+  modelProviderScopeSchema,
+  type Model,
+  type ModelProviderSummary,
+} from "./model-provider.ts";
 
 const extraHeaderSchema = z.object({ key: z.string(), value: z.string() }).strict();
 

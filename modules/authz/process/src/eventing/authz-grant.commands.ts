@@ -38,6 +38,7 @@ import {
   EventUtils,
 } from "@langwatch/eventing";
 import type { ZodSchema } from "zod";
+
 import {
   AUTHZ_GRANT_AGGREGATE_TYPE,
   type GrantAttachedEvent,

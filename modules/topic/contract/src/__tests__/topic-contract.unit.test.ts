@@ -1,10 +1,11 @@
+import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
+
 import {
   topicClusteringRunHistoryEntrySchema,
   topicClusteringStatusSchema,
   topicSchema,
 } from "../index.ts";
-import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
 
 describe("Topic contract", () => {
   it("validates the projected topic shape", () => {

@@ -2,6 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
+
 import { beforeSessionCreate } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 

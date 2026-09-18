@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-import { createTenantId, SecurityError, StoreError } from "@langwatch/eventing";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { createTenantId, SecurityError, StoreError } from "@langwatch/eventing";
+import { describe, expect, it, vi } from "vitest";
+
 import { ClickHouseSuiteRunRepository } from "../clickhouse.suite-run.repository.ts";
 
 const stateRow = {

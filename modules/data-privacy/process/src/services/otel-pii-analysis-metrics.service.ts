@@ -4,10 +4,8 @@ import {
   type CounterHandle,
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
-import {
-  type PiiAnalysisMetrics,
-  type PiiAnalysisOutcome,
-} from "../app/data-privacy.members.ts";
+
+import { type PiiAnalysisMetrics, type PiiAnalysisOutcome } from "../app/data-privacy.members.ts";
 
 /**
  * Series names and evaluator labels are pinned and read externally; renamed

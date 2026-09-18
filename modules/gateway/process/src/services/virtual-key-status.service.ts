@@ -4,9 +4,15 @@
  * a paused key resumes exactly as it was.
  */
 
-import { TRPCError } from "@trpc/server";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import { type GatewayAudit,type GatewayChangeEvents,type GatewayTransaction,type GatewayGovernanceSignals } from "../app/gateway.members.ts";
+import { TRPCError } from "@trpc/server";
+
+import {
+  type GatewayAudit,
+  type GatewayChangeEvents,
+  type GatewayTransaction,
+  type GatewayGovernanceSignals,
+} from "../app/gateway.members.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {

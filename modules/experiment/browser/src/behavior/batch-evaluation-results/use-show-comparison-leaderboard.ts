@@ -1,6 +1,6 @@
-import { useFeatureFlag } from "@langwatch/workflow-browser/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/workflow-browser/feature-flag";
 
 /**
  * The rollout flag the Bradley-Terry leaderboard hangs off (issue #5103).

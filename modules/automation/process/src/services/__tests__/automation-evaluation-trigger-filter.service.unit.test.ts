@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { AutomationEvaluationTriggerFilterService } from "../automation-evaluation-trigger-filter.service.ts";
+
 import type { AutomationEvaluationQueryClassification } from "../../app/automation.members.ts";
+import { AutomationEvaluationTriggerFilterService } from "../automation-evaluation-trigger-filter.service.ts";
 
 class TestTraceService implements AutomationEvaluationQueryClassification {
   // `TraceService` grew these and the fakes did not follow. A member left

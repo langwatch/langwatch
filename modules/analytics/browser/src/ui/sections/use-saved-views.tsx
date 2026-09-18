@@ -4,6 +4,9 @@
  * endpoints.
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { differenceInCalendarDays, nowInstant, subDays, toDate } from "@langwatch/time";
 import type React from "react";
 import {
@@ -15,10 +18,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "@langwatch/browser-host/use-router";
+
 import { availableFilters } from "../../model/filters/registry.ts";
 import type { FilterField } from "../../model/filters/types.ts";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   type DefaultView,
   findMatchingView,
@@ -27,7 +29,6 @@ import {
 } from "./saved-views-logic.ts";
 import type { FilterParam } from "./use-filter-params.ts";
 import { useFilterParams } from "./use-filter-params.ts";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 
 // Re-export types and constants for consumers
 export {
@@ -262,7 +263,10 @@ function useSavedViewsInternal() {
       if (period) {
         if (period.relativeDays !== undefined) {
           endDate = nowInstant().toString({ fractionalSecondDigits: 3 });
-          startDate = subDays(nowInstant().epochMilliseconds, period.relativeDays - 1).toISOString();
+          startDate = subDays(
+            nowInstant().epochMilliseconds,
+            period.relativeDays - 1,
+          ).toISOString();
         } else if (period.startDate && period.endDate) {
           startDate = period.startDate;
           endDate = period.endDate;

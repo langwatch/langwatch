@@ -1,5 +1,5 @@
-import { TRPCError } from "@trpc/server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { TRPCError } from "@trpc/server";
 
 /** The client slice the organization/group tenancy reads below touch. */
 export type GatewayOrganizationDirectoryDatabase = Pick<

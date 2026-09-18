@@ -1,7 +1,8 @@
 import { Box, Button, Flex, Input, Text, Textarea } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
-import { LLM_MODELS } from "../../model/foundry-models.ts";
+
 import { useTraceStore } from "../../behavior/trace.store.ts";
+import { LLM_MODELS } from "../../model/foundry-models.ts";
 import type { ChatMessage, LLMConfig, SpanConfig } from "../../model/foundry-types.ts";
 
 const ROLE_COLORS: Record<string, string> = {

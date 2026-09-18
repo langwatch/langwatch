@@ -1,15 +1,19 @@
 import { Box, createListCollection, Field, HStack, Input, Text } from "@chakra-ui/react";
-import { Search } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
-import { modelDisplayLabel,isLatestAlias,resolveLatestAlias } from "@langwatch/model-provider-contract";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Select } from "@langwatch/design-system/select";
 import { titleCase } from "@langwatch/design-system/string-casing";
+import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
+import {
+  modelDisplayLabel,
+  isLatestAlias,
+  resolveLatestAlias,
+} from "@langwatch/model-provider-contract";
 import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
 } from "@langwatch/prompt-contract/llm-config-constants";
-import { InputGroup } from "@langwatch/design-system/input-group";
-import { Select } from "@langwatch/design-system/select";
+import { Search } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 
 type ModelOption = {
   label: string;

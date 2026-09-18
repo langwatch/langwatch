@@ -1,4 +1,5 @@
 import type { MonitorSummary } from "@langwatch/monitor-contract";
+
 import type { MonitorRepository } from "../repositories/monitor.repository.ts";
 
 /**

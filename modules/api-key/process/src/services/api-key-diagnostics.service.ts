@@ -15,8 +15,7 @@ export class ApiKeyDiagnosticsAdapter implements ApiKeyDiagnostics {
     return new ApiKeyDiagnosticsAdapter(logger);
   }
 
-  private constructor(private readonly logger: Pick<Logger, "warn">) {
-  }
+  private constructor(private readonly logger: Pick<Logger, "warn">) {}
 
   warn(context: Record<string, unknown>, message: string): void {
     this.logger.warn(context, message);

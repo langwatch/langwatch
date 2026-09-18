@@ -1,4 +1,6 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import { MAX_SECTION_TEXT_CHARS } from "../block-kit-allowlist.ts";
 import {
   ALERT_TRIGGER_DEFAULTS,
@@ -12,7 +14,6 @@ import {
   type ReportTemplateContext,
   type ReportTraceRow,
 } from "../template-context.ts";
-import { Temporal } from "@langwatch/time";
 
 const SLACK_DEFAULTS = {
   slackString: REPORT_TRIGGER_DEFAULTS.slackString,

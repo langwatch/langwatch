@@ -1,7 +1,4 @@
 import { Button, HStack, Spinner, Text } from "@chakra-ui/react";
-import { Play, Square, Trash2, X } from "lucide-react";
-import { useState } from "react";
-
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -11,6 +8,8 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/studio-dialog";
+import { Play, Square, Trash2, X } from "lucide-react";
+import { useState } from "react";
 
 export type SelectionToolbarProps = {
   selectedCount: number;

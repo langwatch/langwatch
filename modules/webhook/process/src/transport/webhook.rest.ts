@@ -4,6 +4,8 @@ import {
   BadRequestError,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
+import { Temporal, type Instant } from "@langwatch/time";
 import {
   WEBHOOK_EVENT_TYPES,
   webhookDestinationKindSchema,
@@ -12,8 +14,6 @@ import {
   type SqsDestinationInput,
   type WebhookEndpointView,
 } from "@langwatch/webhook-contract";
-import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
-import { Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 // ── Wire enums ──────────────────────────────────────────────────────────
@@ -340,7 +340,9 @@ function destinationFromBody(body: {
 }
 
 /** The `firedAt~id` wire cursor, parsed into the position the service reads. */
-function deliveriesCursorOf(cursor: string | undefined): { firedAt: Instant; id: string } | undefined {
+function deliveriesCursorOf(
+  cursor: string | undefined,
+): { firedAt: Instant; id: string } | undefined {
   if (!cursor) return undefined;
   const [firedAtMs, cursorId] = cursor.split("~");
   const parsedMs = Number(firedAtMs);
@@ -524,7 +526,11 @@ export const webhookRest: Readonly<{
     const result = await app.testFire({ organizationId: scope.id, endpointId: input.id });
 
     return result.delivered
-      ? { delivered: true, response_status: result.responseStatus, response_body: result.responseBody }
+      ? {
+          delivered: true,
+          response_status: result.responseStatus,
+          response_body: result.responseBody,
+        }
       : { delivered: false, response_status: result.responseStatus, error: result.error };
   })
 
@@ -619,7 +625,9 @@ export const webhookRest: Readonly<{
   .get("/events", "getApiWebhooksV1Events")
   .withQuery(eventsQuerySchema)
   .withPermission("webhookEndpoints:view")
-  .withOutput(z.object({ data: z.array(webhookEventEnvelopeSchema), next_cursor: nextCursorSchema }))
+  .withOutput(
+    z.object({ data: z.array(webhookEventEnvelopeSchema), next_cursor: nextCursorSchema }),
+  )
   .withDocs({
     tags: ["Webhooks"],
     summary: "List emitted events",

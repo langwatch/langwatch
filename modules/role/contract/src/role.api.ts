@@ -14,7 +14,8 @@ import type {
   AuthzListManagedBindingsForUserOutput,
   AuthzUpdateBindingInput,
 } from "@langwatch/authz-contract";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type { RolePermissionCatalog } from "./role-rest.schemas.ts";
 import type { Role, RoleCreate, RoleUpdate, RoleWriteAcknowledged } from "./role.ts";
 

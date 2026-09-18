@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AuthzEngine } from "../engine.ts";
+
 import type {
   AuthzScopeRef,
   CollectedBinding,
@@ -7,6 +7,7 @@ import type {
   LegacyTeamMembership,
   ResourceGrant,
 } from "../authz.ts";
+import { AuthzEngine } from "../engine.ts";
 
 const engine = new AuthzEngine();
 

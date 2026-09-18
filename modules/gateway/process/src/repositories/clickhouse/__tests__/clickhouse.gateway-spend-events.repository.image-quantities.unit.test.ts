@@ -4,6 +4,7 @@
  * reporting every image call at a fraction of its real usage.
  */
 import { describe, expect, it } from "vitest";
+
 import { GatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 
 type Query = { query: string; query_params?: Record<string, unknown> };
@@ -125,7 +126,11 @@ describe("GatewaySpendEventsRepository image quantities", () => {
       });
 
       expect(queries[0]!.query).toContain("TokensInputImage");
-      expect(result).toMatchObject({ tokensInputImage: 800, tokensOutputImage: 1600, imageCount: 1 });
+      expect(result).toMatchObject({
+        tokensInputImage: 800,
+        tokensOutputImage: 1600,
+        imageCount: 1,
+      });
     });
 
     it("answers zeroed image quantities without resolving a client when no tenant is named", async () => {

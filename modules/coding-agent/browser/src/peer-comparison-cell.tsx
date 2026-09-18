@@ -1,7 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
-import type React from "react";
-
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type React from "react";
 
 /** Number with percentile bar showing position among visible peers; red at/past p95. */
 

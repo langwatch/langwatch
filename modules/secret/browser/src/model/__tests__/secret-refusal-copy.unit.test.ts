@@ -11,6 +11,7 @@ import {
   SecretReservedNameError,
 } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   describeSecretRefusal,
   readSecretRefusalCode,

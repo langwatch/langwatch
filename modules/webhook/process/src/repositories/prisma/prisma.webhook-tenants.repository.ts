@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { WebhookTenantsRepository } from "../webhook-tenants.repository.ts";
 
 /** Only what this repository reads: a project is the ClickHouse TenantId,

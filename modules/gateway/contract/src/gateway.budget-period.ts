@@ -2,8 +2,9 @@
  * Which period a budget is in, and the lower bound a spend read for it must honor.
  */
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
-import type { GatewayBudgetWindow } from "./gateway.budget.ts";
+
 import { GatewayWindow } from "./gateway.budget-window.ts";
+import type { GatewayBudgetWindow } from "./gateway.budget.ts";
 
 /**
  * The OccurredAt lower bound a spend read must honor for a budget whose period boundary is not

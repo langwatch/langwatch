@@ -2,6 +2,7 @@ import { Box } from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity-contract";
 import { Fingerprint, KeyRound, Mail } from "lucide-react";
 import type { ReactNode } from "react";
+
 import { GitHub } from "./github-icon.tsx";
 import { Google } from "./google-icon.tsx";
 import { Microsoft } from "./microsoft-icon.tsx";

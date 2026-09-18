@@ -9,13 +9,13 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
-
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { useEffect, useState } from "react";
+
 import { api } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
 
 type BudgetRow = {
   id: string;
@@ -117,7 +117,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
                   docHref="/ai-gateway/budgets#creating-a-budget"
                 />
               </Field.Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)}  />
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
             </Field.Root>
             <Field.Root>
               <Field.Label>Description</Field.Label>

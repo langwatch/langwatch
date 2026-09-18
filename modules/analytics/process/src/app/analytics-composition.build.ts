@@ -1,14 +1,16 @@
 import type {
   AnalyticsEvaluationReadMetrics,
-  AnalyticsService as AnalyticsServiceContract,AnalyticsTripwire
+  AnalyticsService as AnalyticsServiceContract,
+  AnalyticsTripwire,
 } from "@langwatch/analytics-contract";
-import { AnalyticsService } from "../services/analytics.service.ts";
-import { ClickHouseAnalyticsRepository } from "../repositories/clickhouse/clickhouse.analytics.repository.ts";
+
 import { NullAnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
 import {
   ClickHouseAnalyticsEvaluationRepository,
   type EvaluationAnalyticsClickHouseClient,
 } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
+import { ClickHouseAnalyticsRepository } from "../repositories/clickhouse/clickhouse.analytics.repository.ts";
+import { AnalyticsService } from "../services/analytics.service.ts";
 
 /**
  * Process composition binds the one Analytics repository to the service.

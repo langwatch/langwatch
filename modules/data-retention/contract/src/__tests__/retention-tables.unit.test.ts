@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   RETENTION_TABLE_CATEGORY_MAP,
   SECURITY_RETENTION_EXEMPT_TABLES,

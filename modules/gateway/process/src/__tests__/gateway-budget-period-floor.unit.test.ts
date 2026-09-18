@@ -1,10 +1,10 @@
-import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
 import {
   budgetPeriodFloorMs,
   currentPeriodStart,
   GatewayWindow,
 } from "@langwatch/gateway-contract";
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
 
 const NOW = Temporal.Instant.from("2026-07-15T12:00:00.000Z");
 

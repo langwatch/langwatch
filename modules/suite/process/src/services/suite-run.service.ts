@@ -1,3 +1,8 @@
+import { ValidationError } from "@langwatch/handled-error";
+import {
+  parseScenarioParameterDefinitions,
+  type ScenarioTestSuite,
+} from "@langwatch/scenario-contract";
 /**
  * Running a suite: resolving its scope to scenarios and targets, and handing the resolved run
  * to the execution port. The suite's own CRUD stays on `SuiteService`, which composes this one.
@@ -35,21 +40,17 @@ import {
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
-import { ValidationError } from "@langwatch/handled-error";
-import {
-  parseScenarioParameterDefinitions,
-  type ScenarioTestSuite,
-} from "@langwatch/scenario-contract";
-import { ConnectedTargetService } from "./connected-target.service.ts";
+
 import type { SuiteExecution } from "../app/suite.app.ts";
-import type { SuiteServiceOptions } from "./suite.service.ts";
 import {
   defaultSuiteId,
   suiteSlugOf,
   TARGET_SECRET_REFUSAL,
   targetsOverrideASecret,
 } from "../rules/suite-target.rules.ts";
+import { ConnectedTargetService } from "./connected-target.service.ts";
 import { SuiteRunScopeService } from "./suite-run-scope.service.ts";
+import type { SuiteServiceOptions } from "./suite.service.ts";
 
 type SuiteRunServiceOptions = {
   options: SuiteServiceOptions;

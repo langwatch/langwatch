@@ -1,4 +1,3 @@
-import { nowInstant } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -11,12 +10,14 @@ import {
   Table,
   Text,
 } from "@chakra-ui/react";
-import { useState } from "react";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
-import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { Drawer } from "@langwatch/design-system/drawer";
 import type { ProcessInstanceRow } from "@langwatch/ops-contract";
+import { nowInstant } from "@langwatch/time";
+import { useState } from "react";
+
 import { api } from "../../../../behavior/ops-api.ts";
+import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 import { describeNextWake } from "../../model/process-presentation.ts";
 
 const PAGE_SIZE = 25;

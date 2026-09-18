@@ -1,13 +1,14 @@
 import type { ProcessDefinition } from "@langwatch/eventing";
 import { buildProcessDefinition, buildProcessManager } from "@langwatch/eventing";
+import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
+
 import type { TopicClusteringProcessingEvent } from "../../services/topic-events.service.ts";
 import {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,
   type TopicClusteringProcessState,
 } from "../topic-clustering.process.ts";
-import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 
 const PROJECT_ID = "project-1";
 const DAY_MS = 24 * 60 * 60 * 1000;

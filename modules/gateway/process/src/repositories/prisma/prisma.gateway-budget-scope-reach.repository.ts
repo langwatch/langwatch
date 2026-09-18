@@ -1,5 +1,6 @@
-import type { GatewayKeyReachCandidate } from "../gateway-budget.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import type { GatewayKeyReachCandidate } from "../gateway-budget.repository.ts";
 
 /** The client slice the reach walk reads. */
 export type GatewayBudgetScopeReachDatabase = Pick<PrismaClient, "virtualKey" | "groupMembership">;

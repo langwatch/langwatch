@@ -8,8 +8,9 @@ import {
   type TokenCredential,
   WorkloadIdentityCredential,
 } from "@azure/identity";
-import type { AzureCredentials, AzureTokenAuthMode } from "./azure-blob-credentials.service.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { AzureCredentials, AzureTokenAuthMode } from "./azure-blob-credentials.service.ts";
 
 export type TokenModeCredentials = Extract<AzureCredentials, { mode: AzureTokenAuthMode }>;
 

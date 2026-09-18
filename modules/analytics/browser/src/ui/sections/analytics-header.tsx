@@ -1,13 +1,14 @@
 import { Box, HStack, Input, Spacer } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LuListTree } from "react-icons/lu";
-import { useAnalyticsHost } from "../../model/analytics-host.ts";
-import { FilterToggle } from "./filter-toggle.tsx";
+
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { AnalyticsPeriodPicker } from "./analytics-period-picker.tsx";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { FilterToggle } from "./filter-toggle.tsx";
 
 export interface AnalyticsHeaderProps {
   title: string;

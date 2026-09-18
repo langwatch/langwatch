@@ -1,9 +1,11 @@
 import { createHmac } from "node:crypto";
+
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
+
 import type { BetterAuthAnnouncements } from "../better-auth.channel.ts";
 
 /** Everything the passkey ceremony asks of the user directory. */

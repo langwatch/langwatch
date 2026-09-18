@@ -4,18 +4,22 @@
  */
 
 import type { PiiLevel, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
-import { type DataPrivacyResolution,type PIICheckOptions,type PiiAnalysis } from "../app/data-privacy.members.ts";
 import type { TenantId } from "@langwatch/eventing";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createLogger } from "@langwatch/observability";
 import { STRICT_ONLY_PII_ENTITIES } from "@langwatch/redaction";
 import {
   compilePolicyPiiExceptions,
   compilePolicySecretPatterns,
   nativePiiEntitiesForPolicy,
 } from "@langwatch/redaction/pii";
-
-import { createLogger } from "@langwatch/observability";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+
+import {
+  type DataPrivacyResolution,
+  type PIICheckOptions,
+  type PiiAnalysis,
+} from "../app/data-privacy.members.ts";
 
 /**
  * Maximum attribute value length (in characters) for PII redaction.

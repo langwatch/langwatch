@@ -1,10 +1,10 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import type { Monaco } from "@monaco-editor/react";
-import { LuFileCode, LuX } from "react-icons/lu";
 import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { LuFileCode, LuX } from "react-icons/lu";
 
 import type {
   PythonField,

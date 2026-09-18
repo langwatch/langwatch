@@ -1,3 +1,4 @@
+import type { AgentType } from "@langwatch/agent-contract";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
@@ -10,7 +11,6 @@ import {
   Table,
   Workflow,
 } from "lucide-react";
-import type { AgentType } from "@langwatch/agent-contract";
 
 import type { SearchResult } from "./command-bar-types.ts";
 
@@ -19,6 +19,7 @@ export type AgentEditorDrawerName =
   | "agentCodeEditor"
   | "agentHttpEditor"
   | "agentWorkflowEditor"
+  | "agentVoiceEditor"
   | "agentConnectedDetail";
 
 export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName | null {
@@ -29,6 +30,8 @@ export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName
       return "agentHttpEditor";
     case "workflow":
       return "agentWorkflowEditor";
+    case "voice":
+      return "agentVoiceEditor";
     /** Connected agents have no editor, send to detail view like the agents page does */
     case "connected":
       return "agentConnectedDetail";

@@ -10,16 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type Node, useUpdateNodeInternals } from "@xyflow/react";
-import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
-import { Columns, Info, Plus, Trash2, X } from "react-feather";
-import { useFieldArray, useForm } from "react-hook-form";
-import { useDebouncedCallback } from "use-debounce";
-import { useShallow } from "zustand/react/shallow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useInsideDrawer } from "../elements/studio-drawer-footer.tsx";
-import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import type {
   Component,
   ComponentType,
@@ -33,6 +24,16 @@ import {
   nameToId,
   validateNodeName,
 } from "@langwatch/workflow-contract";
+import { type Node, useUpdateNodeInternals } from "@xyflow/react";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Columns, Info, Plus, Trash2, X } from "react-feather";
+import { useFieldArray, useForm } from "react-hook-form";
+import { useDebouncedCallback } from "use-debounce";
+import { useShallow } from "zustand/react/shallow";
+
+import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
+import { useInsideDrawer } from "../elements/studio-drawer-footer.tsx";
 import { ComponentExecutionButton } from "./workflow-node-execution.tsx";
 import { getNodeDisplayName, isExecutableComponent } from "./workflow-nodes.tsx";
 

@@ -1,8 +1,9 @@
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { getMappingSurfaceInputs, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
 import { z } from "zod";
+
 import { type WorkflowAgentMapping } from "../app/workflow.app.ts";
 
 const identifiedFieldSchema = z.object({ identifier: z.string() });

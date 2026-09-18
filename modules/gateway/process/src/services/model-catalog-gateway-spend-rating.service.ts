@@ -1,3 +1,4 @@
+import type { SpendUsage } from "@langwatch/gateway-contract";
 import {
   estimateCost,
   getStaticModelCostRates,
@@ -8,7 +9,6 @@ import {
 import { createLogger } from "@langwatch/observability";
 
 import { type GatewaySpendRating } from "../app/gateway.members.ts";
-import type { SpendUsage } from "@langwatch/gateway-contract";
 
 /**
  * Rating for the gateway spend pipeline: quantities in, integer nano-USD out,

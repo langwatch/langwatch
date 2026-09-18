@@ -1,13 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
-import type { CanonicalLogRecordRepository } from "../../repositories/canonical-log-record.repository.ts";
-import type { LogTraceContribution,LogRecordReceivedEventData } from "@langwatch/trace-contract";
+import type { LogTraceContribution, LogRecordReceivedEventData } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
+import { describe, expect, it, vi } from "vitest";
+
+import type { LogRedaction, LogTraceIoExtractor, LogTraceIo } from "../../app/log.members.ts";
+import type { CanonicalLogRecordRepository } from "../../repositories/canonical-log-record.repository.ts";
 import {
   type LogRequestCollectionResult,
   LogRequestCollectionService,
 } from "../log-request-collection.service.ts";
-import type { LogRedaction, LogTraceIoExtractor, LogTraceIo } from "../../app/log.members.ts";
 import { createLogTestService } from "./log.fixture.ts";
 
 /**

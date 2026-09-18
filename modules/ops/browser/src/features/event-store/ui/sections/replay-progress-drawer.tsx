@@ -1,4 +1,3 @@
-import { nowInstant, toEpochMs } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -11,15 +10,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo } from "react";
-import { parseActiveProjections } from "../../model/replay-presentation.ts";
-import { formatDuration } from "../../../../model/ops-formatters.ts";
-import { PHASE_ICONS, PHASE_LABELS, PhaseTimeline } from "../elements/phase-timeline.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { useReplayStatus } from "../../behavior/use-replay-status.ts";
+import { nowInstant, toEpochMs } from "@langwatch/time";
+import { useMemo } from "react";
+
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { formatDuration } from "../../../../model/ops-formatters.ts";
+import { useReplayStatus } from "../../behavior/use-replay-status.ts";
+import { parseActiveProjections } from "../../model/replay-presentation.ts";
+import { PHASE_ICONS, PHASE_LABELS, PhaseTimeline } from "../elements/phase-timeline.tsx";
 
 /** The tint each terminal replay state carries; anything running stays blue. */
 const STATE_COLORS: Record<string, string> = {

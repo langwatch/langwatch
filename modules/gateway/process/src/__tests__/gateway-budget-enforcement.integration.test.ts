@@ -1,5 +1,7 @@
 /** @vitest-environment node */
 
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * Real Postgres + real ClickHouse. Regression for #6141.
  * @see specs/ai-gateway/budgets.feature
@@ -8,18 +10,15 @@ import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
-
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import { NANO_USD_PER_USD } from "../services/model-catalog-gateway-spend-rating.service.ts";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { NANO_USD_PER_USD } from "../services/model-catalog-gateway-spend-rating.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;

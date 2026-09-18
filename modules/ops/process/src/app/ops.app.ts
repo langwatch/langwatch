@@ -22,13 +22,13 @@ import {
   type OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
   AdminSessionExpiredError,
   AdminSurfaceHiddenError,
   OpsApi,
   adminResourceNameSchema,
+  opsConfig,
   type AdminIdentity,
   type AggregateDiscovery,
   type AggregateEventView,
@@ -71,6 +71,7 @@ import {
   type RunAdminOperationInput,
   type StartAdminImpersonationInput,
   type StopAdminImpersonationInput,
+  type OpsServerConfig,
   type SubmitBugReport,
 } from "@langwatch/ops-contract";
 import {
@@ -80,7 +81,6 @@ import {
 } from "@langwatch/project-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
-import { z } from "zod";
 
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
@@ -92,7 +92,7 @@ import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
 import type { OpsService } from "../services/ops.service.ts";
-import { buildOpsInfrastructure } from "./ops-composition.build.ts";
+import { buildOpsInfrastructure, type OpsProcessMembers } from "./ops-composition.build.ts";
 /**
  * Who an operator request is attributed to: the impersonator where there is
  * one, so a back-office read is recorded against the human who made it rather
@@ -400,28 +400,14 @@ type OpsRuntimeDependencies = Readonly<{
   isProduction: boolean;
 }>;
 
-/** Config schema: operator allow-list, EXPLAIN account, production flag.
- * Fields default to absent-config: no operators, EXPLAIN refuses. */
-const opsAppConfigSchema = z.object({
-  adminEmails: z.array(z.string()).default([]),
-  /** `LANGWATCH_OPS_API_KEY`. Absent refuses every EXPLAIN call. */
-  opsApiKey: z.string().optional(),
-  /** `CLICKHOUSE_OPS_URL`, the dedicated `langwatch_ops` readonly account. */
-  opsClickHouseUrl: z.string().optional(),
-  isProduction: z.boolean().default(false),
-  /** `process.env.SSOCONN_ROUTING === "enforce"` (ADR-117 §5). */
-  legacySsoStringWritesRetired: z.boolean().default(false),
-});
-export type OpsAppConfig = z.infer<typeof opsAppConfigSchema>;
-
 /** {@link OpsAppDependencies} plus the two contract peers only `create()` itself reads. */
 type OpsAppRuntimeDependencies = OpsAppDependencies &
   Readonly<{ apiKeys: ApiKeyApiContract; featureFlags: FeatureFlagApi }>;
 
 type OpsSetup = FeatureSetup<
   typeof OpsApp.dependencies,
-  MembersRead<typeof OpsApp.reads>,
-  OpsAppConfig,
+  OpsProcessMembers,
+  OpsServerConfig,
   OpsRepositories
 >;
 
@@ -541,8 +527,15 @@ export class OpsApp implements OpsApi {
     apiKeys: ApiKeyApi,
     featureFlags: FeatureFlagApi,
   };
-  static readonly configSchema = opsAppConfigSchema;
-  static readonly reads = reads("prisma", "redis", "clickhouse", "eventing", "logger");
+  static readonly config = opsConfig;
+  static readonly reads = [
+    "prisma",
+    "redis",
+    "clickhouse",
+    "eventing",
+    "logger",
+    "nodeEnvironment",
+  ] as const;
 
   /**
    * Builds this process's own {@link OpsAppInfrastructure} from the members it

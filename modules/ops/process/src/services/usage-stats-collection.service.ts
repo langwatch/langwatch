@@ -1,9 +1,10 @@
+import type { Instant } from "@langwatch/time";
+
 import type { UsageStatsReport } from "../app/ops.app.ts";
 import type {
   UsageStatsClickHouseRepository,
   UsageStatsProjectRepository,
 } from "../repositories/observe/usage-stats.repository.ts";
-import type { Instant } from "@langwatch/time";
 
 export interface UsageStatsCollectionServiceOptions {
   projects: UsageStatsProjectRepository;

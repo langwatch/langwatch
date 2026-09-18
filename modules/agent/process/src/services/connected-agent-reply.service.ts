@@ -1,12 +1,13 @@
 import type { AgentCallSignal } from "@langwatch/agent-contract";
 import { instanceGoneSchema, replyNudgeSchema } from "@langwatch/agent-contract";
 import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
+import { z } from "zod";
+
 import {
   INSTANCE_GONE_CHANNEL,
   replyChannel,
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
-import { z } from "zod";
 
 type Waiter = {
   resolve: (outcome: WaitOutcome) => void;

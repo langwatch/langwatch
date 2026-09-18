@@ -1,19 +1,20 @@
-import { createConnectedAgentFixture } from "./connected-agent.fixture.ts";
+import type { StoredCall } from "@langwatch/agent-contract";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 /**
  * The instance-agent fence a session reads a call through: an instance only
  * ever sees calls for the agents it registered itself (ADR-128, "No inbound access").
  * @see specs/agents/connected-agents.feature
  */
 import { describe, expect, it } from "vitest";
-import type { StoredCall } from "@langwatch/agent-contract";
-import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+
 import { callKey, callAckKey, resultKey } from "../rules/connected-agent-keys.rules.ts";
+import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import {
   AgentSessionService,
   type SessionInfo,
 } from "../services/connected-agent-session.service.ts";
+import { createConnectedAgentFixture } from "./connected-agent.fixture.ts";
 
 const projectId = "proj_1";
 const instanceId = "inst_stranger";

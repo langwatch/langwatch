@@ -13,13 +13,14 @@ import {
   type UpdateApiKeyInput,
   API_KEY_PREFIX,
   INGEST_KEY_PREFIX,
-  HIDDEN_SYSTEM_KEY_NAMES
+  HIDDEN_SYSTEM_KEY_NAMES,
 } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
-import type { ApiKeyDependencies } from "./api-key.service.ts";
-import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { fromDate } from "@langwatch/time";
+
+import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
+import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const logger = createLogger("langwatch:api-key:lifecycle");
 

@@ -12,18 +12,18 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { nowInstant } from "@langwatch/time";
 import { GitCompare, X } from "lucide-react";
 import { useMemo } from "react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatTimeAgo, getColorForString } from "./presentation.tsx";
 
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import {
   INTERRUPTED_THRESHOLD_MS,
   isRunFinished,
 } from "../../../model/batch-evaluation-results.run-state.ts";
-import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import { RunDisplayName } from "../../elements/batch-results/run-display-name.tsx";
-import { nowInstant } from "@langwatch/time";
+import { formatTimeAgo, getColorForString } from "./presentation.tsx";
 
 /**
  * Summary data for a single evaluation run
@@ -144,7 +144,9 @@ export function BatchRunsSidebar({
   // so "Run #N" numbering stays stable (Run #1 = oldest, Run #N = newest)
   const { sortedRuns, chronologicalIndexMap } = useMemo(() => {
     const sorted = [...runs].toSorted((a, b) => b.timestamps.createdAt - a.timestamps.createdAt);
-    const chronological = [...runs].toSorted((a, b) => a.timestamps.createdAt - b.timestamps.createdAt);
+    const chronological = [...runs].toSorted(
+      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
+    );
     const indexMap = new Map<string, number>();
     chronological.forEach((run, i) => void indexMap.set(run.runId, i));
     return { sortedRuns: sorted, chronologicalIndexMap: indexMap };

@@ -7,12 +7,12 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
+import { dataPrivacySnapshotSchema } from "./data-privacy.snapshot.ts";
 import {
   DATA_PRIVACY_SCOPE_TYPES,
   dataPrivacyConfigSchema,
   dataPrivacyPolicySchema,
 } from "./data-privacy.ts";
-import { dataPrivacySnapshotSchema } from "./data-privacy.snapshot.ts";
 
 /** The project every privacy procedure is opened from. */
 export const dataPrivacyProjectScopeSchema = z.object({ projectId: z.string() });

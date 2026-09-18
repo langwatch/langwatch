@@ -6,25 +6,27 @@ import {
 } from "@langwatch/api/rest";
 import type { WorkbenchCredential } from "@langwatch/experiment-contract";
 import { defineServerModule } from "@langwatch/kernel";
+
 import { ExperimentApp, type ExperimentAppDependencies } from "#app/experiment.app";
-import {
-  RedisExperimentRunProcessingRepository,
-  type ClickHouseExperimentRunProcessingAdapterOptions,
-} from "./repositories/redis/redis.experiment-run-processing.repository.ts";
+
+import type { ExperimentEventingClickHouseResolver } from "./repositories/clickhouse/clickhouse.experiment-clickhouse.repository.ts";
 import {
   ExperimentEventingAdapter,
   type ExperimentRunProcessingPipeline,
   type ExperimentRunEventingIdLookup,
 } from "./repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
-import type { ExperimentEventingClickHouseResolver } from "./repositories/clickhouse/clickhouse.experiment-clickhouse.repository.ts";
+import {
+  RedisExperimentRunProcessingRepository,
+  type ClickHouseExperimentRunProcessingAdapterOptions,
+} from "./repositories/redis/redis.experiment-run-processing.repository.ts";
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
-import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 import { experimentV3Rest, experimentWorkbenchCredential } from "./transport/experiment-v3.rest.ts";
 import {
   experimentWorkbenchCaller,
   experimentWorkbenchRunRest,
 } from "./transport/experiment-workbench-run.rest.ts";
+import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 
 export type { ExperimentAppDependencies };

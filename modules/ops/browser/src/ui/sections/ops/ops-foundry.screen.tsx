@@ -1,13 +1,14 @@
 import { Box, Button, Center, Flex, HStack, Text, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+
+import { useTraceStore } from "../../../features/foundry/behavior/trace.store.ts";
+import { FoundryTransport } from "../../../features/foundry/ui/sections/foundry-transport.tsx";
 import { GenerateConversationDialog } from "../../../features/foundry/ui/sections/generate-conversation-dialog.tsx";
 import { GenerateTraceDialog } from "../../../features/foundry/ui/sections/generate-trace-dialog.tsx";
 import { PlaygroundContent } from "../../../features/foundry/ui/sections/playground-content.tsx";
 import { PresetPicker } from "../../../features/foundry/ui/sections/preset-picker.tsx";
-import { FoundryTransport } from "../../../features/foundry/ui/sections/foundry-transport.tsx";
-import { useTraceStore } from "../../../features/foundry/behavior/trace.store.ts";
 
 const SPLASH_LINES = [
   "Warming up the flux capacitor...",

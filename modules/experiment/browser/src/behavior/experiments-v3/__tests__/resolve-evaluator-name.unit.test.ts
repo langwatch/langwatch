@@ -2,6 +2,7 @@
  * @see specs/experiments-v3/evaluator-naming.feature
  */
 import { describe, expect, it } from "vitest";
+
 import type { EvaluatorConfig } from "../../../model/experiments-v3/types.ts";
 import { resolveEvaluatorName } from "../use-evaluator-name.ts";
 

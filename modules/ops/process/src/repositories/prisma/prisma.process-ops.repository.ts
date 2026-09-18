@@ -1,5 +1,4 @@
 import type { ProcessRef } from "@langwatch/eventing";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,
@@ -8,6 +7,8 @@ import type {
   ProcessOutboxMessageView,
   ProcessWakeRow,
 } from "@langwatch/ops-contract";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type {
   ProcessNameCounts,
   ProcessOpsRepository,
@@ -309,15 +310,15 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     const [rows, totals] = await Promise.all([
       this.prisma.$queryRaw<
         (Omit<
-            DeadOutboxMessageView,
-            "nextAttemptAt" | "leasedUntil" | "createdAt" | "updatedAt"
-          > & {
-            nextAttemptAt: Date;
-            leasedUntil: Date | null;
-            createdAt: Date;
-            updatedAt: Date;
-            traceCarrier: unknown;
-          })[]
+          DeadOutboxMessageView,
+          "nextAttemptAt" | "leasedUntil" | "createdAt" | "updatedAt"
+        > & {
+          nextAttemptAt: Date;
+          leasedUntil: Date | null;
+          createdAt: Date;
+          updatedAt: Date;
+          traceCarrier: unknown;
+        })[]
       >(Prisma.sql`
         -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
         SELECT "id", "processName", "projectId", "processKey", "messageKey",

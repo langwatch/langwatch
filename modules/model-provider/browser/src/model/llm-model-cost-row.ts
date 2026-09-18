@@ -4,8 +4,8 @@
  * module survives for `LLMModelCostDrawer`.
  */
 
-import type { ModelCost as StoredModelCost } from "@langwatch/model-provider-contract";
 import type { WireOf } from "@langwatch/api/web";
+import type { ModelCost as StoredModelCost } from "@langwatch/model-provider-contract";
 
 /** A cost rule as the browser receives it: its instants are ISO strings. */
 type ModelCost = WireOf<StoredModelCost>;

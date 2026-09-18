@@ -1,9 +1,9 @@
 import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
+import { Markdown } from "@langwatch/browser-host/markdown";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { RenderInputOutput } from "@langwatch/trace-browser/surfaces/render-input-output";
-import { Markdown } from "@langwatch/browser-host/markdown";
 import { useEffect, useRef, useState } from "react";
 
 import { isJson } from "../../model/is-json.ts";

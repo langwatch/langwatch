@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { canonicalLogRecordSchema } from "./log-record.ts";
 
 export const recordCanonicalLogCommandDataSchema = canonicalLogRecordSchema;

@@ -10,7 +10,11 @@ import {
   STRICT_ONLY_PII_ENTITIES,
 } from "@langwatch/redaction";
 import { describe, expect, it } from "vitest";
-import { ESSENTIAL_PII_ENTITY_LABELS, STRICT_ADDED_PII_ENTITY_LABELS } from "../pii-entity-labels.ts";
+
+import {
+  ESSENTIAL_PII_ENTITY_LABELS,
+  STRICT_ADDED_PII_ENTITY_LABELS,
+} from "../pii-entity-labels.ts";
 
 const essential = Object.keys(ESSENTIAL_PII_ENTITY_LABELS);
 const strictAdded = Object.keys(STRICT_ADDED_PII_ENTITY_LABELS);
@@ -23,7 +27,9 @@ const redactableIdentities = [...REDACTION_MARKER_ENTITIES].filter(
 describe("given the two PII label maps the custom picker renders", () => {
   describe("when the redaction vocabulary changes", () => {
     it("labels every identity a redaction marker can name", () => {
-      expect([...essential, ...strictAdded].toSorted()).toEqual([...redactableIdentities].toSorted());
+      expect([...essential, ...strictAdded].toSorted()).toEqual(
+        [...redactableIdentities].toSorted(),
+      );
     });
 
     it("never offers the secrets marker as a PII identity", () => {

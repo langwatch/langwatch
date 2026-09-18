@@ -18,6 +18,7 @@ vi.mock("@aws-sdk/client-s3", async () => {
 });
 
 import { UnsupportedStorageSchemeError } from "@langwatch/stored-object-contract";
+
 import { MigrationBlobS3Repository } from "#repositories/s3/s3.object-storage-migration-blob.repository";
 
 const AZURE_URI = "azure-blob://account.blob.core.windows.net/container/proj-123/deadbeef";

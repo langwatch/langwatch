@@ -1,8 +1,8 @@
 import { Button, Field, Heading, HStack, Textarea, VStack } from "@chakra-ui/react";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { useCallback, useEffect, useMemo } from "react";
 import { Play } from "react-feather";
 import { type FieldErrors, useForm } from "react-hook-form";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 
 // Create a simplified field type that matches what we need
 export type InputField = {

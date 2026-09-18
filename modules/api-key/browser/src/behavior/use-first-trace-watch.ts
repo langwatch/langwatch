@@ -3,13 +3,14 @@
 // Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
 
 import { useEffect, useMemo, useState } from "react";
+
+import { useApiKeyHost } from "../model/api-key-host.ts";
 import {
   FIRST_TRACE_POLL_TIMEOUT_MS,
   FIRST_TRACE_REDIRECT_DELAY_MS,
   resolveFirstTracePolling,
   resolveFirstTraceTransition,
 } from "../model/first-trace-policy.ts";
-import { useApiKeyHost } from "../model/api-key-host.ts";
 import { findPersonalProject } from "../model/personal-project.ts";
 import { apiKeyApi } from "./api-key-api.ts";
 

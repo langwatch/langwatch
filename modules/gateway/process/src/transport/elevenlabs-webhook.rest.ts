@@ -1,13 +1,13 @@
-import { GatewayApi } from "@langwatch/gateway-contract";
-import {
-  gatewayElevenLabsSignatureSchema,
-  gatewayElevenLabsWebhookParamsSchema,
-} from "@langwatch/gateway-contract/gateway-elevenlabs-webhook-schemas";
 import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
+import { GatewayApi } from "@langwatch/gateway-contract";
+import {
+  gatewayElevenLabsSignatureSchema,
+  gatewayElevenLabsWebhookParamsSchema,
+} from "@langwatch/gateway-contract/gateway-elevenlabs-webhook-schemas";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 

@@ -4,15 +4,18 @@
  * so none of legacy's JOINs, dedup or fan-out apply. Unsupported shapes throw as routing bugs.
  */
 
-import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
-import type { AnalyticsAggregation,
+import type {
+  AnalyticsAggregation,
   AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
+  BuiltAnalyticsQuery,
+} from "@langwatch/analytics-contract";
+
 import {
   isRollupAvgMetricKey,
   isRollupRollableTraceMetricKey,
   type TraceRollupMetricKey,
 } from "./clickhouse.analytics-route-table.mapper.ts";
+import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import { dateTrunc } from "./clickhouse.timeseries-query-shared.mapper.ts";
 
 const ROLLUP_TABLE = "trace_analytics_rollup" as const;

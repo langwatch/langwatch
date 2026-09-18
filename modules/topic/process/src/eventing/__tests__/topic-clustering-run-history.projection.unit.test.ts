@@ -5,6 +5,7 @@ import {
   type TopicClusteringRunCompletedEventData,
 } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
+
 import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,

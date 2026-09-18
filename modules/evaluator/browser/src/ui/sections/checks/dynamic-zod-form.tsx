@@ -9,26 +9,27 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import React, { useMemo } from "react";
-import { Info, Plus, Trash2, X } from "react-feather";
-import { Controller, type FieldErrors, useFieldArray, useFormContext } from "react-hook-form";
-import { type ZodType, z } from "zod";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { AddModelProviderKey } from "@langwatch/workflow-browser/add-model-provider-key";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
+import { SmallLabel } from "@langwatch/design-system/small-label";
+import { camelCaseToTitleCase, titleCase } from "@langwatch/design-system/string-casing";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { camelCaseToTitleCase, titleCase } from "@langwatch/design-system/string-casing";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   allModelOptions,
   ModelSelector,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { SmallLabel } from "@langwatch/design-system/small-label";
-import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
-import { Switch } from "@langwatch/design-system/switch";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { AddModelProviderKey } from "@langwatch/workflow-browser/add-model-provider-key";
+import React, { useMemo } from "react";
+import { Info, Plus, Trash2, X } from "react-feather";
+import { Controller, type FieldErrors, useFieldArray, useFormContext } from "react-hook-form";
+import { type ZodType, z } from "zod";
+
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 // Simple component to handle model disabled check

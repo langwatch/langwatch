@@ -1,13 +1,13 @@
-import { RuntimeConfig } from "@langwatch/config";
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { dataPrivacyServerConfigDefinition } from "../data-privacy.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({
-    name: "data-privacy",
-    definition: dataPrivacyServerConfigDefinition,
-    source,
-  }).value;
+import { dataPrivacyConfig } from "../data-privacy.config.ts";
+
+const read = (source: Record<string, string | undefined>) =>
+  parseProcessConfig({
+    owners: [{ name: "data-privacy", config: dataPrivacyConfig }],
+    environment: source,
+  })["data-privacy"];
 
 describe("data privacy server configuration", () => {
   describe("given the DLP opt-out is written the way the deployment reads it", () => {

@@ -67,6 +67,9 @@ export class MemoryAnomalyRateTrackerRepository extends AnomalyRateTrackerReposi
     const latest = Math.floor(this.now() / 60_000);
     const span = Math.max(1, Math.ceil(windowSeconds / 60));
 
-    return Array.from({ length: span }, (_unused, offset) => minutes.get(latest - span + 1 + offset) ?? 0);
+    return Array.from(
+      { length: span },
+      (_unused, offset) => minutes.get(latest - span + 1 + offset) ?? 0,
+    );
   }
 }

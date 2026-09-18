@@ -4,8 +4,9 @@
  */
 
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
 import type { ReactNode } from "react";
+import { describe, expect, it } from "vitest";
+
 import { NavigationHostProvider } from "../../model/navigation-host.ts";
 import { StubNavigationHost } from "../../testing.tsx";
 import { useProjectPickGroups } from "../use-project-pick-groups.ts";

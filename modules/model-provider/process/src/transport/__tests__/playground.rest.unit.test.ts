@@ -1,172 +1,93 @@
 /**
  * @vitest-environment node
- * The playground door's own refusals, in the order it makes them.
+ * The playground keeps its released header wire contract while using the standard browser door.
  */
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createErrorHandler } from "@langwatch/api";
+import { createRestRuntime } from "@langwatch/api/rest";
+import type {
+  ModelProviderApi,
+  ModelProviderPlaygroundCompletion,
+  ModelProviderPlaygroundRequest,
+} from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  playgroundRest,
-  playgroundRestCaller,
-  playgroundRestExecutionProxy,
-  playgroundRestModel,
-  playgroundRestProject,
-  playgroundRestSystemPrompt,
-} from "../playground.rest.ts";
+import { playgroundRest } from "../playground.rest.ts";
 import { mountableModelProviderApp } from "./model-provider.harness.ts";
 
 const PROJECT_ID = "project-1";
-
-/** One stored row, as the execution listing hands it over. */
-const disabledProvider = {
-  id: "mp_openai",
-  organizationId: "organization-1",
-  provider: "openai",
-  name: "OpenAI",
-  enabled: false,
-  routingHandle: null,
-  scopes: [{ scopeType: "PROJECT" as const, scopeId: PROJECT_ID }],
-  customKeys: null,
-  customModels: [],
-  customEmbeddingsModels: [],
-  extraHeaders: [],
-  rateLimitRpm: null,
-  rateLimitTpm: null,
-  rateLimitRpd: null,
-  fallbackPriorityGlobal: null,
-  providerConfig: null,
-  deploymentMapping: null,
-  createdAt: new Date("2026-01-01T00:00:00.000Z"),
-  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-  models: null,
-  embeddingsModels: null,
-  isSystem: false,
-  embeddingsUnsupported: false,
-};
-
-const renderUnknown: RestErrorHandler = (_error, c) =>
-  c.json({ error: "internal_server_error" }, 500);
-
-type Caller = { kind: "anonymous" } | { kind: "signedIn"; userId: string; permitted: boolean };
+const MODEL = "openai/gpt-5-mini";
 
 function mount(
   options: {
-    caller?: Caller;
-    projectHeader?: string | null;
-    modelHeader?: string | null;
+    permitted?: boolean;
+    projectHeader?: string;
+    modelHeader?: string;
     modelProviders?: Partial<ModelProviderApi>;
   } = {},
 ) {
   const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });
-  const hono = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("the playground door resolves no credential");
-      },
-    },
-  }).mount(playgroundRest.router(), {
+  const caller = {
+    actor: { type: "user" as const, id: "user-1" },
+    scope: null,
+  };
+  const identity = {
+    identify: () => caller,
+    authenticate: () => caller,
+    authorize: () => ({ permitted: options.permitted ?? true, organizationRole: null }),
+  };
+  const hono = createRestRuntime({ identity }).mount(playgroundRest.router(), {
     app: () => app,
-    credential: "public",
-    onError: renderUnknown,
-    facts: [
-      bindRestMiddleware(
-        playgroundRestCaller,
-        (): Caller => options.caller ?? { kind: "signedIn", userId: "user-1", permitted: true },
-      ),
-      bindRestMiddleware(playgroundRestProject, () =>
-        options.projectHeader === undefined ? PROJECT_ID : options.projectHeader,
-      ),
-      bindRestMiddleware(playgroundRestModel, () =>
-        options.modelHeader === undefined ? "openai/gpt-5-mini" : options.modelHeader,
-      ),
-      bindRestMiddleware(playgroundRestSystemPrompt, () => null),
-      bindRestMiddleware(playgroundRestExecutionProxy, () => "http://nlp.test/go/proxy/v1"),
-    ],
+    onError: createErrorHandler(),
   });
 
   return (body: unknown = { messages: [] }) =>
     hono.fetch(
       new Request("http://api.test/api/playground", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "x-project-id": options.projectHeader ?? PROJECT_ID,
+          "x-model": options.modelHeader ?? MODEL,
+        },
         body: JSON.stringify(body),
       }),
     );
 }
 
 describe("the playground door", () => {
-  describe("given nobody is signed in", () => {
-    describe("when a completion is asked for", () => {
-      it("answers 401 in the sentence this door has always used", async () => {
-        const response = await mount({ caller: { kind: "anonymous" } })();
+  it("checks playground:view against the parsed project header", async () => {
+    const response = await mount({ permitted: false })();
 
-        expect(response.status).toBe(401);
-        await expect(response.json()).resolves.toEqual({
-          error: "You must be logged in to access this endpoint.",
-        });
-      });
-    });
+    expect(response.status).toBe(403);
   });
 
-  describe("given a signed-in person", () => {
-    describe("when the request names no project", () => {
-      it("answers 400 before anything is read", async () => {
-        const response = await mount({ projectHeader: null })();
+  it("passes the released headers to the app operation while keeping project out of JSON", async () => {
+    let received: ModelProviderPlaygroundRequest | undefined;
+    const completion: ModelProviderPlaygroundCompletion = {
+      status: 200,
+      mediaType: "text/plain",
+      headers: { "content-type": "text/plain" },
+      body: (async function* () {
+        yield new TextEncoder().encode("ok");
+      })(),
+    };
+    const response = await mount({
+      modelProviders: {
+        runPlaygroundCompletion: async (input) => {
+          received = input;
 
-        expect(response.status).toBe(400);
-        await expect(response.json()).resolves.toEqual({ error: "Missing projectId header" });
-      });
-    });
+          return completion;
+        },
+      },
+    })({ messages: [{ role: "user", content: "hello" }] });
 
-    describe("when they hold no playground permission on that project", () => {
-      it("answers 403", async () => {
-        const response = await mount({
-          caller: { kind: "signedIn", userId: "user-1", permitted: false },
-        })();
-
-        expect(response.status).toBe(403);
-        await expect(response.json()).resolves.toEqual({
-          error: "You do not have permission to access this endpoint.",
-        });
-      });
-    });
-
-    describe("when the request names no model", () => {
-      it("answers 400", async () => {
-        const response = await mount({ modelHeader: null })();
-
-        expect(response.status).toBe(400);
-        await expect(response.json()).resolves.toEqual({ error: "Missing model header" });
-      });
-    });
-
-    describe("when the project has not configured that provider", () => {
-      it("names the provider it could not find", async () => {
-        const response = await mount({
-          modelProviders: { getExecutionProviders: (async () => ({})) as never },
-        })();
-
-        expect(response.status).toBe(400);
-        await expect(response.json()).resolves.toEqual({
-          error: "Provider not configured: openai",
-        });
-      });
-    });
-
-    describe("when the configured provider is switched off", () => {
-      it("says so, and says where to switch it on", async () => {
-        const response = await mount({
-          modelProviders: {
-            getExecutionProviders: (async () => ({ openai: disabledProvider })) as never,
-          },
-        })();
-
-        expect(response.status).toBe(400);
-        await expect(response.json()).resolves.toEqual({
-          error: "Provider openai is disabled, go to settings to enable it",
-        });
-      });
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe("ok");
+    expect(received).toEqual({
+      projectId: PROJECT_ID,
+      model: MODEL,
+      systemPrompt: null,
+      messages: [{ role: "user", content: "hello" }],
     });
   });
 });

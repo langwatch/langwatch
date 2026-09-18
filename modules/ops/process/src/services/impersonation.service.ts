@@ -4,10 +4,12 @@ import {
   CannotImpersonateWithoutSecondFactorError,
   type StartImpersonationInput,
   type StopImpersonationInput,
-  UserToImpersonateNotFoundError,type AdminAuditRequest
+  UserToImpersonateNotFoundError,
+  type AdminAuditRequest,
 } from "@langwatch/ops-contract";
-import type { AdminAccess } from "./admin-access.service.ts";
 import { type Instant, nowInstant } from "@langwatch/time";
+
+import type { AdminAccess } from "./admin-access.service.ts";
 
 const IMPERSONATION_TTL_MS = 60 * 60 * 1_000;
 

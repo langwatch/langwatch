@@ -1,4 +1,5 @@
-import { type AgentCallSignal,
+import {
+  type AgentCallSignal,
   type AgentConnection,
   type AgentConnectCredentials,
   type AgentConnectFramesInput,
@@ -9,18 +10,20 @@ import { type AgentCallSignal,
   type AgentConnectRegisterAnswer,
   type AgentServerConfig,
   type DispatchAgent,
-  type DispatchCall } from "@langwatch/agent-contract";
+  type DispatchCall,
+} from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { ConnectedAgentRuntimeService } from "./connected-agent-runtime.service.ts";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
+
 import type { AgentService } from "./agent.service.ts";
 import { ConnectedAgentConnectionService } from "./connected-agent-connection.service.ts";
 import { ConnectedAgentCredentialService } from "./connected-agent-credential.service.ts";
 import { LongPollTransportService } from "./connected-agent-long-poll.service.ts";
 import { ConnectedAgentPresenceService } from "./connected-agent-presence.service.ts";
+import { ConnectedAgentRuntimeService } from "./connected-agent-runtime.service.ts";
 import { AgentSessionService } from "./connected-agent-session.service.ts";
 
 export type ConnectedAgentOptions = {

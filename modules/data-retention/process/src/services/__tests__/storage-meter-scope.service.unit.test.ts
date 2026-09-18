@@ -7,6 +7,7 @@ import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contrac
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   type DataRetentionDirectoryReader,
   type RetentionOrganizationDirectory,

@@ -1,10 +1,11 @@
 /** Compact metrics pill for run/group row headers with pass rate, duration, and cost. */
 
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronRight, Clock, Zap } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
+
 import { formatCost, formatLatency } from "../../../model/formatters.ts";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { RunGroupSummary } from "../../../model/run-history-transforms.ts";
 
 function getPassRateGradientColor(passRate: number | null): string {

@@ -1,12 +1,13 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+
 import {
   githubInstallStatePayloadSchema,
   type GithubInstallStatePayload,
 } from "@langwatch/github-contract";
+import { nowInstant } from "@langwatch/time";
 
 import { type GithubInstallState } from "../app/github.members.ts";
 import type { GithubInstallNonceRepository } from "../repositories/github-install-nonce.repository.ts";
-import { nowInstant } from "@langwatch/time";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;
@@ -27,8 +28,7 @@ export class GithubInstallStateService implements GithubInstallState {
   private constructor(
     private readonly signingKey: string,
     private readonly nonces: GithubInstallNonceRepository,
-  ) {
-  }
+  ) {}
 
   getTtlMs(): number {
     return STATE_TTL_MS;

@@ -1,6 +1,7 @@
 import type { SeriesInputType } from "@langwatch/analytics-browser/surfaces/analytics-registry";
 import { buildSeriesName, type TimeseriesBucket } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
+
 import { type AttentionInboxSignals, buildAttentionInbox } from "../../attention-inbox.ts";
 import type { BriefingReceipt } from "../../types.ts";
 import { readGroupedSummaryMetric, readSummaryMetric } from "../use-langy-briefing.ts";

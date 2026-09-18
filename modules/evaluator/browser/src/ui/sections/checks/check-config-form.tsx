@@ -11,18 +11,18 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Edit2, HelpCircle } from "react-feather";
-import { Controller, FormProvider, type Resolver, useFieldArray, useForm } from "react-hook-form";
-import { z } from "zod";
-import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { slugify } from "@langwatch/design-system/slugify";
-import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser/platform-defaults";
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { DEFAULT_MAPPINGS, migrateLegacyMappings,type MappingState,mappingStateSchema } from "@langwatch/dataset-contract";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import {
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
+  type MappingState,
+  mappingStateSchema,
+} from "@langwatch/dataset-contract";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { slugify } from "@langwatch/design-system/slugify";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   evaluatorDisplayName,
   type Evaluators,
@@ -32,18 +32,24 @@ import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser/platform-defaults";
+import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Edit2, HelpCircle } from "react-feather";
+import { Controller, FormProvider, type Resolver, useFieldArray, useForm } from "react-hook-form";
+import { z } from "zod";
+
+import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
 import {
   type CheckPreconditions,
   checkPreconditionsSchema,
 } from "../../../model/evaluations/types.ts";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { PreconditionsField } from "../../elements/checks/preconditions-field.tsx";
 import { EvaluatorTracesMapping } from "../../elements/evaluations/evaluator-traces-mapping.tsx";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import DynamicZodForm from "./dynamic-zod-form.tsx";
 import { EvaluationManualIntegration } from "./evaluation-manual-integration.tsx";
 import { EvaluatorSelection } from "./evaluator-selection.tsx";
-import { PreconditionsField } from "../../elements/checks/preconditions-field.tsx";
 import { TryItOut } from "./try-it-out.tsx";
 
 export interface CheckConfigFormData {

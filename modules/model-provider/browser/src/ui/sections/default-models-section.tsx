@@ -1,10 +1,3 @@
-import type { WireOf } from "@langwatch/api/web";
-/**
- * Default Models — every policy the caller can see, one row per policy.
- * Contract: specs/model-providers/role-based-default-models.feature,
- *           specs/model-providers/model-default-config-cascade.feature.
- */
-
 import {
   Badge,
   Box,
@@ -19,6 +12,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+/**
+ * Default Models — every policy the caller can see, one row per policy.
+ * Contract: specs/model-providers/role-based-default-models.feature,
+ *           specs/model-providers/model-default-config-cascade.feature.
+ */
+import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
 import type {
   ModelDefaultConfigSnapshot,
@@ -38,8 +37,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
+
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
-import type { ScopeFilterValue, ScopeHierarchy } from "../../model/provider-scope-filter.ts";
 import {
   compareConfigsByScopeThenName,
   mostSpecificScope,
@@ -50,6 +49,7 @@ import {
   type ModelRoleKey,
 } from "../../model/default-model-cascade.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import type { ScopeFilterValue, ScopeHierarchy } from "../../model/provider-scope-filter.ts";
 import { filterRowsByScope } from "../../model/provider-scope-filter.ts";
 import { ModelChip } from "../elements/model-chip.tsx";
 

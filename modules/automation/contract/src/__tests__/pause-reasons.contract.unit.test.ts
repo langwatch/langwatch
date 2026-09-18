@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { isAutomationPauseReason, RUNAWAY_PAUSE_REASON } from "../index.ts";
 
 describe("automation pause reasons", () => {

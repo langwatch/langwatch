@@ -4,16 +4,19 @@
  * clickhouse-queries.md's TenantId/partition/dedup rules; throws on unsupported shapes.
  */
 
-import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
-import type { AnalyticsAggregation,
+import type {
+  AnalyticsAggregation,
   AnalyticsFilterValue,
   AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
+  BuiltAnalyticsQuery,
+} from "@langwatch/analytics-contract";
+
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
 import {
   isSlimEligibleTraceMetricKey,
   type SlimTraceMetricKey,
 } from "./clickhouse.analytics-route-table.mapper.ts";
+import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
   appendMetadataValueFilterClauses,
   collectStringValues,

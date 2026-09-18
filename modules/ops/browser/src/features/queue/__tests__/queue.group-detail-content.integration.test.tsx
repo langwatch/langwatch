@@ -4,9 +4,10 @@
  * table refresh and click).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { GroupInfo,OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
+import type { GroupInfo, OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { GroupDetailContent } from "../ui/sections/queue-group-detail-content.tsx";
 
 const NOW = 1_755_100_000_000;

@@ -1,14 +1,18 @@
+import type {
+  FilterField,
+  AnalyticsFilterValue as FilterParam,
+} from "@langwatch/analytics-contract";
 /**
  * `clickHouseFilterConditions` builders translate a filter field's selected
  * values into raw SQL; `generateClickHouseFilterConditions` composes them.
  * Spec: specs/traces/saved-views.feature, modules/analytics/specs/filter-sql-generation.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   clickHouseFilterConditions,
   generateClickHouseFilterConditions,
 } from "../analytics-filter-conditions.rules.ts";
-import type { FilterField,AnalyticsFilterValue as FilterParam } from "@langwatch/analytics-contract";
 
 describe("clickHouseFilterConditions", () => {
   describe("given a filter field backed by one trace_summaries column", () => {

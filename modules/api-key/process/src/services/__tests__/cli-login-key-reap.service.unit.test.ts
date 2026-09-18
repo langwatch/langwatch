@@ -4,11 +4,11 @@
  * Spec: modules/api-key/specs/api-key.feature
  */
 import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
+import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRepository } from "../../repositories/api-key.repository.ts";
 import { CliLoginKeyReapService } from "../cli-login-key-reap.service.ts";
-import { Temporal, type Instant } from "@langwatch/time";
 
 const NOW = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 

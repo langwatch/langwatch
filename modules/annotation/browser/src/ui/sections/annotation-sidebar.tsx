@@ -4,11 +4,12 @@
  */
 
 import { Box, Button, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import type { AnnotationQueuePendingCount } from "@langwatch/annotation-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import { Inbox, MoreVertical, Pencil, Plus, SquarePen, Users } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";
 import { useState } from "react";
-import type { AnnotationQueuePendingCount } from "@langwatch/annotation-contract";
+
 import type { AnnotationView } from "../../model/annotation-view.ts";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 import { SidebarMenuLink } from "../elements/sidebar-menu-link.tsx";

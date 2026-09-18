@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import { getAdaptivePollingInterval } from "../model/get-adaptive-polling-interval.ts";
 import { makeScenarioRunData } from "./test-helpers.ts";
 

@@ -1,16 +1,8 @@
 import { Box, HStack, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
-import { useState } from "react";
-import {
-  AVAILABLE_EVALUATORS,
-  type Evaluator,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
 import {
   langwatchEndpoint,
   langwatchEndpointEnv,
 } from "@langwatch/design-system/langwatch-endpoint-env";
-import { RenderCode } from "@langwatch/workflow-browser/render-code";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -19,6 +11,14 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/studio-dialog";
+import {
+  AVAILABLE_EVALUATORS,
+  type Evaluator,
+  type EvaluatorTypes,
+} from "@langwatch/evaluator-contract";
+import { RenderCode } from "@langwatch/workflow-browser/render-code";
+import { ExternalLink } from "lucide-react";
+import { useState } from "react";
 
 export type EvaluatorApiUsageDialogProps = {
   evaluator: Evaluator | null;

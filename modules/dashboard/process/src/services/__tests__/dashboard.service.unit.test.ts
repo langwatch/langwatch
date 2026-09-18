@@ -14,8 +14,7 @@ import { MemoryDashboardRepository } from "../../repositories/memory/memory.dash
 import { DashboardService } from "../dashboard.service.ts";
 
 class FixedWorkbenchAccess implements WorkbenchAccess {
-  constructor(private readonly enabled: boolean) {
-  }
+  constructor(private readonly enabled: boolean) {}
 
   async isWorkbenchEnabled(): Promise<boolean> {
     return this.enabled;

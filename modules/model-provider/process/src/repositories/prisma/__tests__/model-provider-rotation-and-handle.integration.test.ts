@@ -4,9 +4,9 @@
  * Spec: specs/ai-gateway/instance-routing-handle.feature
  */
 import { randomBytes } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { ModelProvider } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -15,7 +15,8 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createLogger } from "@langwatch/observability";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { ModelProviderCredentialCodec } from "../../../app/model-provider.members.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 

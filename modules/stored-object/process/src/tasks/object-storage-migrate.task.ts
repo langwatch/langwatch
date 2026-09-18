@@ -3,6 +3,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
+
 import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
 import {
   type AzureCredentials,
@@ -10,9 +11,16 @@ import {
 } from "#services/azure-blob-credentials.service";
 import { AzureBlobCredentialsAdapter } from "#services/azure-blob-credentials.service";
 const { assertTokenModeTransportSafety } = AzureBlobCredentialsAdapter;
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import { z } from "zod";
+
 import type { ObjectStorageMigrationInventory } from "#repositories/object-storage-migration-inventory.repository";
+import {
+  MigrationCutoverAuditRedisRepository,
+  type MigrationCutoverRedisConfig,
+} from "#repositories/redis/redis.object-storage-migration-audit.repository";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+
+import { createMigrationStorageEndpoint } from "../rules/object-storage-migration-transfer.rules.ts";
 import {
   ObjectStorageMigrationService,
   type MigrationFinalizeReport,
@@ -20,11 +28,6 @@ import {
   type ObjectStorageMigrationDeps,
   type QueueMigrationBlocker,
 } from "../services/object-storage-migration.service.ts";
-import { createMigrationStorageEndpoint } from "../rules/object-storage-migration-transfer.rules.ts";
-import {
-  MigrationCutoverAuditRedisRepository,
-  type MigrationCutoverRedisConfig,
-} from "#repositories/redis/redis.object-storage-migration-audit.repository";
 
 const logger = createLogger("langwatch:tasks:migrate-object-storage");
 

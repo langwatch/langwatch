@@ -7,6 +7,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   gatePullRequestSessionTitles,
   gateSessionListCost,

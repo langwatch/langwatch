@@ -1,5 +1,6 @@
 import { RoleBindingScopeType } from "@langwatch/organization-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { PersonalTeamScopeReader } from "../../services/personal-team-scope.service.ts";
 
 export type PersonalTeamScopeClient = PrismaClient | Prisma.TransactionClient;
@@ -137,7 +138,8 @@ export class PrismaPersonalTeamScopeRepository {
 export function bindPersonalTeamScopeReader(database: PrismaClient): PersonalTeamScopeReader {
   const scopes = PrismaPersonalTeamScopeRepository.create();
   return {
-    tryFindPersonalTeamInScopes: (input) => scopes.tryFindPersonalTeamInScopes({ client: database, ...input }),
+    tryFindPersonalTeamInScopes: (input) =>
+      scopes.tryFindPersonalTeamInScopes({ client: database, ...input }),
     tryFindForeignPersonalTeamInScopes: (input) =>
       scopes.tryFindForeignPersonalTeamInScopes({ client: database, ...input }),
   };

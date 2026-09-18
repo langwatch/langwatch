@@ -1,7 +1,8 @@
 import type { TriggerFire, TriggerFireStats } from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { TriggerFireHistoryRepository } from "../trigger-fire-history.repository.ts";
 import { toDate, type Instant } from "@langwatch/time";
+
+import { TriggerFireHistoryRepository } from "../trigger-fire-history.repository.ts";
 const mapFire = (row: unknown): TriggerFire => {
   const value = row as Record<string, unknown>;
   return {

@@ -5,8 +5,9 @@ import {
   type AnnotationQueueDetail,
 } from "@langwatch/annotation-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
-import type { Prisma } from "@langwatch/prisma-client/generated";
 import { isRecordNotFoundError } from "@langwatch/prisma-client/errors";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+
 import type {
   AnnotationQueueRepository,
   QueueByIdInput,

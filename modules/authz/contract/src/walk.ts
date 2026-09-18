@@ -1,10 +1,3 @@
-/**
- * Ordered decision steps; ORDER lives in AuthzEngine.decide() (engine.ts).
- * Legacy quirks tagged LEGACY-QUIRK(<stage>) (ADR-092 §2).
- */
-import { bindingGrants, legacyTeamFallbackGrants, findResourceGrant } from "./matchers.ts";
-import { builtinRoleGrants, builtinRolePermissions } from "./roles.ts";
-import type { ScopeChainLink } from "./scope.ts";
 import type {
   AuthzDecision,
   AuthzPrincipalRef,
@@ -13,6 +6,13 @@ import type {
   CollectedGrants,
   ResourceGrant,
 } from "./authz.ts";
+/**
+ * Ordered decision steps; ORDER lives in AuthzEngine.decide() (engine.ts).
+ * Legacy quirks tagged LEGACY-QUIRK(<stage>) (ADR-092 §2).
+ */
+import { bindingGrants, legacyTeamFallbackGrants, findResourceGrant } from "./matchers.ts";
+import { builtinRoleGrants, builtinRolePermissions } from "./roles.ts";
+import type { ScopeChainLink } from "./scope.ts";
 
 /**
  * What every step of the walk reads. `chain` and `chainBindings` are derived

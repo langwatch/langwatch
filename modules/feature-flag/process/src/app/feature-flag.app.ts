@@ -1,8 +1,9 @@
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import {
   FEATURE_FLAG_REGISTRY,
+  FEATURE_FLAGS,
   FeatureFlagApi,
-  resolveFeatureFlagConfig,
+  featureFlagConfig,
   type FeatureFlagApi as FeatureFlagApiContract,
   type AuthenticatedExperimentTarget,
   type AuthenticatedFeatureFlagTargetInput,
@@ -11,9 +12,11 @@ import {
   type ExperimentTenantPolicyForCaller,
   type ExperimentTenantScope,
   type FeatureFlagConfig,
+  type FeatureFlagDefinition,
   type FeatureFlagKey,
   type FeatureFlagReadForCaller,
   type FeatureFlagRules,
+  type FeatureFlagServerConfig,
   type FeatureFlagTarget,
   type FeatureFlagTargetRequestForCaller,
   type FeatureFlagWrite,
@@ -22,15 +25,16 @@ import {
   type OrganizationFeatureFlagsForCaller,
   type PublicAnonymousFlagMap,
 } from "@langwatch/feature-flag-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
+
 import type { FeatureFlagRepositories } from "../repositories/feature-flag.repositories.ts";
+import { CachedFeatureFlagRowAdapter } from "../services/cached-feature-flag-row.service.ts";
 import { FeatureFlagService } from "../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../services/organization-created-at-cache.service.ts";
-import { CachedFeatureFlagRowAdapter } from "../services/cached-feature-flag-row.service.ts";
 import { UncachedFeatureFlagCacheAdapter } from "../services/uncached-feature-flag-cache.service.ts";
 
 /** The operator row as the cache carries it. */
@@ -55,32 +59,30 @@ export interface FeatureFlagCache {
   delete(key: string): Promise<void>;
 }
 
+function isEnvOverridable(definition: FeatureFlagDefinition): boolean {
+  return definition.envOverridable !== false;
+}
+
 /**
- * This deployment's environment overrides: the force-enable list plus every
- * per-flag override, read by env var name via `resolveFeatureFlagConfig` —
- * parsed straight from `.env`, with no extra wiring needed.
+ * Turns the parsed slice's per-flag leaves into the service's `Map`/`Set`
+ * pair: the derived variable wins where it states one, the legacy alias
+ * only where it does not.
  */
-const featureFlagAppConfigSchema: FeatureConfigSchema<FeatureFlagConfig> = {
-  parse: (value: unknown): FeatureFlagConfig => {
-    // The slice is the process's ALREADY-PARSED FeatureFlagConfig: env-var
-    // parsing belongs to the process config layer (`resolveFeatureFlagConfig`
-    // stays exported from the contract for exactly that), and parsing a
-    // parsed record a second time silently emptied the force-enable list —
-    // the process's Map and Set carry no env-var names to read.
-    if (value === undefined) return resolveFeatureFlagConfig({});
-    const config = value as FeatureFlagConfig;
-    if (config.overrides instanceof Map && config.forceEnabled instanceof Set) return config;
-    throw new Error(
-      'The "feature-flag" config slice must be the process\'s resolved FeatureFlagConfig ' +
-        "(resolveFeatureFlagConfig over its own environment), not a raw env record.",
-    );
-  },
-};
+export function assembleFeatureFlagConfig(config: FeatureFlagServerConfig): FeatureFlagConfig {
+  const overrides = new Map<FeatureFlagKey, boolean>();
+  for (const definition of FEATURE_FLAGS) {
+    if (!isEnvOverridable(definition)) continue;
+    const value = config.overrides[definition.key] ?? config.legacy[definition.key];
+    if (value !== undefined) overrides.set(definition.key, value);
+  }
+
+  return { overrides, forceEnabled: new Set<FeatureFlagKey>(config.forceEnable) };
+}
 
 type FeatureFlagSetup = FeatureSetup<
   typeof FeatureFlagApp.dependencies,
   MembersRead<typeof FeatureFlagApp.reads>,
-  FeatureFlagConfig,
+  FeatureFlagServerConfig,
   FeatureFlagRepositories
 >;
 
@@ -91,7 +93,7 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
     projects: ProjectApi,
     organizations: OrganizationApi,
   };
-  static readonly configSchema = featureFlagAppConfigSchema;
+  static readonly config = featureFlagConfig;
   /**
    * No process member: the cache tier `installApiFeatureFlag` used to read
    * was always an uncached stub in every deployment, so `create` builds
@@ -104,10 +106,7 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
   readonly #projects: ProjectApi;
   readonly #organizations: OrganizationApi;
 
-  private constructor(
-    flags: FeatureFlagService,
-    dependencies: FeatureFlagSetup["dependencies"],
-  ) {
+  private constructor(flags: FeatureFlagService, dependencies: FeatureFlagSetup["dependencies"]) {
     this.#flags = flags;
     this.#permissions = dependencies.permissions;
     this.#projects = dependencies.projects;
@@ -124,7 +123,7 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
         cache: UncachedFeatureFlagCacheAdapter.create(),
         now,
       }),
-      config: setup.config,
+      config: assembleFeatureFlagConfig(setup.config),
       registry: FEATURE_FLAG_REGISTRY,
       organizationAges: OrganizationCreatedAtCacheService.create({
         organizations: setup.dependencies.organizations,
@@ -248,9 +247,7 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
     });
   }
 
-  async setExperimentTenantPolicyForCaller(
-    input: ExperimentTenantPolicyForCaller,
-  ): Promise<void> {
+  async setExperimentTenantPolicyForCaller(input: ExperimentTenantPolicyForCaller): Promise<void> {
     await this.authorizeTenantPolicyChange(input.userId, input.scope);
 
     await this.#flags.setExperimentTenantPolicy({
@@ -327,10 +324,7 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
     }
   }
 
-  private async authorizeOrganizationView(
-    userId: string,
-    organizationId: string,
-  ): Promise<void> {
+  private async authorizeOrganizationView(userId: string, organizationId: string): Promise<void> {
     const permitted = await this.#permissions.hasPermission({
       userId,
       permission: "organization:view",

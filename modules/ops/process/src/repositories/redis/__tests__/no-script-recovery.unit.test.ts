@@ -1,5 +1,6 @@
 import type { ChainableCommander } from "ioredis";
 import { describe, expect, it } from "vitest";
+
 import { QueueRedisRepository } from "../queue.repository.ts";
 
 /**

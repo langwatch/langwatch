@@ -16,7 +16,7 @@ import {
   type GithubConnectionAuditEntry,
   type GithubInstallStatePayload,
 } from "@langwatch/github-contract";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";

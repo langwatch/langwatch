@@ -4,10 +4,11 @@
  * @see specs/agents/connected-agents.feature
  */
 import { PRESENCE_TTL_SECONDS } from "@langwatch/agent-contract";
-import { describe, expect, it } from "vitest";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import { ConnectedAgentRegistryService } from "../connected-agent-registry.service.ts";
+import { describe, expect, it } from "vitest";
+
 import type { InstanceMeta } from "../../services/connected-agent-runtime.service.ts";
+import { ConnectedAgentRegistryService } from "../connected-agent-registry.service.ts";
 
 function meta(overrides: Partial<InstanceMeta> = {}): InstanceMeta {
   return {

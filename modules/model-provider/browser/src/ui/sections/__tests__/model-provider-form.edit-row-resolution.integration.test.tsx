@@ -93,9 +93,10 @@ vi.mock("../../../behavior/use-model-provider-api-key-validation.ts", () => ({
 
 import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
 import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
-import { EditModelProviderForm } from "../model-provider-form.tsx";
-import { FakeModelProviderHost } from "../../../testing.tsx";
+
 import { ModelProviderHostProvider } from "../../../model/model-provider-host.ts";
+import { FakeModelProviderHost } from "../../../testing.tsx";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
 import { Wrapper } from "./model-provider-drawer-harness.tsx";
 
 // rowA is the edit TARGET: the wider (organization) scope, absent from the

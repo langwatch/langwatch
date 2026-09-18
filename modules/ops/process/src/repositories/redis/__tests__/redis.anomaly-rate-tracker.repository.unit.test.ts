@@ -1,9 +1,10 @@
-import Redis from "ioredis";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import Redis from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RedisAnomalyRateTrackerRepository } from "../redis.anomaly-rate-tracker.repository.ts";
+
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../../rules/anomaly-constants.rules.ts";
+import { RedisAnomalyRateTrackerRepository } from "../redis.anomaly-rate-tracker.repository.ts";
 
 function redisFake() {
   const redis = new Redis({ lazyConnect: true, enableOfflineQueue: false });

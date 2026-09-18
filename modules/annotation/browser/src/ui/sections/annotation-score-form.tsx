@@ -1,11 +1,12 @@
-import type { AnnotationScoreDataType as AnnotationScoreDataTypeName } from "@langwatch/annotation-contract";
-import { AnnotationScoreDataType } from "../../model/annotation-score-data-type.ts";
 import { Input, Textarea } from "@chakra-ui/react";
+import type { AnnotationScoreDataType as AnnotationScoreDataTypeName } from "@langwatch/annotation-contract";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AnnotationScoreEditor } from "../blocks/annotation-score-editor.tsx";
+
 import { annotationScoresApi } from "../../behavior/annotation-scores-api.ts";
+import { AnnotationScoreDataType } from "../../model/annotation-score-data-type.ts";
 import { useAnnotationScoresHost } from "../../model/annotation-scores-host.ts";
+import { AnnotationScoreEditor } from "../blocks/annotation-score-editor.tsx";
 
 type FormData = {
   name: string;

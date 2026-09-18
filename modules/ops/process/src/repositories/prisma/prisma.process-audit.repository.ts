@@ -1,9 +1,12 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
-
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
-import { ProcessAuditRepository, type ProcessControlAction } from "../process/ops-audit.repository.ts";
+
+import {
+  ProcessAuditRepository,
+  type ProcessControlAction,
+} from "../process/ops-audit.repository.ts";
 
 const TARGET_KIND = "process_instance";
 

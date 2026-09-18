@@ -1,11 +1,9 @@
 import "@testing-library/jest-dom/vitest";
-
 // @vitest-environment jsdom
 /**
  * Switch Dataset on the active dataset tab.
  * @see specs/experiments-v3/dataset-management.feature
  */
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

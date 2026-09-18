@@ -1,9 +1,10 @@
-import { createLogger } from "@langwatch/observability";
-import { Temporal, nowInstant } from "@langwatch/time";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { z } from "zod";
 
 import type { GatewayElevenLabsWebhookAnswer } from "@langwatch/gateway-contract";
+import { createLogger } from "@langwatch/observability";
+import { Temporal, nowInstant } from "@langwatch/time";
+import { z } from "zod";
+
 import {
   GatewayElevenLabsCredentialService,
   type ElevenLabsCredentialCollaborators,

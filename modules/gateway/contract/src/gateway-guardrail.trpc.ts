@@ -4,8 +4,8 @@
  * one through its own configuration.
  */
 
-import { z } from "zod";
 import { defineTrpcContract } from "@langwatch/api/contract";
+import { z } from "zod";
 
 import {
   gatewayGuardrailDirectionSchema,

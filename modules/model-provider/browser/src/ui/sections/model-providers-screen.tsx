@@ -33,22 +33,27 @@ import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 import { BrainCircuit, Edit, MoreVertical, PlugZap, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useAllModelProvidersList } from "../../behavior/use-all-model-providers-list.ts";
 import {
   useModelProviderConnectionTest,
   type ConnectionTestState,
 } from "../../behavior/use-model-provider-connection-test.ts";
-import { MODEL_PROVIDER_MANAGE_PERMISSION, MODEL_PROVIDER_SCOPE_QUERY_KEY, useModelProviderHost } from "../../model/model-provider-host.ts";
-import { CodexCodingDefaultsAskHost } from "./codex-coding-defaults-ask.tsx";
+import {
+  MODEL_PROVIDER_MANAGE_PERMISSION,
+  MODEL_PROVIDER_SCOPE_QUERY_KEY,
+  useModelProviderHost,
+} from "../../model/model-provider-host.ts";
 import {
   addableProviders,
   scopeNamesOf,
   sortProvidersForTable,
 } from "../../model/provider-catalogue.ts";
 import { filterRowsByScope } from "../../model/provider-scope-filter.ts";
-import { DefaultModelsSection } from "./default-models-section.tsx";
 import { modelProviderIcons } from "../elements/model-provider-icons.tsx";
+import { CodexCodingDefaultsAskHost } from "./codex-coding-defaults-ask.tsx";
+import { DefaultModelsSection } from "./default-models-section.tsx";
 
 type ProviderRowData = ReturnType<typeof useAllModelProvidersList>["providers"][number];
 

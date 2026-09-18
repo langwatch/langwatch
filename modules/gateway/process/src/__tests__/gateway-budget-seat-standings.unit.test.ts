@@ -4,13 +4,13 @@
  * comparator is invisible on screen and wrong exactly where it matters.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
 
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { type BucketSpend } from "../app/gateway.members.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {

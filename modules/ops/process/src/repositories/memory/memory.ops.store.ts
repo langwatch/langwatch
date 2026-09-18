@@ -7,10 +7,8 @@ import {
   type SchedulerAuditEntryView,
   type ReplayStatus,
 } from "@langwatch/ops-contract";
-import type {
-  UsageStatsOrganization,
-  UsageStatsProjectCounts,
-} from "../../app/ops.app.ts";
+
+import type { UsageStatsOrganization, UsageStatsProjectCounts } from "../../app/ops.app.ts";
 
 /** One organization's ClickHouse-backed counts, keyed by organization id. */
 export interface MemoryUsageStatsClickHouseCounts {

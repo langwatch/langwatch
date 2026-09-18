@@ -4,6 +4,7 @@
  * Shows target name with icon and summary statistics (similar to V3 TargetHeader).
  */
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { memo } from "react";
 import {
   LuChevronRight,
@@ -14,7 +15,9 @@ import {
   LuTriangleAlert,
   LuTriangleRight,
 } from "react-icons/lu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
+import type { BatchTargetAggregate } from "../batch-evaluation-results.aggregates.ts";
+import type { BatchTargetColumn } from "../batch-evaluation-results.types.ts";
 import {
   formatCost,
   formatLatency,
@@ -24,8 +27,6 @@ import {
   PassRateCircle,
   useInteractiveTooltip,
 } from "./presentation.tsx";
-import type { BatchTargetColumn } from "../batch-evaluation-results.types.ts";
-import type { BatchTargetAggregate } from "../batch-evaluation-results.aggregates.ts";
 
 type BatchTargetHeaderProps = {
   target: BatchTargetColumn;

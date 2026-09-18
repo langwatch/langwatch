@@ -5,10 +5,10 @@
  * could otherwise target another tenant's team or project.
  */
 
-import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 

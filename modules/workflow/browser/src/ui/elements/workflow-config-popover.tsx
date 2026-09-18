@@ -1,7 +1,7 @@
 import { Button, HStack, PopoverTrigger, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
 import { type ReactNode, useEffect, useState } from "react";
 import { X } from "react-feather";
-import { Popover } from "@langwatch/design-system/popover";
 
 export function WorkflowConfigPopover({
   open,

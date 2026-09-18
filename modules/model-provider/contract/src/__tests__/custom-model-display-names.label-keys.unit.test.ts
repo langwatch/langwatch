@@ -1,8 +1,11 @@
+import {
+  toLegacyCompatibleCustomModels,
+  buildCustomModelDisplayNames,
+  modelDisplayLabel,
+} from "@langwatch/model-provider-contract";
 /** Guard dual-keying and fallback contract for custom model display names (#5837). */
 import { describe, expect, it } from "vitest";
-import { toLegacyCompatibleCustomModels,
-  buildCustomModelDisplayNames,
-  modelDisplayLabel } from "@langwatch/model-provider-contract";
+
 import { makeProvider } from "./model-provider.test-helpers.ts";
 
 describe("given a custom model row identified by its row id", () => {

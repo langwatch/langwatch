@@ -16,6 +16,7 @@ import type {
 import type { WireOf } from "@langwatch/api/web";
 import { Bot, Plus } from "lucide-react";
 import { Fragment, type ComponentType, type ReactNode } from "react";
+
 import type { AgentClient, ConnectedAgentBrowser } from "../../model/agent-client.ts";
 
 /**

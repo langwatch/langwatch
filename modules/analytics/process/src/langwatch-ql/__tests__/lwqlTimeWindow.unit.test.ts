@@ -6,15 +6,15 @@
 
 import { describe, expect, it } from "vitest";
 
-import { pinTimezone } from "./pinTimezone.ts";
-
 import { LangWatchQLTimeWindowService } from "../../services/langwatch-ql-time-window.service.ts";
+import { pinTimezone } from "./pinTimezone.ts";
 
 const timeWindows = LangWatchQLTimeWindowService.create();
 import {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,
 } from "@langwatch/analytics-contract";
+
 import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 
 const PERIOD: LangWatchQLParameter[] = [
@@ -229,7 +229,10 @@ describe("given a statement and the window a surface is showing", () => {
     it("defers the declared reserved names rather than refusing them", () => {
       const resolved = timeWindows.resolveTimeWindow({ declared: PERIOD });
 
-      expect(resolved.awaitingTimeWindow).toEqual(["dashboard_context_period_end", "dashboard_context_period_start"]);
+      expect(resolved.awaitingTimeWindow).toEqual([
+        "dashboard_context_period_end",
+        "dashboard_context_period_start",
+      ]);
       expect(resolved.followsTimeWindow).toBe(true);
       expect(resolved.parameters).toBeUndefined();
     });

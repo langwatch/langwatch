@@ -4,9 +4,10 @@
  * pre-filtered deep-link never silently widens to the whole organization.
  */
 
-import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 import type { WireOf } from "@langwatch/api/web";
+import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 import { type Instant, toDate } from "@langwatch/time";
+
 import { readableDate } from "./display-formatters.ts";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */

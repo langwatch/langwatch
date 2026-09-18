@@ -1,15 +1,16 @@
 import { Box, Field, Input, VStack } from "@chakra-ui/react";
+import { UiSlot } from "@langwatch/browser-host/slots";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import type React from "react";
 import { useEffect } from "react";
-import { UiSlot } from "@langwatch/browser-host/slots";
-import { fieldMetadataFor } from "../../model/model-provider-field-metadata.ts";
+
+import { api } from "../../behavior/model-provider-api.ts";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../behavior/use-model-provider-form.ts";
 import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys.ts";
-import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
-import { api } from "../../behavior/model-provider-api.ts";
+import { fieldMetadataFor } from "../../model/model-provider-field-metadata.ts";
 import { isSecretCredentialField } from "../../model/model-provider-helpers.ts";
 import { SmallLabel } from "../elements/small-label.tsx";
 

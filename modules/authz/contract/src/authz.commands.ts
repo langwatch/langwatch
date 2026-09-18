@@ -1,10 +1,6 @@
 import { actorSchema } from "@langwatch/actor";
 import { z } from "zod";
-import {
-  grantableAuthzScopeRefSchema,
-  roleBindingScopeTypeSchema,
-  teamUserRoleSchema,
-} from "./authz.ts";
+
 import {
   grantEventSourceSchema,
   grantShapeRefinement,
@@ -14,6 +10,11 @@ import {
   legacyBindingRoleSchema,
   resourceGrantTermsSchema,
 } from "./authz-grant.events.ts";
+import {
+  grantableAuthzScopeRefSchema,
+  roleBindingScopeTypeSchema,
+  teamUserRoleSchema,
+} from "./authz.ts";
 
 export const ATTACH_GRANT_COMMAND_TYPE = "lw.authz_grant.attach" as const;
 export const CHANGE_GRANT_ROLE_COMMAND_TYPE = "lw.authz_grant.change_role" as const;

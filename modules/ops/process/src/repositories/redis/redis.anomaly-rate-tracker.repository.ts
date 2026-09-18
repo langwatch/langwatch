@@ -1,9 +1,10 @@
-import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { AnomalyRateTrackerRepository } from "../observe/anomaly.repository.ts";
+
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
+import { AnomalyRateTrackerRepository } from "../observe/anomaly.repository.ts";
 
 const logger = createLogger("langwatch:observability:tenantRateTracker");
 
@@ -199,7 +200,11 @@ export class RedisAnomalyRateTrackerRepository extends AnomalyRateTrackerReposit
     }
 
     try {
-      for (let index = 0; index < fields.length; index += RedisAnomalyRateTrackerRepository.trimBatch) {
+      for (
+        let index = 0;
+        index < fields.length;
+        index += RedisAnomalyRateTrackerRepository.trimBatch
+      ) {
         await this.redis.hdel(
           key,
           ...fields.slice(index, index + RedisAnomalyRateTrackerRepository.trimBatch),

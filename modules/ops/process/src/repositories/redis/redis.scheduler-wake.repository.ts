@@ -8,8 +8,7 @@ export interface SchedulerWakeRedis {
 
 /** Best-effort cross-process wake for the app-owned scheduler loop. */
 export class RedisSchedulerWakeRepository implements SchedulerWake {
-  private constructor(private readonly redis: SchedulerWakeRedis) {
-  }
+  private constructor(private readonly redis: SchedulerWakeRedis) {}
 
   static create(redis: SchedulerWakeRedis): RedisSchedulerWakeRepository {
     return new RedisSchedulerWakeRepository(redis);

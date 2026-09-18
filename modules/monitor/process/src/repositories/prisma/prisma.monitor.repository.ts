@@ -1,4 +1,3 @@
-import { Prisma } from "@langwatch/prisma-client/generated";
 import {
   enabledGuardrailMonitorSchema,
   monitorMappingsInputSchema,
@@ -15,10 +14,13 @@ import {
   type MonitorSummary,
   type MonitorToggleInput,
   type MonitorUpdateInput,
-  type MonitorWithEvaluator,MonitorNotFoundError
+  type MonitorWithEvaluator,
+  MonitorNotFoundError,
 } from "@langwatch/monitor-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { isRecordNotFoundError } from "@langwatch/prisma-client/errors";
+import { Prisma } from "@langwatch/prisma-client/generated";
+
 import type { MonitorRepository } from "../monitor.repository.ts";
 
 /** A write that named a row this project does not hold, said by name. */

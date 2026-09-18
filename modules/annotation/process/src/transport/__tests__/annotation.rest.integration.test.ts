@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { annotationRest } from "../annotation.rest.ts";
 
 describe("annotation REST transport declaration", () => {

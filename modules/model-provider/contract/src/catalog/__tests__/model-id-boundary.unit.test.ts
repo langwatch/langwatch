@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { translateModelIdForLitellm } from "../model-id-boundary.ts";
 
 describe("translateModelIdForLitellm", () => {

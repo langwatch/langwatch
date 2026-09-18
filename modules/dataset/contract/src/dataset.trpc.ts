@@ -8,11 +8,6 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import {
-  datasetNameResultSchema,
-  datasetSchema,
-  datasetSummarySchema,
-} from "./dataset.ts";
-import {
   datasetApiCopyInputSchema,
   datasetApiDatasetInputSchema,
   datasetApiDeleteInputSchema,
@@ -23,6 +18,7 @@ import {
   datasetApiUpsertTargetInputSchema,
   datasetApiValidateNameInputSchema,
 } from "./dataset.schemas.ts";
+import { datasetNameResultSchema, datasetSchema, datasetSummarySchema } from "./dataset.ts";
 
 /** What an archive or its undo answers. */
 export const datasetDeletedSchema = z.object({ success: z.literal(true) }).strict();

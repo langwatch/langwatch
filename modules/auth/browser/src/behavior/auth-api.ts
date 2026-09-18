@@ -3,8 +3,8 @@
  * not yet split. Segment names are load-bearing for React Query cache.
  */
 
-import type { frontDoorTrpc } from "@langwatch/auth-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { frontDoorTrpc } from "@langwatch/auth-contract";
 
 /** What an invitation link may say to whoever opens it. */
 export type AuthInviteLanding = {

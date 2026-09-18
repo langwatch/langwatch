@@ -28,7 +28,12 @@ describe("the coding-agent REST families", () => {
           route.permission,
         ]),
       ).toEqual([
-        ["get", "/sessions/:sessionId/events", "getApiCodingAgentSessionsBySessionIdEvents", "traces:view"],
+        [
+          "get",
+          "/sessions/:sessionId/events",
+          "getApiCodingAgentSessionsBySessionIdEvents",
+          "traces:view",
+        ],
       ]);
     });
 
@@ -47,12 +52,7 @@ describe("the coding-agent REST families", () => {
 
     it("keeps the address, the operation id and the permission it asks", () => {
       expect(
-        rollup.routes.map((route) => [
-          route.method,
-          route.path,
-          route.operation,
-          route.permission,
-        ]),
+        rollup.routes.map((route) => [route.method, route.path, route.operation, route.permission]),
       ).toEqual([
         [
           "get",

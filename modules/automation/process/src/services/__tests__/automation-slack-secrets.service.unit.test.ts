@@ -9,7 +9,11 @@ import {
   type SlackActionParams,
 } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { AutomationSlackSecretsService, type AutomationSecretCrypto } from "../automation-slack-secrets.service.ts";
+
+import {
+  AutomationSlackSecretsService,
+  type AutomationSecretCrypto,
+} from "../automation-slack-secrets.service.ts";
 
 /**
  * A stand-in cipher. It hex-encodes rather than wrapping, so a test asserting

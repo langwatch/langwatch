@@ -1,19 +1,20 @@
 // ADR-066 pillar 2: coalescing does not reorder contributions; model calls
 // derive order-dependent fields from call arrival order; see specs.
 
-import type { Event } from "@langwatch/eventing";
-import { processCommandBatch } from "@langwatch/eventing/testing";
-import { describe, expect, it, vi } from "vitest";
 import {
   CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
   CONTRIBUTE_LOG_FACTS_COMMAND_TYPE,
   type ContributeLogFactsCommandData,
 } from "@langwatch/coding-agent-contract";
-import { EventingContributeLogFactsAdapter } from "../../services/contribute-log-facts.service.ts";
+import type { Event } from "@langwatch/eventing";
+import { processCommandBatch } from "@langwatch/eventing/testing";
+import { describe, expect, it, vi } from "vitest";
+
+import { buildTestCodingAgentProcessingPipeline } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
+import { EventingContributeLogFactsAdapter } from "../../services/contribute-log-facts.service.ts";
 import { CodingAgentSessionLogProjection } from "../coding-agent-session-log.projection.ts";
 import { CodingAgentSessionStateProjection } from "../coding-agent-session-state.projection.ts";
-import { buildTestCodingAgentProcessingPipeline } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 
 const TENANT_ID = "tenant-coding-agent-coalescing";
 const SESSION_ID = "session-abc";

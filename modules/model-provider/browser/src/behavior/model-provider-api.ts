@@ -3,12 +3,12 @@
  * from features not yet split. Segment names are load-bearing for React Query cache.
  */
 
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type {
   modelProviderTrpc,
   llmModelCostTrpc,
   translateTrpc,
 } from "@langwatch/model-provider-contract";
-import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 
 type BorrowedProcedures = {
   organization: {

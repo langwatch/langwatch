@@ -1,16 +1,16 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { EventSourcing } from "@langwatch/eventing";
 /**
  * Builds the {@link OpsAppInfrastructure} `apps/api/src/features/ops/ops.composition.ts`
  * (deleted by b383462d96) used to hand-compose. Answers each api-unavailable
  * capability with its named refusal, exactly as that composition did.
  */
 import { PrismaProcessStore, PrismaScheduledJobStore } from "@langwatch/eventing/server";
-import type { EventSourcing } from "@langwatch/eventing";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
-import type { Logger } from "@langwatch/observability";
-import { OpsCapabilityUnavailableError } from "@langwatch/ops-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { ResourceOwnership } from "@langwatch/kernel";
+import type { Logger } from "@langwatch/observability";
+import { OpsCapabilityUnavailableError, type OpsServerConfig } from "@langwatch/ops-contract";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import { EventExplorerClickHouseRepository } from "../repositories/clickhouse/clickhouse.event-explorer.repository.ts";
 import type { EventExplorerClickHouseClient } from "../repositories/clickhouse/clickhouse.event-explorer.repository.ts";
@@ -22,15 +22,14 @@ import type {
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
-import { AdminAuditSink } from "../services/impersonation.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingOpsIntrospectionAdapter } from "../services/eventing.ops-introspection.service.ts";
+import { AdminAuditSink } from "../services/impersonation.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
 import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
 import { OpsOperations } from "./ops-operations.ts";
 import type {
-  OpsAppConfig,
   OpsAppDependencies,
   OpsAppInfrastructure,
   OpsCapability,
@@ -48,6 +47,8 @@ export type OpsProcessMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   eventing: EventSourcing;
   logger: Logger;
+  /** The process's own fact (§6), for the EXPLAIN fail-closed rule. */
+  nodeEnvironment: string | undefined;
 }>;
 
 /** One operator explorer, refused by name on every method. */
@@ -144,7 +145,7 @@ class MemberOpsSnapshotRedis implements OpsSnapshotRedis {
 /** Builds the {@link OpsAppInfrastructure} `OpsApp.create` composes over. */
 export function buildOpsInfrastructure(input: {
   members: OpsProcessMembers;
-  config: OpsAppConfig;
+  config: OpsServerConfig;
   resources: ResourceOwnership;
 }): OpsAppInfrastructure {
   const { members, config, resources } = input;
@@ -161,7 +162,7 @@ export function buildOpsInfrastructure(input: {
   resources.own("api ops snapshot reader", () => snapshots.stop());
 
   const explainRuntime = OpsClickHouseRuntime.create({
-    url: config.opsClickHouseUrl,
+    url: config.clickhouseOpsUrl,
     buildTime: false,
   });
   resources.own("api ops explain client", () => explainRuntime.close());
@@ -170,7 +171,7 @@ export function buildOpsInfrastructure(input: {
   return {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       const operations = OpsOperations.create({
-        adminEmails: config.adminEmails,
+        adminEmails: config.adminEmails ?? "",
         // Once the connection projection decides sign-in, editing the legacy
         // `ssoDomain`/`ssoProvider` strings changes nothing a person
         // experiences, so the backoffice refuses rather than accepting a
@@ -247,8 +248,8 @@ export function buildOpsInfrastructure(input: {
     bugReportRateLimiter: { consume: () => Promise.resolve({ allowed: true }) },
     bugReportNotifier: { notify: () => Promise.resolve() },
     explainClients,
-    findOpsApiKey: () => config.opsApiKey ?? null,
-    isProduction: config.isProduction,
+    findOpsApiKey: () => config.apiKey ?? null,
+    isProduction: members.nodeEnvironment === "production",
     // -- unused by the api role's `OpsApp.create`, kept only because a worker
     // composition builds the same `OpsAppInfrastructure` shape with its own
     // real implementations for these. --------------------------------------

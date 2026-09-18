@@ -3,8 +3,9 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
+
+import type { UserAvatarStorage } from "../../app/user.members.ts";
 import type { UserRepository } from "../../repositories/user.repository.ts";
-import type { UserAvatarStorage } from "../../app/user.app.ts";
 import { UserService } from "../user.service.ts";
 
 const user: UserFullProfile = {

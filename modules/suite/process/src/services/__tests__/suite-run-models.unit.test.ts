@@ -1,14 +1,15 @@
-/**
- * @vitest-environment node
- * @see specs/scenarios/resolved-run-models-on-runs.feature
- */
-import { describe, expect, it, vi } from "vitest";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   JUDGE_MODEL_FEATURE_KEY,
   SIMULATOR_MODEL_FEATURE_KEY,
   type ScenarioApi,
 } from "@langwatch/scenario-contract";
+/**
+ * @vitest-environment node
+ * @see specs/scenarios/resolved-run-models-on-runs.feature
+ */
+import { describe, expect, it, vi } from "vitest";
+
 import { SuiteRunModelsService } from "../suite-run-models.service.ts";
 
 const projectId = "project-1";

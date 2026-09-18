@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
+import { describe, expect, it } from "vitest";
+
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 
 function makePayload(

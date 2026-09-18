@@ -34,16 +34,8 @@ describe("the public evaluation REST family", () => {
         declaration.routes.map((route) => [route.method, route.path, route.operation]),
       ).toEqual([
         ["get", "/api/evaluations/list", "getApiEvaluationsList"],
-        [
-          "post",
-          "/api/evaluations/batch/log_results",
-          "postApiEvaluationsBatchLogResults",
-        ],
-        [
-          "post",
-          "/api/evaluations/:evaluator/evaluate",
-          "postApiEvaluationsByEvaluatorEvaluate",
-        ],
+        ["post", "/api/evaluations/batch/log_results", "postApiEvaluationsBatchLogResults"],
+        ["post", "/api/evaluations/:evaluator/evaluate", "postApiEvaluationsByEvaluatorEvaluate"],
         [
           "post",
           "/api/evaluations/:evaluator/:subpath/evaluate",

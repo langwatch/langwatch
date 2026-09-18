@@ -6,9 +6,8 @@
 
 import { Box, HStack, Table, Text } from "@chakra-ui/react";
 
-import { formatNumber } from "../../model/format.ts";
-
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
+import { formatNumber } from "../../model/format.ts";
 
 /** How many result rows the preview table shows — this is a query tester, not a data grid. */
 const MAX_PREVIEW_ROWS = 20;

@@ -1,5 +1,10 @@
 import { Box, Button, HStack, Portal, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { formatLatency } from "@langwatch/design-system/metric-value-formatters";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
 import type { SerializedHandledError } from "@langwatch/handled-error";
+import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuCheck,
@@ -10,21 +15,17 @@ import {
   LuPlus,
   LuSquare,
 } from "react-icons/lu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { describeCellFailure } from "../../../../model/experiments-v3/cell-failure.ts";
-import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
-import { useDrawer } from "@langwatch/browser-host/drawer";
-import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
-import { parseLLMError } from "../../../../model/format-llm-error.ts";
-import { formatTargetOutput } from "../../../../model/format-target-output.ts";
+
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useCodeEvaluatorIds } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";
 import { useOpenEvaluatorEditor } from "../../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
 import { useTargetName } from "../../../../behavior/experiments-v3/use-target-name.ts";
+import { describeCellFailure } from "../../../../model/experiments-v3/cell-failure.ts";
+import { evaluatorHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
 import type { EvaluatorConfig, TargetConfig } from "../../../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
-import { formatLatency } from "@langwatch/design-system/metric-value-formatters";
-import { evaluatorHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
+import { parseLLMError } from "../../../../model/format-llm-error.ts";
+import { formatTargetOutput } from "../../../../model/format-target-output.ts";
 import { EvaluatorChip } from "./evaluator-chip.tsx";
 
 // Max characters to display for performance reasons

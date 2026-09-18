@@ -6,9 +6,10 @@ import type {
   ExperimentDspyStepSummary,
   ExperimentDspyStepsLookup,
 } from "@langwatch/experiment-contract";
+import { Temporal, toDate } from "@langwatch/time";
+
 import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
-import { Temporal, toDate } from "@langwatch/time";
 
 /**
  * Epoch millis as the value the ClickHouse client binds to a `DateTime64(3)`.

@@ -1,4 +1,3 @@
-import { nowInstant, toDate } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -14,15 +13,15 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { nowInstant, toDate } from "@langwatch/time";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { useReplayStatus } from "../../behavior/use-replay-status.ts";
-import { api } from "../../../../behavior/ops-api.ts";
 import { TenantSelector } from "./tenant-selector.tsx";
-
-import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 const KIND_PALETTE = {
   fold: "blue",
   map: "purple",

@@ -1,6 +1,9 @@
+import {
+  CUSTOM_CHART_PLAYGROUND_FLAG,
+  CustomGraphWritesDisabledForPlaygroundError,
+} from "@langwatch/analytics-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { CUSTOM_CHART_PLAYGROUND_FLAG, CustomGraphWritesDisabledForPlaygroundError } from "@langwatch/analytics-contract";
 
 export class CustomChartPlaygroundAccessService {
   #featureFlags: FeatureFlagApi;
@@ -11,7 +14,10 @@ export class CustomChartPlaygroundAccessService {
     this.#projects = projects;
   }
 
-  static create(input: { featureFlags: FeatureFlagApi; projects: ProjectApi }): CustomChartPlaygroundAccessService {
+  static create(input: {
+    featureFlags: FeatureFlagApi;
+    projects: ProjectApi;
+  }): CustomChartPlaygroundAccessService {
     return new CustomChartPlaygroundAccessService(input.featureFlags, input.projects);
   }
 

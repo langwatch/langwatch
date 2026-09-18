@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { formatDuration, getStatusColor, renderTemplate } from "../http-test-panel.tsx";
 
 describe("renderTemplate", () => {

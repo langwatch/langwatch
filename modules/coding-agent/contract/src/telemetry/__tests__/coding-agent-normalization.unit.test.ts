@@ -4,6 +4,7 @@
  * plausible-looking identifiers would defeat the module's whole purpose.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   declaredCodingAgent,
   detectCodingAgent,

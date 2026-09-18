@@ -27,8 +27,8 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/ksuid": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

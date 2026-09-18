@@ -1,5 +1,21 @@
 import { Box, Button, Circle, HStack, Icon, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { AgentTypeEnum } from "@langwatch/experiment-contract";
+import {
+  computeComparisonColumnTargetAggregate,
+  computeComparisonTargetAggregate,
+  computeTargetAggregates,
+  isRowEmpty,
+  countCellsForTarget,
+  toComparisonConfig,
+  disambiguateNames,
+} from "@langwatch/experiment-contract";
+import { useLatestPromptVersion } from "@langwatch/prompt-browser/latest-prompt-version";
+import { VersionBadge } from "@langwatch/prompt-browser/prompt-version";
+import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { Bot, Swords, Trophy } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import {
@@ -18,13 +34,6 @@ import {
   LuTrash2,
   LuWorkflow,
 } from "react-icons/lu";
-import { Menu } from "@langwatch/design-system/menu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
-import { VersionBadge } from "@langwatch/prompt-browser/prompt-version";
-import { useLatestPromptVersion } from "@langwatch/prompt-browser/latest-prompt-version";
-import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants.ts";
 
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { usePromptTemplateFields } from "../../../../behavior/experiments-v3/use-prompt-template-fields.ts";
@@ -32,15 +41,10 @@ import {
   useTargetName,
   useTargetNames,
 } from "../../../../behavior/experiments-v3/use-target-name.ts";
-import type { AgentTypeEnum } from "@langwatch/experiment-contract";
+import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants.ts";
+import { targetHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
 import type { TargetConfig } from "../../../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
-import {
-  computeComparisonColumnTargetAggregate,
-  computeComparisonTargetAggregate,
-  computeTargetAggregates,isRowEmpty,countCellsForTarget,toComparisonConfig,disambiguateNames
-} from "@langwatch/experiment-contract";
-import { targetHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
 import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
 import { TargetSummary } from "./target-summary.tsx";
 

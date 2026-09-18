@@ -1,4 +1,4 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -6,10 +6,8 @@ import { z } from "zod";
  * the stored-secret cipher key so the pepper can rotate without
  * re-encrypting every credential. Blank still authenticates; not a refusal.
  */
-export const apiKeyServerConfigDefinition = RuntimeConfig.define({
-  pepper: Config.value(z.string().optional(), { env: "API_KEY_PEPPER" }),
-});
+export const apiKeyServerConfig = Config.define((c) => ({
+  pepper: c.env("API_KEY_PEPPER", z.string().optional()),
+}));
 
-export type ApiKeyServerConfig = ConfigValue<typeof apiKeyServerConfigDefinition>;
-
-export const apiKeyServerConfigSchema = compileRuntimeConfig(apiKeyServerConfigDefinition);
+export type ApiKeyServerConfig = ConfigOf<typeof apiKeyServerConfig>;

@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 /**
  * Changing what a member may do: enabling and disabling a seat, and the cascading role update
  * across the organization and its teams.
@@ -11,10 +12,7 @@ import {
   MemberSeatLimitReachedError,
   PersonalWorkspaceNotManagedHereError,
 } from "@langwatch/organization-contract";
-import { HandledError } from "@langwatch/handled-error";
-import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service.ts";
-import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
-import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
+
 import {
   type OrganizationGrantCache,
   type OrganizationPromptSeed,
@@ -26,6 +24,9 @@ import type {
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository.ts";
+import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
+import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
+import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service.ts";
 
 /**
  * The union of permissions granted by the custom roles behind these team bindings, or

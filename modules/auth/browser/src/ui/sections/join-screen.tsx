@@ -1,9 +1,10 @@
 import { useCallback } from "react";
+
+import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import { useRequiredSession } from "../../behavior/use-required-session.ts";
+import { JoinBeforeCreateInterstitial } from "../../ui/blocks/join-before-create-interstitial.tsx";
 import { LoadingScreen } from "../../ui/sections/loading-screen.tsx";
 import { SetupLayout } from "../../ui/sections/setup-layout.tsx";
-import { JoinBeforeCreateInterstitial } from "../../ui/blocks/join-before-create-interstitial.tsx";
-import { useRequiredSession } from "../../behavior/use-required-session.ts";
-import { hardRedirect } from "../../behavior/hard-redirect.ts";
 
 /** Step before workspace creation; interstitial offers join or create path. */
 export default function Join() {

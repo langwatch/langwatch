@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DatasetColumns } from "../dataset.ts";
+
 import {
   convertRowsToColumnTypes,
   convertValueToColumnType,
@@ -10,6 +10,7 @@ import {
   parseJSONL,
   renameReservedColumns,
 } from "../dataset-file.ts";
+import type { DatasetColumns } from "../dataset.ts";
 
 describe("Feature: Dataset File Upload - Upload Utils", () => {
   // ── Format Detection ───────────────────────────────────────────

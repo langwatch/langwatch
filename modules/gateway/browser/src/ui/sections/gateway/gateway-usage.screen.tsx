@@ -13,6 +13,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { neutralizeRows } from "@langwatch/csv";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { BarChart3, Bird, Download, X } from "lucide-react";
 import Parse from "papaparse";
 import { useMemo } from "react";
@@ -26,23 +30,18 @@ import {
   YAxis,
 } from "recharts";
 
-import { neutralizeRows } from "@langwatch/csv";
-
-import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import { api } from "../../../behavior/gateway-api.ts";
+import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { useRollingWindow } from "../../../behavior/use-rolling-window.ts";
 import {
   resolveTracesHrefForKey,
   type TracesWindow,
 } from "../../../features/virtual-keys/model/traces-href-for-key.ts";
 import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
-import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
-import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
-import { useRollingWindow } from "../../../behavior/use-rolling-window.ts";
-import { api } from "../../../behavior/gateway-api.ts";
-import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
 /** A query bag as a query string, dropping the keys that have no value. */
 function queryString(query: Readonly<Record<string, string | undefined>>): string {

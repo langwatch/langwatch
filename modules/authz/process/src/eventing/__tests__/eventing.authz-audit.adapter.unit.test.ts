@@ -7,14 +7,15 @@ import {
   ROLE_DEFINED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
 import { createTenantId } from "@langwatch/eventing";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import {
   AuthzAuditTrailStore,
   type AuthzAuditRow,
 } from "../../repositories/authz-audit-trail.repository.ts";
-import { EventingAuthzAuditAdapter } from "../authz-grant.subscriber.ts";
 import type { AuthzGrantsEvent } from "../authz-grant.events.ts";
-import { Temporal } from "@langwatch/time";
+import { EventingAuthzAuditAdapter } from "../authz-grant.subscriber.ts";
 
 const TENANT_ID = "org_acme";
 const OCCURRED_AT = 1_700_000_000_000;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { buildRollupTimeseriesQuery } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 

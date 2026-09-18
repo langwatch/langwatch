@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { BetterAuthAnnouncements } from "../../channels/better-auth.channel.ts";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,

@@ -1,3 +1,8 @@
+import {
+  createRestRuntime,
+  type IdempotentRunner,
+  type RestErrorHandler,
+} from "@langwatch/api/rest";
 /**
  * The four provider-binding addresses answer 410 on the in-memory runtime.
  * Mounted rather than called directly, because the fact under test is what a
@@ -5,7 +10,6 @@
  */
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { createRestRuntime, type IdempotentRunner, type RestErrorHandler } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 

@@ -1,8 +1,5 @@
-import {
-  WebhookEventsRepository,
-  type WebhookEventsPage,
-} from "../webhook-events.repository.ts";
 import type { WebhookSpendEventRow } from "../../services/webhook-envelope.service.ts";
+import { WebhookEventsRepository, type WebhookEventsPage } from "../webhook-events.repository.ts";
 
 function idSuffixFor(status: WebhookSpendEventRow["status"]): string {
   return status === "settled" ? "settled" : status === "admitted" ? "admitted" : "completed";
@@ -39,9 +36,13 @@ export class MemoryWebhookEventsRepository extends WebhookEventsRepository {
     const start = input.cursor ? Number(input.cursor) : 0;
     const matching = this.#rows
       .filter((row) => input.tenantIds.includes(row.tenantId))
-      .filter((row) => input.fromMs === undefined || row.occurredAt.epochMilliseconds >= input.fromMs)
+      .filter(
+        (row) => input.fromMs === undefined || row.occurredAt.epochMilliseconds >= input.fromMs,
+      )
       .filter((row) => input.toMs === undefined || row.occurredAt.epochMilliseconds < input.toMs)
-      .toSorted((left, right) => right.occurredAt.epochMilliseconds - left.occurredAt.epochMilliseconds);
+      .toSorted(
+        (left, right) => right.occurredAt.epochMilliseconds - left.occurredAt.epochMilliseconds,
+      );
     const page = matching.slice(start, start + input.limit);
 
     return {

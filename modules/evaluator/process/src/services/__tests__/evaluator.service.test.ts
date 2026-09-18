@@ -1,5 +1,3 @@
-import { describe, expect, it, vi } from "vitest";
-import { ZodError } from "zod";
 import {
   EvaluatorInvalidConfigError,
   EvaluatorNotFoundError,
@@ -10,6 +8,8 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 
 import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";

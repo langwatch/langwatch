@@ -11,6 +11,7 @@ import {
   type UpsertAnnotationScoreInput,
 } from "@langwatch/annotation-contract";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import type { AnnotationScoreRepository } from "../annotation-score.repository.ts";
 import { MemoryAnnotationQueueDatabase } from "./memory.annotation-queue.database.ts";
 

@@ -16,6 +16,7 @@ import {
 } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
 import { ExternalLink, FileClock, KeyRound, TriangleAlert, Users } from "lucide-react";
+
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 

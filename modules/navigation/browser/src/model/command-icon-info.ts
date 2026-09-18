@@ -1,7 +1,8 @@
 import { Folder } from "lucide-react";
-import { type FeatureKey, featureIcons } from "./feature-icons.ts";
+
 import { iconColors } from "./command-bar-constants.ts";
 import type { Command, RecentItem, SearchResult } from "./command-bar-types.ts";
+import { type FeatureKey, featureIcons } from "./feature-icons.ts";
 
 /**
  * Unified item type for keyboard navigation.

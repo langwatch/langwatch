@@ -4,8 +4,9 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import BugReportsView from "../ui/sections/bug-reports-view.tsx";
+
 import { renderWithOpsHost } from "../../../testing.tsx";
+import BugReportsView from "../ui/sections/bug-reports-view.tsx";
 
 const listState = vi.hoisted(() => ({
   current: {

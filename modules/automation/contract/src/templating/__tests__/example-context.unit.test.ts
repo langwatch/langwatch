@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { AlertType } from "../../providers.ts";
 import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "../example-context.ts";
 

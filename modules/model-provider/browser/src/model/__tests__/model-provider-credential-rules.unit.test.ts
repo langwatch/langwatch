@@ -1,8 +1,9 @@
+import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";
 // Tests credential rules against real schema (not mocked) to prevent drift
 // between schema and requiredness logic
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";
+
 import {
   getDisplayKeysForProvider,
   getEmptyRequiredCredentialKeys,

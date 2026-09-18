@@ -1,10 +1,11 @@
+import type { EvaluatorConfig, ExecutionCell } from "@langwatch/experiment-contract";
 /**
  * The dispatch guard: an evaluator handed nothing to read reports that, rather
  * than comparing empty to empty and reporting a pass that counts.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
 import { describe, expect, it } from "vitest";
-import type { EvaluatorConfig, ExecutionCell } from "@langwatch/experiment-contract";
+
 import { ExperimentEvaluatorInputService } from "../experiment-evaluator-input.service.ts";
 import type { LoadedEvaluators } from "../experiment-execution-data.service.ts";
 

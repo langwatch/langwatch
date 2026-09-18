@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
+
 import { ProcessOpsPrismaRepository } from "../prisma.process-ops.repository.ts";
 
 /**

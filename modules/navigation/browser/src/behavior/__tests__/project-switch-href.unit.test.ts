@@ -1,6 +1,7 @@
 /** Tests projectSwitchHref, which reads route boundaries from matched pattern instead of a table */
 
 import { describe, expect, it } from "vitest";
+
 import { projectSwitchHref } from "../use-project-pick-groups.ts";
 
 describe("projectSwitchHref", () => {

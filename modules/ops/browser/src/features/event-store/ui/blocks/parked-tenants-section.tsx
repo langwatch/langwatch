@@ -3,6 +3,7 @@ import type { ParkedTenant } from "@langwatch/ops-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
+
 import { formatCount, formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 

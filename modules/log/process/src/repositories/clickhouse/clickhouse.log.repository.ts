@@ -1,13 +1,14 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogApi, LogProcessingEvent } from "@langwatch/log-contract";
+
 import type { LogRedaction } from "../../app/log.members.ts";
-import { CanonicalLogAdapter } from "../../services/canonical-log.service.ts";
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../../eventing/log.pipeline.ts";
+import { CanonicalLogAdapter } from "../../services/canonical-log.service.ts";
 import { LogService } from "../../services/log.service.ts";
 import type { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
+import { NullCanonicalLogRecordRepository } from "../null/null.canonical-log-record.repository.ts";
 import type { LogClickHouseClientResolver } from "./clickhouse.canonical-log-record-append.repository.ts";
 import { ClickHouseCanonicalLogRecordRepository } from "./clickhouse.canonical-log-record.repository.ts";
-import { NullCanonicalLogRecordRepository } from "../null/null.canonical-log-record.repository.ts";
 
 /** Process composition for the log service and its durable processing pipeline. */
 export class ClickhouseLogRepository {

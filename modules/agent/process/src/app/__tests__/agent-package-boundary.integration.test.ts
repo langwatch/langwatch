@@ -4,9 +4,10 @@
  * @see modules/agent/specs/package-boundary.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { agentTrpcTransport } from "../../transport/agent.trpc.ts";
-import { agentTrpcCaller } from "../../transport/__tests__/agent-trpc.fixture.ts";
+
 import { buildAgentApps } from "../../transport/__tests__/agent-rest.fixture.ts";
+import { agentTrpcCaller } from "../../transport/__tests__/agent-trpc.fixture.ts";
+import { agentTrpcTransport } from "../../transport/agent.trpc.ts";
 
 const PROJECT_ID = "project_agents";
 const OTHER_PROJECT_ID = "project_elsewhere";

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import type { WebhookSpendEventRow } from "../services/webhook-envelope.service.ts";
 import type {
   AdmitSpendCommandData,
   ConfirmSpendCommandData,
@@ -10,7 +11,6 @@ import type {
   SpendAttribution,
   WebhookDeliveryState,
 } from "./webhook-delivery-contract.rules.ts";
-import type { WebhookSpendEventRow } from "../services/webhook-envelope.service.ts";
 
 /** The columns admission's attribution owns. A row whose process instance
  *  never saw an `admitted` event still needs every one of them, so each

@@ -1,10 +1,11 @@
+import { resolveRequestBound } from "@langwatch/plans";
 /**
  * The registry enterprise ceiling is the outer validation shell for inline
  * row data: above 4000 rows refuses at the schema. The execution data load
  * refuses above the caller's tier, so the bound holds at every entry.
  */
 import { describe, expect, it } from "vitest";
-import { resolveRequestBound } from "@langwatch/plans";
+
 import { executionRequestSchema, runInputsBodySchema } from "../workbench/execution/types.ts";
 
 const ENTERPRISE_ROWS = resolveRequestBound("experimentInlineRowsMax", "ENTERPRISE");

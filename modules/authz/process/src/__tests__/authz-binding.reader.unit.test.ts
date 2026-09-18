@@ -1,8 +1,9 @@
 import type { AuthzAccessBinding } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
-import { AuthzBindingReaderService } from "../services/authz-binding-reader.service.ts";
+
 import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { AuthzBindingReaderService } from "../services/authz-binding-reader.service.ts";
 
 const createdAt = new Date("2026-08-20T12:00:00.000Z");
 

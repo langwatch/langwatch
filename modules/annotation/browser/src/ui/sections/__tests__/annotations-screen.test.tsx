@@ -1,8 +1,9 @@
 /** @vitest-environment jsdom */
 
-import { screen } from "@testing-library/react";
 import { Temporal } from "@langwatch/time";
+import { screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { renderWithAnnotationHost } from "../../../testing.tsx";
 
 const mocks = vi.hoisted(() => ({

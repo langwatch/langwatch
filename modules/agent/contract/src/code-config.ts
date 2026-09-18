@@ -9,6 +9,8 @@ export const DEFAULT_CODE = `class Code:
 `;
 
 export function getCodeFromConfig(config: AgentConfig): string {
+  if (!("parameters" in config)) return DEFAULT_CODE;
+
   const parameter = config.parameters?.find(
     (field) => "identifier" in field && field.identifier === "code" && field.type === "code",
   );

@@ -24,10 +24,7 @@ export function useDashboardWidgetInPlaceEditor({
   projectSlug: string;
   timeWindow: { start: number; end: number };
   onClose: () => void;
-  onSave: (args: {
-    draft: DashboardWidgetDraft;
-    onSuccess: () => void;
-  }) => void;
+  onSave: (args: { draft: DashboardWidgetDraft; onSuccess: () => void }) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"code" | "queries">("code");
   const draft = useWidgetDraft({ widget });

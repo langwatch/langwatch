@@ -5,6 +5,7 @@
  */
 
 import type { ComponentType } from "react";
+
 import type { CustomGraphScreenMode } from "./ui/sections/analytics/custom-graph.screen.tsx";
 
 /** A screen that needs nothing from the route beyond its host. */

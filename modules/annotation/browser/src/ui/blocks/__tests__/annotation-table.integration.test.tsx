@@ -2,10 +2,11 @@
 
 import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Temporal } from "@langwatch/time";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { type AnnotationRow } from "../../../model/annotation-row.ts";
 import { AnnotationTable } from "../annotation-table.tsx";
 

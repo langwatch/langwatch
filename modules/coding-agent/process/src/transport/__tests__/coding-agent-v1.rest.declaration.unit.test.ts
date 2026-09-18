@@ -25,13 +25,12 @@ describe("the coding-agent v1 REST family", () => {
       expect(
         declaration.routes.map((route) => [route.method, route.path, route.operation]),
       ).toEqual([
-          [
-            "get",
-            "/api/v1/coding-agent/pull-request-usage",
-            "getOrganizationCodingAgentPullRequestUsage",
-          ],
+        [
+          "get",
+          "/api/v1/coding-agent/pull-request-usage",
+          "getOrganizationCodingAgentPullRequestUsage",
         ],
-      );
+      ]);
     });
 
     it("names no permission: the cut is the caller's own, resolved per project", () => {

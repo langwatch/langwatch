@@ -2,9 +2,10 @@
  * The rule that turns an SDK's `experiment_slug` into an experiment row.
  */
 import type { Experiment, ExperimentType } from "@langwatch/experiment-contract";
-import type { ExperimentService } from "./experiment.service.ts";
 import { generate } from "@langwatch/ksuid";
 import originalSlugify from "slugify";
+
+import type { ExperimentService } from "./experiment.service.ts";
 
 /**
  * The app's KSUID resource for an experiment row (`KSUID_RESOURCES.EXPERIMENT`).

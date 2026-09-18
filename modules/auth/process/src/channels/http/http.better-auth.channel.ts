@@ -14,16 +14,17 @@ import {
   requestPathname,
   type AuthApi,
 } from "@langwatch/auth-contract";
-import { createLogger } from "@langwatch/observability";
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
-import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
-import type { UserApi } from "@langwatch/user-contract";
+import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { UserApi } from "@langwatch/user-contract";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
+
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,

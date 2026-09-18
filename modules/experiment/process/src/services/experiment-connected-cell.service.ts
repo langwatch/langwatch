@@ -4,7 +4,6 @@
  * queue rather than a failure, so the turn is retried inside a bounded budget with jitter.
  */
 
-import type { WorkflowService } from "@langwatch/workflow-process";
 import {
   BUSY_RETRY_AFTER_MS,
   DEFAULT_CALL_TIMEOUT_MS,
@@ -13,7 +12,8 @@ import {
   type CallOutcome,
   type ConnectedAgentConfig,
   type DispatchAgent,
-  type DispatchCall,type Agent as TypedAgent
+  type DispatchCall,
+  type Agent as TypedAgent,
 } from "@langwatch/agent-contract";
 import {
   CONNECTED_OUTPUT_FIELD,
@@ -22,7 +22,9 @@ import {
   type ExecutionCell,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import { generateOtelSpanId, generateOtelTraceId } from "@langwatch/trace-contract";
+import type { WorkflowService } from "@langwatch/workflow-process";
 
 import { buildEvaluatorCellWorkflow } from "../eventing/experiment-cell-workflow.process.ts";
 import {
@@ -33,11 +35,10 @@ import {
   connectedOutputText,
 } from "../eventing/experiment-connected-target.process.ts";
 import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
-import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
-import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
+import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * Dispatches one turn to a connected agent, through the runtime a live SDK

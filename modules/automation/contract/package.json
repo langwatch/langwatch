@@ -20,9 +20,9 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "croner": "catalog:",

@@ -63,100 +63,102 @@ export function createAutomationRest(): Readonly<{
   namespace: string;
   router: () => RestTransportDeclaration<AutomationApi>;
 }> {
-  return defineRestRouter(AutomationApi)
-    .withNamespace("triggers")
-    .withVersion(MANAGEMENT_API_VERSION)
+  return (
+    defineRestRouter(AutomationApi)
+      .withNamespace("triggers")
+      .withVersion(MANAGEMENT_API_VERSION)
 
-    .get("/", "getApiTriggers")
-    .withPermission("triggers:view")
-    .withOutput(z.array(automationRestResponseSchema))
-    .withDocs({
-      tags: ["Triggers"],
-      description: "List all active triggers (automations) for the project",
-    })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, scope }, project) => {
-      logger.info({ projectId: scope.id }, "Listing triggers");
+      .get("/", "getApiTriggers")
+      .withPermission("triggers:view")
+      .withOutput(z.array(automationRestResponseSchema))
+      .withDocs({
+        tags: ["Triggers"],
+        description: "List all active triggers (automations) for the project",
+      })
+      .withMiddleware(projectRestFacts)
+      .handle(async ({ app, scope }, project) => {
+        logger.info({ projectId: scope.id }, "Listing triggers");
 
-      const triggers = await app.getAllForProject({ projectId: scope.id });
+        const triggers = await app.getAllForProject({ projectId: scope.id });
 
-      return triggers.map((trigger) =>
-        automationWire({ app, projectSlug: project.projectSlug, trigger }),
-      );
-    })
+        return triggers.map((trigger) =>
+          automationWire({ app, projectSlug: project.projectSlug, trigger }),
+        );
+      })
 
-    .get("/:id", "getApiTriggersById")
-    .withParams(automationRestIdParamsSchema)
-    .withPermission("triggers:view")
-    .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
-    .withDocs({
-      tags: ["Triggers"],
-      description: "Get a trigger by its ID",
-    })
-    .withMiddleware(projectRestFacts)
-    .handle(({ app, input, scope }, project) =>
-      readAutomation({ app, id: input.id, projectId: scope.id, project }),
-    )
+      .get("/:id", "getApiTriggersById")
+      .withParams(automationRestIdParamsSchema)
+      .withPermission("triggers:view")
+      .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
+      .withDocs({
+        tags: ["Triggers"],
+        description: "Get a trigger by its ID",
+      })
+      .withMiddleware(projectRestFacts)
+      .handle(({ app, input, scope }, project) =>
+        readAutomation({ app, id: input.id, projectId: scope.id, project }),
+      )
 
-    // Creating asks for `triggers:create`; `:manage` still implies it, so no
-    // existing caller changes and a viewer is declined as before.
-    .post("/", "postApiTriggers")
-    .withInput(automationRestCreateInputSchema)
-    .withPermission("triggers:create")
-    .withOutput(automationRestResponseSchema)
-    .withStatus(201)
-    .withDocs({
-      tags: ["Triggers"],
-      description: "Create a new trigger (automation)",
-    })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) => {
-      logger.info({ projectId: scope.id }, "Creating trigger");
+      // Creating asks for `triggers:create`; `:manage` still implies it, so no
+      // existing caller changes and a viewer is declined as before.
+      .post("/", "postApiTriggers")
+      .withInput(automationRestCreateInputSchema)
+      .withPermission("triggers:create")
+      .withOutput(automationRestResponseSchema)
+      .withStatus(201)
+      .withDocs({
+        tags: ["Triggers"],
+        description: "Create a new trigger (automation)",
+      })
+      .withMiddleware(projectRestFacts)
+      .handle(async ({ app, input, scope }, project) => {
+        logger.info({ projectId: scope.id }, "Creating trigger");
 
-      // This route only ever writes trace automations - it carries no graph or
-      // report shape - so a condition is always required. The rule is the
-      // application's, and the tRPC surface writes through the same operation.
-      const trigger = await app.createTraceAutomation({
-        id: ksuid("trigger").toString(),
-        name: input.name,
-        action: input.action,
-        actionParams: input.actionParams,
-        filters: input.filters ?? {},
-        projectId: scope.id,
-        message: input.message ?? null,
-        alertType: input.alertType ?? null,
-      });
+        // This route only ever writes trace automations - it carries no graph or
+        // report shape - so a condition is always required. The rule is the
+        // application's, and the tRPC surface writes through the same operation.
+        const trigger = await app.createTraceAutomation({
+          id: ksuid("trigger").toString(),
+          name: input.name,
+          action: input.action,
+          actionParams: input.actionParams,
+          filters: input.filters ?? {},
+          projectId: scope.id,
+          message: input.message ?? null,
+          alertType: input.alertType ?? null,
+        });
 
-      return automationWire({ app, projectSlug: project.projectSlug, trigger });
-    })
+        return automationWire({ app, projectSlug: project.projectSlug, trigger });
+      })
 
-    .patch("/:id", "patchApiTriggersById")
-    .withParams(automationRestIdParamsSchema)
-    .withInput(automationRestUpdateInputSchema)
-    .withPermission("triggers:update")
-    .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
-    .withDocs({
-      tags: ["Triggers"],
-      description: "Update a trigger (name, active state, message, filters)",
-    })
-    .withMiddleware(projectRestFacts)
-    .handle(({ app, input, scope }, project) =>
-      editAutomation({ app, input, projectId: scope.id, project }),
-    )
+      .patch("/:id", "patchApiTriggersById")
+      .withParams(automationRestIdParamsSchema)
+      .withInput(automationRestUpdateInputSchema)
+      .withPermission("triggers:update")
+      .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
+      .withDocs({
+        tags: ["Triggers"],
+        description: "Update a trigger (name, active state, message, filters)",
+      })
+      .withMiddleware(projectRestFacts)
+      .handle(({ app, input, scope }, project) =>
+        editAutomation({ app, input, projectId: scope.id, project }),
+      )
 
-    // Destruction deliberately stays at `:manage`.
-    .delete("/:id", "deleteApiTriggersById")
-    .withParams(automationRestIdParamsSchema)
-    .withPermission("triggers:manage")
-    .responds({ 200: automationRestDeletedSchema, 404: badRequestSchema })
-    .withDocs({
-      tags: ["Triggers"],
-      description: "Delete (soft-delete) a trigger",
-    })
-    .handle(({ app, input, scope }) =>
-      removeAutomation({ app, id: input.id, projectId: scope.id }),
-    )
-    .build();
+      // Destruction deliberately stays at `:manage`.
+      .delete("/:id", "deleteApiTriggersById")
+      .withParams(automationRestIdParamsSchema)
+      .withPermission("triggers:manage")
+      .responds({ 200: automationRestDeletedSchema, 404: badRequestSchema })
+      .withDocs({
+        tags: ["Triggers"],
+        description: "Delete (soft-delete) a trigger",
+      })
+      .handle(({ app, input, scope }) =>
+        removeAutomation({ app, id: input.id, projectId: scope.id }),
+      )
+      .build()
+  );
 }
 
 /** The project facts a row is written with, as the mount resolves them. */

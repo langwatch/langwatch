@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { SuiteRepositories } from "../suite.repositories.ts";
 import { PrismaSuiteRepository } from "./prisma.suite.repository.ts";
 

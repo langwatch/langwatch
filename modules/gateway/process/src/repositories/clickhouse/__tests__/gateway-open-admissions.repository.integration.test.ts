@@ -15,15 +15,16 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../../eventing/gateway-spend-settlement.intent.ts";
+import type { GatewaySpendState } from "../../../eventing/gateway-spend.projection.ts";
+import type { OpenAdmission } from "../../../repositories/gateway-open-admissions.repository.ts";
+import { ClickHouseGatewayOpenAdmissionsRepository } from "../clickhouse.gateway-open-admissions.repository.ts";
+import { GatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
-import { GatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
-import { ClickHouseGatewayOpenAdmissionsRepository } from "../clickhouse.gateway-open-admissions.repository.ts";
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../../eventing/gateway-spend-settlement.intent.ts";
-import type { OpenAdmission } from "../../../repositories/gateway-open-admissions.repository.ts";
-import type { GatewaySpendState } from "../../../eventing/gateway-spend.projection.ts";
 
 const chUrl = testClickHouseUrl();
 

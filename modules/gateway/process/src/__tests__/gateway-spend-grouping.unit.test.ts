@@ -1,12 +1,11 @@
-/**
- * @vitest-environment node
- */
-import { describe, expect, it } from "vitest";
-
 import {
   FixedGatewaySettlementPolicyService,
   GatewaySpendGroupingAdapter,
 } from "@langwatch/gateway-process";
+/**
+ * @vitest-environment node
+ */
+import { describe, expect, it } from "vitest";
 
 const spendGrouping = GatewaySpendGroupingAdapter.create();
 

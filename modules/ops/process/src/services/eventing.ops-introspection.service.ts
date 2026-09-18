@@ -1,4 +1,5 @@
 import { killSwitchDescriptorsFor, type StaticPipelineDefinition } from "@langwatch/eventing";
+
 import {
   type OpsEventingIntrospection,
   type OpsDejaViewProjection,
@@ -15,8 +16,7 @@ type AnyPipelineDefinition = StaticPipelineDefinition<any, any, any>;
  * during boot and an explorer may be built before the last one lands.
  */
 export class EventingOpsIntrospectionAdapter implements OpsEventingIntrospection {
-  private constructor(private readonly definitions: () => readonly AnyPipelineDefinition[]) {
-  }
+  private constructor(private readonly definitions: () => readonly AnyPipelineDefinition[]) {}
 
   static create(
     definitions: () => readonly AnyPipelineDefinition[],

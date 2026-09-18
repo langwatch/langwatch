@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { EvaluationAnalyticsFoldProjection } from "../eventing/evaluation-analytics-fold.projection.ts";
 import { EvaluationAnalyticsStore } from "../eventing/evaluation-attributes.store.ts";
 

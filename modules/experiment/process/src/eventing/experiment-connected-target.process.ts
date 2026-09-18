@@ -3,11 +3,11 @@
  * See ADR-128 and specs/experiments-v3/connected-agent-target.feature for the full contract.
  */
 
-import type { SerializedHandledError } from "@langwatch/handled-error";
-import { HandledError } from "@langwatch/handled-error";
-import { CONNECTED_INPUT_FIELD, UNNAMED_FAILURE } from "@langwatch/experiment-contract";
 // The relay's wire shapes (ADR-128), which the Agent feature package owns.
 import type { CallOutput, ProtocolMessage } from "@langwatch/agent-contract";
+import { CONNECTED_INPUT_FIELD, UNNAMED_FAILURE } from "@langwatch/experiment-contract";
+import type { SerializedHandledError } from "@langwatch/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 
 /**

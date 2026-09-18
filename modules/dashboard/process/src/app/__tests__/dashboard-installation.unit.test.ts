@@ -12,7 +12,7 @@ import {
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(dashboardServer)])
-    .withConfig({ dashboard: { baseHost: "" } })
+    .withMember("publicBaseUrl", undefined)
     .provide({
       analytics: createDashboardTestAnalytics(),
       automation: createDashboardTestAutomation(),

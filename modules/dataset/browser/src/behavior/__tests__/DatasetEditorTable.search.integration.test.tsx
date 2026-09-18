@@ -5,11 +5,11 @@
  * the grid while a search is in effect.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { DatasetEditorTable } from "../../ui/sections/datasets/editor/dataset-editor-table.tsx";
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({

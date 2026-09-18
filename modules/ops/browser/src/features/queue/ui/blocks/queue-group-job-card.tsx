@@ -1,9 +1,10 @@
 import { Badge, Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
-import { useState } from "react";
 import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
+import { useState } from "react";
+
 import { formatBytes, formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
+import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import { type JobContextInfo, readJobContext, readJobKind } from "../../model/queue-job-context.ts";
 
 function ContextRow({

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { RedisAuthzEpochRepository } from "../redis.authz-epoch.repository.ts";
 
 const ORGANIZATION_ID = "org_epoch";

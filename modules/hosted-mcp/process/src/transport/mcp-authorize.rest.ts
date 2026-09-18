@@ -3,16 +3,16 @@
  * posts here once a signed-in person has approved a client's request.
  * @see specs/security/hosted-mcp-grant-fidelity.feature
  */
-import { publicRoute } from "@langwatch/api/access";
+import { optionalCredential } from "@langwatch/api/access";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
-  defineRestMiddleware,
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-} from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel";
+  approved,
+  signedOut,
+  refused,
+  postedApprovalFieldsSchema,
+} from "@langwatch/hosted-mcp-contract";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { resolveRequestBound } from "@langwatch/plans";
-import { z } from "zod";
-import { HTTPException } from "hono/http-exception";
 
 import type {
   McpApprovalOutcome,
@@ -26,17 +26,7 @@ export interface McpAuthorizeApi {
 
 export const McpAuthorizeApi = moduleApi<McpAuthorizeApi>()("hosted-mcp");
 
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
-
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
-
-/** The signed-in person behind the request, as the mounting process resolves one. */
-export const mcpAuthorizeApprover = defineRestMiddleware(
-  "mcpAuthorizeApprover",
-  z.object({ user: z.object({ id: z.string() }) }).nullable(),
-);
 
 /**
  * Schemes an OAuth redirect_uri may never use. TRANSCRIBED from `@langwatch/api-key-browser`'s
@@ -51,36 +41,6 @@ const DISALLOWED_REDIRECT_SCHEMES: readonly string[] = [
   "filesystem:",
 ];
 
-/** What the approving browser is sent to next. */
-const approved = z.object({ redirect: z.string() });
-
-/** The refusal a signed-out caller reads, in the sentence this route has always used. */
-const signedOut = z.object({ error: z.string() });
-
-/**
- * The OAuth error shape RFC 6749 §4.1.2.1 defines — error, error_description and the
- * redirect that sends the client back to its own URI with them.
- */
-const refused = z.object({
-  error: z.string(),
-  error_description: z.string().optional(),
-  redirect: z.string().optional(),
-});
-
-/**
- * The posted document's known fields, each read as a non-empty string or not
- * at all — a wrong-typed or blank field is absent, never a parse failure, so
- * this stays the shape check it always was rather than a new refusal class.
- */
-const postedApprovalFieldsSchema = z.object({
-  projectId: z.string().min(1).optional().catch(undefined),
-  redirect_uri: z.string().min(1).optional().catch(undefined),
-  client_id: z.string().min(1).optional().catch(undefined),
-  code_challenge: z.string().min(1).optional().catch(undefined),
-  code_challenge_method: z.string().min(1).optional().catch(undefined),
-  state: z.string().min(1).optional().catch(undefined),
-});
-
 /**
  * `/api/mcp/authorize`, at exactly the path the consent page and every registered OAuth
  * client hold. Literal because the flow has no dated contract to negotiate and its address
@@ -89,6 +49,7 @@ const postedApprovalFieldsSchema = z.object({
 export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
   .withNamespace("mcp-authorize")
   .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("browser")
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/mcp/authorize", "approveMcpAuthorization")
@@ -96,18 +57,18 @@ export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
   // this route words itself, and may owe the client at its own registered
   // redirect URI, rather than one a validation envelope can express.
   .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(
-    publicRoute({
+    optionalCredential({
       reason:
-        "the consent page's browser session is resolved by the route itself, which answers " +
+        "the browser door resolves the consent page session; OAuth approval preserves " +
         "its own 401; no API credential opens this door",
     }),
   )
-  .withMiddleware(mcpAuthorizeApprover)
   .responds({ 200: approved, 400: refused, 401: signedOut, 403: refused, 500: refused })
-  .handle(async ({ app, raw }, approver) => {
-    if (!approver) return { status: 401, body: { error: "Not authenticated" } };
+  .handle(async ({ app, raw, actor }) => {
+    if (!actor || actor.type !== "user")
+      return { status: 401, body: { error: "Not authenticated" } };
 
     const posted = postedApproval(raw);
 
@@ -127,7 +88,7 @@ export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
     }
 
     const outcome = await app.approve({
-      approver,
+      approver: { user: { id: actor.id } },
       projectId,
       clientId,
       redirectUri,

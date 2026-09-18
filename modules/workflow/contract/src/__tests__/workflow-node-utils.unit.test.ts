@@ -2,9 +2,9 @@
  * @vitest-environment node
  */
 
-import { describe, expect, it } from "vitest";
 import type { Field, StudioEdge, StudioNode } from "@langwatch/workflow-contract";
 import { getInputsOutputs, getMappingSurfaceInputs } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Helpers

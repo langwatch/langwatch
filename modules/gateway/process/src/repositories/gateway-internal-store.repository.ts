@@ -1,5 +1,8 @@
-import type { GatewayBudget, GatewayBudgetBucketBoundary,VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-
+import type {
+  GatewayBudget,
+  GatewayBudgetBucketBoundary,
+  VirtualKeyWithScopes,
+} from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 
 /**

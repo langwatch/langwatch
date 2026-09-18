@@ -1,3 +1,4 @@
+import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import {
   Activity,
   Anvil,
@@ -40,7 +41,7 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
-import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+
 import type { Command } from "./command-bar-types.ts";
 
 /**

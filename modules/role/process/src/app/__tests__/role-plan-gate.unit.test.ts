@@ -5,6 +5,7 @@
  */
 import { ROLE_KIND, type Role } from "@langwatch/role-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
 import { createRoleTestApp, testBinding, testPlan } from "./role.fixture.ts";
 
@@ -81,10 +82,7 @@ describe("given an organization whose plan is not ENTERPRISE", () => {
       const { app, permissions } = harness("FREE");
 
       await expect(
-        app.assignRoleToUser(
-          { userId: "user-2", teamId: "team-1", customRoleId: role.id },
-          CALLER,
-        ),
+        app.assignRoleToUser({ userId: "user-2", teamId: "team-1", customRoleId: role.id }, CALLER),
       ).rejects.toThrowError(NOT_IN_PLAN);
       expect(permissions.changeBindingRole).not.toHaveBeenCalled();
       expect(permissions.attachBindings).not.toHaveBeenCalled();

@@ -1,6 +1,7 @@
 /** Projects switcher offers; one answer for both; "New Project" for project:create access */
 
 import { useMemo } from "react";
+
 import { useOptionalNavigationHost } from "../model/navigation-host.ts";
 import type { ProjectPickGroup } from "../model/project-pick-items.ts";
 

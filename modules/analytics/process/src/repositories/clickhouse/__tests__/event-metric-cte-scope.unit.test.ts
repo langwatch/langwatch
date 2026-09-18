@@ -1,10 +1,11 @@
+import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 /**
  * @regression
  * CTE-dedup count-like expressions on `ss.Events.*` columns rewrite to
  * `uniqExact(trace_id)`; value-based aggregations are NOT rewritten.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 

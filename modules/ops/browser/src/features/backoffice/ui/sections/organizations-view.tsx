@@ -1,4 +1,3 @@
-import { Temporal, toEpochMs } from "@langwatch/time";
 import {
   Box,
   Button,
@@ -14,20 +13,20 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { MoreVertical, Pencil } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useDebounce } from "use-debounce";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Switch } from "@langwatch/design-system/switch";
-
-import { Currency, PricingModel } from "../../model/backoffice-enums.ts";
-import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
-import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
-import { dateInputToISO, EmptyCell, formatDate } from "../elements/backoffice-cells.tsx";
-import { BackofficeTable } from "./backoffice-table-shell.tsx";
+import { Temporal, toEpochMs } from "@langwatch/time";
+import { MoreVertical, Pencil } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useDebounce } from "use-debounce";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
+import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
+import { Currency, PricingModel } from "../../model/backoffice-enums.ts";
+import { dateInputToISO, EmptyCell, formatDate } from "../elements/backoffice-cells.tsx";
+import { BackofficeTable } from "./backoffice-table-shell.tsx";
 /**
  * Read-facing Organization shape - excludes the s3 credential fields. The
  * admin Hono route strips them from every list/getOne response; the edit

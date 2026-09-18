@@ -3,8 +3,8 @@
  * cache keys. No credentials on this map.
  */
 
-import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { createModuleApi } from "@langwatch/api/web";
+import type { OrganizationIntent } from "@langwatch/organization-contract";
 import type { TimeInput } from "@langwatch/time";
 
 /** What a signing-up reader told us about themselves, verbatim. */

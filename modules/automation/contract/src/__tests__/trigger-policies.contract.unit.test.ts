@@ -1,10 +1,11 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import {
   computeScheduledFor,
   hasActionableTriggerFilters,
   isMatchEverythingTrigger,
 } from "../trigger-policies.ts";
-import { Temporal } from "@langwatch/time";
 
 const trigger = (overrides: Record<string, unknown> = {}) => ({
   triggerKind: "AUTOMATION" as const,

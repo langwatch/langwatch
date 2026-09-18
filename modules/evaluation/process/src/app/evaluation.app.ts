@@ -23,11 +23,11 @@ import {
   type WarmupEvaluatorsInput,
 } from "@langwatch/evaluation-contract";
 import { AVAILABLE_EVALUATORS, type SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -82,7 +82,9 @@ export type EvaluationInfrastructure = Readonly<{
 }>;
 
 /** Closed evaluation capabilities for a process that installs reads but no evaluator runtime. */
-export function createUnavailableEvaluationInfrastructure(processName: string): EvaluationInfrastructure {
+export function createUnavailableEvaluationInfrastructure(
+  processName: string,
+): EvaluationInfrastructure {
   const unavailable = (capability: string): never => {
     throw new Error(`${processName} composes no ${capability}`);
   };

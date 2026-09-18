@@ -4,8 +4,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { fetchTracesFromClickHouse } from "../topic-clustering-runner.intent.ts";
+
 import type { TopicClusteringClickHouse } from "../../app/topic.members.ts";
+import { fetchTracesFromClickHouse } from "../topic-clustering-runner.intent.ts";
 
 describe("topicClustering page fetch memory guard", () => {
   describe("when the page of traces is fetched", () => {

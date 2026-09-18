@@ -1,9 +1,11 @@
 import { Readable } from "node:stream";
+
+import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { toJsonlChunks } from "../../rules/dataset-chunking.rules.ts";
 import { DatasetNormalizeAdapter, StagingKeyMismatchError } from "../dataset-normalize.service.ts";
 import type { DatasetNormalizeDeps } from "../dataset-normalize.service.ts";
-import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
 
 /** The adapter's one operation, as the queue calls it. */
 const normalizeHandler =

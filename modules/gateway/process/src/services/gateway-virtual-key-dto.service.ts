@@ -1,12 +1,16 @@
+import {
+  type VirtualKeyWithScopes,
+  metadataFromRow,
+  type ResourceMetadata,
+  toWireEnum,
+} from "@langwatch/gateway-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * Shared DTO for VirtualKey (tRPC camelCase, REST snake_case). Post-collapse:
  * providerCredentialIds/providerChain are gone — eligible providers derive
  * from the scope graph + RoutingPolicy at request time (scopeResolver.ts).
  */
 import { toDate } from "@langwatch/time";
-import { type VirtualKeyWithScopes,metadataFromRow,type ResourceMetadata,toWireEnum } from "@langwatch/gateway-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-
 
 /**
  * A key follows its stored trace-destination pointer even after the project

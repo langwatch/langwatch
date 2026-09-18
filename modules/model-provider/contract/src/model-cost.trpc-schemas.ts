@@ -4,6 +4,7 @@
  * catastrophic backtracking; the contract's own check runs in the schemas below.
  */
 import { z } from "zod";
+
 import { isSafeCostRegex } from "./model-cost.ts";
 import { modelProviderScopeTypeSchema } from "./model-provider.ts";
 

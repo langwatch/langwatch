@@ -19,10 +19,7 @@ export const secretTrpcTransport = defineTrpcRouter(SecretApi, secretTrpc)
   .procedure("update")
   .withPermission("secrets:manage")
   .handle(async ({ app, input, actor }) => {
-    await app.update(
-      { projectId: input.projectId, id: input.secretId, value: input.value },
-      actor,
-    );
+    await app.update({ projectId: input.projectId, id: input.secretId, value: input.value }, actor);
 
     return { success: true };
   })

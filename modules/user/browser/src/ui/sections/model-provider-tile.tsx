@@ -3,9 +3,9 @@ import { Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff } from "lucide-reac
 import { useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
+import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 import { Link } from "../elements/personal-link.tsx";
 import { TileIcon } from "../elements/tile-icon.tsx";
-import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 
 /**
  * Personal-VK label rules (mirrors `PersonalVirtualKeyTrpcApi.issuePersonal`

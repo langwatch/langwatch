@@ -1,9 +1,11 @@
-import { z } from "zod";
 import {
   annotationSuggestedOutput,
   type AnnotationAnchorRef,
-  describeAnnotationAnchor,type AnnotationScore as StoredAnnotationScore,type AnnotationWithUser as Annotation
+  describeAnnotationAnchor,
+  type AnnotationScore as StoredAnnotationScore,
+  type AnnotationWithUser as Annotation,
 } from "@langwatch/annotation-contract";
+import { z } from "zod";
 
 /**
  * Only what the mapping reads off a project score: its id, to match a
@@ -18,7 +20,9 @@ import {
   type Evaluation,
   type LLMSpan,
   reservedTraceMetadataSchema,
-  type Span,getRAGChunks,getRAGInfo
+  type Span,
+  getRAGChunks,
+  getRAGInfo,
 } from "@langwatch/trace-contract";
 
 /** The label a span is listed under: its own name, or an LLM span's model. */
@@ -111,9 +115,7 @@ export const RESERVED_METADATA_KEYS = [
  * @param metadataKeys - Dynamic metadata keys extracted from project traces
  * @returns Array of metadata field children
  */
-export function buildMetadataFieldChildren(
-  metadataKeys: { key: string; label: string }[],
-): {
+export function buildMetadataFieldChildren(metadataKeys: { key: string; label: string }[]): {
   name: string;
   label: string;
   type: "str" | "dict" | "list";

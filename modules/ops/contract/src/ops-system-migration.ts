@@ -1,10 +1,10 @@
+import type { TenantMigrationRecord, TenantMigrationStatus } from "@langwatch/system-migrations";
 /**
  * The input shapes the operator system-migrations surface parses. The
  * confirmations are typed strings, optional, because only migrations that
  * declare themselves destructive demand one - the transport asks the runner.
  */
 import { z } from "zod";
-import type { TenantMigrationRecord, TenantMigrationStatus } from "@langwatch/system-migrations";
 
 /** One organization, for one registered migration. */
 export const opsMigrationTenantInputSchema = z.object({

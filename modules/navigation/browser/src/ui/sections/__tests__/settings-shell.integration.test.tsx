@@ -25,13 +25,13 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
   },
 }));
 
-import { captureSettingsReturnPath } from "../../../model/resolve-settings-back-target.ts";
-import { WithStubNavigationHost, StubNavigationHost } from "../../../testing.tsx";
-import { NavigationHostProvider } from "../../../model/navigation-host.ts";
-import { ShellTopBar } from "../shell-top-bar.tsx";
 import type { NavigationShellReadyState } from "../../../behavior/use-navigation-shell-state.ts";
+import { NavigationHostProvider } from "../../../model/navigation-host.ts";
+import { captureSettingsReturnPath } from "../../../model/resolve-settings-back-target.ts";
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import { WithStubNavigationHost, StubNavigationHost } from "../../../testing.tsx";
 import { SidebarContent } from "../product-sidebar.tsx";
+import { ShellTopBar } from "../shell-top-bar.tsx";
 
 const ORGANIZATION = { id: "org_1", name: "ACME", teams: [] };
 const commandBarOpenMock = vi.fn();

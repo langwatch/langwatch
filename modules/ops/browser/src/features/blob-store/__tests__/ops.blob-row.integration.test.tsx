@@ -4,10 +4,9 @@
  * may act on it - the row half of the payload-store scenarios.
  */
 import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
+import type { OpsBlobSummary } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
 import { BlobRow } from "../ui/blocks/blob-row.tsx";
 

@@ -1,3 +1,13 @@
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import {
+  AuthzApi,
+  type AuthzListTeamMemberBindingsInput,
+  type AuthzTeamMemberBinding,
+} from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { HandledError } from "@langwatch/handled-error";
+import { IdentityApi } from "@langwatch/identity-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 /**
  * The organization feature's application: what its four tRPC doors (`organization.*`, `team.*`,
  * `group.*`, the personal-workspace nav predicate) call. What lives here is cross-door shared
@@ -11,23 +21,6 @@ import {
   OrganizationGroupService,
   OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import {
-  AuthzApi,
-  type AuthzListTeamMemberBindingsInput,
-  type AuthzTeamMemberBinding,
-} from "@langwatch/authz-contract";
-import { ApiKeyApi } from "@langwatch/api-key-contract";
-import { ShareApi } from "@langwatch/share-contract";
-import { UserApi } from "@langwatch/user-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { IdentityApi } from "@langwatch/identity-contract";
-import { RoleApi } from "@langwatch/role-contract";
-import { z } from "zod";
-import { buildOrganizationInfrastructure } from "./organization-composition.build.ts";
-import { HandledError } from "@langwatch/handled-error";
 import type {
   AddOrganizationGroupBindingInput,
   AddOrganizationTeamMemberInput,
@@ -86,12 +79,36 @@ import type {
   GroupDetail,
   GroupListItem,
   GroupMembershipView,
-  TeamWithProjects
+  TeamWithProjects,
 } from "@langwatch/organization-contract";
-import type { TeamManagementApi } from "../transport/team.rest.ts";
-import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
+import type { PaginatedProjects, Project } from "@langwatch/project-contract";
+import { RoleApi } from "@langwatch/role-contract";
+import { ShareApi } from "@langwatch/share-contract";
+import { UserApi } from "@langwatch/user-contract";
+
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
+import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
+import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
+import {
+  organizationMemberDatesFromDate,
+  organizationProvisioningSummaryFromDate,
+} from "../rules/organization-time-boundary.rules.ts";
+import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
+import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
+import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
+import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
+import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
+import { OrganizationOnboardingService } from "../services/organization-onboarding.service.ts";
+import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
+import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
+import {
+  PersonalTeamScopeService,
+  type PersonalTeamScopeReader,
+} from "../services/personal-team-scope.service.ts";
+import type { TeamManagementApi } from "../transport/team.rest.ts";
+import { buildOrganizationInfrastructure } from "./organization-composition.build.ts";
 import type {
   GroupIdentity,
   OrganizationGrantCache,
@@ -110,23 +127,6 @@ import type {
   OrganizationPlanGate,
   OrganizationSignals,
 } from "./organization.members.ts";
-import type { PaginatedProjects, Project } from "@langwatch/project-contract";
-import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
-import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
-import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
-import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
-import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
-import { OrganizationOnboardingService } from "../services/organization-onboarding.service.ts";
-import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
-import {
-  PersonalTeamScopeService,
-  type PersonalTeamScopeReader,
-} from "../services/personal-team-scope.service.ts";
-import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
-import {
-  organizationMemberDatesFromDate,
-  organizationProvisioningSummaryFromDate,
-} from "../rules/organization-time-boundary.rules.ts";
 
 // ---------------------------------------------------------------------------
 // The rows this application hands back — restated from the composed service's own generated
@@ -183,26 +183,20 @@ export interface ServerOrganizationAppDependencies {
   apiKeys: ApiKeyApi;
 }
 
-/**
- * Config schema: this process's name (attributed in refusals) and the demo
- * organization's person/project, defaulting to the deleted composition's
- * own absent-config answer (constructed name; empty strings for no demo).
- */
-const organizationAppConfigSchema = z.object({
-  processName: z.string().default("langwatch"),
-  demoProject: z
-    .object({ userId: z.string().default(""), projectId: z.string().default("") })
-    .default({ userId: "", projectId: "" }),
-  /** This deployment's public origin, for the invite accept link. Empty on a process that
-   * names none, which is what the deleted composition's own absent-config answer was. */
-  baseHost: z.string().default(""),
-});
-export type OrganizationAppConfig = z.infer<typeof organizationAppConfigSchema>;
+/** `processName`/`demoProject`/`publicBaseUrl` are facts this module could
+ * not turn into its own env config; `demoProject` collides with `authz`'s
+ * landed leaves if redeclared here. See the handoff. */
+type OrganizationMembers = MembersRead<readonly ["prisma", "encryption", "logger", "redis"]> &
+  Readonly<{
+    publicBaseUrl: string | undefined;
+    processName: string;
+    demoProject: Readonly<{ userId: string; projectId: string }>;
+  }>;
 
 type OrganizationSetup = FeatureSetup<
   typeof ServerOrganizationApp.dependencies,
-  MembersRead<typeof ServerOrganizationApp.reads>,
-  OrganizationAppConfig,
+  OrganizationMembers,
+  undefined,
   OrganizationRepositories
 >;
 
@@ -295,8 +289,14 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     /** Where custom-role assignability is defined, for the invitation door. */
     roles: RoleApi,
   };
-  static readonly configSchema = organizationAppConfigSchema;
-  static readonly reads = reads("prisma", "encryption", "logger", "redis");
+  /** `publicBaseUrl`/`processName`/`demoProject` are named raw so the process
+   * can answer them through `withMember`/`withMembers` (see {@link OrganizationMembers}). */
+  static readonly reads = [
+    ...reads("prisma", "encryption", "logger", "redis"),
+    "publicBaseUrl",
+    "processName",
+    "demoProject",
+  ] as const;
   #dependencies: ServerOrganizationAppDependencies;
 
   static create(setup: OrganizationSetup): ServerOrganizationApp {
@@ -305,7 +305,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       encryption: setup.members.encryption,
       logger: setup.members.logger,
       redis: setup.members.redis,
-      config: setup.config,
+      publicBaseUrl: setup.members.publicBaseUrl,
+      processName: setup.members.processName,
+      demoProject: setup.members.demoProject,
       dependencies: {
         projects: setup.dependencies.projects,
         identity: setup.dependencies.identity,

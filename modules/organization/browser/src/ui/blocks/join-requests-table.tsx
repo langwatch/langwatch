@@ -1,7 +1,8 @@
 import { Badge, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
-import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
-import type { PendingJoinRequest } from "../../model/pending-join-request.ts";
+
 import { readableDate } from "../../model/display-formatters.ts";
+import type { PendingJoinRequest } from "../../model/pending-join-request.ts";
+import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 
 interface JoinRequestsTableProps {
   requests: PendingJoinRequest[];

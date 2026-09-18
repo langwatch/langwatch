@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
+
 import type { TopicClusteringRepository } from "../../repositories/topic-clustering.repository.ts";
+import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
 
 // Boot-seed wiring fires both seeds in background without escaping failures to boot path.
 // Seeds page the GLOBAL `Project` model, distinguished by which repository method each drives.

@@ -361,8 +361,7 @@ const BATCH_EVALUATIONS: LangWatchQLViewDefinition = {
     {
       name: "ExperimentId",
       type: "String",
-      description:
-        "Experiment this batch evaluation belongs to. Join key to `experiments`.",
+      description: "Experiment this batch evaluation belongs to. Join key to `experiments`.",
       gates: [],
       sourceColumns: ["experimentId"],
     },

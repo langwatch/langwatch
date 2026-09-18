@@ -10,7 +10,9 @@ import {
   type PresetLabels,
   type ReportDraft,
   type ReportSourceKind,
-  type SetSliceAction as WebSetSliceAction,OPERATOR_LABELS,TIME_PERIOD_LABELS
+  type SetSliceAction as WebSetSliceAction,
+  OPERATOR_LABELS,
+  TIME_PERIOD_LABELS,
 } from "../../model/draft-reducer.ts";
 import {
   AUTOMATION_DRAFT_MODEL,

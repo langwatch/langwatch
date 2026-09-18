@@ -21,6 +21,7 @@ import {
   User,
   WandSparkles,
 } from "lucide-react";
+
 import type {
   CompanySize,
   DesireType,

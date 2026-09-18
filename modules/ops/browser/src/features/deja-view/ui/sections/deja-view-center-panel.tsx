@@ -1,8 +1,9 @@
 import { Badge, Box, Button, Center, HStack, Spinner, Text } from "@chakra-ui/react";
-import { EventDetail } from "../blocks/deja-view-event-detail.tsx";
-import { hashEventTypeColor } from "../../model/deja-view-fragment.ts";
+
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
+import { hashEventTypeColor } from "../../model/deja-view-fragment.ts";
 import type { EventResult } from "../../model/deja-view-types.ts";
+import { EventDetail } from "../blocks/deja-view-event-detail.tsx";
 
 /** The replayed projection state, while it loads and when there is none. */
 function ProjectionStateBody({

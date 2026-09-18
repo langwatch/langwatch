@@ -1,5 +1,6 @@
 import type { GatedBlockType } from "@langwatch/automation-contract";
 import type { ComponentType } from "react";
+
 import digestCompactSource from "./digest-compact.liquid?raw";
 import digestEvaluatorRollupSource from "./digest-evaluator-rollup.liquid?raw";
 import digestInlineRichSource from "./digest-inline-rich.liquid?raw";
@@ -12,8 +13,8 @@ import graphAlertHistoryTableSource from "./graph-alert-history-table.liquid?raw
 import graphAlertNoDataSource from "./graph-alert-no-data.liquid?raw";
 import graphAlertOneLinerSource from "./graph-alert-one-liner.liquid?raw";
 import graphAlertResolvedSource from "./graph-alert-resolved.liquid?raw";
-import reportChartSource from "./report-chart.liquid?raw";
 import reportChartCardSource from "./report-chart-card.liquid?raw";
+import reportChartSource from "./report-chart.liquid?raw";
 import reportDashboardSource from "./report-dashboard.liquid?raw";
 import reportDigestSource from "./report-digest.liquid?raw";
 import reportSummaryCardSource from "./report-summary-card.liquid?raw";
@@ -21,7 +22,6 @@ import reportTableSource from "./report-table.liquid?raw";
 import traceAlertCompactSource from "./trace-alert-compact.liquid?raw";
 import traceAlertOneLinerSource from "./trace-alert-one-liner.liquid?raw";
 import traceCardRichSource from "./trace-card-rich.liquid?raw";
-
 import {
   DigestCompactWireframe,
   DigestEvaluatorRollupWireframe,

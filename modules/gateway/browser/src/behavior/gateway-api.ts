@@ -3,7 +3,6 @@
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
  */
 
-import type { Instant } from "@langwatch/time";
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   GatewayApplicableBudget,
@@ -19,6 +18,7 @@ import type {
   VirtualKeyConfig,
 } from "@langwatch/gateway-contract";
 import type { TierTargetSuggestion } from "@langwatch/model-provider-contract";
+import type { Instant } from "@langwatch/time";
 
 /** An acknowledgement, for the writes whose only answer is that they happened. */
 export type GatewayAcknowledgement = { ok: boolean };

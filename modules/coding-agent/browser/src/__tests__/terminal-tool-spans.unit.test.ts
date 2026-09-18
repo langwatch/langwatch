@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { SpanDetail } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { indexToolSpansBySpanId, parsePatchHunks } from "../trace/terminal-tool-spans.ts";
 
 /**

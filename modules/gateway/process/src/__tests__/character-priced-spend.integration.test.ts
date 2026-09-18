@@ -29,20 +29,19 @@ function toBudgetRow<
   };
 }
 
+import type { SpendUsage } from "@langwatch/gateway-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
-import type { SpendUsage } from "@langwatch/gateway-contract";
 import { EMPTY_SPEND_USAGE } from "../eventing/gateway-spend-commands.process.ts";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
 
 const spendRating = ModelCatalogGatewaySpendRatingService.create();
 

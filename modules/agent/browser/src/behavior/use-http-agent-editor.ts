@@ -7,10 +7,11 @@ import {
   type HttpHeader,
   type HttpMethod,
 } from "@langwatch/agent-contract";
+import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import { hasScenarioInputMapping } from "@langwatch/scenario-contract";
 import { useEffect, useRef, useState } from "react";
+
 import type { AgentBrowser } from "../model/agent-client.ts";
-import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 
 export const HTTP_FIXED_VARIABLES: Field[] = [
   { identifier: "threadId", type: "str" },

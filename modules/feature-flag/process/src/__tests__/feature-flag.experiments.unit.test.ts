@@ -10,6 +10,7 @@ import {
   type FeatureFlagExperiment,
 } from "@langwatch/feature-flag-contract";
 import { describe, expect, it } from "vitest";
+
 import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
 
 const FLAG = "release_ui_agent_testing_v2_enabled";

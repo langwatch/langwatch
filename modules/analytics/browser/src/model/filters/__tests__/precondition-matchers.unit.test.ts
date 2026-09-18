@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
 import {
   normalizePreconditionTraceData,
   PRECONDITION_FIELD_MATCHERS,
 } from "@langwatch/analytics-contract";
 import type { PreconditionField, PreconditionTraceData } from "@langwatch/analytics-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   getAvailablePreconditionFields,
   getFieldLabel,

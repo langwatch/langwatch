@@ -1,4 +1,6 @@
 import { on } from "node:events";
+
+import { createLogger } from "@langwatch/observability";
 import {
   presenceCursorEventSchema,
   presenceEventSchema,
@@ -6,7 +8,7 @@ import {
   type PresenceCursorPayload,
   type PresenceEvent,
 } from "@langwatch/presence-contract";
-import { createLogger } from "@langwatch/observability";
+
 import type { PresenceEmitter } from "../app/presence.app.ts";
 import type { PresenceService } from "./presence.service.ts";
 

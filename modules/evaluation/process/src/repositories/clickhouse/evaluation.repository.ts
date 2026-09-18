@@ -8,9 +8,10 @@ import type {
   TraceEvaluationData,
   TraceEvaluationsQuery,
 } from "@langwatch/evaluation-contract";
+
 import type { EvaluationRetentionFloor } from "../../app/evaluation.members.ts";
-import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 import { EvaluationRunRepository } from "../evaluation.repository.ts";
+import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 import { EvaluationRunClickHouseReadRepository } from "./evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.repository.ts";
 

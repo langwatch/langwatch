@@ -1,9 +1,9 @@
+import type { MetricStats } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
-import { buildParetoPoints } from "../pareto-scatter-chart.tsx";
 import type { BTLeaderboardEntry } from "../../../../model/batch-evaluation-results.bt-leaderboard.ts";
-import type { MetricStats } from "@langwatch/experiment-contract";
 import type { VariantMetrics } from "../../batch-evaluation-results.variant-metrics.ts";
+import { buildParetoPoints } from "../pareto-scatter-chart.tsx";
 
 /**
  * What the trade-off chart is allowed to draw.

@@ -2,7 +2,6 @@
  * Where a run's cells reach the saved workbench state.
  */
 
-import { createLogger } from "@langwatch/observability";
 import {
   applyRunEvent,
   emptyRunResultsDraft,
@@ -17,6 +16,8 @@ import {
   type RunResultsDraft,
   type WorkbenchActor,
 } from "@langwatch/experiment-contract";
+import { createLogger } from "@langwatch/observability";
+
 import type { ExperimentService } from "./experiment.service.ts";
 
 /**

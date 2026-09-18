@@ -1,14 +1,15 @@
-import { createLogger } from "@langwatch/observability";
+import { tryAndConvertTo } from "@langwatch/dataset-contract";
+import {
+  EvaluatorExecutionError,
+  EvaluatorInputTooLargeError,
+} from "@langwatch/evaluation-contract";
 import {
   batchEvaluationResultSchema,
   type BatchEvaluationResult,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import {
-  EvaluatorExecutionError,
-  EvaluatorInputTooLargeError,
-} from "@langwatch/evaluation-contract";
-import { tryAndConvertTo } from "@langwatch/dataset-contract";
+import { createLogger } from "@langwatch/observability";
+
 import {
   type EvaluationLangevals,
   type EvaluationExecutionTelemetry,
@@ -48,8 +49,7 @@ export class HttpLangevalsEvaluatorAdapter implements EvaluationLangevals {
   private constructor(
     private readonly config: LangevalsRuntimeConfig,
     private readonly telemetry: EvaluationExecutionTelemetry | undefined,
-  ) {
-  }
+  ) {}
 
   async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
     return this.evaluateWithRetry(params, this.config.maxRetries);

@@ -1,6 +1,7 @@
 import type { GatewayBudget } from "@langwatch/gateway-contract";
-import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 import type { Instant } from "@langwatch/time";
+
+import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 
 /** The cap fields a key's own drawer sets. */
 export type GatewayKeyBudgetFields = {

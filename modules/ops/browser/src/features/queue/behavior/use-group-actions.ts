@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import { api } from "../../../behavior/ops-api.ts";
-
 import { useOpsToaster, useShowErrorToast } from "../../../behavior/ops-feedback.ts";
 export interface GroupTarget {
   queueName: string;

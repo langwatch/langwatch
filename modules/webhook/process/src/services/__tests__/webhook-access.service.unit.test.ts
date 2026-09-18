@@ -1,6 +1,7 @@
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
+
 import { WebhookAccessService } from "../webhook-access.service.ts";
 
 const plan = (webhookEndpointsEnabled: boolean): Plan => ({

@@ -1,4 +1,5 @@
 import { Counter, type Registry } from "prom-client";
+
 import type { AuthzRevocationReason } from "./authz-revocation-telemetry.service.ts";
 
 /** The one thing AuthZ asks of a metric: that it can be incremented. */

@@ -1,10 +1,12 @@
+import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
 /**
  * The analytics feature's application: what both doors call, holding every service and
  * port as the one typed thing a transport is given. A caller is always an argument,
  * never read from a session, so one operation serves a browser, an API key, or a background job.
  */
 import {
-  analyticsServerConfigSchema,
+  analyticsServerConfig,
+  type AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiToken,
   CustomChartPlaygroundNotEnabledError,
   type AnalyticsFeedbacksResult,
@@ -24,7 +26,6 @@ import {
   type LangWatchQLService,
   type AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
-import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
@@ -32,29 +33,26 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
 import { NotFoundError } from "@langwatch/handled-error";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { z } from "zod";
-import {
-  dashboardWidgetPlatformUrl as dashboardWidgetPlatformUrl_,
-  savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_,
-} from "../rules/analytics-platform-url.rules.ts";
+import type { RateLimiter } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
+
+import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
+import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
+import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.ts";
+import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
+import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
+import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import { lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import {
   resolveApiKeyProtections as resolveApiKeyProtectionsRule,
   resolveWorkbenchProtections,
   resolveWorkbenchRunCaller,
 } from "../rules/workbench-protections.rules.ts";
-import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
-import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
-import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
-import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.ts";
+import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
-import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
-import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
+import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /**
  * The filter-value read this feature makes on the host's filter registry — declared
@@ -122,20 +120,17 @@ type AnalyticsDependencies = Readonly<{
 }>;
 
 /**
- * The contract's env-resolved LWQL identity, plus `publicBaseUrl` — supplied by the
- * api's own composition rather than an env var this module reads itself — for the
- * deep links this module publishes on saved charts and dashboard widgets.
+ * Shapes restated rather than imported from `@langwatch/process-stores`: a
+ * module depends on contracts. `publicBaseUrl` is the process's own fact,
+ * absent where the deployment named no `BASE_HOST`.
  */
-const analyticsAppConfigSchema = analyticsServerConfigSchema.and(
-  z.object({ publicBaseUrl: z.url() }),
-);
-export type AnalyticsAppConfig = z.infer<typeof analyticsAppConfigSchema>;
+type AnalyticsMembers = Readonly<{
+  clickhouse: ClickHouseQueryClient;
+  rateLimiter: RateLimiter;
+  publicBaseUrl: string | undefined;
+}>;
 
-type AnalyticsSetup = FeatureSetup<
-  AnalyticsDependencies,
-  MembersRead<typeof AnalyticsApp.reads>,
-  AnalyticsAppConfig
->;
+type AnalyticsSetup = FeatureSetup<AnalyticsDependencies, AnalyticsMembers, AnalyticsServerConfig>;
 
 const isPresent = (value: string | undefined): value is string => Boolean(value);
 
@@ -203,9 +198,13 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     projects: ProjectApi,
     plans: EntitlementApi,
   };
-  static readonly configSchema = analyticsAppConfigSchema;
-  /** `rateLimiter` is the per-project counter every LangWatchQL execution is checked against. */
-  static readonly reads = reads("clickhouse", "rateLimiter");
+  static readonly config = analyticsServerConfig;
+  /**
+   * `rateLimiter` is the per-project counter every LangWatchQL execution is
+   * checked against. All three names are from the process's vocabulary; boot
+   * refuses by name.
+   */
+  static readonly reads = ["clickhouse", "rateLimiter", "publicBaseUrl"] as const;
 
   static create(setup: AnalyticsSetup): AnalyticsApp {
     const clickhouse = setup.members.clickhouse;
@@ -247,15 +246,15 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
           rateLimiter: setup.members.rateLimiter,
         }),
       },
-      setup.config.publicBaseUrl,
+      setup.members.publicBaseUrl,
     );
   }
 
   #dependencies: AnalyticsAppDependencies;
-  #publicBaseUrl: string;
+  #publicBaseUrl: string | undefined;
   #playgroundAccess: CustomChartPlaygroundAccessService;
 
-  private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string) {
+  private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#publicBaseUrl = publicBaseUrl;
     this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
@@ -400,17 +399,19 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     });
   }
 
-  /** The deep link back to the Workbench editor for a saved chart in this project. */
+  /**
+   * The deep link back to the Workbench editor for a saved chart in this
+   * project. A deployment that serves the Workbench but named no public
+   * origin refuses by name.
+   */
   savedWorkbenchChartPlatformUrl(input: { projectSlug: string }): string {
-    return savedWorkbenchChartPlatformUrl_({
-      publicBaseUrl: this.#publicBaseUrl,
-      projectSlug: input.projectSlug,
-    });
-  }
+    if (this.#publicBaseUrl === undefined) {
+      throw new Error(
+        "The analytics workbench was asked for a platform link, but this deployment named no public base URL",
+      );
+    }
 
-  /** The deep link back to the dashboards list for a playground widget in this project. */
-  dashboardWidgetPlatformUrl(input: { projectSlug: string }): string {
-    return dashboardWidgetPlatformUrl_({
+    return savedWorkbenchChartPlatformUrl_({
       publicBaseUrl: this.#publicBaseUrl,
       projectSlug: input.projectSlug,
     });

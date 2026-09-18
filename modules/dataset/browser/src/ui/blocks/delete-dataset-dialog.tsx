@@ -52,7 +52,7 @@ export function DeleteDatasetDialog({
             </Text>
             <Input
               ref={inputRef}
-              
+
               value={typed}
               aria-label={`Type ${CONFIRMATION_WORD} to confirm`}
               data-testid="delete-dataset-confirmation"

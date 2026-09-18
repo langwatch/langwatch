@@ -3,6 +3,7 @@
  */
 
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
+
 import type { EvaluatorConfig, TargetConfig } from "../experiment-workbench.ts";
 import { isGoldenFieldSatisfied } from "../experiment-workbench.ts";
 import { extractVariablesFromBodyTemplate } from "./body-template-variables.ts";

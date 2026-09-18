@@ -1,20 +1,21 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
-import { LoadingScreen } from "../blocks/loading-screen.tsx";
-import { useRequiredSession } from "../../behavior/use-required-session.ts";
+
 import { api } from "../../behavior/onboarding-api.ts";
-import { useRouter } from "@langwatch/browser-host/use-router";
+import { useOnboardingFlow } from "../../behavior/use-onboarding-flow.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useRequiredSession } from "../../behavior/use-required-session.ts";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
+import { resolveWelcomeRedirect } from "../../model/welcome-redirect.ts";
+import { LoadingScreen } from "../blocks/loading-screen.tsx";
 import { OnboardingContainer } from "../blocks/onboarding-container.tsx";
 import { OnboardingNavigation } from "../elements/onboarding-navigation.tsx";
-import { OnboardingFormProvider } from "./form-context.tsx";
-import { useOnboardingFlow } from "../../behavior/use-onboarding-flow.ts";
-import { resolveWelcomeRedirect } from "../../model/welcome-redirect.ts";
 import { useCreateWelcomeScreens } from "./create-welcome-screens.tsx";
+import { OnboardingFormProvider } from "./form-context.tsx";
 
 export const WelcomeScreen: React.FC = () => {
   const host = useOnboardingHost();

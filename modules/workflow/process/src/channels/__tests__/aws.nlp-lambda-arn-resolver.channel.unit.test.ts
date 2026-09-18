@@ -4,15 +4,11 @@
  *
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
-import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
-import {
-  CreateFunctionCommand,
-  UpdateFunctionConfigurationCommand,
-  type LambdaClient,
-} from "@aws-sdk/client-lambda";
+import { CreateFunctionCommand, UpdateFunctionConfigurationCommand } from "@aws-sdk/client-lambda";
 import { describe, expect, it } from "vitest";
-import { AwsNlpLambdaArnResolverAdapter } from "../../adapters/aws.nlp-lambda-arn-resolver.adapter.ts";
+
 import type { StudioLambdaConfig } from "../../rules/nlp-lambda-config.rules.ts";
+import { AwsNlpLambdaArnResolverChannel } from "../aws/aws.nlp-lambda-arn-resolver.channel.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";
 
@@ -63,12 +59,12 @@ function resolver(options: {
 
       return Promise.resolve(answer);
     },
-  } as unknown as LambdaClient;
-  const logs = { send: () => Promise.resolve({}) } as unknown as CloudWatchLogsClient;
+  } as never;
+  const logs = { send: () => Promise.resolve({}) } as never;
 
   return {
     sent,
-    subject: AwsNlpLambdaArnResolverAdapter.create({
+    subject: AwsNlpLambdaArnResolverChannel.create({
       lambda,
       logs,
       config: CONFIG,
@@ -89,7 +85,8 @@ describe("given a project whose studio engine needs a function", () => {
 
       expect(arn).toBe(ARN);
       const created = sent.find((call) => call.name === "CreateFunctionCommand");
-      expect(created?.input).toMatchObject({
+      if (!created) throw new Error("expected CreateFunctionCommand");
+      expect(created.input).toMatchObject({
         FunctionName: "langwatch_nlp-project-1",
         Role: CONFIG.roleArn,
         Code: { ImageUri: CONFIG.imageUri },
@@ -98,7 +95,7 @@ describe("given a project whose studio engine needs a function", () => {
         VpcConfig: { SubnetIds: ["subnet-1"], SecurityGroupIds: ["sg-1"] },
       });
       expect(
-        (created?.input.Environment as { Variables: Record<string, string> }).Variables,
+        (created.input.Environment as { Variables: Record<string, string> }).Variables,
       ).toMatchObject({
         LANGWATCH_ENDPOINT: "https://app.test",
         AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
@@ -124,8 +121,9 @@ describe("given a project whose studio engine needs a function", () => {
       await subject.resolve({ projectId: "project-1" });
 
       const reconciled = sent.find((call) => call.name === "UpdateFunctionConfigurationCommand");
+      if (!reconciled) throw new Error("expected UpdateFunctionConfigurationCommand");
       expect(
-        (reconciled?.input.Environment as { Variables: Record<string, string> }).Variables,
+        (reconciled.input.Environment as { Variables: Record<string, string> }).Variables,
       ).toMatchObject({
         SET_BY_HAND: "keep",
         STUDIO_RUNTIME: "async",

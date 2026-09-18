@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
+
 import type { FrontDoorDepth, FrontDoorDoor, FrontDoorStage } from "./ground-palette.ts";
 
 /** Module-scoped store: tracks current door/depth for ground animation. */

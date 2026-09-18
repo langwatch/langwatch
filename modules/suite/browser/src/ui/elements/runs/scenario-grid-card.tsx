@@ -5,12 +5,13 @@
  */
 
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
-import { MessagePreview } from "./message-preview.tsx";
-import { SimulationCard } from "./simulation-card.tsx";
-import { Square } from "lucide-react";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
+import { Square } from "lucide-react";
+
 import { buildDisplayTitle } from "../../../model/run-history-transforms.ts";
 import { isCancellableStatus } from "../../../model/run-status.ts";
+import { MessagePreview } from "./message-preview.tsx";
+import { SimulationCard } from "./simulation-card.tsx";
 
 type ScenarioGridCardProps = {
   scenarioRun: ScenarioRunData;

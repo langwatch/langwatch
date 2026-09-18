@@ -1,9 +1,15 @@
-import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
-import { CODING_AGENT_MAP_COALESCE_MAX_BATCH,
+import {
+  CODING_AGENT_MAP_COALESCE_MAX_BATCH,
   contributionFactsSchema,
   type ContributionFacts,
   type LogFactsContributedEvent,
-  logFactsContributedEventSchema } from "@langwatch/coding-agent-contract";
+  logFactsContributedEventSchema,
+} from "@langwatch/coding-agent-contract";
+import {
+  type AppendStore,
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "@langwatch/eventing";
 import { z } from "zod";
 
 const contributionEventDataSchema = z.object({

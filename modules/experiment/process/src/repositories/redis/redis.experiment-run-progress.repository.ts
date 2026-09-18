@@ -1,12 +1,13 @@
+import type { EvaluationV3Event } from "@langwatch/experiment-contract";
 /**
  * One run's progress in Redis under a 24-hour TTL. Enables polling across processes; `POST
  * /run` starts on one replica, `GET /runs/{runId}` is served by any. Connection injected to
  * ensure both see the same Redis instance.
  */
 import { createLogger } from "@langwatch/observability";
-import type { EvaluationV3Event } from "@langwatch/experiment-contract";
-import type { Redis } from "ioredis";
 import { nowInstant } from "@langwatch/time";
+import type { Redis } from "ioredis";
+
 import {
   ExperimentRunProgressRepository,
   type ExperimentRunProgressFailure,

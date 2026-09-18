@@ -1,12 +1,10 @@
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  */
 import { initTRPC } from "@trpc/server";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
-import { annotationTrpcTransport } from "../annotation.trpc.ts";
 import {
   createAnnotationTestAuthz,
   createAnnotationTestApp,
@@ -15,6 +13,8 @@ import {
   createAnnotationTestTraces,
   createAnnotationTestUsers,
 } from "../../app/__tests__/annotation.fixture.ts";
+import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
+import { annotationTrpcTransport } from "../annotation.trpc.ts";
 
 type TestContext = { actor: { id: string } };
 

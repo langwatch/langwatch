@@ -10,10 +10,11 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/authz-contract";
+import { type Instant, fromDate, toDate } from "@langwatch/time";
+
 import { AuthzListingRepository } from "../authz-listing.repository.ts";
 import type { AuthzDatabase } from "../authz-read.repository.ts";
 import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
-import { type Instant, fromDate, toDate } from "@langwatch/time";
 
 const USER_CREATED_ROLE_KIND = "custom" as const;
 const ACCESS_LISTING_USER_SELECT = {
@@ -503,9 +504,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     userId: string;
     groupIds: readonly string[];
   }): Record<string, unknown>[] {
-    const principals: Record<string, unknown>[] = [
-      { principalType: "USER", principalId: userId },
-    ];
+    const principals: Record<string, unknown>[] = [{ principalType: "USER", principalId: userId }];
     if (groupIds.length > 0) {
       principals.push({
         principalType: "GROUP",

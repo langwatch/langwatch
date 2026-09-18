@@ -9,11 +9,11 @@ import {
   UnauthorizedError,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { completeDatasetApi } from "../../app/__tests__/dataset-api.fake.ts";
-import { HandledError } from "@langwatch/handled-error";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
+import { completeDatasetApi } from "../../app/__tests__/dataset-api.fake.ts";
 import { createDatasetErrorHandler } from "../dataset-rest.errors.ts";
 import { createDatasetRest } from "../dataset.rest.ts";
 

@@ -2,14 +2,15 @@
 // don't confuse users to ask support.
 
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { Menu } from "@langwatch/design-system/menu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ChevronsUpDown, Lock } from "lucide-react";
 import {
   type AccessLevel,
   PERMISSION_CATEGORIES,
   type PermissionCategory,
 } from "@langwatch/api-key-contract";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { ChevronsUpDown, Lock } from "lucide-react";
+
 import { categoryAccessAvailability } from "../../model/api-key-permissions.ts";
 
 export type PermissionSelection = "none" | AccessLevel;

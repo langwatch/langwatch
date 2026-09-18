@@ -4,10 +4,10 @@
  * since the frame fully remounts (fresh CDN/Babel) on identity change, not on every keystroke.
  */
 
+import { useDashboardWidgetInPlaceEditor } from "../../behavior/use-dashboard-widget-in-place-editor.ts";
 import type { DashboardWidgetDraft } from "../../model/dashboard-widget-definition.ts";
 import { DashboardWidgetEditDrawer } from "./dashboard-widget-edit-drawer.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
-import { useDashboardWidgetInPlaceEditor } from "../../behavior/use-dashboard-widget-in-place-editor.ts";
 
 /** The drawer's chart preview isn't grid-constrained: a fixed, generous height. */
 const DRAWER_PREVIEW_HEIGHT_PX = 320;

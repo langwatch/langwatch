@@ -1,9 +1,10 @@
-import type { BlobSweepReport,
+import type {
+  BlobSweepReport,
   OpsBlobPage,
   OpsBlobSort,
   OpsBlobStoreStats,
-  OpsBlobSummary } from "@langwatch/ops-contract";
-
+  OpsBlobSummary,
+} from "@langwatch/ops-contract";
 
 /**
  * Outcome of an atomic hand delete. `refusedLiveLeases` is non-zero only

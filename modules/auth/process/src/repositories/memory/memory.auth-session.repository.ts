@@ -1,7 +1,4 @@
-import type {
-  AuthSessionRepository,
-  StoredBrowserSession,
-} from "../auth-session.repository.ts";
+import type { AuthSessionRepository, StoredBrowserSession } from "../auth-session.repository.ts";
 import type { MemoryAuthDatabase } from "./memory.auth.database.ts";
 
 /** The `Session` rows in memory, with the Prisma twin's delete semantics. */

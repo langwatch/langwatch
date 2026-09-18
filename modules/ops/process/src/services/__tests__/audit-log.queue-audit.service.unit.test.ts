@@ -4,9 +4,10 @@ import type {
   RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
 import { describe, expect, it } from "vitest";
-import { QueueAuditAdapter } from "../audit-log.queue-audit.service.ts";
+
 import { PrismaProcessAuditRepository } from "../../repositories/prisma/prisma.process-audit.repository.ts";
 import { PrismaSchedulerAuditRepository } from "../../repositories/prisma/prisma.scheduler-audit.repository.ts";
+import { QueueAuditAdapter } from "../audit-log.queue-audit.service.ts";
 
 class RecordingAuditLog implements AuditLogApi {
   readonly commands: RecordAuditLogCommand[] = [];

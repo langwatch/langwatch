@@ -1,3 +1,4 @@
+import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point.ts";
 import { buildHistogramRow } from "./explicit-histogram.ts";
 import { buildExponentialHistogramRow } from "./exponential-histogram.ts";
 import { type BucketEntry, baseRow } from "./rollup-row.ts";
@@ -10,7 +11,6 @@ import {
   usesPredecessor,
 } from "./sequence.ts";
 import { buildSummaryRow } from "./summary.ts";
-import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point.ts";
 
 const BUILDERS = {
   gauge: buildGaugeRow,

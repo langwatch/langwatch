@@ -28,9 +28,7 @@ const CONNECT_ACCESS = {
     "The connected-session protocol authenticates its declared credential facts and throws typed refusals.",
 };
 
-export function createAgentConnectRest(
-  relayMaxPayloadMb?: number,
-): Readonly<{
+export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<AgentApi>;

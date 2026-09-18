@@ -1,6 +1,6 @@
-import { Boxes, Building2, type LucideIcon, UserRound, Waypoints } from "lucide-react";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import { Boxes, Building2, type LucideIcon, UserRound, Waypoints } from "lucide-react";
 
 /** Product registry; Settings excluded (no switcher, no memory, own shell) */
 export type ProductId = "me" | "llm-ops" | "gateway" | "governance";
@@ -77,10 +77,7 @@ export function productById(id: ProductId): ProductDefinition {
 /** Checks if product is org-scoped; registry owns scope so fifth product means one edit */
 export function isOrganizationScopedProduct(id: ProductId | null): boolean {
   if (!id) return false;
-  return (
-    PRODUCTS.find((candidate) => candidate.id === id)?.scopeKind ===
-    "organization"
-  );
+  return PRODUCTS.find((candidate) => candidate.id === id)?.scopeKind === "organization";
 }
 
 /**

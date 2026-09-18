@@ -1,6 +1,7 @@
 import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
+
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 
 const logger = createLogger("langwatch:api-key:cli-login-key-reaper");
@@ -13,14 +14,14 @@ const logger = createLogger("langwatch:api-key:cli-login-key-reaper");
 export class CliLoginKeyReapService {
   static create(options: {
     repository: ApiKeyRepository;
-    revoke: (input: {
-      id: string;
-      organizationId: string;
-      userId: string;
-    }) => Promise<unknown>;
+    revoke: (input: { id: string; organizationId: string; userId: string }) => Promise<unknown>;
     now?: () => Instant;
   }): CliLoginKeyReapService {
-    return new CliLoginKeyReapService(options.repository, options.revoke, options.now ?? nowInstant);
+    return new CliLoginKeyReapService(
+      options.repository,
+      options.revoke,
+      options.now ?? nowInstant,
+    );
   }
 
   private constructor(

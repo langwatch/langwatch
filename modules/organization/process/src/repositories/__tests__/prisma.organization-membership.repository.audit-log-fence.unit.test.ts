@@ -3,8 +3,9 @@
  */
 
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organization-membership.repository.ts";
 
 const organizationUserFindMany = vi.fn();

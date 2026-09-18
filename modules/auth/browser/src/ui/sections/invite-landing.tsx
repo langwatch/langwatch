@@ -1,14 +1,15 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
-import { AuthCard } from "../elements/auth-card.tsx";
-import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import { readHandledError } from "../../model/read-handled-error.ts";
-import { acceptInviteResultSchema } from "../../model/accept-invite-result.ts";
+
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn, signOut, useSession } from "../../behavior/auth-client.tsx";
-import Link from "../elements/router-link.tsx";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
+import { acceptInviteResultSchema } from "../../model/accept-invite-result.ts";
+import { readHandledError } from "../../model/read-handled-error.ts";
+import { AuthCard } from "../elements/auth-card.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import Link from "../elements/router-link.tsx";
 import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
 
 /** Invitation landing: handles signed-out, signed-in, and expired cases. */

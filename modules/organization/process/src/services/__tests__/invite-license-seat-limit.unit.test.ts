@@ -1,10 +1,10 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
-import { InviteService } from "../invite.service.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
+import { InviteService } from "../invite.service.ts";
 
 /** Lapsed licenses still bind their sold seat count. */
 function buildService(options: { maxMembers: number; currentFullMembers: number }) {

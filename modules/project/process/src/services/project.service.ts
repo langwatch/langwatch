@@ -1,3 +1,4 @@
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   PROJECT_KIND,
   activeProjectsByScopesInputSchema,
@@ -36,15 +37,15 @@ import {
   PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
   ProjectSlugConflictError,
-  TeamNotInOrganizationError
+  TeamNotInOrganizationError,
 } from "@langwatch/project-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
-import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
+
 import type { ProjectRepository } from "../repositories/project.repository.ts";
+import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
+import { mintProjectSlug } from "../rules/project-slug-service.rules.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
-import { mintProjectSlug } from "../rules/project-slug-service.rules.ts";
 
 /** The LWQL column mapping a project's ingestion key is synced to. Nothing in
  * this module implements it yet — it is the one caller-supplied capability

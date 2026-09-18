@@ -5,20 +5,21 @@ import {
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
+
 import { CodingAgentApp } from "./app/coding-agent.app.ts";
 import { codingAgentRepositories } from "./repositories/coding-agent-repositories.registry.ts";
-import {
-  codingAgentRest,
-  codingAgentRestCaller,
-  codingAgentRollupRest,
-} from "./transport/coding-agent.rest.ts";
-import { codingAgentV1Rest, codingAgentV1RestCaller } from "./transport/coding-agent-v1.rest.ts";
-import { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
 import {
   RedisCodingAgentProcessingRepository,
   type RedisCodingAgentProcessingRepositoryOptions,
 } from "./repositories/redis/redis.coding-agent-processing.repository.ts";
 import type { CodingAgentProcessingPipeline } from "./repositories/redis/redis.coding-agent-session-pipeline.repository.ts";
+import { codingAgentV1Rest, codingAgentV1RestCaller } from "./transport/coding-agent-v1.rest.ts";
+import {
+  codingAgentRest,
+  codingAgentRestCaller,
+  codingAgentRollupRest,
+} from "./transport/coding-agent.rest.ts";
+import { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
 
 export type { CodingAgentInfrastructure } from "./app/coding-agent.app.ts";
 

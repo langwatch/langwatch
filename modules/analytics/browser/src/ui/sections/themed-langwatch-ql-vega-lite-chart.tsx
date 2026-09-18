@@ -4,7 +4,6 @@
  * adapter: the chart takes a resolved theme, and only this module resolves one.
  */
 
-import { LangWatchQLVegaLiteChart as VegaLiteChart } from "./langwatch-ql-vega-lite-chart.tsx";
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
@@ -13,7 +12,9 @@ import {
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
 } from "@langwatch/analytics-contract/visualization";
+
 import { useLangwatchVegaTokens } from "../../behavior/use-langwatch-vega-tokens.ts";
+import { LangWatchQLVegaLiteChart as VegaLiteChart } from "./langwatch-ql-vega-lite-chart.tsx";
 
 export interface LangWatchQLVegaLiteChartProps {
   readonly spec: unknown;

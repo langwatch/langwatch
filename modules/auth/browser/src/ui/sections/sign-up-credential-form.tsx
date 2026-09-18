@@ -5,22 +5,24 @@ import { PASSWORD_REQUIREMENTS_HINT, passwordProblem } from "@langwatch/identity
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { applyHandledErrorToForm } from "../../model/apply-handled-error-to-form.ts";
-import { FormServerError } from "../elements/form-server-error.tsx";
-import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import { readHandledError } from "../../model/read-handled-error.ts";
-import { usePublicEnv } from "../../behavior/use-public-env.ts";
-import { authFailureMessage } from "../../model/auth-failure-message.ts";
+
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn } from "../../behavior/auth-client.tsx";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import { applyHandledErrorToForm } from "../../model/apply-handled-error-to-form.ts";
+import { authFailureMessage } from "../../model/auth-failure-message.ts";
 import { credentialSignInFailure } from "../../model/credential-sign-in.ts";
-import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
-import "../elements/auth-front-door.css";
 import { SHAPE } from "../../model/front-door-theme.ts";
+import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
+import { readHandledError } from "../../model/read-handled-error.ts";
 import { EmailPill } from "../elements/email-pill.tsx";
+
+import "../elements/auth-front-door.css";
+import { FormServerError } from "../elements/form-server-error.tsx";
 import { FrontDoorField } from "../elements/front-door-field.tsx";
-import { PasskeySignUpButton } from "./passkey-sign-up-button.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { PasswordInput } from "../elements/password-input.tsx";
+import { PasskeySignUpButton } from "./passkey-sign-up-button.tsx";
 import { MethodDivider } from "./sign-in-method-picker.tsx";
 
 // No name here: onboarding asks for it where it's worth asking, not at the

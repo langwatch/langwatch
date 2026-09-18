@@ -1,11 +1,16 @@
 import { Box, Grid, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { formatCost } from "@langwatch/design-system/display-formatters";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+
+import {
+  contextHealthBand,
+  contextWindowCeiling,
+  type ContextHealthTone,
+} from "./context-health.ts";
 import type { CodingAgentSessionDisplay } from "./session-display.ts";
-import { formatCost } from "@langwatch/design-system/display-formatters";
-import { contextHealthBand, contextWindowCeiling, type ContextHealthTone } from "./context-health.ts";
 import {
   deriveSessionSignals,
   formatCompact,

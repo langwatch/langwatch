@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
 
 import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
+import { STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES } from "../model/dashboard-widget/presets.ts";
 import { analyticsApi as api } from "./analytics-api.ts";
-import {
-  STARTER_WIDGET_CODE,
-  STARTER_WIDGET_QUERIES,
-} from "../model/dashboard-widget/presets.ts";
 import { useShowErrorToast } from "./analytics-feedback.ts";
 import { useWidgetPreview } from "./use-widget-preview.ts";
 
@@ -34,9 +31,7 @@ export function useCreateDashboardWidgetDrawer({
   const [drawerTab, setDrawerTab] = useState<"code" | "queries">("code");
   const [draftName, setDraftName] = useState("New widget");
   const [draftCode, setDraftCode] = useState(STARTER_WIDGET_CODE);
-  const [draftQueries, setDraftQueries] = useState<DashboardWidgetQuery[]>(
-    STARTER_WIDGET_QUERIES,
-  );
+  const [draftQueries, setDraftQueries] = useState<DashboardWidgetQuery[]>(STARTER_WIDGET_QUERIES);
 
   const preview = useWidgetPreview({
     code: draftCode,
@@ -75,8 +70,7 @@ export function useCreateDashboardWidgetDrawer({
           void utils.dashboardWidgets.list.invalidate({ projectId });
           onClose();
         },
-        onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't create this widget" }),
+        onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create this widget" }),
       },
     );
   };

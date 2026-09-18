@@ -1,3 +1,4 @@
+import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
  * The `project.*` procedures over the real runtime, one `ProjectApi` fake
@@ -5,7 +6,6 @@
  * against the declared output schema. Spec: modules/project/specs/project-service.feature.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   PersonalProjectProtectedError,

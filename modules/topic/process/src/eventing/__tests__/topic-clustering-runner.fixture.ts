@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 import type { TopicClusteringRunnerDeps } from "../topic-clustering-runner.intent.ts";
 
 export function makeProject(overrides: Record<string, unknown> = {}) {

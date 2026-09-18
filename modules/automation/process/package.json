@@ -29,7 +29,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
@@ -41,12 +40,13 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/task": "workspace:*",

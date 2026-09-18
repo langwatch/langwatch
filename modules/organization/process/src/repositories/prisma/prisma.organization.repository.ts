@@ -8,6 +8,7 @@ import {
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
+
 import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,

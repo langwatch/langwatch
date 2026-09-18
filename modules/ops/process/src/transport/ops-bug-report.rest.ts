@@ -12,8 +12,8 @@ import {
   type RestRawResult,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { HTTPException } from "hono/http-exception";
 import { OpsApi, submitBugReportSchema } from "@langwatch/ops-contract";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 /**

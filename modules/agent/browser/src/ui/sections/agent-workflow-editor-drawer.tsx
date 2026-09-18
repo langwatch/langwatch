@@ -13,6 +13,7 @@ import { type AgentInputBinding, type Field as AgentField } from "@langwatch/age
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
+
 import {
   useWorkflowAgentEditor,
   type WorkflowAgentEditorOptions,

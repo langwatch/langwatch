@@ -1,10 +1,11 @@
+import { resolveRequestBound } from "@langwatch/plans";
 /**
  * The registry enterprise ceiling is the outer validation shell for the
  * optimized-queues page size: above 400 refuses, at 400 parses. The
  * application clamps the effective take to the caller's tier.
  */
 import { describe, expect, it } from "vitest";
-import { resolveRequestBound } from "@langwatch/plans";
+
 import { annotationApiOptimizedQueuesInputSchema } from "../annotation-trpc.schemas.ts";
 
 const ENTERPRISE_PAGE_SIZE = resolveRequestBound("annotationPageSizeMax", "ENTERPRISE");

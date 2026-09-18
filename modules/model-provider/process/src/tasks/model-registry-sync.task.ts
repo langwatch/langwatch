@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+
 import type {
   LLMModelEntry,
   LLMModelPricing,
@@ -7,8 +8,10 @@ import type {
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
+import { nowInstant } from "@langwatch/time";
 import { OpenRouter } from "@openrouter/sdk";
 import type { Model } from "@openrouter/sdk/models";
+
 import {
   auditCatalog,
   blockingFindings,
@@ -30,7 +33,6 @@ import {
   mapProviderName,
 } from "../rules/provider-id-mapping.rules.ts";
 import { getReasoningConfig } from "../rules/reasoning-config.rules.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:task:model-registry-sync");
 

@@ -1,19 +1,19 @@
+import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 /**
  * The pinned experiment wire: twenty tRPC procedures and sixteen REST routes
  * with their origin/main names, kinds and permissions.
  * Spec: modules/experiment/specs/experiment-service.feature.
  */
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
-import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { experimentsTrpc } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
 import { experimentDspyStepsRest } from "../experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "../experiment-init.rest.ts";
+import { experimentV3Rest } from "../experiment-v3.rest.ts";
+import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts";
 import { experimentRest } from "../experiment.rest.ts";
 import { experimentTrpcTransport } from "../experiment.trpc.ts";
-import { experimentV3AliasRest, experimentV3Rest } from "../experiment-v3.rest.ts";
-import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts";
 
 /** Records the access each declared procedure asked for, building nothing. */
 function accessDeclaredBy(declaration: {
@@ -146,8 +146,18 @@ describe("given the experiment REST families", () => {
         ["get", "/runs", "getApiExperimentsRuns", "evaluations:view"],
         ["get", "/runs/:runId", "getApiExperimentsRunsByRunId", "evaluations:view"],
         ["get", "/runs/:runId/results", "getApiExperimentsRunsByRunIdResults", "evaluations:view"],
-        ["get", "/:slug/workbench-state", "getApiExperimentsBySlugWorkbenchState", "experiments:view"],
-        ["put", "/:slug/workbench-state", "putApiExperimentsBySlugWorkbenchState", "experiments:update"],
+        [
+          "get",
+          "/:slug/workbench-state",
+          "getApiExperimentsBySlugWorkbenchState",
+          "experiments:view",
+        ],
+        [
+          "put",
+          "/:slug/workbench-state",
+          "putApiExperimentsBySlugWorkbenchState",
+          "experiments:update",
+        ],
         ["get", "/:slug/versions", "getApiExperimentsBySlugVersions", "experiments:view"],
         [
           "post",
@@ -177,17 +187,6 @@ describe("given the experiment REST families", () => {
 
     it("answers the browser run doors under the namespace they have always answered at", () => {
       expect(experimentWorkbenchRunRest.namespace).toBe(experimentV3Rest.namespace);
-    });
-
-    it("keeps the legacy evaluations-v3 alias public and literal", () => {
-      const [alias] = experimentV3AliasRest.router().routes;
-
-      expect(alias).toMatchObject({
-        method: "get",
-        path: "/api/evaluations/v3/*",
-        operation: "evaluationsV3Alias",
-        access: { kind: "public" },
-      });
     });
   });
 });

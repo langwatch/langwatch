@@ -16,6 +16,17 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { downloadCsv } from "@langwatch/csv/download";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
+import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
+import { Pagination } from "@langwatch/design-system/pagination";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { keepPreviousData } from "@tanstack/react-query";
 import {
   type ColumnDef,
@@ -29,19 +40,7 @@ import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useDebounce } from "use-debounce";
 import { useStore } from "zustand";
 
-import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer.tsx";
-import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
-import { Pagination } from "@langwatch/design-system/pagination";
-import { SearchInput } from "@langwatch/design-system/search-input";
-import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { showErrorToast } from "@langwatch/browser-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
-import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal.tsx";
-import { downloadCsv } from "@langwatch/csv/download";
+import { useDatasetRecordSync } from "../../../../behavior/datasets/editor/use-dataset-record-sync.ts";
 import {
   createDatasetEditorStore,
   type EditorColumn,
@@ -63,7 +62,8 @@ import {
 } from "../../../../model/dataset-table-context.tsx";
 import { datasetTableCss } from "../../../../model/dataset-table-styles.ts";
 import { VirtualizedTableBody } from "../../../blocks/virtualized-table-body.tsx";
-import { useDatasetRecordSync } from "../../../../behavior/datasets/editor/use-dataset-record-sync.ts";
+import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer.tsx";
+import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal.tsx";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -215,10 +215,7 @@ export function DatasetEditorTable({
   // bare-string debounce would leave the previous dataset's term live for
   // 300ms after switching, long enough to fetch the new dataset narrowed by
   // a word never typed against it.
-  const searchScope = useMemo(
-    () => ({ datasetId, text: searchInput }),
-    [datasetId, searchInput],
-  );
+  const searchScope = useMemo(() => ({ datasetId, text: searchInput }), [datasetId, searchInput]);
   const [debouncedSearch] = useDebounce(searchScope, 300);
   const activeSearch =
     datasetId && debouncedSearch.datasetId === datasetId
@@ -229,8 +226,7 @@ export function DatasetEditorTable({
   // `isSearching` alone is the wrong gate for withdrawing ways to add a row —
   // it trails the box by 300ms, long enough to offer a row search is about to
   // remove. RESULTS still gate on `isSearching`: nothing to say until it runs.
-  const hasSearchTakenTheGrid =
-    !!datasetId && (!!searchInput.trim() || isSearching);
+  const hasSearchTakenTheGrid = !!datasetId && (!!searchInput.trim() || isSearching);
 
   // Where the user was before the search started, so clearing it puts them back
   // rather than on page 1 — see `onSearchChange` below, which maintains it.
@@ -315,17 +311,10 @@ export function DatasetEditorTable({
   // Snap page back into range; guard against search settling to avoid bouncing to page 1.
   const isSearchSettling = (searchInput.trim() || undefined) !== activeSearch;
   useEffect(() => {
-    if (serverRecordCount == null || holdingPreviousData || isSearchSettling)
-      return;
+    if (serverRecordCount == null || holdingPreviousData || isSearchSettling) return;
     const count = Math.max(1, Math.ceil(serverRecordCount / pageSize));
     if (page > count) setPage(count);
-  }, [
-    serverRecordCount,
-    pageSize,
-    page,
-    holdingPreviousData,
-    isSearchSettling,
-  ]);
+  }, [serverRecordCount, pageSize, page, holdingPreviousData, isSearchSettling]);
 
   const datasetName = datasetId ? databaseDataset.data?.name : inMemoryDataset?.name;
   const columnTypes: DatasetColumns = useMemo(
@@ -502,11 +491,7 @@ export function DatasetEditorTable({
   const hasSearchFailed = isSearching && !!databaseDatasetError;
   // Match count only reportable once search settles; avoid false counts during in-flight or error.
   const isMatchCountKnown = !hasSearchFailed && !holdingPreviousData;
-  const displayRowCount = hasSearchFailed
-    ? 0
-    : showAddRow
-      ? Math.max(rowCount + 1, 3)
-      : rowCount;
+  const displayRowCount = hasSearchFailed ? 0 : showAddRow ? Math.max(rowCount + 1, 3) : rowCount;
 
   // Block page navigation while a record save is queued or in flight: switching
   // pages reloads the store (setData drops the prior page's records), so an

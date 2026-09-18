@@ -1,16 +1,17 @@
 import { BookOpen, Search, Sparkles } from "lucide-react";
 import { useMemo } from "react";
+
 import {
   MIN_SEARCH_QUERY_LENGTH,
   RECENT_ITEMS_DISPLAY_LIMIT,
 } from "../model/command-bar-constants.ts";
+import type { Command, RecentItem, SearchResult } from "../model/command-bar-types.ts";
 import { findEasterEgg } from "../model/command-easter-eggs.ts";
 import type { ListItem } from "../model/command-icon-info.ts";
-import type { Command, RecentItem, SearchResult } from "../model/command-bar-types.ts";
-import type { GroupedRecentItems } from "./use-recent-items.ts";
 import { useTopLevelNavigationCommands } from "./use-command-feature-flags.ts";
 import type { FilteredCommands } from "./use-filtered-commands.ts";
 import type { FilteredProject } from "./use-filtered-projects.ts";
+import type { GroupedRecentItems } from "./use-recent-items.ts";
 
 /**
  * Hook that builds the flat list of all items for keyboard navigation and display.

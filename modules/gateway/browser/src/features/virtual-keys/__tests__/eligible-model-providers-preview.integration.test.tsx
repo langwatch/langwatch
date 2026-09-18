@@ -4,15 +4,16 @@
  * Spec: specs/ai-gateway/governance/vk-scope-inheritance.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { fromDate } from "@langwatch/time";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { OrgModelProvider } from "../model/eligible-model-providers.ts";
 import {
   EligibleModelProvidersPreview,
   EligibleModelProvidersSummary,
 } from "../ui/blocks/eligible-model-providers-preview.tsx";
-import type { OrgModelProvider } from "../model/eligible-model-providers.ts";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -126,7 +127,10 @@ describe("given the eligible model providers panel at a project scope", () => {
     it("does not offer it to the key", () => {
       renderPreview([
         orgProvider,
-        { ...projectProvider, disabledAt: new Date("2026-07-01T00:00:00Z") },
+        {
+          ...projectProvider,
+          disabledAt: fromDate(new Date("2026-07-01T00:00:00Z")),
+        },
       ]);
 
       expect(screen.getByText("Central Anthropic")).toBeTruthy();
@@ -138,7 +142,10 @@ describe("given the eligible model providers panel at a project scope", () => {
     it("falls back to the empty state instead of listing them", () => {
       const { container } = renderPreview([
         { ...orgProvider, enabled: false },
-        { ...projectProvider, disabledAt: new Date("2026-07-01T00:00:00Z") },
+        {
+          ...projectProvider,
+          disabledAt: fromDate(new Date("2026-07-01T00:00:00Z")),
+        },
       ]);
 
       expect(container.textContent).toContain("No model providers visible at this scope");

@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * Every virtual key stores the project its traces and costs land in, against real Postgres.
  * @vitest-environment node
@@ -7,12 +8,9 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
-import { TraceDestinationProjectService } from "./support/trace-destination-project-service.ts";
-
 import { PostgresVirtualKeyAdapter } from "../testing.ts";
+import { TraceDestinationProjectService } from "./support/trace-destination-project-service.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();

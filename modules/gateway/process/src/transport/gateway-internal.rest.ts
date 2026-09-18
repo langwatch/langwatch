@@ -1,13 +1,14 @@
-import { createHash, createHmac, timingSafeEqual } from "crypto";
-
 /**
  * `/api/internal/gateway`: control plane between the two halves of one
- * deployment. Every route answers behind {@link gatewayInternalSignature}'s
+ * deployment. Every route answers behind {@link GatewayInternalIdentity}'s
  * HMAC gate; each capability is OPTIONAL, refusing (503) rather than silent.
  */
-import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
+import { anyAuthenticated } from "@langwatch/api/access";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
+  gatewayInternalHeadersSchema,
+  gatewayInternalChangesQuerySchema,
+  gatewayInternalBucketQuerySchema,
   gatewayInternalCodexRefreshSchema,
   gatewayInternalConfigParamsSchema,
   gatewayInternalGuardrailCheckSchema,
@@ -17,27 +18,31 @@ import {
   gatewayInternalResolveKeySchema,
   gatewayInternalSessionParamsSchema,
   gatewayInternalSpendCommandBatchSchema,
-  GatewayInternalAuthenticationError,
-  GatewayInternalAuthenticationUnavailableError,
   GatewayApi,
+  gatewayInternalHealthAnswers,
+  gatewayInternalResolveKeyAnswers,
+  gatewayInternalCodexRefreshAnswers,
+  gatewayInternalConfigAnswers,
+  gatewayInternalChangesAnswers,
+  gatewayInternalGuardrailAnswers,
+  gatewayInternalBucketSpendAnswers,
+  gatewayInternalSpendCommandsAnswers,
+  gatewayInternalReserveSessionAnswers,
+  gatewayInternalPatchSessionAnswers,
+  gatewayInternalReportUsageAnswers,
+  gatewayInternalBootstrapAnswers,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant, type Instant } from "@langwatch/time";
-import type { Context, MiddlewareHandler, Next } from "hono";
-import { HTTPException } from "hono/http-exception";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
+import { logAuthDecision } from "../services/gateway-internal-identity.service.ts";
 import {
   VirtualKeyCryptoService,
   VirtualKeyCryptoError,
 } from "../services/virtual-key-crypto.service.ts";
 
 const logger = createLogger("langwatch:gateway-internal");
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
@@ -48,29 +53,23 @@ const PRODUCES_JSON = "application/json";
  * is the family's own HMAC, applied under its paths before any route.
  */
 const GATEWAY_INTERNAL_GATE =
-  "the Go data plane signs every call with the deployment's own gateway secret, and gatewayInternalSignature verifies it under this family's paths before any route runs";
+  "the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs";
 
 // ── the family's own answers ────────────────────────────────────────────
 
-/** One answer, in the shape `c.json(body, status)` used to write. */
-function answer(body: unknown, status: ContentfulStatusCode = 200): RestRawResult {
-  return {
-    status,
-    headers: { "content-type": PRODUCES_JSON },
-    body: JSON.stringify(body),
-  };
+function answer<const Body>(body: Body) {
+  return { status: 200 as const, body };
 }
 
-/** One refusal, in the envelope the Go client already parses. */
-function refuse(
-  status: ContentfulStatusCode,
-  error: Readonly<{ type: string; code: string; message: string } & Record<string, unknown>>,
-): RestRawResult {
-  return answer({ error }, status);
+function refuse<Status extends 400 | 401 | 403 | 404 | 429 | 501 | 503>(
+  status: Status,
+  error: { type: string; code: string; message: string } & Record<string, unknown>,
+) {
+  return { status, body: { error } };
 }
 
 /** 503 when no session store: the gateway must refuse the mint, not book an unbilled call. */
-const realtimeSessionsUnavailable = (): RestRawResult =>
+const realtimeSessionsUnavailable = () =>
   refuse(503, {
     type: "unavailable",
     code: "realtime_sessions_unavailable",
@@ -87,117 +86,6 @@ function readJson(raw: string): unknown {
 }
 
 // ── the family's own door ───────────────────────────────────────────────
-
-export const GATEWAY_SIGNATURE_WINDOW_SECONDS = 300;
-
-/**
- * Build the canonical string the Go gateway signs:
- *   METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
- */
-export function buildGatewayCanonicalString(input: {
-  method: string;
-  path: string;
-  timestamp: string;
-  body: string;
-}): string {
-  const bodyHash = createHash("sha256").update(input.body).digest("hex");
-
-  return `${input.method}\n${input.path}\n${input.timestamp}\n${bodyHash}`;
-}
-
-/** hex(hmac_sha256(secret, canonical)) */
-export function computeGatewaySignature(secret: string, canonical: string): string {
-  return createHmac("sha256", secret).update(canonical).digest("hex");
-}
-
-function logAuthDecision(
-  request: Request,
-  code: string,
-  status: number,
-  detail?: Record<string, unknown>,
-): void {
-  logger.warn(
-    {
-      code,
-      status,
-      path: new URL(request.url).pathname,
-      gatewayNodeId: request.headers.get("X-LangWatch-Gateway-Node") ?? null,
-      ...detail,
-    },
-    `gateway-internal auth: ${code}`,
-  );
-}
-
-/**
- * This family's gate travels with the declaration since a published control
- * plane can't change what a deployed Go gateway demands. HMAC checked before
- * timestamp (avoids a timing channel); an unset secret 500s, never admits all.
- */
-export function gatewayInternalSignature(secretOf: () => string | undefined): MiddlewareHandler {
-  return async function verify(c: Context, next: Next) {
-    const secret = secretOf();
-    if (!secret) {
-      logAuthDecision(c.req.raw, "gateway_internal_secret_missing", 500);
-      throw new GatewayInternalAuthenticationUnavailableError();
-    }
-
-    const presentedSig = c.req.header("X-LangWatch-Gateway-Signature");
-    const presentedTs = c.req.header("X-LangWatch-Gateway-Timestamp");
-    if (!presentedSig || !presentedTs) {
-      logAuthDecision(c.req.raw, "missing_signature", 401, {
-        hasSignature: Boolean(presentedSig),
-        hasTimestamp: Boolean(presentedTs),
-      });
-
-      throw new GatewayInternalAuthenticationError(
-        "missing_signature",
-        "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
-      );
-    }
-
-    const body = await c.req.raw.clone().text();
-    const url = new URL(c.req.url);
-    const canonical = buildGatewayCanonicalString({
-      method: c.req.method,
-      path: url.pathname,
-      timestamp: presentedTs,
-      body,
-    });
-    const expected = computeGatewaySignature(secret, canonical);
-
-    const a = Buffer.from(expected);
-    const b = Buffer.from(presentedSig);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      logAuthDecision(c.req.raw, "invalid_signature", 401);
-
-      throw new GatewayInternalAuthenticationError("invalid_signature", "signature mismatch");
-    }
-
-    const ts = Number.parseInt(presentedTs, 10);
-    if (!Number.isFinite(ts)) {
-      logAuthDecision(c.req.raw, "invalid_timestamp", 401, { presentedTs });
-
-      throw new GatewayInternalAuthenticationError(
-        "invalid_timestamp",
-        "X-LangWatch-Gateway-Timestamp must be unix seconds",
-      );
-    }
-
-    const now = Math.floor(nowInstant().epochMilliseconds / 1000);
-    if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
-      logAuthDecision(c.req.raw, "timestamp_out_of_window", 401, { driftSeconds: now - ts });
-
-      throw new GatewayInternalAuthenticationError(
-        "timestamp_out_of_window",
-        `timestamp drift > ${GATEWAY_SIGNATURE_WINDOW_SECONDS}s`,
-      );
-    }
-
-    await next();
-
-    return undefined;
-  };
-}
 
 // ── §4.1 resolving a presented virtual key ──────────────────────────────
 
@@ -266,24 +154,26 @@ function virtualKeyStatusRejection({
 export const gatewayInternalRest = defineRestRouter(GatewayApi)
   .withNamespace("gateway-internal")
   .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("internalSecret")
   .withAddressing("literal", { v1Twin: false })
 
   // §4.7: probe for /health. Riding the signed channel is the point — a 200 here
   // also proves the shared HMAC secret matches, not just that the pod is up.
   .get("/api/internal/gateway/health", "gatewayInternalHealth")
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalHealthAnswers)
   .withDocs({ hide: true })
   .handle(() => answer({ status: "ok" }))
 
   // §4.1 — resolve a raw virtual key to a signed JWT and its current revision.
   .post("/api/internal/gateway/resolve-key", "gatewayInternalResolveKey")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalResolveKeyAnswers)
   .withDocs({ hide: true })
-  .handle(async ({ app, raw, request }) => {
+  .withHeaders(gatewayInternalHeadersSchema)
+  .handle(async ({ app, raw }, headers) => {
     const presented = gatewayInternalResolveKeySchema.safeParse(readJson(raw) ?? {});
     if (!presented.success) {
       return refuse(400, {
@@ -295,14 +185,18 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
 
     const parseRejection = virtualKeyParseRejection(presented.data.key_presented);
     if (parseRejection) {
-      logAuthDecision(request, parseRejection.code, parseRejection.status);
+      logAuthDecision(
+        headers["x-langwatch-gateway-node"],
+        parseRejection.code,
+        parseRejection.status,
+      );
 
       return refuse(parseRejection.status, { ...parseRejection });
     }
 
     const vk = await app.findVirtualKeyBySecret(presented.data.key_presented);
     if (!vk) {
-      logAuthDecision(request, "virtual_key_not_found", 401);
+      logAuthDecision(headers["x-langwatch-gateway-node"], "virtual_key_not_found", 401);
 
       return refuse(401, {
         type: "invalid_api_key",
@@ -316,7 +210,12 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       expiresAt: vk.expiresAt,
     });
     if (statusRejection) {
-      logAuthDecision(request, statusRejection.code, statusRejection.status, { vkId: vk.id });
+      logAuthDecision(
+        headers["x-langwatch-gateway-node"],
+        statusRejection.code,
+        statusRejection.status,
+        { vkId: vk.id },
+      );
 
       return refuse(statusRejection.status, { ...statusRejection });
     }
@@ -356,9 +255,9 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
 
   .post("/api/internal/gateway/codex/refresh", "gatewayInternalCodexRefresh")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalCodexRefreshAnswers)
   .withDocs({ hide: true })
   .handle(async ({ app, raw }) => {
     const parsed = gatewayInternalCodexRefreshSchema.safeParse(readJson(raw));
@@ -408,10 +307,11 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
 
   .get("/api/internal/gateway/config/:vk_id", "gatewayInternalConfig")
   .withParams(gatewayInternalConfigParamsSchema)
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalConfigAnswers)
   .withDocs({ hide: true })
-  .handle(async ({ app, input, request }) => {
+  .withHeaders(gatewayInternalHeadersSchema)
+  .handle(async ({ app, input }, headers) => {
     const vk = await app.findVirtualKeyForConfig(input.vk_id);
     if (!vk) {
       return refuse(404, {
@@ -421,13 +321,14 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       });
     }
 
-    const ifNoneMatch = request.headers.get("If-None-Match");
+    const ifNoneMatch = headers["if-none-match"];
     const currentETag = await app.configVersionToken(vk);
     if (ifNoneMatch && ifNoneMatch === currentETag) {
-      return new Response(null, {
-        status: 304,
-        headers: { ETag: currentETag, "Cache-Control": "no-store" },
-      });
+      return {
+        status: 304 as const,
+        body: void 0,
+        headers: { "content-type": PRODUCES_JSON, ETag: currentETag, "Cache-Control": "no-store" },
+      };
     }
 
     // EC4 — the CH repo lets the materialiser stamp current-period spend
@@ -444,17 +345,17 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
         ETag: currentETag,
         "Cache-Control": "no-store",
       },
-      body: JSON.stringify(payload),
+      body: gatewayInternalConfigAnswers[200].parse(payload),
     } as const;
   })
 
   .get("/api/internal/gateway/changes", "gatewayInternalChanges")
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalChangesAnswers)
   .withDocs({ hide: true })
-  .handle(async ({ app, request }) => {
-    const query = new URL(request.url).searchParams;
-    const orgId = query.get("organization_id");
+  .withQuery(gatewayInternalChangesQuerySchema)
+  .handle(async ({ app, input }) => {
+    const orgId = input.organization_id;
     if (!orgId) {
       return refuse(400, {
         type: "bad_request",
@@ -465,7 +366,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
 
     let since: bigint;
     try {
-      since = BigInt(query.get("since") ?? "0");
+      since = BigInt(input.since);
     } catch {
       return refuse(400, {
         type: "bad_request",
@@ -474,10 +375,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       });
     }
 
-    const timeoutSeconds = Math.max(
-      1,
-      Math.min(25, Number.parseInt(query.get("timeout_s") ?? "10", 10) || 10),
-    );
+    const timeoutSeconds = Math.max(1, Math.min(25, Number.parseInt(input.timeout_s, 10) || 10));
     const deadline = nowInstant().epochMilliseconds + timeoutSeconds * 1000;
 
     while (nowInstant().epochMilliseconds < deadline) {
@@ -500,17 +398,18 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
 
     const current = await app.currentRevision(orgId);
 
-    return new Response(null, {
-      status: 204,
+    return {
+      status: 204 as const,
+      body: void 0,
       headers: { "X-LangWatch-Revision": current.toString() },
-    });
+    };
   })
 
   .post("/api/internal/gateway/guardrail/check", "gatewayInternalGuardrailCheck")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalGuardrailAnswers)
   .withDocs({ hide: true })
   .handle(async ({ app, raw }) => {
     const body = readJson(raw);
@@ -566,13 +465,13 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
   })
 
   .get("/api/internal/gateway/budget-bucket-spend", "gatewayInternalBudgetBucketSpend")
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalBucketSpendAnswers)
   .withDocs({ hide: true })
-  .handle(async ({ app, request }) => {
-    const query = new URL(request.url).searchParams;
-    const budgetId = query.get("budget_id") ?? "";
-    const endUserId = query.get("end_user_id") ?? "";
+  .withQuery(gatewayInternalBucketQuerySchema)
+  .handle(async ({ app, input }) => {
+    const budgetId = input.budget_id;
+    const endUserId = input.end_user_id;
     if (!budgetId || !endUserId) {
       return refuse(400, {
         type: "bad_request",
@@ -595,9 +494,9 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
 
   .post("/api/internal/gateway/spend-commands", "gatewayInternalSpendCommands")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalSpendCommandsAnswers)
   .withDocs({ hide: true })
   .handle(async ({ app, raw }) => {
     const parsed = gatewayInternalSpendCommandBatchSchema.safeParse(readJson(raw));
@@ -632,9 +531,9 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
   // ── realtime voice sessions (ADR-097) ─────────────────────────────────
   .post("/api/internal/gateway/realtime-sessions", "gatewayInternalReserveRealtimeSession")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalReserveSessionAnswers)
   .withDocs({ hide: true })
   .handle(async ({ app, raw }) => {
     const parsed = gatewayInternalReserveSessionSchema.safeParse(readJson(raw));
@@ -680,9 +579,9 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
   )
   .withParams(gatewayInternalSessionParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalPatchSessionAnswers)
   .withDocs({ hide: true })
   .handle(async ({ app, input, raw }) => {
     const parsed = gatewayInternalPatchSessionSchema.safeParse(readJson(raw));
@@ -732,9 +631,9 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
   )
   .withParams(gatewayInternalSessionParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalReportUsageAnswers)
   .withDocs({ hide: true })
   .handle(async ({ app, input, raw }) => {
     const parsed = gatewayInternalReportUsageSchema.safeParse(readJson(raw));
@@ -770,8 +669,8 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
   // (LW_GATEWAY_BOOTSTRAP_PULL); the address answers 501 until it is built, so a
   // gateway that dials it learns that rather than 404ing on an unknown route.
   .get("/api/internal/gateway/bootstrap", "gatewayInternalBootstrap")
-  .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
-  .withRawResponse({ produces: PRODUCES_JSON })
+  .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
+  .responds(gatewayInternalBootstrapAnswers)
   .withDocs({ hide: true })
   .handle(() =>
     refuse(501, {

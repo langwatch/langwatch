@@ -1,7 +1,4 @@
-import type {
-  UsageStatsOrganization,
-  UsageStatsOrganizationDatabase,
-} from "../../app/ops.app.ts";
+import type { UsageStatsOrganization, UsageStatsOrganizationDatabase } from "../../app/ops.app.ts";
 import { UsageStatsOrganizationRepository } from "../observe/usage-stats.repository.ts";
 
 export class PrismaUsageStatsOrganizationRepository extends UsageStatsOrganizationRepository {

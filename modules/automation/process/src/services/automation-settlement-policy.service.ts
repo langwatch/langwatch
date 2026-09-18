@@ -1,6 +1,6 @@
+import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { DerivedTraceEvent, TraceSummaryData } from "@langwatch/trace-contract";
-import type { TriggerSummary } from "@langwatch/automation-contract";
 
 /** Dispatch-time recheck against the settled trace. This has one
  * compatibility implementation while the trace filter evaluator finishes its

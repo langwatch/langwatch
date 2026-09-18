@@ -9,6 +9,7 @@ import {
 } from "@langwatch/data-privacy-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import type { DataPrivacyResolution } from "../../app/data-privacy.members.ts";
 import { OtlpSpanContentDropService } from "../otlp-span-content-drop.service.ts";
 

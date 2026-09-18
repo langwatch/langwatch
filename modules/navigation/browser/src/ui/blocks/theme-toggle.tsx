@@ -1,8 +1,9 @@
 import { Box, HStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
-import { useTheme } from "next-themes";
-import { LuMonitor, LuMoon, LuSun } from "react-icons/lu";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { useTheme } from "next-themes";
+import type { ReactNode } from "react";
+import { LuMonitor, LuMoon, LuSun } from "react-icons/lu";
+
 import { MENU_ITEM_HEIGHT } from "./side-menu-link.tsx";
 
 export type ThemeToggleProps = {

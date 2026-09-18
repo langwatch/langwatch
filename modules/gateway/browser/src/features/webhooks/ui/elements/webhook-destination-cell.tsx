@@ -1,4 +1,5 @@
 import { Badge, Table, Text, VStack } from "@chakra-ui/react";
+
 import {
   WEBHOOK_DESTINATION_LABELS,
   type WebhookDestinationKind,

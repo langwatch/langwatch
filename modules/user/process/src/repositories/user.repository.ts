@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import type {
   CreateUserInput,
   CreateCredentialUserInput,
@@ -13,7 +14,6 @@ import type {
   UserSsoStatus,
   UserTourPreference,
 } from "@langwatch/user-contract";
-import type { Instant } from "@langwatch/time";
 
 /**
  * The issuer a credential account row is stored under — it travels with the

@@ -1,4 +1,24 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+import type {
+  EnsuredPersonalWorkspace,
+  FindPersonalWorkspaceInput,
+  PersonalWorkspace,
+  PersonalWorkspaceInput,
+} from "@langwatch/organization-contract";
+
+import type {
+  MeProject,
+  MePersonalCredential,
+  MeUsage,
+  UserAvatarCaller,
+} from "./user-rest.schemas.ts";
+import type {
+  UserBudgetIncreaseRequested,
+  UserHomePagePickerState,
+  UserPersonalBudget,
+  UserPersonalContext,
+} from "./user.responses.ts";
+import type { UserApiRequestBudgetIncreaseInput } from "./user.schemas.ts";
 import type {
   ChangeOwnPasswordInput,
   CompleteUserVerificationInput,
@@ -36,25 +56,6 @@ import type {
   UserTourPreference,
   UserVerificationCompleted,
 } from "./user.ts";
-import type {
-  MeProject,
-  MePersonalCredential,
-  MeUsage,
-  UserAvatarCaller,
-} from "./user-rest.schemas.ts";
-import type {
-  UserBudgetIncreaseRequested,
-  UserHomePagePickerState,
-  UserPersonalBudget,
-  UserPersonalContext,
-} from "./user.responses.ts";
-import type { UserApiRequestBudgetIncreaseInput } from "./user.schemas.ts";
-import type {
-  EnsuredPersonalWorkspace,
-  FindPersonalWorkspaceInput,
-  PersonalWorkspace,
-  PersonalWorkspaceInput,
-} from "@langwatch/organization-contract";
 
 /** Portable User use cases exposed to process peers and transports. */
 export interface UserApi {

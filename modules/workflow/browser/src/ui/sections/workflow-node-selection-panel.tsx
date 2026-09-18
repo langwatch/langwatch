@@ -1,10 +1,10 @@
 import { Box, Button, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
+import type { Component, Field, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
 import merge from "lodash-es/merge";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
 
-import type { Component, Field, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
-import { MODULES } from "../../model/studio-registry.ts";
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
+import { MODULES } from "../../model/studio-registry.ts";
 import { AgentNodeDraggable } from "./workflow-agent-node-draggable.tsx";
 import { EvaluatorNodeDraggable } from "./workflow-evaluator-node-draggable.tsx";
 import { NodeDraggable } from "./workflow-node-draggable.tsx";

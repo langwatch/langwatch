@@ -1,13 +1,14 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { MetricProcessingEvent } from "@langwatch/metric-contract";
-import {
-  ClickHouseMetricDataPointAppendRepository,
-  type MetricClickHouseClientResolver,
-} from "./clickhouse.metric-data-point-append.repository.ts";
+
 import {
   MetricProcessingService,
   type MetricProcessingPipeline,
 } from "../../services/metric-processing.service.ts";
+import {
+  ClickHouseMetricDataPointAppendRepository,
+  type MetricClickHouseClientResolver,
+} from "./clickhouse.metric-data-point-append.repository.ts";
 
 /**
  * Durable metric processing, composed from nothing but a tenant-keyed

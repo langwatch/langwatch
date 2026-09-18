@@ -1,5 +1,6 @@
 import type { LLMModelEntry, LLMModelPricing } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   auditCatalog,
   blockingFindings,

@@ -3,8 +3,9 @@ import {
   type CodingAgentPullRequestMappingBackfillInput,
   type CodingAgentSession,
 } from "@langwatch/coding-agent-contract";
-import { createLogger } from "@langwatch/observability";
 import type { GithubApi } from "@langwatch/github-contract";
+import { createLogger } from "@langwatch/observability";
+
 import type { CodingAgentClock } from "../app/coding-agent.members.ts";
 import type { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
 

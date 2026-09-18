@@ -1,7 +1,7 @@
 import type { RedisConnection } from "@langwatch/redis-client";
+import { nowInstant } from "@langwatch/time";
 
 import type { GatewayAgentCacheEntryRepository } from "../../repositories/gateway-agent-cache.repository.ts";
-import { nowInstant } from "@langwatch/time";
 
 export type GatewayAgentCacheEntryStore = GatewayAgentCacheEntryRepository;
 

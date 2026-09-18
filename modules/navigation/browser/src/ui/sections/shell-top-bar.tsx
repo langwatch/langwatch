@@ -2,6 +2,7 @@
 
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Settings as SettingsIcon } from "lucide-react";
+
 import type { NavigationShellReadyState } from "../../behavior/use-navigation-shell-state.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
@@ -9,10 +10,10 @@ import type { ProductId } from "../../model/products.ts";
 import { DevBadge } from "../elements/dev-badge.tsx";
 import { LogoIcon } from "../elements/logo-icon.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
-import { ProductSwitcherMenu } from "./product-switcher-menu.tsx";
 import { AppHeaderUserMenu } from "./app-header-user-menu.tsx";
 import { OrganizationSelect } from "./organization-select.tsx";
 import { ProductScopeControl } from "./product-scope-control.tsx";
+import { ProductSwitcherMenu } from "./product-switcher-menu.tsx";
 
 const LOGO_HEIGHT = 26;
 

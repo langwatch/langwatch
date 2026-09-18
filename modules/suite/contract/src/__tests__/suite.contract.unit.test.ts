@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+
 import { suiteRunStateDataSchema, suiteTargetSchema } from "../index.ts";
 
 describe("Suite contract", () => {

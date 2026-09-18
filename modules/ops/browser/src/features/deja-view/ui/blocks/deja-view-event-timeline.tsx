@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
+
 import { formatTimestamp, hashEventTypeColor } from "../../model/deja-view-fragment.ts";
 import type { EventResult } from "../../model/deja-view-types.ts";
 

@@ -12,6 +12,8 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
@@ -21,8 +23,6 @@ import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-tex
 import { Popover } from "@langwatch/design-system/popover";
 import { Slider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import type { TRPCClientErrorLike } from "@trpc/client";

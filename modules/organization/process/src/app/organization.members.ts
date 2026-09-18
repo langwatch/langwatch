@@ -1,4 +1,3 @@
-import type { Instant } from "@langwatch/time";
 import type {
   JoinRequestJoining,
   JoinRequestJoiningChanged,
@@ -6,8 +5,11 @@ import type {
   OrganizationInviteValidation,
   OrganizationListedInvite,
 } from "@langwatch/organization-contract";
+import type { Instant } from "@langwatch/time";
+
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
-export interface OrganizationInfrastructure {  groupIdentity: GroupIdentity;
+export interface OrganizationInfrastructure {
+  groupIdentity: GroupIdentity;
   organizationGrantCache: OrganizationGrantCache;
   organizationPromptSeed: OrganizationPromptSeed;
   organizationSeatLicense: OrganizationSeatLicense;
@@ -170,22 +172,18 @@ export interface OrganizationPromptSeed {
   reportCompensationFailure(error: Error): void;
 }
 
-
 export interface OrganizationSettingsSecret {
   encrypt(value: string): string;
   decrypt(value: string): string;
 }
 
-
 export interface PersonalWorkspaceIdentity {
   create(input: { userId: string; organizationId: string }): PersonalWorkspaceResourceIds;
 }
 
-
 export interface PersonalWorkspaceDiagnostics {
   warn(message: string, context: Record<string, unknown>): void;
 }
-
 
 export interface TeamIdentity {
   createTeam(input: { name: string }): {
@@ -194,7 +192,6 @@ export interface TeamIdentity {
   };
   createBindingId(): string;
 }
-
 
 export interface GroupIdentity {
   createGroupId(): string;

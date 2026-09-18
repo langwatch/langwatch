@@ -1,16 +1,9 @@
-import {
-  HStack,
-  IconButton,
-  Input,
-  InputGroup,
-  type InputProps,
-  Text,
-} from "@chakra-ui/react";
+import { HStack, IconButton, Input, InputGroup, type InputProps, Text } from "@chakra-ui/react";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Clipboard, ClipboardPlus, Eye, EyeOff } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { useColorModeValue } from "@langwatch/design-system/color-mode";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface InputWithPrefixProps {
   value: string;

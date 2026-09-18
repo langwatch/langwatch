@@ -7,6 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { OrganizationUserRole, RoleBindingScopeType } from "../../../model/prisma-types.ts";
 import type { PendingBinding } from "../group-binding-input-row.tsx";
 

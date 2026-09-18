@@ -8,6 +8,7 @@ import type { WireOf } from "@langwatch/api/web";
 type AgentWithFields = WireOf<StoredAgentWithFields>;
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import {
   AgentHttpEditorDrawer,
   type AgentHttpEditorDrawerProps,

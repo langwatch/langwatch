@@ -5,11 +5,13 @@
  */
 import crypto from "node:crypto";
 import type { Readable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   getStoredObjectStorageScheme,
-  mintAzureBlobStoredObjectUri,ObjectNotFoundError
+  mintAzureBlobStoredObjectUri,
+  ObjectNotFoundError,
 } from "@langwatch/stored-object-contract";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Token-mode tests isolate the driver from real @azure/identity network
 // calls — token acquisition itself is covered by
@@ -26,8 +28,8 @@ vi.mock("#adapters/azure-blob-token-provider.adapter", () => ({
 }));
 
 import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
-import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 
 const ACCOUNT_NAME = "lwtestacct";
 // Base64-encoded 256-bit key — arbitrary fixed value for deterministic signature tests.

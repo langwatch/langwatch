@@ -1,5 +1,6 @@
-import type { AlertType } from "../trigger.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
+
+import type { AlertType } from "../trigger.ts";
 
 /**
  * The variable contract every trigger-notification template renders against, for

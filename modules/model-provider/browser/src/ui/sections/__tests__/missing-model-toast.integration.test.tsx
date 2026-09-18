@@ -3,8 +3,8 @@
  * UX contract: specs/model-providers/missing-model-popup.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

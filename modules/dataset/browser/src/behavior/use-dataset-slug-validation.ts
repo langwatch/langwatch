@@ -2,10 +2,11 @@
  * every 1000ms while typing continues.
  */
 
+import { nowInstant } from "@langwatch/time";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import type { SlugValidation } from "../model/dataset-slug-validation.ts";
 import { datasetApi } from "./dataset-api.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** How long typing has to settle before the trailing check runs. */
 const SETTLE_MS = 500;

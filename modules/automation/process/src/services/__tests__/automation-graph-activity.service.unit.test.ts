@@ -1,22 +1,7 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
-import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
-import {
-  AutomationSlackSecretsService,
-  AutomationSlackBotTokenDecryptorService,
-} from "../automation-slack-secrets.service.ts";
-import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
-import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
-import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
-import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
-import {
-  PrismaTriggerRepository,
-  type TriggerDatabase,
-} from "../../repositories/prisma/prisma.trigger.repository.ts";
-import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
-import { AutomationGraphDeliveryService } from "../automation-graph-delivery.service.ts";
-import { AutomationGraphActivityService } from "../automation-graph-activity.service.ts";
+
 import {
   BreachingAnalytics,
   createGraphActivityPrismaDouble,
@@ -27,6 +12,22 @@ import {
   SilentLogger,
   TestDispatchErrors,
 } from "../../fixtures/graph-activity.fixture.ts";
+import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
+import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
+import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+import {
+  PrismaTriggerRepository,
+  type TriggerDatabase,
+} from "../../repositories/prisma/prisma.trigger.repository.ts";
+import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
+import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
+import { AutomationGraphActivityService } from "../automation-graph-activity.service.ts";
+import { AutomationGraphDeliveryService } from "../automation-graph-delivery.service.ts";
+import {
+  AutomationSlackSecretsService,
+  AutomationSlackBotTokenDecryptorService,
+} from "../automation-slack-secrets.service.ts";
+import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
 
 /**
  * Spec: modules/automation/specs/graph-alert-worker-composition.feature
@@ -46,7 +47,10 @@ function compose(
   const clock = new FrozenClock();
   const delivery = over.delivery ?? new RecordingDelivery();
   const logger = new SilentLogger();
-  const triggers = PrismaTriggerRepository.create(database.prisma as unknown as TriggerDatabase, clock);
+  const triggers = PrismaTriggerRepository.create(
+    database.prisma as unknown as TriggerDatabase,
+    clock,
+  );
   const service = AutomationGraphActivityService.create({
     triggers,
     customGraphs: PrismaCustomGraphRepository.create(database.prisma as never),
@@ -61,7 +65,9 @@ function compose(
     analytics: new BreachingAnalytics() as unknown as AnalyticsService,
     delivery,
     webhooks: AutomationWebhookSecretsService.create(crypto),
-    slackTokens: new AutomationSlackBotTokenDecryptorService(AutomationSlackSecretsService.create(crypto)),
+    slackTokens: new AutomationSlackBotTokenDecryptorService(
+      AutomationSlackSecretsService.create(crypto),
+    ),
     emailCaps: AutomationEmailCapService.create({ store: null }),
     logger,
     dispatchErrors: new TestDispatchErrors(),

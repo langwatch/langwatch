@@ -2,6 +2,7 @@
  * The two reads the operator back office makes of the support inbox.
  */
 import type { BugReport, BugReportListing } from "@langwatch/ops-contract";
+
 import type { BugReportRepository } from "../repositories/admin/bug-report.repository.ts";
 
 export class BugReportInboxService {

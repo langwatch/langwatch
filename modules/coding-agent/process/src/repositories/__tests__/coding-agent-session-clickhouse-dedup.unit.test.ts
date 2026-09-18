@@ -1,14 +1,15 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 /**
  * @vitest-environment node
  * Dedup and tiebreak behaviour of the session ClickHouse repository (ADR-071).
  * @see specs/coding-agent/session-aggregate.feature
  */
 import { describe, expect, it } from "vitest";
-import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
+
 import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { parseClickHouseDateTimeMs } from "../clickhouse/clickhouse.mapper.ts";
+import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
+import { parseClickHouseDateTimeMs } from "../clickhouse/clickhouse.mapper.ts";
 
 /**
  * ClickHouse renders DateTime64 without a timezone suffix, and the
@@ -41,10 +42,7 @@ function makeRepository(client: ClickHouseQueryClient) {
  * `<expression> ASC|DESC` keys before LIMIT, where an expression is a column,
  * a `length(<column>)`, or a `+`-separated sum of columns.
  */
-function applyOrderBy(
-  rows: Record<string, unknown>[],
-  query: string,
-): Record<string, unknown>[] {
+function applyOrderBy(rows: Record<string, unknown>[], query: string): Record<string, unknown>[] {
   const clause = /ORDER BY([\s\S]*?)LIMIT/i.exec(query)?.[1];
   if (clause === undefined) return [...rows];
 

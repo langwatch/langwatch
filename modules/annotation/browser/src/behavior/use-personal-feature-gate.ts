@@ -1,7 +1,7 @@
 /** Enables the advanced-features bundle before an annotation hand-off to a dataset. */
 
-import { useCallback, useEffect, useState } from "react";
 import { personalWorkspaceFeaturesApi } from "@langwatch/organization-browser/surfaces/personal-workspace-features";
+import { useCallback, useEffect, useState } from "react";
 
 type PendingEnable = {
   projectId: string;

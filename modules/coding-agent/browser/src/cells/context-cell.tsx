@@ -1,8 +1,8 @@
 import { Text, VStack } from "@chakra-ui/react";
+import { formatTokens } from "@langwatch/design-system/display-formatters";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatTokens } from "@langwatch/design-system/display-formatters";
 import type { SessionListRow } from "../session-list-row.ts";
 import { ComparisonBar } from "./comparison-bar.tsx";
 import { MissingValue } from "./missing-value.tsx";

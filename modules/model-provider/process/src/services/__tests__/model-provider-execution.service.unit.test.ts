@@ -2,11 +2,12 @@
  * The second place the Codex licence is enforced.
  */
 
-import { describe, expect, it } from "vitest";
 import {
   expandLatestAlias,
   ModelRestrictedForExecutionError,
 } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
+
 import { ModelProviderExecutionService } from "../model-provider-execution.service.ts";
 
 function executionWith(providers: Record<string, unknown>, rowById?: unknown) {

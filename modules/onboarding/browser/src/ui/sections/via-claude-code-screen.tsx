@@ -7,9 +7,10 @@ import { useAnalytics } from "react-contextual-analytics";
 
 const MotionVStack = motion.create(VStack);
 
-import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useActiveProject } from "./active-project-context.tsx";
+
+import { copyToClipboard } from "../../behavior/shared/copy-to-clipboard.ts";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import {
   PROMPT_AGENT_PERFORMANCE,
   PROMPT_EXPERIMENTS,
@@ -25,10 +26,10 @@ import {
   CLOUD_ENDPOINT,
   findLangwatchEnvLines,
 } from "../../model/shared/build-mcp-config.ts";
-import { copyToClipboard } from "../../behavior/shared/copy-to-clipboard.ts";
-import { InlineCopyButton } from "./shared/inline-copy-button.tsx";
 import { JsonHighlight } from "../elements/shared/json-highlight.tsx";
 import { TabButton } from "../elements/shared/tab-button.tsx";
+import { useActiveProject } from "./active-project-context.tsx";
+import { InlineCopyButton } from "./shared/inline-copy-button.tsx";
 
 type TabKey = "prompt" | "skill" | "mcp";
 

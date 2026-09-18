@@ -1,3 +1,4 @@
+import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz.ts";
 /**
  * Grant rules: does a binding/legacy row/resource grant carry the requested
  * permission? Walk decides which to consult and order (ADR-092 §2).
@@ -5,7 +6,6 @@
 import { bindingScopeCanGrantPermission, permissionSatisfiedBy } from "./registry.ts";
 import { builtinRoleGrants, roleKeyForTeamRole } from "./roles.ts";
 import { audienceMatches, type ScopeChainLink } from "./scope.ts";
-import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz.ts";
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: flat ordered
 // sequence of legacy grant rules whose ORDER is the stage-A parity contract;

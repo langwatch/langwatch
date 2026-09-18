@@ -13,8 +13,9 @@ import {
   type AgentPushToCopies,
   type AgentSyncFromSource,
 } from "@langwatch/agent-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { createLogger } from "@langwatch/observability";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
+
 import type { AgentRepository, AgentCopyRecord } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
 

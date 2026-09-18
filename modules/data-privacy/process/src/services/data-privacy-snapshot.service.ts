@@ -11,6 +11,7 @@ import {
   type DataPrivacyScopeType,
   type DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
+
 import type { DataPrivacyDirectoryReader } from "../app/data-privacy.app.ts";
 import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
 

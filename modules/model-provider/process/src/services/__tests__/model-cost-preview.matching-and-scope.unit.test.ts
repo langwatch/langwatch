@@ -1,6 +1,7 @@
 // The span reader is a structural port, so matching and tenant scoping are testable with a fake
 // reader instead of live ClickHouse. Spec: model-cost-matching-spans-preview.feature
 import { describe, expect, it } from "vitest";
+
 import {
   ModelCostPreviewService,
   type ModelCostPreviewSpanReader,

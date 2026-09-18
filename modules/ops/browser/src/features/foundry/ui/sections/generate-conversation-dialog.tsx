@@ -1,18 +1,19 @@
-import { nowInstant } from "@langwatch/time";
 import { Box, Button, Flex, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { MessagesSquare } from "lucide-react";
-import { useState } from "react";
 import {
   PopoverBody,
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
+import { nowInstant } from "@langwatch/time";
+import { MessagesSquare } from "lucide-react";
+import { useState } from "react";
+
 import { useExecutionStore } from "../../behavior/execution.store.ts";
 import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
 import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
-import { generateConversation } from "../../model/generate-conversation.ts";
 import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
+import { generateConversation } from "../../model/generate-conversation.ts";
 
 const TURN_PRESETS = [10, 25, 50, 100] as const;
 

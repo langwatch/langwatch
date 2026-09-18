@@ -33,14 +33,14 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
@@ -54,6 +54,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "^4.1.9"

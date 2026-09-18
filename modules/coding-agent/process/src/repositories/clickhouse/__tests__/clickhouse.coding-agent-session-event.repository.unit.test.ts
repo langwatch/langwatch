@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
+
 import { TestClickHouseEndpoint } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
+import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 
 const endpoints: TestClickHouseEndpoint[] = [];
 

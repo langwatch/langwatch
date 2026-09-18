@@ -6,8 +6,8 @@ import { createAnalyticsComparisonWindow } from "@langwatch/analytics-process";
 import type { EvaluationApi, MonitorPerformanceQuery } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EvaluatorReplicationService } from "@langwatch/evaluator-process";
-import { MonitorCapabilityUnavailableError } from "@langwatch/monitor-contract";
 import { generate } from "@langwatch/ksuid";
+import { MonitorCapabilityUnavailableError } from "@langwatch/monitor-contract";
 
 import type {
   MonitorAppInfrastructure,
@@ -43,7 +43,9 @@ type MonitorWorkflowReplication = Readonly<{
       actor: Readonly<{ id: string }>;
     }>,
   ): Promise<string>;
-  deleteReplicatedWorkflow(input: Readonly<{ workflowId: string; projectId: string }>): Promise<void>;
+  deleteReplicatedWorkflow(
+    input: Readonly<{ workflowId: string; projectId: string }>,
+  ): Promise<void>;
 }>;
 
 function unreplicatedEvaluatorWorkflows(): MonitorWorkflowReplication {
@@ -73,7 +75,8 @@ class ProcessMonitorReplication implements MonitorReplicationReader {
     const copied = await EvaluatorReplicationService.create({
       replicateEvaluatorWorkflow: (replication) =>
         this.workflows.replicateEvaluatorWorkflow({ ...replication, actor: input.actor }),
-      deleteReplicatedWorkflow: (replication) => this.workflows.deleteReplicatedWorkflow(replication),
+      deleteReplicatedWorkflow: (replication) =>
+        this.workflows.deleteReplicatedWorkflow(replication),
     }).copyToProject({
       evaluators: {
         findById: (lookup) => this.evaluators.findById(lookup),
@@ -102,7 +105,9 @@ function composeMonitorPerformance(
 ): MonitorPerformance {
   const window = createAnalyticsComparisonWindow();
   const previousPeriodStartMs = ({ startMs, endMs }: { startMs: number; endMs: number }) =>
-    window.currentVsPrevious({ startDate: startMs, endDate: endMs }).previousPeriodStartDate.getTime();
+    window
+      .currentVsPrevious({ startDate: startMs, endDate: endMs })
+      .previousPeriodStartDate.getTime();
 
   return new EvaluationApiMonitorPerformance(evaluation, previousPeriodStartMs);
 }

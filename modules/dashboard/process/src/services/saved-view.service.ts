@@ -1,10 +1,11 @@
-import { generate } from "@langwatch/ksuid";
 import {
   SAVED_VIEW_KSUID_RESOURCE,
   SavedViewNotFoundError,
   SavedViewReorderUnknownIdsError,
   type SavedViewJson,
 } from "@langwatch/dashboard-contract";
+import { generate } from "@langwatch/ksuid";
+
 import type {
   SavedViewRecord,
   SavedViewRepository,

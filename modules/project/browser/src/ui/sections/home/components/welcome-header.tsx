@@ -1,7 +1,8 @@
 import { Heading } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
 import { SERIF } from "@langwatch/langy-browser/surfaces/asaplangy";
 import { nowInstant, toDate } from "@langwatch/time";
+import { useEffect, useState } from "react";
+
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { HttpWorkflowNlpRuntimeAdapter } from "../../channels/http/http.workflow-nlp-runtime.channel.ts";
 
 /**

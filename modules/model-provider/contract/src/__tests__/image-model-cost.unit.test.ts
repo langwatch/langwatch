@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { estimateCost } from "../model-cost.ts";
 import type { ModelCostRate } from "../model-provider.ts";
 
@@ -54,10 +55,7 @@ describe("estimateCost with image token rates", () => {
           inputImageTokens: 323,
           outputImageTokens: 196,
         }),
-      ).toBeCloseTo(
-        14 * IMAGE2_TEXT_IN + 323 * IMAGE2_IMAGE_IN + 196 * IMAGE2_IMAGE_OUT,
-        12,
-      );
+      ).toBeCloseTo(14 * IMAGE2_TEXT_IN + 323 * IMAGE2_IMAGE_IN + 196 * IMAGE2_IMAGE_OUT, 12);
     });
   });
 

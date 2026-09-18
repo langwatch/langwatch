@@ -6,10 +6,10 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 
 const { mutateMock, chartQueryMock } = vi.hoisted(() => ({
   mutateMock: vi.fn(),

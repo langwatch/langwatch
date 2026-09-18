@@ -32,9 +32,11 @@ export type PersonalQuery = Readonly<Record<string, string | undefined>>;
 export type PersonalHostRecording = {
   navigations: string[];
   /** The passkey ceremonies a screen ran, and what it named them with. */
-  passkeyCeremonies: (| { kind: "register" }
+  passkeyCeremonies: (
+    | { kind: "register" }
     | { kind: "rename"; id: string; name: string }
-    | { kind: "remove"; id: string })[];
+    | { kind: "remove"; id: string }
+  )[];
   /** The providers a screen asked to link an additional sign-in method with. */
   linkedProviders: string[];
   /** How many times a screen asked for the signed-in reader to be re-read. */

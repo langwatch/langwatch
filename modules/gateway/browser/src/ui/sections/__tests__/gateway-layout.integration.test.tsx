@@ -5,6 +5,7 @@
 
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import AiGatewayLayout from "../gateway-layout.tsx";
 

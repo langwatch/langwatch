@@ -3,9 +3,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
+
 import { BatchSection } from "../ui/sections/batch-section.tsx";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers.ts";
 

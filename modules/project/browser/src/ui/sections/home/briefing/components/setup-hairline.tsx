@@ -2,14 +2,15 @@ import { Box, Collapsible, chakra, Grid, HStack, Text, VStack } from "@chakra-ui
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { LuCheck } from "react-icons/lu";
+
+import { homeApi } from "../../../../../behavior/home-api.ts";
+import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
 import {
   buildOnboardingSteps,
   calculateCompletionPercentage,
   type OnboardingStepKey,
   STEP_ICON,
 } from "../../components/onboarding-progress.tsx";
-import { homeApi } from "../../../../../behavior/home-api.ts";
-import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
 
 /**
  * Setup checklist that collapses to a hairline after first activation.

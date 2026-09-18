@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 /**
  * The demand half that knows a project and resolves organization/marks
  * activity; the sweep is separate because it has no project.
@@ -5,10 +6,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { GithubHost } from "../../app/github.members.ts";
-import type { BranchMappingTarget } from "../github-branch-mapping.service.ts";
 import { GithubBranchDemandService } from "../github-branch-demand.service.ts";
+import type { BranchMappingTarget } from "../github-branch-mapping.service.ts";
 import { TestProjectService } from "./fixtures/github-services.fixture.ts";
-import { Temporal } from "@langwatch/time";
 
 const REQUEST = {
   tenantId: "project-1",

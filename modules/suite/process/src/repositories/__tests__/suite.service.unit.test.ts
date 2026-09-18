@@ -1,3 +1,11 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import {
+  ScenarioTestSuiteNotFoundError,
+  scenarioSchema,
+  type Scenario,
+  type ScenarioApi,
+} from "@langwatch/scenario-contract";
 import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
@@ -13,22 +21,15 @@ import {
   SuiteScopeEmptyError,
   SuiteTargetsRequiredError,
 } from "@langwatch/suite-contract";
-import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import {
-  ScenarioTestSuiteNotFoundError,
-  scenarioSchema,
-  type Scenario,
-  type ScenarioApi,
-} from "@langwatch/scenario-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
 import type { SuiteExecution } from "../../app/suite.app.ts";
-import { SuiteRepository } from "../suite.repository.ts";
-import { MemorySuiteRunRepository } from "../memory/memory.suite-run.repository.ts";
 import { SuiteService, type SuiteServiceOptions } from "../../services/suite.service.ts";
+import { MemorySuiteRunRepository } from "../memory/memory.suite-run.repository.ts";
+import { SuiteRepository } from "../suite.repository.ts";
 
 const suite = (overrides: Partial<Suite> = {}): Suite =>
   suiteSchema.parse({

@@ -8,8 +8,8 @@ import { LuInfo, LuScissors } from "react-icons/lu";
 
 import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
 import { computeParetoDominance } from "../batch-evaluation-results.pareto.ts";
-import type { VariantMetrics } from "../batch-evaluation-results.variant-metrics.ts";
 import { formatTradeoffSummary } from "../batch-evaluation-results.tradeoff.ts";
+import type { VariantMetrics } from "../batch-evaluation-results.variant-metrics.ts";
 
 export type TradeoffSummaryLineProps = {
   leaderboard: BTLeaderboard;

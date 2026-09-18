@@ -1,8 +1,8 @@
 import { createListCollection, HStack, Text } from "@chakra-ui/react";
-import { useMemo } from "react";
 import { datasetColumnTypeSchema, type DatasetColumnType } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { Select } from "@langwatch/design-system/select";
+import { useMemo } from "react";
 
 type ColumnTypeOption = { value: DatasetColumnType; label: string };
 

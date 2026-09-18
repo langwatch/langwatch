@@ -22,6 +22,7 @@ import {
   type UserSsoStatus,
   type UserTourPreference,
 } from "@langwatch/user-contract";
+
 import type {
   CreateCredentialUserRow,
   CreatePasskeyUserRow,

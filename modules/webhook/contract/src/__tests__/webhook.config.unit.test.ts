@@ -1,10 +1,10 @@
-import { InvalidRuntimeConfigError, RuntimeConfig } from "@langwatch/config";
+import { ConfigParseError, parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { webhookServerConfigDefinition } from "../webhook.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "webhook", definition: webhookServerConfigDefinition, source })
-    .value;
+import { webhookConfig } from "../webhook.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({ owners: [{ name: "webhook", config: webhookConfig }], environment }).webhook;
 
 describe("webhook server configuration", () => {
   describe("given a deployment sets neither fence", () => {
@@ -27,9 +27,7 @@ describe("webhook server configuration", () => {
   describe("given a deployment opens a fence a way nothing reads", () => {
     /** @scenario "An unreadable switch is refused instead of read as off" */
     it("refuses the boot rather than leaving the fence quietly closed", () => {
-      expect(() => read({ WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS: "true" })).toThrow(
-        InvalidRuntimeConfigError,
-      );
+      expect(() => read({ WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS: "true" })).toThrow(ConfigParseError);
     });
   });
 });

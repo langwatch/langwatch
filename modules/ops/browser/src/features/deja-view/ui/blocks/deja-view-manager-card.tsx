@@ -1,6 +1,6 @@
 import { Badge, Box, HStack, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
-
 import { nowInstant } from "@langwatch/time";
+
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 

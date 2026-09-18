@@ -1,12 +1,13 @@
 import { Box, Button, Input, Spinner } from "@chakra-ui/react";
-import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { MenuLink } from "../elements/analytics-menu-link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
-import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
 import { analyticsApi } from "../../behavior/analytics-api.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { MenuLink } from "../elements/analytics-menu-link.tsx";
 import { DashboardNameDialog } from "./dashboard-name-dialog.tsx";
 
 interface CustomDashboardsSectionProps {

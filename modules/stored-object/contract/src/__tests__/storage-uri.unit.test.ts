@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+
 import {
   getStoredObjectStorageScheme,
   mintAzureBlobStoredObjectUri,
@@ -8,7 +10,6 @@ import {
   redactStoredObjectStorageUri,
   redactStoredObjectStorageUrisInText,
 } from "../index.ts";
-import { describe, expect, it } from "vitest";
 
 describe("stored object storage URIs", () => {
   /** @scenario "Minted URI is content-addressed under projectId and sha256" */

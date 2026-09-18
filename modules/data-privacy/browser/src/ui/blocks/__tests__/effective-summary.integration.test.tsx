@@ -5,15 +5,16 @@
  * (organization, team, or full cascade) based on the scope filter.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
-import type React from "react";
-import { afterEach, describe, expect, it } from "vitest";
 import {
   type DataPrivacySnapshot,
   type PiiLevel,
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import { cleanup, render, screen } from "@testing-library/react";
+import type React from "react";
+import { afterEach, describe, expect, it } from "vitest";
+
 import { EffectiveSummary } from "../effective-summary.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (

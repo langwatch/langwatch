@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 /**
  * @vitest-environment node
  *
@@ -5,7 +6,7 @@
  * "no condition" would match everyone, the opposite of targeting new signups.
  */
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@langwatch/time";
+
 import {
   evaluateRules,
   type FeatureFlagRules,

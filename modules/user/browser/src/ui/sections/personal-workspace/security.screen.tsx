@@ -5,6 +5,7 @@
  */
 
 import { Heading, Text, VStack } from "@chakra-ui/react";
+
 import { usePersonalWorkspaceHost } from "../../../model/personal-workspace-host.ts";
 import { EmailAndLinkedAccountsSection } from "../email-and-linked-accounts-section.tsx";
 import { EnterpriseCapabilitiesSection } from "../enterprise-capabilities-section.tsx";

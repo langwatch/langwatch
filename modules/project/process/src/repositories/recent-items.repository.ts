@@ -1,4 +1,5 @@
 import type { Instant } from "@langwatch/time";
+
 import type { GetRecentItemsParams } from "../rules/recent-items.rules.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */

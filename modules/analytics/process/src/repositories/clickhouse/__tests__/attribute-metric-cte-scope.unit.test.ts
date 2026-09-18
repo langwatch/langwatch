@@ -1,10 +1,11 @@
+import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 /**
  * @regression Attributes-backed metrics (thread_id, user_id, etc.) emit `ts.Attributes[...]`
  * into the outer arrayJoin-CTE query, which has no `ts` in scope -- only 3 metrics were hoisted.
  * `transformMetricForDedup`'s guard only fired after a match, so the never-matching case slipped.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+
 import {
   __testOnly__,
   buildTimeseriesQuery,

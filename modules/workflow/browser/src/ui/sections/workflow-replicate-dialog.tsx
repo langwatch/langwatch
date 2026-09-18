@@ -5,12 +5,12 @@
  */
 
 import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
+import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
 
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 export function WorkflowReplicateDialog({

@@ -4,8 +4,8 @@ import {
   type WebhookActionParams,
   webhookMethodSchema,
 } from "@langwatch/automation-contract";
-import { z } from "zod";
 import { nowInstant, type Instant } from "@langwatch/time";
+import { z } from "zod";
 
 export const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -213,7 +213,8 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
     const current = existing?.signingSecretEncrypted
       ? crypto.decrypt(existing.signingSecretEncrypted)
       : null;
-    if (current === submitted) return AutomationWebhookSecretsService.keepStoredSigningSecret(existing);
+    if (current === submitted)
+      return AutomationWebhookSecretsService.keepStoredSigningSecret(existing);
     if (!current) return { signingSecretEncrypted: crypto.encrypt(submitted) };
     return {
       signingSecretEncrypted: crypto.encrypt(submitted),

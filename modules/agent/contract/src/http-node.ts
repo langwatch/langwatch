@@ -1,5 +1,5 @@
-import type { Field } from "./fields.ts";
 import type { HttpAuth, HttpHeader, HttpMethod } from "./config/http.ts";
+import type { Field } from "./fields.ts";
 
 export type HttpCallConfig = {
   url: string;

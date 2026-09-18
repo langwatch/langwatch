@@ -6,6 +6,7 @@
 
 import { Box, Button, Heading, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
+
 import { automationApi } from "../../behavior/automation-api.ts";
 
 /** Which of the two promises in the footer link the recipient took. */
@@ -63,11 +64,19 @@ export default function UnsubscribeScreen({ token }: { token: string }) {
         </Text>
         <VStack align="stretch" width="full" gap={3}>
           {resolved.data.triggerName && (
-            <Button variant="outline" loading={confirm.isPending} onClick={() => onConfirm("trigger")}>
+            <Button
+              variant="outline"
+              loading={confirm.isPending}
+              onClick={() => onConfirm("trigger")}
+            >
               Stop receiving {resolved.data.triggerName}
             </Button>
           )}
-          <Button colorPalette="red" loading={confirm.isPending} onClick={() => onConfirm("project")}>
+          <Button
+            colorPalette="red"
+            loading={confirm.isPending}
+            onClick={() => onConfirm("project")}
+          >
             Stop all notifications from {resolved.data.projectName}
           </Button>
         </VStack>

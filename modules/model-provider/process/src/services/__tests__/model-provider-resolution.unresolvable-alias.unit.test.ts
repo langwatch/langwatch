@@ -16,6 +16,7 @@ vi.mock("@langwatch/model-provider-contract", async (importOriginal) => ({
 }));
 
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+
 import { ModelProviderResolutionService } from "../model-provider-resolution.service.ts";
 
 const PLAYGROUND = "prompt.create_default";

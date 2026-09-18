@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { toCanonicalCustomModelList } from "../custom-model-list.rules.ts";
 
 describe("toCanonicalCustomModelList", () => {

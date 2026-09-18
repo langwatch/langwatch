@@ -1,10 +1,10 @@
-import { z } from "zod";
 import { filterFieldsEnum } from "@langwatch/analytics-browser/surfaces/filter-types";
 import type {
   EvaluationResult,
   EvaluationResultError,
   EvaluationResultSkipped,
 } from "@langwatch/evaluator-contract";
+import { z } from "zod";
 
 // ---------------------------------------------------------------------------
 // Precondition schemas (Zod-first, types inferred)

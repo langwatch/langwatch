@@ -5,8 +5,6 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry.ts";
-import { lookupBetweenRegisteredDatasets } from "./fixtures/valid/index.ts";
 import { validateVegaLiteSpec } from "../validate-vega-lite-spec.ts";
 import { ALLOWED_VEGA_EXPRESSION_IDENTIFIERS } from "../vega-lite-expressions.ts";
 import {
@@ -16,6 +14,8 @@ import {
 } from "../vega-lite-policy.ts";
 import { VEGA_LITE_SCHEMA_URL as S } from "../vega-lite-schema.ts";
 import type { VegaValidationError } from "../visualization-types.ts";
+import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry.ts";
+import { lookupBetweenRegisteredDatasets } from "./fixtures/valid/index.ts";
 
 const validate = (spec: unknown) =>
   validateVegaLiteSpec({

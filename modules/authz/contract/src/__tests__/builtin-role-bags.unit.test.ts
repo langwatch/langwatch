@@ -4,6 +4,7 @@
  * changes several roles at once. Spec: specs/rbac/fetch-org-role-permission-resolution.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { type BuiltinRoleKey, builtinRoleGrants, roleKeyForTeamRole } from "../roles.ts";
 
 const grants = (role: BuiltinRoleKey, permission: string): boolean =>

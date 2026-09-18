@@ -1,16 +1,20 @@
-// Routing keys are cross-process contract; test builds definition through adapter.
-import { describe, expect, it, vi } from "vitest";
 import {
   EventSourcing,
   EventStoreProducerOnly,
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
-import { AuthzGrantsCommandDispatcher,EventingAuthzCommandDispatcherAdapter } from "../authz-grants-command-dispatcher.service.ts";
-import type { AuthzGrantsCommandSenders } from "../authz-grants-command-dispatcher.service.ts";
-import type { PostgresAuthzDatabase } from "../../repositories/prisma/prisma.authz.database.ts";
+// Routing keys are cross-process contract; test builds definition through adapter.
+import { describe, expect, it, vi } from "vitest";
+
 import { PostgresAuthzAdapter } from "../../app/postgres-authz.build.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
+import type { PostgresAuthzDatabase } from "../../repositories/prisma/prisma.authz.database.ts";
+import {
+  AuthzGrantsCommandDispatcher,
+  EventingAuthzCommandDispatcherAdapter,
+} from "../authz-grants-command-dispatcher.service.ts";
+import type { AuthzGrantsCommandSenders } from "../authz-grants-command-dispatcher.service.ts";
 
 const ORGANIZATION = "organization-1";
 const ACTOR = { type: "user", id: "user-1" } as const;

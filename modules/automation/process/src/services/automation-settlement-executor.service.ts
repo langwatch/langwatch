@@ -1,4 +1,5 @@
 import type { IntentContext } from "@langwatch/eventing";
+
 import type {
   LogOverflowIntent,
   NotifyDigestIntent,

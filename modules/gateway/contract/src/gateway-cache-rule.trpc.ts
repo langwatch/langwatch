@@ -4,8 +4,8 @@
  * bundle, so this namespace is the platform surface for the rules themselves.
  */
 
-import { z } from "zod";
 import { defineTrpcContract } from "@langwatch/api/contract";
+import { z } from "zod";
 
 import {
   gatewayCacheRuleActionSchema,

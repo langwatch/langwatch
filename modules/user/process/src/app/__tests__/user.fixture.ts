@@ -1,25 +1,34 @@
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
-import { UserApp, type UserAvatarStorage, type UserInfrastructure } from "../user.app.ts";
-import type { UserRepositories } from "../../repositories/user.repositories.ts";
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
+import type { UserRepositories } from "../../repositories/user.repositories.ts";
+import { UserApp, type UserFacts } from "../user.app.ts";
+import type { UserAvatarStorage, UserInfrastructure } from "../user.members.ts";
 
-/** The issuer a test deployment stores its credential account rows under. */
-export const TEST_CREDENTIAL_ISSUER = "credential";
+/** The issuer this deployment stores its credential account rows under. */
+export const TEST_CREDENTIAL_ISSUER = "local:credential";
 
-export function createUserTestAuth() {
+/** The auth peer a suite runs against; `provider` is what ADR-027 resolved. */
+export function createUserTestAuth(provider = "email") {
   return Object.assign(createApiFixture<AuthApi>(), {
     revokeOtherBrowserSessions: vi.fn(async () => undefined),
     revokeAllBrowserSessions: vi.fn(async () => undefined),
+    resolveAuthProvider: vi.fn(async () => provider),
   });
 }
 
 export function createUserTestOps(isAdmin = false) {
   return createApiFixture<OpsApi>({ isAdmin: () => isAdmin });
+}
+
+export function createUserTestProjects() {
+  return createApiFixture<ProjectApi>({ findIdentity: async () => null });
 }
 
 export function createUserTestOrganizations(projectId = "project-1") {
@@ -30,6 +39,7 @@ export function createUserTestOrganizations(projectId = "project-1") {
     })),
     tryFindPersonalWorkspace: vi.fn(async () => null),
     tryGetOrganizationIdByTeamId: vi.fn(async () => null),
+    isMember: vi.fn(async () => true),
   });
 }
 
@@ -60,23 +70,20 @@ export class TestPasswordHasher {
   }
 }
 
+/** The deployment a suite runs against: no passkeys, no public base URL. */
+export const TEST_USER_CONFIG: UserFacts = { passkeysEnabled: false, baseUrl: null };
+
 /**
- * Everything the process holds, as a test supplies it: an email deployment
- * that offers no passkeys, budgets nobody has spent, and every capability the
- * account doors reach recorded rather than performed.
+ * What the process still hands this module, as a test supplies it: budgets
+ * nobody has spent, and every capability the account doors reach recorded
+ * rather than performed.
  */
 export function createUserTestInfrastructure(
   overrides: Partial<UserInfrastructure> = {},
 ): UserInfrastructure {
   return {
-    credentialIssuer: TEST_CREDENTIAL_ISSUER,
     avatarStorage: new TestUserAvatarStorage(),
     passwords: new TestPasswordHasher(),
-    deployment: {
-      authProvider: vi.fn(async () => "email"),
-      offersPasskeys: vi.fn(() => false),
-      findBaseUrl: vi.fn(() => null),
-    },
     rateLimit: vi.fn(async () => ({ allowed: true, resetAt: 0 })),
     analytics: { trackServerEvent: vi.fn() },
     federatedPasswords: {
@@ -85,23 +92,18 @@ export function createUserTestInfrastructure(
     },
     cliCredentials: { revokeForUser: vi.fn(async () => undefined) },
     organizations: {
-      isMember: vi.fn(async () => true),
       findSupportContact: vi.fn(async () => null),
       getBudgetIncreaseRecipient: vi.fn(async () => "admin@example.com"),
       findName: vi.fn(async () => null),
       findFirstProjectSlug: vi.fn(async () => null),
     },
-    projects: {
-      findById: vi.fn(async () => null),
-      findGovernanceProject: vi.fn(async () => null),
-    },
+    governanceProjects: { findGovernanceProject: vi.fn(async () => null) },
     gateway: {
       findDefaultRoutingPolicy: vi.fn(async () => null),
       listPersonalVirtualKeys: vi.fn(async () => []),
       checkBudget: vi.fn(async () => ({ decision: "allow", scopes: [], blockedBy: [] })),
     },
     budgetRequests: { sendBudgetIncreaseRequest: vi.fn(async () => undefined) },
-    verification: { completeEmailVerification: vi.fn(async () => undefined) },
     personalUsage: {
       personalUsage: vi.fn(async () => ({
         summary: {
@@ -128,18 +130,24 @@ export function createUserTestApp(
     members?: Partial<UserInfrastructure>;
     dependencies?: Partial<{
       auth: AuthApi;
+      identity: IdentityApi;
       organizations: OrganizationApi;
       ops: OpsApi;
+      projects: ProjectApi;
     }>;
+    facts?: UserFacts;
   }> = {},
 ): UserApp {
   return UserApp.createForTesting({
     repositories: input.repositories ?? MemoryUserRepositories.create(),
     members: createUserTestInfrastructure(input.members ?? {}),
+    facts: input.facts ?? TEST_USER_CONFIG,
     dependencies: {
       auth: input.dependencies?.auth ?? createUserTestAuth(),
+      identity: input.dependencies?.identity ?? createApiFixture<IdentityApi>(),
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
       ops: input.dependencies?.ops ?? createUserTestOps(),
+      projects: input.dependencies?.projects ?? createUserTestProjects(),
     },
   });
 }

@@ -1,17 +1,14 @@
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { describe, expect, it } from "vitest";
-import type {
-  OrganizationDataplane,
-  OrganizationDataplaneResolver,
-} from "../../app/ops.app.ts";
+
+import type { OrganizationDataplane, OrganizationDataplaneResolver } from "../../app/ops.app.ts";
 import { SystemMigrationCohortService } from "../system-migration-cohort.service.ts";
 
 /** The routing table as a fake: organizations it names are on their own instance. */
 class FakeDataplane implements OrganizationDataplaneResolver {
   readonly asked: string[] = [];
 
-  constructor(private readonly endpoints: Record<string, string>) {
-  }
+  constructor(private readonly endpoints: Record<string, string>) {}
 
   dataplaneFor(organizationId: string): OrganizationDataplane {
     this.asked.push(organizationId);

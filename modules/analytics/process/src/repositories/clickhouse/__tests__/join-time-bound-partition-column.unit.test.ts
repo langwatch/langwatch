@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import type { FilterField, AggregationTypes } from "@langwatch/analytics-contract";
 import { TIME_PARTITIONED_TABLES } from "@langwatch/clickhouse-client";
-import type { FilterField,AggregationTypes } from "@langwatch/analytics-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   buildDataForFilterQuery,
   buildTimeseriesQuery,

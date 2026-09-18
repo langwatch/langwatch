@@ -9,6 +9,7 @@ import type {
   AuthzTeamMemberBinding,
   RoleBindingScopeType,
 } from "@langwatch/authz-contract";
+
 import { AuthzListingRepository } from "../authz-listing.repository.ts";
 import type { AuthzDatabase } from "../authz-read.repository.ts";
 
@@ -241,8 +242,8 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
       },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     })) as (AuthzBindingForSynthesis & {
-        group: { organizationId: string } | null;
-      })[];
+      group: { organizationId: string } | null;
+    })[];
 
     return bindings
       .filter(

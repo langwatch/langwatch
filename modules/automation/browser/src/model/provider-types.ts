@@ -1,8 +1,10 @@
-import type { NotificationCadence,
+import type {
+  NotificationCadence,
   SavedTriggerRow,
   SharedDef,
   TemplateDraft,
-  VariableInfo } from "@langwatch/automation-contract";
+  VariableInfo,
+} from "@langwatch/automation-contract";
 import type { ComponentType } from "react";
 
 /** Browser definitions for automation providers. Delivery and secrets remain server-owned. */

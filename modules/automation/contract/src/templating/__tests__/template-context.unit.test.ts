@@ -1,10 +1,11 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import {
   buildGraphAlertTemplateContext,
   buildReportTemplateContext,
   buildTemplateContext,
 } from "../template-context.ts";
-import { Temporal } from "@langwatch/time";
 
 const baseArgs = {
   trigger: {

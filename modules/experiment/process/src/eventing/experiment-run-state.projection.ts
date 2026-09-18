@@ -1,5 +1,12 @@
-import { type FoldProjectionStore, type Projection,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
+import {
+  type FoldProjectionStore,
+  type Projection,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
+
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
+import { normalizeDurationMs } from "./experiment-run-duration.process.ts";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -14,7 +21,6 @@ import {
   targetResultEventSchema,
   traceMetricsComputedEventSchema,
 } from "./experiment-run-events.process.ts";
-import { normalizeDurationMs } from "./experiment-run-duration.process.ts";
 
 /**
  * State data for an experiment run. Matches the experiment_runs ClickHouse

@@ -4,13 +4,16 @@
  * Unit tests for S3Driver — verifies per-method contract using a mocked S3 client.
  */
 import { Readable } from "node:stream";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   ObjectNotFoundError,
   UnsupportedStorageSchemeError,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectS3TargetResolver } from "../../../app/stored-object.members.ts";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { StoredObjectBlobS3Repository } from "#repositories/s3/s3.stored-object-blob.repository";
+
+import type { StoredObjectS3TargetResolver } from "../../../app/stored-object.members.ts";
 
 // ---------------------------------------------------------------------------
 // Mocks

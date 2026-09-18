@@ -6,9 +6,6 @@
  */
 
 import { Box, Button, HStack, Input, Stack, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
-import { Temporal, toDate } from "@langwatch/time";
-
 // The leaf module, never the barrel: `timeWindow.ts` is import-free precisely
 // so the browser can read the same names and format the database is bound with,
 // while the barrel would drag the executor and the remediation registry in with
@@ -18,6 +15,8 @@ import {
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
 } from "@langwatch/analytics-contract";
+import { Temporal, toDate } from "@langwatch/time";
+import { useEffect, useState } from "react";
 
 import type { LangWatchQLTimeWindowValues } from "../../model/lwql-request-state.ts";
 

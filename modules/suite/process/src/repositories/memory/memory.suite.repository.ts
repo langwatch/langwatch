@@ -11,6 +11,7 @@ import {
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import { SuiteRepository } from "../suite.repository.ts";
 import { MemorySuiteDatabase } from "./memory.suite.database.ts";
 
@@ -112,10 +113,7 @@ export class MemorySuiteRepository extends SuiteRepository {
     return scenarioIds;
   }
 
-  async resolveScopeMembership(input: {
-    projectId: string;
-    scope: SuiteScope;
-  }): Promise<string[]> {
+  async resolveScopeMembership(input: { projectId: string; scope: SuiteScope }): Promise<string[]> {
     if (input.scope.mode === "scenarios") return [];
 
     const scenarios = this.database.activeScenarios(input.projectId);

@@ -1,12 +1,14 @@
+import { z } from "zod";
+
+import { HTTP_METHODS, httpAuthSchema, httpHeaderSchema } from "./config/http.ts";
 import {
   codeAgentConfigSchema,
   connectedAgentConfigSchema,
   httpAgentConfigSchema,
   signatureAgentConfigSchema,
+  voiceAgentConfigSchema,
   workflowAgentConfigSchema,
 } from "./config/index.ts";
-import { z } from "zod";
-import { HTTP_METHODS, httpAuthSchema, httpHeaderSchema } from "./config/http.ts";
 
 export const httpAgentTestInputSchema = z.object({
   projectId: z.string(),
@@ -55,6 +57,11 @@ const createAgentRequestVariants = [
     type: z.literal("connected"),
     config: connectedAgentConfigSchema,
   }),
+  z.object({
+    ...createAgentRequestBaseSchema.shape,
+    type: z.literal("voice"),
+    config: voiceAgentConfigSchema,
+  }),
 ] as const;
 
 export const createAgentRequestSchema = z.discriminatedUnion("type", createAgentRequestVariants);
@@ -85,11 +92,15 @@ export const createAgentCommandSchema = z.discriminatedUnion("type", [
     ...createAgentCommandBaseSchema.shape,
     ...createAgentRequestVariants[4].shape,
   }),
+  z.object({
+    ...createAgentCommandBaseSchema.shape,
+    ...createAgentRequestVariants[5].shape,
+  }),
 ]);
 
 export const updateAgentRequestSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  type: z.enum(["signature", "code", "workflow", "http", "connected"]).optional(),
+  type: z.enum(["signature", "code", "workflow", "http", "connected", "voice"]).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   workflowId: z.string().nullable().optional(),
 });

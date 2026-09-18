@@ -1,4 +1,5 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
+
 import { type OpsSnapshotRedis } from "../../app/ops.app.ts";
 
 /** The snapshot store's four commands over a live connection. */
@@ -7,8 +8,7 @@ export class RedisOpsSnapshotRedisRepository implements OpsSnapshotRedis {
     return new RedisOpsSnapshotRedisRepository(redis);
   }
 
-  private constructor(private readonly redis: IORedis | Cluster) {
-  }
+  private constructor(private readonly redis: IORedis | Cluster) {}
 
   eval(script: string, numberOfKeys: number, ...args: string[]): Promise<unknown> {
     return this.redis.eval(script, numberOfKeys, ...args);

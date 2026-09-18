@@ -1,7 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
+import { formatCost } from "@langwatch/design-system/display-formatters";
 import type React from "react";
 
-import { formatCost } from "@langwatch/design-system/display-formatters";
 import type { SessionListRow } from "../session-list-row.ts";
 import { ComparisonBar } from "./comparison-bar.tsx";
 import { MissingValue } from "./missing-value.tsx";

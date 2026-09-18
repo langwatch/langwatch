@@ -26,34 +26,40 @@ import {
   defaultsForSourceKind,
   filterVariablesForCadence,
 } from "@langwatch/automation-contract";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { Select } from "@langwatch/design-system/select";
+import { nowInstant } from "@langwatch/time";
 import { ExternalLink } from "lucide-react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
+
+import { api } from "../../../../behavior/automation-api.ts";
+import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
+import type {
+  ConfigFormProps,
+  NotifyClientDef,
+  SummaryIdentity,
+} from "../../../../model/provider-types.ts";
 import { Link } from "../../../../ui/elements/automation-link.tsx";
-import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { Select } from "@langwatch/design-system/select";
-import { SLACK_BLOCK_KIT_JSON_SCHEMA,VariableInfoIcon,LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor/index.ts";
+import {
+  SLACK_BLOCK_KIT_JSON_SCHEMA,
+  VariableInfoIcon,
+  LIQUID_JSON_LANGUAGE_ID,
+} from "../../../liquid-editor/index.ts";
+import {
+  findTemplateOptionBySource,
+  pickDefaultSlackBlockKitTemplateId,
+  reportSourceIsAutoLayout,
+  SLACK_BLOCK_KIT_TEMPLATES,
+  SlackBlockKitTemplatePicker,
+} from "../../../slack-templates/index.ts";
+import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
 import {
   CompactSlackPreview,
   FieldHeader,
   LiquidEditor,
   TemplateDisclosure,
 } from "./template-authoring.tsx";
-import { api } from "../../../../behavior/automation-api.ts";
-import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
-import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
-import type {
-  ConfigFormProps,
-  NotifyClientDef,
-  SummaryIdentity,
-} from "../../../../model/provider-types.ts";
-import {
-  findTemplateOptionBySource,
-  pickDefaultSlackBlockKitTemplateId,
-  reportSourceIsAutoLayout,
-  SLACK_BLOCK_KIT_TEMPLATES,SlackBlockKitTemplatePicker
-} from "../../../slack-templates/index.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** A template field. `usingDefault` means "the author has not customised this"
  *  — it is what the Reset affordance and the default badge read. `value` is the
@@ -292,8 +298,7 @@ function SlackChannelField({
     list.mutate(
       { projectId, botToken: typedToken || null, automationId },
       {
-        onError: (error) =>
-          console.error("[slack] listSlackChannels failed", error),
+        onError: (error) => console.error("[slack] listSlackChannels failed", error),
       },
     );
   };

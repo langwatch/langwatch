@@ -6,8 +6,8 @@ import type {
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
@@ -38,6 +38,7 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
         followsGranularity: false,
       }) as unknown as LangWatchQLQueryResult,
     isWorkbenchEnabled: async () => true,
+    assertCustomChartPlaygroundEnabled: async () => void 0,
     resolveProtections: async () => FULLY_PERMITTED,
     resolveRunCaller: async () => ({
       project: { id: "project-1", lwqlKey: "restricted-project-key" },
@@ -63,7 +64,7 @@ export function createDashboardTestProjects(slug = "project-one"): ProjectApi {
 export function createDashboardTestApp(
   input: Readonly<{
     repositories?: DashboardRepositories;
-    config?: Partial<{ baseHost: string }>;
+    publicBaseUrl?: string;
     dependencies?: Partial<{
       analytics: AnalyticsApi;
       automation: AutomationApi;
@@ -73,13 +74,14 @@ export function createDashboardTestApp(
 ): DashboardApp {
   return DashboardApp.create({
     repositories: input.repositories ?? MemoryDashboardRepositories.create(),
-    members: {},
+    members: { publicBaseUrl: input.publicBaseUrl },
     dependencies: {
       analytics: input.dependencies?.analytics ?? createDashboardTestAnalytics(),
       automation: input.dependencies?.automation ?? createDashboardTestAutomation(),
       projects: input.dependencies?.projects ?? createDashboardTestProjects(),
     },
-    config: { baseHost: "", ...input.config },
+    config: undefined,
     resources: new ResourceScope(),
+    secrets: {} as never,
   });
 }

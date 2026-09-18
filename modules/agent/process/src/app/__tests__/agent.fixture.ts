@@ -1,24 +1,27 @@
-import type { TraceApi } from "@langwatch/trace-contract";
-import { agentSchema, type Agent } from "@langwatch/agent-contract";
-import { Temporal, toDate } from "@langwatch/time";
-import { ResourceScope } from "@langwatch/kernel";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { agentSchema, type Agent, type AgentServerConfig } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { ResourceScope } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal, toDate } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import {
   workflowSchema,
   workflowVersionSchema,
   type WorkflowApi,
 } from "@langwatch/workflow-contract";
-import type { MembersRead } from "@langwatch/process-stores/members";
-import { AgentApp, type AgentAppConfig } from "../agent.app.ts";
-import { memoryRedis } from "./memory-redis.ts";
-import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
+
 import type { AgentRepositories } from "../../repositories/agent.repositories.ts";
+import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
+import { AgentApp } from "../agent.app.ts";
+import { memoryRedis } from "./memory-redis.ts";
+
+type AgentAppMembers = Readonly<{ redis: RedisConnection; publicBaseUrl: string | undefined }>;
 
 export function agentFixture(overrides: Partial<Agent> = {}): Agent {
   return agentSchema.parse({
@@ -47,8 +50,8 @@ export function createAgentAppFixture(
     users?: UserApi;
     workflows?: WorkflowApi;
     repositories?: AgentRepositories;
-    members?: MembersRead<typeof AgentApp.reads>;
-    config?: AgentAppConfig;
+    members?: Partial<AgentAppMembers>;
+    config?: AgentServerConfig;
   } = {},
 ) {
   const repositories = options.repositories ?? MemoryAgentRepositories.create();
@@ -64,8 +67,8 @@ export function createAgentAppFixture(
       users: options.users ?? createApiFixture<UserApi>(),
       workflows: options.workflows ?? createApiFixture<WorkflowApi>(),
     },
-    members: options.members ?? { redis: memoryRedis() },
-    config: options.config ?? { publicBaseUrl: "https://langwatch.test", connected: null },
+    members: { redis: memoryRedis(), publicBaseUrl: "https://langwatch.test", ...options.members },
+    config: options.config ?? { replicaCount: 1, relayMaxPayloadMb: void 0 },
     resources,
     repositories,
   });

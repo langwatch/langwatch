@@ -11,14 +11,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AlertCircle, Play } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
 import {
   type HttpTestErrorExplanation,
   type HttpTestResult,
   messagesToJson,
   type TestMessage,
 } from "@langwatch/agent-contract/http-test";
+import { AlertCircle, Play } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+
 import { TestMessagesBuilder } from "../blocks/http-test-messages-builder.tsx";
 import { HttpTestRequestPreview } from "../blocks/http-test-request-preview.tsx";
 import { HttpTestResponseDisplay } from "../blocks/http-test-response-display.tsx";

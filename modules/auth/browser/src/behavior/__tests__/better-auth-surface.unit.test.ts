@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { passkeyClient } from "@better-auth/passkey/client";
 import { createAuthClient } from "better-auth/react";
+import { describe, expect, it } from "vitest";
 
 /**
  * The browser reads a trimmed `better-auth-react.d.ts`, not better-auth's own

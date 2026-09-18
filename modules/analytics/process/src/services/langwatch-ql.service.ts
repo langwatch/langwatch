@@ -4,8 +4,6 @@
  * boundary. Server and result ceilings throw or truncate on overflow; neither is caller-set.
  */
 
-import { createLogger } from "@langwatch/observability";
-import { nowInstant, type Instant } from "@langwatch/time";
 import {
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
@@ -16,26 +14,28 @@ import {
   type LangWatchQLSchema,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
-import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant, type Instant } from "@langwatch/time";
 
+import type {
+  LangWatchQLExecutor,
+  LangWatchQLResultLimits,
+} from "../repositories/langwatch-ql-executor.repository.ts";
+import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "./langwatch-ql-executor.service.ts";
-import type {
-  LangWatchQLExecutor,
-  LangWatchQLResultLimits,
-} from "../repositories/langwatch-ql-executor.repository.ts";
+import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import {
   type LangWatchQLGranularityResolution,
   LangWatchQLTimeWindowService,
 } from "./langwatch-ql-time-window.service.ts";
-import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service.ts";
-import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import { LangWatchQLValidationService } from "./langwatch-ql-validation.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();

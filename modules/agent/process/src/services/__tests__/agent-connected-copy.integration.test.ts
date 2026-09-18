@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 
 describe("copying a connected agent", () => {

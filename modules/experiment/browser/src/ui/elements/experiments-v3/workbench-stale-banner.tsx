@@ -1,7 +1,6 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
-import { useState } from "react";
-
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useState } from "react";
 
 /** Who last wrote the newer version, named by the actor the server reported. */
 const WHO_UPDATED_IT: Record<string, string> = {

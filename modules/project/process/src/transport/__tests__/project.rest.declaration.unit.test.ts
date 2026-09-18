@@ -39,12 +39,7 @@ describe("the projects REST declaration", () => {
         // permission: they refuse every token, so no permission would grant
         // them and none is asked for.
         ["get", "/:projectId/api-key", "getProjectApiKey", "authenticated"],
-        [
-          "post",
-          "/:projectId/regenerate-api-key",
-          "regenerateProjectApiKey",
-          "authenticated",
-        ],
+        ["post", "/:projectId/regenerate-api-key", "regenerateProjectApiKey", "authenticated"],
       ]);
     });
 
@@ -73,9 +68,7 @@ describe("the projects REST declaration", () => {
      * permissions" widening their token is the one thing that must not work here.
      */
     it("asks no permission on either base-key route, because none would grant it", () => {
-      const baseKeyRoutes = declaration.routes.filter((route) =>
-        route.path.endsWith("api-key"),
-      );
+      const baseKeyRoutes = declaration.routes.filter((route) => route.path.endsWith("api-key"));
 
       expect(baseKeyRoutes.map((route) => route.operation)).toEqual([
         "getProjectApiKey",

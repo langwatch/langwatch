@@ -16,6 +16,25 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import type { WorkflowApiRouter } from "@langwatch/browser-trpc/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { formatMoney } from "@langwatch/design-system/format-money";
+import { getColorForString } from "@langwatch/design-system/rotating-colors";
+import { titleCase } from "@langwatch/design-system/string-casing";
+import type {
+  AppliedOptimization,
+  AppliedOptimizationField,
+  DSPyPredictor,
+  DSPyRunsSummary,
+  DSPyStep,
+  DSPyStepSummary,
+  ExperimentRunWorkflowVersion,
+} from "@langwatch/experiment-contract";
+import { FormatMoney } from "@langwatch/workflow-browser/format-money";
+import { VersionBox } from "@langwatch/workflow-browser/version-history";
+import type { Experiment, Project } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import numeral from "numeral";
@@ -32,25 +51,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Experiment, Project } from "@langwatch/workflow-contract";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { FormatMoney } from "@langwatch/workflow-browser/format-money";
-import { VersionBox } from "@langwatch/workflow-browser/version-history";
-import type { WorkflowApiRouter } from "@langwatch/browser-trpc/workflow-api";
-import type {
-  AppliedOptimization,
-  AppliedOptimizationField,
-  DSPyPredictor,
-  DSPyRunsSummary,
-  DSPyStep,
-  DSPyStepSummary,
-  ExperimentRunWorkflowVersion,
-} from "@langwatch/experiment-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { formatMoney } from "@langwatch/design-system/format-money";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { getColorForString } from "@langwatch/design-system/rotating-colors";
-import { titleCase } from "@langwatch/design-system/string-casing";
+
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 
 /** The runs query, with the contract's row rather than the router's inference. */
@@ -64,13 +65,14 @@ type DSPyStepQuery = UseTRPCQueryResult<
   DSPyStep | undefined,
   TRPCClientErrorLike<WorkflowApiRouter>
 >;
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
+import { LLMIcon } from "@langwatch/design-system/icons";
+import { Switch } from "@langwatch/design-system/switch";
+import { RenderInputOutput } from "@langwatch/trace-browser/surfaces/render-input-output";
+
 import { ChartTooltip } from "../analytics/chart-tooltip.tsx";
 import { FeedbackLink } from "../feedback-link.tsx";
-import { LLMIcon } from "@langwatch/design-system/icons";
 import { MetadataTag } from "../metadata-tag.tsx";
-import { RenderInputOutput } from "@langwatch/trace-browser/surfaces/render-input-output";
-import { getRawColorValue } from "@langwatch/design-system/color-mode";
-import { Switch } from "@langwatch/design-system/switch";
 
 export function DSPyExperiment({
   project,

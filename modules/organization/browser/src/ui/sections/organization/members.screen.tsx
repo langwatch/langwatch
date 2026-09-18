@@ -16,35 +16,39 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { OverflownTextWithTooltip } from "../../../ui/elements/overflown-text.tsx";
-import { RandomColorAvatar } from "../../../ui/elements/random-color-avatar.tsx";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { type OrganizationUserRole, RoleBindingScopeType } from "../../../model/prisma-types.ts";
-import { useDrawer } from "../../../behavior/use-drawer.ts";
-import { useMemberDisableAction } from "../../../behavior/use-member-disable-action.ts";
-import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
-import { CopyInput } from "../../../ui/elements/copy-input.tsx";
-import { DomainJoinCard } from "../../../ui/blocks/domain-join-card.tsx";
-import { InvitesTable } from "../../../ui/sections/invites-table.tsx";
-import { JoinRequestsTable } from "../../../ui/blocks/join-requests-table.tsx";
-import { useJoinRequests } from "../../../behavior/use-join-requests.ts";
-import { DepartmentPicker } from "../../../ui/sections/department-picker.tsx";
-import { MemberDetailDialog } from "../../../ui/sections/member-detail-dialog.tsx";
-import { MemberSeatUsage } from "../../../ui/sections/member-seat-usage.tsx";
-import { useDepartmentColumn } from "../../../behavior/use-department-column.ts";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { useInviteActions } from "../../../behavior/use-invite-actions.ts";
-import { useOrganizationHost, type OrganizationTeamReading } from "../../../model/organization-host.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { usePublicEnv } from "../../../behavior/use-public-env.ts";
-import { useRequiredSession } from "../../../behavior/use-required-session.ts";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
+import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
 import type { RouterOutputs } from "../../../behavior/organization-api.ts";
 import { api } from "../../../behavior/organization-api.ts";
 import { useOrganizationToaster } from "../../../behavior/organization-feedback.ts";
 import { reportUnexpected } from "../../../behavior/report-unexpected.ts";
+import { useDepartmentColumn } from "../../../behavior/use-department-column.ts";
+import { useDrawer } from "../../../behavior/use-drawer.ts";
+import { useInviteActions } from "../../../behavior/use-invite-actions.ts";
+import { useJoinRequests } from "../../../behavior/use-join-requests.ts";
+import { useMemberDisableAction } from "../../../behavior/use-member-disable-action.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { usePublicEnv } from "../../../behavior/use-public-env.ts";
+import { useRequiredSession } from "../../../behavior/use-required-session.ts";
+import {
+  useOrganizationHost,
+  type OrganizationTeamReading,
+} from "../../../model/organization-host.ts";
+import { type OrganizationUserRole, RoleBindingScopeType } from "../../../model/prisma-types.ts";
+import { DomainJoinCard } from "../../../ui/blocks/domain-join-card.tsx";
+import { JoinRequestsTable } from "../../../ui/blocks/join-requests-table.tsx";
+import { CopyInput } from "../../../ui/elements/copy-input.tsx";
+import { OverflownTextWithTooltip } from "../../../ui/elements/overflown-text.tsx";
+import { RandomColorAvatar } from "../../../ui/elements/random-color-avatar.tsx";
+import { DepartmentPicker } from "../../../ui/sections/department-picker.tsx";
+import { InvitesTable } from "../../../ui/sections/invites-table.tsx";
+import { MemberDetailDialog } from "../../../ui/sections/member-detail-dialog.tsx";
+import { MemberSeatUsage } from "../../../ui/sections/member-seat-usage.tsx";
 
 /** The organization graph as the browser receives it: instants are ISO strings. */
 type OrganizationWithMembersAndTheirTeams =

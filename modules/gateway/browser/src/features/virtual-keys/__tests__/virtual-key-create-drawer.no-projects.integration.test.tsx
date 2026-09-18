@@ -4,10 +4,9 @@
  * Prevents the 100% CPU infinite re-render bug from before the guard was added.
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
-
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import { VirtualKeyCreateDrawer } from "../ui/sections/virtual-key-create-drawer.tsx";
 
 const ORG_ID = "org-empty";

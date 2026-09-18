@@ -57,7 +57,9 @@ const securityRetentionExemptTables = new Set<string>(SECURITY_RETENTION_EXEMPT_
 
 for (const table of Object.keys(RETENTION_TABLE_CATEGORY_MAP)) {
   if (securityRetentionExemptTables.has(table)) {
-    throw new Error(`${table} is durable security state and cannot be enrolled in tenant retention`);
+    throw new Error(
+      `${table} is durable security state and cannot be enrolled in tenant retention`,
+    );
   }
 }
 

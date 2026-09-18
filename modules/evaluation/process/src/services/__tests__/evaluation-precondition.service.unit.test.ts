@@ -6,6 +6,7 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EvaluationTraceSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   EvaluationPreconditionService,
   PRECONDITION_FIELDS,

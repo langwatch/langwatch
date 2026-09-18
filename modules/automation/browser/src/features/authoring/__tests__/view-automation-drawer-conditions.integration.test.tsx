@@ -6,6 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ViewAutomationDrawer } from "../ui/sections/view-automation-drawer.tsx";
 
 let mockTriggerRow: Record<string, unknown> | null = null;

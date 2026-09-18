@@ -4,6 +4,7 @@ import type {
   OpsQueueReconcileResult,
   QueueInfo,
 } from "@langwatch/ops-contract";
+
 import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import type { QueueService } from "./queue.service.ts";
 

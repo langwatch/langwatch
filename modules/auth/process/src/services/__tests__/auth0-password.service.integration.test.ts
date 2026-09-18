@@ -4,7 +4,9 @@
  */
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import {
   Auth0ApiError,
   buildAuth0Config,

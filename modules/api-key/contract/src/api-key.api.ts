@@ -1,5 +1,13 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
+
+import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
+import type {
+  ApiKeyTokenResolutionInput,
+  OrganizationApiKeyResolution,
+  OrganizationApiKeyResolutionInput,
+  ResolvedApiKeyCredential,
+} from "./api-key.tokens.ts";
 import type {
   ApiKey,
   ApiKeyAdminKeyInput,
@@ -27,13 +35,6 @@ import type {
   RevokeApiKeyInput,
   UpdateApiKeyInput,
 } from "./api-key.ts";
-import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
-import type {
-  ApiKeyTokenResolutionInput,
-  OrganizationApiKeyResolution,
-  OrganizationApiKeyResolutionInput,
-  ResolvedApiKeyCredential,
-} from "./api-key.tokens.ts";
 import type { ApiKeyVisibleProjects, ApiKeyVisibleProjectsInput } from "./api-key.visibility.ts";
 
 export type ApiKeyManagementCaller = Readonly<{ id: string }>;

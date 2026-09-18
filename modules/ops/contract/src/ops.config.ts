@@ -1,10 +1,4 @@
-import {
-  Config,
-  compileRuntimeConfig,
-  environmentOneOrTrueSchema,
-  RuntimeConfig,
-  type ConfigValue,
-} from "@langwatch/config";
+import { Config, environmentOneOrTrueSchema, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /** Operator surfaces and config; bearers are optional and blank means the
@@ -12,33 +6,44 @@ import { z } from "zod";
 /** Values of `CLICKHOUSE_BACKUP_METRICS_ENABLED` that turn backup collection off. */
 const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
 
-export const opsServerConfigDefinition = RuntimeConfig.define({
+export const opsConfig = Config.define((c) => ({
   /** The ClickHouse EXPLAIN endpoint's operator secret. */
-  apiKey: Config.value(z.string().optional(), { env: "LANGWATCH_OPS_API_KEY" }),
+  apiKey: c.env("LANGWATCH_OPS_API_KEY", z.string().optional()),
   /** The metrics-scrape bearer, under the name every LangWatch tier reads it by. */
-  metricsApiKey: Config.value(z.string().optional(), { env: "METRICS_API_KEY" }),
+  metricsApiKey: c.env("METRICS_API_KEY", z.string().optional()),
   /** A third ClickHouse identity; never falls back to the tenant-keyed client. */
-  clickhouseOpsUrl: Config.value(z.string().optional(), { env: "CLICKHOUSE_OPS_URL" }),
+  clickhouseOpsUrl: c.env("CLICKHOUSE_OPS_URL", z.string().optional()),
+  /** The platform-operator allow-list; `AdminAccessService` splits and trims it. */
+  adminEmails: c.env("ADMIN_EMAILS", z.string().optional()),
+  /**
+   * ADR-117 §5: once the connection projection decides sign-in, legacy
+   * string writes are refused.
+   */
+  legacySsoStringWritesRetired: c.env(
+    "SSOCONN_ROUTING",
+    z
+      .string()
+      .optional()
+      .transform((value) => value === "enforce"),
+  ),
   usageStats: {
-    disabled: Config.value(environmentOneOrTrueSchema, { env: "DISABLE_USAGE_STATS" }),
-    installMethod: Config.value(z.string().optional(), { env: "INSTALL_METHOD" }),
+    disabled: c.env("DISABLE_USAGE_STATS", environmentOneOrTrueSchema),
+    installMethod: c.env("INSTALL_METHOD", z.string().optional()),
   },
-  collectClickHouseBackupMetrics: Config.value(
+  collectClickHouseBackupMetrics: c.env(
+    "CLICKHOUSE_BACKUP_METRICS_ENABLED",
     z
       .string()
       .optional()
       .transform((value) => !BACKUP_METRICS_OFF_VALUES.has((value ?? "").trim().toLowerCase())),
-    { env: "CLICKHOUSE_BACKUP_METRICS_ENABLED" },
   ),
   productAnalytics: {
-    key: Config.value(z.string().optional(), { env: "POSTHOG_KEY" }),
-    host: Config.value(z.string().optional(), { env: "POSTHOG_HOST" }),
+    key: c.env("POSTHOG_KEY", z.string().optional()),
+    host: c.env("POSTHOG_HOST", z.string().optional()),
   },
-});
+}));
 
-export type OpsServerConfig = ConfigValue<typeof opsServerConfigDefinition>;
-
-export const opsServerConfigSchema = compileRuntimeConfig(opsServerConfigDefinition);
+export type OpsServerConfig = ConfigOf<typeof opsConfig>;
 
 /** What a browser is told about product analytics and browser tracing. */
 export const opsWebConfigSchema = z.strictObject({

@@ -1,5 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import type { Field } from "@langwatch/workflow-contract";
+
 import {
   COMPARISON_COLUMN_REFUSAL,
   type EvaluatorConfig,

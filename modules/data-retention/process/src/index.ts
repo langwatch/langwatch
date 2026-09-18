@@ -6,7 +6,6 @@ export { dataRetentionTrpcTransport } from "./transport/data-retention.trpc.ts";
  * feature deliberately does not own.
  */
 export type {
-  DataRetentionAppConfig,
   DataRetentionDirectoryReader,
   DataRetentionInfrastructure,
   RetentionOrganizationDirectory,

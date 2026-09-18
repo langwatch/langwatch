@@ -11,13 +11,14 @@ import {
   type WorkbenchVersionSummary,
 } from "@langwatch/experiment-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
+
 import {
   ArchivedExperimentWriteError,
   ExperimentRepository,
   type ExperimentRowState,
   type WorkbenchWriteResult,
 } from "../experiment.repository.ts";
-import { toDate, type Instant } from "@langwatch/time";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -131,10 +132,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     throw new ExperimentNotFoundError(input.slugOrId);
   }
 
-  async findRowState(input: {
-    projectId: string;
-    id: string;
-  }): Promise<ExperimentRowState | null> {
+  async findRowState(input: { projectId: string; id: string }): Promise<ExperimentRowState | null> {
     const row = await this.database.experiment.findUnique({
       where: { id: input.id, projectId: input.projectId },
       select: { slug: true, workflowId: true, archivedAt: true },

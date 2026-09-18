@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef } from "react";
 import { toaster } from "@langwatch/browser-host/toaster";
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import { generateWorkflowRunId,mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
-import { usePostEvent } from "./use-post-event.tsx";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { nowInstant } from "@langwatch/time";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import { generateWorkflowRunId, mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
+import { useCallback, useEffect, useRef } from "react";
+
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { usePostEvent } from "./use-post-event.tsx";
 
 /** Which half of the run the timeout landed in, for the message the user reads. */
 const evaluationTimeoutStage = (timeoutOnStatus: "waiting" | "running") =>

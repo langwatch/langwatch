@@ -4,6 +4,7 @@
  * @see specs/agents/connected-agents.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { ConnectedAgentParameterSpecService } from "../connected-agent-parameter-spec.service.ts";
 
 describe("ConnectedAgentParameterSpecService.normalizeParameterSchema", () => {

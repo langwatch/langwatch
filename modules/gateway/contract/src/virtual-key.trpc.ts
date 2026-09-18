@@ -7,6 +7,12 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 
 import {
+  virtualKeyApplicableBudgetsSchema,
+  virtualKeyCamelDtoSchema,
+  virtualKeyMintedSchema,
+  virtualKeySpendThisMonthSchema,
+} from "./gateway.responses.ts";
+import {
   virtualKeyApiApplicableBudgetsInputSchema,
   virtualKeyApiCreateInputSchema,
   virtualKeyApiDisableInputSchema,
@@ -14,12 +20,6 @@ import {
   virtualKeyApiOrganizationInputSchema,
   virtualKeyApiUpdateInputSchema,
 } from "./virtual-key.schemas.ts";
-import {
-  virtualKeyApplicableBudgetsSchema,
-  virtualKeyCamelDtoSchema,
-  virtualKeyMintedSchema,
-  virtualKeySpendThisMonthSchema,
-} from "./gateway.responses.ts";
 
 export const virtualKeyTrpc = defineTrpcContract("virtualKeys")
   .query("list")

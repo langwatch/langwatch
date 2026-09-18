@@ -1,8 +1,8 @@
 import { z } from "zod";
 
+import { studioOptimizerIdSchema, studioOptimizerParamsSchema } from "./studio-optimization.ts";
 import type { BaseComponent, StudioWorkflow } from "./studio-workflow.ts";
 import { studioWorkflowSchema } from "./studio-workflow.ts";
-import { studioOptimizerIdSchema, studioOptimizerParamsSchema } from "./studio-optimization.ts";
 
 export const studioClientEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("is_alive"), payload: z.record(z.string(), z.never()) }),

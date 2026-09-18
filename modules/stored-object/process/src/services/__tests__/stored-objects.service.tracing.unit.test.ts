@@ -3,6 +3,7 @@
  * @vitest-environment node
  */
 import { Readable } from "node:stream";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const spanNames = vi.hoisted(() => [] as string[]);
@@ -28,10 +29,10 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
-import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
-import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
 import type { StoredObjectsTelemetry } from "../../app/stored-object.members.ts";
+import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
+import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
+import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import { StoredObjectsService } from "../stored-objects.service.ts";
 
 const PROJECT_ID = "proj-1";

@@ -1,40 +1,28 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
- * Mail gateway config selected consistently across processes to maintain
- * SPF/sender policy alignment. All settings optional; send fails at runtime
- * if unconfigured.
+ * Mail gateway config; all settings optional, send fails at runtime if
+ * unconfigured. Credentials never live here (ADR-132) — they are handles on
+ * the App that resolves them.
  */
-export const notificationServerConfigDefinition = RuntimeConfig.define({
-  defaultFrom: Config.value(z.string().optional(), { env: "EMAIL_DEFAULT_FROM" }),
-  provider: Config.value(z.string().optional(), { env: "EMAIL_PROVIDER" }),
+export const notificationConfig = Config.define((c) => ({
+  defaultFrom: c.env("EMAIL_DEFAULT_FROM", z.string().optional()),
+  provider: c.env("EMAIL_PROVIDER", z.string().optional()),
   ses: {
-    enabled: Config.value(z.string().optional(), { env: "USE_AWS_SES" }),
-    region: Config.value(z.string().optional(), { env: "AWS_REGION" }),
-    endpoint: Config.value(z.string().optional(), { env: "AWS_SES_ENDPOINT" }),
-  },
-  sendgrid: {
-    apiKey: Config.optionalSecret({ env: "SENDGRID_API_KEY" }),
+    enabled: c.env("USE_AWS_SES", z.string().optional()),
+    region: c.env("AWS_REGION", z.string().optional()),
+    endpoint: c.env("AWS_SES_ENDPOINT", z.string().optional()),
   },
   smtp: {
-    url: Config.optionalSecret({ env: "SMTP_URL" }),
-    host: Config.value(z.string().optional(), { env: "SMTP_HOST" }),
-    port: Config.value(z.string().optional(), { env: "SMTP_PORT" }),
-    user: Config.value(z.string().optional(), { env: "SMTP_USER" }),
-    password: Config.optionalSecret({ env: "SMTP_PASSWORD" }),
-    secure: Config.value(z.string().optional(), { env: "SMTP_SECURE" }),
+    host: c.env("SMTP_HOST", z.string().optional()),
+    port: c.env("SMTP_PORT", z.string().optional()),
+    user: c.env("SMTP_USER", z.string().optional()),
+    secure: c.env("SMTP_SECURE", z.string().optional()),
   },
-  resend: {
-    apiKey: Config.optionalSecret({ env: "RESEND_API_KEY" }),
-  },
-});
+}));
 
-export type NotificationServerConfig = ConfigValue<typeof notificationServerConfigDefinition>;
-
-export const notificationServerConfigSchema = compileRuntimeConfig(
-  notificationServerConfigDefinition,
-);
+export type NotificationServerConfig = ConfigOf<typeof notificationConfig>;
 
 /** All a browser learns: whether this deployment can send mail at all. */
 export const notificationWebConfigSchema = z.strictObject({ email: z.boolean() });

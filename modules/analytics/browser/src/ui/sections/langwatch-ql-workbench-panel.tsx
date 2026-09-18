@@ -1,15 +1,13 @@
+import { useColorMode } from "@langwatch/design-system/color-mode";
 /** Application composition for the portable LangWatchQL workbench. */
 import { useMemo } from "react";
 
-import { LangWatchQLWorkbench as PackageWorkbench } from "./langwatch-ql-workbench.tsx";
-
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
-import { useColorMode } from "@langwatch/design-system/color-mode";
-import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-
 import { useLangWatchQLQuery } from "../../behavior/use-langwatch-ql-query.ts";
 import { useLangWatchQLSchema } from "../../behavior/use-langwatch-ql-schema.ts";
 import { useSavedChartWiring } from "../../behavior/use-saved-chart-wiring.ts";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { LangWatchQLWorkbench as PackageWorkbench } from "./langwatch-ql-workbench.tsx";
 import { LazyLangWatchQLChartMode } from "./lazy-langwatch-ql-chart-mode.tsx";
 import { SavedChartsToolbar } from "./saved-charts-toolbar.tsx";
 

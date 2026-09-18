@@ -6,6 +6,7 @@
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";
+
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 
 type LinkProps = {

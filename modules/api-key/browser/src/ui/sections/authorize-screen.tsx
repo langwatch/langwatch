@@ -2,6 +2,7 @@
 // by name; trackEvent("api_key_copy") is app's.
 
 import { Card, Container, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+
 import { useAuthorizeHost } from "../../model/authorize-host.ts";
 import { CopyInput } from "../elements/copy-input.tsx";
 

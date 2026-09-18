@@ -9,10 +9,15 @@ import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  WebhookApp,
+  type WebhookAppDependencies,
+  type WebhookId,
+  type WebhookSecret,
+} from "../../app/webhook.app.ts";
+import {
   PrismaWebhookEndpointRepository,
   type WebhookEndpointDeps,
 } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
-import { WebhookApp, type WebhookAppDependencies,type WebhookId,type WebhookSecret } from "../../app/webhook.app.ts";
 import { webhookEndpointTrpcTransport } from "../webhook-endpoint.trpc.ts";
 import {
   webhookEndpointTrpcTestMembers,
@@ -120,7 +125,9 @@ function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: 
   });
 
   const trpc = initTRPC.context<WebhookEndpointTrpcTestContext>().create();
-  const { members, seenPermissions } = webhookEndpointTrpcTestMembers(new Set(options.denied ?? []));
+  const { members, seenPermissions } = webhookEndpointTrpcTestMembers(
+    new Set(options.denied ?? []),
+  );
   const router = createTrpcRuntime<WebhookEndpointTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,

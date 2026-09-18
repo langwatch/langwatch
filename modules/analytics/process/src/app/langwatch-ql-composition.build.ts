@@ -1,3 +1,4 @@
+import { ClickHouseLangWatchQLExecutorAdapter } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 /**
  * Process composition binds the restricted LangWatchQL identity to its service.
  */
@@ -8,7 +9,6 @@ import {
   LangWatchQLService,
   type LangWatchQLServiceDependencies,
 } from "../services/langwatch-ql.service.ts";
-import { ClickHouseLangWatchQLExecutorAdapter } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 
 const executorService = LangWatchQLExecutorService.create();
 
@@ -20,49 +20,51 @@ const executorService = LangWatchQLExecutorService.create();
 let cached: LangWatchQLService | null = null;
 
 export function createLangWatchQLService(
-    options: {
-      /** The restricted identity, or `null` where a deployment provisioned none. */
-      connection: LangWatchQLConnection | null;
-    } & Partial<Omit<LangWatchQLServiceDependencies, "executor" | "database">>,
-  ): LangWatchQLService {
-    const { connection, ...overrides } = options;
+  options: {
+    /** The restricted identity, or `null` where a deployment provisioned none. */
+    connection: LangWatchQLConnection | null;
+  } & Partial<Omit<LangWatchQLServiceDependencies, "executor" | "database">>,
+): LangWatchQLService {
+  const { connection, ...overrides } = options;
 
-    return LangWatchQLService.create({
-      executor: connection ? ClickHouseLangWatchQLExecutorAdapter.create({ connection }) : null,
-      database: connection?.database ?? DEFAULT_LWQL_DATABASE,
-      ...overrides,
-    });
-  }
+  return LangWatchQLService.create({
+    executor: connection ? ClickHouseLangWatchQLExecutorAdapter.create({ connection }) : null,
+    database: connection?.database ?? DEFAULT_LWQL_DATABASE,
+    ...overrides,
+  });
+}
 
-  /** Builds the service from an environment a process handed over. */
+/** Builds the service from an environment a process handed over. */
 export function langWatchQLServiceFromEnvironment(
-    environment: Record<string, string | undefined>,
-    overrides: Partial<LangWatchQLServiceDependencies> = {},
-  ): LangWatchQLService {
-    return createLangWatchQLService({
-      connection: executorService.tryConnectionFromEnvironment(environment),
-      ...overrides,
-    });
-  }
+  environment: Record<string, string | undefined>,
+  overrides: Partial<LangWatchQLServiceDependencies> = {},
+): LangWatchQLService {
+  return createLangWatchQLService({
+    connection: executorService.tryConnectionFromEnvironment(environment),
+    ...overrides,
+  });
+}
 
-  /** The process-wide service, built from the environment on first use. */
-export function sharedLangWatchQLService(environment: Record<string, string | undefined>): LangWatchQLService {
-    cached ??= langWatchQLServiceFromEnvironment(environment);
+/** The process-wide service, built from the environment on first use. */
+export function sharedLangWatchQLService(
+  environment: Record<string, string | undefined>,
+): LangWatchQLService {
+  cached ??= langWatchQLServiceFromEnvironment(environment);
 
-    return cached;
-  }
+  return cached;
+}
 
-  /**
-   * Replaces the process-wide service, or clears it so the next read rebuilds
-   * from the environment.
-   */
+/**
+ * Replaces the process-wide service, or clears it so the next read rebuilds
+ * from the environment.
+ */
 export function setSharedLangWatchQLService(service: LangWatchQLService | null): void {
-    cached = service;
-  }
+  cached = service;
+}
 
-  /** Clears the process-wide service, releasing the transport it holds first. */
+/** Clears the process-wide service, releasing the transport it holds first. */
 export async function closeSharedLangWatchQLService(): Promise<void> {
-    const previous = cached;
-    cached = null;
-    await previous?.close();
-  }
+  const previous = cached;
+  cached = null;
+  await previous?.close();
+}

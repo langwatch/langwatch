@@ -11,8 +11,7 @@ export const personalWorkspaceScreens = {
   overview: () => import("./ui/sections/personal-workspace/personal-overview.screen.tsx"),
   configure: () => import("./ui/sections/personal-workspace/personal-configure.screen.tsx"),
   sessions: () => import("./ui/sections/personal-workspace/personal-sessions.screen.tsx"),
-  pullRequests: () =>
-    import("./ui/sections/personal-workspace/personal-pull-requests.screen.tsx"),
+  pullRequests: () => import("./ui/sections/personal-workspace/personal-pull-requests.screen.tsx"),
   budgetRequest: () =>
     import("./ui/sections/personal-workspace/personal-budget-request.screen.tsx"),
   projectSessions: () => import("./ui/sections/personal-workspace/project-sessions.screen.tsx"),

@@ -9,6 +9,7 @@ import { uiSlots } from "@langwatch/browser-host/slots";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
+
 import {
   type OrganizationActor,
   type OrganizationProjectReading,

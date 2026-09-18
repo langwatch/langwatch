@@ -6,7 +6,11 @@
 
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../../testing.tsx";
+
+import {
+  fakePersonalWorkspaceHost,
+  renderWithPersonalWorkspaceHost,
+} from "../../../../testing.tsx";
 import ProfileScreen from "../profile.screen.tsx";
 
 vi.mock("../../../../behavior/personal-workspace-api.ts", () => ({

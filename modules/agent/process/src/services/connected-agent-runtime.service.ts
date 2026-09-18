@@ -4,14 +4,13 @@
  * by the composition root (ADR-093) rather than a module singleton.
  */
 
-import { generate } from "@langwatch/ksuid";
-
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { ConnectedAgentDispatchService } from "./connected-agent-dispatch.service.ts";
-import { ConnectedAgentRegistryService } from "./connected-agent-registry.service.ts";
-import { ConnectedAgentInstanceOwnershipService } from "./connected-agent-instance-ownership.service.ts";
-
 import type { AgentCallSignal, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
+import { generate } from "@langwatch/ksuid";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+
+import { ConnectedAgentDispatchService } from "./connected-agent-dispatch.service.ts";
+import { ConnectedAgentInstanceOwnershipService } from "./connected-agent-instance-ownership.service.ts";
+import { ConnectedAgentRegistryService } from "./connected-agent-registry.service.ts";
 
 /**
  * The app's KSUID resource for a pod id (`KSUID_RESOURCES.POD`). The literal

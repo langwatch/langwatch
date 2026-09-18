@@ -1,12 +1,12 @@
-import { generate } from "@langwatch/ksuid";
 import type {
   EvaluatorConfig,
   LocalPromptConfig,
   TargetConfig,
   ExecutionCell,
   WorkflowBuilderInput,
-  WorkflowBuilderOutput
+  WorkflowBuilderOutput,
 } from "@langwatch/experiment-contract";
+import { generate } from "@langwatch/ksuid";
 import {
   type Code,
   type Entry,
@@ -37,8 +37,8 @@ import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { buildHttpNodeParameters } from "@langwatch/agent-contract";
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ChatMessage } from "@langwatch/trace-contract";
 import { fromDate, type Instant } from "@langwatch/time";
+import type { ChatMessage } from "@langwatch/trace-contract";
 
 // ============================================================================
 // Main Workflow Builder
@@ -683,20 +683,16 @@ export const buildSignatureNodeFromAgent = (
   // Get inputs with value mappings applied. The `in` guards keep the union
   // narrow: a voice agent's config carries neither inputs nor outputs, and it
   // never reaches this builder anyway (buildTargetNode dispatches by type).
-  const inputs = ("inputs" in config ? (config.inputs ?? []) : []).map(
-    (input) => ({
-      identifier: input.identifier,
-      type: input.type as Field["type"],
-      value: getInputValue(input.identifier, targetConfig, cell),
-    }),
-  );
+  const inputs = ("inputs" in config ? (config.inputs ?? []) : []).map((input) => ({
+    identifier: input.identifier,
+    type: input.type as Field["type"],
+    value: getInputValue(input.identifier, targetConfig, cell),
+  }));
 
-  const outputs = ("outputs" in config ? (config.outputs ?? []) : []).map(
-    (output) => ({
-      identifier: output.identifier,
-      type: output.type as Field["type"],
-    }),
-  );
+  const outputs = ("outputs" in config ? (config.outputs ?? []) : []).map((output) => ({
+    identifier: output.identifier,
+    type: output.type as Field["type"],
+  }));
 
   // Build parameters array, normalizing from top-level fields or existing parameters
   const parameters = buildSignatureNodeParameters(config);
@@ -721,9 +717,7 @@ const buildSignatureNodeParameters = (config: TypedAgent["config"]): Field[] => 
   // Only the studio node kinds carry node fields as parameters; a connected
   // agent's parameters are run parameter declarations, never node fields.
   const baseParams = (
-    "sdk" in config || !("parameters" in config)
-      ? []
-      : (config.parameters ?? [])
+    "sdk" in config || !("parameters" in config) ? [] : (config.parameters ?? [])
   ) as Field[];
 
   // Start with existing parameters (may already have llm, instructions, messages)
@@ -786,20 +780,16 @@ export const buildCodeNodeFromAgent = (
   // Get inputs with value mappings applied. The `in` guards keep the union
   // narrow: a voice agent's config carries neither inputs nor outputs, and it
   // never reaches this builder anyway (buildTargetNode dispatches by type).
-  const inputs = ("inputs" in config ? (config.inputs ?? []) : []).map(
-    (input) => ({
-      identifier: input.identifier,
-      type: input.type as Field["type"],
-      value: getInputValue(input.identifier, targetConfig, cell),
-    }),
-  );
+  const inputs = ("inputs" in config ? (config.inputs ?? []) : []).map((input) => ({
+    identifier: input.identifier,
+    type: input.type as Field["type"],
+    value: getInputValue(input.identifier, targetConfig, cell),
+  }));
 
-  const outputs = ("outputs" in config ? (config.outputs ?? []) : []).map(
-    (output) => ({
-      identifier: output.identifier,
-      type: output.type as Field["type"],
-    }),
-  );
+  const outputs = ("outputs" in config ? (config.outputs ?? []) : []).map((output) => ({
+    identifier: output.identifier,
+    type: output.type as Field["type"],
+  }));
 
   return {
     id: nodeId,

@@ -14,10 +14,11 @@
  * failure it would be a backoff floor on a batch that is already dead.
  */
 
-import { describe, expect, it } from "vitest";
 import { DispatchError } from "@langwatch/eventing";
-import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
+import { describe, expect, it } from "vitest";
+
 import type { WebhookDispatchResult } from "../../rules/webhook-delivery-contract.rules.ts";
+import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
 
 type Recorded = Record<string, unknown>;
 

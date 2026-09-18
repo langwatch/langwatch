@@ -5,13 +5,14 @@
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
 import { describe, expect, it } from "vitest";
+
+import { buildStudioLambdaConfig } from "../../workflow.server.ts";
 import {
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
   buildStudioLambdaEnvironment,
   clampCodeBlockTimeoutSeconds,
   type StudioLambdaFleetFields,
 } from "../nlp-lambda-config.rules.ts";
-import { buildStudioLambdaConfig } from "../../workflow.server.ts";
 
 const FIELDS: StudioLambdaFleetFields = {
   region: "eu-central-1",

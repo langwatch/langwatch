@@ -1,14 +1,14 @@
+import {
+  attributedUserBucketScopeId,
+  bucketScopeIdFor,
+  groupBucketScopeId,
+} from "@langwatch/gateway-contract";
 /**
  * Resolves which budgets apply to a request/key/draft-key, shared by the
  * config materialiser, debits, budget.check and the VK drawer. providerKey
  * only narrows spend to that provider; narrow further with budgetAppliesToProvider.
  */
 import type { GatewayBudget, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  attributedUserBucketScopeId,
-  bucketScopeIdFor,
-  groupBucketScopeId,
-} from "@langwatch/gateway-contract";
 
 export type BudgetResolutionTarget = {
   organizationId: string;

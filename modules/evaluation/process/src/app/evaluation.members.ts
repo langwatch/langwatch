@@ -1,9 +1,4 @@
 import type {
-  AVAILABLE_EVALUATORS,
-  EvaluatorTypes,
-  SingleEvaluationResult,
-} from "@langwatch/evaluator-contract";
-import type {
   ExecuteEvaluationCommand,
   EvaluationExecutionResult,
   ExecuteEvaluationCommandData,
@@ -13,6 +8,11 @@ import type {
   EvaluationRunOutcome,
   ReportEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
+import type {
+  AVAILABLE_EVALUATORS,
+  EvaluatorTypes,
+  SingleEvaluationResult,
+} from "@langwatch/evaluator-contract";
 import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import type {
   Trace,
@@ -21,7 +21,8 @@ import type {
   EvaluationTraceSpan,
   EvaluationTraceEvent,
 } from "@langwatch/trace-contract";
-export interface EvaluationInfrastructure {  evaluationCustomEvaluators: EvaluationCustomEvaluators;
+export interface EvaluationInfrastructure {
+  evaluationCustomEvaluators: EvaluationCustomEvaluators;
   evaluationExecutionTelemetry: EvaluationExecutionTelemetry;
   evaluationInstallEnvironment: EvaluationInstallEnvironment;
   evaluationLangevals: EvaluationLangevals;
@@ -266,10 +267,7 @@ export interface EvaluationInputStorage {
     bytes: Uint8Array;
   }): Promise<{ id: string }>;
 
-  tryRead(input: {
-    tenantId: string;
-    id: string;
-  }): Promise<AsyncIterable<Uint8Array> | null>;
+  tryRead(input: { tenantId: string; id: string }): Promise<AsyncIterable<Uint8Array> | null>;
 }
 
 /** Applies the operator-controlled payload-offload availability switch. */

@@ -38,7 +38,13 @@ function process_() {
 
   return createApp({ role: "api" })
     .withModules([withMemoryRepositories(workflowServer)])
-    .withConfig({ workflow: {} })
+    .withConfig({
+      workflow: {
+        codeBlockTimeoutSeconds: undefined,
+        stagingThresholdBytes: undefined,
+        stagingTtlSeconds: undefined,
+      },
+    })
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
     .withEncryption({
       encrypt: (value: string) => value,

@@ -17,8 +17,9 @@ import {
   type ProjectionAnnotation,
   type UpdateAnnotationInput,
 } from "@langwatch/annotation-contract";
-import type { AnnotationRepository } from "../repositories/annotation.repository.ts";
 import { generate } from "@langwatch/ksuid";
+
+import type { AnnotationRepository } from "../repositories/annotation.repository.ts";
 
 export class AnnotationService {
   #repository: AnnotationRepository;

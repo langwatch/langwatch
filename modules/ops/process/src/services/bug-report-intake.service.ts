@@ -1,12 +1,10 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { SubmitBugReport } from "@langwatch/ops-contract";
-import type {
-  BugReportNotifier,
-  BugReportRateLimiter,
-} from "../app/ops.app.ts";
+import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
+
+import type { BugReportNotifier, BugReportRateLimiter } from "../app/ops.app.ts";
 import type { BugReportRepository } from "../repositories/admin/bug-report.repository.ts";
 
 const logger = createLogger("langwatch:bug-reports");

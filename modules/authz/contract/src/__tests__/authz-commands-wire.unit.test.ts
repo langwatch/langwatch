@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { GRANT_EVENT_SOURCES } from "../authz-grant.events.ts";
 import {
   attachGrantCommandDataSchema,

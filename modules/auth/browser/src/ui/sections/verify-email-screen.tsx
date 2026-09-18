@@ -1,6 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { AuthCard } from "../../ui/elements/auth-card.tsx";
+
 import { useSearchParams } from "../../behavior/use-route.ts";
+import { AuthCard } from "../../ui/elements/auth-card.tsx";
 
 /**
  * Magic-link landing page: renders only, no request — proof stays in URL.

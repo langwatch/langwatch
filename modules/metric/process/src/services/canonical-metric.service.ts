@@ -2,13 +2,22 @@ import type {
   MetricDataPointPreparation,
   MetricPiiRedactionLevel,
 } from "@langwatch/metric-contract";
+import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
+
+import {
+  type MetricPreparation,
+  type MetricPreparationInput,
+  type MetricRedaction,
+} from "../app/metric.members.ts";
+import {
+  METRIC_KIND_DATA_KEY,
+  candidatePointCount,
+  metricKind,
+} from "../rules/metric-kinds.rules.ts";
 import { buildPoint } from "../rules/metric-point.rules.ts";
-import { METRIC_KIND_DATA_KEY,candidatePointCount,metricKind } from "../rules/metric-kinds.rules.ts";
 import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
 import { MetricRedactionService } from "./metric-redaction.service.ts";
-import { type MetricPreparation, type MetricPreparationInput,type MetricRedaction } from "../app/metric.members.ts";
-import { nowInstant } from "@langwatch/time";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 const exportMetricsRequestSchema = z

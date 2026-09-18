@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
-import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
 import type { OpsSnapshotService } from "@langwatch/ops-contract";
-import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
+import { describe, expect, it, vi } from "vitest";
+
 import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
+import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
+import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
 
 /**
  * The lease must return before scanning, not skip the write - a version

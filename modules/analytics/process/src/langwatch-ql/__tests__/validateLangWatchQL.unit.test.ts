@@ -1,3 +1,4 @@
+import type { LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 /**
  * The LangWatchQL gate, driven through the real ClickHouse parser. Every case here submits SQL
  * text rather than a hand-built tree, so a rule that stops matching what the grammar actually
@@ -7,7 +8,6 @@ import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
-import type { LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 
 /** A catalog with one restricted field, which is the interesting configuration. */
 const POLICY = {

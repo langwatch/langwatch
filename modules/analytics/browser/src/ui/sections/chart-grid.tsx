@@ -5,15 +5,10 @@
  */
 
 import "react-grid-layout/css/styles.css";
-
 import { Box } from "@chakra-ui/react";
 import { type ReactNode, useCallback } from "react";
-import {
-  GridLayout,
-  type Layout,
-  type LayoutItem,
-  useContainerWidth,
-} from "react-grid-layout";
+import { GridLayout, type Layout, type LayoutItem, useContainerWidth } from "react-grid-layout";
+
 import {
   CHART_GRID_COLUMNS,
   CHART_GRID_MARGIN_PX,
@@ -52,13 +47,7 @@ export const fromLayoutItem = (item: LayoutItem): ChartGridPlacement => ({
   rowSpan: item.h,
 });
 
-const samePlacement = ({
-  a,
-  b,
-}: {
-  a: ChartGridPlacement;
-  b: ChartGridPlacement;
-}): boolean =>
+const samePlacement = ({ a, b }: { a: ChartGridPlacement; b: ChartGridPlacement }): boolean =>
   a.graphId === b.graphId &&
   a.gridColumn === b.gridColumn &&
   a.gridRow === b.gridRow &&

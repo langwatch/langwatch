@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { ModelRegistrySyncTask } from "../model-registry-sync.task.ts";
 
 describe("ModelRegistrySyncTask", () => {

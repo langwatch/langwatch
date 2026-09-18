@@ -4,10 +4,10 @@
  * filters reset paging and reach the query; load-more needs a next cursor.
  */
 import { cleanup, screen } from "@testing-library/react";
-
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
 
 const listQuery = vi.hoisted(() => vi.fn());
 

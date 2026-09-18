@@ -9,8 +9,8 @@ import { createLangWatchQLService } from "@langwatch/analytics-process/testing";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
-import { SavedWorkbenchChartPolicyService } from "../saved-workbench-chart-policy.service.ts";
 import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
+import { SavedWorkbenchChartPolicyService } from "../saved-workbench-chart-policy.service.ts";
 
 const PROJECT_ID = "project_1";
 

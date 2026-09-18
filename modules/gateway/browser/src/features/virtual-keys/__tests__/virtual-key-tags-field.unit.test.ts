@@ -1,11 +1,10 @@
+import { normalizeVkTags, VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
 /**
  * The Tags field's copy and caps, pinned to the limits the server actually
  * applies — a quoted number must derive from the enforcing code, or it
  * drifts into a promise we do not keep (dev/docs/best_practices/copywriting.md).
  */
 import { describe, expect, it } from "vitest";
-
-import { normalizeVkTags, VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
 
 import {
   parseTagsCsv,

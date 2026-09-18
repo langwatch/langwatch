@@ -1,5 +1,26 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
+import type { AgentWithFields } from "@langwatch/agent-contract";
+import {
+  getFlowCallbacks,
+  setComplexProps,
+  setFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import type { RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
+import { AddOrEditDatasetDrawer } from "@langwatch/dataset-browser/dataset-drawer";
+import {
+  type DatasetTableColumnType as ColumnType,
+  datasetTableCss,
+  useTableKeyboardNavigation,
+  VirtualizedTableBody,
+} from "@langwatch/dataset-browser/dataset-table";
+import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
+import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -10,34 +31,19 @@ import {
 } from "@tanstack/react-table";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { AddOrEditDatasetDrawer } from "@langwatch/dataset-browser/dataset-drawer";
-import {
-  type DatasetTableColumnType as ColumnType,
-  datasetTableCss,
-  useTableKeyboardNavigation,
-  VirtualizedTableBody,
-} from "@langwatch/dataset-browser/dataset-table";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
-import {
-  getFlowCallbacks,
-  setComplexProps,
-  setFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "@langwatch/browser-host/drawer";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
-import type { AgentWithFields } from "@langwatch/agent-contract";
-import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 
 /** An evaluator as this table holds one: off a query, so its instants are strings. */
 type EvaluatorWithFields = NonNullable<RouterOutputs["evaluators"]["getById"]>;
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import { newTargetId,connectedTargetFields,isRowEmpty,isCellInExecution,toComparisonConfig } from "@langwatch/experiment-contract";
-import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";
-import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name.ts";
+import {
+  newTargetId,
+  connectedTargetFields,
+  isRowEmpty,
+  isCellInExecution,
+  toComparisonConfig,
+} from "@langwatch/experiment-contract";
+import { nowInstant } from "@langwatch/time";
+
 import { useDatasetSync } from "../../../behavior/experiments-v3/use-dataset-sync.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";
@@ -48,6 +54,21 @@ import {
 } from "../../../behavior/experiments-v3/use-open-target-editor.ts";
 import { useDatasetSelectionLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
 import { useSyncWorkflowTargetFields } from "../../../behavior/experiments-v3/use-sync-workflow-target-fields.ts";
+import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";
+import { convertInlineToRowRecords } from "../../../model/experiments-v3/dataset-conversion.ts";
+import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks.ts";
+import { convertFromUIMapping } from "../../../model/experiments-v3/field-mapping-converters.ts";
+import {
+  buildInputsFromBodyTemplate,
+  convertHttpComponentConfig,
+} from "../../../model/experiments-v3/http-agent-utils.ts";
+import { evaluatorHasMissingMappings } from "../../../model/experiments-v3/mapping-validation.ts";
+import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks.ts";
+import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name.ts";
+import {
+  type PromptOutputField,
+  toTargetOutputFields,
+} from "../../../model/experiments-v3/target-output-fields.ts";
 import type {
   ComparisonEvaluatorConfig,
   DatasetColumn,
@@ -64,32 +85,18 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../../../model/experiments-v3/types.ts";
-import { convertInlineToRowRecords } from "../../../model/experiments-v3/dataset-conversion.ts";
-import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks.ts";
-import { convertFromUIMapping } from "../../../model/experiments-v3/field-mapping-converters.ts";
-import {
-  buildInputsFromBodyTemplate,
-  convertHttpComponentConfig,
-} from "../../../model/experiments-v3/http-agent-utils.ts";
-import { evaluatorHasMissingMappings } from "../../../model/experiments-v3/mapping-validation.ts";
-import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks.ts";
-import {
-  type PromptOutputField,
-  toTargetOutputFields,
-} from "../../../model/experiments-v3/target-output-fields.ts";
+import { SelectionToolbar } from "../../elements/experiments-v3/selection-toolbar.tsx";
+import { TargetSuperHeader } from "../../elements/experiments-v3/target-super-header.tsx";
 import { ComparisonCell } from "./comparison-cell.tsx";
 import { ComparisonColumnHeader } from "./comparison-column-header.tsx";
 import { DatasetSuperHeader } from "./dataset-super-header.tsx";
 import { EvaluationsV3DatasetTableProvider } from "./evaluations-v3-dataset-table-provider.tsx";
-import { SelectionToolbar } from "../../elements/experiments-v3/selection-toolbar.tsx";
 import {
   CheckboxCellFromMeta,
   CheckboxHeaderFromMeta,
   TargetCellFromMeta,
   TargetHeaderFromMeta,
 } from "./table-meta-wrappers.tsx";
-import { TargetSuperHeader } from "../../elements/experiments-v3/target-super-header.tsx";
-import { nowInstant } from "@langwatch/time";
 
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_FIT_MODE = 100;

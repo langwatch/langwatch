@@ -1,3 +1,4 @@
+import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
 /**
  * The token check counts its callers: past the registry's per-minute ceiling
  * the answer is the handled 429, not another probe of the token store.
@@ -7,8 +8,8 @@
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { describe, expect, it } from "vitest";
+
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
-import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
 import { AuthApp } from "../auth.app.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
@@ -35,7 +36,12 @@ function countingLimiter() {
 
 function appFor(limiter: ReturnType<typeof countingLimiter>["rateLimiter"]): AuthApp {
   return AuthApp.create({
-    config: { processName: "langwatch-api", isSaas: false },
+    config: {
+      sessionUrl: undefined,
+      mfaEnrollmentOpen: false,
+      passkeysEnabled: false,
+      passkeyHandleSecret: undefined,
+    },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
       users: new TestUserApi({}) as never,
@@ -49,15 +55,25 @@ function appFor(limiter: ReturnType<typeof countingLimiter>["rateLimiter"]): Aut
       prisma: {} as never,
       redis: null as never,
       rateLimiter: limiter,
+      secrets: {
+        find: () => undefined,
+        read: (key: string) => {
+          throw new Error(`test double does not stub secrets.read("${key}")`);
+        },
+      },
+      publicBaseUrl: undefined,
       identityEmails: undefined as never,
       rateLimit: undefined as never,
       route: undefined as never,
       signUp: null,
       invites: null,
       authProvider: undefined as never,
+      federatedProvider: undefined,
+      isSaas: false,
       processName: "langwatch-api",
     },
     resources: { own: () => undefined } as never,
+    secrets: {} as never,
   });
 }
 

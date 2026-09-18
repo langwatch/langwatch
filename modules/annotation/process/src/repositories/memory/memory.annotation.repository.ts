@@ -17,6 +17,7 @@ import {
   type UpdateAnnotationInput,
 } from "@langwatch/annotation-contract";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import type { AnnotationRepository } from "../annotation.repository.ts";
 
 export class MemoryAnnotationRepository implements AnnotationRepository {

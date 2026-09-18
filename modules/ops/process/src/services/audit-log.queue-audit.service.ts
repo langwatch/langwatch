@@ -1,5 +1,6 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { z } from "zod";
+
 import { QueueAuditSink, type QueueControlAction } from "./queue-audit-sink.service.ts";
 
 const auditMetadataSchema = z.record(z.string(), z.json());

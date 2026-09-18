@@ -1,17 +1,18 @@
+import { resolveRequestBound } from "@langwatch/plans";
 /**
  * The registry enterprise ceiling is the outer validation shell for dataset
  * batches: entries and recordIds arrays above 4000 refuse at the schema.
  * The application refuses above the caller's tier through the entitlement peer.
  */
 import { describe, expect, it } from "vitest";
-import { resolveRequestBound } from "@langwatch/plans";
-import { newDatasetEntriesSchema } from "../dataset.ts";
-import { datasetRecordApiDeleteManyInputSchema } from "../dataset.schemas.ts";
+
 import {
   datasetRestBatchCreateRecordsSchema,
   datasetRestDeleteRecordsSchema,
   datasetRestLegacyEntriesSchema,
 } from "../dataset-rest.schemas.ts";
+import { datasetRecordApiDeleteManyInputSchema } from "../dataset.schemas.ts";
+import { newDatasetEntriesSchema } from "../dataset.ts";
 
 const ENTERPRISE_BATCH = resolveRequestBound("datasetBatchMax", "ENTERPRISE");
 

@@ -5,6 +5,7 @@
 
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
 import { useSuiteForm } from "../behavior/use-suite-form.ts";
 
 const baseParams = {

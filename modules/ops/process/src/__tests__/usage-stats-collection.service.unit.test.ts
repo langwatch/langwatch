@@ -1,14 +1,15 @@
+import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
+
 import type { UsageStatsProjectDatabase, UsageStatsProjectCounts } from "../app/ops.app.ts";
+import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse.usage-stats.repository.ts";
 import {
   UsageStatsClickHouseRepository,
   UsageStatsProjectRepository,
 } from "../repositories/observe/usage-stats.repository.ts";
-import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
-import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse.usage-stats.repository.ts";
 import { PrismaUsageStatsProjectRepository } from "../repositories/prisma/prisma.usage-stats-project.repository.ts";
 import { UsageStatsCollectionService } from "../services/usage-stats-collection.service.ts";
-import { Temporal } from "@langwatch/time";
 
 const projectCounts: UsageStatsProjectCounts = {
   projectIds: ["project-1"],

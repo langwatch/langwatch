@@ -6,6 +6,7 @@
 
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import { GatewayVirtualKeySpendRepository } from "../clickhouse.gateway-virtual-key-spend.repository.ts";
 
 type Query = { query: string; query_params: Record<string, unknown> };

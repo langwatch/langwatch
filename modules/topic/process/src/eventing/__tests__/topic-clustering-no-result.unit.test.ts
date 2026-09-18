@@ -4,6 +4,7 @@
  * deleted every Topic row while still reporting the run completed).
  */
 import { describe, expect, it, vi } from "vitest";
+
 import { clusterTopicsForProject, storeResults } from "../topic-clustering-runner.intent.ts";
 import { fakeRunnerDeps } from "./topic-clustering-runner.fixture.ts";
 

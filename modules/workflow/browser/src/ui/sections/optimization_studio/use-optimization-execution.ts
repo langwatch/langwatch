@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
 import { toaster } from "@langwatch/browser-host/toaster";
+import { nowInstant } from "@langwatch/time";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import { generateWorkflowRunId,mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
+import { generateWorkflowRunId, mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
+import { useCallback, useEffect, useState } from "react";
+
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { OPTIMIZERS } from "../../../model/optimizers.ts";
 import { usePostEvent } from "./use-post-event.tsx";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** The timer this hook arms, naming the run and the state it timed out on. */
 type OptimizationTimeoutTrigger = {

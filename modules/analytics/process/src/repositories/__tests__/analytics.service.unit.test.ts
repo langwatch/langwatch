@@ -1,14 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { addDays, differenceInCalendarDays } from "@langwatch/time";
 import type {
   AnalyticsEvaluationRow,
   AnalyticsTable,
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
-import { AnalyticsService } from "../../services/analytics.service.ts";
+import { addDays, differenceInCalendarDays } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
 import { AnalyticsAdapter } from "../../index.ts";
+import { AnalyticsService } from "../../services/analytics.service.ts";
 import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
 import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository.ts";
 import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";

@@ -18,9 +18,13 @@ import {
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { MoreVertical, Plus } from "lucide-react";
+
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { toLLMModelCostRow } from "../../model/llm-model-cost-row.ts";
-import { MODEL_COST_MANAGE_PERMISSION, useModelProviderHost } from "../../model/model-provider-host.ts";
+import {
+  MODEL_COST_MANAGE_PERMISSION,
+  useModelProviderHost,
+} from "../../model/model-provider-host.ts";
 
 /**
  * One per-token rate, rendered at full precision. Rates run to nine decimal

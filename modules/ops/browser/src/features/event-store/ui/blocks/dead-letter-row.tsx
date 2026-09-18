@@ -1,8 +1,9 @@
 import { Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { RotateCcw, XCircle } from "lucide-react";
+
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
+import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import {
   type DeadLetterAttemptHistoryRenderer,
   type DeadLetterMessage,

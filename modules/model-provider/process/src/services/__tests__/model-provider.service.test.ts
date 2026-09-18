@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { AuthzService, type AuthzApi } from "@langwatch/authz-contract";
 import {
   type ModelCost,
   type ModelDefaultConfig,
@@ -12,13 +12,12 @@ import {
   expandLatestAlias,
   ModelProviderCredentialsUnreadableError,
 } from "@langwatch/model-provider-contract";
-import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
-import { TestProjectApi } from "./test-project-api.ts";
 import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
-import { AuthzService, type AuthzApi } from "@langwatch/authz-contract";
+import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
-import { ModelProviderService } from "../model-provider.service.ts";
+import { describe, expect, it } from "vitest";
+
 import {
   ModelProviderCatalog,
   ModelProviderCredentialPolicy,
@@ -33,6 +32,8 @@ import type {
   ModelDefaultRepository,
 } from "../../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../../repositories/model-provider.repository.ts";
+import { ModelProviderService } from "../model-provider.service.ts";
+import { TestProjectApi } from "./test-project-api.ts";
 
 const now = toDate(nowInstant());
 function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {

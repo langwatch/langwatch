@@ -1,3 +1,4 @@
+import { defineTrpcContract } from "@langwatch/api/contract";
 /**
  * Every `roleBinding.*` procedure, declared once: who holds a role, and where.
  * Every read is audit-grade authorization data, so the whole surface sits at
@@ -10,7 +11,6 @@ import {
   authzListManagedBindingsForOrganizationOutputSchema,
   authzListManagedBindingsForUserOutputSchema,
 } from "@langwatch/authz-contract";
-import { defineTrpcContract } from "@langwatch/api/contract";
 
 import {
   roleBindingApiApplyMemberBindingsInputSchema,

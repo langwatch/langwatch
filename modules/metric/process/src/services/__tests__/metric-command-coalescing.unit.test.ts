@@ -1,8 +1,6 @@
 import type { EventStoreReadContext } from "@langwatch/eventing";
 import { processCommandBatch } from "@langwatch/eventing/testing";
 import type { ProcessCommandBatchParams } from "@langwatch/eventing/testing";
-import { describe, expect, it, vi } from "vitest";
-import { RecordMetricDataPointCommand,createMetricProcessingPipeline } from "../metric-processing.service.ts";
 import {
   METRIC_COMMAND_COALESCE_MAX_BATCH,
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
@@ -12,7 +10,13 @@ import type {
   CanonicalMetricDataPoint,
   MetricDataPointReceivedEvent,
 } from "@langwatch/metric-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { point } from "../../app/__tests__/metric.fixture.ts";
+import {
+  RecordMetricDataPointCommand,
+  createMetricProcessingPipeline,
+} from "../metric-processing.service.ts";
 
 const TENANT_ID = "project_metric_coalescing";
 

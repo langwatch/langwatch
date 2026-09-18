@@ -1,5 +1,5 @@
-import type { CodingAgentSessionState } from "../../eventing/coding-agent-session.projection.ts";
 import { CodingAgentSessionStateProjection } from "../../eventing/coding-agent-session-state.projection.ts";
+import type { CodingAgentSessionState } from "../../eventing/coding-agent-session.projection.ts";
 
 // Folded session initialized from projection's init state to prevent
 // composition tests from restating counters or silently dropping mapper changes.

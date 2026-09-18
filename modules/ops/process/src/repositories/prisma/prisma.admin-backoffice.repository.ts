@@ -1,20 +1,22 @@
-import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
-import { PlanTypes, SubscriptionStatus } from "@langwatch/prisma-client/generated";
 import type {
   AdminDataResult,
   AdminListResult,
   AdminOperationInput,
   AdminOperationParams,
-  AdminOperationResult,UserWithBackofficeIncludes
+  AdminOperationResult,
+  UserWithBackofficeIncludes,
 } from "@langwatch/ops-contract";
+import { PlanTypes, SubscriptionStatus } from "@langwatch/prisma-client/generated";
+import { type Instant, toDate } from "@langwatch/time";
+import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
+
+import { AdminBackofficeRepository } from "../admin/admin-backoffice.repository.ts";
+import { PrismaAdminUserMapper, USER_BACKOFFICE_INCLUDE } from "./prisma.admin-user.mapper.ts";
 import {
   type AdminDatabase,
   ORGANIZATION_SAFE_SELECT,
   PROJECT_SAFE_SELECT,
 } from "./prisma.admin.repository.ts";
-import { PrismaAdminUserMapper, USER_BACKOFFICE_INCLUDE } from "./prisma.admin-user.mapper.ts";
-import { AdminBackofficeRepository } from "../admin/admin-backoffice.repository.ts";
-import { type Instant, toDate } from "@langwatch/time";
 
 /**
  * Private Prisma/React-Admin adapter for the Ops backoffice surface.

@@ -2,7 +2,11 @@
  * Spec: modules/authz/specs/grants-command-dispatch.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { AuthzLedgerUnavailableError,EventingAuthzCommandDispatcherAdapter } from "../authz-grants-command-dispatcher.service.ts";
+
+import {
+  AuthzLedgerUnavailableError,
+  EventingAuthzCommandDispatcherAdapter,
+} from "../authz-grants-command-dispatcher.service.ts";
 import type { AuthzGrantsCommandSenders } from "../authz-grants-command-dispatcher.service.ts";
 
 function senders(): AuthzGrantsCommandSenders {

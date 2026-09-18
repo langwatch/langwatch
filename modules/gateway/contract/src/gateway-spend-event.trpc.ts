@@ -1,10 +1,10 @@
+import { defineTrpcContract } from "@langwatch/api/contract";
 /**
  * The `gatewaySpendEvents.*` procedure, declared once: a read-only, newest-
  * first, cursor-paged view over `gateway_spend`. Project-scoped, like the
  * neighbouring usage reads; organization-wide rollups are a later fast-follow.
  */
 import { z } from "zod";
-import { defineTrpcContract } from "@langwatch/api/contract";
 
 import { spendFiltersSchema } from "./gateway-spend.schemas.ts";
 import { gatewaySpendEventPageSchema } from "./gateway.responses.ts";

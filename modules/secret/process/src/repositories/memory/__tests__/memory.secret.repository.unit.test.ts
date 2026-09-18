@@ -1,5 +1,6 @@
 import { SecretDuplicateError, SecretNotFoundError } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
+
 import { MemorySecretRepository } from "../memory.secret.repository.ts";
 
 function stored(name: string, projectId = "project-1") {

@@ -2,13 +2,15 @@
  * The LangWatchQL executor over a real ClickHouse endpoint.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { nowInstant } from "@langwatch/time";
 import {
   LangWatchQLProvisioningIncompleteError,
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
 } from "@langwatch/analytics-contract";
+import { nowInstant } from "@langwatch/time";
 
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "../../services/langwatch-ql-access-model.service.ts";
+import { LangWatchQLExecutorService } from "../../services/langwatch-ql-executor.service.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
@@ -23,8 +25,6 @@ import {
   unknownIdentifierFromError,
 } from "./clickhouse.query-error-translation.mapper.ts";
 import { toError } from "./clickhouse.to-error.mapper.ts";
-import { DEFAULT_LWQL_RESOURCE_LIMITS } from "../../services/langwatch-ql-access-model.service.ts";
-import { LangWatchQLExecutorService } from "../../services/langwatch-ql-executor.service.ts";
 
 const executorService = LangWatchQLExecutorService.create();
 

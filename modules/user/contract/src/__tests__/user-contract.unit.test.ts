@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   USER_AVATAR_MAX_DATA_URL_LENGTH,
   setFirstUserPasswordInputSchema,

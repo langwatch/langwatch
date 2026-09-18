@@ -4,6 +4,7 @@
  * Spec: modules/api-key/specs/api-key.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   CLI_LOGIN_UNKNOWN_DEVICE_LABEL,
   deviceLabelForSession,
@@ -44,9 +45,9 @@ describe("sanitizeDeviceLabel", () => {
 describe("deviceLabelForSession", () => {
   describe("given both a chosen label and a hostname", () => {
     it("prefers the user-chosen label", () => {
-      expect(
-        deviceLabelForSession({ device_label: "work-laptop", hostname: "some-host" }),
-      ).toBe("work-laptop");
+      expect(deviceLabelForSession({ device_label: "work-laptop", hostname: "some-host" })).toBe(
+        "work-laptop",
+      );
     });
   });
 

@@ -4,22 +4,23 @@
  */
 
 import { useBreakpointValue } from "@chakra-ui/react";
+
 import {
   useNavigationHost,
   type NavigationProject,
   type NavigationUser,
 } from "../model/navigation-host.ts";
-import {
-  SHELL_SIDEBAR_WIDTH_COMPACT,
-  SHELL_SIDEBAR_WIDTH_EXPANDED,
-} from "../model/shell-layout.ts";
+import type { ProductId } from "../model/products.ts";
 import {
   projectNavItemAt,
   toProjectRoutePattern,
   type ProjectNavItem,
 } from "../model/project-nav-items.ts";
 import { resolveShellRoute, type ShellRoute } from "../model/resolve-shell-route.ts";
-import type { ProductId } from "../model/products.ts";
+import {
+  SHELL_SIDEBAR_WIDTH_COMPACT,
+  SHELL_SIDEBAR_WIDTH_EXPANDED,
+} from "../model/shell-layout.ts";
 import { useIsMobileViewport } from "./use-is-mobile-viewport.ts";
 
 export interface NavigationShellReadyState {

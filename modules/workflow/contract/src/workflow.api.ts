@@ -1,6 +1,6 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Evaluator } from "@langwatch/evaluator-contract";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { StudioClientEvent, StudioServerEvent } from "./studio-events.ts";
 import type { ExecutionState, Field, StudioWorkflow } from "./studio-workflow.ts";

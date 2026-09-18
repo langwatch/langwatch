@@ -1,13 +1,14 @@
 // Guarded upserts in raw SQL; one statement per event; guard in WHERE for atomicity.
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate } from "@langwatch/time";
+
 import {
   type GrantProjectionWrite,
   GrantProjectionWriteStore,
 } from "../../eventing/authz-grant.projection.ts";
 import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import { AuthzGrantMapper } from "./prisma.authz-grant.mapper.ts";
-import { toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:projection-compat");
 

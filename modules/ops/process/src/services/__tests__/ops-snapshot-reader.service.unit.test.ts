@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   SNAPSHOT_VERSION,
   type DashboardData,
   type DetailSnapshot,
   type LiveSnapshot,
 } from "@langwatch/ops-contract";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { OpsSnapshotRepository } from "../../repositories/observe/ops-snapshot.repository.ts";
 import { DefaultOpsSnapshotService } from "../ops-snapshot-reader.service.ts";
 

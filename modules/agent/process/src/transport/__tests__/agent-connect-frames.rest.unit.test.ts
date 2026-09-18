@@ -1,5 +1,3 @@
-import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AgentApi } from "@langwatch/agent-contract";
 /**
  * @vitest-environment node
@@ -13,8 +11,11 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
+
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
 import { agentRestErrorHandler } from "../agent.rest.ts";
 
@@ -50,7 +51,9 @@ function buildApi(relayMaxPayloadMb?: number) {
     }),
   );
   return {
-    hono: { request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init) },
+    hono: {
+      request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init),
+    },
     framesSpy,
   };
 }

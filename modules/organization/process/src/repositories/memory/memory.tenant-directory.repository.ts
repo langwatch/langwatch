@@ -1,5 +1,6 @@
 import type { TenantDirectory } from "@langwatch/clickhouse-client";
 import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
+
 import type { TenantOwnershipReader } from "../../services/tenant-directory.service.ts";
 import type { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 

@@ -4,13 +4,13 @@
  * Spec: specs/ai-gateway/budgets-principal-cascade.feature
  */
 
-import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { ProjectApi } from "@langwatch/project-contract";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
+import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 

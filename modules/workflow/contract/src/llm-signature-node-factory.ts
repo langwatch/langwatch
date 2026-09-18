@@ -1,5 +1,5 @@
-import type { LlmPromptConfigComponent } from "./studio-workflow.ts";
 import type { NodeWithOptionalPosition } from "./studio-workflow-node-utils.ts";
+import type { LlmPromptConfigComponent } from "./studio-workflow.ts";
 
 type LlmSignatureNode = NodeWithOptionalPosition<LlmPromptConfigComponent>;
 

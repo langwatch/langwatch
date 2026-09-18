@@ -1,12 +1,11 @@
 /** @vitest-environment jsdom */
 
-import { act } from "react";
-import { createRoot } from "react-dom/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { Component, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   type AgentPickerCallbacks,

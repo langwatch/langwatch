@@ -1,3 +1,6 @@
+import { UNNAMED_FAILURE, type EvaluationV3Event } from "@langwatch/experiment-contract";
+import { ValidationError } from "@langwatch/handled-error";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 /**
  * What a run's engine events become on the wire: which cell a result lands in,
  * what a target's output looks like, what a failure is allowed to say, and what
@@ -5,9 +8,7 @@
  * @see specs/experiments-v3/execution-backend.feature
  */
 import { describe, expect, it } from "vitest";
-import { ValidationError } from "@langwatch/handled-error";
-import { UNNAMED_FAILURE, type EvaluationV3Event } from "@langwatch/experiment-contract";
-import type { StudioServerEvent } from "@langwatch/workflow-contract";
+
 import {
   coercePassed,
   coerceScore,

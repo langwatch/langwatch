@@ -1,12 +1,13 @@
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
+import { nowInstant } from "@langwatch/time";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle } from "react-feather";
+
 import { api } from "../../../behavior/onboarding-api.ts";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { useActiveProject } from "../active-project-context.tsx";
-import { nowInstant } from "@langwatch/time";
 
 export function WaitingForTracesChip(): React.ReactElement {
   const accent = useColorRawValue("orange.400");

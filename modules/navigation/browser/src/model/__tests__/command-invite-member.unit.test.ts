@@ -4,6 +4,7 @@
  * @see specs/settings/add-member-drawer.feature
  */
 import { describe, expect, it, vi } from "vitest";
+
 import { allStaticCommands } from "../command-catalogue.ts";
 import { handleCommandSelect } from "../command-select-handlers.ts";
 

@@ -1,5 +1,6 @@
 import { aggregateSeriesValues, extractSeriesPoints } from "@langwatch/analytics-contract";
 import type { GraphTriggerEvaluationResult } from "@langwatch/automation-contract";
+
 import {
   GRAPH_TRIGGER_MAX_RESULT_ROWS,
   TriggerEvaluatorService,

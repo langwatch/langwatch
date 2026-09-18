@@ -1,6 +1,7 @@
+import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 /** Guard scope ranking and prototype-chain safety (#5837 AC3). */
 import { describe, expect, it } from "vitest";
-import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
+
 import { makeProvider } from "./model-provider.test-helpers.ts";
 
 describe("given a project-scoped row and an organization-scoped row that both define the same model id", () => {

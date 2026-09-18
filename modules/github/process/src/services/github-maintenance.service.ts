@@ -7,6 +7,12 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+
+import type { GithubBranchMaintenance } from "../app/github.members.ts";
+import {
+  runGithubBranchRecheck,
+  runGithubRetentionPrune,
+} from "../eventing/github-branch-recheck.intent.ts";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
@@ -15,11 +21,6 @@ import {
   githubBranchRecheckSchema,
   githubBranchRecheckWake,
 } from "../eventing/github-branch-recheck.process.ts";
-import {
-  runGithubBranchRecheck,
-  runGithubRetentionPrune,
-} from "../eventing/github-branch-recheck.intent.ts";
-import type { GithubBranchMaintenance } from "../app/github.members.ts";
 
 export interface GithubMaintenancePipelineDeps {
   /**

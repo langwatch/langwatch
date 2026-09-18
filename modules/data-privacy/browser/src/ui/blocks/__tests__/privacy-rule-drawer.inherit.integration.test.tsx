@@ -5,9 +5,6 @@
  * start with all fields inherited and show resolved values for inherited fields.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type DataPrivacyRule,
   type DataPrivacyScopeAvailable,
@@ -15,6 +12,10 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import type React from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { PrivacyRuleDrawer } from "../privacy-rule-drawer.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (

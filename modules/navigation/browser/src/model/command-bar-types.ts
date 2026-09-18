@@ -1,6 +1,6 @@
+import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import type { LucideIcon } from "lucide-react";
 import { z } from "zod";
-import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 
 /** Drawer name (address, not component); host resolves against its own registry */
 export type CommandDrawerName = string;

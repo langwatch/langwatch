@@ -1,7 +1,8 @@
 import { Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Switch } from "@langwatch/design-system/switch";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import {
   cronFromParts,
   cronScheduleError,

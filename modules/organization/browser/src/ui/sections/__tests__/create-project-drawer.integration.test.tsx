@@ -67,8 +67,8 @@ vi.mock("react-contextual-analytics", () => ({
   useAnalytics: () => ({ emit: mockEmit }),
 }));
 
-import { CreateProjectDrawer } from "../create-project-drawer.tsx";
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
+import { CreateProjectDrawer } from "../create-project-drawer.tsx";
 
 const typeName = async (name: string) => {
   const user = userEvent.setup();

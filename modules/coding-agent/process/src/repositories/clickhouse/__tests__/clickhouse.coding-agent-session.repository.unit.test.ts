@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { NoopCodingAgentReadMetrics } from "../../../services/coding-agent-read-metrics-noop.service.ts";
+
 import {
   TestClickHouseEndpoint,
   TestClock,
   session,
 } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
+import { NoopCodingAgentReadMetrics } from "../../../services/coding-agent-read-metrics-noop.service.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
 const endpoints: TestClickHouseEndpoint[] = [];

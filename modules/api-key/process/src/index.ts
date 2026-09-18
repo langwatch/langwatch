@@ -28,6 +28,7 @@ export {
   apiKeyServer,
   hashApiKeySecret,
   createAgentSandboxKeyReapService,
+  createCliLoginKeyReapService,
   buildAgentSandboxMaintenancePipeline,
 } from "./api-key.server.ts";
 export { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";

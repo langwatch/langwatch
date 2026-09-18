@@ -1,7 +1,8 @@
 import { SecurityError } from "@langwatch/eventing";
+import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/metric-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
-import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/metric-contract";
+
 import type {
   MetricDataPointBulkWrite,
   MetricDataPointWrite,

@@ -2,12 +2,12 @@
  * The scope reading the moved studio modules already do.
  */
 
-import { useMemo } from "react";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Temporal, toDate } from "@langwatch/time";
+import type { Project } from "@langwatch/workflow-contract";
+import { useMemo } from "react";
 
 import { useWorkflowHost, type WorkflowCopyTarget } from "../../model/workflow-host.ts";
-import type { Project } from "@langwatch/workflow-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 
 /**
  * The project row, as the studio's closure reads it.

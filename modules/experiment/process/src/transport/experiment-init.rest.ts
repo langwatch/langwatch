@@ -3,14 +3,18 @@
  * (not handled-error envelope) to match SDK wire contract.
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import { ExperimentApi, experimentInitBodySchema } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 
 import { INIT_EXPERIMENT } from "../rules/experiment-openapi.rules.ts";
 

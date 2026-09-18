@@ -5,11 +5,12 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 
 // The menu's "Add to dashboard" item reads tRPC hooks at render; none of
 // these scenarios show it, so the client is stubbed rather than provided.

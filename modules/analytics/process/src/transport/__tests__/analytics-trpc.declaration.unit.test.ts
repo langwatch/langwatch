@@ -49,10 +49,10 @@ describe("given the workbench tRPC contract", () => {
 describe("given the server halves of both namespaces", () => {
   describe("when their declarations are read", () => {
     it("binds each namespace to the analytics feature under its own name", () => {
-      expect([
-        analyticsTrpcTransport.namespace,
-        analyticsLwqlTrpcTransport.namespace,
-      ]).toEqual(["analytics", "analytics.lwql"]);
+      expect([analyticsTrpcTransport.namespace, analyticsLwqlTrpcTransport.namespace]).toEqual([
+        "analytics",
+        "analytics.lwql",
+      ]);
     });
 
     it("declares both as tRPC transports the process mounts", () => {

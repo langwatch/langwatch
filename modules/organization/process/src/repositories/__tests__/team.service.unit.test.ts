@@ -3,7 +3,6 @@ import type {
   AuthzApi,
   AuthzTeamMemberBinding,
 } from "@langwatch/authz-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   CannotRemoveSelfAsLastAdminError,
   TeamLastAdminRequiredError,
@@ -12,16 +11,18 @@ import {
   type OrganizationGroupMember,
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+
 import type {
   GroupIdentity,
   PersonalWorkspaceIdentity,
   TeamIdentity,
 } from "../../app/organization.members.ts";
-import type { OrganizationRepository } from "../organization.repository.ts";
-import { GroupRepository } from "../group.repository.ts";
-import { TeamRepository } from "../team.repository.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
+import { GroupRepository } from "../group.repository.ts";
+import type { OrganizationRepository } from "../organization.repository.ts";
+import { TeamRepository } from "../team.repository.ts";
 
 const team: OrganizationTeam = {
   id: "team_1",

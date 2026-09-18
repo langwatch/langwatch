@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   resolveDataPrivacy,

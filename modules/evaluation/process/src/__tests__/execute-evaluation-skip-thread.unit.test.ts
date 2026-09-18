@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { EvaluationExecutionIntentService as ExecuteEvaluationCommand } from "../services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,

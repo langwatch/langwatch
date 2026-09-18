@@ -26,18 +26,19 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

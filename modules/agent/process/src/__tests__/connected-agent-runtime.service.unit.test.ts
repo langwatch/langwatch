@@ -1,13 +1,18 @@
+import {
+  CALL_ENVELOPE_KEYS,
+  RESULT_TTL_SECONDS,
+  buildCallEnvelope,
+  type StoredResult,
+  storedCallSchema,
+} from "@langwatch/agent-contract";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 /**
  * The dispatcher against the in-memory store, with a fake instance that plays the
  * gateway's part: it reads envelopes off the store and writes acks and results back the
  * @see specs/agents/connected-agents.feature
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CALL_ENVELOPE_KEYS, RESULT_TTL_SECONDS,buildCallEnvelope,type StoredResult,storedCallSchema } from "@langwatch/agent-contract";
 
-import type { InstanceMeta,ConnectedAgentRuntime } from "../services/connected-agent-runtime.service.ts";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import {
   callAckKey,
   callKey,
@@ -16,6 +21,10 @@ import {
   replyChannel,
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
+import type {
+  InstanceMeta,
+  ConnectedAgentRuntime,
+} from "../services/connected-agent-runtime.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 
 const projectId = "proj_1";

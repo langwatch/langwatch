@@ -1,5 +1,6 @@
 import { AnnotationNotFoundError } from "@langwatch/annotation-contract";
 import { describe, expect, it } from "vitest";
+
 import { MemoryAnnotationRepository } from "../memory.annotation.repository.ts";
 
 const annotationInput = {

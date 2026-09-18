@@ -7,9 +7,8 @@
 
 import { useMemo } from "react";
 
-import { analyticsApi } from "./analytics-api.ts";
-
 import { type LangWatchQLSchemaModel, lwqlSchemaModel } from "../model/lwql-schema-model.ts";
+import { analyticsApi } from "./analytics-api.ts";
 
 export interface UseLangWatchQLSchema {
   /** Exactly what the endpoint returned, shaped for the browser and editor. */

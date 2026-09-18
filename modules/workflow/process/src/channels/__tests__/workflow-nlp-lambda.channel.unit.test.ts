@@ -4,17 +4,18 @@
  * @see specs/nlp-go/lambda-invoke-payload-staging.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  InvokePayloadTooLargeError,
-  NlpInvokeTransportAdapter,
-  type NlpInvokeStagingConfig,
-} from "../workflow-nlp-lambda.channel.ts";
+
 import {
   type NlpLambdaInvoke,
   type NlpPayloadStaging,
   type NlpLambdaInvokeResult,
   type StagedNlpPayload,
 } from "../../app/workflow.app.ts";
+import {
+  InvokePayloadTooLargeError,
+  NlpInvokeTransportAdapter,
+  type NlpInvokeStagingConfig,
+} from "../workflow-nlp-lambda.channel.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:nlpgo-project";
 

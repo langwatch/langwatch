@@ -1,10 +1,11 @@
 import { Button, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { RotateCcw } from "lucide-react";
+
 import { useOpsOverlay } from "../../../behavior/ops-overlays.ts";
-import { EventSourcingLayout } from "../../../ui/sections/event-sourcing-layout.tsx";
 import { OpsReplayDrawer } from "../../../features/event-store/ui/sections/ops-replay-drawer.tsx";
 import { ProjectionsCard } from "../../../features/event-store/ui/sections/projections-panel.tsx";
 import { ReplayHistorySection } from "../../../features/event-store/ui/sections/replay-history-panel.tsx";
+import { EventSourcingLayout } from "../../../ui/sections/event-sourcing-layout.tsx";
 
 /** Projections and replays that rebuild them; wizard addressed by page query. */
 export default function OpsProjectionsScreen() {

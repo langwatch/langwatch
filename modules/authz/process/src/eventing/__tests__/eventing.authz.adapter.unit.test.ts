@@ -9,6 +9,11 @@ import {
   type ProjectionStoreContext,
 } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
+import {
+  AuthzAuditTrailStore,
+  type AuthzAuditRow,
+} from "../../repositories/authz-audit-trail.repository.ts";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
@@ -19,14 +24,7 @@ import {
 } from "../authz-grant.commands.ts";
 import { AUTHZ_GRANT_AGGREGATE_TYPE } from "../authz-grant.events.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME, EventingAuthzAdapter } from "../authz-grant.pipeline.ts";
-import {
-  AuthzAuditTrailStore,
-  type AuthzAuditRow,
-} from "../../repositories/authz-audit-trail.repository.ts";
-import {
-  type GrantProjectionWrite,
-  GrantProjectionWriteStore,
-} from "../authz-grant.projection.ts";
+import { type GrantProjectionWrite, GrantProjectionWriteStore } from "../authz-grant.projection.ts";
 
 const ORGANIZATION_ID = "org_acme";
 const OCCURRED_AT = 1_755_000_000_000;

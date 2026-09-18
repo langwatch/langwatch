@@ -1,11 +1,12 @@
 import { Box, Center, Container, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useAnalytics } from "react-contextual-analytics";
+
+import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { FullLogo } from "../elements/icons/full-logo.tsx";
 import { Link } from "../elements/link.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { OnboardingMeshBackground } from "../elements/onboarding-mesh-background.tsx";
 import SpookyScarySkeleton from "../elements/spooky-scary-skeleton.tsx";
 

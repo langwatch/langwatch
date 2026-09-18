@@ -5,6 +5,7 @@ import {
   type Notification,
   type NotificationRecentQuery,
 } from "@langwatch/notification-contract";
+
 import type { NotificationRepository } from "../repositories/notification.repository.ts";
 
 /** Canonical Notification service; delivery policy remains outside this class. */

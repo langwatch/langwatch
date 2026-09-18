@@ -21,6 +21,7 @@ vi.mock("@langwatch/egress", async (importOriginal) => ({
 }));
 
 import { RedirectRefusedError } from "@langwatch/egress";
+
 import { SsrfModelProviderEgressAdapter } from "../ssrf.model-provider-egress.service.ts";
 
 const egress = SsrfModelProviderEgressAdapter.create({

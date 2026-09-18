@@ -1,7 +1,4 @@
-import {
-  findSeriesIdentifier,
-  graphSeriesCollectionSchema,
-} from "@langwatch/automation-contract";
+import { findSeriesIdentifier, graphSeriesCollectionSchema } from "@langwatch/automation-contract";
 
 /** A pickable series on a custom graph. */
 export interface GraphSeriesOption {

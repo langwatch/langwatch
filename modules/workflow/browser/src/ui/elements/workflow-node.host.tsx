@@ -1,7 +1,6 @@
+import type { Component, ComponentType, Custom, Entry } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { createContext, useContext } from "react";
-
-import type { Component, ComponentType, Custom, Entry } from "@langwatch/workflow-contract";
 
 type NodeHost = {
   ComponentIcon: React.ComponentType<{

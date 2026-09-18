@@ -1,11 +1,12 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { GitPullRequest, Sparkles } from "lucide-react";
-import type { MouseEvent, ReactNode } from "react";
 import { LangyPanelSurface } from "@langwatch/langy-browser/surfaces/asaplangy";
 import { Chip } from "@langwatch/trace-browser/surfaces/trace-drawer-chip";
+import { GitPullRequest, Sparkles } from "lucide-react";
+import type { MouseEvent, ReactNode } from "react";
+
+import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
 import type { BriefingData, BriefingReceipt, BriefingSeverity, ScenarioBar } from "../types.ts";
 import { QuietHeadline } from "./quiet-headline.tsx";
-import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
 
 /**
  * Langy's briefing: what changed since last visit (headline, plan chips,

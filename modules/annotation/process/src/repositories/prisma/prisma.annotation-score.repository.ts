@@ -11,6 +11,7 @@ import {
 } from "@langwatch/annotation-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { isRecordNotFoundError } from "@langwatch/prisma-client/errors";
+
 import type { AnnotationScoreRepository } from "../annotation-score.repository.ts";
 
 const annotationScoreSelect = {

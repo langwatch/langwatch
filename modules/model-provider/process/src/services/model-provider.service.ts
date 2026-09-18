@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   ModelProviderInvalidError,
   translateInputSchema,
@@ -35,38 +36,32 @@ import {
   type TranslateInput,
   type TranslateOutput,
 } from "@langwatch/model-provider-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+
 import type {
   CodexTokenRefresher,
   ModelProviderCatalog,
   ModelProviderConnectionRateLimiter,
   ModelProviderCredentialPolicy,
   ModelProviderIdService,
-  ModelTranslation
+  ModelTranslation,
 } from "../app/model-provider.members.ts";
-import type {
-  ModelCostRepository
-} from "../repositories/model-cost.repository.ts";
-import type {
-  ModelDefaultRepository
-} from "../repositories/model-default.repository.ts";
-import type {
-  ModelProviderRepository
-} from "../repositories/model-provider.repository.ts";
-import { ModelProviderCommandService } from "./model-provider-command.service.ts";
+import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
+import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
+import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import { ModelProviderCodexService } from "./model-provider-codex.service.ts";
+import { ModelProviderCommandService } from "./model-provider-command.service.ts";
 import { ModelProviderCostsService } from "./model-provider-costs.service.ts";
-import { ModelProviderDefaultsService } from "./model-provider-defaults.service.ts";
 import { ModelProviderDefaultsWriteService } from "./model-provider-defaults-write.service.ts";
+import { ModelProviderDefaultsService } from "./model-provider-defaults.service.ts";
 import { ModelProviderExecutionService } from "./model-provider-execution.service.ts";
 import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
 import { ModelProviderQueryService } from "./model-provider-query.service.ts";
-import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
-import { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 import { ModelProviderResolutionService } from "./model-provider-resolution.service.ts";
+import { ModelProviderScopeService } from "./model-provider-scope.service.ts";
+import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
 
 export interface ModelProviderServiceOptions {
   repository: ModelProviderRepository;

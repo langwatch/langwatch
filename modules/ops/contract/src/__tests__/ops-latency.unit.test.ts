@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   LATENCY_HISTOGRAM_BOUNDS_MS,
   LATENCY_HISTOGRAM_OVERFLOW_FIELD,

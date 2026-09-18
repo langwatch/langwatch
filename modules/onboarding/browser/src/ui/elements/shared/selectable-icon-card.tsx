@@ -1,13 +1,14 @@
 import { Box, type IconProps, Text, VStack } from "@chakra-ui/react";
-import type React from "react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type React from "react";
+
 import { type IconSizeKey, iconSizeToPixels } from "../../../model/icon-size.ts";
-import type { IconData } from "../../../model/shared/types.ts";
 import {
   SELECTED_SURFACE_BG,
   SELECTED_SURFACE_BORDER,
 } from "../../../model/shared/accent-surface.ts";
+import type { IconData } from "../../../model/shared/types.ts";
 
 interface SelectableIconCardProps {
   label: string;

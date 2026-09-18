@@ -1,8 +1,9 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
+
 import type { PlatformKey } from "../../../model/observability/types.ts";
-import { PLATFORM_OPTIONS } from "./ui-options.ts";
 import { SelectableIconCard } from "../../elements/shared/selectable-icon-card.tsx";
+import { PLATFORM_OPTIONS } from "./ui-options.ts";
 
 type PlatformOption = (typeof PLATFORM_OPTIONS)[number];
 

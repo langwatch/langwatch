@@ -2,10 +2,11 @@
  * @vitest-environment node
  */
 
-import { describe, expect, it, vi } from "vitest";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { WorkflowAgentMappingService } from "../workflow-agent-mapping.service.ts";
 
 /** The adapter under test, over the fake rows one case supplies. */

@@ -1,15 +1,16 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { ChartNoAxesColumn, Telescope } from "lucide-react";
 import type React from "react";
 import { useAnalytics } from "react-contextual-analytics";
-import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { useOnboardingFormContext } from "./form-context.tsx";
+
 import {
   accentChipBg,
   accentChipBorder,
   selectedSurfaceBg,
   selectedSurfaceBorder,
 } from "../../model/shared/accent-surface.ts";
+import { useOnboardingFormContext } from "./form-context.tsx";
 
 interface IntentOption {
   value: OrganizationIntent;

@@ -6,9 +6,10 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { describe, expect, it, vi } from "vitest";
+
 import type { FeatureFlagApi } from "../feature-flag.api.ts";
-import { isVoiceAgentsEnabledForProject } from "../voiceAgents.ts";
 import { VOICE_AGENTS_FLAG_KEY } from "../voiceAgents.message.ts";
+import { isVoiceAgentsEnabledForProject } from "../voiceAgents.ts";
 
 function fakeFeatureFlags(isEnabledMock: ReturnType<typeof vi.fn>): FeatureFlagApi {
   return { isEnabled: isEnabledMock } as unknown as FeatureFlagApi;

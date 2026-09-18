@@ -1,9 +1,7 @@
 import type { SystemMigration } from "@langwatch/system-migrations";
+
+import type { OrganizationDataplane, OrganizationDataplaneResolver } from "../app/ops.app.ts";
 import { organizationMigrates } from "../rules/ops-system-migration-cohort.rules.ts";
-import type {
-  OrganizationDataplane,
-  OrganizationDataplaneResolver,
-} from "../app/ops.app.ts";
 
 /** One organization's place in one migration's cohort, and where it lives. */
 export type OrganizationCohortAdmission = Readonly<{

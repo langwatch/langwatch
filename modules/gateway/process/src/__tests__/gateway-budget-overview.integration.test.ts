@@ -1,3 +1,6 @@
+import type { OrganizationService } from "@langwatch/organization-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * Real Postgres + ClickHouse: what a member sees about budgets binding their key.
@@ -5,23 +8,17 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
-import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { PrismaGatewayBudgetOverviewRepository } from "../repositories/prisma/prisma.gateway-budget-overview.repository.ts";
+import { PrismaGatewayProviderLabelRepository } from "../repositories/prisma/prisma.gateway-provider-label.repository.ts";
+import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestFeatureFlags } from "./support/test-feature-flag-service.ts";
-import { TestOrganizationService } from "./support/test-organization-service.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 import {
   BUDGET_ARCHIVED_ID,
   BUDGET_GROUP_ID,
@@ -38,8 +35,9 @@ import {
   TENANTS,
   USER_ID,
 } from "./support/budget-overview.fixture.ts";
-
-import { PrismaGatewayProviderLabelRepository } from "../repositories/prisma/prisma.gateway-provider-label.repository.ts";
+import { TestFeatureFlags } from "./support/test-feature-flag-service.ts";
+import { TestOrganizationService } from "./support/test-organization-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();

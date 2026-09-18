@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { evaluateCustomGraphThreshold, isNoDataPredicate } from "../index.ts";
 
 describe("evaluateCustomGraphThreshold", () => {

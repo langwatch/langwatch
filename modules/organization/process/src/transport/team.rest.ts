@@ -1,3 +1,11 @@
+import { SYSTEM_ACTORS } from "@langwatch/actor";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
+import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
+import { moduleApi } from "@langwatch/kernel/module-api";
 /**
  * `/api/teams` - the organization's teams, their members, and their projects.
  * Routes that address a single team (`:id`) check permissions at team scope;
@@ -22,14 +30,6 @@ import {
   type OrganizationTeam,
   type UpdateOrganizationTeamInput,
 } from "@langwatch/organization-contract";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
-import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
-import { moduleApi } from "@langwatch/kernel";
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { z } from "zod";
 
 /**

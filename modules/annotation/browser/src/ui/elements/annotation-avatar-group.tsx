@@ -1,7 +1,8 @@
 import { HStack } from "@chakra-ui/react";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
-import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+
 import type { AnnotationUser } from "../../model/annotation-row.ts";
 
 export function AnnotationAvatarGroup({

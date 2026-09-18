@@ -10,6 +10,7 @@ import {
   type TenantMigrationRecord,
 } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,

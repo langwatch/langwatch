@@ -1,15 +1,16 @@
 // Per-project error isolation for the heartbeat; a failure must not silence
 // no-data alerts for all projects.
 
+import type { TriggerSummary } from "@langwatch/automation-contract";
+import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   type GraphTriggerHeartbeatDeps,
   GraphTriggerHeartbeatService,
 } from "../../services/graph-trigger-heartbeat.service.ts";
-import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { GraphTriggerSentRepository } from "../graph-trigger-sent.repository.ts";
 import { HeartbeatTriggerRepository, SilentAutomationLogger } from "./support/heartbeat.fakes.ts";
-import { Temporal } from "@langwatch/time";
 
 const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
 

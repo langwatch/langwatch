@@ -7,9 +7,9 @@ import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
+import type { AuthDirectory } from "../../app/auth.members.ts";
 import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
 import { CliDeviceSessionService } from "../../services/cli-device-session.service.ts";
-import type { AuthDirectory } from "../../app/auth.members.ts";
 import { authCliDeviceFlowRest, type AuthCliDeviceFlowApi } from "../auth-cli-device-flow.rest.ts";
 
 const USER_ID = "user-1";

@@ -2,6 +2,8 @@
  * ADR-032: the streaming chunk writer — the I/O orchestrator that turns a
  */
 import { generate } from "@langwatch/ksuid";
+
+import type { DatasetStorage } from "../app/dataset.app.ts";
 import {
   CHUNK_MAX_BYTES,
   type ChunkedDatasetMeta,
@@ -9,7 +11,6 @@ import {
   chunkedMeta,
   chunkMetaOf,
 } from "../rules/dataset-chunking.rules.ts";
-import type { DatasetStorage } from "../app/dataset.app.ts";
 
 /**
  * The app's KSUID resource for a chunk-line row (`KSUID_RESOURCES.RECORD`).

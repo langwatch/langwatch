@@ -6,6 +6,7 @@
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import {
   CannotArchiveCurrentProjectError,
   ProjectCreateDeniedError,
@@ -15,7 +16,6 @@ import {
   projectTrpc,
   type ProjectApi,
 } from "@langwatch/project-contract";
-import { moduleApi } from "@langwatch/kernel";
 
 /** A scope a probe is asked at, when the declaration resolved a different one. */
 export type ProjectPermissionScope = Readonly<{

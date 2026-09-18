@@ -1,12 +1,13 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import qs from "qs";
 import { X } from "react-feather";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
-import { filterOutEmptyFilters } from "../analytics/utils.ts";
+
 import type { FilterField } from "../../../model/filters/types.ts";
-import { URL_QS_PARSE_OPTIONS } from "../../../model/utils/qs-parse-options.ts";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { URL_QS_PARSE_OPTIONS } from "../../../model/qs-parse-options.ts";
+import { filterOutEmptyFilters } from "../analytics/utils.ts";
+import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
 import { FilterIconWithBadge } from "./filter-icon-with-badge.tsx";
 
 /**

@@ -5,15 +5,15 @@
  */
 
 import {
-  type QueryParameterRowVM,
-  QueryParametersPanel,
-  reservedPrefixProblem,
-} from "./query-parameters-panel.tsx";
-import {
   type DashboardWidgetQuery,
   type DashboardWidgetQueryParameterDeclaration,
   RESERVED_PARAMETERS,
 } from "../../model/dashboard-widget-definition.ts";
+import {
+  type QueryParameterRowVM,
+  QueryParametersPanel,
+  reservedPrefixProblem,
+} from "./query-parameters-panel.tsx";
 
 const TYPE_OPTIONS = [
   { value: "string", label: "Text" },
@@ -35,9 +35,7 @@ function coerceDefault(
   return raw;
 }
 
-function defaultInputValue(
-  value: DashboardWidgetQueryParameterDeclaration["default"],
-): string {
+function defaultInputValue(value: DashboardWidgetQueryParameterDeclaration["default"]): string {
   return value === undefined ? "" : String(value);
 }
 
@@ -52,13 +50,9 @@ function nameProblem(name: string): string | undefined {
  * the same `nameProblem` a row shows inline. The Save gate reuses this so
  * a `dashboard_context_`-prefixed name can't be submitted, not just flagged.
  */
-export function declaredParamsAreValid(
-  queries: DashboardWidgetQuery[],
-): boolean {
+export function declaredParamsAreValid(queries: DashboardWidgetQuery[]): boolean {
   return queries.every((query) =>
-    (query.parameters ?? []).every(
-      (param) => nameProblem(param.name) === undefined,
-    ),
+    (query.parameters ?? []).every((param) => nameProblem(param.name) === undefined),
   );
 }
 
@@ -86,8 +80,7 @@ function rowVM({
         default: undefined,
       }),
     value: defaultInputValue(param.default),
-    onValueChange: (raw) =>
-      onChange({ ...param, default: coerceDefault(raw, param.type) }),
+    onValueChange: (raw) => onChange({ ...param, default: coerceDefault(raw, param.type) }),
     valueKind: param.type === "boolean" ? "boolean" : "input",
     inputType: param.type === "number" ? "number" : "text",
     onRemove,
@@ -120,9 +113,7 @@ export function DashboardWidgetQueryParamsEditor({
           onRemove: () => onChange(params.filter((_, i) => i !== index)),
         }),
       )}
-      onAdd={() =>
-        onChange([...params, { name: "", type: "string", default: undefined }])
-      }
+      onAdd={() => onChange([...params, { name: "", type: "string", default: undefined }])}
     />
   );
 }

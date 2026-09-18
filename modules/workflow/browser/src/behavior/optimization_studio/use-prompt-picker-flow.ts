@@ -1,6 +1,6 @@
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo } from "react";
 
-import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/use-drawer";
 import {
   useWorkflowPromptPickerFlow,
   type PromptPickerController,

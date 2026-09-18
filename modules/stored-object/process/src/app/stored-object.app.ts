@@ -5,9 +5,9 @@
  */
 import type { Readable } from "node:stream";
 
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
+import { StoredObjectApi, storedObjectConfig } from "@langwatch/stored-object-contract";
 import type {
   DeleteProjectStoredObjectsResult,
   ReadStoredObjectResult,
@@ -19,6 +19,7 @@ import type {
   StoredObjectMetadata,
   StoredObjectOwnerResolver,
   StoredObjectReference,
+  StoredObjectServerConfig,
   StoredObjectsConfirmUploadInput,
   StoredObjectsCreateUploadInput,
   StoredObjectsCreateUploadOutput,
@@ -27,7 +28,6 @@ import type {
   StoredObjectsGetInput,
   StoredObjectsGetOutput,
 } from "@langwatch/stored-object-contract";
-import { z } from "zod";
 
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
@@ -72,75 +72,26 @@ export type StoredObjectInfrastructure = Readonly<{
   owners: StoredObjectOwnerResolver;
 }>;
 
-/**
- * Stored-objects backend selection config; routes as plain object for JSON schema parsing.
- */
-const storedObjectS3ConfigSchema = z.object({
-  bucket: z.string().optional(),
-  endpoint: z.string().optional(),
-  region: z.string().optional(),
-  accessKeyId: z.string().optional(),
-  secretAccessKey: z.string().optional(),
-  sessionToken: z.string().optional(),
-});
-
-const storedObjectAzureConfigSchema = z.object({
-  authMode: z.string().optional(),
-  accountName: z.string().optional(),
-  accountKey: z.string().optional(),
-  container: z.string().optional(),
-  endpoint: z.string().optional(),
-  authorityHost: z.string().optional(),
-  tokenAudience: z.string().optional(),
-  allowInsecureTokenEndpointForTests: z.boolean().default(false),
-  identity: z
-    .object({
-      tenantId: z.string().optional(),
-      clientId: z.string().optional(),
-      federatedTokenFile: z.string().optional(),
-    })
-    .default(() => ({})),
-});
-
-const storedObjectAppConfigSchema = z.object({
-  backend: z.enum(["s3", "azure"]).optional(),
-  localFilesystemRoot: z.string().optional(),
-  s3: storedObjectS3ConfigSchema.default(() => ({})),
-  azure: storedObjectAzureConfigSchema.default(() => ({
-    allowInsecureTokenEndpointForTests: false,
-    identity: {},
-  })),
-  azureSpoolRetentionConfirmed: z.boolean().default(false),
-  /** One organization's own S3 account, keyed by organization id. */
-  routes: z
-    .record(
-      z.string(),
-      z.object({
-        endpoint: z.string().optional(),
-        bucket: z.string().optional(),
-        accessKeyId: z.string().optional(),
-        secretAccessKey: z.string().optional(),
-      }),
-    )
-    .default(() => ({})),
-});
-export type StoredObjectAppConfig = z.infer<typeof storedObjectAppConfigSchema>;
-
 /** {@link StoredObjectSetup}'s members, once built into what the app composes over. */
 type StoredObjectDependencies = Record<never, never>;
 
+/** `nodeEnvironment` is the process's own fact (§6), for the Azure insecure-token-endpoint gate. */
+type StoredObjectMembers = Pick<ProcessMembers, "prisma" | "clickhouse" | "logger" | "secrets"> &
+  Readonly<{ nodeEnvironment: string | undefined }>;
+
 type StoredObjectSetup = FeatureSetup<
   StoredObjectDependencies,
-  Pick<ProcessMembers, "prisma" | "clickhouse" | "logger">,
-  StoredObjectAppConfig,
+  StoredObjectMembers,
+  StoredObjectServerConfig,
   StoredObjectRepositories
 >;
 
 export class StoredObjectApp implements StoredObjectApi {
   static readonly contract = StoredObjectApi;
   static readonly dependencies = {};
-  static readonly configSchema = storedObjectAppConfigSchema;
-  static readonly reads = ["prisma", "clickhouse", "logger"] as const;
+  static readonly config = storedObjectConfig;
+  /** Both names are from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["prisma", "clickhouse", "logger", "secrets", "nodeEnvironment"] as const;
 
   /**
    * Builds this process's own {@link StoredObjectInfrastructure} from the

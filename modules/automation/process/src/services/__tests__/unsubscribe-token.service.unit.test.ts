@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { TriggerNoReplyService, TriggerNoReplyWarning } from "../trigger-no-reply.service.ts";
 import { UnsubscribeTokenService } from "../unsubscribe-token.service.ts";
 
@@ -90,7 +91,9 @@ describe("UnsubscribeTokenService", () => {
       expect(() =>
         tokens.sign({ projectId: "project-1", triggerId: null, email: "ada@example.com" }),
       ).toThrow(/NEXTAUTH_SECRET/);
-      expect(() => tokens.findVerifiedPayload(APPLICATION_TRIGGER_TOKEN)).toThrow(/NEXTAUTH_SECRET/);
+      expect(() => tokens.findVerifiedPayload(APPLICATION_TRIGGER_TOKEN)).toThrow(
+        /NEXTAUTH_SECRET/,
+      );
     });
   });
 });

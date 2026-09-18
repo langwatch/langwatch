@@ -5,6 +5,7 @@
  */
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -43,10 +44,11 @@ vi.mock("@langwatch/observability", () => ({
 // ---------------------------------------------------------------------------
 
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
-import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
-import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
+
 import type { StoredObjectsTelemetry } from "../../app/stored-object.members.ts";
+import type { StoredObjectStorageRepository } from "../../repositories/stored-object-storage.repository.ts";
+import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository.ts";
+import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import type { MintStorageUri } from "../stored-objects.service.ts";
 import { deriveStoredObjectId, StoredObjectsService } from "../stored-objects.service.ts";
 

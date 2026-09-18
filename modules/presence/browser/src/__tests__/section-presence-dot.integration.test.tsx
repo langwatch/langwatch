@@ -2,9 +2,10 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
+import type { PresenceLocation, PresenceSession } from "@langwatch/presence-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { PresenceLocation, PresenceSession } from "@langwatch/presence-contract";
+
 import { SectionPresenceDot, usePresenceStore } from "../index.ts";
 
 afterEach(cleanup);

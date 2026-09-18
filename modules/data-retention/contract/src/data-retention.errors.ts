@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+
 import type { RetroactiveMutationProgress } from "./data-retention.ts";
 
 /** The scope a retention override was aimed at is not there to hang one on. */
@@ -38,11 +39,9 @@ export class RetentionNotOnPlanError extends HandledError {
   declare readonly code: "data_retention_not_on_plan";
 
   constructor() {
-    super(
-      "data_retention_not_on_plan",
-      "Configuring data retention is a paid-plan feature.",
-      { httpStatus: 403 },
-    );
+    super("data_retention_not_on_plan", "Configuring data retention is a paid-plan feature.", {
+      httpStatus: 403,
+    });
     this.name = "RetentionNotOnPlanError";
   }
 }

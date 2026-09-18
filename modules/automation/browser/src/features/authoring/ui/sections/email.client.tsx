@@ -9,20 +9,21 @@ import {
 } from "@langwatch/automation-contract";
 import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
+
+import { api } from "../../../../behavior/automation-api.ts";
+import type {
+  ConfigFormProps,
+  NotifyClientDef,
+  SummaryIdentity,
+} from "../../../../model/provider-types.ts";
 import { VariableInfoIcon } from "../../../liquid-editor/index.ts";
+import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
 import {
   CompactEmailPreview,
   FieldHeader,
   LiquidEditor,
   TemplateDisclosure,
 } from "./template-authoring.tsx";
-import { api } from "../../../../behavior/automation-api.ts";
-import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
-import type {
-  ConfigFormProps,
-  NotifyClientDef,
-  SummaryIdentity,
-} from "../../../../model/provider-types.ts";
 
 /** A "field that defaults to the framework template until the user
  *  edits it" — `usingDefault=true` means the editor renders the default

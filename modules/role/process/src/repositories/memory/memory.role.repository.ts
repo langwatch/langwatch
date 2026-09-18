@@ -1,4 +1,5 @@
 import { ROLE_KIND, roleSchema, type Role } from "@langwatch/role-contract";
+
 import type { RoleRepository } from "../role.repository.ts";
 
 /**

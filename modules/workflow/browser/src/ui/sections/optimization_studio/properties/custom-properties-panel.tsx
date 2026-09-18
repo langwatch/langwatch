@@ -1,17 +1,18 @@
 import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Link } from "@langwatch/browser-host/link";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { Avatar } from "@langwatch/design-system/avatar";
 import { toEpochMs } from "@langwatch/time";
+import { getInputsOutputs, parseStudioWorkflow, type Custom } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
-import { Avatar } from "@langwatch/design-system/avatar";
-import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
-import { Link } from "@langwatch/browser-host/link";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+
 import { useComponentVersion } from "../../../../behavior/optimization_studio/use-component-version.tsx";
+import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
-import { getInputsOutputs, parseStudioWorkflow, type Custom } from "@langwatch/workflow-contract";
 import { VersionBox } from "../history.tsx";
 import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 

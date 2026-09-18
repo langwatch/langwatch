@@ -9,6 +9,7 @@
 // modules/model-provider/specs/model-provider.feature.
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
+
 import { ModelProviderCredentialCodec } from "../../../app/model-provider.members.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 

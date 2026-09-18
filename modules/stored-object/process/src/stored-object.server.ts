@@ -1,8 +1,9 @@
 import { defineServerModule } from "@langwatch/kernel";
+
 import { StoredObjectApp } from "#app/stored-object.app";
 import type { StoredObjectsTelemetry } from "#app/stored-object.members";
-import { storedObjectRepositories } from "#repositories/stored-object-repositories.registry";
 import type { PayloadStaging } from "#repositories/payload-staging.repository";
+import { storedObjectRepositories } from "#repositories/stored-object-repositories.registry";
 import { AbsentPayloadStagingAdapter } from "#services/absent-payload-staging.service";
 import { AzureBlobCredentialsAdapter } from "#services/azure-blob-credentials.service";
 import type {

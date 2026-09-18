@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * Real-Postgres cover for the onboarding seed's per-key merge (#7556): the seed used to stop
  * at the first config already attached to a scope, so provider order decided which roles ever
@@ -6,15 +7,15 @@
  * @see specs/model-providers/onboarding-flow.feature
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { ModelProviderOnboardingDefaultsService } from "../services/model-provider-onboarding-defaults.service.ts";
-import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
-import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
-import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
-import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
+
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
+import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
+import { ModelProviderOnboardingDefaultsService } from "../services/model-provider-onboarding-defaults.service.ts";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,

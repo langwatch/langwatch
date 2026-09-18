@@ -1,14 +1,11 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useEffect, useRef, useState } from "react";
-import { AuthCard } from "../elements/auth-card.tsx";
-import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import { normalizeErrorCode, SignInError } from "./sign-in-error-screen.tsx";
+
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { replaceLocation } from "../../behavior/browser-navigation.ts";
-import Link from "../elements/router-link.tsx";
-import { useSearchParams } from "../../behavior/use-route.ts";
 import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
+import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { signUpHref } from "../../model/carried-email.ts";
 import type { FrontDoorDepth } from "../../model/ground-palette.ts";
@@ -19,10 +16,14 @@ import {
   rememberPendingMethod,
 } from "../../model/last-used-method.ts";
 import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels.ts";
+import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import Link from "../elements/router-link.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
+import { normalizeErrorCode, SignInError } from "./sign-in-error-screen.tsx";
 import {
   AlternativeMethods,
   hasAlternativeMethods,

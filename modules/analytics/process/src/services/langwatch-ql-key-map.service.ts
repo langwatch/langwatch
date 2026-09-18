@@ -1,13 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 
-import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
-
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
+import type { LwqlKeyMapRepository } from "../repositories/langwatch-ql-key-map.repository.ts";
+import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   type LwqlKeyMapRow,
 } from "./langwatch-ql-production-provisioning.service.ts";
-import type { LwqlKeyMapRepository } from "../repositories/langwatch-ql-key-map.repository.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 

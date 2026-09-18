@@ -1,4 +1,3 @@
-import { nowInstant, Temporal } from "@langwatch/time";
 import {
   bucketPeriodFloorMs,
   effectiveBudgetPeriod,
@@ -7,6 +6,8 @@ import {
   toWireEnum,
   usdDisplayString,
 } from "@langwatch/gateway-contract";
+import { nowInstant, Temporal } from "@langwatch/time";
+
 import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type {
   AttributedUserBudgetTemplate,

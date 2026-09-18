@@ -38,10 +38,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-browser": "workspace:*",
     "@langwatch/analytics-browser-kit": "workspace:*",
+    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
@@ -50,7 +51,6 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "@tanstack/react-query": "catalog:",

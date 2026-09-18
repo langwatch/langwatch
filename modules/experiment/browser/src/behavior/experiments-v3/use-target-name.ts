@@ -1,8 +1,9 @@
-import { useMemo } from "react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import type { TargetConfig } from "../../model/experiments-v3/types.ts";
 import { type NamedEntity, pickTargetName } from "@langwatch/experiment-contract";
+import { useMemo } from "react";
+
+import type { TargetConfig } from "../../model/experiments-v3/types.ts";
 
 /** Picks the value matching a target's type, defaulting to the evaluator branch. */
 function selectByTargetType<T>(

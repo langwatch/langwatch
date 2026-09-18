@@ -1,15 +1,16 @@
 import { EmptyState, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Checkbox } from "@langwatch/design-system/checkbox";
 import React, { useEffect, useRef, useState } from "react";
-import { useAnalyticsHost } from "../../model/analytics-host.ts";
-import { useFilterParams } from "../../behavior/use-filter-params.ts";
+
 import {
   analyticsApi,
   type AnalyticsSubtopicCount,
   type AnalyticsTopicCount,
 } from "../../behavior/analytics-api.ts";
+import { useFilterParams } from "../../behavior/use-filter-params.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { Delayed } from "../elements/delayed.tsx";
 import { OverflownTextWithTooltip } from "../elements/overflown-text.tsx";
-import { Checkbox } from "@langwatch/design-system/checkbox";
 
 type TopicCounts = {
   topicCounts: AnalyticsTopicCount[];

@@ -5,8 +5,7 @@ export class NoopCodingAgentReadMetrics implements CodingAgentReadMetrics {
     return new NoopCodingAgentReadMetrics();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   observeSessionListRead(): void {}
 }

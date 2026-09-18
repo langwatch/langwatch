@@ -13,8 +13,11 @@ import {
   type OrganizationWithMembersAndTheirTeams,
 } from "@langwatch/organization-contract";
 
+import type {
+  OrganizationDemoProject,
+  OrganizationSettingsSecret,
+} from "../app/organization.members.ts";
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
-import type { OrganizationDemoProject, OrganizationSettingsSecret } from "../app/organization.members.ts";
 
 /**
  * How many permission questions one organization asks at once, bounded

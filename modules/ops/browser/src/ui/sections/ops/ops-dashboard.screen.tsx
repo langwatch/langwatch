@@ -1,8 +1,9 @@
 import { Button, Center, EmptyState, Spacer, Spinner } from "@chakra-ui/react";
-import { Database } from "lucide-react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { useOpsOverlay } from "../../../behavior/ops-overlays.ts";
+import { Database } from "lucide-react";
+
 import { api } from "../../../behavior/ops-api.ts";
+import { useOpsOverlay } from "../../../behavior/ops-overlays.ts";
 import { OpsBlobsDrawer } from "../../../features/blob-store/ui/sections/ops-blobs-drawer.tsx";
 import { ConnectionStatusIndicator } from "../../../features/event-store/ui/elements/connection-status-indicator.tsx";
 import { OpsDashboardContent } from "../../../features/event-store/ui/sections/ops-dashboard-content.tsx";

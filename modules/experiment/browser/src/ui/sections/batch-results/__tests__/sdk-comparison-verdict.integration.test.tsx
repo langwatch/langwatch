@@ -1,25 +1,23 @@
 import "@testing-library/jest-dom/vitest";
-
 // @vitest-environment jsdom
 /**
  * A comparison logged by the code-first SDKs must reach the experiment results page
  * with no server-side and no frontend change.
  */
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { BatchEvaluationResultsTable } from "../batch-evaluation-results-table.tsx";
-import { ComparisonWinnerCell } from "../comparison-winner-cell.tsx";
 import type {
   BatchComparisonColumn,
   BatchComparisonVerdict,
 } from "../../batch-evaluation-results.types.ts";
 import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
+import { BatchEvaluationResultsTable } from "../batch-evaluation-results-table.tsx";
+import { ComparisonWinnerCell } from "../comparison-winner-cell.tsx";
 import { WinRateChart } from "../win-rate-chart.tsx";
 
 // recharts renders its bars through internal layout, so under jsdom there is

@@ -6,6 +6,7 @@
 
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service.ts";
 
 const NOW_ISH = Temporal.Instant.from("2026-06-01T00:00:00.000Z");

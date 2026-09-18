@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * Pass-rate buckets omit unprocessed days (never 0); `full` returns run-weighted rate.
  * @see specs/analytics/evaluation-pass-rate-consistency.feature
@@ -10,7 +12,6 @@ import {
   type AnalyticsSeries,
   type AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {

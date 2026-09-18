@@ -1,4 +1,9 @@
-import { type FoldProjectionStore, type Projection,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
+import {
+  type FoldProjectionStore,
+  type Projection,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import {
   type SuiteRunStateData,
   SUITE_RUN_PROJECTION_VERSIONS,
@@ -34,13 +39,12 @@ function isFailedItemStatus(status: string): boolean {
  * The counters one item adds to the suite run: which completion bucket it
  * sits in, whether the judge graded it, and whether it passed.
  */
-function itemCounts({
-  status,
-  verdict,
-}: {
-  status: string;
-  verdict: string | undefined;
-}): { completed: number; failed: number; graded: number; passed: number } {
+function itemCounts({ status, verdict }: { status: string; verdict: string | undefined }): {
+  completed: number;
+  failed: number;
+  graded: number;
+  passed: number;
+} {
   const failed = isFailedItemStatus(status) ? 1 : 0;
   return {
     completed: 1 - failed,
@@ -50,13 +54,7 @@ function itemCounts({
   };
 }
 
-function passRateBpsOf({
-  passed,
-  graded,
-}: {
-  passed: number;
-  graded: number;
-}): number | null {
+function passRateBpsOf({ passed, graded }: { passed: number; graded: number }): number | null {
   return graded > 0 ? Math.round((passed / graded) * 10000) : null;
 }
 
@@ -192,22 +190,10 @@ export class SuiteRunStateFoldProjection
       verdict: event.data.verdict,
     });
 
-    const completedCount = Math.max(
-      0,
-      state.CompletedCount - before.completed + after.completed,
-    );
-    const failedCount = Math.max(
-      0,
-      state.FailedCount - before.failed + after.failed,
-    );
-    const gradedCount = Math.max(
-      0,
-      state.GradedCount - before.graded + after.graded,
-    );
-    const passedCount = Math.max(
-      0,
-      state.PassedCount - before.passed + after.passed,
-    );
+    const completedCount = Math.max(0, state.CompletedCount - before.completed + after.completed);
+    const failedCount = Math.max(0, state.FailedCount - before.failed + after.failed);
+    const gradedCount = Math.max(0, state.GradedCount - before.graded + after.graded);
+    const passedCount = Math.max(0, state.PassedCount - before.passed + after.passed);
 
     const finished = state.FinishedAt != null;
     return {
@@ -218,11 +204,7 @@ export class SuiteRunStateFoldProjection
       GradedCount: gradedCount,
       PassedCount: passedCount,
       PassRateBps: passRateBpsOf({ passed: passedCount, graded: gradedCount }),
-      Status: finished
-        ? failedCount > 0
-          ? "FAILURE"
-          : "SUCCESS"
-        : state.Status,
+      Status: finished ? (failedCount > 0 ? "FAILURE" : "SUCCESS") : state.Status,
     };
   }
 }

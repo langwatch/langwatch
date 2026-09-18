@@ -2,7 +2,6 @@
 // shared detection, prefix-stripping and alias tables; downstream code never
 // compares vendor literals.
 
-import { CODING_AGENT_REGISTRY } from "./index.ts";
 import type {
   CodingAgent,
   CodingAgentEvent,
@@ -10,6 +9,7 @@ import type {
   CodingAgentSignal,
   TokenType,
 } from "./coding-agent-definition.ts";
+import { CODING_AGENT_REGISTRY } from "./index.ts";
 
 /** Detect agent from record name (reliable signal), not scope (varies by vendor). */
 export function detectCodingAgent({

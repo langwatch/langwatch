@@ -7,6 +7,7 @@ import {
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import { GroupRepository, type OrganizationGroupWithMemberCount } from "../group.repository.ts";
 import type { MemoryGroupRow, MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 
@@ -45,7 +46,9 @@ export class MemoryGroupRepository extends GroupRepository {
     data: OrganizationGroupWithMemberCount[];
     pagination: { page: number; limit: number; total: number };
   }> {
-    const all = this.groupsOf(input.organizationId).toSorted((a, b) => a.name.localeCompare(b.name));
+    const all = this.groupsOf(input.organizationId).toSorted((a, b) =>
+      a.name.localeCompare(b.name),
+    );
     const start = (input.page - 1) * input.limit;
     return {
       data: all
@@ -186,7 +189,9 @@ export class MemoryGroupRepository extends GroupRepository {
     if (!row) throw new GroupNotFoundError(input.groupId);
     if (
       row.scimSource &&
-      (input.rename || input.memberUserIdsToAdd.length > 0 || input.memberUserIdsToRemove.length > 0)
+      (input.rename ||
+        input.memberUserIdsToAdd.length > 0 ||
+        input.memberUserIdsToRemove.length > 0)
     ) {
       throw new ScimManagedGroupError(input.groupId);
     }

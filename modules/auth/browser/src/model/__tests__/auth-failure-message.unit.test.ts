@@ -3,6 +3,7 @@
  * Error message copy for better-auth and platform failures; registry in front-door-error-copy.ts
  */
 import { describe, expect, it } from "vitest";
+
 import { authFailureMessage } from "../auth-failure-message.ts";
 import { frontDoorErrorCopy } from "../front-door-error-copy.ts";
 

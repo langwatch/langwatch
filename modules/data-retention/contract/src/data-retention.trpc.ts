@@ -8,6 +8,10 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import {
+  retentionPolicySnapshotSchema,
+  retentionStorageUsageSchema,
+} from "./data-retention.snapshot.ts";
+import {
   killRetroactiveMutationInputSchema,
   resolvedRetentionSchema,
   retentionCategorySchema,
@@ -18,10 +22,6 @@ import {
   retroactiveMutationProjectInputSchema,
   retroactiveRetentionUpdateResultSchema,
 } from "./data-retention.ts";
-import {
-  retentionPolicySnapshotSchema,
-  retentionStorageUsageSchema,
-} from "./data-retention.snapshot.ts";
 
 /** The project every retention procedure is opened from. */
 export const retentionProjectScopeSchema = z.object({ projectId: z.string() });

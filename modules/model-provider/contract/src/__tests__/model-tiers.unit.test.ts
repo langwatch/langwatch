@@ -1,10 +1,9 @@
-import { describe, expect, it } from "vitest";
-
 import {
   compareModelSortKeys,
   type OpenAIVariant,
   rankOpenAIChatModel,
 } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
 
 const ranks = ({ id, variant }: { id: string; variant: OpenAIVariant }) =>
   rankOpenAIChatModel({ id, variant }) !== null;

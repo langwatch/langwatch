@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
-import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { useFeatureFlag } from "./use-feature-flag.ts";
-import { usePublicEnv } from "./use-public-env.ts";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import type { OrganizationIntent } from "@langwatch/organization-contract";
+import { useMemo, useState } from "react";
+
 import { readAttribution } from "./attribution.ts";
 import { getOnboardingFlowConfig } from "./onboarding-flow.ts";
 import {
@@ -15,7 +14,9 @@ import {
   type SolutionType,
   type UsageStyle,
 } from "./types.ts";
+import { useFeatureFlag } from "./use-feature-flag.ts";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow.ts";
+import { usePublicEnv } from "./use-public-env.ts";
 
 export const useOnboardingFlow = () => {
   const publicEnv = usePublicEnv();

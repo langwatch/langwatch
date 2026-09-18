@@ -4,8 +4,8 @@
  * browser that calls it, and a loosened access decision is a widened surface.
  */
 
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { dataRetentionTrpc } from "@langwatch/data-retention-contract";
 import { describe, expect, it } from "vitest";
 

@@ -12,9 +12,14 @@ import type {
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { type MonitorEvaluator,type MonitorPerformance,MonitorApp,type MonitorReplicationReader } from "../monitor.app.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import type { MonitorRepositories } from "../../repositories/monitor.repositories.ts";
+import {
+  type MonitorEvaluator,
+  type MonitorPerformance,
+  MonitorApp,
+  type MonitorReplicationReader,
+} from "../monitor.app.ts";
 
 /** The evaluators a project holds, named by id. */
 export class FakeMonitorEvaluators implements MonitorEvaluator {
@@ -42,8 +47,7 @@ export class FakeMonitorEvaluators implements MonitorEvaluator {
 export class FakeMonitorPerformance implements MonitorPerformance {
   readonly queries: MonitorPerformanceQuery[] = [];
 
-  constructor(private readonly rows: OnlineEvaluationPerformance[] = []) {
-  }
+  constructor(private readonly rows: OnlineEvaluationPerformance[] = []) {}
 
   async getMonitorPerformance(query: MonitorPerformanceQuery) {
     this.queries.push(query);
@@ -103,8 +107,7 @@ export function createMonitorTestApp(
     repositories: input.repositories ?? createMonitorTestRepositories(),
     dependencies: {
       permissions:
-        input.permissions ??
-        createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
+        input.permissions ?? createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       evaluators: createApiFixture<EvaluatorApi>(),
       evaluation: createApiFixture<EvaluationApi>(),
     },

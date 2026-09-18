@@ -1,10 +1,11 @@
 import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
-import { OrganizationUserRole } from "../../model/prisma-types.ts";
+import { CORE_SEAT_TYPE_COPY, useUiSeatTypeCopy } from "@langwatch/browser-host/slots";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import { Select } from "@langwatch/design-system/select";
-import { CORE_SEAT_TYPE_COPY, useUiSeatTypeCopy } from "@langwatch/browser-host/slots";
+import { useMemo } from "react";
+
+import { OrganizationUserRole } from "../../model/prisma-types.ts";
 
 export type OrgRoleOption = {
   label: string;

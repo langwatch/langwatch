@@ -22,12 +22,11 @@ import {
   type WorkflowAgentConfig,
   workflowAgentConfigSchema,
 } from "@langwatch/agent-contract";
+import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { z } from "zod";
 
-import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { workflowDslSchema, type WorkflowDsl } from "./workflow.ts";
-
-import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 
 export const LlmConfigInputTypes = [
   "str",
@@ -352,14 +351,7 @@ export type End = BaseComponent & {
   isEvaluator?: boolean;
 };
 
-export type Component =
-  | BaseComponent
-  | Entry
-  | Signature
-  | Code
-  | Evaluator
-  | End
-  | Custom;
+export type Component = BaseComponent | Entry | Signature | Code | Evaluator | End | Custom;
 
 /**
  * Portable graph values. The contract deliberately describes the persisted

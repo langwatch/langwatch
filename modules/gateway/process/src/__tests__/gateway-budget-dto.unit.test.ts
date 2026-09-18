@@ -4,10 +4,11 @@
  * @see specs/ai-gateway/public-rest-api.feature
  */
 
+import { decimalUsdToNanoUsd } from "@langwatch/gateway-contract";
+import { Prisma } from "@langwatch/prisma-client/generated";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
-import { Prisma } from "@langwatch/prisma-client/generated";
-import { decimalUsdToNanoUsd } from "@langwatch/gateway-contract";
+
 import { GatewayBudgetDtoService, type GatewayBudgetWithSeats } from "../index.ts";
 
 const budgetDtos = GatewayBudgetDtoService.create();

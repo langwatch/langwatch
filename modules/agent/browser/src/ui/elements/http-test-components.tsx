@@ -1,7 +1,7 @@
 import { Box, Button, Collapsible, HStack, Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);

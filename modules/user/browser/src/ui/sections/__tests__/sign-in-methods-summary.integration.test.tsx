@@ -6,6 +6,7 @@
 
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
 import type { FakePersonalHostOptions } from "../../../testing.tsx";
 import { SignInMethodsSummary } from "../sign-in-methods-summary.tsx";
@@ -51,9 +52,7 @@ describe("given an account signed in with an address, a linked account and a pas
   describe("when the profile opens", () => {
     /** @scenario Each way in is one line */
     it("gives each one its own line, including whether a password is set", async () => {
-      linkedAccountsData.data = [
-        { id: "acct-1", provider: "google", providerAccountId: "g-1" },
-      ];
+      linkedAccountsData.data = [{ id: "acct-1", provider: "google", providerAccountId: "g-1" }];
 
       renderSummary();
 
@@ -123,9 +122,7 @@ describe("given an account with a passkey but no address ever added", () => {
         currentUser: { id: "user-1", name: "Ana", email: "ana@acme.example", image: null },
       });
 
-      expect(screen.getByTestId("method-line-address").textContent).toContain(
-        "ana@acme.example",
-      );
+      expect(screen.getByTestId("method-line-address").textContent).toContain("ana@acme.example");
     });
   });
 });

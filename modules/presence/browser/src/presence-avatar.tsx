@@ -1,8 +1,9 @@
 import { Box } from "@chakra-ui/react";
-import { useState } from "react";
 import { Avatar, type AvatarRootProps } from "@langwatch/design-system/avatar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { PresenceSession } from "@langwatch/presence-contract";
+import { useState } from "react";
+
 import { presenceDisplayName, presenceSessionColor } from "./presence-user-color.ts";
 
 export interface PresenceAvatarProps extends Omit<AvatarRootProps, "size"> {

@@ -4,8 +4,10 @@
  * @vitest-environment node
  */
 import { randomUUID } from "node:crypto";
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { createLogger } from "@langwatch/observability";
 import type { BugReport } from "@langwatch/ops-contract";
 import {
   PrismaConfigService,
@@ -16,10 +18,9 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { createLogger } from "@langwatch/observability";
 
-import type { BugReportNotifier, BugReportRateLimiter } from "../../app/ops.app.ts";
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
+import type { BugReportNotifier, BugReportRateLimiter } from "../../app/ops.app.ts";
 import { PrismaBugReportRepository } from "../../repositories/prisma/prisma.bug-report.repository.ts";
 import { BugReportRateLimitedError } from "../../services/bug-report-intake.service.ts";
 import { bugReportCredential, opsBugReportRest } from "../ops-bug-report.rest.ts";

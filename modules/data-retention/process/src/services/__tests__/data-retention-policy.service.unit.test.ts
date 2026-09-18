@@ -3,6 +3,8 @@
  * persist, and who may switch retention off entirely.
  */
 import { describe, expect, it } from "vitest";
+
+import { createDataRetentionTestAuthz } from "../../app/__tests__/data-retention.fixture.ts";
 import {
   type DataRetentionDirectoryReader,
   type RetentionOrganizationDirectory,
@@ -12,7 +14,6 @@ import type {
   DataRetentionPlanResolver,
   DataRetentionPlan,
 } from "../../app/data-retention.members.ts";
-import { createDataRetentionTestAuthz } from "../../app/__tests__/data-retention.fixture.ts";
 import { DataRetentionPolicyService } from "../data-retention-policy.service.ts";
 import { RetentionPermissionsService } from "../retention-permissions.service.ts";
 
@@ -41,8 +42,7 @@ class StubDirectory implements DataRetentionDirectoryReader {
 }
 
 class StubPlans implements DataRetentionPlanResolver {
-  constructor(private readonly plan: DataRetentionPlan) {
-  }
+  constructor(private readonly plan: DataRetentionPlan) {}
   async getPlan(): Promise<DataRetentionPlan> {
     return this.plan;
   }

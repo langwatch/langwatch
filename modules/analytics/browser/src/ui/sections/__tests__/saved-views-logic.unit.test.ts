@@ -1,5 +1,6 @@
 import { subDays } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import type { FilterField } from "../../../model/filters/types.ts";
 import {
   DEFAULT_VIEWS,

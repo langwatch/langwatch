@@ -1,3 +1,5 @@
+import { readStoredSkipList } from "@langwatch/model-provider-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Proves the real JSON column behind the drawer's skip-permissions scenarios, including the
@@ -5,8 +7,7 @@
  * @see specs/settings/model-provider-skip-permissions.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { readStoredSkipList } from "@langwatch/model-provider-contract";
+
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
 import {
   DB_URL,

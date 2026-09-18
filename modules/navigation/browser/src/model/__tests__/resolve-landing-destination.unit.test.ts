@@ -2,6 +2,7 @@
  * Spec: specs/navigation/navigation-v2-landing.feature
  */
 import { describe, expect, it } from "vitest";
+
 import type { ProductId } from "../products.ts";
 import {
   type LandingDestinationInput,

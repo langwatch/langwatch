@@ -1,9 +1,10 @@
 import { Box, type BoxProps, Field, HStack, Text, VStack } from "@chakra-ui/react";
+import { CopyButton } from "@langwatch/browser-host/copy-button";
 import { useCallback } from "react";
+
+import type { SlugValidationResult } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 import { SlugChangeWarningAlert } from "../../elements/slug-change-warning-alert.tsx";
 import { SlugConflictAlert } from "../../elements/slug-conflict-alert.tsx";
-import { CopyButton } from "@langwatch/browser-host/copy-button";
-import type { SlugValidationResult } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 
 /**
  * Props for DatasetSlugDisplay.

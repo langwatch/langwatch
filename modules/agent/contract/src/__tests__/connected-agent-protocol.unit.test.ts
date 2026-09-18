@@ -4,6 +4,7 @@
  * @see specs/agents/connected-agents.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { relayPayloadCaps } from "../connected-agent.constants.ts";
 import {
   PROTOCOL_VERSION,

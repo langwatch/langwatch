@@ -1,8 +1,21 @@
-import { type SpendUsage, type VirtualKeyWithScopes,type ModelProvider,PROVIDER_BUCKET_SEPARATOR,bucketScopeIdFor,budgetPeriodFloorMs,type GatewayBudgetLedgerStatus,type GatewayBudgetResource,type GatewayBudgetScopeType,type GatewayBudgetWindow } from "@langwatch/gateway-contract";
-import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import {
+  type SpendUsage,
+  type VirtualKeyWithScopes,
+  type ModelProvider,
+  PROVIDER_BUCKET_SEPARATOR,
+  bucketScopeIdFor,
+  budgetPeriodFloorMs,
+  type GatewayBudgetLedgerStatus,
+  type GatewayBudgetResource,
+  type GatewayBudgetScopeType,
+  type GatewayBudgetWindow,
+} from "@langwatch/gateway-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
-export interface GatewayInfrastructure {  gatewayAudit: GatewayAudit;
+
+import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
+export interface GatewayInfrastructure {
+  gatewayAudit: GatewayAudit;
   gatewayBudgetSpend: GatewayBudgetSpend;
   gatewayChangeEvents: GatewayChangeEvents;
   gatewayClickHouse: GatewayClickHouse;
@@ -65,10 +78,7 @@ export type GatewayAuditTransaction = object;
 
 /** Audit sink for Gateway mutations, independent of the shared table implementation. */
 export interface GatewayAudit {
-  append(
-    input: AppendGatewayAuditInput,
-    transaction?: GatewayAuditTransaction,
-  ): Promise<void>;
+  append(input: AppendGatewayAuditInput, transaction?: GatewayAuditTransaction): Promise<void>;
 }
 
 export type GatewayBudgetSpendRecord = {
@@ -169,7 +179,6 @@ export type PulledUsageTotals = {
   tokensInput: number;
   tokensOutput: number;
 };
-
 
 /**
  * Read targets for a plain list of budgets, no request context (a GROUP
@@ -381,7 +390,6 @@ export type GatewayVirtualKeyLifecycleSignal = {
   reason?: string | null;
 };
 
-
 export interface GatewayGovernanceSignals {
   emitVirtualKeyLifecycle(signal: GatewayVirtualKeyLifecycleSignal): Promise<void>;
 }
@@ -421,7 +429,6 @@ export interface GatewayScopePermissions {
     scope: GatewayPermissionScope;
   }): Promise<boolean>;
 }
-
 
 export interface GatewaySettlementPolicy {
   graceMs(): number;
@@ -529,7 +536,6 @@ export type GatewayTraceRow = {
   hasError: boolean;
   blockedByGuardrail: boolean;
 };
-
 
 export interface GatewayVirtualKeySpend {
   spendByVirtualKey(input: {

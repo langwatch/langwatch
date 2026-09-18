@@ -1,16 +1,17 @@
 import { Box, Field, Input, Text, VStack } from "@chakra-ui/react";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Link } from "@langwatch/browser-host/link";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { toEpochMs } from "@langwatch/time";
+import { WorkflowCardDisplay } from "@langwatch/workflow-browser/workflow-card";
 import { ExternalLink } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FormProvider, useWatch } from "react-hook-form";
 import type { ZodType } from "zod";
-import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
-import { Link } from "@langwatch/browser-host/link";
-import { WorkflowCardDisplay } from "@langwatch/workflow-browser/workflow-card";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
+
 import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section.tsx";
+import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
+import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
 
 /**
  * Props for the evaluator editor content.

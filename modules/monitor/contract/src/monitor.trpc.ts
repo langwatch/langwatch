@@ -5,7 +5,6 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { onlineEvaluationPerformanceSchema } from "@langwatch/evaluation-contract";
 
-import { monitorSchema, monitorWithEvaluatorSchema } from "./monitor.ts";
 import {
   monitorApiCopyInputSchema,
   monitorApiCreateInputSchema,
@@ -18,6 +17,7 @@ import {
   monitorNameAvailabilitySchema,
   monitorWriteAcknowledgedSchema,
 } from "./monitor-trpc.schemas.ts";
+import { monitorSchema, monitorWithEvaluatorSchema } from "./monitor.ts";
 
 export const monitorTrpc = defineTrpcContract("monitors")
   .query("getAllForProject")

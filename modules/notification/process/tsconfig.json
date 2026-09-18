@@ -33,6 +33,9 @@
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {

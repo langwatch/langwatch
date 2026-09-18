@@ -7,6 +7,7 @@ import {
   webhookProvider,
 } from "@langwatch/automation-contract";
 import type { SavedTriggerRow, TemplateDraft } from "@langwatch/automation-contract";
+
 import type { NotifyClientDef, SummaryIdentity } from "./provider-types.ts";
 
 interface ProviderClientShape {

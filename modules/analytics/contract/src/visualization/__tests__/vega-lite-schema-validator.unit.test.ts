@@ -10,7 +10,6 @@ import {
   readBundledVegaLiteSchema,
   VEGA_LITE_AJV_OPTIONS,
 } from "../../../scripts/generate-vega-lite-validator.ts";
-
 import { getVegaLiteSchemaValidator } from "../vega-lite-schema.ts";
 import { ADVERSARIAL_VEGA_FIXTURES } from "./fixtures/adversarial/index.ts";
 import { INVALID_VEGA_FIXTURES } from "./fixtures/invalid/index.ts";

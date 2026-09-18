@@ -1,7 +1,8 @@
 import type { ButtonProps } from "@chakra-ui/react";
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
-import { Check, ChevronsUpDown } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
+import { Check, ChevronsUpDown } from "lucide-react";
+
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";

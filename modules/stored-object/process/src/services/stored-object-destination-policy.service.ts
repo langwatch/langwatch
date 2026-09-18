@@ -1,4 +1,5 @@
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
+
 import { StoredObjectProjectDestinationResolver } from "./stored-object-storage-runtime.service.ts";
 
 export type StoredObjectStorageSelection = Readonly<{

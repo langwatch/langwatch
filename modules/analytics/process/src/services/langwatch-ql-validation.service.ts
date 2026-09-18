@@ -4,7 +4,12 @@
  * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
  */
 import type { SqlSourcePosition, LangWatchQLViolationCode } from "@langwatch/analytics-contract";
-import { clickHouseSqlParser, type LangWatchQLParser, type SqlAstNode } from "../rules/langwatch-ql-parser.rules.ts";
+
+import {
+  clickHouseSqlParser,
+  type LangWatchQLParser,
+  type SqlAstNode,
+} from "../rules/langwatch-ql-parser.rules.ts";
 import {
   type LangWatchQLPolicy,
   qualifyTableName,

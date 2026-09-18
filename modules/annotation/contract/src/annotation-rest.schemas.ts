@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { annotationAnchorScopeSchema } from "./annotation-anchor.schemas.ts";
 import { annotationSchema } from "./annotation.schemas.ts";
 

@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   type Workflow,
   type WorkflowRunAnswer,
@@ -6,25 +5,27 @@ import {
   type WorkflowWithVersion,
   WorkflowNotPublishedError,
   studioClientEventSchema,
-  type RunWorkflowCommand
+  type RunWorkflowCommand,
 } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   type WorkflowDslMigration,
   type WorkflowExecution,
   type WorkflowId,
   type WorkflowExecutionInput,
 } from "../../app/workflow.app.ts";
-import type {
-  StudioEventPreparer,
-  StudioEventPreparationInput,
-} from "../studio-event-preparer.service.ts";
-import { WorkflowService as ServerWorkflowService } from "../workflow.service.ts";
 import {
   WorkflowRepository,
   type PersistWorkflowInput,
   type PersistWorkflowVersionInput,
   type WorkflowVersionHistoryRecord,
 } from "../../repositories/workflow.repository.ts";
+import type {
+  StudioEventPreparer,
+  StudioEventPreparationInput,
+} from "../studio-event-preparer.service.ts";
+import { WorkflowService as ServerWorkflowService } from "../workflow.service.ts";
 import { TestDatasetService } from "./dataset.service.fake.ts";
 
 const workflow = (id = "workflow_1", projectId = "project_1"): Workflow => ({

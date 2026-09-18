@@ -5,8 +5,9 @@ import {
   type InternalProjectQuery,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import type { ProjectCredentials } from "./project-credentials.service.ts";
+
 import type { ProjectRepository } from "../repositories/project.repository.ts";
+import type { ProjectCredentials } from "./project-credentials.service.ts";
 
 /**
  * Single question: which team has been in organization longest. Narrowed from

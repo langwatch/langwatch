@@ -1,3 +1,4 @@
+import { PrismaRepository } from "@langwatch/prisma-client";
 import {
   Prisma,
   type PrismaClient,
@@ -24,14 +25,14 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import { PrismaRepository } from "@langwatch/prisma-client";
 import { toDate } from "@langwatch/time";
-import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper.ts";
+
 import type {
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
 } from "../project.repository.ts";
+import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper.ts";
 
 /**
  * Models used by this repository; lets composition roots hand a typed client

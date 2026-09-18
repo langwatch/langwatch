@@ -10,25 +10,3 @@ export {
 } from "./tasks/user-data-erase.task.ts";
 export type { GdprUserDataEraseDatabase } from "./repositories/prisma/prisma.user-data-erase.repository.ts";
 export { userServer } from "./user.server.ts";
-export type {
-  UserAnalytics,
-  UserAvatarObjects,
-  UserAvatarStorage,
-  UserBudgetCheckInput,
-  UserBudgetDecision,
-  UserBudgetRequestMailer,
-  UserBudgetScopeDecision,
-  UserCliCredentials,
-  UserDeployment,
-  UserFederatedPasswordOutcome,
-  UserFederatedPasswords,
-  UserGatewayGovernance,
-  UserInfrastructure,
-  UserKeyProject,
-  UserOrganizationDirectory,
-  UserPasswordHasher,
-  UserPersonalUsageReader,
-  UserProjectDirectory,
-  UserRateLimiter,
-  UserVerificationCeremony,
-} from "./user.server.ts";

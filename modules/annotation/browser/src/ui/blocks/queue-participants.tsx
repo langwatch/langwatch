@@ -16,6 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { Select } from "@langwatch/design-system/select";
 import { Plus, Users } from "lucide-react";
+
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 
 /** A person or a queue, named the way the queue reads name them. */

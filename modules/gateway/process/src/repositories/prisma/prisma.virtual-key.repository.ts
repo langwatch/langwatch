@@ -1,20 +1,23 @@
+import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "@langwatch/gateway-contract";
+import { identityPatchData } from "@langwatch/gateway-contract";
 /**
  * Data-access for VirtualKey. Post-collapse: organization-scoped + reachable
  * from N (scopeType, scopeId) VirtualKeyScope entries. dbMultiTenancyProtection
  * enforces every where-clause carries organizationId, an id, a secret, or scopes.
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "@langwatch/gateway-contract";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
-import { identityPatchData } from "@langwatch/gateway-contract";
 import { z } from "zod";
-import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
-import { gatewayRoutingPolicySelect,
+
+import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
+import {
+  gatewayRoutingPolicySelect,
   GatewayVirtualKeyRepository,
   type CreateGatewayVirtualKeyInput,
   type SetGatewayVirtualKeyDisabledInput,
-  type UpdateGatewayVirtualKeyInput } from "../../repositories/gateway-virtual-key.repository.ts";
-import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
+  type UpdateGatewayVirtualKeyInput,
+} from "../../repositories/gateway-virtual-key.repository.ts";
+import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
 
 /**
  * Routing-policy columns the materialiser reads off a virtual key — one constant, not a copy

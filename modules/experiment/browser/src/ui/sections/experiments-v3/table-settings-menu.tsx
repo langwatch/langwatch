@@ -2,14 +2,15 @@
  * TableSettingsMenu - "Run Options" popover menu for the workbench toolbar.
  */
 import { Box, Button, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
-import { ListChevronsDownUp, ListChevronsUpDown, SlidersHorizontal, Terminal } from "lucide-react";
-import React, { useState } from "react";
-import { LuGauge } from "react-icons/lu";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { RowHeightMode } from "@langwatch/dataset-browser/dataset-table";
 import { Popover } from "@langwatch/design-system/popover";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { ListChevronsDownUp, ListChevronsUpDown, SlidersHorizontal, Terminal } from "lucide-react";
+import React, { useState } from "react";
+import { LuGauge } from "react-icons/lu";
+
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { DEFAULT_CONCURRENCY } from "../../../model/experiments-v3/types.ts";
 import { RunViaApiDialogContainer } from "./run-via-api-button.tsx";

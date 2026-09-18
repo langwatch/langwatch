@@ -1,13 +1,14 @@
 import { GrantValidationError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
-import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
-import { AuthzGrantsService } from "../services/authz-grants.service.ts";
-import { AuthzService } from "../services/authz.service.ts";
 import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
+import { AuthzGrantsService } from "../services/authz-grants.service.ts";
+import { AuthzService } from "../services/authz.service.ts";
 import { liveShareLinkRow, ORG, traceScope } from "./support/resource-fixtures.ts";
 
 describe("AuthzService on a resource scope", () => {

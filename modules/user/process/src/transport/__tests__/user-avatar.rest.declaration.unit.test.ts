@@ -16,9 +16,9 @@ describe("the user-avatar REST family", () => {
       expect(userAvatarRest.namespace).toBe("user-avatar");
       expect(declaration.addressing).toBe("literal");
       expect(declaration.v1Twin).toBe(false);
-      expect(declaration.routes.map((route) => [route.path, route.operation, route.methods])).toEqual(
-        [["/api/user-avatar/:projectId/:id", "readUserAvatarBytes", ["get", "head"]]],
-      );
+      expect(
+        declaration.routes.map((route) => [route.path, route.operation, route.methods]),
+      ).toEqual([["/api/user-avatar/:projectId/:id", "readUserAvatarBytes", ["get", "head"]]]);
     });
 
     it("answers behind the browser's own door, which a project key opens too", () => {

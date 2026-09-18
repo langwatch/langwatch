@@ -1,10 +1,12 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+
 import {
   API_KEY_PREFIX,
   INGEST_KEY_PREFIX,
   LEGACY_PAT_PREFIX,
   splitApiKeyToken,
 } from "@langwatch/api-key-contract";
+
 import { ApiKeyTokenRepository } from "../api-key-token.repository.ts";
 
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -18,9 +20,11 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenRepository {
     return new ApiKeyTokenAdapter(pepper);
   }
 
-  generate(
-    options: { prefix?: string } = {},
-  ): { token: string; lookupId: string; hashedSecret: string } {
+  generate(options: { prefix?: string } = {}): {
+    token: string;
+    lookupId: string;
+    hashedSecret: string;
+  } {
     return ApiKeyTokenAdapter.generateApiKeyToken(this.pepper, options);
   }
 

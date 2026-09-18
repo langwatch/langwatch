@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { authzPermissionSchema, shareableResourceKindSchema } from "./registry.ts";
 import { bindingScopeTierSchema, storedBindingScopeTierSchema } from "./vocabulary.ts";
 

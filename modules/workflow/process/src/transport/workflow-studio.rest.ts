@@ -96,15 +96,14 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   .withCredential("browser")
   .withAddressing("literal", { v1Twin: false })
 
-  // The project is read off the query rather than declared as one: a route
-  // that resolves no credential may not name a scope field in its own input,
-  // and this family checks the project itself, in the handler, against the
-  // session it resolved.
+  // The door resolves the browser session; the handler then checks the
+  // project named in the query against that session itself, so the gate is
+  // authentication alone, never a spoofable tenant field.
   .post("/api/workflows/code-completion", "completeWorkflowCode")
   .withQuery(workflowCodeCompletionQuerySchema)
   .withInput(workflowCodeCompletionBodySchema)
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess({ kind: "public", reason: SESSION_RESOLVED_IN_HANDLER })
+  .withAccess({ kind: "authenticated", reason: SESSION_RESOLVED_IN_HANDLER })
   .withOutput(workflowCodeCompletionResponseSchema)
   .withMiddleware(workflowStudioSession)
   .handle(({ app, input }, session) => {

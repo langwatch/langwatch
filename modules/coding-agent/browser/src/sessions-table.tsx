@@ -1,24 +1,28 @@
 import { Skeleton, Table, Text, VStack } from "@chakra-ui/react";
-import { type SessionListRow, toListRow } from "./session-list-row.ts";
-import { type SessionsSortColumn, type SessionsSortState, useSessionsSort } from "./session-sort.ts";
-import { SessionsTableHeader } from "./sessions-table-header.tsx";
-import { isWithinPeriod, matchesSessionSearch, type PeriodSelection } from "./session-filters.ts";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Pagination } from "@langwatch/design-system/pagination";
 import { SquareTerminal } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 
-import { ListTable } from "@langwatch/design-system/list-table";
-import { Pagination } from "@langwatch/design-system/pagination";
 import { codingAgentApi as api } from "./coding-agent-api.ts";
+import { useCodingAgentRouter } from "./coding-agent-router.ts";
 import { NoDataInfoBlock } from "./no-data-info-block.tsx";
-import { PullRequestDetailDrawer } from "./pull-request-detail-drawer.tsx";
 import {
   decodePullRequestRef,
   encodePullRequestRef,
   PULL_REQUEST_QUERY_KEY,
 } from "./pull-request-detail-address.ts";
-import { useCodingAgentRouter } from "./coding-agent-router.ts";
+import { PullRequestDetailDrawer } from "./pull-request-detail-drawer.tsx";
+import { isWithinPeriod, matchesSessionSearch, type PeriodSelection } from "./session-filters.ts";
+import { type SessionListRow, toListRow } from "./session-list-row.ts";
 import { SessionRow } from "./session-row.tsx";
+import {
+  type SessionsSortColumn,
+  type SessionsSortState,
+  useSessionsSort,
+} from "./session-sort.ts";
+import { SessionsTableHeader } from "./sessions-table-header.tsx";
 import { SessionsToolbar } from "./sessions-toolbar.tsx";
 import { useTerminalReplay } from "./use-terminal-replay.ts";
 

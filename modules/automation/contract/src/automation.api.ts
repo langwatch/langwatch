@@ -1,5 +1,12 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Monitor } from "@langwatch/monitor-contract";
+import type { Instant } from "@langwatch/time";
+
+import type {
+  AutomationListRow,
+  AutomationPersistCapStatus,
+  SlackChannelListing,
+} from "./automation.responses.ts";
 import type {
   AutomationApiCreateInput,
   AutomationApiListSlackChannelsInput,
@@ -8,20 +15,14 @@ import type {
   AutomationApiUpdateTriggerFiltersInput,
   AutomationApiUpsertInput,
 } from "./automation.trpc-schemas.ts";
-import type {
-  AutomationListRow,
-  AutomationPersistCapStatus,
-  SlackChannelListing,
-} from "./automation.responses.ts";
-import type { AutomationPersistCapCount } from "./persist-cap.ts";
-import type { CustomGraphNameRef } from "./custom-graph.ts";
 import type { EmailSuppression, EmailSuppressionRow, UnsubscribeView } from "./automation.ts";
-import type { ReportSchedule, TriggerFire, TriggerFireStats } from "./trigger.queries.ts";
-import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands.ts";
-import type { Trigger } from "./trigger.ts";
+import type { CustomGraphNameRef } from "./custom-graph.ts";
+import type { AutomationPersistCapCount } from "./persist-cap.ts";
 import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire.ts";
+import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands.ts";
+import type { ReportSchedule, TriggerFire, TriggerFireStats } from "./trigger.queries.ts";
+import type { Trigger } from "./trigger.ts";
 import type { WebhookDeliveryRow } from "./webhook-delivery.ts";
-import type { Instant } from "@langwatch/time";
 
 /**
  * The caller a write is attributed to, as the door resolved them. It travels as
@@ -51,10 +52,7 @@ export interface AutomationApi {
   findRedactedById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
   findLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
   getById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
-  findByCustomGraphId(input: {
-    projectId: string;
-    customGraphId: string;
-  }): Promise<Trigger | null>;
+  findByCustomGraphId(input: { projectId: string; customGraphId: string }): Promise<Trigger | null>;
   getByCustomGraphIds(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]>;
   assertCustomGraphInProject(input: { customGraphId: string; projectId: string }): Promise<void>;
   customGraphExistsInProject(input: { customGraphId: string; projectId: string }): Promise<boolean>;

@@ -8,8 +8,9 @@ import type {
   OpsSnapshotAbortSignal,
   OpsSnapshotLease,
 } from "@langwatch/ops-contract";
-import { OpsSnapshotRepository } from "../repositories/observe/ops-snapshot.repository.ts";
 import { nowInstant, toDate } from "@langwatch/time";
+
+import { OpsSnapshotRepository } from "../repositories/observe/ops-snapshot.repository.ts";
 
 const logger = createLogger("langwatch:ops:snapshot-reader");
 

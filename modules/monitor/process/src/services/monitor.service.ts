@@ -23,6 +23,7 @@ import {
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
+
 import type { MonitorEvaluator } from "../app/monitor.app.ts";
 import type { MonitorRepository } from "../repositories/monitor.repository.ts";
 

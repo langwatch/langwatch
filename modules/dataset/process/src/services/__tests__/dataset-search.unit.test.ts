@@ -31,19 +31,13 @@ describe("matchesDatasetSearch()", () => {
   };
 
   it("matches a cell value", () => {
-    expect(matchesDatasetSearch({ entry: entry, search: "manager" })).toBe(
-      true,
-    );
+    expect(matchesDatasetSearch({ entry: entry, search: "manager" })).toBe(true);
   });
 
   /** @scenario Search matches regardless of letter case */
   it("matches regardless of letter case", () => {
-    expect(matchesDatasetSearch({ entry: entry, search: "escalation" })).toBe(
-      true,
-    );
-    expect(matchesDatasetSearch({ entry: entry, search: "ESCALATION" })).toBe(
-      true,
-    );
+    expect(matchesDatasetSearch({ entry: entry, search: "escalation" })).toBe(true);
+    expect(matchesDatasetSearch({ entry: entry, search: "ESCALATION" })).toBe(true);
   });
 
   /** @scenario A word that only appears in a column name matches nothing */
@@ -75,9 +69,7 @@ describe("matchesDatasetSearch()", () => {
   });
 
   it("reports no match when nothing contains the text", () => {
-    expect(matchesDatasetSearch({ entry: entry, search: "refund" })).toBe(
-      false,
-    );
+    expect(matchesDatasetSearch({ entry: entry, search: "refund" })).toBe(false);
   });
 
   it("survives an entry that is not an object", () => {
@@ -88,21 +80,15 @@ describe("matchesDatasetSearch()", () => {
     expect(() =>
       matchesDatasetSearch({ entry: null as never, search: "escalation" }),
     ).not.toThrow();
-    expect(
-      matchesDatasetSearch({ entry: null as never, search: "escalation" }),
-    ).toBe(false);
-    expect(
-      matchesDatasetSearch({ entry: undefined as never, search: "escalation" }),
-    ).toBe(false);
+    expect(matchesDatasetSearch({ entry: null as never, search: "escalation" })).toBe(false);
+    expect(matchesDatasetSearch({ entry: undefined as never, search: "escalation" })).toBe(false);
     expect(
       matchesDatasetSearch({
         entry: "escalation" as never,
         search: "escalation",
       }),
     ).toBe(false);
-    expect(matchesDatasetSearch({ entry: 42 as never, search: "4" })).toBe(
-      false,
-    );
+    expect(matchesDatasetSearch({ entry: 42 as never, search: "4" })).toBe(false);
   });
 });
 
@@ -114,9 +100,7 @@ describe("measureRowsBytes()", () => {
     const oneWideRow = [{ text: "x".repeat(10_000) }];
     const manyNarrowRows = Array.from({ length: 20 }, () => ({ text: "x" }));
 
-    expect(measureRowsBytes(oneWideRow)).toBeGreaterThan(
-      measureRowsBytes(manyNarrowRows),
-    );
+    expect(measureRowsBytes(oneWideRow)).toBeGreaterThan(measureRowsBytes(manyNarrowRows));
   });
 
   it("counts bytes rather than characters", () => {

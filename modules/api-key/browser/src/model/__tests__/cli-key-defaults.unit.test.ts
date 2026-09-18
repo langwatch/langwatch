@@ -5,8 +5,9 @@
 import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import { builtinRolePermissions, permissionSatisfiedBy } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
-import { defaultCliKeyScopes } from "../cli-key-scope-defaults.ts";
+
 import { getUserPermissionsAcrossScopes } from "../api-key-permissions.ts";
+import { defaultCliKeyScopes } from "../cli-key-scope-defaults.ts";
 
 const ORG = "org-1";
 

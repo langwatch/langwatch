@@ -7,12 +7,6 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import {
-  workflowSchema,
-  workflowVersionHistoryEntrySchema,
-  workflowVersionSchema,
-  workflowWithVersionSchema,
-} from "./workflow.ts";
-import {
   workflowApiArchiveInputSchema,
   workflowApiAutosaveInputSchema,
   workflowApiCommitVersionInputSchema,
@@ -35,6 +29,12 @@ import {
   workflowRelatedEntitiesSchema,
   workflowWithNewVersionSchema,
 } from "./workflow.trpc-schemas.ts";
+import {
+  workflowSchema,
+  workflowVersionHistoryEntrySchema,
+  workflowVersionSchema,
+  workflowWithVersionSchema,
+} from "./workflow.ts";
 
 /**
  * What a sync answers: the copy row the process read beside the version it

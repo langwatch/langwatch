@@ -1,7 +1,8 @@
 /** Wire shapes for `/api/monitors`, distinct from domain schemas. */
 import { z } from "zod";
-import { monitorExecutionModeSchema } from "./monitor.ts";
+
 import { monitorApiMappingsSchema } from "./monitor-trpc.schemas.ts";
+import { monitorExecutionModeSchema } from "./monitor.ts";
 
 export const monitorRestIdParamsSchema = z.object({
   id: z.string().min(1).describe("The monitor id."),

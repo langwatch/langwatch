@@ -1,5 +1,6 @@
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { describe, expect, it, vi } from "vitest";
+
 import { INSTANCE_GONE_CHANNEL, replyChannel } from "../../rules/connected-agent-keys.rules.ts";
 import { ConnectedAgentReplyService } from "../connected-agent-reply.service.ts";
 
@@ -23,12 +24,12 @@ describe("ConnectedAgentReplyService lifecycle", () => {
     const store = SessionStateStoreFactory.memory();
     const subscribe = store.subscribe.bind(store);
     const failure = new Error("subscription failed");
-    const subscribeSpy = vi.spyOn(store, "subscribe").mockImplementation(
-      async (channel, handler) => {
+    const subscribeSpy = vi
+      .spyOn(store, "subscribe")
+      .mockImplementation(async (channel, handler) => {
         if (channel === INSTANCE_GONE_CHANNEL) throw failure;
         return subscribe(channel, handler);
-      },
-    );
+      });
     const replies = ConnectedAgentReplyService.create({ podId: "pod", store, pollMs: 10 });
 
     await expect(replies.start()).rejects.toBe(failure);

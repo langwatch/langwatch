@@ -5,5 +5,4 @@
  */
 export const VOICE_AGENTS_FLAG_KEY = "release_voice_agents_enabled" as const;
 
-export const VOICE_AGENTS_DISABLED_MESSAGE =
-  "Voice agents are not enabled for this project";
+export const VOICE_AGENTS_DISABLED_MESSAGE = "Voice agents are not enabled for this project";

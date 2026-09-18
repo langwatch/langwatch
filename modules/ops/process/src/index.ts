@@ -20,9 +20,7 @@ export type { OpsOperationsOptions } from "./app/ops-operations.ts";
 export type { SchedulerWakeRedis } from "./repositories/redis/redis.scheduler-wake.repository.ts";
 export type { OpsSnapshotRedis } from "./app/ops.app.ts";
 export type { ProcessControlAction } from "./repositories/process/ops-audit.repository.ts";
-export type {
-  ScheduledJobRecord,
-} from "./repositories/process/scheduler-ops.repository.ts";
+export type { ScheduledJobRecord } from "./repositories/process/scheduler-ops.repository.ts";
 export type { SchedulerWake } from "./app/ops.app.ts";
 export {
   type AdminAccess,
@@ -30,7 +28,10 @@ export {
   type AdminAccessServiceOptions,
 } from "./services/admin-access.service.ts";
 export type { RedisCpuSample } from "./rules/ops-redis-engine-cpu.rules.ts";
-export { PrismaOpsWorkerRepository as OpsWorkerAdapter, type OpsWorkerAdapterOptions } from "./repositories/prisma/prisma.ops-worker.repository.ts";
+export {
+  PrismaOpsWorkerRepository as OpsWorkerAdapter,
+  type OpsWorkerAdapterOptions,
+} from "./repositories/prisma/prisma.ops-worker.repository.ts";
 export type { AnomalyHardTierAlert } from "./app/ops.app.ts";
 export type { StorageStatsMetrics } from "./app/ops.app.ts";
 export { OtelStorageStatsMetricsAdapter } from "./services/otel.storage-stats-metrics.service.ts";
@@ -47,11 +48,7 @@ export type {
   UsageStatsTelemetryClient,
   UsageStatsWorkerDatabase,
 } from "./app/ops.app.ts";
-export type {
-  OpsWorker,
-  OpsWorkerHandle,
-  UsageStatsWorkerConfig,
-} from "./app/ops.app.ts";
+export type { OpsWorker, OpsWorkerHandle, UsageStatsWorkerConfig } from "./app/ops.app.ts";
 
 /** The operations explorers and the replay runner, moved off the application. */
 export type {
@@ -64,9 +61,7 @@ export type {
   AggregateDiscoveryRow,
   RawEventRow,
 } from "./repositories/observe/event-explorer.repository.ts";
-export type {
-  ProcessNameCounts,
-} from "./repositories/process/process-ops.repository.ts";
+export type { ProcessNameCounts } from "./repositories/process/process-ops.repository.ts";
 export type { ReplayRepository } from "./repositories/process/replay.repository.ts";
 export type {
   OpsExplainClientResolution,
@@ -95,10 +90,7 @@ export {
 // The state rows on their own, for a reader that is not the runner: the
 // identity write gate decides a user's fork from the backfill's record.
 export { RoutingTableOrganizationDataplaneAdapter } from "./services/routing-table.organization-dataplane.service.ts";
-export type {
-  OrganizationDataplane,
-  OrganizationDataplaneResolver,
-} from "./app/ops.app.ts";
+export type { OrganizationDataplane, OrganizationDataplaneResolver } from "./app/ops.app.ts";
 export type { OrganizationCohortAdmission } from "./services/system-migration-cohort.service.ts";
 export { SystemMigrationsPassTask } from "./tasks/system-migrations-pass.task.ts";
 export {
@@ -108,9 +100,7 @@ export {
   type ProcessManagerPurgeReport,
 } from "./tasks/process-manager-purge.task.ts";
 export { PrismaProcessManagerPurgeRepository } from "./repositories/prisma/prisma.process-manager-purge.repository.ts";
-export type {
-  ProcessManagerPurgeTarget,
-} from "./repositories/process/process-manager-purge.repository.ts";
+export type { ProcessManagerPurgeTarget } from "./repositories/process/process-manager-purge.repository.ts";
 
 // The transport declarations the process mounts. Each is inert: it names its
 // routes or procedures, the access each is reached behind, and the facts the

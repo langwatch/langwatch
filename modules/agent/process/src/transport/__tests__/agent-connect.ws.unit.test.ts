@@ -1,5 +1,3 @@
-import type { AgentService } from "../../services/agent.service.ts";
-import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fixture.ts";
 /**
  * The gateway's own guards, with no datastore: the payload caps on a result,
  * and the connection refusal with no Redis on a multi-replica deployment.
@@ -8,15 +6,19 @@ import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fix
 import { createServer, type Server, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
+
 import { PROTOCOL_VERSION, relayPayloadCaps } from "@langwatch/agent-contract";
+import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
+
+import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fixture.ts";
 import { resultCapViolation } from "../../rules/connected-agent-caps.rules.ts";
-import { ConnectedAgentRuntimeService } from "../../services/connected-agent-runtime.service.ts";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import { AgentSessionService } from "../../services/connected-agent-session.service.ts";
+import type { AgentService } from "../../services/agent.service.ts";
 import type { ConnectedAgentCredentials } from "../../services/connected-agent-credential.service.ts";
-import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
+import { ConnectedAgentRuntimeService } from "../../services/connected-agent-runtime.service.ts";
+import { AgentSessionService } from "../../services/connected-agent-session.service.ts";
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
 import { ConnectGatewayFixture } from "./agent-connect-gateway.fixture.ts";
 

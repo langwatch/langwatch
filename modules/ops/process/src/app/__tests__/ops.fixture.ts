@@ -1,3 +1,4 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * A real `OpsApp` over memory repositories, fixture peers and a literal
  * members record. Every collaborator a test wants to watch is passed in
@@ -5,15 +6,19 @@
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
-import { OpsApp, type OpsAppInfrastructure, type OpsCapability,type OpsEventingIntrospection } from "../ops.app.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
+import {
+  OpsApp,
+  type OpsAppInfrastructure,
+  type OpsCapability,
+  type OpsEventingIntrospection,
+} from "../ops.app.ts";
 
 /** The staff address every fixture operator is measured against. */
 export const OPS_STAFF_ADDRESS = "staff@langwatch.ai";

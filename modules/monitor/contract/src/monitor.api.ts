@@ -1,5 +1,6 @@
-import { moduleApi } from "@langwatch/kernel";
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type {
   EnabledGuardrailMonitor,
   Monitor,

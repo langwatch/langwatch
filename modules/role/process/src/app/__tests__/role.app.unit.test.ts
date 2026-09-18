@@ -9,6 +9,7 @@ import {
   type Role,
 } from "@langwatch/role-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
 import { createRoleTestApp, testBinding } from "./role.fixture.ts";
 
@@ -181,10 +182,7 @@ describe("given a role something still holds", () => {
       });
 
       await expect(
-        app.deleteRoleInOrganization(
-          { roleId: "role-1", organizationId: ORGANIZATION_ID },
-          CALLER,
-        ),
+        app.deleteRoleInOrganization({ roleId: "role-1", organizationId: ORGANIZATION_ID }, CALLER),
       ).rejects.toBeInstanceOf(RoleInUseError);
       expect(deleteRole).not.toHaveBeenCalled();
     });
@@ -210,10 +208,7 @@ describe("given a deletion that races a new holder", () => {
       });
 
       await expect(
-        app.deleteRoleInOrganization(
-          { roleId: "role-1", organizationId: ORGANIZATION_ID },
-          CALLER,
-        ),
+        app.deleteRoleInOrganization({ roleId: "role-1", organizationId: ORGANIZATION_ID }, CALLER),
       ).rejects.toMatchObject({ code: "custom_role_in_use", bindingCount: 1 });
       expect(deleteRole).not.toHaveBeenCalled();
     });

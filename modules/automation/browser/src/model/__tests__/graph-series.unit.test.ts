@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { deriveSeriesOptionsFromGraph, resolveSeriesLabel } from "../graph-series.ts";
 
 describe("graph series presentation", () => {

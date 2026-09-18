@@ -14,7 +14,9 @@
     // trimmed browser contract, the bundler still resolves the real package.
     "paths": {
       "better-auth/react": ["../../../packages/browser-types/better-auth-react.d.ts"],
-      "@better-auth/passkey/client": ["../../../packages/browser-types/better-auth-passkey-client.d.ts"]
+      "@better-auth/passkey/client": [
+        "../../../packages/browser-types/better-auth-passkey-client.d.ts"
+      ]
     },
 
     "rewriteRelativeImportExtensions": false

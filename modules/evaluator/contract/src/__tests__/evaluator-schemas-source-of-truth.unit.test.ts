@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
 import {
   chatRichContentSchema,
   collectorRESTParamsSchema,
   spanInputOutputSchema,
   langWatchSpanSchema,
 } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { AVAILABLE_EVALUATORS, evaluatorTypesSchema, evaluatorsSchema } from "../index.ts";
 
 describe("given Zod schemas are the single source of truth", () => {

@@ -2,17 +2,18 @@
  * Live tier combining Postgres and ClickHouse; hand-written to span two stores coexisting.
  */
 import { generate } from "@langwatch/ksuid";
-import {
-  createWebhookClickHouseResolver,
-  type WebhookRoutedClickHouse,
-} from "../clickhouse/webhook-clickhouse.resolver.ts";
-import type { WebhookId,WebhookSecret } from "../../app/webhook.app.ts";
+
+import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import { WebhookEndpointConfiguration } from "../../services/webhook-endpoint-policy.service.ts";
-import type { WebhookRepositories } from "../webhook.repositories.ts";
 import {
   WebhookEventsClickHouseRepository,
   type WebhookClickHouseClientResolver,
 } from "../clickhouse/clickhouse.webhook-events.repository.ts";
+import {
+  createWebhookClickHouseResolver,
+  type WebhookRoutedClickHouse,
+} from "../clickhouse/webhook-clickhouse.resolver.ts";
+import type { WebhookRepositories } from "../webhook.repositories.ts";
 import {
   PrismaWebhookEndpointRepository,
   type WebhookEndpointDatabase,

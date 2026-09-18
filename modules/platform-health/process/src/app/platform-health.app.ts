@@ -1,31 +1,41 @@
+import { AutomationApi } from "@langwatch/automation-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 import {
   PlatformHealthApi,
   type PlatformHealthApi as PlatformHealthApiContract,
   type PlatformHealthCheckName,
   type PlatformHealthQuery,
   type PlatformHealthReport,
-  type PlatformHealthServerConfig,
   PLATFORM_HEALTH_CHECK_NAMES,
-  platformHealthServerConfigSchema,
 } from "@langwatch/platform-health-contract";
-import { AutomationApi } from "@langwatch/automation-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import { SubsystemProbeAdapter } from "../services/subsystem-probe-run.service.ts";
 import { PlatformHealthKeyService } from "../services/platform-health-key.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
-import { SubsystemProbeService, type SubsystemProbeCollaborators } from "../services/subsystem-probe.service.ts";
+import { SubsystemProbeAdapter } from "../services/subsystem-probe-run.service.ts";
+import {
+  SubsystemProbeService,
+  type SubsystemProbeCollaborators,
+} from "../services/subsystem-probe.service.ts";
 
 export type PlatformHealthInfrastructure = SubsystemProbeCollaborators;
 
+/**
+ * Shapes restated rather than imported from `@langwatch/process-stores`: a
+ * module depends on contracts. `publicBaseUrl` is the process's own fact,
+ * drilled in — absent where the deployment named no `BASE_HOST`.
+ */
+type PlatformHealthMembers = Readonly<{
+  secrets: Readonly<{ find(key: string): string | undefined }>;
+  publicBaseUrl: string | undefined;
+}>;
+
 type PlatformHealthSetup = FeatureSetup<
   typeof PlatformHealthApp.dependencies,
-  MembersRead<typeof PlatformHealthApp.reads>,
-  PlatformHealthServerConfig
+  PlatformHealthMembers,
+  undefined
 >;
 
 /** The process-owned platform-health capability. */
@@ -36,8 +46,8 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     workflow: WorkflowApi,
     projects: ProjectApi,
   };
-  static readonly reads = reads("secrets");
-  static readonly configSchema = platformHealthServerConfigSchema;
+  /** Both names are from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["secrets", "publicBaseUrl"] as const;
 
   readonly #health: PlatformHealthService;
   readonly #key: PlatformHealthKeyService;
@@ -47,10 +57,10 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     this.#key = key;
   }
 
-  static create({ dependencies, config, members }: PlatformHealthSetup): PlatformHealthApp {
+  static create({ dependencies, members }: PlatformHealthSetup): PlatformHealthApp {
     const probeApiKey = members.secrets.find("PLATFORM_HEALTH_PROBE_API_KEY") ?? "";
     const collaborators: SubsystemProbeCollaborators = {
-      publicBaseUrl: config.publicBaseUrl ?? "",
+      publicBaseUrl: members.publicBaseUrl ?? "",
       automation: () => ({
         findById: (input) => dependencies.automation.findById(input),
         getRecentFires: async (input) =>

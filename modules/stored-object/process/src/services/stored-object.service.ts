@@ -21,6 +21,8 @@ import {
   type StoredObjectsDeleteOutput,
   type StoredObjectsGetOutput,
 } from "@langwatch/stored-object-contract";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
+
 import {
   StoredObjectDelivery,
   StoredObjectStorage,
@@ -33,7 +35,6 @@ import type {
 } from "../repositories/stored-object-record.repository.ts";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
 import { StoredObjectUploadService } from "./stored-object-upload.service.ts";
-import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
@@ -71,7 +72,8 @@ export class StoredObjectService {
 
   private constructor(private readonly options: StoredObjectServiceOptions) {
     this.now = options.now ?? nowInstant;
-    this.operationId = options.operationId ?? (() => generate(UPLOAD_OPERATION_KSUID_RESOURCE).toString());
+    this.operationId =
+      options.operationId ?? (() => generate(UPLOAD_OPERATION_KSUID_RESOURCE).toString());
     this.uploads = StoredObjectUploadService.create({
       ...options,
       now: this.now,

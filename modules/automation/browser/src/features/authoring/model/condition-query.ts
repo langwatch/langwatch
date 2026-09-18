@@ -1,13 +1,13 @@
-/**
- * Bridges condition builder and liqe queries; null when query exceeds builder representation.
- */
-import type { LiqeQuery, ParserAst, TagToken } from "liqe";
 import {
   parse,
   SEARCH_FIELDS,
   stripAtSigils,
   type SearchFieldMeta,
 } from "@langwatch/trace-contract";
+/**
+ * Bridges condition builder and liqe queries; null when query exceeds builder representation.
+ */
+import type { LiqeQuery, ParserAst, TagToken } from "liqe";
 
 /** Comparators the builder exposes. Categorical / text / existence fields get
  *  `is` / `is_not`; range fields get the numeric comparators plus `between`. */

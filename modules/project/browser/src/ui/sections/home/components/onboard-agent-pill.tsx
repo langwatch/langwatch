@@ -1,11 +1,12 @@
-import { LuBot, LuSparkles, LuTerminal } from "react-icons/lu";
+import { HeroLeadPill } from "@langwatch/design-system/hero-lead-pill";
 import {
   AgentActionsMenu,
   setupAgentPrompt,
 } from "@langwatch/trace-browser/surfaces/setup-with-agent-button";
-import { selfHostedEndpoint } from "../../../../model/self-hosted-endpoint.ts";
+import { LuBot, LuSparkles, LuTerminal } from "react-icons/lu";
+
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
-import { HeroLeadPill } from "@langwatch/design-system/hero-lead-pill";
+import { selfHostedEndpoint } from "../../../../model/self-hosted-endpoint.ts";
 
 const INTEGRATION_DOCS = "https://docs.langwatch.ai/integration/overview";
 

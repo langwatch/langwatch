@@ -3,8 +3,9 @@
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { fakeOpsHost } from "../../../../testing.tsx";
+
 import { OpsHostProvider } from "../../../../model/ops-host.ts";
+import { fakeOpsHost } from "../../../../testing.tsx";
 import OpsProjectionsPage from "../ops-projections.screen.tsx";
 import OpsSchedulesPage from "../ops-schedules.screen.tsx";
 

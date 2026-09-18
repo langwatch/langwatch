@@ -4,7 +4,9 @@ import {
   CannotImpersonateWithoutSecondFactorError,
   UserToImpersonateNotFoundError,
 } from "@langwatch/ops-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import { AdminAccessService } from "../admin-access.service.ts";
 import {
   AdminAuditSink,
@@ -13,7 +15,6 @@ import {
   type ImpersonationTarget,
   type ImpersonationWindow,
 } from "../impersonation.service.ts";
-import { Temporal } from "@langwatch/time";
 
 class InMemoryImpersonationRepository extends ImpersonationRepository {
   window: ImpersonationWindow | null = null;

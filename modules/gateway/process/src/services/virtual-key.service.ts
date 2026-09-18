@@ -4,10 +4,17 @@
  * caller may ask of a key rather than a second copy of the invariants.
  */
 
-import { type Instant, nowInstant } from "@langwatch/time";
 import type { ScopeInput, VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { type GatewayAudit,type GatewayChangeEvents,type GatewayTransaction,type GatewayVirtualKeyCrypto,type GatewayGovernanceSignals } from "../app/gateway.members.ts";
+import { type Instant, nowInstant } from "@langwatch/time";
+
+import {
+  type GatewayAudit,
+  type GatewayChangeEvents,
+  type GatewayTransaction,
+  type GatewayVirtualKeyCrypto,
+  type GatewayGovernanceSignals,
+} from "../app/gateway.members.ts";
 import type { GatewayKeyBudgetRepository } from "../repositories/gateway-key-budget.repository.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";

@@ -1,4 +1,5 @@
 import { Box, Input, Text, VStack } from "@chakra-ui/react";
+
 import { useTraceStore } from "../../behavior/trace.store.ts";
 
 export function TraceSettings({ compact = false }: { compact?: boolean }) {

@@ -1,9 +1,13 @@
+import type { ModelCost, ModelCostRate } from "@langwatch/model-provider-contract";
 /**
  * See specs/traces-v2/span-unmapped-cost-suggestion.feature.
  */
 import { describe, expect, it } from "vitest";
-import type { ModelCost, ModelCostRate } from "@langwatch/model-provider-contract";
-import { ModelCostPreviewService, type ModelCostRuleReader } from "../model-cost-preview.service.ts";
+
+import {
+  ModelCostPreviewService,
+  type ModelCostRuleReader,
+} from "../model-cost-preview.service.ts";
 import { ModelCostRegexSafetyService } from "../model-cost-regex-safety.service.ts";
 
 const preview = ModelCostPreviewService.create({

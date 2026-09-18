@@ -4,7 +4,6 @@
  * shows. Rendered under the dialog header as a secondary segmented control.
  */
 import { HStack, Text } from "@chakra-ui/react";
-
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 
 import type { RunSnippetDataSource } from "../../../model/run-via-api/run-snippets.ts";

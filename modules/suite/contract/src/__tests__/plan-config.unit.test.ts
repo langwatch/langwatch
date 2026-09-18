@@ -4,6 +4,7 @@
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   configurationKey,
   duplicateSuiteTargets,
@@ -11,8 +12,8 @@ import {
   scopeKey,
   sortSuiteTargets,
 } from "../plan-config.ts";
-import { declaredDefaults, targetSortKey, withCanonicalOverrides } from "../target-key.ts";
 import type { SuiteTarget } from "../suite.ts";
+import { declaredDefaults, targetSortKey, withCanonicalOverrides } from "../target-key.ts";
 
 describe("normalizePlanScope", () => {
   describe("when the scope names every active test suite of the project", () => {

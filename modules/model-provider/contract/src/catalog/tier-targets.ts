@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { llmModels } from "./model-catalog.ts";
+
 import { resolveLatestAlias } from "./latest-aliases.ts";
+import { llmModels } from "./model-catalog.ts";
 import type { LLMModelEntry } from "./model-catalog.types.ts";
 
 const MODEL_TIERS = ["complex", "reasoning", "fast"] as const;

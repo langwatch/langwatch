@@ -1,4 +1,5 @@
 import type { CodingAgentSessionMetricSeriesRecord } from "@langwatch/coding-agent-contract";
+
 import {
   SessionMetricSeriesRepository,
   type SessionMetricTotal,

@@ -4,8 +4,8 @@
  * straight from the contract, so the browser cannot name an unserved shape.
  */
 
-import type { dataPrivacyTrpc } from "@langwatch/data-privacy-contract";
 import { createModuleApi, type ContractApiMap, type ModuleApi } from "@langwatch/api/web";
+import type { dataPrivacyTrpc } from "@langwatch/data-privacy-contract";
 
 export type DataPrivacyApiMap = ContractApiMap<typeof dataPrivacyTrpc>;
 

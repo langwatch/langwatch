@@ -1,13 +1,14 @@
+import { DatasetBatchTooLargeError } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment node
  * The tier-aware batch bound: batches above the plan's `datasetBatchMax`
  * refuse with the module's typed error; batches at or under it pass through.
  */
 import { describe, expect, it } from "vitest";
-import { DatasetBatchTooLargeError } from "@langwatch/dataset-contract";
+
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
 import { DatasetService } from "../dataset.service.ts";
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 
 const PROJECT_ID = "project-1";
 

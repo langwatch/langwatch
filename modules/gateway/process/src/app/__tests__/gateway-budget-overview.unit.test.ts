@@ -10,9 +10,13 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GatewayApp } from "../gateway.app.ts";
+
+/** No handle is ever resolved through it in these tests. */
+const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
 /** A peer that answers nothing: the composition resolves it, no test call reaches it. */
 function peer(name: string): never {
@@ -92,6 +96,7 @@ function gatewayAppStub(): GatewayApp {
       spendSettlementGraceMs: void 0,
     },
     resources: new ResourceScope(),
+    secrets: noSecrets,
   });
 }
 

@@ -1,24 +1,8 @@
-import {
-  bindRestHeader,
-  bindRestMiddleware,
-  projectCredentialOfRequest,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
-import { ModelProviderApp } from "./app/model-provider.app.ts";
-import { modelProviderRepositories } from "./repositories/model-provider-repositories.registry.ts";
-import { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
-import { modelDefaultsRest, modelDefaultsRestCredential } from "./transport/model-defaults.rest.ts";
-import { modelProviderRest } from "./transport/model-provider.rest.ts";
-import { modelProviderTrpcTransport } from "./transport/model-provider.trpc.ts";
-import {
-  playgroundRest,
-  playgroundRestModel,
-  playgroundRestProject,
-  playgroundRestSystemPrompt,
-} from "./transport/playground.rest.ts";
-import { translateTrpcTransport } from "./transport/translate.trpc.ts";
 import { getModelById, type CustomModelEntry } from "@langwatch/model-provider-contract";
 
+import { ModelProviderApp } from "./app/model-provider.app.ts";
 import type {
   ModelProviderCodexDeviceFlow,
   ModelProviderInfrastructure,
@@ -30,6 +14,7 @@ import type {
   ModelProviderRateLimit,
   ModelTranslation,
 } from "./app/model-provider.members.ts";
+import { modelProviderRepositories } from "./repositories/model-provider-repositories.registry.ts";
 import { PrismaModelCostCatalogRepository } from "./repositories/prisma/prisma.model-cost-catalog.repository.ts";
 import {
   CodexAccountService,
@@ -57,6 +42,12 @@ import { UnavailableModelProviderCredentialProbeAdapter } from "./services/unava
 import { UnmanagedModelProviderGatewayAdapter } from "./services/unmanaged.model-provider-gateway.service.ts";
 import { VercelAiModelTranslationAdapter } from "./services/vercel-ai.model-translation.service.ts";
 import { WindowedModelProviderConnectionRateLimiterAdapter } from "./services/windowed.model-provider-connection-rate-limiter.service.ts";
+import { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
+import { modelDefaultsRest, modelDefaultsRestCredential } from "./transport/model-defaults.rest.ts";
+import { modelProviderRest } from "./transport/model-provider.rest.ts";
+import { modelProviderTrpcTransport } from "./transport/model-provider.trpc.ts";
+import { playgroundRest } from "./transport/playground.rest.ts";
+import { translateTrpcTransport } from "./transport/translate.trpc.ts";
 
 export type { ModelProviderInfrastructure } from "./app/model-provider.app.ts";
 
@@ -71,8 +62,6 @@ export const modelProviderServer = defineServerModule("model-provider")
     llmModelCostTrpcTransport,
     translateTrpcTransport,
   )
-  // The playground's caller and execution proxy address are resolved by the process (session
-  // cookie, platform address) and stay on the host's fact list; other headers need no collaborator.
   .withTransportFacts(() => [
     bindRestMiddleware(modelDefaultsRestCredential, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
@@ -84,9 +73,6 @@ export const modelProviderServer = defineServerModule("model-provider")
         organizationId: credential.organizationId,
       };
     }),
-    bindRestHeader(playgroundRestModel, "x-model"),
-    bindRestHeader(playgroundRestProject, "x-project-id"),
-    bindRestHeader(playgroundRestSystemPrompt, "x-system-prompt"),
   ]);
 
 // Model Provider's composition seam: a process composes the gateway through the factories below

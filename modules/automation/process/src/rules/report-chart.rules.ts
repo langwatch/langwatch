@@ -1,4 +1,3 @@
-import type { CustomGraph, ReportChart } from "@langwatch/automation-contract";
 import {
   aggregateSeriesValues,
   buildSeriesName,
@@ -7,6 +6,7 @@ import {
   type AnalyticsSeries,
   type AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
+import type { CustomGraph, ReportChart } from "@langwatch/automation-contract";
 
 /**
  * The stored graph JSON as a report reads it. The full `CustomGraphInput` is a BROWSER type

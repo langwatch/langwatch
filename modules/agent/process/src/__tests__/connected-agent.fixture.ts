@@ -1,11 +1,12 @@
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+
+import { agentFixture } from "../app/__tests__/agent.fixture.ts";
+import type { AgentService } from "../services/agent.service.ts";
+import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
 import {
   AgentSessionService,
   type SessionCoreOptions,
 } from "../services/connected-agent-session.service.ts";
-import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { AgentService } from "../services/agent.service.ts";
-import { agentFixture } from "../app/__tests__/agent.fixture.ts";
 
 export function createConnectedAgentFixture(overrides: Partial<AgentService> = {}): AgentService {
   return createApiFixture<AgentService>({

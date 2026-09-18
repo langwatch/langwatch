@@ -17,6 +17,7 @@ import {
 import { roleBindingScopeTypeSchema } from "@langwatch/authz-contract";
 import { Users } from "lucide-react";
 import { useState } from "react";
+
 import { authzApi } from "../../behavior/authz-api.ts";
 import { useAuthzHost } from "../../model/authz-host.ts";
 import {

@@ -1,5 +1,13 @@
-import type { BatchClusteringParams, IncrementalClusteringParams, TopicClusteringTrigger, TopicModelEntry, TopicModelRecordMode, TopicModelRecordSource } from "@langwatch/topic-contract";
-export interface TopicInfrastructure {  langevalsPayloadStaging: LangevalsPayloadStaging;
+import type {
+  BatchClusteringParams,
+  IncrementalClusteringParams,
+  TopicClusteringTrigger,
+  TopicModelEntry,
+  TopicModelRecordMode,
+  TopicModelRecordSource,
+} from "@langwatch/topic-contract";
+export interface TopicInfrastructure {
+  langevalsPayloadStaging: LangevalsPayloadStaging;
   topicClusteringClickHouse: TopicClusteringClickHouse;
   topicClusteringCommands: TopicClusteringCommands;
   topicClusteringLangevals: TopicClusteringLangevals;
@@ -16,7 +24,6 @@ export interface StagedLangevalsPayload {
    */
   discard(): Promise<void>;
 }
-
 
 export const STAGED_PAYLOAD_HEADER = "X-Payload-S3-URL";
 
@@ -49,7 +56,6 @@ export type TopicClusteringClickHouseQuery = {
   format: "JSONEachRow";
   clickhouse_settings?: Record<string, number>;
 };
-
 
 export interface TopicClusteringClickHouse {
   query(input: TopicClusteringClickHouseQuery): Promise<{
@@ -101,7 +107,6 @@ export interface TopicClusteringLangevalsResponse {
   text(): Promise<string>;
   json(): Promise<unknown>;
 }
-
 
 export interface TopicClusteringLangevals {
   postClustering(params: {

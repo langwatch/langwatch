@@ -13,7 +13,10 @@ export {
 /**
  * The tenant broadcast fabric the presence emitter and the export relay both subscribe on.
  */
-export { RedisBroadcastRepository as BroadcastAdapter, type BroadcastEventType } from "./repositories/redis/redis.broadcast.repository.ts";
+export {
+  RedisBroadcastRepository as BroadcastAdapter,
+  type BroadcastEventType,
+} from "./repositories/redis/redis.broadcast.repository.ts";
 export {
   BroadcastTenantRateLimiterAdapter,
   type BucketConfig,

@@ -10,25 +10,28 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import {
+  ProviderScopeChips,
+  ScopeChipPicker,
+  type ScopeTriadEntry,
+} from "@langwatch/authz-browser-kit/scope-picker";
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { X } from "lucide-react";
 import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
-import { ProviderScopeChips,ScopeChipPicker,type ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
-import type { ModelTier } from "../../model/model-tier-presets.ts";
-
-import { ModelNameMappingSection } from "../blocks/model-name-mapping-section.tsx";
-import { ModelTiersSection } from "./model-tiers-section.tsx";
-import type { ProviderCredentialOption } from "../../model/provider-credential-option.ts";
-import { ProviderCredentialPicker } from "../elements/provider-credential-picker.tsx";
-import { RestrictionsSection } from "../blocks/restrictions-section.tsx";
-import type { RoutingPolicyFormValues } from "../../model/routing-policy-form.ts";
 import { useRoutingPolicyDrawerForm } from "../../behavior/use-routing-policy-drawer-form.ts";
 import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mutations.ts";
+import type { ModelTier } from "../../model/model-tier-presets.ts";
+import type { ProviderCredentialOption } from "../../model/provider-credential-option.ts";
+import type { RoutingPolicyFormValues } from "../../model/routing-policy-form.ts";
+import { ModelNameMappingSection } from "../blocks/model-name-mapping-section.tsx";
+import { RestrictionsSection } from "../blocks/restrictions-section.tsx";
+import { ProviderCredentialPicker } from "../elements/provider-credential-picker.tsx";
+import { ModelTiersSection } from "./model-tiers-section.tsx";
 
 /**
  * URL-routed routing-policy editor shell (see dev/docs/best_practices/drawers.md).
@@ -172,7 +175,7 @@ function DrawerBody({
     <VStack align="stretch" gap={5}>
       <Field.Root required>
         <Field.Label>Name</Field.Label>
-        <Input  placeholder="Developer default" {...register("name")} />
+        <Input placeholder="Developer default" {...register("name")} />
       </Field.Root>
 
       <Field.Root>

@@ -8,13 +8,12 @@ import {
   type ModelProviderExecution,
   type ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
+
 import type {
   ModelProviderCatalog,
-  ModelProviderCredentialPolicy
+  ModelProviderCredentialPolicy,
 } from "../app/model-provider.members.ts";
-import type {
-  ModelProviderRepository
-} from "../repositories/model-provider.repository.ts";
+import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type ModelProviderQueryOptions = {

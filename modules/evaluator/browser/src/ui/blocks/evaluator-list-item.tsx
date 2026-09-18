@@ -1,8 +1,5 @@
-import type { WireOf } from "@langwatch/api/web";
 import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { CheckCircle, Code, Workflow } from "lucide-react";
-import type { MouseEvent } from "react";
-import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
+import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   AVAILABLE_EVALUATORS,
@@ -10,6 +7,9 @@ import {
   type Evaluator,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
+import { CheckCircle, Code, Workflow } from "lucide-react";
+import type { MouseEvent } from "react";
+import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 
 export type EvaluatorListItemProps = {
   evaluator: WireOf<Evaluator>;

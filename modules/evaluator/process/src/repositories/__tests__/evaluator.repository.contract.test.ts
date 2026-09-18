@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+
+import { createLogger } from "@langwatch/observability";
 /**
  * @vitest-environment node
  * The evaluator-row contract, run against both backends: the memory
@@ -13,9 +16,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createLogger } from "@langwatch/observability";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { EvaluatorRepository } from "../evaluator.repository.ts";
@@ -220,9 +221,7 @@ const connection = databaseUrl
   ? PrismaConnectionService.create({
       guard: new AllowTestQueries(),
       logger: createLogger("langwatch:test:evaluator-repository"),
-    }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {

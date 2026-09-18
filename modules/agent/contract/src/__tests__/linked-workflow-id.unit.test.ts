@@ -7,6 +7,7 @@
  * precedence is pinned here rather than inside one caller's suite.
  */
 import { describe, expect, it } from "vitest";
+
 import { linkedWorkflowId } from "../agent.ts";
 
 describe("linkedWorkflowId", () => {

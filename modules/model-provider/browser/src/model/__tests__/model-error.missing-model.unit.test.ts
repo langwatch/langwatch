@@ -3,6 +3,7 @@
  * global mutation interceptor uses to drive the missing-model toast.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   extractMissingModelInfo,
   isHandledByMissingModelHandler,

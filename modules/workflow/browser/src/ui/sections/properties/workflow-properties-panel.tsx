@@ -1,9 +1,10 @@
 import { Box } from "@chakra-ui/react";
+import type { Component } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
-import type { Component } from "@langwatch/workflow-contract";
+
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 
 export type WorkflowPropertiesPanelProps = {

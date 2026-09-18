@@ -5,16 +5,19 @@
  */
 import { useEffect, useMemo, useRef } from "react";
 import { useAnalytics } from "react-contextual-analytics";
+
+import {
+  type ProductFlowConfig,
+  type OnboardingScreen,
+  ProductScreenIndex,
+  type ProductSelection,
+} from "../../behavior/types.ts";
 import { ModelProviderStepScreen } from "./model-provider-step-screen.tsx";
 import { ObservabilityScreen } from "./observability-screen.tsx";
 import { ProductSelectionScreen } from "./product-selection-screen.tsx";
 import { ViaClaudeCodeScreen } from "./via-claude-code-screen.tsx";
 import { ViaMcpClientScreen } from "./via-claude-desktop-screen.tsx";
 import { ViaPlatformScreen } from "./via-platform-screen.tsx";
-import { type ProductFlowConfig,
-  type OnboardingScreen,
-  ProductScreenIndex,
-  type ProductSelection } from "../../behavior/types.ts";
 
 interface ProductSelectionScreenWithAnalyticsProps {
   onSelectProduct: (product: ProductSelection) => void;

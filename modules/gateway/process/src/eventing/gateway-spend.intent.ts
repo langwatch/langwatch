@@ -1,6 +1,7 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventSchema, EventUtils } from "@langwatch/eventing";
 import { z } from "zod";
+
 import {
   ADMIT_SPEND_COMMAND_TYPE,
   type AdmitSpendCommandData,

@@ -1,10 +1,11 @@
 import { Box } from "@chakra-ui/react";
+import type { Component, Field } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
+
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import type { Component, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,

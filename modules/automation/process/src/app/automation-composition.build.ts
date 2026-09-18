@@ -9,8 +9,8 @@ import {
   type SlackChannelListing,
 } from "@langwatch/automation-contract";
 import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
-import type { Encryption, ProcessMembers } from "@langwatch/process-stores/members";
 import type { Logger } from "@langwatch/observability";
+import type { Encryption, ProcessMembers } from "@langwatch/process-stores/members";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -23,7 +23,6 @@ import type {
   AutomationScheduledJobRepository,
   ScheduledJobRecord,
 } from "../repositories/automation-scheduled-job.repository.ts";
-import type { AutomationClock } from "./automation.members.ts";
 import type {
   AutomationDispatchError,
   AutomationHeartbeat,
@@ -41,26 +40,32 @@ import type {
   AutomationSlackDirectory,
   AutomationTraceFilterCompiler,
 } from "./automation.app.ts";
+import type { AutomationClock } from "./automation.members.ts";
 
-/** What `buildAutomationInfrastructure` reads off the process's own members. */
+/**
+ * What `buildAutomationInfrastructure` reads off process members.
+ * `unsubscribeSecret` is reused cipher-key material, not automation's own
+ * secret; where it comes from is still open, so it stays a member, not config.
+ */
 export type AutomationProcessMembers = Readonly<{
   prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
   logger: Logger;
   encryption: Encryption;
+  publicBaseUrl: string | undefined;
+  unsubscribeSecret: string | undefined;
 }>;
 
 /** Builds the {@link AutomationInfrastructure} `AutomationApp.create` composes over. */
 export function buildAutomationInfrastructure(input: {
   members: AutomationProcessMembers;
-  config: Readonly<{ baseHost: string; unsubscribeSecret?: string }>;
   auditLog: AuditLogApi;
 }): AutomationInfrastructure {
-  const { members, config } = input;
+  const { members } = input;
   const providers = AutomationProviderRegistryService.create(members.encryption);
 
   return {
-    verifier: HmacUnsubscribeTokenAdapter.create({ secret: config.unsubscribeSecret }),
+    verifier: HmacUnsubscribeTokenAdapter.create({ secret: members.unsubscribeSecret }),
     // The report calendar, on the SAME `ScheduledJob` store the worker's loop
     // claims a due row through — Eventing's own, not a second narrowing of it,
     // so the row this process writes on save is the row that process reads.
@@ -80,7 +85,7 @@ export function buildAutomationInfrastructure(input: {
     traceFilters: new UnwiredAutomationTraceFilterCompiler(),
     limits: new RedisAutomationCallCounter(members.redis),
     audit: new AuditLogAutomationAuditSink(input.auditLog),
-    publicBaseUrl: config.baseHost === "" ? undefined : config.baseHost,
+    publicBaseUrl: members.publicBaseUrl,
   };
 }
 
@@ -397,7 +402,9 @@ class AuditLogAutomationAuditSink implements AutomationAuditSink {
       userId: entry.userId,
       ...(entry.projectId === undefined ? {} : { projectId: entry.projectId }),
       action: entry.action,
-      ...(entry.args === undefined ? {} : { args: entry.args as Parameters<AuditLogApi["record"]>[0]["args"] }),
+      ...(entry.args === undefined
+        ? {}
+        : { args: entry.args as Parameters<AuditLogApi["record"]>[0]["args"] }),
     });
   }
 }

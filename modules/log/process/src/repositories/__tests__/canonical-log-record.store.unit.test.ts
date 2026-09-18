@@ -1,9 +1,9 @@
 import { createTenantId } from "@langwatch/eventing";
+import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
 
 import { CanonicalLogRecordStore } from "../../eventing/canonical-log-record.store.ts";
-import type { CanonicalLogRecord } from "@langwatch/log-contract";
+import type { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
 
 describe("CanonicalLogRecordStore", () => {
   it("delegates a projection batch as one repository operation", async () => {

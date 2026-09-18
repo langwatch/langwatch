@@ -1,14 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
+
 import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   projectIdentitySchema,
   projectWithTeamSchema,
   type ProjectApi,
 } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import type { ApiKeyBindingId } from "../../services/api-key-binding-id.service.ts";
 import { ApiKeyService, type ApiKeyDependencies } from "../../services/api-key.service.ts";
 import {
   ApiKeyRepository,
@@ -17,8 +21,6 @@ import {
   type StoredApiKey,
 } from "../api-key.repository.ts";
 import { ApiKeyTokenAdapter } from "../memory/memory.api-key-token.repository.ts";
-import type { ApiKeyBindingId } from "../../services/api-key-binding-id.service.ts";
-import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 class TestApiKeyBindingId implements ApiKeyBindingId {
   static create(): TestApiKeyBindingId {

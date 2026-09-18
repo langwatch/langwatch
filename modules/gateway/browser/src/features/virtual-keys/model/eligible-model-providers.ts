@@ -1,6 +1,7 @@
-import type { Instant } from "@langwatch/time";
-import { MODEL_PROVIDER_DEFAULT_MODELS } from "./model-provider-default-models.ts";
 import { isDispatchableProvider } from "@langwatch/model-provider-contract";
+import type { Instant } from "@langwatch/time";
+
+import { MODEL_PROVIDER_DEFAULT_MODELS } from "./model-provider-default-models.ts";
 import { SCOPE_BREADTH, scopeBreadthRank } from "./scope-breadth.ts";
 
 /**

@@ -4,7 +4,6 @@ import type { Agent as TypedAgent } from "@langwatch/agent-contract";
  * run, run reads and saved setup. Each route names its required permission,
  * so the handler receives an already-resolved scope, not a raw caller.
  */
-import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestMiddleware,
   defineRestRouter,
@@ -27,7 +26,7 @@ import {
   type ExecutionScope,
 } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
@@ -100,13 +99,6 @@ export interface ExperimentV3RestApi {
 }
 
 export const ExperimentV3RestApi = moduleApi<ExperimentV3RestApi>()("experiment");
-
-/** The `/api/evaluations/v3` alias: the one thing it does is forward. */
-export interface ExperimentV3AliasApi {
-  forward(request: Request): Promise<Response>;
-}
-
-export const ExperimentV3AliasApi = moduleApi<ExperimentV3AliasApi>()("experiment");
 
 /** The refusal a run door answers where this process composed no run loop. */
 /**
@@ -763,33 +755,6 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     );
 
     return jsonAnswer({ version: restored.version }, 200);
-  })
-
-  .build();
-
-/**
- * `/api/evaluations/v3/*` - the family's older name, re-dispatched. TERMINATES
- * NOTHING: the canonical route authenticates the forwarded request exactly as
- * a direct one.
- */
-export const experimentV3AliasRest = defineRestRouter(ExperimentV3AliasApi)
-  .withNamespace("evaluations-v3-alias")
-  .withVersion(MANAGEMENT_API_VERSION)
-  .withAddressing("literal", { v1Twin: false })
-  .get("/api/evaluations/v3/*", "evaluationsV3Alias")
-  .withAccess(
-    publicRoute({
-      reason:
-        "the alias rewrites the path and hands the request to the canonical route, which " +
-        "authenticates it exactly as it would a direct one",
-    }),
-  )
-  .anyMethod()
-  .withRawResponse({ produces: "application/json" })
-  .handle(({ app, request }): Promise<Response> => {
-    const url = new URL(request.url);
-    url.pathname = url.pathname.replace(/^\/api\/evaluations\/v3/, "/api/experiments");
-    return app.forward(new Request(url.toString(), request));
   })
 
   .build();

@@ -1,10 +1,10 @@
+import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/trpc";
 /**
  * The dashboard tRPC wire, pinned: every procedure name, its kind, and the
  * permission the server binds to it — a rename here is a cache-key change
  * in every browser that calls it. Spec: dashboard-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/trpc";
 import {
   dashboardTrpc,
   graphTrpc,

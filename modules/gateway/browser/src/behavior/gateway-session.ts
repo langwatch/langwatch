@@ -4,6 +4,7 @@
  */
 
 import { useMemo } from "react";
+
 import {
   useGatewayHost,
   type GatewayActor,

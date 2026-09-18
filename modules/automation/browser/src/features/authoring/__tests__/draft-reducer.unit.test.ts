@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   AlertType,
   TriggerAction,
@@ -6,14 +5,16 @@ import {
   type SavedTriggerRow,
   type TemplateDraft,
 } from "@langwatch/automation-contract";
+import { describe, expect, it } from "vitest";
+
+import { createClientProviderRegistry } from "../../../model/provider-registry.ts";
+import type { SummaryIdentity } from "../../../model/provider-types.ts";
 import {
   createAutomationDraftModel,
   type AutomationDraft as WebAutomationDraft,
   INITIAL_GRAPH_ALERT_DRAFT,
   INITIAL_REPORT_DRAFT,
 } from "../model/draft-reducer.ts";
-import { createClientProviderRegistry } from "../../../model/provider-registry.ts";
-import type { SummaryIdentity } from "../../../model/provider-types.ts";
 
 interface EmailSlice {
   members: string[];

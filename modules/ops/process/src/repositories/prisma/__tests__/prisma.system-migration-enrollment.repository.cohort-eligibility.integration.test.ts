@@ -4,7 +4,7 @@
  * @see specs/migration/system-migrations-runner.feature
  */
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -13,6 +13,8 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaSystemMigrationEnrollmentRepository } from "../prisma.system-migration-enrollment.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;

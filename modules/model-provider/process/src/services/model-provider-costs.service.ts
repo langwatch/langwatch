@@ -9,17 +9,16 @@ import {
   type ModelCostEstimateInput,
   type ModelCostWriteInput,
 } from "@langwatch/model-provider-contract";
+import { nowInstant, toDate } from "@langwatch/time";
+
 import type {
   ModelProviderCatalog,
-  ModelProviderIdService
+  ModelProviderIdService,
 } from "../app/model-provider.members.ts";
-import type {
-  ModelCostRepository
-} from "../repositories/model-cost.repository.ts";
+import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
 import { ModelCostCatalogService } from "./model-cost-catalog.service.ts";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
-import { nowInstant, toDate } from "@langwatch/time";
 
 type ModelProviderCostsOptions = {
   costs: ModelCostRepository;

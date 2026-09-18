@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+
 import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
 
 /**

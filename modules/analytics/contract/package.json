@@ -46,9 +46,10 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "ajv": "catalog:",
     "zod": "catalog:"
   },

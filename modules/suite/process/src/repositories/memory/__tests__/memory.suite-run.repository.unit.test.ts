@@ -1,6 +1,7 @@
 import { createTenantId, type Projection } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
+import { describe, expect, it } from "vitest";
+
 import { MemorySuiteRunRepository } from "../memory.suite-run.repository.ts";
 
 const state: SuiteRunStateData = {
@@ -24,10 +25,7 @@ const state: SuiteRunStateData = {
   GradedCount: 0,
 };
 
-function projectionOf(
-  data: SuiteRunStateData,
-  id = "projection_1",
-): Projection<SuiteRunStateData> {
+function projectionOf(data: SuiteRunStateData, id = "projection_1"): Projection<SuiteRunStateData> {
   return {
     id,
     aggregateId: data.BatchRunId,

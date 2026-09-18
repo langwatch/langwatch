@@ -6,12 +6,13 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { TenantMigrationRecord } from "@langwatch/system-migrations";
+import { nowInstant } from "@langwatch/time";
+
 import {
   ROLLBACK_EFFECT_STATUSES,
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules.ts";
 import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 

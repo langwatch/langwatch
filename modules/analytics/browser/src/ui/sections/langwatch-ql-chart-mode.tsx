@@ -5,24 +5,28 @@
  */
 
 import { Badge, Box, Button, HStack, Stack, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef } from "react";
-
-import { LWQL_QUERY_RESULT_DATASET,starterVegaLiteSpecText,isPlainObject,ALLOWED_VEGA_LITE_TRANSFORMS } from "@langwatch/analytics-contract/visualization";
 import {
-  parseVegaLiteSpecText,
-  validateVegaLiteSpec,
-} from "@langwatch/analytics-contract/visualization/validation";
+  LWQL_QUERY_RESULT_DATASET,
+  starterVegaLiteSpecText,
+  isPlainObject,
+  ALLOWED_VEGA_LITE_TRANSFORMS,
+} from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLDatasetColumn,
   VegaLiteValidationResult,
   VegaValidationError,
   LangWatchQLVegaColorMode,
-  LangWatchQLVegaConfig
+  LangWatchQLVegaConfig,
 } from "@langwatch/analytics-contract/visualization";
+import {
+  parseVegaLiteSpecText,
+  validateVegaLiteSpec,
+} from "@langwatch/analytics-contract/visualization/validation";
+import { useEffect, useMemo, useRef } from "react";
 
 import { LangWatchQLChartFailure } from "../elements/langwatch-ql-chart-failure.tsx";
-import { LangWatchQLVegaLiteChart } from "./langwatch-ql-vega-lite-chart.tsx";
 import { VegaLiteSpecEditor } from "../elements/vega-lite-spec-editor.tsx";
+import { LangWatchQLVegaLiteChart } from "./langwatch-ql-vega-lite-chart.tsx";
 
 /** The shape of a LangWatchQL result, narrowed to what a chart reads. */
 export interface LangWatchQLChartResult {

@@ -3,8 +3,9 @@
  * zero attempts are unknown, and p95 from unsorted lists is arbitrary.
  */
 
-import { describe, expect, it } from "vitest";
 import type { ProcessStore } from "@langwatch/eventing";
+import { describe, expect, it } from "vitest";
+
 import {
   WebhookHealthService,
   type WebhookEndpointHealthSource,

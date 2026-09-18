@@ -14,12 +14,14 @@ import {
   type LucideIcon,
   MoreVertical,
   Pencil,
+  PhoneCall,
   Play,
   RefreshCw,
   Trash2,
   Workflow,
 } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
+
 import { agentHasDevTunnel } from "../../model/agent-dev-tunnel.ts";
 import { LocalTunnelBadge } from "../elements/local-tunnel-badge.tsx";
 
@@ -30,6 +32,7 @@ export const agentTypeIcons: Record<AgentType, LucideIcon> = {
   http: Globe,
   workflow: Workflow,
   connected: Bot,
+  voice: PhoneCall,
 };
 
 export const agentTypeLabels: Record<AgentType, string> = {
@@ -38,6 +41,7 @@ export const agentTypeLabels: Record<AgentType, string> = {
   http: "HTTP",
   workflow: "Workflow",
   connected: "Connected",
+  voice: "Voice",
 };
 
 /** The class that keeps a click inside the card menu out of the card click. */

@@ -6,12 +6,13 @@ import type {
   Prisma,
   PrismaClient,
 } from "@langwatch/prisma-client/generated";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
+
 import {
   GatewayRealtimeSessionRepository,
   type NewGatewayRealtimeSession,
   type ReserveResult,
 } from "../gateway-realtime-session.repository.ts";
-import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 /** The client slice realtime sessions are booked and settled through. */
 export type GatewayRealtimeSessionDatabase = Pick<

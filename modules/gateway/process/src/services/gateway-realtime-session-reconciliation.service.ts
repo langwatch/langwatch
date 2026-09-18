@@ -1,6 +1,6 @@
 import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
-import { z } from "zod";
 import type { Instant } from "@langwatch/time";
+import { z } from "zod";
 
 export const elevenLabsConversationReportSchema = z
   .object({

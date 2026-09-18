@@ -1,7 +1,7 @@
 import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "@langwatch/browser-host/use-router";
 
 // Constants
 const DEFAULT_PAGE_SIZE = 25;

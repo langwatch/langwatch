@@ -11,14 +11,15 @@
  */
 
 import { InMemoryProcessStore } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import type { WebhookEndpointView } from "@langwatch/webhook-contract";
+import { describe, expect, it } from "vitest";
+
+import { WEBHOOK_DELIVERY_PROCESS_NAME } from "../../rules/webhook-delivery-contract.rules.ts";
 import {
   WebhookDeliveryService,
   type WebhookDeliveryProcessDeps,
 } from "../webhook-delivery.service.ts";
 import { WebhookEndpointStreamService } from "../webhook-endpoint-stream.service.ts";
-import { WEBHOOK_DELIVERY_PROCESS_NAME } from "../../rules/webhook-delivery-contract.rules.ts";
 
 const NOW = 1_700_000_000_000;
 const ORGANIZATION_ID = "organization-1";
@@ -93,14 +94,15 @@ describe("WebhookEndpointStreamService", () => {
       const directStore = InMemoryProcessStore.createForTesting();
       const viaDeliveryStore = InMemoryProcessStore.createForTesting();
 
-      await WebhookEndpointStreamService.create({ processStore: directStore, now: () => NOW }).appendReplay(
-        {
-          organizationId: ORGANIZATION_ID,
-          endpoint: endpoint(),
-          envelope: envelope(),
-          replayId: "replay-1",
-        },
-      );
+      await WebhookEndpointStreamService.create({
+        processStore: directStore,
+        now: () => NOW,
+      }).appendReplay({
+        organizationId: ORGANIZATION_ID,
+        endpoint: endpoint(),
+        envelope: envelope(),
+        replayId: "replay-1",
+      });
 
       await WebhookDeliveryService.create(
         deliveryServiceDeps(viaDeliveryStore),

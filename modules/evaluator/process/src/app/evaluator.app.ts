@@ -5,7 +5,6 @@
  */
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
@@ -33,20 +32,20 @@ import {
   type ResolvedEvaluatorExecution,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { generate } from "@langwatch/ksuid";
+import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
-import { generate } from "@langwatch/ksuid";
-import { z } from "zod";
 
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
+import { EvaluatorGraphAdapter } from "../repositories/prisma/prisma.evaluator-graph.repository.ts";
 import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
 import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execution.service.ts";
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
-import { EvaluatorGraphAdapter } from "../repositories/prisma/prisma.evaluator-graph.repository.ts";
 import { refusingEvaluatorNlpDispatcher } from "./evaluator-composition.build.ts";
 
 /**
@@ -87,22 +86,19 @@ export interface EvaluatorGraph {
 }
 
 /**
- * Config: fallback models for a project that configured none, and the
- * platform's public origin for `platformUrl`. Both default to `undefined`
- * — an unconfigured deployment keeps that exact absence.
+ * Shapes restated rather than imported from `@langwatch/process-stores`: a
+ * module depends on contracts. `publicBaseUrl` is the process's own fact,
+ * absent where the deployment named no `BASE_HOST`.
  */
-const evaluatorAppConfigSchema = z.object({
-  fallbackModels: z
-    .object({ defaultModel: z.string(), embeddingsModel: z.string() })
-    .optional(),
-  publicBaseUrl: z.string().optional(),
-});
-export type EvaluatorAppConfig = z.infer<typeof evaluatorAppConfigSchema>;
+type EvaluatorMembers = Readonly<{
+  prisma: PrismaClient;
+  publicBaseUrl: string | undefined;
+}>;
 
 type EvaluatorSetup = FeatureSetup<
   typeof EvaluatorApp.dependencies,
-  MembersRead<typeof EvaluatorApp.reads>,
-  EvaluatorAppConfig,
+  EvaluatorMembers,
+  undefined,
   EvaluatorRepositories
 >;
 
@@ -129,8 +125,8 @@ export class EvaluatorApp implements EvaluatorApi {
     /** Resolves the project's default and embeddings models. */
     modelProviders: ModelProviderApi,
   };
-  static readonly configSchema = evaluatorAppConfigSchema;
-  static readonly reads = reads("prisma");
+  /** Both names are from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["prisma", "publicBaseUrl"] as const;
 
   static create(setup: EvaluatorSetup): EvaluatorApp {
     const graph = EvaluatorGraphAdapter.create({
@@ -147,7 +143,7 @@ export class EvaluatorApp implements EvaluatorApi {
    * is this module's own seam, not a process member.
    */
   static createWithGraph(setup: EvaluatorSetup, graph: EvaluatorGraph): EvaluatorApp {
-    const { dependencies, repositories, config } = setup;
+    const { dependencies, repositories, members } = setup;
 
     return new EvaluatorApp({
       evaluators: EvaluatorRuntimeService.create({
@@ -157,14 +153,13 @@ export class EvaluatorApp implements EvaluatorApi {
           auditLog: dependencies.auditLog,
           users: dependencies.users,
         }),
-        ...(config.fallbackModels ? { fallbackModels: config.fallbackModels } : {}),
         codeExecution: EvaluatorCodeExecutionService.create(refusingEvaluatorNlpDispatcher()),
         generateId: (kind: string) => generate(kind).toString(),
       }),
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
       graph,
-      publicBaseUrl: config.publicBaseUrl,
+      publicBaseUrl: members.publicBaseUrl,
     });
   }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { AXIS_INTERVALS, alignedMax, axisTicks, axisWidthFor, niceMax } from "../../../index.ts";
 
 const formatAxisValue = (value: number): string => {

@@ -1,17 +1,30 @@
-import { type Instant, toDate } from "@langwatch/time";
+import {
+  type GatewayBudget,
+  type ModelProvider,
+  type VirtualKey,
+  type VirtualKeyWithScopes,
+  type GatewayCacheRuleResource,
+  type GatewayConfigGuardrailAttachment,
+  type GatewayGuardrailBundleEntry,
+  type GatewayMoney,
+  type GatewayResolvedBudget,
+  effectiveBudgetPeriod,
+  parseVirtualKeyConfig,
+  type GatewayBudgetResource,
+} from "@langwatch/gateway-contract";
 /**
  * The wire shapes the Go data plane reads, and the pure mapping from control-plane rows onto them.
  * Nothing here reads a store: a materialisation gathers the rows, and this decides what each one
  * looks like in the bundle.
  */
-
-import { type GatewayBudget, type ModelProvider, type VirtualKey,type VirtualKeyWithScopes,type GatewayCacheRuleResource,type GatewayConfigGuardrailAttachment,type GatewayGuardrailBundleEntry,type GatewayMoney,type GatewayResolvedBudget,
-  effectiveBudgetPeriod,
-  parseVirtualKeyConfig,
-  type GatewayBudgetResource } from "@langwatch/gateway-contract";
 import type { LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "@langwatch/model-provider-contract";
-import type { GatewayConfigAssembly,GatewayModelProviderCredentials } from "../app/gateway.members.ts";
+import { type Instant, toDate } from "@langwatch/time";
+
+import type {
+  GatewayConfigAssembly,
+  GatewayModelProviderCredentials,
+} from "../app/gateway.members.ts";
 
 export type GuardrailWire = {
   id: string;

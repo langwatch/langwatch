@@ -26,10 +26,9 @@ function recentItem(overrides: Partial<RecentItem> = {}): RecentItem {
 }
 
 function mount({ rows = [recentItem()] }: { rows?: RecentItem[] } = {}) {
-  const reader =
-    vi.fn<(input: { userId: string; projectId: string; limit: number }) => Promise<RecentItem[]>>(
-      async () => rows,
-    );
+  const reader = vi.fn<
+    (input: { userId: string; projectId: string; limit: number }) => Promise<RecentItem[]>
+  >(async () => rows);
   const trpc = initTRPC.context<ProjectTrpcTestContext>().create();
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,

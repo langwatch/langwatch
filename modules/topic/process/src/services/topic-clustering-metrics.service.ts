@@ -4,6 +4,7 @@ import {
   type CounterHandle,
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
+
 import type { TopicClusteringMetrics } from "../eventing/topic-clustering.intent.ts";
 
 /**
@@ -35,15 +36,11 @@ export class OtelTopicClusteringMetricsService implements TopicClusteringMetrics
     private readonly duration: HistogramHandle,
   ) {}
 
-  incrementPageTotal(
-    params: Parameters<TopicClusteringMetrics["incrementPageTotal"]>[0],
-  ): void {
+  incrementPageTotal(params: Parameters<TopicClusteringMetrics["incrementPageTotal"]>[0]): void {
     this.pages.inc({ outcome: params.outcome }, 1);
   }
 
-  observePageDuration(
-    params: Parameters<TopicClusteringMetrics["observePageDuration"]>[0],
-  ): void {
+  observePageDuration(params: Parameters<TopicClusteringMetrics["observePageDuration"]>[0]): void {
     this.duration.observe(params.durationMs, { mode: params.mode });
   }
 }

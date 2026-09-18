@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEvaluatorCatalogue, evaluatorSettingsJsonSchema } from "../evaluator-catalogue.rules.ts";
+import {
+  buildEvaluatorCatalogue,
+  evaluatorSettingsJsonSchema,
+} from "../evaluator-catalogue.rules.ts";
 
 interface CatalogueEntry {
   name: string;
   settings_json_schema: {
     type?: string;
-    properties?: Record<string, { type?: string; default?: unknown; description?: string; enum?: unknown[] }>;
+    properties?: Record<
+      string,
+      { type?: string; default?: unknown; description?: string; enum?: unknown[] }
+    >;
   };
 }
 
@@ -14,7 +20,9 @@ describe("the built-in evaluator catalogue", () => {
   describe("given an evaluator whose settings carry a default and a description", () => {
     /** @scenario "An evaluator's settings are described field by field" */
     it("names the object's type and every setting, with its default and prose", () => {
-      const schema = evaluatorSettingsJsonSchema("azure/content_safety") as CatalogueEntry["settings_json_schema"];
+      const schema = evaluatorSettingsJsonSchema(
+        "azure/content_safety",
+      ) as CatalogueEntry["settings_json_schema"];
 
       expect(schema.type).toBe("object");
       expect(Object.keys(schema.properties ?? {}).toSorted()).toEqual([
@@ -28,7 +36,9 @@ describe("the built-in evaluator catalogue", () => {
 
     /** @scenario "A setting with a fixed list of choices publishes that list" */
     it("publishes a fixed set of values as an enumeration", () => {
-      const schema = evaluatorSettingsJsonSchema("azure/content_safety") as CatalogueEntry["settings_json_schema"];
+      const schema = evaluatorSettingsJsonSchema(
+        "azure/content_safety",
+      ) as CatalogueEntry["settings_json_schema"];
 
       expect(schema.properties?.output_type?.type).toBe("string");
       expect(schema.properties?.output_type?.enum).toEqual([
@@ -42,7 +52,9 @@ describe("the built-in evaluator catalogue", () => {
   describe("given an evaluator with no settings", () => {
     /** @scenario "An evaluator that takes no settings still answers a schema" */
     it("describes an object with no settings", () => {
-      const schema = evaluatorSettingsJsonSchema("azure/jailbreak") as CatalogueEntry["settings_json_schema"];
+      const schema = evaluatorSettingsJsonSchema(
+        "azure/jailbreak",
+      ) as CatalogueEntry["settings_json_schema"];
 
       expect(schema.type).toBe("object");
       expect(schema.properties).toBeUndefined();

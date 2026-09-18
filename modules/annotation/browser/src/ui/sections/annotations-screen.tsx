@@ -1,11 +1,14 @@
 /** Renders the selected annotation list view. */
 
-import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Box, Flex, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useMemo } from "react";
-import { annotationApi } from "../../behavior/annotation-api.ts";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { downloadCsv } from "@langwatch/csv/download";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { Inbox } from "lucide-react";
+import { useMemo } from "react";
+
+import { annotationApi } from "../../behavior/annotation-api.ts";
 import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
 import { allAnnotationsExport, csvFileName } from "../../model/annotation-export.ts";
 import { useAnnotationHost } from "../../model/annotation-host.ts";
@@ -21,13 +24,11 @@ import {
   type AnnotationTrace,
 } from "../../model/annotation-row.ts";
 import type { AnnotationView } from "../../model/annotation-view.ts";
+import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
+import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 import { AnnotationList, type PageQueue } from "./annotation-list.tsx";
 import { AnnotationQueueEditor } from "./annotation-queue-editor.tsx";
 import { AnnotationSidebar } from "./annotation-sidebar.tsx";
-import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
-import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { Inbox } from "lucide-react";
 
 export function AnnotationsScreen({ view }: { view: AnnotationView }) {
   const host = useAnnotationHost();

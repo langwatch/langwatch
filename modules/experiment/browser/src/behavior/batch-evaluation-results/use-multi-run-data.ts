@@ -1,9 +1,9 @@
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 /**
  * useMultiRunData - Hook for fetching multiple run data in compare mode
  */
 import { useMemo } from "react";
-import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 
 // Run colors for comparison mode - distinct, accessible colors
 export const RUN_COLORS = [

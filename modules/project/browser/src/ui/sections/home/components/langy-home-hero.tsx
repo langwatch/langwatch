@@ -1,13 +1,18 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { selectLangySuggestions,useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
 import { AskChip } from "@langwatch/design-system/ask-chip";
+import {
+  selectLangySuggestions,
+  useLangyStore,
+} from "@langwatch/langy-browser/surfaces/langy-store";
+
+import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { useHomeDevState } from "./dev/home-dev-state.ts";
-import { HeroAskField } from "./hero-ask-field.tsx";
+
 import "./homeHeroScroll.css";
+import { HeroAskField } from "./hero-ask-field.tsx";
 import { OnboardAgentPill } from "./onboard-agent-pill.tsx";
 import { useProjectReach } from "./use-project-reach.ts";
 import { WelcomeHeader } from "./welcome-header.tsx";
-import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**
  * Langy home hero: greeting, command palette field, and suggested asks.

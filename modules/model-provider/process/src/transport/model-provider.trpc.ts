@@ -20,11 +20,7 @@ const PROVIDER_WRITE_PERMISSIONS = [
 ] as const;
 
 /** Which permissions the application enforces on a default-models write. */
-const DEFAULT_WRITE_PERMISSIONS = [
-  "organization:manage",
-  "team:manage",
-  "project:manage",
-] as const;
+const DEFAULT_WRITE_PERMISSIONS = ["organization:manage", "team:manage", "project:manage"] as const;
 
 const TENANT_IS_DATA =
   "the tenant anchor is data: a project when one is named, otherwise the organization the provider belongs to, and the application's per-scope assertCanWrite is what checks it";
@@ -221,9 +217,7 @@ export const modelProviderTrpcTransport = defineTrpcRouter(ModelProviderApi, mod
 
   .procedure("getDefaultModelsForProject")
   .withPermission("project:view")
-  .handle(({ app, input, actor }) =>
-    app.getDefaultSnapshot({ projectId: input.projectId }, actor),
-  )
+  .handle(({ app, input, actor }) => app.getDefaultSnapshot({ projectId: input.projectId }, actor))
 
   .procedure("setRoleAssignmentForScope")
   .serviceAuthorized({ reason: DEFAULT_SCOPE_IS_DATA, permissions: DEFAULT_WRITE_PERMISSIONS })

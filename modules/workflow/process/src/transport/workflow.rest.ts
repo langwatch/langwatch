@@ -119,9 +119,7 @@ async function archiveWorkflow(params: {
   app: WorkflowApi;
   id: string;
   projectId: string;
-}): Promise<
-  Readonly<{ status: 200; body: { id: string; archived: boolean } }> | typeof NOT_FOUND
-> {
+}): Promise<Readonly<{ status: 200; body: { id: string; archived: boolean } }> | typeof NOT_FOUND> {
   try {
     await params.app.archive({ id: params.id, projectId: params.projectId });
 

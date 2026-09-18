@@ -1,12 +1,13 @@
 import { Badge, Box, Button, Flex, Text } from "@chakra-ui/react";
 import { ChevronDown, Shuffle } from "lucide-react";
 import { useState } from "react";
+
 import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
 import { usePresetStore } from "../../behavior/preset.store.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
+import { useFoundryPrompts } from "../../behavior/use-foundry-prompts.ts";
 import type { SpanConfig, TraceConfig } from "../../model/foundry-types.ts";
 import { shortId } from "../../model/foundry-types.ts";
-import { useFoundryPrompts } from "../../behavior/use-foundry-prompts.ts";
 
 function countSpans(spans: SpanConfig[]): number {
   return spans.reduce((acc, s) => acc + 1 + countSpans(s.children), 0);

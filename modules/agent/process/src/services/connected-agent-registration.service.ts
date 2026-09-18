@@ -18,12 +18,13 @@ import {
   scopeColumns,
 } from "@langwatch/agent-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+
 import { nextAgentId } from "../rules/agent-id.rules.ts";
 import type { AgentService } from "./agent.service.ts";
-import { createLogger } from "@langwatch/observability";
+import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
 import { ConnectedAgentParameterSpecService } from "./connected-agent-parameter-spec.service.ts";
 import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
-import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
 import type { SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:registration");

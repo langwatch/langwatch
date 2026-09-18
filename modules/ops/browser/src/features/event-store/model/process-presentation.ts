@@ -1,5 +1,6 @@
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
+
 import { formatTimeAgo } from "../../../model/ops-formatters.ts";
 
 /** Anything the summary counted as wrong — decides row tinting. */

@@ -1,10 +1,15 @@
-import { type StateProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
+import {
+  type StateProjectionStore,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import {
   TOPIC_CLUSTERING_PROJECTION_VERSIONS,
   TOPIC_MODEL_RECORD_MODE,
   TOPIC_MODEL_RECORD_SOURCE,
   type TopicModelEntry,
 } from "@langwatch/topic-contract";
+
 import type { TopicClusteringTopicsRecordedEvent } from "../services/topic-events.service.ts";
 import { TopicClusteringTopicsRecordedEventSchema } from "../services/topic-events.service.ts";
 

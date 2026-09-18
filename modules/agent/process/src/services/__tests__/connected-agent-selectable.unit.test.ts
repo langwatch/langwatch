@@ -1,6 +1,7 @@
 /** @see specs/agents/connected-agents.feature */
 import type { ConnectedAgentOwner } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   ConnectedAgentPresenceService,
   type AgentPresence,

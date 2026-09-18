@@ -4,11 +4,12 @@
  * drop. See specs/analytics/negate-filters-and-trace-scope.feature.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { AnalyticsTimeseriesQuery } from "../../analytics.repository.ts";
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
-import type { AnalyticsTimeseriesQuery } from "../../analytics.repository.ts";
 
 vi.mock("../clickhouse.aggregation-builder.mapper.ts", () => ({
   buildTimeseriesQuery: vi.fn().mockReturnValue({ sql: "SELECT 1", params: {} }),

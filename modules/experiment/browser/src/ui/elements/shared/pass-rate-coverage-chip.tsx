@@ -1,5 +1,6 @@
 import { HStack, Icon, Text } from "@chakra-ui/react";
 import { LuTriangleAlert } from "react-icons/lu";
+
 import { passRateCoverage } from "../../../model/shared/pass-rate-coverage.ts";
 
 /**

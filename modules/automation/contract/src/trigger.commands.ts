@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { alertTypeSchema, triggerActionSchema, triggerKindSchema } from "./trigger.ts";
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());

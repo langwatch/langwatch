@@ -1,7 +1,8 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable, Position } from "monaco-editor";
-import { PYTHON_BUILTIN_BY_NAME } from "./python-stdlib.ts";
+
 import { ATTR_ACCESS, type ContractRef, scanImports } from "./python-provider.shared.ts";
+import { PYTHON_BUILTIN_BY_NAME } from "./python-stdlib.ts";
 
 function hoverContents(
   title: string,

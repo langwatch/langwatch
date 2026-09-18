@@ -1,11 +1,12 @@
 import { z } from "zod";
+
+import type { AgentCallSignal } from "./connected-agent.connection.ts";
 import {
   callRunSchema,
   messageSchema,
   outputSchema,
   paramsSchema,
 } from "./connected-agent.protocol.ts";
-import type { AgentCallSignal } from "./connected-agent.connection.ts";
 
 export const relayCallBodySchema = z.object({
   messages: z.array(messageSchema).describe("The whole conversation so far, OpenAI style."),

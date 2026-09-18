@@ -5,7 +5,8 @@
  */
 import type { UnlinkUserAccountOutcome, UserLinkedAccount } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { UserPasswordHasher } from "../../app/user.app.ts";
+
+import type { UserPasswordHasher } from "../../app/user.members.ts";
 import type {
   UserCredentialAccount,
   UserCredentialRepository,

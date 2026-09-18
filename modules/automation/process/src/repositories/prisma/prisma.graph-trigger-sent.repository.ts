@@ -1,10 +1,11 @@
+import { parseSeriesIndex } from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
+
 import {
   GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
 } from "../graph-trigger-sent.repository.ts";
-import { parseSeriesIndex } from "@langwatch/automation-contract";
-import { toDate, type Instant } from "@langwatch/time";
 
 /** Prisma-backed graph-alert incident ledger, private to Automation server. */
 /**

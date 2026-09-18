@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   __testOnly__,
   buildDataForFilterQuery,

@@ -1,8 +1,10 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ResolvedRetention } from "@langwatch/data-retention-contract";
 import { TeamNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { ResolvedRetention } from "@langwatch/data-retention-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
+
 import {
   createDataRetentionTestOrganizations,
   createDataRetentionTestProjects,
@@ -10,10 +12,9 @@ import {
 } from "../../app/__tests__/data-retention.fixture.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
+import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
 import { DataRetentionCacheStore } from "../../stores/data-retention-cache.store.ts";
 import { DataRetentionService } from "../data-retention.service.ts";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
 import { StorageMeterService } from "../storage-meter.service.ts";
 
 /** These cases never meter: a read reaching ClickHouse is the test failing. */

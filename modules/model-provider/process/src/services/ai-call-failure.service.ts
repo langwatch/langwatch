@@ -1,11 +1,10 @@
 import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
-
 import {
   ModelNotConfiguredError,
   ModelProviderDisabledError,
   type ModelRole,
 } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:modelProviders:aiCall");
 

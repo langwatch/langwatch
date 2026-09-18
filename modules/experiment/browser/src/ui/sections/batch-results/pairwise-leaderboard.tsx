@@ -1,13 +1,14 @@
 import { Box, HStack, Icon, Table, Text, VStack } from "@chakra-ui/react";
 import { LuArrowDown, LuArrowUp, LuArrowUpDown, LuTriangleAlert } from "react-icons/lu";
-import { type BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
-import { winMatrixHasPairwiseDetail } from "../../../model/batch-evaluation-results.win-matrix.ts";
+
 import {
   type RankedEntry,
   type SortDir,
   type SortKey,
   usePairwiseSort,
 } from "../../../behavior/use-pairwise-sort.ts";
+import { type BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
+import { winMatrixHasPairwiseDetail } from "../../../model/batch-evaluation-results.win-matrix.ts";
 
 /**
  * Bradley-Terry leaderboard panel for the Comparison evaluator (#5103). Purely

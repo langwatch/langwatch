@@ -3,6 +3,7 @@
  * and the runs they start. Addressed only under `/api/v1`, like run plans.
  */
 import { randomUUID } from "node:crypto";
+
 import {
   badRequestSchema,
   defineRestRouter,
@@ -222,9 +223,9 @@ export function createTestSuitesRest(): Readonly<{
     })
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, input, scope }, project) =>
-      (await app.listTestSuites({ projectId: scope.id, includeArchived: input.includeArchived })).map(
-        (suite) => suiteWire({ app, projectSlug: project.projectSlug, suite }),
-      ),
+      (
+        await app.listTestSuites({ projectId: scope.id, includeArchived: input.includeArchived })
+      ).map((suite) => suiteWire({ app, projectSlug: project.projectSlug, suite })),
     )
 
     .post("/", "createTestSuite")
@@ -303,9 +304,7 @@ export function createTestSuitesRest(): Readonly<{
         "Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live.",
       responses: notFound,
     })
-    .handle(({ app, input, scope }) =>
-      archiveTestSuite({ app, id: input.id, projectId: scope.id }),
-    )
+    .handle(({ app, input, scope }) => archiveTestSuite({ app, id: input.id, projectId: scope.id }))
 
     .post("/:id/run", "runTestSuite")
     .withParams(testSuiteIdParamsSchema)

@@ -4,10 +4,11 @@
  * the presentation registry. Spec: specs/identity/sso-onboarding-tiers.feature
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
+
 import { OpsOperations } from "../../app/ops-operations.ts";
 import { AuditStub, AuthStub, organizationEdit } from "./support/backoffice-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";

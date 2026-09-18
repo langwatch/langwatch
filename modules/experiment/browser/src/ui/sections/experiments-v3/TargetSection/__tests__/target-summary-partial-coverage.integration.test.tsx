@@ -3,12 +3,12 @@
  * A stopped run's column can have results for only part of the dataset.
  */
 import "@testing-library/jest-dom/vitest";
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { TargetAggregate } from "@langwatch/experiment-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TargetAggregate } from "@langwatch/experiment-contract";
+
 import { TargetSummary } from "../target-summary.tsx";
 
 vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({

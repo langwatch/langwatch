@@ -8,10 +8,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { Select } from "@langwatch/design-system/select";
 import { FIELD_NAMES, FIELD_VALUES, SEARCH_FIELDS } from "@langwatch/trace-contract";
+import { Plus, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import {
   type Condition,
   type ConditionOperator,

@@ -1,5 +1,4 @@
 import "@testing-library/jest-dom/vitest";
-
 /**
  * Tests for BatchTargetCell component
  *
@@ -11,8 +10,11 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type {
+  BatchEvaluatorResult,
+  BatchTargetOutput,
+} from "../../batch-evaluation-results.types.ts";
 import { BatchTargetCell } from "../batch-target-cell.tsx";
-import type { BatchEvaluatorResult, BatchTargetOutput } from "../../batch-evaluation-results.types.ts";
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: ReactNode }) => (

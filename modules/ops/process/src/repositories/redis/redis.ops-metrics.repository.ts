@@ -1,5 +1,3 @@
-import type IORedis from "ioredis";
-import type { Cluster } from "ioredis";
 import {
   LATENCY_HOUR_BUCKET_MS,
   LATENCY_MINUTE_BUCKET_MS,
@@ -7,6 +5,9 @@ import {
   latencyHourBucketKey,
   latencyMinuteBucketKey,
 } from "@langwatch/ops-contract";
+import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
+
 import {
   OpsMetricsRepository,
   type OpsLatencyHistograms,

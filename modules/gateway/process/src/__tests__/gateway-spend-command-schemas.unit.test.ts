@@ -4,13 +4,13 @@
  * into a parse failure, so defaults are the compatibility contract.
  */
 
-import { describe, expect, it } from "vitest";
 import {
   admitSpendCommandDataSchema,
   admitSpendWireSchema,
   confirmSpendWireSchema,
   failSpendWireSchema,
 } from "@langwatch/gateway-process";
+import { describe, expect, it } from "vitest";
 
 /** Exactly what the Go emitter sends, mapped through the ingest route. */
 const wireAdmission = {

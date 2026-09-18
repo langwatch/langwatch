@@ -4,10 +4,11 @@ import {
   definePipeline,
   type FoldProjectionStore,
 } from "@langwatch/eventing";
-import type { SuiteRunStateData,SuiteRunProcessingEvent } from "@langwatch/suite-contract";
-import { SuiteRunCommandsAdapter } from "./suite-run-commands.service.ts";
-import { SuiteRunStateFoldProjection } from "../eventing/suite-run-state.projection.ts";
+import type { SuiteRunStateData, SuiteRunProcessingEvent } from "@langwatch/suite-contract";
 import { SUITE_RUN_PROCESSING_EVENT_TYPES } from "@langwatch/suite-contract";
+
+import { SuiteRunStateFoldProjection } from "../eventing/suite-run-state.projection.ts";
+import { SuiteRunCommandsAdapter } from "./suite-run-commands.service.ts";
 
 export interface SuiteRunProcessingPipelineDeps {
   suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData>;
@@ -39,45 +40,42 @@ function jobId<TPayload>(
 const buildSuiteRunProcessingPipeline = (deps: SuiteRunProcessingPipelineDeps) => {
   const commands = SuiteRunCommandsAdapter.create();
 
-    return (
-      definePipeline<SuiteRunProcessingEvent>({
-        name: "suite_run_processing",
-        aggregate: defineAggregate({
-          type: "suite_run",
-          events: defineEvents(SUITE_RUN_PROCESSING_EVENT_TYPES),
+  return (
+    definePipeline<SuiteRunProcessingEvent>({
+      name: "suite_run_processing",
+      aggregate: defineAggregate({
+        type: "suite_run",
+        events: defineEvents(SUITE_RUN_PROCESSING_EVENT_TYPES),
+      }),
+    })
+      .withClickHouseFoldProjection(
+        SuiteRunStateFoldProjection.create({
+          store: deps.suiteRunStateFoldStore,
         }),
+      )
+      // These three fold by addition (Started/Completed/FailedCount + 1),
+      // deduped by `event.id` — `withCommand` only reads dedup from
+      // `makeJobId` in these options; omit it and a redelivery double-counts,
+      // flipping status to SUCCESS/FAILURE before the run has finished.
+      .withCommand("startSuiteRun", commands.startSuiteRun, {
+        deduplication: {
+          makeId: jobId("startSuiteRun", commands.startSuiteRun.makeJobId),
+          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+        },
       })
-        .withClickHouseFoldProjection(
-          SuiteRunStateFoldProjection.create({
-            store: deps.suiteRunStateFoldStore,
-          }),
-        )
-        // These three fold by addition (Started/Completed/FailedCount + 1),
-        // deduped by `event.id` — `withCommand` only reads dedup from
-        // `makeJobId` in these options; omit it and a redelivery double-counts,
-        // flipping status to SUCCESS/FAILURE before the run has finished.
-        .withCommand("startSuiteRun", commands.startSuiteRun, {
-          deduplication: {
-            makeId: jobId("startSuiteRun", commands.startSuiteRun.makeJobId),
-            ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-          },
-        })
-        .withCommand("recordSuiteRunItemStarted", commands.recordSuiteRunItemStarted, {
-          deduplication: {
-            makeId: jobId(
-              "recordSuiteRunItemStarted",
-              commands.recordSuiteRunItemStarted.makeJobId,
-            ),
-            ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-          },
-        })
-        .withCommand("completeSuiteRunItem", commands.completeSuiteRunItem, {
-          deduplication: {
-            makeId: jobId("completeSuiteRunItem", commands.completeSuiteRunItem.makeJobId),
-            ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-          },
-        })
-        .build()
+      .withCommand("recordSuiteRunItemStarted", commands.recordSuiteRunItemStarted, {
+        deduplication: {
+          makeId: jobId("recordSuiteRunItemStarted", commands.recordSuiteRunItemStarted.makeJobId),
+          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+        },
+      })
+      .withCommand("completeSuiteRunItem", commands.completeSuiteRunItem, {
+        deduplication: {
+          makeId: jobId("completeSuiteRunItem", commands.completeSuiteRunItem.makeJobId),
+          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+        },
+      })
+      .build()
   );
 };
 

@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 function hasChartsDirectory(directory: string): boolean {

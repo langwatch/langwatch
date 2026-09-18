@@ -1,20 +1,14 @@
 import { Box, Button, HStack, Kbd, Spinner, Text } from "@chakra-ui/react";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { z } from "zod";
-
 import {
   isLangWatchQLSurfaceParameter,
   type LangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
 } from "@langwatch/analytics-contract";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 
-import { type LangWatchQLParameterValue,
-  isLangWatchQLResultStale,
-  type LangWatchQLActionLabel,
-  type LangWatchQLRequestState,
-  type LangWatchQLTimeWindowValues } from "../../model/lwql-request-state.ts";
 import {
   type LangWatchQLEditorMarker,
   LWQL_PARAMETER_MISSING_CODE,
@@ -22,19 +16,26 @@ import {
   lwqlEditorMarkers,
   readLangWatchQLFailure,
 } from "../../model/lwql-failure.ts";
-import type { LangWatchQLSchemaModel } from "../../model/lwql-schema-model.ts";
 import {
-  LangWatchQLParametersEditor,
-  type LangWatchQLParametersChange,
-} from "../elements/langwatch-ql-parameters-editor.tsx";
-import { LangWatchQLEditor } from "./langwatch-ql-editor.tsx";
-import { LangWatchQLGranularityPicker } from "../elements/langwatch-ql-granularity-picker.tsx";
+  type LangWatchQLParameterValue,
+  isLangWatchQLResultStale,
+  type LangWatchQLActionLabel,
+  type LangWatchQLRequestState,
+  type LangWatchQLTimeWindowValues,
+} from "../../model/lwql-request-state.ts";
+import type { LangWatchQLSchemaModel } from "../../model/lwql-schema-model.ts";
 import {
   LangWatchQLResultPane,
   type LangWatchQLResultView,
 } from "../blocks/langwatch-ql-result-pane.tsx";
+import { LangWatchQLGranularityPicker } from "../elements/langwatch-ql-granularity-picker.tsx";
+import {
+  LangWatchQLParametersEditor,
+  type LangWatchQLParametersChange,
+} from "../elements/langwatch-ql-parameters-editor.tsx";
 import { LangWatchQLSchemaBrowser } from "../elements/langwatch-ql-schema-browser.tsx";
 import { LangWatchQLTimeWindowEditor } from "../elements/langwatch-ql-time-window-editor.tsx";
+import { LangWatchQLEditor } from "./langwatch-ql-editor.tsx";
 
 export interface LangWatchQLWorkbenchQuery {
   readonly state: LangWatchQLRequestState;

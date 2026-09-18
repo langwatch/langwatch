@@ -6,6 +6,7 @@
 
 import type { AvatarRootProps } from "@langwatch/design-system/avatar";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
+
 import { UserAvatar } from "./user-avatar.tsx";
 
 /**

@@ -3,11 +3,11 @@
  * `ModelProviderListEntry` wire shape. Not exported — a test imports it relatively.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
+import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
 import { screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { vi } from "vitest";
-import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
-import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
 
 export const SELF_HOSTED_URL = "https://llm.internal.acme.example/v1";
 

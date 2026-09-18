@@ -4,6 +4,7 @@
  */
 
 import type React from "react";
+
 import ProductScreen from "../../../ui/sections/product-screen.tsx";
 
 const OnboardingProduct: React.FC = () => <ProductScreen />;

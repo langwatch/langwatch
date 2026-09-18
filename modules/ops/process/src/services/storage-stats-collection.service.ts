@@ -4,9 +4,9 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { toEpochMs } from "@langwatch/time";
 
 import type { StorageStatsMetrics } from "../app/ops.app.ts";
-import { toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:ops:storage-stats");
 

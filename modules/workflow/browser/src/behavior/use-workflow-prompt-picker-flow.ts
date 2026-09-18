@@ -1,10 +1,9 @@
-import { useCallback, useRef } from "react";
-
+import { nowInstant } from "@langwatch/time";
 import type { Component, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
 import { fieldSchema } from "@langwatch/workflow-contract";
+import { useCallback, useRef } from "react";
 
 import { useWorkflowStore } from "./use-workflow-store.ts";
-import { nowInstant } from "@langwatch/time";
 
 export type PromptSelection = {
   id: string;

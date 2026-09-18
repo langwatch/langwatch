@@ -1,12 +1,11 @@
 import { Accordion, Box, Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
-import { LuChevronDown } from "react-icons/lu";
-
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { parseSkipListInput, skipListToInput } from "@langwatch/model-provider-contract";
-
-import { SmallLabel } from "../elements/small-label.tsx";
 import { toEpochMs, type TimeInput } from "@langwatch/time";
+import { LuChevronDown } from "react-icons/lu";
+
 import { readableDate } from "../../model/display-formatters.ts";
+import { SmallLabel } from "../elements/small-label.tsx";
 
 /**
  * The accordion item the Advanced section renders into. Exported so the parent

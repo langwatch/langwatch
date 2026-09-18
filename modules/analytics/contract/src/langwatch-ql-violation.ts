@@ -79,4 +79,3 @@ export interface LangWatchQLViolation {
   /** Where in the submitted SQL, when the parser reported a position. */
   readonly at?: SqlSourcePosition;
 }
-

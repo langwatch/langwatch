@@ -4,6 +4,7 @@
  * addressed only under `/api/v1`.
  */
 import { randomUUID } from "node:crypto";
+
 import {
   badRequestSchema,
   defineRestRouter,
@@ -79,11 +80,7 @@ function planWire(params: {
  * is refused: the two families address disjoint sets of rows, so an id from
  * one is simply not a member of the other.
  */
-async function readPlan(params: {
-  app: SuiteApi;
-  id: string;
-  projectId: string;
-}): Promise<Suite> {
+async function readPlan(params: { app: SuiteApi; id: string; projectId: string }): Promise<Suite> {
   const found = await params.app.getByIdOrTestSuite({ id: params.id, projectId: params.projectId });
   if (found.kind !== "suite" || found.suite.kind !== "run_plan") {
     throw new SuiteNotFoundError("Run plan not found");
@@ -279,8 +276,6 @@ export function createRunPlansRest(): Readonly<{
         "Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are.",
       responses: notFound,
     })
-    .handle(({ app, input, scope }) =>
-      archivePlan({ app, id: input.id, projectId: scope.id }),
-    )
+    .handle(({ app, input, scope }) => archivePlan({ app, id: input.id, projectId: scope.id }))
     .build();
 }

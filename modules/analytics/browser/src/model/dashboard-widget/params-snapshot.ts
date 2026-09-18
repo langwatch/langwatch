@@ -1,5 +1,4 @@
 import type { DashboardWidgetQuery } from "../dashboard-widget-definition.ts";
-
 import type { ChartFrameParamsSnapshot } from "./bridge-protocol";
 
 /**

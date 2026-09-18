@@ -1,9 +1,11 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { parseProcessConfig } from "@langwatch/config";
 import {
   FEATURE_FLAG_REGISTRY,
-  resolveFeatureFlagConfig,
+  featureFlagConfig,
   type FeatureFlagConfig,
   type FeatureFlagRegistry,
+  type FeatureFlagServerConfig,
 } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -19,10 +21,31 @@ import { CachedFeatureFlagRowAdapter } from "../../services/cached-feature-flag-
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../../services/organization-created-at-cache.service.ts";
 import {
+  assembleFeatureFlagConfig,
   FeatureFlagApp,
   type FeatureFlagCache,
   type FeatureFlagCacheSlot,
 } from "../feature-flag.app.ts";
+
+/**
+ * The parsed slice a raw environment record would produce, through the real
+ * one-parse pipeline — never a second hand-rolled parse.
+ */
+export function resolveTestFeatureFlagServerConfig(
+  source: Readonly<Record<string, string | undefined>> = {},
+): FeatureFlagServerConfig {
+  return parseProcessConfig({
+    owners: [{ name: "feature-flag", config: featureFlagConfig }],
+    environment: source,
+  })["feature-flag"];
+}
+
+/** The assembled `Map`/`Set` pair a raw environment record would produce. */
+export function resolveTestFeatureFlagConfig(
+  source: Readonly<Record<string, string | undefined>> = {},
+): FeatureFlagConfig {
+  return assembleFeatureFlagConfig(resolveTestFeatureFlagServerConfig(source));
+}
 
 /** Shared cache tier held in process, for tests that need no Redis. */
 export class MemoryFeatureFlagCache implements FeatureFlagCache {
@@ -122,7 +145,7 @@ export function createFeatureFlagTestService(options?: {
     repository,
     rows: CachedFeatureFlagRowAdapter.create({ repository, cache, now }),
     experiments,
-    config: options?.config ?? resolveFeatureFlagConfig({}),
+    config: options?.config ?? resolveTestFeatureFlagConfig(),
     registry: options?.registry ?? FEATURE_FLAG_REGISTRY,
     organizationAges: OrganizationCreatedAtCacheService.create({
       organizations: organizations.api(),
@@ -136,7 +159,7 @@ export function createFeatureFlagTestService(options?: {
 export function createFeatureFlagTestApp(
   input: Readonly<{
     repositories?: FeatureFlagRepositories;
-    config?: FeatureFlagConfig;
+    config?: FeatureFlagServerConfig;
     dependencies?: Partial<{
       permissions: AuthzApi;
       projects: ProjectApi;
@@ -151,7 +174,7 @@ export function createFeatureFlagTestApp(
       projects: input.dependencies?.projects ?? createFeatureFlagTestProjects(),
       organizations: input.dependencies?.organizations ?? TestOrganizations.create().api(),
     },
-    config: input.config ?? resolveFeatureFlagConfig({}),
+    config: input.config ?? resolveTestFeatureFlagServerConfig(),
     resources: new ResourceScope(),
     members: {},
   });

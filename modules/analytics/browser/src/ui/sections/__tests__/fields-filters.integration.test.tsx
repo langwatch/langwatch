@@ -47,8 +47,8 @@ vi.mock("../../../behavior/use-filter-params.ts", () => ({
   }),
 }));
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import type { FilterField } from "../../../model/analytics-filter-definition.ts";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { FieldsFilters } from "../fields-filters.tsx";
 
 const mockFilterOptions = [

@@ -1,12 +1,13 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
-import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
+
 import {
   MonitorPerformanceRepository,
   type MonitorPerformanceBucket,
   type MonitorPerformanceBucketQuery,
 } from "../monitor-performance.repository.ts";
+import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 
 /** A moment as a ClickHouse statement carries it. The client serialises this into
  *  `DateTime64(3)`; an instant serialises to `{}`, so the conversion is here. */

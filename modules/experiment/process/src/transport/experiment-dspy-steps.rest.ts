@@ -4,16 +4,20 @@
  * optimizer parses `{ message }`/`{ error }`, not a reshaping schema.
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import { dSPyStepRESTParamsSchema, ExperimentApi } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 
-import { LOG_DSPY_STEPS } from "../rules/experiment-openapi.rules.ts";
 import { dspyStepOf } from "../rules/experiment-dspy-step.rules.ts";
+import { LOG_DSPY_STEPS } from "../rules/experiment-openapi.rules.ts";
 
 /**
  * Experiments carry their own permission, decoupled from workflows. The check

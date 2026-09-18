@@ -1,3 +1,4 @@
+import { ValidationError } from "@langwatch/handled-error";
 /**
  * The cost-rule drawer's live preview, and the span detail's "you have no rate
  * for this model" hint.
@@ -11,9 +12,9 @@ import {
   type ModelCost,
   type ModelCostRate,
 } from "@langwatch/model-provider-contract";
-import { ValidationError } from "@langwatch/handled-error";
-import type { ModelCostRegexSafetyService } from "./model-cost-regex-safety.service.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { ModelCostRegexSafetyService } from "./model-cost-regex-safety.service.ts";
 
 /**
  * How far back the preview looks for spans. Wide enough to catch models that

@@ -1,6 +1,9 @@
-import { ProjectVisibilityTooWideError,
+import {
+  ProjectVisibilityTooWideError,
   apiKeyVisibleProjectsInputSchema,
-  type ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
+  type ApiKeyVisibleProjects,
+} from "@langwatch/api-key-contract";
+
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 

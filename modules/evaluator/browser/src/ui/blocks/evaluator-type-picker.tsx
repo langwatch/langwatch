@@ -5,6 +5,7 @@ import {
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import { LuExternalLink } from "react-icons/lu";
+
 import type { EvaluatorCategoryId } from "./evaluator-category-picker.tsx";
 
 type EvaluatorPickerCategory = EvaluatorCategoryId | "ignored";

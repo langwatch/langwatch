@@ -6,18 +6,19 @@
  * @see modules/coding-agent/specs/session-git-context.feature
  */
 
-import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
-import {
-  CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
-  type LogProcessingEvent,
-} from "@langwatch/log-contract";
 import type { ContributeLogFactsCommandData } from "@langwatch/coding-agent-contract";
 import {
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
+import { createTenantId } from "@langwatch/eventing";
+import {
+  CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
+  type LogProcessingEvent,
+} from "@langwatch/log-contract";
+import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
+import { describe, expect, it } from "vitest";
+
 import { createCodingAgentLogFactsDispatchSubscriber } from "../coding-agent-log-facts-dispatch.subscriber.ts";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";

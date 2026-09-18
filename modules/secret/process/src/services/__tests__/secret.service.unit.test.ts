@@ -6,6 +6,7 @@ import {
   SecretReservedNameError,
 } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { ReversibleTestSecretEncryption } from "../../app/__tests__/secret.fixture.ts";
 import type {
   CreateStoredSecretInput,

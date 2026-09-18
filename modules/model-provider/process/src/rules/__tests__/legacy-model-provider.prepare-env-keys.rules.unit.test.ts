@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { LegacyModelProviderExecution } from "../legacy-model-provider.rules.ts";
 import { prepareEnvKeys } from "../legacy-model-provider.rules.ts";
 

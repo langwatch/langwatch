@@ -1,11 +1,10 @@
-import { z } from "zod";
 import type {
   AnalyticsFeedbacksResult,
   AnalyticsTimeseriesResult,
   AnalyticsTopDocumentsResult,
 } from "@langwatch/analytics-contract";
-
 import { filterFieldsEnum } from "@langwatch/analytics-contract";
+import { z } from "zod";
 
 /** `T[]` unwrapped to `T`; anything else unchanged. */
 type Unpacked<T> = T extends (infer U)[] ? U : T;

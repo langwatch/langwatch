@@ -4,7 +4,10 @@
  * hook, so the feature file's guards are covered without a component tree.
  */
 
-import type { LangWatchQLQueryResult,LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLQueryResult,
+  LangWatchQLGranularityStep,
+} from "@langwatch/analytics-contract";
 
 import {
   initialLangWatchQLRequestState,

@@ -1,8 +1,9 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
-import { MemoryAuthRepositories } from "../memory.auth.repositories.ts";
-import { MemoryAuthDatabase } from "../memory.auth.database.ts";
+
 import { MemoryAuthSessionRepository } from "../memory.auth-session.repository.ts";
+import { MemoryAuthDatabase } from "../memory.auth.database.ts";
+import { MemoryAuthRepositories } from "../memory.auth.repositories.ts";
 import { MemorySignUpVerificationTokenRepository } from "../memory.signup-verification-token.repository.ts";
 
 const NOW = Temporal.Instant.from("2026-08-28T00:00:00.000Z");
@@ -22,10 +23,7 @@ describe("MemoryAuthSessionRepository", () => {
   describe("given three sessions across two people", () => {
     describe("when one person's sessions are listed", () => {
       it("names only that person's tokens", async () => {
-        await expect(sessions().listTokensForUser({ userId: "u1" })).resolves.toEqual([
-          "t1",
-          "t2",
-        ]);
+        await expect(sessions().listTokensForUser({ userId: "u1" })).resolves.toEqual(["t1", "t2"]);
       });
     });
 

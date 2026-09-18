@@ -1,10 +1,11 @@
+import { DatasetConflictError } from "@langwatch/dataset-contract";
 /**
  * Dataset names are unique per project by slug. The editor asks whether a name is free, and a
  * copy asks for the next name that is — neither may hand back a slug that already belongs to
  * another dataset.
  */
 import { describe, expect, it } from "vitest";
-import { DatasetConflictError } from "@langwatch/dataset-contract";
+
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
 import { DatasetNamingService } from "../dataset-naming.service.ts";
 

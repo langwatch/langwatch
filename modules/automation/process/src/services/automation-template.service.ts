@@ -20,6 +20,7 @@ import {
   type TestFireTemplateDraft,
   type TriggerTemplateDefaults,
 } from "@langwatch/automation-contract";
+
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 
 const SLACK_TEMPLATE_TYPES = ["string", "block_kit"] as const;

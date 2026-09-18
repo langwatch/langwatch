@@ -1,8 +1,10 @@
+import { AnalyticsService } from "@langwatch/analytics-contract";
+import { evaluationCompletedEventSchema } from "@langwatch/evaluation-contract";
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { AnalyticsService } from "@langwatch/analytics-contract";
-import { evaluationCompletedEventSchema } from "@langwatch/evaluation-contract";
+
+import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   EvaluationAnalyticsFoldProjection,
@@ -12,7 +14,6 @@ import {
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
 } from "../eventing/evaluation-analytics-row.projection.ts";
-import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import { EvaluationAnalyticsStore } from "../eventing/evaluation-attributes.store.ts";
 
 /**

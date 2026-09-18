@@ -1,6 +1,8 @@
+import { IconGlyph } from "@langwatch/design-system/icons";
+import type { modelProviders } from "@langwatch/model-provider-contract";
 // biome-ignore lint/style/useImportType: React is needed at runtime for JSX outside jsdom tests
 import React from "react";
-import type { modelProviders } from "@langwatch/model-provider-contract";
+
 import { Anthropic } from "../icons/anthropic.tsx";
 import { AWS } from "../icons/aws.tsx";
 import { Azure } from "../icons/azure.tsx";
@@ -15,7 +17,6 @@ import { Groq } from "../icons/groq.tsx";
 import { OpenAI } from "../icons/open-ai.tsx";
 import { Voyage } from "../icons/voyage.tsx";
 import { Xai } from "../icons/xai.tsx";
-import { IconGlyph } from "@langwatch/design-system/icons";
 
 export const modelProviderIcons: Record<keyof typeof modelProviders, React.ReactNode> = {
   openai: <OpenAI />,

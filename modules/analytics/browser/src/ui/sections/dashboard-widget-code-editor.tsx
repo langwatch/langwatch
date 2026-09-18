@@ -5,13 +5,12 @@
  */
 
 import { Box } from "@chakra-ui/react";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import type { BeforeMount, OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { lazy, Suspense, useEffect, useRef } from "react";
 
-import { useColorMode } from "@langwatch/design-system/color-mode";
 import { RESERVED_PARAMETERS } from "../../model/dashboard-widget-definition.ts";
-
 import { LW_GLOBAL_DTS } from "../../model/dashboard-widget/lw-global-types.ts";
 
 const LW_GLOBAL_DTS_URI = "file:///lw-global.d.ts";
@@ -48,23 +47,16 @@ const configureTypeScriptDefaults: BeforeMount = (monaco) => {
   // and the edit drawer call this) — addExtraLib would otherwise stack
   // duplicate libs under the same content each time a pane mounts.
   const alreadyRegistered =
-    monaco.languages.typescript.typescriptDefaults.getExtraLibs()[
-      LW_GLOBAL_DTS_URI
-    ] !== undefined;
+    monaco.languages.typescript.typescriptDefaults.getExtraLibs()[LW_GLOBAL_DTS_URI] !== undefined;
   if (!alreadyRegistered) {
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      LW_GLOBAL_DTS,
-      LW_GLOBAL_DTS_URI,
-    );
+    monaco.languages.typescript.typescriptDefaults.addExtraLib(LW_GLOBAL_DTS, LW_GLOBAL_DTS_URI);
   }
 };
 
 /** Matches ClickHouse bound-param tokens like `{dashboard_context_period_start:DateTime}`. */
 const BOUND_PARAM_PATTERN = /\{([A-Za-z_][A-Za-z0-9_]*):[A-Za-z0-9_]+\}/g;
 
-const RESERVED_PARAM_NAMES = new Set<string>(
-  RESERVED_PARAMETERS.map((p) => p.name),
-);
+const RESERVED_PARAM_NAMES = new Set<string>(RESERVED_PARAMETERS.map((p) => p.name));
 
 const PARAM_TOKEN_CLASS_RESERVED = "lw-sql-param-reserved";
 const PARAM_TOKEN_CLASS_DECLARED = "lw-sql-param-declared";
@@ -91,9 +83,7 @@ function ensureParamTokenStyles() {
 /** Which of the three token classes a `{name:Type}` param falls into. */
 function classifyParamToken(name: string, declared: Set<string>): string {
   if (RESERVED_PARAM_NAMES.has(name)) return PARAM_TOKEN_CLASS_RESERVED;
-  return declared.has(name)
-    ? PARAM_TOKEN_CLASS_DECLARED
-    : PARAM_TOKEN_CLASS_UNDECLARED;
+  return declared.has(name) ? PARAM_TOKEN_CLASS_DECLARED : PARAM_TOKEN_CLASS_UNDECLARED;
 }
 
 /** Every bound-param token in the model, decorated by its class. */
@@ -143,9 +133,7 @@ export function DashboardWidgetCodeEditor({
 }: DashboardWidgetCodeEditorProps) {
   const { colorMode } = useColorMode();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(
-    null,
-  );
+  const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(null);
 
   const updateDecorations = useRef(() => {
     // placeholder until the real implementation is assigned below
@@ -192,9 +180,7 @@ export function DashboardWidgetCodeEditor({
         onChange={(v: string | undefined) => onChange(v ?? "")}
         onMount={handleMount}
         options={EDITOR_OPTIONS}
-        beforeMount={
-          language === "typescript" ? configureTypeScriptDefaults : undefined
-        }
+        beforeMount={language === "typescript" ? configureTypeScriptDefaults : undefined}
       />
     </Suspense>
   );

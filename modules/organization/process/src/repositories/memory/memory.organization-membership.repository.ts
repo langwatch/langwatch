@@ -12,6 +12,8 @@ import {
   type TeamUserRole,
   type User,
 } from "@langwatch/organization-contract";
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
+
 import type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -31,7 +33,6 @@ import type {
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
 } from "../organization-membership.repository.ts";
-import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import type {
   MemoryOrganizationDatabase,
   MemoryOrganizationRow,
@@ -310,7 +311,10 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       organizationId: params.organizationId,
     });
     if (!caller || caller.disabledAt) return null;
-    const row = this.membershipRow({ userId: params.userId, organizationId: params.organizationId });
+    const row = this.membershipRow({
+      userId: params.userId,
+      organizationId: params.organizationId,
+    });
     if (!row) return null;
     return this.memberWithUser(row);
   }
@@ -378,7 +382,8 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       0,
       this.memory.organizationUsers.length,
       ...this.memory.organizationUsers.filter(
-        (candidate) => !(candidate.organizationId === organizationId && candidate.userId === userId),
+        (candidate) =>
+          !(candidate.organizationId === organizationId && candidate.userId === userId),
       ),
     );
     this.memory.teamUsers.splice(
@@ -737,7 +742,9 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
   }
 
   private findOrganizationBySlug(slug: string) {
-    return [...this.memory.organizations.values()].find((organization) => organization.slug === slug);
+    return [...this.memory.organizations.values()].find(
+      (organization) => organization.slug === slug,
+    );
   }
 
   private activeAdminCount(

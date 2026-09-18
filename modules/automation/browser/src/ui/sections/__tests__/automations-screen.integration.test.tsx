@@ -64,8 +64,8 @@ vi.mock("../../../features/authoring/ui/sections/view-automation-drawer.tsx", ()
   ViewAutomationDrawer: () => <div>the panel</div>,
 }));
 
-import AutomationsPage from "../automations-screen.tsx";
 import { fakeAutomationHost, renderWithAutomationHost } from "../../../testing.tsx";
+import AutomationsPage from "../automations-screen.tsx";
 
 const TRACE_AUTOMATION = {
   id: "tr_1",

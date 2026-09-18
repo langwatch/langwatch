@@ -1,10 +1,10 @@
+import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 /**
  * The workflow module's wire, pinned: every procedure and route, with the
  * permission bound to it. A rename here breaks a browser cache key or a URL.
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { workflowOptimizationTrpc, workflowTrpc } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
@@ -138,7 +138,12 @@ describe("the workflow module's transport declarations", () => {
           "postApiOptimizationByWorkflowIdByVersionId",
           "workflows:manage",
         ],
-        ["POST", "/api/workflows/:workflowId/run", "postApiWorkflowsByWorkflowIdRun", "workflows:manage"],
+        [
+          "POST",
+          "/api/workflows/:workflowId/run",
+          "postApiWorkflowsByWorkflowIdRun",
+          "workflows:manage",
+        ],
         [
           "POST",
           "/api/workflows/:workflowId/:versionId/run",

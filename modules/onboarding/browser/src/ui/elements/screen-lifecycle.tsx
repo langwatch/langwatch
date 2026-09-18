@@ -1,6 +1,6 @@
+import { nowInstant } from "@langwatch/time";
 import { useEffect, useRef } from "react";
 import { useAnalytics } from "react-contextual-analytics";
-import { nowInstant } from "@langwatch/time";
 
 export const ScreenLifecycle: React.FC = () => {
   const { emit } = useAnalytics();

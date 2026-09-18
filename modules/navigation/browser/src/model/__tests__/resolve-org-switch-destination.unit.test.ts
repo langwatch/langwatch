@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { resolveOrgSwitchDestination } from "../resolve-org-switch-destination.ts";
 
 describe("resolveOrgSwitchDestination", () => {

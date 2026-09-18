@@ -4,14 +4,6 @@
  * Every budget row belongs to exactly one organization.
  */
 
-import { createLogger } from "@langwatch/observability";
-import type {
-  GatewayBudget,
-  GatewayBudgetWindow,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
-import { Prisma } from "@langwatch/prisma-client/generated";
-import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository.ts";
 import {
   serializeRowForAudit,
   budgetPeriodFloorMs,
@@ -35,10 +27,20 @@ import {
   identityPatchData,
   type ResourceMetadata,
 } from "@langwatch/gateway-contract";
+import { createLogger } from "@langwatch/observability";
+import type {
+  GatewayBudget,
+  GatewayBudgetWindow,
+  PrismaClient,
+} from "@langwatch/prisma-client/generated";
+import { Prisma } from "@langwatch/prisma-client/generated";
+import type { ProjectIdentity } from "@langwatch/project-contract";
+import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
+
 import type { BudgetBucketBoundary, GatewayBudgetSpend } from "../../app/gateway.members.ts";
-import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository.ts";
-import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository.ts";
-import { type GatewayBudgetScopeReach,
+import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
+import {
+  type GatewayBudgetScopeReach,
   GatewayBudgetRepository,
   type AttributedUserBudgetTemplate,
   type BucketBoundaryRow,
@@ -47,15 +49,16 @@ import { type GatewayBudgetScopeReach,
   type GatewayKeyReachCandidate,
   type GatewayOrganizationBudgetReadInput,
   type GatewayProjectBudgetReadInput,
-  type GatewayVirtualKeyProjectScope } from "../gateway-budget.repository.ts";
-import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository.ts";
+  type GatewayVirtualKeyProjectScope,
+} from "../gateway-budget.repository.ts";
+import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository.ts";
+import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository.ts";
+import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository.ts";
 import {
   type BudgetScopeTargetInfo,
   PrismaGatewayBudgetScopeTargetRepository,
 } from "./prisma.gateway-budget-scope-target.repository.ts";
-import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
-import type { ProjectIdentity } from "@langwatch/project-contract";
-import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
+import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository.ts";
 
 const logger = createLogger("langwatch:gateway:budget-service");
 

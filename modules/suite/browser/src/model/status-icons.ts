@@ -3,9 +3,9 @@
  * server-safe StatusConfig with Lucide icons and animation flags.
  */
 
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { LucideIcon } from "lucide-react";
 import { AlertTriangle, Ban, CheckCircle, Clock, Loader, XCircle } from "lucide-react";
-import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 export interface StatusIconConfig {
   icon: LucideIcon;

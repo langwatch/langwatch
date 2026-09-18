@@ -1,12 +1,12 @@
 import { toDate, type Instant } from "@langwatch/time";
 
-import type { DatasetRow } from "../dataset.repository.ts";
 import type {
   CreateDatasetInput,
   DatasetContentRepository,
   DatasetContentUpdate,
   UpdateDatasetInput,
 } from "../dataset-content.repository.ts";
+import type { DatasetRow } from "../dataset.repository.ts";
 import { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
 /** The defaults a stored dataset row carries when a write did not name them. */
@@ -255,8 +255,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
               : this.#database
                   .records()
                   .filter(
-                    (record) =>
-                      record.projectId === row.projectId && record.datasetId === row.id,
+                    (record) => record.projectId === row.projectId && record.datasetId === row.id,
                   ).length,
         },
       })),
@@ -280,9 +279,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
 }
 
 /** The write fields a stored row takes, with the two time inputs made dates. */
-function normalise(
-  fields: Readonly<Record<string, unknown>>,
-): Partial<DatasetRow> {
+function normalise(fields: Readonly<Record<string, unknown>>): Partial<DatasetRow> {
   const written: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(fields)) {

@@ -1,10 +1,14 @@
+import {
+  MAX_FILTER_VALUES,
+  SPEND_STATUS_FILTERS,
+  spendFiltersSchema,
+} from "@langwatch/gateway-contract";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
 import { ZodError, type z } from "zod";
 
-import { MAX_FILTER_VALUES, SPEND_STATUS_FILTERS, spendFiltersSchema } from "@langwatch/gateway-contract";
 import { GatewaySpendFiltersAdapter, spendFilterQueryShape } from "../index.ts";
 
 const spendFilters = GatewaySpendFiltersAdapter.create();

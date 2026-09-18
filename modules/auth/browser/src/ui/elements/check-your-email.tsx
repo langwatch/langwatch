@@ -1,4 +1,5 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
+
 import { AuthCard } from "./auth-card.tsx";
 
 /** Verification link confirmation screen; includes back option for wrong address. */

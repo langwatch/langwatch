@@ -3,6 +3,7 @@
  * storage.
  */
 import type { Readable } from "node:stream";
+
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -12,13 +13,15 @@ import {
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
+
 import { S3UriRules } from "#rules/s3-uri.rules";
 const { parseS3Uri } = S3UriRules;
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+
 import type {
   StoredObjectS3Target,
   StoredObjectS3TargetResolver,
 } from "../../app/stored-object.members.ts";
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 
 /**
  * The process's shared AWS transport policy, as this driver asks for it.

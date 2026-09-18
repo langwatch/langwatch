@@ -1,7 +1,13 @@
 import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
 import type { Instant } from "@langwatch/time";
-import type { NormalizedSpan, OtlpInstrumentationScope, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-export interface CodingAgentInfrastructure {  codingAgentBillingPolicy: CodingAgentBillingPolicy;
+import type {
+  NormalizedSpan,
+  OtlpInstrumentationScope,
+  OtlpResource,
+  OtlpSpan,
+} from "@langwatch/trace-contract";
+export interface CodingAgentInfrastructure {
+  codingAgentBillingPolicy: CodingAgentBillingPolicy;
   codingAgentCallerScopeDirectory: CodingAgentCallerScopeDirectory;
   codingAgentClock: CodingAgentClock;
   codingAgentCostEstimator: CodingAgentCostEstimator;
@@ -19,10 +25,7 @@ export interface CodingAgentInfrastructure {  codingAgentBillingPolicy: CodingAg
  * view or individual callbacks.
  */
 export interface CodingAgentBillingPolicy {
-  isSourceNonBillable(input: {
-    organizationId: string;
-    sourceType: string;
-  }): Promise<boolean>;
+  isSourceNonBillable(input: { organizationId: string; sourceType: string }): Promise<boolean>;
 }
 
 /** One project of an organization, as the scope rule reads it. */
@@ -93,7 +96,6 @@ export type CodingAgentCostMetric = {
   valueUsd: number;
 };
 
-
 export interface CodingAgentCostMetrics {
   recordComputed(input: CodingAgentCostMetric): void;
   recordReported(input: CodingAgentCostMetric): void;
@@ -134,7 +136,6 @@ export interface CodingAgentReadMetrics {
     durationMs: number;
   }): void;
 }
-
 
 export interface CodingAgentTraceProcessor {
   normalizeSpan(input: {

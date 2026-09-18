@@ -35,15 +35,11 @@ export class ApiKeyAdminRequiredError extends HandledError {
   declare readonly code: "api_key_admin_required";
 
   constructor(action: ApiKeyAdminRequiredAction) {
-    super(
-      "api_key_admin_required",
-      ADMIN_REQUIRED_MESSAGES[action],
-      {
-        meta: { action },
-        httpStatus: 403,
-        fault: "customer",
-      },
-    );
+    super("api_key_admin_required", ADMIN_REQUIRED_MESSAGES[action], {
+      meta: { action },
+      httpStatus: 403,
+      fault: "customer",
+    });
     this.name = "ApiKeyAdminRequiredError";
   }
 }

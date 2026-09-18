@@ -1,12 +1,13 @@
+import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
 /**
  * The role tRPC wire, pinned: every procedure name and the access each declares.
  * A rename is a cache-key change in every browser, and a widened decision is a
  * privilege-escalation surface.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
 import { roleBindingTrpc, roleTrpc } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";
+
 import { roleBindingTrpcTransport } from "../role-binding.trpc.ts";
 import { roleTrpcTransport } from "../role.trpc.ts";
 
@@ -50,7 +51,15 @@ describe("given the role transport declared by the feature", () => {
       const claims = claimsOf(roleTrpcTransport);
 
       expect(Object.keys(claims).toSorted()).toEqual(
-        ["assignToUser", "create", "delete", "getAll", "getById", "removeFromUser", "update"].toSorted(),
+        [
+          "assignToUser",
+          "create",
+          "delete",
+          "getAll",
+          "getById",
+          "removeFromUser",
+          "update",
+        ].toSorted(),
       );
       expect(Object.keys(claims).toSorted()).toEqual(Object.keys(roleTrpc.members).toSorted());
 
@@ -62,7 +71,9 @@ describe("given the role transport declared by the feature", () => {
     it("publishes the binding surface at manage, apart from the caller's own standing", () => {
       const claims = claimsOf(roleBindingTrpcTransport);
 
-      expect(Object.keys(claims).toSorted()).toEqual(Object.keys(roleBindingTrpc.members).toSorted());
+      expect(Object.keys(claims).toSorted()).toEqual(
+        Object.keys(roleBindingTrpc.members).toSorted(),
+      );
       expect(claims.getMyAccessBreakdown).toEqual(["organization:view"]);
       for (const [name, claimed] of Object.entries(claims)) {
         if (name === "getMyAccessBreakdown") continue;

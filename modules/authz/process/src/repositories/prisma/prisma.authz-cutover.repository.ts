@@ -1,4 +1,5 @@
 import type { MigrationTenantStatus } from "@langwatch/authz-contract";
+
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import { AuthzCutoverRepository, type AuthzCutoverRow } from "../authz-cutover.repository.ts";
 
@@ -26,7 +27,11 @@ export class PrismaAuthzCutoverRepository extends AuthzCutoverRepository {
     super();
   }
 
-  async findCutover({ organizationId }: { organizationId: string }): Promise<AuthzCutoverRow | null> {
+  async findCutover({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<AuthzCutoverRow | null> {
     const record = await this.database.systemMigrationTenantState.findUnique({
       where: {
         migrationName_tenantId: {
@@ -37,6 +42,9 @@ export class PrismaAuthzCutoverRepository extends AuthzCutoverRepository {
       select: { status: true, occurredAt: true },
     });
     if (!record) return null;
-    return { status: record.status as MigrationTenantStatus, occurredAt: record.occurredAt ?? null };
+    return {
+      status: record.status as MigrationTenantStatus,
+      occurredAt: record.occurredAt ?? null,
+    };
   }
 }

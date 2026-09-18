@@ -5,9 +5,10 @@
  */
 
 import { HStack, Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LucideIcon } from "lucide-react";
 import { AlertTriangle, Ban, Check, Clock, Loader, X } from "lucide-react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import type { RunGroupSummary } from "../../../model/run-history-transforms.ts";
 
 type RunSummaryCountsProps = {

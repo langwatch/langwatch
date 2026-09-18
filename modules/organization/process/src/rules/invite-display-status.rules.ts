@@ -1,5 +1,5 @@
-import { nowInstant } from "@langwatch/time";
 import type { OrganizationInvite } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * What an invitation IS, as a person sees it, separate from the service that mints/mails/spends

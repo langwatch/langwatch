@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
 import { PrismaProjectRepository } from "../prisma.project.repository.ts";
 
 const destination = {

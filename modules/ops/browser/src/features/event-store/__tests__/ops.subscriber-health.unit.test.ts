@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { PipelineNode } from "@langwatch/ops-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   joinSubscriberHealth,
   type SubscriberMeta,

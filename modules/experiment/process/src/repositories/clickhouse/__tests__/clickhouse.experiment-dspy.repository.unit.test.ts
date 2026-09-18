@@ -1,11 +1,12 @@
 import type { ExperimentDspyStep } from "@langwatch/experiment-contract";
 import { describe, expect, it, vi } from "vitest";
+
+import { ExperimentDspyRetentionRepository } from "../../experiment-dspy-retention.repository.ts";
 import {
   ClickHouseExperimentDspyRepository,
   type ExperimentDspyClickHouseResult,
   type ExperimentDspyClickHouseClient,
 } from "../clickhouse.experiment-dspy.repository.ts";
-import { ExperimentDspyRetentionRepository } from "../../experiment-dspy-retention.repository.ts";
 
 const step = (overrides: Partial<ExperimentDspyStep> = {}): ExperimentDspyStep => ({
   tenantId: "project_1",

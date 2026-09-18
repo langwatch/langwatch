@@ -4,12 +4,12 @@
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { describe, expect, it } from "vitest";
-
 import {
   LangWatchQLGranularityRequiresTimeWindowError,
   LangWatchQLReservedGranularityTypeError,
 } from "@langwatch/analytics-contract";
+import { describe, expect, it } from "vitest";
+
 import { LangWatchQLTimeWindowService } from "../../services/langwatch-ql-time-window.service.ts";
 
 const timeWindows = LangWatchQLTimeWindowService.create();

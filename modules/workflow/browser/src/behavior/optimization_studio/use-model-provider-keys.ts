@@ -1,6 +1,6 @@
-import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project.ts";
-
 import type { Component, LLMConfig, Signature, StudioWorkflow } from "@langwatch/workflow-contract";
+
+import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project.ts";
 
 export const useModelProviderKeys = ({
   workflow,

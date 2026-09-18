@@ -1,8 +1,9 @@
 import { Box, VStack } from "@chakra-ui/react";
-import { Filter } from "lucide-react";
-import { FilterDisplay } from "./filter-display.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Filter } from "lucide-react";
+
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
+import { FilterDisplay } from "./filter-display.tsx";
 
 interface GraphFilterIndicatorProps {
   filters: Record<FilterField, string[] | Record<string, string[]>>;

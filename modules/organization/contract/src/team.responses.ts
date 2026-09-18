@@ -1,5 +1,6 @@
 /** Contract schemas for the team feature's tRPC responses. */
 import { z } from "zod";
+
 import { organizationTeamWithMembersSchema } from "./team.ts";
 
 /**

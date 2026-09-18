@@ -11,11 +11,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, HelpCircle } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import type { AgentInputBinding, Field as AgentField } from "@langwatch/agent-contract";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { AgentInputBinding, Field as AgentField } from "@langwatch/agent-contract";
+import { ArrowLeft, HelpCircle } from "lucide-react";
+import { useState, type ReactNode } from "react";
+
 import {
   useAgentCodeEditor,
   type AgentCodeEditorOptions,

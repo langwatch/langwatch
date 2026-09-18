@@ -4,8 +4,10 @@
  * already 128+ bits. Pepper stops a DB leak recovering plaintext.
  */
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
-import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
+
 import { nowInstant } from "@langwatch/time";
+
+import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
 
 const VK_PREFIX = "vk-lw-";
 

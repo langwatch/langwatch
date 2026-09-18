@@ -1,10 +1,11 @@
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 /**
  * @see modules/organization/specs/invitations.feature
  * What `InviteCreationService` refuses to write when the organization it is asked to invite
  * into is not there, proved against an in-memory repository fake.
  */
 import { describe, expect, it } from "vitest";
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+
 import { InviteCreationService } from "../invite-creation.service.ts";
 import {
   FakeOrganizationInviteRepository,

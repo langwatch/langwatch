@@ -11,15 +11,13 @@
  */
 
 import { useToken } from "@chakra-ui/react";
-import { useMemo } from "react";
-
-import { getRawColorValue, useColorMode } from "@langwatch/design-system/color-mode";
-import { rotatingColors } from "@langwatch/design-system/rotating-colors";
-
 import type {
   LangWatchQLVegaColorMode,
   LangwatchVegaTokens,
 } from "@langwatch/analytics-contract/visualization";
+import { getRawColorValue, useColorMode } from "@langwatch/design-system/color-mode";
+import { rotatingColors } from "@langwatch/design-system/rotating-colors";
+import { useMemo } from "react";
 
 /**
  * The palette names behind the application's chart colours, derived from the

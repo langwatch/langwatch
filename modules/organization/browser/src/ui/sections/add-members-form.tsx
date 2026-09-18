@@ -10,6 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useUiSeatTypeCopy } from "@langwatch/browser-host/slots";
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
+import { Select } from "@langwatch/design-system/select";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import {
@@ -21,20 +26,16 @@ import {
   useForm,
   useWatch,
 } from "react-hook-form";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
+
 import { api } from "../../behavior/organization-api.ts";
-import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints.ts";
 import type { InviteData, MembersForm, TeamAssignment } from "../../model/member-invite-form.ts";
-import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
-import { useUiSeatTypeCopy } from "@langwatch/browser-host/slots";
+import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints.ts";
+import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 import {
   type RoleOption,
   TeamRoleSelectItemContent,
   teamRolesOptions,
 } from "./team-user-role-field.tsx";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { Select } from "@langwatch/design-system/select";
 
 type Option = { label: string; value: string; description?: string };
 
@@ -206,7 +207,7 @@ export function AddMembersForm({
               placeholder="alice@example.com, bob@example.com"
               // When the drawer was opened from the inline invite box, land focus
               // on the email field so typing continues seamlessly.
-              
+
               {...register("emailsRaw", {
                 required: "At least one email is required",
                 validate: (value) => {

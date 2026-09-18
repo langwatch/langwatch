@@ -1,6 +1,6 @@
 import { Button } from "@chakra-ui/react";
-import { LuFolder } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { LuFolder } from "react-icons/lu";
 
 interface PromptSelectionButtonProps {
   onClick: () => void;

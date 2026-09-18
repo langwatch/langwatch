@@ -16,6 +16,7 @@ import {
 import { KeyRound } from "lucide-react";
 import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";

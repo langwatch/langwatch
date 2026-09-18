@@ -1,10 +1,10 @@
 import { HStack } from "@chakra-ui/react";
+import { SearchInput } from "@langwatch/design-system/search-input";
 import { nowInstant } from "@langwatch/time";
-import type { PeriodSelection } from "./session-filters.ts";
 import type React from "react";
 
 import { computeRelativeWindow, PeriodSelector } from "./period-selector.tsx";
-import { SearchInput } from "@langwatch/design-system/search-input";
+import type { PeriodSelection } from "./session-filters.ts";
 
 /**
  * The window the period control shows while no period has been picked. It is

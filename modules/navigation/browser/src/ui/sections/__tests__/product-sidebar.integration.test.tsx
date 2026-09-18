@@ -27,10 +27,10 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
   },
 }));
 
-import { WithStubNavigationHost } from "../../../testing.tsx";
-import { MENU_WIDTH_EXPANDED } from "../main-menu.tsx";
 import { forgetMenuScrollPositions } from "../../../behavior/use-menu-scroll-position.ts";
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import { WithStubNavigationHost } from "../../../testing.tsx";
+import { MENU_WIDTH_EXPANDED } from "../main-menu.tsx";
 import { ProductSidebar } from "../product-sidebar.tsx";
 
 const team = {
@@ -336,25 +336,16 @@ describe("the product sidebar", () => {
     it("groups the Platform entries under one label, after the ungrouped ones", () => {
       renderSidebar({ surface: "governance", pathname: "/governance" });
 
-      expect(
-        screen.getByRole("button", { name: "Collapse Platform" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse Platform" })).toBeInTheDocument();
       // DOM order, not presence: the group sits after every flat entry
       // and keeps its own order inside.
       const labels = screen
         .getAllByRole("link")
         .map((link) => link.textContent?.trim())
         .filter((label) =>
-          ["People", "Insights", "Analytics", "Signals & Alerts"].includes(
-            label ?? "",
-          ),
+          ["People", "Insights", "Analytics", "Signals & Alerts"].includes(label ?? ""),
         );
-      expect(labels).toEqual([
-        "People",
-        "Insights",
-        "Analytics",
-        "Signals & Alerts",
-      ]);
+      expect(labels).toEqual(["People", "Insights", "Analytics", "Signals & Alerts"]);
     });
   });
 

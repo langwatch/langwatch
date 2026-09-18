@@ -44,8 +44,5 @@ export {
 export { AuthzGrantIdentity } from "./services/authz-grant-identity.service.ts";
 export type { AuthzRepositories } from "./repositories/authz.repositories.ts";
 export { authzServer, type AuthzInfrastructure } from "./authz.server.ts";
-export {
-  authzRoleBindingRest,
-  roleBindingRestFacts,
-} from "./transport/authz-role-binding.rest.ts";
+export { authzRoleBindingRest, roleBindingRestFacts } from "./transport/authz-role-binding.rest.ts";
 export { authzTrpc, authzTrpcTransport } from "./transport/authz.trpc.ts";

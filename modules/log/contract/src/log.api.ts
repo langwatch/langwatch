@@ -1,6 +1,7 @@
-import { moduleApi } from "@langwatch/kernel";
-import type { CanonicalTraceLogRecord } from "./log-record.ts";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type { LogPiiRedactionLevel, LogPreparation } from "./log-preparation.types.ts";
+import type { CanonicalTraceLogRecord } from "./log-record.ts";
 
 /** The portable canonical log capability shared by process features. */
 export interface LogApi {

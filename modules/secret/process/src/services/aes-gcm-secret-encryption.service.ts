@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+
 import type { SecretEncryption } from "../app/secret.app.ts";
 
 /**
@@ -22,8 +23,7 @@ export class AesGcmSecretEncryptionAdapter implements SecretEncryption {
     return new AesGcmSecretEncryptionAdapter(key);
   }
 
-  private constructor(private readonly key: Uint8Array) {
-  }
+  private constructor(private readonly key: Uint8Array) {}
 
   encrypt(value: string): string {
     const iv = randomBytes(AesGcmSecretEncryptionAdapter.IV_BYTES);

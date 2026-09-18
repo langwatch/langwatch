@@ -1,5 +1,5 @@
-import { useSignalFocusedHomeVisibility } from "./use-show-signal-focused-home.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import { useSignalFocusedHomeVisibility } from "./use-show-signal-focused-home.ts";
 
 /**
  * Which of the three home compositions renders: `signal-focused` (briefing

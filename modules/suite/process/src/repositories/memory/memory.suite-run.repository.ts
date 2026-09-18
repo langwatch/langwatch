@@ -5,6 +5,7 @@ import type {
   SuiteRunStateData,
   SuiteRunStateInput,
 } from "@langwatch/suite-contract";
+
 import { SuiteRunReadRepository } from "../suite-run.repository.ts";
 
 // In-memory run projection for testing without ClickHouse.

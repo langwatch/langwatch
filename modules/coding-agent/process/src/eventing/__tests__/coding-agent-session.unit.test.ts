@@ -5,10 +5,6 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 
-import { createTenantId } from "@langwatch/eventing";
-import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
-import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
-import { describe, expect, it } from "vitest";
 import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
@@ -17,11 +13,17 @@ import {
   type MetricFactsContributedEvent,
   type SpanFactsContributedEvent,
 } from "@langwatch/coding-agent-contract";
+import { createTenantId } from "@langwatch/eventing";
+import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
+import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
+import { describe, expect, it } from "vitest";
+
+import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { CodingAgentSessionSpanProjection } from "../coding-agent-session-span.projection.ts";
 import {
   CodingAgentSessionStateProjection,
   MAX_SET,
 } from "../coding-agent-session-state.projection.ts";
-import { CodingAgentSessionSpanProjection } from "../coding-agent-session-span.projection.ts";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CodingAgentSessionFoldProjection,
@@ -29,7 +31,6 @@ import {
   type CodingAgentSessionState,
   CodingAgentSessionStateMapper,
 } from "../coding-agent-session.projection.ts";
-import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 
 const SESSION_ID = "8f2c9a1e-4711-4e0f-9d2e-session";
 const TRACE_A = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";

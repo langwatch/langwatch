@@ -63,8 +63,9 @@ vi.mock("../../../behavior/use-model-provider-api-key-validation.ts", () => ({
 }));
 
 import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
-import { EditModelProviderForm } from "../model-provider-form.tsx";
+
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
 import {
   eitherOrProviders,
   inputFor,

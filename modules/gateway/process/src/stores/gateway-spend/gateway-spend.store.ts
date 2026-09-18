@@ -1,6 +1,7 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
-import type { GatewaySpendEvents } from "../../repositories/gateway-spend-events.repository.ts";
+
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
+import type { GatewaySpendEvents } from "../../repositories/gateway-spend-events.repository.ts";
 
 /**
  * FoldProjectionStore adapter for the gateway spend fold. `gateway_spend` round-trips the

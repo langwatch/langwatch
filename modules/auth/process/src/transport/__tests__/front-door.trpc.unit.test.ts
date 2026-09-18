@@ -4,11 +4,11 @@
  * @see specs/auth/signup-does-not-strand-an-account.feature
  */
 import { bindTrpcFact, callerAddressFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import type { AuthApi } from "@langwatch/auth-contract";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AuthApi } from "@langwatch/auth-contract";
 import { callerEmailFact, frontDoorTrpcTransport } from "../front-door.trpc.ts";
 import { authTrpcTestMembers, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
 
@@ -32,6 +32,8 @@ const door: AuthApi = {
   resolveAuthProvider: () => unreached("resolveAuthProvider"),
   tryVerifyBrowserSession: () => unreached("tryVerifyBrowserSession"),
   tryResolveBrowserSession: () => unreached("tryResolveBrowserSession"),
+  findCliAccessSession: () => unreached("findCliAccessSession"),
+  revokeCliAccessToken: () => unreached("revokeCliAccessToken"),
   revokeAllBrowserSessions: () => unreached("revokeAllBrowserSessions"),
   revokeBrowserSession: () => unreached("revokeBrowserSession"),
   revokeOtherBrowserSessions: () => unreached("revokeOtherBrowserSessions"),
@@ -147,9 +149,9 @@ describe("the signed-out front door", () => {
     it("mails the link for an address that has none", async () => {
       addressIsRegistered.mockResolvedValue(false);
 
-      await expect(
-        visitor.requestSignUpVerification({ email: "ana@acme.com" }),
-      ).resolves.toEqual({ sent: true });
+      await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
+        sent: true,
+      });
       expect(requestSignUpVerification).toHaveBeenCalledWith({ email: "ana@acme.com" });
     });
   });
@@ -180,7 +182,8 @@ describe("the signed-out front door", () => {
   });
 
   describe("when a signed-in person asks for their own confirmation link", () => {
-    const signedIn = () => router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+    const signedIn = () =>
+      router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
 
     it("mails the address the session named, keyed on the caller rather than their address", async () => {
       await expect(signedIn().sendMyAddressConfirmation({})).resolves.toEqual({ sent: true });

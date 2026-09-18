@@ -1,3 +1,4 @@
+import posthog from "posthog-js";
 /**
  * @vitest-environment jsdom
  *
@@ -5,7 +6,6 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import posthog from "posthog-js";
 import { captureException } from "../model/posthog-error-capture.ts";
 
 vi.mock("posthog-js", () => ({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { workflowDslSchema } from "../workflow.ts";
+
+import { LlmModelNotSetError, workflowDslSchema } from "../index.ts";
 
 describe("Workflow contract", () => {
   it("accepts the portable graph envelope and preserves node values", () => {
@@ -20,5 +21,15 @@ describe("Workflow contract", () => {
     expect(() => workflowDslSchema.parse({ name: "Incomplete", nodes: [], edges: [] })).toThrow(
       ZodError,
     );
+  });
+
+  it("describes a missing LLM model as a handled 422", () => {
+    const error = new LlmModelNotSetError("Summarize");
+
+    expect(error).toMatchObject({
+      code: "llm_model_not_set",
+      httpStatus: 422,
+      message: 'LLM node "Summarize" has no model selected. Open the node and choose a model.',
+    });
   });
 });

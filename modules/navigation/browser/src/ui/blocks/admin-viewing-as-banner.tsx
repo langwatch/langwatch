@@ -1,9 +1,9 @@
 import { Alert, Box, Button, HStack, IconButton, Spacer, Text } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import { Eye, LogOut, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { NavigationLink } from "../elements/navigation-link.tsx";
-import { nowInstant } from "@langwatch/time";
 
 /** Admin viewing-as banner for personal workspaces (only where impersonation is real) */
 const DISMISS_TTL_MS = 24 * 60 * 60 * 1000;

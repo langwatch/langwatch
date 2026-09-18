@@ -4,18 +4,18 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { AvailableSource } from "@langwatch/prompt-browser-kit/variables";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AvailableSource } from "@langwatch/prompt-browser-kit/variables";
-import { EvaluationsV3Table } from "../evaluations-v3-table.tsx";
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import type {
   DatasetReference,
   EvaluatorConfig,
   TargetConfig,
 } from "../../../../model/experiments-v3/types.ts";
+import { EvaluationsV3Table } from "../evaluations-v3-table.tsx";
 
 let openedDrawerType: string | null = null;
 let openedDrawerParams: Record<string, any> = {};

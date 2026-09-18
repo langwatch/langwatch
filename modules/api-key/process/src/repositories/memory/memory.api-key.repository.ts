@@ -1,10 +1,11 @@
-import { generate } from "@langwatch/ksuid";
 import {
   CLI_LOGIN_KEY_NAME_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
   type ApiKeyRevocationCause,
 } from "@langwatch/api-key-contract";
+import { generate } from "@langwatch/ksuid";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+
 import type {
   ApiKeyCreateRecord,
   ApiKeyRepository,

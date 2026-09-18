@@ -1,4 +1,13 @@
 import {
+  OrganizationHasNoTeamError,
+  type OrganizationApi,
+  OrganizationService as OrganizationServiceContract,
+  type AddOrganizationTeamMemberInput,
+  type CreateOrganizationTeamInput,
+  type OrganizationBillingProfile,
+  type OrganizationTeam,
+} from "@langwatch/organization-contract";
+import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
@@ -10,19 +19,11 @@ import {
   type ProjectWithTeam,
   type TraceDestinationProject,
 } from "@langwatch/project-contract";
-import {
-  OrganizationHasNoTeamError,
-  type OrganizationApi,
-  OrganizationService as OrganizationServiceContract,
-  type AddOrganizationTeamMemberInput,
-  type CreateOrganizationTeamInput,
-  type OrganizationBillingProfile,
-  type OrganizationTeam,
-} from "@langwatch/organization-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
-import { ProjectCredentials } from "../project-credentials.service.ts";
+
 import type { ProjectRepository } from "../../repositories/project.repository.ts";
+import { ProjectCredentials } from "../project-credentials.service.ts";
 import { ProjectService } from "../project.service.ts";
 
 const project: InternalProject = {

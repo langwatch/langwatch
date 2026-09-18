@@ -1,31 +1,33 @@
 import { Button, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useAvailableEvaluators } from "@langwatch/evaluator-browser/available-evaluators";
+import DynamicZodForm from "@langwatch/evaluator-browser/dynamic-zod-form";
+import { EvaluatorEditorContent } from "@langwatch/evaluator-browser/evaluator-editor-content";
+import type { EvaluatorMappingsConfig } from "@langwatch/evaluator-browser/surfaces/evaluator-editor-shared";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+  evaluatorsSchema,
+  getEvaluatorDefaultSettings,
+} from "@langwatch/evaluator-contract";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
-import DynamicZodForm from "@langwatch/evaluator-browser/dynamic-zod-form";
-import { EvaluatorEditorContent } from "@langwatch/evaluator-browser/evaluator-editor-content";
-import type { EvaluatorMappingsConfig } from "@langwatch/evaluator-browser/surfaces/evaluator-editor-shared";
-import { useAvailableEvaluators } from "@langwatch/evaluator-browser/available-evaluators";
+
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-  evaluatorsSchema,getEvaluatorDefaultSettings
-} from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../model/constants.ts";
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
-import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
-import type { Evaluator, Field } from "@langwatch/workflow-contract";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../model/constants.ts";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
 } from "../../../../model/edge-mapping.ts";
+import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
 import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 
 /**

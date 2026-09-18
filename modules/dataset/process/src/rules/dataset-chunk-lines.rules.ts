@@ -1,17 +1,18 @@
-/**
- * Pure shape and arithmetic for a dataset stored as `contentLayout='s3_jsonl'` chunks: the
- * `{ id, entry }` line wrapper, the persisted offset index, the readiness gate, and the
- * old-to-new column remap. No storage or database reaches into this module.
- */
-import { generate } from "@langwatch/ksuid";
 import {
   DatasetNotReadyError,
   DuplicateRecordIdError,
   type DatasetColumns,
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
-import { stripNullBytes } from "./dataset-sanitize.rules.ts";
+/**
+ * Pure shape and arithmetic for a dataset stored as `contentLayout='s3_jsonl'` chunks: the
+ * `{ id, entry }` line wrapper, the persisted offset index, the readiness gate, and the
+ * old-to-new column remap. No storage or database reaches into this module.
+ */
+import { generate } from "@langwatch/ksuid";
+
 import { type ChunkOffset } from "./dataset-chunking.rules.ts";
+import { stripNullBytes } from "./dataset-sanitize.rules.ts";
 
 /**
  * Storage mutation state shared by the portable Dataset aggregate and the

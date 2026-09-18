@@ -1,10 +1,10 @@
 import { nowInstant } from "@langwatch/time";
 
-import { GithubPullRequestStatusCacheRepository } from "../github-pull-request-status-cache.repository.ts";
 import type {
   GithubPullRequestRef,
   GithubPullRequestStatus,
 } from "../../services/github-pull-request-status.service.ts";
+import { GithubPullRequestStatusCacheRepository } from "../github-pull-request-status-cache.repository.ts";
 import type { MemoryGithubDatabase } from "./memory.github.database.ts";
 
 const STATUS_CACHE_TTL_SEC = 60;

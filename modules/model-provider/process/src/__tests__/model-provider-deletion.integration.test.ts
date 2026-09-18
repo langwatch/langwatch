@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 /**
  * Real-Postgres coverage for `ModelProviderCommandService.delete`'s scope-aware lookup: it must
  * resolve org/team/sibling-project credentials, not just the caller's project. Only real
@@ -6,13 +8,12 @@
  * @see specs/model-providers/provider-deletion.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
-import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
-import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,

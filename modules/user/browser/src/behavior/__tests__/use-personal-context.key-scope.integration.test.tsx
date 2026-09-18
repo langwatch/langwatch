@@ -51,8 +51,7 @@ vi.mock("../personal-workspace-session.ts", () => ({
 
 import { usePersonalContext } from "../use-personal-context.ts";
 
-const listCall = () =>
-  queryCalls.find((call) => call.path === "personalVirtualKeys.list");
+const listCall = () => queryCalls.find((call) => call.path === "personalVirtualKeys.list");
 
 describe("given the personal-credentials card on /me", () => {
   afterEach(() => {

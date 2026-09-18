@@ -1,10 +1,11 @@
 // Sending one graph alert once; guard per-recipient claims for idempotent
 // retries and return didSend: true on cap to prevent infinite retries.
 
-import { describe, expect, it } from "vitest";
 import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
-import { GraphAlertDispatchService } from "../graph-alert-dispatch.service.ts";
 import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import { GraphAlertDispatchService } from "../graph-alert-dispatch.service.ts";
 
 /** A real alert context, built the way the evaluator builds one. */
 const CONTEXT = buildGraphAlertTemplateContext({

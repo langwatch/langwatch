@@ -5,12 +5,11 @@
  */
 
 import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { useEffect, useState } from "react";
 
-import { Dialog } from "@langwatch/design-system/dialog";
-
-import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { analyticsApi } from "../../behavior/analytics-api.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 
 export function DashboardNameDialog({
   open,
@@ -71,7 +70,6 @@ export function DashboardNameDialog({
               Give it a name that identifies what this dashboard will focus on.
             </Text>
             <Input
-              
               aria-label="Dashboard name"
               placeholder="Dashboard name"
               value={dashboardName}

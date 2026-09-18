@@ -1,8 +1,9 @@
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 /**
  * One studio run, dispatched to the engine and streamed back event by event.
  */
 import { createLogger } from "@langwatch/observability";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   type StudioClientEvent,
   type StudioServerEvent,
@@ -11,11 +12,11 @@ import {
   WorkflowExecutionFailedError,
   executeWorkflowComponentInputSchema,
   type ExecuteWorkflowComponentInput,
-  type ExecutionState
+  type ExecutionState,
 } from "@langwatch/workflow-contract";
+
 import type { WorkflowStudioStream } from "../app/workflow.app.ts";
 import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:workflows:studio-dispatch");
 

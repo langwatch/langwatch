@@ -1,11 +1,10 @@
+import { agentSchema, type Agent } from "@langwatch/agent-contract";
 /**
  * The `/api/v1/agents` REST family and its deprecated `/api/agents` alias, driven through
  * the real Hono apps `createAgentRest` and `agentLegacyRest` build - mounted
  * @see specs/agents/agents-rest-api.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
-
-import { agentSchema, type Agent } from "@langwatch/agent-contract";
 
 import { AGENTS_ALIAS_SUCCESSOR } from "../agent-legacy.rest.ts";
 import { createAgentRest } from "../agent.rest.ts";

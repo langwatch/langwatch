@@ -7,8 +7,13 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioWorkflow, Workflow } from "@langwatch/workflow-contract";
-import type { WorkflowService } from "../../services/workflow.service.ts";
 
+import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
+import {
+  WorkflowRowRepository,
+  type WorkflowRowDraft,
+} from "../../repositories/workflow-row.repository.ts";
+import type { WorkflowService } from "../../services/workflow.service.ts";
 import type {
   WorkflowCodeCompletions,
   WorkflowCommitMessageWriter,
@@ -20,11 +25,6 @@ import type {
   WorkflowSignals,
   WorkflowStudioRuns,
 } from "../workflow.app.ts";
-import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
-import {
-  WorkflowRowRepository,
-  type WorkflowRowDraft,
-} from "../../repositories/workflow-row.repository.ts";
 
 /** A Studio graph prepared by doing nothing to it. */
 class UnchangedStudioDsl implements WorkflowStudioDsl {

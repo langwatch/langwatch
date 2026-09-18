@@ -1,31 +1,34 @@
-import { describe, expect, it, vi } from "vitest";
 import type {
   EmailSuppression,
   Trigger,
   TriggerFire,
   TriggerFireStats,
-  TriggerSummary,WebhookDeliveryInput,WebhookDeliveryRow
+  TriggerSummary,
+  WebhookDeliveryInput,
+  WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
-import { AutomationService } from "../automation.service.ts";
-import { EmailSuppressionRepository } from "../../repositories/email-suppression.repository.ts";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import type { AutomationClock } from "../../app/automation.members.ts";
+import { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
+import { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
+import type { ScheduledJobRecord } from "../../repositories/automation-scheduled-job.repository.ts";
+import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
 import { EmailSuppressionNameRepository } from "../../repositories/email-suppression-name.repository.ts";
+import { EmailSuppressionRepository } from "../../repositories/email-suppression.repository.ts";
+import { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sent.repository.ts";
 import { TriggerFireHistoryRepository } from "../../repositories/trigger-fire-history.repository.ts";
 import { TriggerRepository } from "../../repositories/trigger.repository.ts";
 import type { ReportScheduleTarget } from "../../repositories/trigger.repository.ts";
-import { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
-import { ReportScheduleService } from "../report-schedule.service.ts";
-import type { AutomationClock } from "../../app/automation.members.ts";
-import { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
-import type { ScheduledJobRecord } from "../../repositories/automation-scheduled-job.repository.ts";
-import { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
-import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
 import { WebhookDeliveryRepository } from "../../repositories/webhook-delivery.repository.ts";
-import { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sent.repository.ts";
-import { AutomationGraphService } from "../trigger-graph.service.ts";
-import { AutomationTemplateService } from "../automation-template.service.ts";
-import { AutomationPersistCapService } from "../persist-cap.service.ts";
+import { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { createAutomationTestRuntime } from "../../testing.ts";
-import { type Instant, Temporal, toDate } from "@langwatch/time";
+import { AutomationTemplateService } from "../automation-template.service.ts";
+import { AutomationService } from "../automation.service.ts";
+import { AutomationPersistCapService } from "../persist-cap.service.ts";
+import { ReportScheduleService } from "../report-schedule.service.ts";
+import { AutomationGraphService } from "../trigger-graph.service.ts";
 
 class EmptyGraphTriggerSent extends GraphTriggerSentRepository {
   findProjectsWithGraphTriggers = async () => [];

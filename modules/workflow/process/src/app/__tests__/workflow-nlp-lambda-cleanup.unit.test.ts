@@ -6,15 +6,15 @@
 // @vitest-environment node
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { NlpLambdaFleetNotComposedError } from "@langwatch/workflow-contract";
-import { Temporal } from "@langwatch/time";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
+import { NlpLambdaFleetNotComposedError } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { WorkflowApp, type NlpLambdaFleet } from "../workflow.app.ts";
-import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
+import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
+import { WorkflowApp, type NlpLambdaFleet } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 /** Decrypts nothing a test named - the sweep never reaches it. */
@@ -47,7 +47,11 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       datasets: members.datasets,
     },
-    config: {},
+    config: {
+      codeBlockTimeoutSeconds: undefined,
+      stagingThresholdBytes: undefined,
+      stagingTtlSeconds: undefined,
+    },
     resources: { own: () => void 0, ownService: () => void 0 },
     repositories: {
       workflowRows: members.workflowRows,

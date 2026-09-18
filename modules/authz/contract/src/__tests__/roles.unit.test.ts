@@ -9,6 +9,7 @@
  * webhook and spend permissions is what stands in for "org-scoped" here.
  */
 import { describe, expect, it } from "vitest";
+
 import { builtinRoleGrants, builtinRolePermissions } from "../roles.ts";
 
 describe("builtinRoleGrants", () => {
@@ -18,21 +19,19 @@ describe("builtinRoleGrants", () => {
       expect(builtinRoleGrants({ role: "org-admin", permission: "webhookEndpoints:view" })).toBe(
         true,
       );
-      expect(
-        builtinRoleGrants({ role: "org-admin", permission: "webhookEndpoints:manage" }),
-      ).toBe(true);
-      expect(builtinRoleGrants({ role: "org-admin", permission: "gatewaySpend:view" })).toBe(
+      expect(builtinRoleGrants({ role: "org-admin", permission: "webhookEndpoints:manage" })).toBe(
         true,
       );
+      expect(builtinRoleGrants({ role: "org-admin", permission: "gatewaySpend:view" })).toBe(true);
       expect(builtinRoleGrants({ role: "org-admin", permission: "gatewaySpend:manage" })).toBe(
         true,
       );
     });
 
     it("does not grant webhook management to the plain org-member role", () => {
-      expect(
-        builtinRoleGrants({ role: "org-member", permission: "webhookEndpoints:manage" }),
-      ).toBe(false);
+      expect(builtinRoleGrants({ role: "org-member", permission: "webhookEndpoints:manage" })).toBe(
+        false,
+      );
     });
   });
 });
@@ -46,12 +45,15 @@ describe("builtinRoleGrants", () => {
 describe("Langy permissions", () => {
   describe("given a project viewer", () => {
     /** @scenario "Below member, Langy is not granted at all" */
-    it.each(["langy:view", "langy:create", "langy:update", "langy:delete", "langy:manage"] as const)(
-      "does not hold %s",
-      (permission) => {
-        expect(builtinRoleGrants({ role: "viewer", permission })).toBe(false);
-      },
-    );
+    it.each([
+      "langy:view",
+      "langy:create",
+      "langy:update",
+      "langy:delete",
+      "langy:manage",
+    ] as const)("does not hold %s", (permission) => {
+      expect(builtinRoleGrants({ role: "viewer", permission })).toBe(false);
+    });
   });
 
   describe("given a project member", () => {

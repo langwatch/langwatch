@@ -1,7 +1,8 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { z } from "zod";
+
 import type { UsageStatsCountInput } from "../../app/ops.app.ts";
 import { UsageStatsClickHouseRepository } from "../observe/usage-stats.repository.ts";
-import { z } from "zod";
 
 const usageStatsCountRowsSchema = z.array(z.object({ Total: z.string() }));
 
@@ -52,11 +53,7 @@ export class ClickHouseUsageStatsRepository extends UsageStatsClickHouseReposito
   }
 
   /** One project's count, named as its own tenant so the client routes it. */
-  private async count(input: {
-    projectId: string;
-    table: string;
-    sql: string;
-  }): Promise<number> {
+  private async count(input: { projectId: string; table: string; sql: string }): Promise<number> {
     const { rows } = await this.clickhouse.query<unknown>({
       tenantId: input.projectId,
       table: input.table,

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { AuthzService } from "../services/authz.service.ts";
+
 import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import { AuthzService } from "../services/authz.service.ts";
 
 const ORG = "org-123";
 

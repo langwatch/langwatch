@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   formatSearchRecordCount,
   noSearchMatchesMessage,
@@ -28,15 +29,11 @@ describe("given a search is in effect", () => {
   describe("when building the count chip", () => {
     it("reports the matches and the dataset total, so neither number misleads alone", () => {
       // Pin the customer-facing message so it can't silently drift.
-      expect(formatSearchRecordCount({ matched: 3, total: 679 })).toBe(
-        "3 of 679 records",
-      );
+      expect(formatSearchRecordCount({ matched: 3, total: 679 })).toBe("3 of 679 records");
     });
 
     it("says zero rather than going blank when nothing matched", () => {
-      expect(formatSearchRecordCount({ matched: 0, total: 679 })).toBe(
-        "0 of 679 records",
-      );
+      expect(formatSearchRecordCount({ matched: 0, total: 679 })).toBe("0 of 679 records");
     });
 
     it("formats both counts with a fixed en-US thousands separator (locale-independent)", () => {
@@ -50,25 +47,19 @@ describe("given a search is in effect", () => {
       // for a dataset of any size — the "it has shrunk" misreading the pair of
       // numbers exists to prevent.
       expect(formatSearchRecordCount({ matched: 1 })).toBe("1 matching record");
-      expect(formatSearchRecordCount({ matched: 1200 })).toBe(
-        "1,200 matching records",
-      );
+      expect(formatSearchRecordCount({ matched: 1200 })).toBe("1,200 matching records");
     });
   });
 
   describe("when the search could not be run", () => {
     it("names the search that failed, so the message is tied to it", () => {
-      expect(searchFailedMessage("escalation")).toBe(
-        "Couldn’t run the search for “escalation”.",
-      );
+      expect(searchFailedMessage("escalation")).toBe("Couldn’t run the search for “escalation”.");
     });
   });
 
   describe("when nothing matched", () => {
     it("repeats the searched text, so the message is tied to a search", () => {
-      expect(noSearchMatchesMessage("escalation")).toBe(
-        "No records match “escalation”.",
-      );
+      expect(noSearchMatchesMessage("escalation")).toBe("No records match “escalation”.");
     });
   });
 });

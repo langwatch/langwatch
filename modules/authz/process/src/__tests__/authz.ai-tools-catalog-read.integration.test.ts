@@ -4,17 +4,19 @@
  * `aiTools:view` sits in the org-member bag every membership holds.
  */
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
 } from "../repositories/prisma/prisma.authz-binding.repository.ts";
 import { PrismaAuthzListingRepository } from "../repositories/prisma/prisma.authz-listing.repository.ts";
 import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
-import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
 const DB_URL = process.env.DATABASE_URL ?? process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -29,7 +31,9 @@ describe.skipIf(!DB_URL)("given an organization publishing an AI tools catalog",
   const authz = AuthzService.create({
     repository: PrismaAuthzReadRepository.create(database),
     listing: PrismaAuthzListingRepository.create(database),
-    bindings: PrismaAuthzBindingRepository.create({ database: prisma as unknown as AuthzBindingDatabase }),
+    bindings: PrismaAuthzBindingRepository.create({
+      database: prisma as unknown as AuthzBindingDatabase,
+    }),
     isOnEngine: async () => false,
   });
 

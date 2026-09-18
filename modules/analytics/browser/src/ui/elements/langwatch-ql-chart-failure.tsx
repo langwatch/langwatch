@@ -6,7 +6,6 @@
  */
 
 import { Badge, Box, Stack, Text, VStack } from "@chakra-ui/react";
-
 import type {
   VegaValidationError,
   VegaValidationErrorCode,

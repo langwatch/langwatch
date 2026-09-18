@@ -1,4 +1,5 @@
 import { create } from "zustand";
+
 import type { SpanConfig, SpanType, TraceConfig } from "../model/foundry-types.ts";
 import { shortId } from "../model/foundry-types.ts";
 

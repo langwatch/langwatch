@@ -1,5 +1,6 @@
 import { defineServerModule } from "@langwatch/kernel";
 
+import { EvaluationApp } from "./app/evaluation.app.ts";
 import type {
   EvaluationAzureSafetyCredentials,
   EvaluationCostRecorder,
@@ -15,9 +16,10 @@ import type {
 import { ClickhouseMonitorPerformanceRepository } from "./repositories/clickhouse/clickhouse.monitor-performance.repository.ts";
 import type { EvaluationClickHouseResolver } from "./repositories/clickhouse/evaluation-clickhouse-client.ts";
 import { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository.ts";
+import { evaluationRepositories } from "./repositories/evaluation-repositories.registry.ts";
 import { PrismaEvaluationCostRepository } from "./repositories/prisma/prisma.evaluation-cost.repository.ts";
-import { EvaluationCostService } from "./services/evaluation-cost.service.ts";
 import { DirectEvaluationExecutionReceiptAdapter } from "./services/direct.evaluation-execution-receipt.service.ts";
+import { EvaluationCostService } from "./services/evaluation-cost.service.ts";
 import { EvaluationExecutionIntentService } from "./services/evaluation-execution-intent.service.ts";
 import {
   EvaluationExecutionService,
@@ -36,9 +38,6 @@ import {
   EvaluationEventingAdapter,
   type EvaluationEventingStores,
 } from "./services/evaluation.eventing.service.ts";
-
-import { EvaluationApp } from "./app/evaluation.app.ts";
-import { evaluationRepositories } from "./repositories/evaluation-repositories.registry.ts";
 import { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
 import { evaluationsLegacyRest } from "./transport/evaluations-legacy.rest.ts";
 
@@ -90,7 +89,9 @@ export function createEvaluationRunReads(access: EvaluationClickHouseAccess): Ev
 export function createMonitorPerformanceReads(input: {
   resolveClickHouse: EvaluationClickHouseResolver;
 }): MonitorPerformanceReads {
-  return ClickhouseMonitorPerformanceRepository.create({ resolveClickHouse: input.resolveClickHouse });
+  return ClickhouseMonitorPerformanceRepository.create({
+    resolveClickHouse: input.resolveClickHouse,
+  });
 }
 
 type EvaluationEventingInput = Parameters<typeof EvaluationEventingAdapter.create>[0];

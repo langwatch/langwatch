@@ -2,9 +2,9 @@
 // design-system/shiki not trace-web re-export (one fewer web-to-web import).
 
 import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
-import type React from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
+import type React from "react";
 
 export function JsonHighlight({
   code,

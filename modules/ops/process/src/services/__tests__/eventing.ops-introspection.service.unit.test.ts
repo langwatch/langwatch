@@ -5,6 +5,7 @@
  */
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import { EventingOpsIntrospectionAdapter } from "../eventing.ops-introspection.service.ts";
 
 function definitionWith({

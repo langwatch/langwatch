@@ -1,7 +1,4 @@
-import {
-  type OrganizationDataplane,
-  type OrganizationDataplaneResolver,
-} from "../app/ops.app.ts";
+import { type OrganizationDataplane, type OrganizationDataplaneResolver } from "../app/ops.app.ts";
 
 /**
  * The dataplane answer, read off the ClickHouse routing table. Takes the
@@ -17,8 +14,7 @@ export class RoutingTableOrganizationDataplaneAdapter implements OrganizationDat
     return new RoutingTableOrganizationDataplaneAdapter(routes);
   }
 
-  private constructor(private readonly routes: ReadonlyMap<string, string>) {
-  }
+  private constructor(private readonly routes: ReadonlyMap<string, string>) {}
 
   dataplaneFor(organizationId: string): OrganizationDataplane {
     const endpoint = this.routes.get(organizationId);

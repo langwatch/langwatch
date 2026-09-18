@@ -2,6 +2,7 @@ import { IdentityEmailService } from "@langwatch/identity-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import type { AuthSessionCacheRepository } from "../../repositories/auth-session-cache.repository.ts";
 import type {
   AuthSessionRepository,
@@ -155,11 +156,11 @@ describe("BrowserSessionService", () => {
   describe("when the identifier ledger holds no address for the person", () => {
     /** @scenario "An unenrolled user's session carries the stored column" */
     it("answers the address stored on the user row, not the one the cookie carried", async () => {
-      await expect(
-        service().service.tryResolveBrowserSession({ verified }),
-      ).resolves.toMatchObject({
-        user: { id: "admin-1", email: "admin-1@example.com" },
-      });
+      await expect(service().service.tryResolveBrowserSession({ verified })).resolves.toMatchObject(
+        {
+          user: { id: "admin-1", email: "admin-1@example.com" },
+        },
+      );
     });
   });
 

@@ -1,5 +1,11 @@
-import type { Component, Entry, StudioEdge, StudioNode, StudioWorkflow } from "./studio-workflow.ts";
 import { checkIsEvaluator } from "./studio-workflow-node-utils.ts";
+import type {
+  Component,
+  Entry,
+  StudioEdge,
+  StudioNode,
+  StudioWorkflow,
+} from "./studio-workflow.ts";
 import type { WorkflowField } from "./workflow.ts";
 
 /**

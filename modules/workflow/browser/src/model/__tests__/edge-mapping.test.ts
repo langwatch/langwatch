@@ -2,9 +2,10 @@
  * @vitest-environment node
  */
 
+import type { Field } from "@langwatch/workflow-contract";
 import type { Edge } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import type { Field } from "@langwatch/workflow-contract";
+
 import { applyMappingChange, buildInputMappings } from "../edge-mapping.ts";
 
 const createEdge = ({

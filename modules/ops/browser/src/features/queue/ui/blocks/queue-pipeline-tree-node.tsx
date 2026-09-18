@@ -1,7 +1,8 @@
 import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Pause, Play } from "lucide-react";
-import type { OpsPipelineNode } from "../../model/queue-presentation.ts";
+
 import { isNodeDirectlyPaused, isNodePaused } from "../../model/queue-pipeline-utils.ts";
+import type { OpsPipelineNode } from "../../model/queue-presentation.ts";
 
 export function PipelineTreeNode({
   node,

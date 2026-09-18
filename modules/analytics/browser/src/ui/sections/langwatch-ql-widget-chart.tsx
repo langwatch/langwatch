@@ -6,12 +6,12 @@
  */
 
 import { Box } from "@chakra-ui/react";
-import { useMemo } from "react";
-
 import {
   type LangWatchQLDatasetColumn,
-  LWQL_QUERY_RESULT_DATASET,starterVegaLiteSpec
+  LWQL_QUERY_RESULT_DATASET,
+  starterVegaLiteSpec,
 } from "@langwatch/analytics-contract/visualization";
+import { useMemo } from "react";
 
 import { ThemedLangWatchQLVegaLiteChart } from "./themed-langwatch-ql-vega-lite-chart.tsx";
 

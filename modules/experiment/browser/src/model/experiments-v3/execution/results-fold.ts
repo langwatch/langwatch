@@ -1,5 +1,6 @@
-import type { SerializedHandledError } from "@langwatch/handled-error";
 import { type EvaluationV3Event, UNNAMED_FAILURE } from "@langwatch/experiment-contract";
+import type { SerializedHandledError } from "@langwatch/handled-error";
+
 import type { EvaluationResults, TargetRowMetadata } from "../types.ts";
 
 /**

@@ -1,14 +1,15 @@
 import { Box } from "@chakra-ui/react";
+import type { Component } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
   type ExecuteData,
   ExecutionInputPanel,
   type InputField,
 } from "../../../elements/executable-panel/execution-input-panel.tsx";
 import { getInputsForExecution, useComponentExecution } from "../use-component-execution.ts";
-import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
-import type { Component } from "@langwatch/workflow-contract";
 
 /**
  * InputPanel component that handles the display and execution of component inputs

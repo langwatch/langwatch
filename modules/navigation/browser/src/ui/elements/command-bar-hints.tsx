@@ -1,6 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Lightbulb } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import { HINTS } from "../../model/command-bar-constants.ts";
 
 /**

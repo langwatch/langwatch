@@ -13,10 +13,11 @@ import {
   type AgentConnectCredentials,
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
-import { instanceChannel, pendingKey } from "../rules/connected-agent-keys.rules.ts";
-import { AgentSessionService, type SessionInfo } from "./connected-agent-session.service.ts";
 import type { Unsubscribe } from "@langwatch/redis-client/session-state";
+
+import { instanceChannel, pendingKey } from "../rules/connected-agent-keys.rules.ts";
 import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
+import { AgentSessionService, type SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:gateway");
 

@@ -4,6 +4,7 @@ import type {
   CodingAgentTraceSessionCandidate,
 } from "@langwatch/coding-agent-contract";
 import type { GithubPullRequest, GithubApi } from "@langwatch/github-contract";
+
 import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
 
 type LinkableSession = CodingAgentTraceSessionCandidate & {

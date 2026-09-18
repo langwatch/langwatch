@@ -4,6 +4,7 @@
  * @see specs/features/agents/voice-phone.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   getSchemaShape,
   isSecretCredentialField,

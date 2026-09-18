@@ -1,6 +1,7 @@
 /** Router for personal-workspace screens, bound through host's route capability. */
 
 import { useMemo } from "react";
+
 import { usePersonalWorkspaceHost } from "../model/personal-workspace-host.ts";
 
 export type PersonalRouter = {

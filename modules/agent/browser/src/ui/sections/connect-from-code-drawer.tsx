@@ -13,12 +13,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
-
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { ArrowLeft } from "lucide-react";
+import type { ReactNode } from "react";
+
 import {
   connectSnippets,
   SNIPPET_LANGUAGE_LABELS,

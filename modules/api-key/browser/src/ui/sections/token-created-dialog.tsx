@@ -8,6 +8,7 @@ import { Alert, Box, createListCollection, HStack, Text, VStack } from "@chakra-
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo, useState } from "react";
+
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
   buildMcpJson,

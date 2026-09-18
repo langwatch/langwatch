@@ -1,17 +1,22 @@
 import { Badge, Box, Button, createListCollection, HStack, Input, Text } from "@chakra-ui/react";
-import { Search } from "lucide-react";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
-import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "../../model/prisma-types.ts";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { Search } from "lucide-react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+
 import { api } from "../../behavior/organization-api.ts";
+import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import {
   getDefaultTeamRoleForOrganizationRole,
   isBindingRoleAllowedForOrganizationRole,
   type TeamRoleValue,
 } from "../../model/member-role-constraints.ts";
-import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "../../model/prisma-types.ts";
 
 // ── Shared display helpers ────────────────────────────────────────────────────
 

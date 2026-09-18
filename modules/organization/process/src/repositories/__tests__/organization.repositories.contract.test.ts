@@ -1,5 +1,3 @@
-/** Repositories contract: memory tier tested here, Prisma tier in prisma/__tests__/. */
-import { beforeEach, describe, expect, it } from "vitest";
 import {
   OrganizationNotFoundError,
   OrganizationHasNoTeamError,
@@ -8,9 +6,12 @@ import {
   GroupNotFoundError,
   type OrganizationIntent,
 } from "@langwatch/organization-contract";
+/** Repositories contract: memory tier tested here, Prisma tier in prisma/__tests__/. */
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { MemoryOrganizationDatabase } from "../memory/memory.organization.database.ts";
 import { organizationRepositories } from "../organization-repositories.registry.ts";
 import type { OrganizationRepositories } from "../organization.repositories.ts";
-import { MemoryOrganizationDatabase } from "../memory/memory.organization.database.ts";
 
 const ORGANIZATION_ID = "org-1";
 const ORGANIZATION_ID_2 = "org-2";
@@ -447,9 +448,9 @@ describe.each(backends)("given the $name organization repositories", ({ create }
     });
 
     it("rejects when organization has no teams", async () => {
-      await expect(
-        repositories.organization.getOldestTeamId("org-with-no-teams"),
-      ).rejects.toThrow(OrganizationHasNoTeamError);
+      await expect(repositories.organization.getOldestTeamId("org-with-no-teams")).rejects.toThrow(
+        OrganizationHasNoTeamError,
+      );
     });
   });
 

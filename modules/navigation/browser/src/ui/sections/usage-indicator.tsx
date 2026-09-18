@@ -6,6 +6,7 @@
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
+
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";

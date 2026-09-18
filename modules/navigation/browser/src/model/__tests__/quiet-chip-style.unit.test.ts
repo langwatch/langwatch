@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { QUIET_SIDEBAR_CHIP } from "../quiet-chip-style.ts";
 
 describe("the quiet sidebar chip", () => {

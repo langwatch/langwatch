@@ -5,8 +5,9 @@
  * @see langwatch#6397
  */
 
-import { describe, expect, it } from "vitest";
 import { HandledError } from "@langwatch/handled-error";
+import { describe, expect, it } from "vitest";
+
 import { EvaluationExecutionIntentService as ExecuteEvaluationCommand } from "../services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,

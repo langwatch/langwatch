@@ -1,10 +1,10 @@
+import type { OpsMigrationOverview } from "@langwatch/ops-contract";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   SystemMigrationStateRepository,
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import type { OpsMigrationOverview } from "@langwatch/ops-contract";
 
 const TENANT_STATUSES: readonly TenantMigrationStatus[] = [
   "migrated",

@@ -2,8 +2,8 @@
  * through same seam, proving byte budgets and null-for-missing behavior.
  */
 
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   batchRecordTrpc,
   DatasetNotFoundError,
@@ -130,8 +130,8 @@ describe("the dataset tRPC declaration", () => {
       ]);
 
       expect(table).toEqual([
-        ["getAllByexperimentIdGroup", "query", "workflows:view"],
-        ["getAllByexperimentSlug", "query", "workflows:view"],
+        ["getAllByexperimentIdGroup", "query", "datasets:view"],
+        ["getAllByexperimentSlug", "query", "datasets:view"],
       ]);
     });
   });
@@ -231,9 +231,11 @@ describe("the dataset tRPC declaration", () => {
       );
       const input = { projectId: "project-1", datasetId: "dataset-1" };
 
-      await expect(
-        handlers.getAll!({ ...invocation, input }),
-      ).resolves.toEqual({ id: "dataset-1", datasetRecords: [], truncated: true });
+      await expect(handlers.getAll!({ ...invocation, input })).resolves.toEqual({
+        id: "dataset-1",
+        datasetRecords: [],
+        truncated: true,
+      });
       expect(getDatasetWithRecords).toHaveBeenCalledWith({
         slugOrId: "dataset-1",
         projectId: "project-1",

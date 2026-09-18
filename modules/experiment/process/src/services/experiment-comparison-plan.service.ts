@@ -12,13 +12,14 @@ import {
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
+
 import {
   buildVariantDisplayNames,
   buildVariantIdentifiers,
 } from "../eventing/experiment-comparison-candidates.process.ts";
 import { type ComparisonSkipReason } from "../eventing/experiment-comparison-skip.process.ts";
-import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentComparisonVariantService } from "./experiment-comparison-variant.service.ts";
+import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 

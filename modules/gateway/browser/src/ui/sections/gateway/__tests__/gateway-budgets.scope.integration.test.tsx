@@ -3,11 +3,11 @@
  * Scope column: shared chip for each kind, clickable for virtual keys.
  */
 import { cleanup, screen, within } from "@testing-library/react";
+import type React from "react";
+import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
-import "@testing-library/jest-dom/vitest";
-import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,

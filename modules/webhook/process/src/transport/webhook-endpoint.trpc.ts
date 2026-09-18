@@ -5,11 +5,7 @@
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { fromDate, toDate } from "@langwatch/time";
-import {
-  WEBHOOK_EVENT_TYPES,
-  WebhookApi,
-  webhookEndpointTrpc,
-} from "@langwatch/webhook-contract";
+import { WEBHOOK_EVENT_TYPES, WebhookApi, webhookEndpointTrpc } from "@langwatch/webhook-contract";
 
 export const webhookEndpointTrpcTransport = defineTrpcRouter(WebhookApi, webhookEndpointTrpc)
   .procedure("eventTypes")

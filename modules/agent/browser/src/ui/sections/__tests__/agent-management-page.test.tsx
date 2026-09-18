@@ -12,6 +12,7 @@ import type {
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import type { AgentClient } from "../../../model/agent-client.ts";
 import {
   type AgentCardRenderInput,

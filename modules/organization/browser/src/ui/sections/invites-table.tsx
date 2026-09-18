@@ -1,11 +1,12 @@
 import { Badge, Box, Card, Heading, HStack, IconButton, Table, VStack } from "@chakra-ui/react";
-import { Mail, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
-import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
-import { Link } from "../elements/link.tsx";
 import { Menu } from "@langwatch/design-system/menu";
+import { Mail, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
+
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
-import { orgRoleOptions } from "../elements/organization-user-role-field.tsx";
 import { readableDate } from "../../model/display-formatters.ts";
+import { Link } from "../elements/link.tsx";
+import { orgRoleOptions } from "../elements/organization-user-role-field.tsx";
+import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 
 type OrganizationInvite = RouterOutputs["organization"]["getOrganizationPendingInvites"][number];
 

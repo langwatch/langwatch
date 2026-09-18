@@ -1,8 +1,8 @@
 import { chakra, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { SessionListRow } from "../session-list-row.ts";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { SessionListRow } from "../session-list-row.ts";
 
 // Session name and branch; untitled sessions show branch (work identifier);
 // name is keyboard-focusable control for replay.

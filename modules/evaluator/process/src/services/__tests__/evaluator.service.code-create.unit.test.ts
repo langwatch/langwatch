@@ -1,15 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import { EvaluatorService } from "../evaluator.service.ts";
+import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
+
 import type {
   EvaluatorRepository,
   PersistEvaluatorInput,
 } from "../../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
 import { EvaluatorHistoryService } from "../evaluator-history.service.ts";
+import { EvaluatorService } from "../evaluator.service.ts";
 
 /** The wire form of a config: what the repository row holds once persisted. */
 function persistedConfig(config: PersistEvaluatorInput["config"]): Evaluator["config"] {

@@ -1,6 +1,7 @@
 // Five permission checkbox rules moved from component; tested as table.
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
+
 import { actionOf, permissionsForResource, resourceOf } from "./permission-catalogue.ts";
 
 /** The actions that cannot stand without `view`. */

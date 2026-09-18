@@ -9,20 +9,21 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Search, X } from "lucide-react";
-import { useState } from "react";
-import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
+import { Search, X } from "lucide-react";
+import { useState } from "react";
+
 import { api } from "../../behavior/organization-api.ts";
+import { useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import {
   BindingInputRow,
   type PendingBinding,
   roleBadgeColor,
   scopeTypeLabel,
 } from "./group-binding-input-row.tsx";
-import { useShowErrorToast } from "../../behavior/organization-feedback.ts";
 
 export function CreateGroupDialog({
   organizationId,
@@ -111,7 +112,6 @@ export function CreateGroupDialog({
         <Dialog.Body pb={6}>
           <VStack gap={5} align="stretch">
             <Input
-              
               placeholder="Group name"
               value={name}
               onChange={(e) => setName(e.target.value)}

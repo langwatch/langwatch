@@ -1,14 +1,14 @@
-/**
- * The `/api/monitors` family over the REAL monitor application: memory
- * repositories, recording ports, and the process ports a mount supplies.
- */
-import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   bindRestMiddleware,
   createRestRuntime,
   projectRestFacts,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
+/**
+ * The `/api/monitors` family over the REAL monitor application: memory
+ * repositories, recording ports, and the process ports a mount supplies.
+ */
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { MonitorApi, type MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";

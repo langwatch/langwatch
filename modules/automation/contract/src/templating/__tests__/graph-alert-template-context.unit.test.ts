@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { buildGraphAlertTemplateContext } from "../template-context.ts";
 import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import { buildGraphAlertTemplateContext } from "../template-context.ts";
 
 const NOW = Temporal.Instant.from("2026-06-21T10:00:00.000Z");
 

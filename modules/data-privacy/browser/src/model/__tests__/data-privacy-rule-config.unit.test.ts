@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
-
 import {
   EMPTY_AUDIENCE,
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   ALL_MEMBERS_VALUE,
   type AudienceFormState,

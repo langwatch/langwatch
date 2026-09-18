@@ -1,28 +1,7 @@
 import { Box, Field, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
-import { toEpochMs } from "@langwatch/time";
-import debounce from "lodash-es/debounce";
-import { ExternalLink } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
-import { z } from "zod";
-
-import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
-import { Link } from "@langwatch/browser-host/link";
-import { Switch } from "@langwatch/design-system/switch";
-import type {
-  AvailableSource,
-  FieldMapping as UIFieldMapping,
-} from "@langwatch/prompt-browser-kit/variables";
-
-import { ComparisonConfigForm } from "@langwatch/experiment-browser/comparison-config-form";
-import type {
-  ComparisonEvaluatorConfig,
-  LocalEvaluatorConfig,
-  TargetConfig,
-} from "@langwatch/experiment-contract";
-import { isComparisonEvaluatorType } from "@langwatch/experiment-contract";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
-import { FormServerError } from "@langwatch/workflow-browser/handled-error-views";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Link } from "@langwatch/browser-host/link";
 import {
   getComplexProps,
   getDrawerStack,
@@ -31,24 +10,44 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { WorkflowCardDisplay } from "@langwatch/workflow-browser/workflow-card";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { Switch } from "@langwatch/design-system/switch";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-  evaluatorsSchema,getEvaluatorDefaultSettings
+  evaluatorsSchema,
+  getEvaluatorDefaultSettings,
 } from "@langwatch/evaluator-contract";
-import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser/platform-defaults";
+import { ComparisonConfigForm } from "@langwatch/experiment-browser/comparison-config-form";
+import type {
+  ComparisonEvaluatorConfig,
+  LocalEvaluatorConfig,
+  TargetConfig,
+} from "@langwatch/experiment-contract";
+import { isComparisonEvaluatorType } from "@langwatch/experiment-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import type {
+  AvailableSource,
+  FieldMapping as UIFieldMapping,
+} from "@langwatch/prompt-browser-kit/variables";
+import { toEpochMs } from "@langwatch/time";
+import { FormServerError } from "@langwatch/workflow-browser/handled-error-views";
+import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser/platform-defaults";
+import { WorkflowCardDisplay } from "@langwatch/workflow-browser/workflow-card";
+import debounce from "lodash-es/debounce";
+import { ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
+import { z } from "zod";
 
+import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
 import { type EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";
 import {
   EvaluatorEditorActions,
   EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
 } from "../../elements/evaluator-editor-chrome.tsx";
 import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section.tsx";
+import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
 
 // Stable module-level reference (not an inline JSX literal): ComparisonConfigForm
 // re-syncs its draft whenever this `value` prop's REFERENCE changes, so a fresh
@@ -714,12 +713,7 @@ export function EvaluatorGateSection({
 }) {
   const checked = gate.canRequire && required;
   return (
-    <HStack
-      align="flex-start"
-      gap={3}
-      paddingTop={4}
-      data-testid="evaluator-gate-section"
-    >
+    <HStack align="flex-start" gap={3} paddingTop={4} data-testid="evaluator-gate-section">
       <VStack align="stretch" gap={0.5} flex={1} minWidth={0}>
         <Text fontSize="sm" fontWeight="medium">
           {REQUIRED_TO_PASS_LABEL}

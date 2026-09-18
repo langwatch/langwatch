@@ -5,9 +5,10 @@
  * @see specs/analytics/timeseries-metric-validation.feature
  */
 
-import { describe, expect, it } from "vitest";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { describe, expect, it } from "vitest";
+
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import {
   KNOWN_METRIC_KEYS,

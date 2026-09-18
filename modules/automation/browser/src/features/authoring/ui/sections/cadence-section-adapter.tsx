@@ -1,8 +1,12 @@
-import { AutomationCadenceSection, type AutomationCadenceDraft } from "../blocks/cadence-section.tsx";
-import { type FacetAccordionProps } from "../elements/facet-section.tsx";
 import type { NotificationCadence } from "@langwatch/automation-contract";
-import { useAutomationStore } from "./automation-store.ts";
+
+import {
+  AutomationCadenceSection,
+  type AutomationCadenceDraft,
+} from "../blocks/cadence-section.tsx";
+import { type FacetAccordionProps } from "../elements/facet-section.tsx";
 import { useDraft } from "./automation-selectors.ts";
+import { useAutomationStore } from "./automation-store.ts";
 
 /** App adapter: binds the package-owned cadence facet to the draft store. */
 export function CadenceSection({

@@ -1,8 +1,9 @@
 import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { SmallLabel } from "@langwatch/design-system/small-label";
+import { useMemo } from "react";
+
 import {
   buildScopeHierarchy,
   type ModelProviderScopeEntry,

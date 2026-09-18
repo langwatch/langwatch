@@ -1,21 +1,21 @@
-import type { WireOf } from "@langwatch/api/web";
+import { Box, HStack, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
 /**
  * The snippets that call this evaluator from a customer's own code. A
  * narrowed family-local copy of the old `EvaluatorApiUsageDialog`, which
  * `EvaluatorListDrawer` still renders — deletes-only forbids repointing it.
  */
-
-import { Box, HStack, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
-import { useState } from "react";
+import type { WireOf } from "@langwatch/api/web";
+import { Dialog } from "@langwatch/design-system/dialog";
 import {
   AVAILABLE_EVALUATORS,
   type Evaluator,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
+import { ExternalLink } from "lucide-react";
+import { useState } from "react";
+
 import { langwatchEndpoint, langwatchEndpointEnv } from "../../model/langwatch-endpoint.ts";
 import { CodeSnippet } from "../elements/code-snippet.tsx";
-import { Dialog } from "@langwatch/design-system/dialog";
 
 export type EvaluatorApiUsageDialogProps = {
   evaluator: WireOf<Evaluator> | null;

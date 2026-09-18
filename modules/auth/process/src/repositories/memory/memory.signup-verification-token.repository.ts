@@ -1,4 +1,5 @@
 import { Temporal, type Instant } from "@langwatch/time";
+
 import type { SignUpVerificationTokenRepository } from "../signup-verification.repository.ts";
 import type { MemoryAuthDatabase } from "./memory.auth.database.ts";
 
@@ -7,9 +8,7 @@ import type { MemoryAuthDatabase } from "./memory.auth.database.ts";
  * expiry is judged, exactly as the delete-then-check the Prisma twin runs: a
  * link that arrives late is still spent, so it cannot be replayed.
  */
-export class MemorySignUpVerificationTokenRepository
-  implements SignUpVerificationTokenRepository
-{
+export class MemorySignUpVerificationTokenRepository implements SignUpVerificationTokenRepository {
   private constructor(private readonly memory: MemoryAuthDatabase) {}
 
   static create({

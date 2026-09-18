@@ -4,6 +4,7 @@ import {
   type WorkflowStudioCopySource,
 } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   WorkflowRowRepository,
   type WorkflowRowDraft,
@@ -80,7 +81,11 @@ const source = (dsl: unknown): WorkflowStudioCopySource => ({
 function build() {
   const datasets = new TestDatasetService(undefined, copiedDataset);
   const rows = new RecordingRowRepository();
-  return { datasets, rows, service: WorkflowStudioCopyService.create({ datasets: datasets.api, rows }) };
+  return {
+    datasets,
+    rows,
+    service: WorkflowStudioCopyService.create({ datasets: datasets.api, rows }),
+  };
 }
 
 describe("WorkflowStudioCopyService", () => {

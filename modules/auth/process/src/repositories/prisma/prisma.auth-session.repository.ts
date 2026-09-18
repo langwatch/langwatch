@@ -1,8 +1,6 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
-import type {
-  AuthSessionRepository,
-  StoredBrowserSession,
-} from "../auth-session.repository.ts";
+
+import type { AuthSessionRepository, StoredBrowserSession } from "../auth-session.repository.ts";
 
 const sessionSelect = {
   id: true,

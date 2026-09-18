@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
-import { createHttpProxyCaller } from "./http-proxy.fixture.ts";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
-import type { TraceApi } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { createHttpProxyCaller } from "./http-proxy.fixture.ts";
 
 const request = {
   projectId: "project_1",

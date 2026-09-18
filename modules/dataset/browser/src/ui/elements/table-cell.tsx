@@ -1,6 +1,7 @@
 import { Skeleton, VStack } from "@chakra-ui/react";
-import { type Cell, flexRender, type RowData } from "@tanstack/react-table";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import { type Cell, flexRender, type RowData } from "@tanstack/react-table";
+
 import { type DatasetTableRowData, useDatasetTable } from "../../model/dataset-table-context.tsx";
 import { EditableCell } from "./editable-cell.tsx";
 

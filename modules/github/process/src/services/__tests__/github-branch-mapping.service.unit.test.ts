@@ -1,5 +1,7 @@
+import type { GithubRepository } from "@langwatch/github-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
-import type { GithubInstallationLookup } from "../github-installation-access.service.ts";
+
 import type {
   GithubAppTokenCache,
   GithubInstallationDetails,
@@ -7,7 +9,6 @@ import type {
   GithubPullRequestSummary,
   MintInstallationTokenInput,
 } from "../../app/github.app.ts";
-import type { GithubRepository } from "@langwatch/github-contract";
 import type { GithubHost } from "../../app/github.members.ts";
 import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository.ts";
 import type {
@@ -18,7 +19,7 @@ import {
   GithubBranchMappingService,
   type BranchMappingTarget,
 } from "../github-branch-mapping.service.ts";
-import { Temporal } from "@langwatch/time";
+import type { GithubInstallationLookup } from "../github-installation-access.service.ts";
 
 const NOW = new Date("2026-01-01T00:00:00Z").getTime();
 

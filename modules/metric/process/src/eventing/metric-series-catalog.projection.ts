@@ -1,11 +1,16 @@
-import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
-import { metricMapGroupKey } from "../services/metric-processing.service.ts";
+import {
+  type AppendStore,
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "@langwatch/eventing";
 import {
   METRIC_MAP_COALESCE_MAX_BATCH,
   type MetricDataPointReceivedEvent,
   metricDataPointReceivedEventSchema,
   type CanonicalMetricDataPoint,
 } from "@langwatch/metric-contract";
+
+import { metricMapGroupKey } from "../services/metric-processing.service.ts";
 
 const events = [metricDataPointReceivedEventSchema] as const;
 

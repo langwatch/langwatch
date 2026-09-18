@@ -3,6 +3,7 @@
 import { VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { useState } from "react";
+
 import { annotationApi } from "../../behavior/annotation-api.ts";
 import type { AnnotationSuccessNotice } from "../../model/annotation-host.ts";
 import { QueueParticipants, type QueueParticipant } from "../blocks/queue-participants.tsx";

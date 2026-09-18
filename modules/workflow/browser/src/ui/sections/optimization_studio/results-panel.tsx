@@ -1,5 +1,10 @@
 import { HStack, type StackProps } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { ExternalImage } from "@langwatch/design-system/external-image";
+import { slugify } from "@langwatch/design-system/slugify";
+import { EvaluatorResultChip } from "@langwatch/evaluator-browser/evaluator-result-chip";
+import { useBatchEvaluationState } from "@langwatch/experiment-browser/batch-evaluation-state";
 import {
   BatchEvaluationResultsTable,
   type BatchRunSummary,
@@ -7,27 +12,23 @@ import {
   BatchSummaryFooter,
   transformBatchEvaluationData,
 } from "@langwatch/experiment-browser/batch-results";
-import { ExternalImage } from "@langwatch/design-system/external-image";
-import { EvaluatorResultChip } from "@langwatch/evaluator-browser/evaluator-result-chip";
 import { describeCellFailure } from "@langwatch/experiment-browser/cell-failure";
 import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { useBatchEvaluationState } from "@langwatch/experiment-browser/batch-evaluation-state";
+import type { Entry, StudioWorkflow } from "@langwatch/workflow-contract";
+import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
+import { useEffect, useState } from "react";
+
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { slugify } from "@langwatch/design-system/slugify";
-import { useRunEvalution } from "./use-run-evalution.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { isExperimentQueryEnabled } from "../../../model/studio-evaluation-query.ts";
+import { OpenFullResultsButton } from "../../elements/optimization_studio/open-full-results-button.tsx";
 import {
   useWorkflowSelectedEvaluationRun,
   WorkflowEvaluationResultsLayout,
   WorkflowResultsPanel,
 } from "../../elements/workflow-results-panel.tsx";
-import type { Entry, StudioWorkflow } from "@langwatch/workflow-contract";
-import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
-import { OpenFullResultsButton } from "../../elements/optimization_studio/open-full-results-button.tsx";
 import { RunViaApiButton } from "./run-via-api-button.tsx";
+import { useRunEvalution } from "./use-run-evalution.ts";
 
 export function ResultsPanel({
   isCollapsed,

@@ -4,21 +4,24 @@ import type {
   GraphTriggerEvaluationResult,
   TriggerSummary,
 } from "@langwatch/automation-contract";
+
 import type {
   AutomationGraphActivity,
-  AutomationProjectDirectory,AutomationClock,AutomationGraphDelivery
+  AutomationProjectDirectory,
+  AutomationClock,
+  AutomationGraphDelivery,
 } from "../app/automation.members.ts";
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
+import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
+import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import {
   type AutomationDispatchError,
   type AutomationLogger,
 } from "./automation-graph-runtime.service.ts";
 import { type AutomationSlackBotTokenDecryptor } from "./automation-slack-secrets.service.ts";
-import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
-import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
-import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
-import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
-import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import { GraphAlertDispatchService } from "./graph-alert-dispatch.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
@@ -77,8 +80,7 @@ export class AutomationGraphActivityService implements AutomationGraphActivity {
   private constructor(
     private readonly active: ActiveTriggerCacheService,
     private readonly evaluator: GraphTriggerEvaluatorService,
-  ) {
-  }
+  ) {}
 
   getActiveGraphTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
     return this.active.getActiveGraphTriggersForProject(projectId);

@@ -5,6 +5,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "react-feather";
+
 import {
   actionOf,
   type AuthzResource,

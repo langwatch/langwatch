@@ -6,9 +6,10 @@ import {
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-cost-metrics.service.ts";
 import { createCodingAgentCostDriftSubscriber } from "../coding-agent-cost-drift.subscriber.ts";
-import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 
 describe("codingAgentCostDrift subscriber redelivery", () => {
   let metricsHarness: ReturnType<typeof createRecordingMeterProvider>;

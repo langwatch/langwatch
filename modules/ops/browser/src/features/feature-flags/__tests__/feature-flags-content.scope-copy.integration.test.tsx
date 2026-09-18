@@ -3,8 +3,9 @@
  */
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FeatureFlagsContent } from "../ui/sections/feature-flags-content.tsx";
+
 import { renderWithOpsHost, fakeOpsHost } from "../../../testing.tsx";
+import { FeatureFlagsContent } from "../ui/sections/feature-flags-content.tsx";
 
 /** Copy is the only source of truth on where values come from (drifted when PostHog
  * left). Assertions pin meaning not wording; no external service names. */

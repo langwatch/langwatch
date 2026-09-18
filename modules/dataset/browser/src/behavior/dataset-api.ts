@@ -4,8 +4,8 @@
  * split. Segment names are load-bearing (React Query cache key).
  */
 
-import type { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
 
 /**
  * Procedures other features own. Each belongs in that feature's own contract;

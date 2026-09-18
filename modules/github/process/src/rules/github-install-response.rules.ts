@@ -5,8 +5,7 @@ export class GithubInstallResponseRules implements GithubInstallResponse {
     return new GithubInstallResponseRules();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   successHtml(login: string): string {
     const safe = login.replace(/[^a-zA-Z0-9_-]/g, "");

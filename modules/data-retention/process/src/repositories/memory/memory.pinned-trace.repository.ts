@@ -7,6 +7,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import type { PinnedTraceRepository } from "../pinned-trace.repository.ts";
 
 const PINNED_TRACE_KSUID_RESOURCE = "pin";

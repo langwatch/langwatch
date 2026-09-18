@@ -1,29 +1,34 @@
-import { Temporal } from "@langwatch/time";
+import {
+  type SpendUsage,
+  nanoUsdToDecimalString,
+  parseSummedNanoUsd,
+  type SpendEventRow,
+  type SpendEventStatus,
+  type SpendFilters,
+} from "@langwatch/gateway-contract";
 /**
  * Gateway spend: the per-request billing record, one row per REQUEST at its
  * latest status, keyed (TenantId, GatewayRequestId) on a ReplacingMergeTree;
  * every read here is FINAL since RMT dedup is eventual. CostNanoUSD is canonical.
  */
-
 import { createLogger } from "@langwatch/observability";
-import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
-import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
-import { type SpendUsage,
-  nanoUsdToDecimalString,
-  parseSummedNanoUsd,
-  type SpendEventRow,
-  type SpendEventStatus,
-  type SpendFilters } from "@langwatch/gateway-contract";
-import { EMPTY_SPEND_USAGE, GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../eventing/gateway-spend-commands.process.ts";
-import {
-  GatewaySpendFiltersAdapter,
-  SPEND_STATUS_IN_FLIGHT,
-} from "../../adapters/gateway-spend-filters.adapter.ts";
-import { GatewaySpendGroupingAdapter } from "../../adapters/gateway-spend-grouping.adapter.ts";
+import { Temporal } from "@langwatch/time";
+
 import {
   GatewaySpendCursorAdapter,
   type GatewaySpendEventsCursor,
-} from "../../adapters/gateway-spend-cursor.adapter.ts";
+} from "../../rules/gateway-spend-cursor.rules.ts";
+import {
+  GatewaySpendFiltersAdapter,
+  SPEND_STATUS_IN_FLIGHT,
+} from "../../rules/gateway-spend-filters.rules.ts";
+import { GatewaySpendGroupingAdapter } from "../../rules/gateway-spend-grouping.rules.ts";
+import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
+import {
+  EMPTY_SPEND_USAGE,
+  GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
+} from "../../eventing/gateway-spend-commands.process.ts";
+import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
 import {
   GatewaySpendEvents,
   type SpendBucket,

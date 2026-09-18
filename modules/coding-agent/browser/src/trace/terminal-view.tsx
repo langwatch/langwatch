@@ -1,5 +1,11 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { readableDate } from "../short-date.ts";
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { classifyPromptText } from "@langwatch/coding-agent-contract";
+import {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";
 import {
   Fragment,
   memo,
@@ -10,33 +16,30 @@ import {
   useRef,
   useState,
 } from "react";
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import { classifyPromptText } from "@langwatch/coding-agent-contract";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "@langwatch/design-system/display-formatters";
+
 import { formatDurationSeconds } from "../duration.ts";
-import { type CacheRebuildEvent, findCacheRebuilds } from "./token-timeline.ts";
-import { toolResultBodyToString } from "./tool-result-body.ts";
-import { CLAUDE_MARK_GRADIENT, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
-import { SyntaxHighlightedCode } from "./terminal-syntax-highlighted-code.tsx";
-import type { SessionBanner } from "./terminal-session-banner.ts";
-import { type TurnDivider,
-  CONVERSATION_TURN_CAP,
-  type EarlierTotals,
-  type ScrollbackStatus } from "./terminal-session-scrollback.ts";
+import { readableDate } from "../short-date.ts";
 import { TerminalDiff } from "./terminal-diff.tsx";
 import { TerminalOutput } from "./terminal-output.tsx";
+import { CLAUDE_MARK_GRADIENT, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 import { TerminalPatch } from "./terminal-patch.tsx";
+import type { SessionBanner } from "./terminal-session-banner.ts";
+import {
+  type TurnDivider,
+  CONVERSATION_TURN_CAP,
+  type EarlierTotals,
+  type ScrollbackStatus,
+} from "./terminal-session-scrollback.ts";
 import {
   buildEntryTimeline,
   extractDiffFromToolInput,
   isDiffTool,
   toolPrimaryArg,
 } from "./terminal-session.ts";
+import { SyntaxHighlightedCode } from "./terminal-syntax-highlighted-code.tsx";
 import { parsePatchHunks, type TerminalToolSpan } from "./terminal-tool-spans.ts";
+import { type CacheRebuildEvent, findCacheRebuilds } from "./token-timeline.ts";
+import { toolResultBodyToString } from "./tool-result-body.ts";
 
 /** What actually ran, keyed by the tool span's OWN id (matches `entry.spanId`). */
 export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;

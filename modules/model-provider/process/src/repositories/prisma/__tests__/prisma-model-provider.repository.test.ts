@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
+
 import { ModelProviderCredentialCodec } from "../../../app/model-provider.members.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 

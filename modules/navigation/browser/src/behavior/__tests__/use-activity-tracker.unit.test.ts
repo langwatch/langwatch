@@ -1,6 +1,7 @@
 /** Tests what Quick Search records; uses real parseEntityUrl, recognizes legacy addresses */
 
 import { describe, expect, it } from "vitest";
+
 import { parseEntityUrl } from "../use-activity-tracker.ts";
 
 describe("useActivityTracker URL parsing", () => {

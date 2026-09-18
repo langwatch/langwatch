@@ -6,6 +6,7 @@ import {
   secretSchema,
   type Secret,
 } from "@langwatch/secret-contract";
+
 import type {
   CreateStoredSecretInput,
   SecretIdentity,

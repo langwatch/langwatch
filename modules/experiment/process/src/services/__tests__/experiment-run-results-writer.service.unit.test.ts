@@ -1,12 +1,13 @@
+import type { EvaluationV3Event } from "@langwatch/experiment-contract";
 /**
  * The writer a streaming run feeds its frames into. The route decides whether a run writes
  * its cells at all; this decides what one frame stream turns into.
  * @see specs/experiments-v3/workbench-versioning.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { EvaluationV3Event } from "@langwatch/experiment-contract";
-import type { ExperimentService } from "../experiment.service.ts";
+
 import { ExperimentRunResultsWriterService } from "../experiment-run-results-writer.service.ts";
+import type { ExperimentService } from "../experiment.service.ts";
 
 const recordWorkbenchRunResults = vi.fn();
 const getWorkbenchState = vi.fn();

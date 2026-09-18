@@ -6,8 +6,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { LLMConfig, StudioWorkflow } from "../studio-workflow.ts";
-import type { WorkflowDsl } from "../workflow.ts";
 import { migrateDSLVersion } from "../workflow-dsl-migration.ts";
+import type { WorkflowDsl } from "../workflow.ts";
 
 const legacyWorkflow = (overrides: {
   default_llm?: Record<string, unknown>;

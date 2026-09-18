@@ -1,16 +1,24 @@
-import { type SlackActionParams, slackDeliveryMethodOf,REPORT_TRIGGER_DEFAULTS,renderTriggerEmail,renderTriggerSlack,type SlackTemplateType,
+import {
+  type SlackActionParams,
+  slackDeliveryMethodOf,
+  REPORT_TRIGGER_DEFAULTS,
+  renderTriggerEmail,
+  renderTriggerSlack,
+  type SlackTemplateType,
   buildReportTemplateContext,
   type ReportChart,
   type ReportTraceRow,
   type ReportSource,
   findReportFromTriggerRow,
-  type Trigger } from "@langwatch/automation-contract";
-import { createLogger } from "@langwatch/observability";
-import { Cron } from "croner";
+  type Trigger,
+} from "@langwatch/automation-contract";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
+import { createLogger } from "@langwatch/observability";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
+import { Cron } from "croner";
+
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
-import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:report-dispatch");
 

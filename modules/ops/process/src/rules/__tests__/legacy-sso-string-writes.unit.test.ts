@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AdminBackofficeService } from "../../services/admin-backoffice.service.ts";
+
 import {
   AuditStub,
   AuthStub,
@@ -7,6 +7,7 @@ import {
   RepositoryStub,
 } from "../../services/__tests__/support/backoffice-doubles.ts";
 import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
+import { AdminBackofficeService } from "../../services/admin-backoffice.service.ts";
 import {
   legacySsoStringColumnsIn,
   legacySsoStringWritesToRefuse,

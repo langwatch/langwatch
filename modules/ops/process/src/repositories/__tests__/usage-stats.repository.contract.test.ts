@@ -45,12 +45,10 @@ function contractCases(backend: Backend): void {
     it("answers zero for an organization with no stored counts", async () => {
       const ch = backend.clickhouse();
 
-      expect(
-        await ch.findTraceCount({ organizationId: "org_unknown", projectIds: [] }),
-      ).toBe(0);
-      expect(
-        await ch.findScenarioRunCount({ organizationId: "org_unknown", projectIds: [] }),
-      ).toBe(0);
+      expect(await ch.findTraceCount({ organizationId: "org_unknown", projectIds: [] })).toBe(0);
+      expect(await ch.findScenarioRunCount({ organizationId: "org_unknown", projectIds: [] })).toBe(
+        0,
+      );
     });
   });
 }
@@ -71,7 +69,9 @@ describe("given the memory usage-stats repositories", () => {
   it("lists the organizations stored ahead of a report", async () => {
     store.usageStatsOrganizations.push({ id: "org_1", name: "Acme" });
 
-    const listed = await MemoryUsageStatsOrganizationRepository.create({ store }).listForUsageStats();
+    const listed = await MemoryUsageStatsOrganizationRepository.create({
+      store,
+    }).listForUsageStats();
 
     expect(listed).toEqual([{ id: "org_1", name: "Acme" }]);
   });

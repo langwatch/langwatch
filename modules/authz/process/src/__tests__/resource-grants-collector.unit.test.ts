@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
-import { AuthzCollectorService } from "../services/authz-collector.service.ts";
-import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
-import { liveShareLinkRow, ORG, PROJECT, TEAM, traceScope } from "./support/resource-fixtures.ts";
 import { type Instant, Temporal, nowInstant } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import { AuthzCollectorService } from "../services/authz-collector.service.ts";
+import { liveShareLinkRow, ORG, PROJECT, TEAM, traceScope } from "./support/resource-fixtures.ts";
 
 const customRoleBinding = [
   {
@@ -64,9 +65,7 @@ describe("collector at the resource tier", () => {
   describe("when a custom role's stored payload is malformed", () => {
     const collectWith = async (permissions: unknown) => {
       const reader = makeReader({
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(customRoleBinding),
         findCustomRolePermissions: vi.fn().mockResolvedValue([{ id: "cr-1", permissions }]),
       });

@@ -1,13 +1,14 @@
 import { bindRestHeader } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
+
 import { SuiteApp } from "#app/suite.app";
 import { suiteRepositories } from "#repositories/suite-repositories.registry";
 import { suiteSurfaceFact } from "#rules/suite-wire-v1.rules";
 import { createRunPlansRest } from "#transport/run-plans.rest";
-import { createSuitesAliasRest } from "#transport/suites-alias.rest";
-import { createTestSuitesRest } from "#transport/test-suites.rest";
 import { suiteTrpcTransport } from "#transport/suite.trpc";
+import { createSuitesAliasRest } from "#transport/suites-alias.rest";
 import { testSuiteTrpcTransport } from "#transport/test-suite.trpc";
+import { createTestSuitesRest } from "#transport/test-suites.rest";
 
 export const suiteServer = defineServerModule("suite")
   .withRepositories(suiteRepositories)

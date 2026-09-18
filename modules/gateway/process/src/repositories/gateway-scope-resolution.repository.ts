@@ -1,4 +1,5 @@
 import type { ModelProvider } from "@langwatch/gateway-contract";
+
 import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 
 /** A model provider row a virtual key may reach. */

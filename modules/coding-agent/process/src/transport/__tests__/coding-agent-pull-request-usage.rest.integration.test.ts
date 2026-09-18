@@ -11,7 +11,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CodingAgentApp } from "#app/coding-agent.app";
 import type { CodingAgentSessionService } from "#services/coding-agent.service";
-import { MemoryCodingAgentRepositories } from "../../repositories/memory/memory.coding-agent.repositories.ts";
+
+import {
+  TestBillingPolicy,
+  TestGithubService,
+  TestProjectService,
+  pullRequest,
+} from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import type {
   CodingAgentAuditSink,
   CodingAgentViewerVisibilityReader,
@@ -22,12 +28,7 @@ import {
   type CodingAgentScopePermissions,
   type CodingAgentScopeCaller,
 } from "../../app/coding-agent.members.ts";
-import {
-  TestBillingPolicy,
-  TestGithubService,
-  TestProjectService,
-  pullRequest,
-} from "../../__tests__/fixtures/coding-agent.fixture.ts";
+import { MemoryCodingAgentRepositories } from "../../repositories/memory/memory.coding-agent.repositories.ts";
 import { codingAgentRestCaller, codingAgentRollupRest } from "../coding-agent.rest.ts";
 
 const USAGE_PATH = "/api/coding-agent/pull-request-usage?repository=acme/widgets&pullRequest=1";

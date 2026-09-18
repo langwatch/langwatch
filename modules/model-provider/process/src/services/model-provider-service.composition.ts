@@ -1,7 +1,8 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
+
 import {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
@@ -13,8 +14,8 @@ import {
 import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
-import { ModelProviderService } from "./model-provider.service.ts";
 import { ModelProviderKeysService } from "./model-provider-keys.service.ts";
+import { ModelProviderService } from "./model-provider.service.ts";
 
 export interface PostgresModelProviderAdapterOptions {
   database: ProcessMembers["prisma"];

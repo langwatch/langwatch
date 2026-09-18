@@ -4,11 +4,11 @@
  * Spec: specs/ai-gateway/virtual-keys.feature
  */
 import { cleanup, screen } from "@testing-library/react";
-
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
 
 const ORG_ID = "org-acme";
 const TEAM_ID = "team-platform";

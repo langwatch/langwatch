@@ -1,7 +1,8 @@
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Gauge } from "lucide-react";
-import { AnnotationHoverChip } from "./annotation-hover-chip.tsx";
+
 import { annotationScoresLine, countAnnotationScores } from "../../model/annotation-row.ts";
+import { AnnotationHoverChip } from "./annotation-hover-chip.tsx";
 
 export function AnnotationScoresChip({
   annotations,

@@ -9,6 +9,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { ConfigFormCtx } from "../../../model/provider-types.ts";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
@@ -50,8 +51,9 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
 }));
 
 import { SLACK_BOT_TOKEN_KEPT, type SlackPreview } from "@langwatch/automation-contract";
-import slackClient, { type SlackSlice } from "../ui/sections/slack.client.tsx";
+
 import { SLACK_BLOCK_KIT_TEMPLATES, templateOptionsFor } from "../../slack-templates/index.ts";
+import slackClient, { type SlackSlice } from "../ui/sections/slack.client.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

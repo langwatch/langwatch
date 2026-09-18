@@ -17,8 +17,9 @@ import {
   type UpdateAnnotationInput,
 } from "@langwatch/annotation-contract";
 import { PrismaRepository, type PrismaModelClient } from "@langwatch/prisma-client";
-import type { Annotation as AnnotationRow, Prisma } from "@langwatch/prisma-client/generated";
 import { isRecordNotFoundError } from "@langwatch/prisma-client/errors";
+import type { Annotation as AnnotationRow, Prisma } from "@langwatch/prisma-client/generated";
+
 import type { AnnotationRepository } from "../annotation.repository.ts";
 
 const annotationSelect = {

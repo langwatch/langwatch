@@ -1,14 +1,15 @@
+import type { CallOutcome } from "@langwatch/agent-contract";
+import type { EvaluationsV3State } from "@langwatch/experiment-contract";
 /**
  * Facade-level seams: behaviour that crosses two collaborators, or proves
  * the facade's delegation is wired rather than merely present.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluationsV3State } from "@langwatch/experiment-contract";
-import type { CallOutcome } from "@langwatch/agent-contract";
-import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
-import type { ConnectedDispatch } from "../experiment-connected-cell.service.ts";
+
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
+import type { ConnectedDispatch } from "../experiment-connected-cell.service.ts";
+import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
 
 const createTestDataset = (rowCount = 3) =>
   Array.from({ length: rowCount }, (_, i) => ({

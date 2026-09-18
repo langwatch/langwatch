@@ -1,3 +1,7 @@
+import { moduleApi } from "@langwatch/kernel/module-api";
+import type { Instant } from "@langwatch/time";
+
+import type { TopicClusteringRequest } from "./project.responses.ts";
 import type {
   ActiveProjectsByScopes,
   ActiveProjectsByScopesInput,
@@ -18,9 +22,6 @@ import type {
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./project.ts";
-import type { TopicClusteringRequest } from "./project.responses.ts";
-import { moduleApi } from "@langwatch/kernel";
-import type { Instant } from "@langwatch/time";
 
 export type ProjectPath = { projectId: string; fullPath: string };
 

@@ -3,11 +3,12 @@
  * registrations.
  */
 import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
-import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
+
+import { type EvaluationExecutionIntent } from "../app/evaluation.members.ts";
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsRollupRow } from "../eventing/evaluation-analytics-rollup.projection.ts";
-import { type EvaluationExecutionIntent } from "../app/evaluation.members.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import { EvaluationProcessingAdapter } from "./evaluation-processing.service.ts";
 
@@ -80,20 +81,21 @@ export class EvaluationProcessingProducerAdapter {
   }): ReturnType<EvaluationProcessingAdapter["build"]> {
     const { processName } = input;
 
-  return EvaluationProcessingAdapter.createPipeline({
-    evalRunStore: new ProducerOnlyFoldStore<EvaluationRunData>(processName, "evaluation run"),
-    evaluationAnalyticsStore: new ProducerOnlyFoldStore<EvaluationAnalyticsData>(
-      processName,
-      "evaluation analytics",
-    ),
-    evaluationAnalyticsRollupAppendStore: new ProducerOnlyAppendStore<EvaluationAnalyticsRollupRow>(
-      processName,
-      "evaluation analytics rollup",
-    ),
-    executeEvaluationCommand: ExecuteEvaluationCommand.create(
-      new ProducerOnlyExecutionIntent(processName),
-    ),
-    automations: producerOnlyAutomations(processName),
-  });
+    return EvaluationProcessingAdapter.createPipeline({
+      evalRunStore: new ProducerOnlyFoldStore<EvaluationRunData>(processName, "evaluation run"),
+      evaluationAnalyticsStore: new ProducerOnlyFoldStore<EvaluationAnalyticsData>(
+        processName,
+        "evaluation analytics",
+      ),
+      evaluationAnalyticsRollupAppendStore:
+        new ProducerOnlyAppendStore<EvaluationAnalyticsRollupRow>(
+          processName,
+          "evaluation analytics rollup",
+        ),
+      executeEvaluationCommand: ExecuteEvaluationCommand.create(
+        new ProducerOnlyExecutionIntent(processName),
+      ),
+      automations: producerOnlyAutomations(processName),
+    });
   }
 }

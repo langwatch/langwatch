@@ -44,7 +44,10 @@ function projectsOwning(ownerUserId: string | null) {
   return { projects: { findPersonalWorkspaceOwner }, findPersonalWorkspaceOwner };
 }
 
-function mintService(options: { ownerUserId?: string | null; share?: AgentSandboxKeyShareRepository }) {
+function mintService(options: {
+  ownerUserId?: string | null;
+  share?: AgentSandboxKeyShareRepository;
+}) {
   const { projects, findPersonalWorkspaceOwner } = projectsOwning(options.ownerUserId ?? null);
   return {
     service: AgentSandboxKeyMintService.create({

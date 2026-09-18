@@ -4,16 +4,12 @@
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type {
-  ModelProviderResolution,
-  ModelProviderApi,
-} from "@langwatch/model-provider-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/kernel";
+import type { ModelProviderResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-
 import { vi } from "vitest";
 
 import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
@@ -93,8 +89,11 @@ export function createEvaluatorTestApp(
         workflows: createApiFixture<WorkflowApi>({ assertInProject: async () => void 0 }),
         modelProviders,
       },
-      members: { prisma: createApiFixture<PrismaClient>() },
-      config: {},
+      members: {
+        prisma: createApiFixture<PrismaClient>(),
+        publicBaseUrl: "https://langwatch.test",
+      },
+      config: undefined,
       resources: new ResourceScope(),
     },
     graph,

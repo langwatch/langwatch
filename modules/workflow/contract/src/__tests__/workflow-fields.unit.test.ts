@@ -2,7 +2,6 @@
  * @vitest-environment node
  */
 
-import { describe, expect, it } from "vitest";
 import type {
   Component,
   StudioEdge,
@@ -14,6 +13,7 @@ import {
   getWorkflowEntryOutputs,
   isOutputConnectedToNonEvaluator,
 } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
 
 describe("workflowFields", () => {
   describe("isOutputConnectedToNonEvaluator()", () => {

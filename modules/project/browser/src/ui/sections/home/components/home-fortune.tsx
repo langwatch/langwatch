@@ -2,8 +2,9 @@ import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { LuDices } from "react-icons/lu";
-import { HomeCard } from "./home-card.tsx";
+
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import { HomeCard } from "./home-card.tsx";
 
 /**
  * A fortune cookie for the observability-minded: one mono line per visit,

@@ -1,4 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+
 import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 
 /**

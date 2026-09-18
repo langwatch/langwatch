@@ -1,3 +1,4 @@
+import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -182,7 +183,12 @@ describe("resolveEligible", () => {
       expect(
         resolveEligible({
           scopes: keyAtProject,
-          providers: [{ ...orgProvider, disabledAt: new Date("2026-07-01T00:00:00Z") }],
+          providers: [
+            {
+              ...orgProvider,
+              disabledAt: fromDate(new Date("2026-07-01T00:00:00Z")),
+            },
+          ],
           hierarchy,
         }),
       ).toEqual([]);

@@ -145,11 +145,9 @@ export function lwqlDerivedConnectionFromEnv(
 
   return {
     url: target.serverUrl.toString(),
-    username:
-      env.LWQL_CLICKHOUSE_USER ?? LWQL_CONNECTION_DEFAULTS.restrictedUser,
+    username: env.LWQL_CLICKHOUSE_USER ?? LWQL_CONNECTION_DEFAULTS.restrictedUser,
     password,
     database: target.database,
-    tenantSetting:
-      env.LWQL_TENANT_SETTING ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
+    tenantSetting: env.LWQL_TENANT_SETTING ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
   };
 }

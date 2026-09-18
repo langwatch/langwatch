@@ -282,9 +282,7 @@ describe("MonitorApp", () => {
       const { app } = harness({ replication, evaluators });
 
       await expect(app.copy(copy)).rejects.toMatchObject({ code: "evaluator_not_found" });
-      expect(evaluators.archived).toEqual([
-        { id: "evaluator-copied", projectId: "project-2" },
-      ]);
+      expect(evaluators.archived).toEqual([{ id: "evaluator-copied", projectId: "project-2" }]);
       expect(replication.deletedWorkflows).toEqual([
         { workflowId: "workflow-copied", projectId: "project-2" },
       ]);

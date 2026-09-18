@@ -12,6 +12,7 @@ import {
   resolveLatestAlias,
 } from "@langwatch/model-provider-contract";
 import { AlertTriangle } from "lucide-react";
+
 import { modelProviderIcons } from "./model-provider-icons.tsx";
 
 const MODEL_ICON_SIZE = "16px";

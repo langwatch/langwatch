@@ -1,16 +1,21 @@
-/**
- * The CLI device grant (RFC 8628) under `/api/auth/cli`, one state machine
- * over one keyspace. ORDERING: mount this family BEFORE the `/api/auth/*`
- * catch-all. @see specs/ai-governance/cli-onboarding/
- */
-import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
 import {
   ApiKeyScopeViolationError,
   type ApiKeyApi,
   type CliKeyScopeSummary,
   type CliKeySelection,
 } from "@langwatch/api-key-contract";
+/**
+ * The CLI device grant (RFC 8628) under `/api/auth/cli`, one state machine
+ * over one keyspace. ORDERING: mount this family BEFORE the `/api/auth/*`
+ * catch-all. @see specs/ai-governance/cli-onboarding/
+ */
+import { publicRoute } from "@langwatch/api/access";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestProtocolProducer,
+  type RestAnswer,
+} from "@langwatch/api/rest";
 import {
   approveRequestSchema,
   clientInfoSchema,
@@ -22,12 +27,11 @@ import {
   refreshRequestSchema,
 } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { moduleApi } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
-import { HTTPException } from "hono/http-exception";
 
 import type { AuthDirectory } from "../app/auth.members.ts";
 import {
@@ -39,10 +43,6 @@ import {
 } from "../services/cli-device-session.service.ts";
 
 const logger = createLogger("langwatch:auth-cli");
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
@@ -110,6 +110,22 @@ export const AuthCliDeviceFlowApi = moduleApi<AuthCliDeviceFlowApi>()("auth");
 
 const JSON_MEDIA_TYPE = "application/json";
 
+type CliDeviceFlowAnswer = Readonly<{
+  status: 200 | 400 | 401 | 403 | 404 | 408 | 409 | 410 | 428 | 429 | 500;
+  body: unknown;
+}>;
+
+function protocolAnswer(
+  response: RestProtocolProducer<"application/json">,
+  answer: CliDeviceFlowAnswer,
+): RestAnswer<"protocol"> {
+  return response.write({
+    status: answer.status,
+    mediaType: JSON_MEDIA_TYPE,
+    body: JSON.stringify(answer.body),
+  });
+}
+
 /**
  * The device flow answers OAuth's own bodies — `authorization_pending`,
  * `slow_down`, `expired_token` and the token response — which released CLI
@@ -132,44 +148,35 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
 
   .post("/api/auth/cli/device-code", "startCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, raw }) => {
-    const parsed = deviceCodeRequestSchema.safeParse(posted(raw));
-
-    if (!parsed.success) {
-      return refuse("invalid_request", parsed.error.issues[0]?.message ?? "invalid body", 400);
-    }
-
-    const record = await app.sessions().startDeviceCode({
-      credentialType: parsed.data.credential_type,
-    });
-    const verificationUri = verificationUriOf(app);
-
-    return answer({
-      device_code: record.device_code,
-      user_code: record.user_code,
-      verification_uri: verificationUri,
-      verification_uri_complete: `${verificationUri}?user_code=${encodeURIComponent(record.user_code)}`,
-      expires_in: DEVICE_CODE_TTL_SECONDS,
-      interval: MIN_POLL_INTERVAL_SECONDS,
-    });
+  .withResponse("protocol", {
+    produces: JSON_MEDIA_TYPE,
+    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
   })
+  .handle(async ({ app, raw, response }) =>
+    protocolAnswer(response, await startDeviceFlow({ app, raw })),
+  )
 
   .post("/api/auth/cli/exchange", "exchangeCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, raw }) => exchange({ app, raw }))
+  .withResponse("protocol", {
+    produces: JSON_MEDIA_TYPE,
+    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
+  })
+  .handle(async ({ app, raw, response }) => protocolAnswer(response, await exchange({ app, raw })))
 
   .post("/api/auth/cli/refresh", "refreshCliDeviceSession")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, raw }) => refresh({ app, raw }))
+  .withResponse("protocol", {
+    produces: JSON_MEDIA_TYPE,
+    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
+  })
+  .handle(async ({ app, raw, response }) => protocolAnswer(response, await refresh({ app, raw })))
 
   /**
    * Read by the browser approval page so it can show what is being approved.
@@ -179,66 +186,37 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   .get("/api/auth/cli/lookup", "lookupCliDeviceCode")
   .withQuery(lookupQuerySchema)
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, input, request }) => {
-    const person = await app.session(request);
-
-    if (!person) return refuse("unauthorized", "Sign in to continue", 401);
-
-    if (!input.user_code) return refuse("invalid_request", "user_code is required", 400);
-
-    const record = await app.sessions().tryFindDeviceCodeByUserCode(input.user_code);
-
-    if (!record) {
-      return refuse("not_found", "Code not recognised — it may have expired", 404);
-    }
-
-    if (expired(record)) {
-      return refuse("expired", "Code has expired — restart `langwatch login`", 410);
-    }
-
-    return answer({
-      user_code: record.user_code,
-      status: record.status,
-      created_at: record.created_at,
-      expires_at: record.expires_at,
-      // The approval page branches its journey on this: `device_session` shows
-      // the approve-only flow, `project_api_key` shows a project picker whose
-      // key is sent to the CLI. Defaults for records minted before the field.
-      credential_type: record.credential_type ?? "device_session",
-    });
+  .withResponse("protocol", {
+    produces: JSON_MEDIA_TYPE,
+    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
   })
+  .handle(async ({ app, input, request, response }) =>
+    protocolAnswer(response, await lookupDeviceFlow({ app, input, request })),
+  )
 
   .post("/api/auth/cli/approve", "approveCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, raw, request }) => approve({ app, raw, request }))
+  .withResponse("protocol", {
+    produces: JSON_MEDIA_TYPE,
+    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
+  })
+  .handle(async ({ app, raw, request, response }) =>
+    protocolAnswer(response, await approve({ app, raw, request })),
+  )
 
   .post("/api/auth/cli/deny", "denyCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, raw, request }) => {
-    const person = await app.session(request);
-
-    if (!person) return refuse("unauthorized", "Sign in to continue", 401);
-
-    const parsed = denyRequestSchema.safeParse(posted(raw));
-
-    if (!parsed.success) return refuse("invalid_request", "user_code is required", 400);
-
-    const record = await app.sessions().tryFindDeviceCodeByUserCode(parsed.data.user_code);
-
-    // Idempotent — denying an unknown code is a no-op.
-    if (!record) return answer({ ok: true });
-
-    await app.sessions().denyDeviceCode(record.device_code);
-
-    return answer({ ok: true });
+  .withResponse("protocol", {
+    produces: JSON_MEDIA_TYPE,
+    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
   })
+  .handle(async ({ app, raw, request, response }) =>
+    protocolAnswer(response, await denyDeviceFlow({ app, raw, request })),
+  )
 
   /**
    * Either token may be supplied; supplying both kills both immediately.
@@ -247,10 +225,13 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
    */
   .post("/api/auth/cli/logout", "endCliDeviceSession")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, raw }) => logout({ app, raw }))
+  .withResponse("protocol", {
+    produces: JSON_MEDIA_TYPE,
+    because: "RFC 8628 device-grant clients require OAuth token and polling error bodies.",
+  })
+  .handle(async ({ app, raw, response }) => protocolAnswer(response, await logout({ app, raw })))
   .build();
 
 /**
@@ -264,7 +245,7 @@ async function exchange({
 }: {
   app: AuthCliDeviceFlowApi;
   raw: string;
-}): Promise<RestRawResult> {
+}): Promise<CliDeviceFlowAnswer> {
   const parsed = exchangeRequestSchema.safeParse(posted(raw));
 
   if (!parsed.success) return refuse("invalid_request", "device_code is required", 400);
@@ -411,7 +392,7 @@ async function refusalForState({
   app: AuthCliDeviceFlowApi;
   record: CliDeviceCodeRecord;
   deviceCode: string;
-}): Promise<RestRawResult | null> {
+}): Promise<CliDeviceFlowAnswer | null> {
   // Server-side expiry check, in case the store has not evicted yet.
   if (expired(record)) {
     await app.sessions().consumeDeviceCode({ record });
@@ -452,7 +433,7 @@ async function projectKeyAnswer({
   user: Readonly<{ id: string; email: string | null; name: string | null }>;
   organization: Readonly<{ id: string; name: string; slug: string }>;
   endpoint: string;
-}): Promise<RestRawResult> {
+}): Promise<CliDeviceFlowAnswer> {
   if (!record.project_api_key) {
     logger.warn(
       `[auth-cli] approved project_api_key device_code ${record.device_code} missing project payload — returning pending`,
@@ -514,7 +495,7 @@ async function refresh({
 }: {
   app: AuthCliDeviceFlowApi;
   raw: string;
-}): Promise<RestRawResult> {
+}): Promise<CliDeviceFlowAnswer> {
   const parsed = refreshRequestSchema.safeParse(posted(raw));
 
   if (!parsed.success) return refuse("invalid_request", "refresh_token is required", 400);
@@ -620,7 +601,7 @@ async function approve({
   app: AuthCliDeviceFlowApi;
   raw: string;
   request: Request;
-}): Promise<RestRawResult> {
+}): Promise<CliDeviceFlowAnswer> {
   const person = await app.session(request);
 
   if (!person) return refuse("unauthorized", "Sign in to continue", 401);
@@ -723,7 +704,7 @@ async function approveProjectKey({
   person: CliBrowserSession;
   organizationId: string;
   project_id: string | undefined;
-}): Promise<RestRawResult> {
+}): Promise<CliDeviceFlowAnswer> {
   if (!project_id) {
     return refuse(
       "invalid_request",
@@ -792,7 +773,7 @@ async function logout({
 }: {
   app: AuthCliDeviceFlowApi;
   raw: string;
-}): Promise<RestRawResult> {
+}): Promise<CliDeviceFlowAnswer> {
   const parsed = logoutRequestSchema.safeParse(posted(raw));
 
   // 200 either way — logout is idempotent, and a client that sent garbage must
@@ -840,7 +821,7 @@ type MintedCliKey =
         permissions: string[];
       }>;
     }>
-  | Readonly<{ refusal: RestRawResult }>;
+  | Readonly<{ refusal: CliDeviceFlowAnswer }>;
 
 /**
  * The user-scoped CLI key, from the selection the approval stamped, so an
@@ -1059,14 +1040,107 @@ function posted(raw: string): unknown {
 }
 
 /** One OAuth refusal, in the two-field shape RFC 8628 clients parse. */
-function refuse(error: string, description: string, status: number): Response {
+function refuse(
+  error: string,
+  description: string,
+  status: CliDeviceFlowAnswer["status"],
+): CliDeviceFlowAnswer {
   return answer({ error, error_description: description }, status);
 }
 
 /** A JSON body this family writes itself, exactly as its clients read it. */
-function answer(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": JSON_MEDIA_TYPE },
+function answer(body: unknown, status: CliDeviceFlowAnswer["status"] = 200): CliDeviceFlowAnswer {
+  return { status, body };
+}
+
+async function startDeviceFlow({
+  app,
+  raw,
+}: {
+  app: AuthCliDeviceFlowApi;
+  raw: string;
+}): Promise<CliDeviceFlowAnswer> {
+  const parsed = deviceCodeRequestSchema.safeParse(posted(raw));
+
+  if (!parsed.success) {
+    return refuse("invalid_request", parsed.error.issues[0]?.message ?? "invalid body", 400);
+  }
+
+  const record = await app.sessions().startDeviceCode({
+    credentialType: parsed.data.credential_type,
   });
+  const verificationUri = verificationUriOf(app);
+
+  return answer({
+    device_code: record.device_code,
+    user_code: record.user_code,
+    verification_uri: verificationUri,
+    verification_uri_complete: `${verificationUri}?user_code=${encodeURIComponent(record.user_code)}`,
+    expires_in: DEVICE_CODE_TTL_SECONDS,
+    interval: MIN_POLL_INTERVAL_SECONDS,
+  });
+}
+
+async function lookupDeviceFlow({
+  app,
+  input,
+  request,
+}: {
+  app: AuthCliDeviceFlowApi;
+  input: import("zod").infer<typeof lookupQuerySchema>;
+  request: Request;
+}): Promise<CliDeviceFlowAnswer> {
+  const person = await app.session(request);
+
+  if (!person) return refuse("unauthorized", "Sign in to continue", 401);
+
+  if (!input.user_code) return refuse("invalid_request", "user_code is required", 400);
+
+  const record = await app.sessions().tryFindDeviceCodeByUserCode(input.user_code);
+
+  if (!record) {
+    return refuse("not_found", "Code not recognised — it may have expired", 404);
+  }
+
+  if (expired(record)) {
+    return refuse("expired", "Code has expired — restart `langwatch login`", 410);
+  }
+
+  return answer({
+    user_code: record.user_code,
+    status: record.status,
+    created_at: record.created_at,
+    expires_at: record.expires_at,
+    // The approval page branches its journey on this: `device_session` shows
+    // the approve-only flow, `project_api_key` shows a project picker whose
+    // key is sent to the CLI. Defaults for records minted before the field.
+    credential_type: record.credential_type ?? "device_session",
+  });
+}
+
+async function denyDeviceFlow({
+  app,
+  raw,
+  request,
+}: {
+  app: AuthCliDeviceFlowApi;
+  raw: string;
+  request: Request;
+}): Promise<CliDeviceFlowAnswer> {
+  const person = await app.session(request);
+
+  if (!person) return refuse("unauthorized", "Sign in to continue", 401);
+
+  const parsed = denyRequestSchema.safeParse(posted(raw));
+
+  if (!parsed.success) return refuse("invalid_request", "user_code is required", 400);
+
+  const record = await app.sessions().tryFindDeviceCodeByUserCode(parsed.data.user_code);
+
+  // Idempotent — denying an unknown code is a no-op.
+  if (!record) return answer({ ok: true });
+
+  await app.sessions().denyDeviceCode(record.device_code);
+
+  return answer({ ok: true });
 }

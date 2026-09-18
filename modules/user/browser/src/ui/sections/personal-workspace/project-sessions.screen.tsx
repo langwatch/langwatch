@@ -1,11 +1,9 @@
 import { Skeleton, Text, VStack } from "@chakra-ui/react";
-
 import { SessionsTable } from "@langwatch/coding-agent-browser/surfaces/activity";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
-import { withCodingAgentHost } from "../coding-agent-host-provider.tsx";
-
 import { useOrganizationTeamProject } from "../../../behavior/personal-workspace-session.ts";
+import { withCodingAgentHost } from "../coding-agent-host-provider.tsx";
 
 /**
  * The project's Sessions page: every coding-agent session it recorded, and

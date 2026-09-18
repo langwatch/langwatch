@@ -2,6 +2,7 @@
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";
+
 import { useGatewayHost } from "../../model/gateway-host.ts";
 
 type LinkProps = {

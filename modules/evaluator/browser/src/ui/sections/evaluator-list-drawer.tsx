@@ -1,19 +1,18 @@
-import type { WireOf } from "@langwatch/api/web";
+import { Button, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 /**
  * "Choose Evaluator": the picker every flow opens, a REGISTERED drawer
  * belonging to the family that owns evaluators. KNOWN GAP: "New
  * Evaluator"/"Edit" still open drawers in `platform/app`.
  */
-
-import { Button, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import type { WireOf } from "@langwatch/api/web";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import type { Evaluator } from "@langwatch/evaluator-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
+import type { Evaluator } from "@langwatch/evaluator-contract";
 import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "@langwatch/experiment-contract";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { formatDistanceToNow } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useState } from "react";

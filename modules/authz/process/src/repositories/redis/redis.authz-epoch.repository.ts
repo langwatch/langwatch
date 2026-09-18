@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+
 import { AuthzEpochRepository } from "../authz-epoch.repository.ts";
 
 const logger = createLogger("langwatch:authz:epoch");

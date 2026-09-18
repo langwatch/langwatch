@@ -1,3 +1,8 @@
+import {
+  type DatasetTableContextValue,
+  DatasetTableProvider,
+} from "@langwatch/dataset-browser/dataset-table";
+import { renderDatasetImage } from "@langwatch/dataset-browser/render-dataset-image";
 /**
  * Adapter that backs the shared dataset table cells with the evaluations workbench
  * store. The cells (EditableCell, TableCell) only know the narrow DatasetTableContext
@@ -5,11 +10,6 @@
  */
 import type { PropsWithChildren } from "react";
 
-import {
-  type DatasetTableContextValue,
-  DatasetTableProvider,
-} from "@langwatch/dataset-browser/dataset-table";
-import { renderDatasetImage } from "@langwatch/dataset-browser/render-dataset-image";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 
 export function EvaluationsV3DatasetTableProvider({ children }: PropsWithChildren) {

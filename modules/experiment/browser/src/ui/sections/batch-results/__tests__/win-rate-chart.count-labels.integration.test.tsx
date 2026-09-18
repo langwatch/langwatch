@@ -1,10 +1,8 @@
 import "@testing-library/jest-dom/vitest";
-
 // @vitest-environment jsdom
 /**
  * The win count printed above each bar, and specifically the one above the TALLEST bar.
  */
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";

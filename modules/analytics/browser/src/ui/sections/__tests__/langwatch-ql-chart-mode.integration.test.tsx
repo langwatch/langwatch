@@ -6,16 +6,18 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
+import {
+  type LangWatchQLDatasetColumn,
+  langwatchVegaConfig,
+  langwatchVegaPinnedConfig,
+  type LangwatchVegaTokens,
+} from "@langwatch/analytics-contract/visualization";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ReactElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LangWatchQLChartMode, type LangWatchQLChartResult } from "../langwatch-ql-chart-mode.tsx";
-import { type LangWatchQLDatasetColumn,
-  langwatchVegaConfig,
-  langwatchVegaPinnedConfig,
-  type LangwatchVegaTokens } from "@langwatch/analytics-contract/visualization";
 
 const vega = vi.hoisted(() => {
   const state = { embeds: 0, data: [] as { name: string; rows: unknown[] }[] };

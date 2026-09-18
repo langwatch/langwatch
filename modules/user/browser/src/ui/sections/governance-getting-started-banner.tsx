@@ -1,11 +1,10 @@
 import { Box, Button, Heading, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { LuArrowRight, LuRocket } from "react-icons/lu";
 
 import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import { Link } from "../elements/personal-link.tsx";
-
-import { useColorModeValue } from "@langwatch/design-system/color-mode";
 
 // Amber → orange → violet palette so the governance hero visually rhymes with
 // the home announcements (same MeshGradient + glass-card shape as

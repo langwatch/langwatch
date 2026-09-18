@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as observability from "@langwatch/observability";
-import { ObservabilityAuthzCutoverAdapter } from "../authz-cutover-telemetry.service.ts";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ENGINE_GATE_CACHE_TTL_MS } from "../authz-cutover-gate.service.ts";
+import { ObservabilityAuthzCutoverAdapter } from "../authz-cutover-telemetry.service.ts";
 
 // A `vi.mock("@langwatch/observability", ...)` factory is a package-wide
 // replacement: under this package's non-isolated vitest pool (`isolate:

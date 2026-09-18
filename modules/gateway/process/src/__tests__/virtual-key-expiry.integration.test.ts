@@ -1,20 +1,19 @@
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * Real Postgres: what create stores, what update means, a past date, what's published after.
  * @vitest-environment node
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
-import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { TestProjectApi } from "./support/test-project-api.ts";
-
 import { PostgresVirtualKeyAdapter } from "../testing.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();

@@ -1,7 +1,6 @@
+import { downloadCsv } from "@langwatch/csv/download";
 /** @vitest-environment jsdom */
 import { beforeAll, describe, expect, it, vi } from "vitest";
-
-import { downloadCsv } from "@langwatch/csv/download";
 
 let lastBlob: Blob | undefined;
 

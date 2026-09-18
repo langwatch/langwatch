@@ -16,9 +16,9 @@ import {
   type UsageMembershipRepository,
 } from "@langwatch/entitlement-process";
 import type { IdentityApi } from "@langwatch/identity-contract";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { Logger } from "@langwatch/observability";
 import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -39,7 +39,7 @@ import {
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
 } from "../services/resource-identifiers.service.ts";
-import type { OrganizationAppConfig, OrganizationInfrastructure } from "./organization.app.ts";
+import type { OrganizationInfrastructure } from "./organization.app.ts";
 import type {
   OrganizationCeremony,
   OrganizationDirectory,
@@ -543,7 +543,12 @@ export function buildOrganizationInfrastructure(input: {
   encryption: { encrypt(value: string): string; decrypt(value: string): string };
   logger: Logger;
   redis: RedisConnection;
-  config: OrganizationAppConfig;
+  /** The process's own fact (`BASE_HOST`); absent where it named none. */
+  publicBaseUrl: string | undefined;
+  /** A process fact, unresolved — see the handoff. */
+  processName: string;
+  /** Unresolved — collides with `authz`'s landed leaves if redeclared here. */
+  demoProject: Readonly<{ userId: string; projectId: string }>;
   dependencies: {
     projects: ProjectApi;
     identity: Pick<IdentityApi, "verifiedEmailsOf">;
@@ -552,7 +557,8 @@ export function buildOrganizationInfrastructure(input: {
     roles: InviteAssignableRoles;
   };
 }): OrganizationInfrastructure {
-  const { prisma, logger, config, dependencies } = input;
+  const { prisma, logger, dependencies } = input;
+  const baseHost = input.publicBaseUrl ?? "";
 
   return {
     identities: PersonalWorkspaceIdentityAdapter.create(),
@@ -563,7 +569,7 @@ export function buildOrganizationInfrastructure(input: {
     // that key, so the settings this writes stay readable everywhere else.
     settingsSecrets: input.encryption,
     diagnostics: PersonalWorkspaceDiagnosticsAdapter.create(logger),
-    prompts: LoggedOrganizationPromptSeed.create({ processName: config.processName, logger }),
+    prompts: LoggedOrganizationPromptSeed.create({ processName: input.processName, logger }),
     seats: EntitlementOrganizationSeatLicense.create({
       plans: dependencies.entitlement,
       memberships: PrismaUsageMembershipRepository.create(prisma),
@@ -572,7 +578,7 @@ export function buildOrganizationInfrastructure(input: {
       prisma,
       redis: input.redis,
       logger,
-      baseHost: config.baseHost,
+      baseHost,
       identity: dependencies.identity,
       entitlement: dependencies.entitlement,
       permissions: dependencies.permissions,
@@ -594,6 +600,6 @@ export function buildOrganizationInfrastructure(input: {
       identity: dependencies.identity,
       userDirectory: PrismaOrganizationUserDirectoryRepository.create(prisma),
     }),
-    demoProject: config.demoProject,
+    demoProject: input.demoProject,
   };
 }

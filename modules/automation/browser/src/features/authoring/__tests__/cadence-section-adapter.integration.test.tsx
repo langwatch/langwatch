@@ -5,9 +5,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
+
 import { useAutomationStore } from "../ui/sections/automation-store.ts";
 import { CadenceSection } from "../ui/sections/cadence-section-adapter.tsx";
+import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
 
 // Transitive: the store pulls in provider clients, which import ~/utils/api.
 vi.mock("../../../behavior/automation-api.ts", () => ({

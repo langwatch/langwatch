@@ -1,6 +1,5 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_AGGREGATE_TYPE,
@@ -15,6 +14,8 @@ import type {
   GatewaySpendFailedEvent,
   GatewaySpendSettledEvent,
 } from "@langwatch/gateway-process";
+import { describe, expect, it } from "vitest";
+
 import { GatewaySpendFoldProjection, type GatewaySpendState } from "../gateway-spend.projection.ts";
 
 const TENANT = "proj_test";

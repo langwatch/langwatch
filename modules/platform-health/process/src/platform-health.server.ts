@@ -1,7 +1,11 @@
 import { bindRestHeader } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
+
 import { PlatformHealthApp } from "./app/platform-health.app.ts";
-import { platformHealthAuthorization, platformHealthRest } from "./transport/platform-health.rest.ts";
+import {
+  platformHealthAuthorization,
+  platformHealthRest,
+} from "./transport/platform-health.rest.ts";
 
 export type { PlatformHealthInfrastructure } from "./app/platform-health.app.ts";
 

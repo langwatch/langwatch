@@ -30,11 +30,12 @@ import {
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
 } from "@langwatch/experiment-contract";
+
+import type { ExperimentRepository } from "../repositories/experiment.repository.ts";
 import {
   isPostgresUniqueConflict,
   postgresUniqueConflictTargets,
 } from "../rules/postgres-unique-conflict.rules.ts";
-import type { ExperimentRepository } from "../repositories/experiment.repository.ts";
 import type { ExperimentSlugService } from "./experiment-slug.service.ts";
 import type { ExperimentWorkbenchReferencesService } from "./experiment-workbench-references.service.ts";
 

@@ -3,15 +3,16 @@ import {
   AuthzService as AuthzServiceContract,
 } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
+
+import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
+import type { PostgresAuthzDatabase } from "../../repositories/prisma/prisma.authz.database.ts";
 import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
 } from "../../services/authz-grants-command-dispatcher.service.ts";
-import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
-import { PostgresAuthzAdapter } from "../postgres-authz.build.ts";
 import { type AuthzCounter, AuthzMetrics } from "../../services/authz-metrics.service.ts";
-import type { PostgresAuthzDatabase } from "../../repositories/prisma/prisma.authz.database.ts";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
+import { PostgresAuthzAdapter } from "../postgres-authz.build.ts";
 
 class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
   calls = 0;

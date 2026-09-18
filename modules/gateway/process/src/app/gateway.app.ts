@@ -31,14 +31,15 @@ import {
   type UpdateGatewayCacheRuleInput,
   type UpdateGatewayGuardrailInput,
   type GatewayApi,
-  gatewayServerConfigSchema,
+  gatewayConfig,
   type GatewayServerConfig,
 } from "@langwatch/gateway-contract";
-import { type ProcessMembers } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
+import { Secret } from "@langwatch/secrets";
 import { toDate, type Instant } from "@langwatch/time";
 import { WebhookApi, eventMatches } from "@langwatch/webhook-contract";
 // The billing envelope and the subscription grammar are the webhook
@@ -47,7 +48,7 @@ import { WebhookApi, eventMatches } from "@langwatch/webhook-contract";
 import { createWebhookEnvelopes, type WebhookEnvelopes } from "@langwatch/webhook-process";
 import type { z } from "zod";
 
-import { GatewayEndUserCapsAdapter } from "../adapters/gateway-end-user-caps.adapter.ts";
+import { GatewayEndUserCapsAdapter } from "./gateway-end-user-caps.composition.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
@@ -543,7 +544,17 @@ export class GatewayApp implements GatewayApi {
     organizations: OrganizationApi,
     featureFlags: FeatureFlagApi,
   };
-  static readonly configSchema = gatewayServerConfigSchema;
+  static readonly config = gatewayConfig;
+  /**
+   * The three AI Gateway credentials, all-or-none per
+   * `assertGatewaySecretsAllOrNone` — optional here because a deployment that
+   * runs no gateway needs none.
+   */
+  static readonly secrets = {
+    internalSecret: Secret.load("LW_GATEWAY_INTERNAL_SECRET", { optional: true }),
+    jwtSecret: Secret.load("LW_GATEWAY_JWT_SECRET", { optional: true }),
+    virtualKeyPepper: Secret.load("LW_VIRTUAL_KEY_PEPPER", { optional: true }),
+  } as const;
   /**
    * `prisma` is the one guarded connection every gateway row read runs on.
    * `clickhouse` is the control plane's ONE routing client, resolved per tenant
@@ -589,12 +600,11 @@ export class GatewayApp implements GatewayApi {
           runEvaluator: internalCollaborators.evaluatorRunner,
         })
       : void 0;
+    const jwtSecret = setup.members.secrets.find("LW_GATEWAY_JWT_SECRET");
     const internalProtocol = GatewayInternalProtocolService.create({
       virtualKeys: controlPlane.internalVirtualKeys,
       projects: setup.dependencies.projects,
-      jwt: setup.members.secrets.find("LW_GATEWAY_JWT_SECRET")
-        ? GatewayJwtService.create({ secret: setup.members.secrets.read("LW_GATEWAY_JWT_SECRET") })
-        : void 0,
+      jwt: jwtSecret ? GatewayJwtService.create({ secret: jwtSecret }) : void 0,
       store: PrismaGatewayInternalStoreRepository.create({ database: setup.members.prisma }),
       changes: controlPlane.internalChanges,
       config,

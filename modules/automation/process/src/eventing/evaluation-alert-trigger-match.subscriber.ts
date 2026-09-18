@@ -1,11 +1,12 @@
-import { createLogger } from "@langwatch/observability";
 import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
 import type {
   AutomationEvaluationTraceSummary,
   AutomationEvaluationTriggerFilter,
   AutomationTriggerMatchRecorder,
 } from "../app/automation.members.ts";
-import { nowInstant } from "@langwatch/time";
 
 const NOTIFY_TRIGGER_ACTIONS = new Set(["SEND_EMAIL", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"]);
 

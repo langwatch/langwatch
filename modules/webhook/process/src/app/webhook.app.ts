@@ -1,23 +1,27 @@
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 /**
  * The webhook feature's application: what both doors (tRPC and REST) call.
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
  * events log — and reaches the rest through {@link endpoints}/{@link health}.
  */
 import { generate } from "@langwatch/ksuid";
-
-import { WebhookApi, type WebhookDestinationKind, type WebhookApi as WebhookApiContract } from "@langwatch/webhook-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
+import {
+  WebhookApi,
+  type WebhookDestinationKind,
+  type WebhookApi as WebhookApiContract,
+} from "@langwatch/webhook-contract";
+
 import type { WebhookEndpointRuntime } from "../repositories/webhook-endpoint.repository.ts";
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
+import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
 import { WebhookHealthService } from "../services/webhook-health.service.ts";
-import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { WebhookTestBoundsService } from "../services/webhook-test-bounds.service.ts";
 import { buildWebhookComposition } from "./webhook-composition.build.ts";
 
@@ -170,7 +174,8 @@ export class WebhookApp implements WebhookApiContract {
   getAll: WebhookApiContract["getAll"] = (input) => this.#dependencies.endpoints.getAll(input);
   getById: WebhookApiContract["getById"] = (input) => this.#dependencies.endpoints.getById(input);
   update: WebhookApiContract["update"] = (input) => this.#dependencies.endpoints.update(input);
-  rollSecret: WebhookApiContract["rollSecret"] = (input) => this.#dependencies.endpoints.rollSecret(input);
+  rollSecret: WebhookApiContract["rollSecret"] = (input) =>
+    this.#dependencies.endpoints.rollSecret(input);
   enable: WebhookApiContract["enable"] = (input) => this.#dependencies.endpoints.enable(input);
   disable: WebhookApiContract["disable"] = (input) => this.#dependencies.endpoints.disable(input);
   archive: WebhookApiContract["archive"] = (input) => this.#dependencies.endpoints.archive(input);
@@ -379,7 +384,6 @@ export interface WebhookDispatchRequest {
   isTestFire?: boolean;
 }
 
-
 export interface WebhookDestination {
   readonly kind: WebhookDestinationKind;
   /**
@@ -389,11 +393,9 @@ export interface WebhookDestination {
   send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult>;
 }
 
-
 export interface WebhookId {
   newEndpointId(): string;
 }
-
 
 export interface WebhookSecret {
   encrypt(value: string): string;

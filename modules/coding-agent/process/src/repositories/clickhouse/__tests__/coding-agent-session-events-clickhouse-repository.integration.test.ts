@@ -4,10 +4,12 @@
  * ReplacingMergeTree + `LIMIT 1 BY` read promise, and the keyset pagination the REST
  */
 import { randomUUID } from "node:crypto";
+
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CodingAgentSessionEventRecord } from "@langwatch/coding-agent-contract";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 import {
   createTestClickHouseClient,

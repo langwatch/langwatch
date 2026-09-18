@@ -1,3 +1,5 @@
+import type { EvaluationV3Event } from "@langwatch/experiment-contract";
+import { applyRunEvent, emptyRunResultsDraft } from "@langwatch/experiment-contract";
 /**
  * `ExperimentRunResultsWriterService.persistRunResults` is the seam both execution paths
  * write through. Tests the merge against saved workbench state, mocking only the
@@ -5,10 +7,9 @@
  * @see specs/experiments-v3/workbench-versioning.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluationV3Event } from "@langwatch/experiment-contract";
-import type { ExperimentService } from "../experiment.service.ts";
-import { applyRunEvent, emptyRunResultsDraft } from "@langwatch/experiment-contract";
+
 import { ExperimentRunResultsWriterService } from "../experiment-run-results-writer.service.ts";
+import type { ExperimentService } from "../experiment.service.ts";
 
 const TARGET_ID = "target-1";
 const EVALUATOR_ID = "evaluator-1";

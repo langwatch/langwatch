@@ -4,16 +4,17 @@
  * period matches the bucketed period — four of six windows used to drift.
  */
 
+import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
+import { Prisma } from "@langwatch/prisma-client/generated";
 import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
-import { Prisma } from "@langwatch/prisma-client/generated";
+
+import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "./support/clickhouse-endpoint.support.ts";
-import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 
 const chUrl = testClickHouseUrl();
 

@@ -1,14 +1,15 @@
-import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createLogger } from "@langwatch/observability";
 import type { Anomaly } from "@langwatch/ops-contract";
+import { nowInstant } from "@langwatch/time";
+
 import type { AnomalyHardTierAlert } from "../app/ops.app.ts";
 import type {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
 } from "../repositories/observe/anomaly.repository.ts";
-import { percentile } from "../rules/ops-anomaly-percentile.rules.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../rules/anomaly-constants.rules.ts";
-import { nowInstant } from "@langwatch/time";
+import { percentile } from "../rules/ops-anomaly-percentile.rules.ts";
 
 const logger = createLogger("langwatch:observability:anomalyDetector");
 

@@ -1,14 +1,15 @@
-import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
 import type { FilterField } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
-import { clickHouseFilters } from "./clickhouse.filter-definitions.mapper.ts";
-import { buildScopeConditions } from "./clickhouse.filter-query-helpers.mapper.ts";
-import type { SupportedClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper.ts";
+
 import {
   FilterOptions,
   type FilterOption,
   type FindFilterOptionsInput,
 } from "../filter-options.repository.ts";
+import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
+import { clickHouseFilters } from "./clickhouse.filter-definitions.mapper.ts";
+import { buildScopeConditions } from "./clickhouse.filter-query-helpers.mapper.ts";
+import type { SupportedClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper.ts";
 
 /** How this repository reaches the tenant's ClickHouse client. */
 export type ClickHouseClientResolver = (

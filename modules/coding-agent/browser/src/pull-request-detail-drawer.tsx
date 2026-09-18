@@ -1,20 +1,20 @@
-import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail.ts";
-import { PullRequestStatusBadge } from "./pull-request-status-badge.tsx";
-import { derivePullRequestStatus } from "./pull-request-status.ts";
-import { formatShortDate } from "./short-date.ts";
 import { Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { GitHubIcon } from "@langwatch/design-system/icons";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import numeral from "numeral";
 import type React from "react";
 
-import { GitHubIcon } from "@langwatch/design-system/icons";
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { codingAgentApi as api } from "./coding-agent-api.ts";
 import { ContributorsSection } from "./contributors-section.tsx";
 import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip.tsx";
 import { ModelsSection } from "./models-section.tsx";
+import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail.ts";
 import { SessionsSection } from "./pull-request-sessions-section.tsx";
+import { PullRequestStatusBadge } from "./pull-request-status-badge.tsx";
+import { derivePullRequestStatus } from "./pull-request-status.ts";
+import { formatShortDate } from "./short-date.ts";
 
 /** PR detail: cost, contributors, model breakdown, sessions; facts only, no content. */
 

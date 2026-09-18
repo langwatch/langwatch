@@ -2,6 +2,7 @@
 // with unchanged call shapes for seamless porting.
 
 import { useCallback, useMemo } from "react";
+
 import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";
 
 /** The subset of the application toaster's create options these tables use. */

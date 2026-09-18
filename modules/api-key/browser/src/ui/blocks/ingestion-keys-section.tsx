@@ -1,12 +1,12 @@
-import type { WireOf } from "@langwatch/api/web";
 import { Badge, Box, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
+import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
+import type { WireOf } from "@langwatch/api/web";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Radio, Trash2 } from "lucide-react";
 
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { nowInstant, toEpochMs } from "@langwatch/time";
 import { readableDate } from "../../model/display-formatters.ts";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */

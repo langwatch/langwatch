@@ -1,3 +1,4 @@
+import { Temporal, nowInstant, type Instant } from "@langwatch/time";
 /**
  * What the agent-sandbox sweep may touch: a fleet-wide predicate bounded by
  * the reserved name and the clock — the two inputs these assertions pin.
@@ -7,7 +8,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRepository } from "../../repositories/api-key.repository.ts";
 import { AgentSandboxKeyReapService } from "../agent-sandbox-key-reap.service.ts";
-import { Temporal, nowInstant, type Instant } from "@langwatch/time";
 
 function repositoryDouble(count = 0) {
   const revokeExpiredByName = vi.fn(async (_input: { name: string; now: Instant }) => count);

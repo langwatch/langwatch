@@ -24,8 +24,8 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/redaction": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/redaction": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

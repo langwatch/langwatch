@@ -2,12 +2,9 @@ import {
   buildProviderOnboardingDefaultPlan,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import type {
-  ModelProviderIdService
-} from "../app/model-provider.members.ts";
-import type {
-  ModelDefaultRepository
-} from "../repositories/model-default.repository.ts";
+
+import type { ModelProviderIdService } from "../app/model-provider.members.ts";
+import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type ModelProviderOnboardingDefaultsOptions = {

@@ -1,5 +1,6 @@
 import { ROLE_KIND, RoleNotFoundError, type Role } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";
+
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
 import { RoleService } from "../role.service.ts";
 
@@ -37,9 +38,7 @@ describe("given a stored custom role", () => {
     it("reads as absent", async () => {
       const { service } = serviceWith(role({ kind: ROLE_KIND.SYSTEM_API_KEY }));
 
-      await expect(service.getById({ roleId: "role-1" })).rejects.toBeInstanceOf(
-        RoleNotFoundError,
-      );
+      await expect(service.getById({ roleId: "role-1" })).rejects.toBeInstanceOf(RoleNotFoundError);
     });
   });
 });

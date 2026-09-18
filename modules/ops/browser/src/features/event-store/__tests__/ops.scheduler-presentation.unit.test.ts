@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   canRunNow,
   compareForAttention,

@@ -7,10 +7,8 @@ import type {
   ProcessOutboxMessageView,
   ProcessWakeRow,
 } from "@langwatch/ops-contract";
-import {
-  ProcessOpsRepository,
-  type ProcessNameCounts,
-} from "../process/process-ops.repository.ts";
+
+import { ProcessOpsRepository, type ProcessNameCounts } from "../process/process-ops.repository.ts";
 import type { MemoryOpsStore, MemoryOutboxRow } from "./memory.ops.store.ts";
 
 /** One redrive or discard sweep moves at most this many rows, as the stored one does. */
@@ -86,14 +84,12 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
         (term === undefined || term === "" || row.processKey.toLowerCase().includes(term)),
     );
 
-    const instances = matching
-      .slice(page * pageSize, page * pageSize + pageSize)
-      .map((row) => ({
-        ...row,
-        pendingMessages: this.#messagesFor(row).filter((message) => message.status === "pending")
-          .length,
-        deadMessages: this.#messagesFor(row).filter((message) => message.status === "dead").length,
-      }));
+    const instances = matching.slice(page * pageSize, page * pageSize + pageSize).map((row) => ({
+      ...row,
+      pendingMessages: this.#messagesFor(row).filter((message) => message.status === "pending")
+        .length,
+      deadMessages: this.#messagesFor(row).filter((message) => message.status === "dead").length,
+    }));
 
     return { instances, total: matching.length };
   }

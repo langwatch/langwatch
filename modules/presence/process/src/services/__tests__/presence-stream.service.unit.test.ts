@@ -1,10 +1,12 @@
 import { EventEmitter } from "node:events";
+
 import type {
   PresenceCursorEvent,
   PresenceEvent,
   PresenceSession,
 } from "@langwatch/presence-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import type { PresenceEmitter } from "../../app/presence.app.ts";
 import { PresenceStreamService } from "../presence-stream.service.ts";
 

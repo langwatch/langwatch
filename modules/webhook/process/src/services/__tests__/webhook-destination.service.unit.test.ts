@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { WebhookDestinationService } from "../webhook-destination.service.ts";
 
 const destinations = WebhookDestinationService.create();

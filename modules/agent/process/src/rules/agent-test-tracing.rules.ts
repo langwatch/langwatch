@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
+
 import type { HttpAuth } from "@langwatch/agent-contract";
-import type { CustomMetadata, Span } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
+import type { CustomMetadata, Span } from "@langwatch/trace-contract";
 
 export type TraceTestContext = {
   url: string;

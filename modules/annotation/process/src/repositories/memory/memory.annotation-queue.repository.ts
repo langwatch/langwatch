@@ -1,11 +1,12 @@
-import { generate } from "@langwatch/ksuid";
 import {
   AnnotationQueueNotFoundError,
   type AnnotationQueueDetail,
   type AnnotationQueueListEntry,
   type AnnotationQueueRecord,
 } from "@langwatch/annotation-contract";
+import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import type {
   AnnotationQueueRepository,
   QueueCountInput,
@@ -40,7 +41,12 @@ export class MemoryAnnotationQueueRepository implements AnnotationQueueRepositor
   }
   async createQueue(input: QueueCreateInput): Promise<AnnotationQueueRecord> {
     const now = toDate(nowInstant());
-    const queue = { id: generate("annotationqueue").toString(), ...input, createdAt: now, updatedAt: now };
+    const queue = {
+      id: generate("annotationqueue").toString(),
+      ...input,
+      createdAt: now,
+      updatedAt: now,
+    };
     this.#database.replaceQueues([...this.#database.queues(), queue]);
 
     return structuredClone(queue);

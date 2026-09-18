@@ -1,4 +1,3 @@
-import { generate } from "@langwatch/ksuid";
 import {
   DASHBOARD_KSUID_RESOURCE,
   dashboardCreateInputSchema,
@@ -23,6 +22,8 @@ import {
   type Graph,
   type GraphLayout,
 } from "@langwatch/dashboard-contract";
+import { generate } from "@langwatch/ksuid";
+
 import type { WorkbenchAccess } from "../app/dashboard.members.ts";
 import type {
   DashboardGraphKind,

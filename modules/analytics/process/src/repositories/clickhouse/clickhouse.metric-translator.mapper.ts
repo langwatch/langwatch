@@ -3,13 +3,15 @@
  * expressions.
  */
 
+import { randomUUID } from "node:crypto";
+
 import type {
   AggregationTypes,
   PercentileAggregationTypes,
   PipelineAggregationTypes,
 } from "@langwatch/analytics-contract";
-import { randomUUID } from "node:crypto";
 import { ValidationError } from "@langwatch/handled-error";
+
 import {
   type CHTable,
   fieldMappings,

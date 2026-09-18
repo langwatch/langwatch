@@ -1,12 +1,13 @@
+import type { TypedAgent } from "@langwatch/agent-contract";
+import type { EvaluationsV3State } from "@langwatch/experiment-contract";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 /**
  * Unit tests for the result-dispatch helpers: the judge model recorded for an evaluator target
  * (pinned from run, not read live), and what non-processed evaluations carry into storage.
  * @see specs/experiments/comparison.feature
  */
 import { describe, expect, it } from "vitest";
-import type { EvaluationsV3State } from "@langwatch/experiment-contract";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { TypedAgent } from "@langwatch/agent-contract";
+
 import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service.ts";
 
 const dispatches = ExperimentResultDispatchService.create();

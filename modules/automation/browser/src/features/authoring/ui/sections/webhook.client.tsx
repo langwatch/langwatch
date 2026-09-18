@@ -11,18 +11,19 @@ import {
   defaultsForSourceKind,
   filterVariablesForCadence,
 } from "@langwatch/automation-contract";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Plus, Trash2, Webhook } from "lucide-react";
 import { useMemo } from "react";
-import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { VariableInfoIcon,LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor/index.ts";
-import { FieldHeader, LiquidEditor } from "./template-authoring.tsx";
-import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
+
 import type {
   ConfigFormCtx,
   ConfigFormProps,
   NotifyClientDef,
   SummaryIdentity,
 } from "../../../../model/provider-types.ts";
+import { VariableInfoIcon, LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor/index.ts";
+import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
+import { FieldHeader, LiquidEditor } from "./template-authoring.tsx";
 
 /** A template field, mirroring the Slack provider's `FieldDraft`: empty +
  *  `usingDefault` means the framework default envelope applies. */
@@ -359,7 +360,8 @@ function WebhookConfigForm({
   onChange,
   ctx,
 }: ConfigFormProps<WebhookSlice, WebhookPreview>) {
-  const urlProblem = slice.url.trim() === "" ? null : findWebhookUrlProblemMessage(slice.url.trim());
+  const urlProblem =
+    slice.url.trim() === "" ? null : findWebhookUrlProblemMessage(slice.url.trim());
   const defaults = defaultsForSourceKind(ctx.sourceKind);
   const templateValue = slice.template.value || defaults.webhookBody;
   const variables = useMemo(

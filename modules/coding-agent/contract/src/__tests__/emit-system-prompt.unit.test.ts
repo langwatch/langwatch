@@ -1,7 +1,8 @@
 // System prompt recorded once per transcript; flag prevents duplication across model calls.
 
-import { describe, expect, it } from "vitest";
 import type { SpanDetail } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { createSpanEntryAccumulator, emitSystemPrompt } from "../coding-agent-transcript-state.ts";
 
 /** A model-call span carrying a chat input with a system message. */

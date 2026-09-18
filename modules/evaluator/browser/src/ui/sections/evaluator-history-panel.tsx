@@ -3,6 +3,7 @@
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { toEpochMs } from "@langwatch/time";
 import {
@@ -17,7 +18,6 @@ import {
 } from "lucide-react";
 
 import { evaluatorApi } from "../../behavior/evaluator-api.ts";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 
 const ACTION_META = {

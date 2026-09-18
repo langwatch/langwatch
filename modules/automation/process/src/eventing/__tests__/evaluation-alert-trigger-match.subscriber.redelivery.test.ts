@@ -3,25 +3,26 @@ import {
   type GraphTriggerEvaluationResult,
   type TriggerSummary,
 } from "@langwatch/automation-contract";
-import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
   type EvaluationProcessingEvent,
   type EvaluationRunData,
 } from "@langwatch/evaluation-contract";
+import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  AutomationEvaluationSubscriberService,
-  AutomationEvaluationTriggerFilterService,
-  type AutomationTriggerMatchRecorder,
-} from "../../index.ts";
+
 import type {
   AutomationEvaluationQueryClassification,
   AutomationEvaluationTraceSummary,
   AutomationGraphActivity,
 } from "../../app/automation.members.ts";
+import {
+  AutomationEvaluationSubscriberService,
+  AutomationEvaluationTriggerFilterService,
+  type AutomationTriggerMatchRecorder,
+} from "../../index.ts";
 import type { AutomationTraceTriggerCatalogue } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
 
 function trigger(): TriggerSummary {

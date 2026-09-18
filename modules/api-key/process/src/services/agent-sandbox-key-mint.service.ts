@@ -3,11 +3,10 @@
  */
 import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
-
 import type { ProjectApi } from "@langwatch/project-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import type { AgentSandboxKeyShareRepository } from "../repositories/agent-sandbox-key-share.repository.ts";
-import { nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 

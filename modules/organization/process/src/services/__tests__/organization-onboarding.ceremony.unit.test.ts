@@ -10,10 +10,7 @@ import type {
 } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  OrganizationCeremony,
-  OrganizationSignals,
-} from "../../app/organization.members.ts";
+import type { OrganizationCeremony, OrganizationSignals } from "../../app/organization.members.ts";
 import { OrganizationOnboardingService } from "../organization-onboarding.service.ts";
 
 const ORGANIZATION = { id: "org_1", name: "Acme Corp" };

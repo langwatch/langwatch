@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
-import { configDefaults, defineConfig } from "vitest/config";
+
 import { moduleVitestTestOptions } from "@langwatch/test-harness/vitest-config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 /**
  * Anchored aliases, not object form: Vite's object alias is a PREFIX

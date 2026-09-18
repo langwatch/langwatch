@@ -3,18 +3,21 @@
  * row store and repository — with only the database and the environment held in process, so
  * these exercise the code path production runs rather than a double of it.
  */
-import { resolveFeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
+
+import {
+  createFeatureFlagTestService,
+  resolveTestFeatureFlagConfig,
+} from "../app/__tests__/feature-flag.fixture.ts";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 const PRODUCT_FLAG = "release_ui_ai_gateway_menu_enabled";
 const NON_ENV_OVERRIDABLE_FLAG = "release_langy_enabled";
 const SYSTEM_TARGET = { kind: "system" } as const;
 const USER_TARGET = { kind: "user", userId: "user-1" } as const;
-function buildService(source: Readonly<Record<string, unknown>> = {}) {
+function buildService(source: Readonly<Record<string, string | undefined>> = {}) {
   return createFeatureFlagTestService({
-    config: resolveFeatureFlagConfig(source),
+    config: resolveTestFeatureFlagConfig(source),
   });
 }
 

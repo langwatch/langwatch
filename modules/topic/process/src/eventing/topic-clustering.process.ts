@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 import type {
   EventHandler,
   ProcessEvolution,
@@ -5,14 +7,14 @@ import type {
   ProcessManagerApplier,
   WakeHandler,
 } from "@langwatch/eventing";
+import { Temporal, toDate } from "@langwatch/time";
 import {
   TOPIC_CLUSTERING_EVENT_TYPES,
   TOPIC_CLUSTERING_STALE_RUN_MS,
   topicClusteringSearchAfterSchema,
 } from "@langwatch/topic-contract";
-import { Temporal, toDate } from "@langwatch/time";
-import crypto from "crypto";
 import { z } from "zod";
+
 import type { TopicClusteringProcessingEvent } from "../services/topic-events.service.ts";
 import {
   createTopicClusteringRunHandler,

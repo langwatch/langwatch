@@ -1,4 +1,5 @@
 import type { CustomGraph, CustomGraphNameRef } from "@langwatch/automation-contract";
+
 import { CustomGraphRepository } from "../custom-graph.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 
@@ -18,10 +19,7 @@ export class MemoryCustomGraphRepository extends CustomGraphRepository {
     return Promise.resolve(row ?? null);
   }
 
-  async existsInProject(input: {
-    customGraphId: string;
-    projectId: string;
-  }): Promise<boolean> {
+  async existsInProject(input: { customGraphId: string; projectId: string }): Promise<boolean> {
     return (await this.findById(input)) !== null;
   }
 
@@ -32,22 +30,17 @@ export class MemoryCustomGraphRepository extends CustomGraphRepository {
     return Promise.resolve(
       this.memory.customGraphs
         .filter(
-          (graph) =>
-            graph.projectId === input.projectId && input.customGraphIds.includes(graph.id),
+          (graph) => graph.projectId === input.projectId && input.customGraphIds.includes(graph.id),
         )
         .map((graph) => ({ id: graph.id, name: graph.name })),
     );
   }
 
   /** Every panel on one dashboard, in the order it was added to the store. */
-  findAllByDashboardId(input: {
-    dashboardId: string;
-    projectId: string;
-  }): Promise<CustomGraph[]> {
+  findAllByDashboardId(input: { dashboardId: string; projectId: string }): Promise<CustomGraph[]> {
     return Promise.resolve(
       this.memory.customGraphs.filter(
-        (graph) =>
-          graph.projectId === input.projectId && graph.dashboardId === input.dashboardId,
+        (graph) => graph.projectId === input.projectId && graph.dashboardId === input.dashboardId,
       ),
     );
   }

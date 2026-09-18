@@ -1,9 +1,10 @@
 import { Alert, Text } from "@chakra-ui/react";
+import type { Custom } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import type { Ref } from "react";
 import { forwardRef, useEffect } from "react";
-import type { Custom } from "@langwatch/workflow-contract";
+
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 import { ComponentNode } from "./workflow-nodes.tsx";
 

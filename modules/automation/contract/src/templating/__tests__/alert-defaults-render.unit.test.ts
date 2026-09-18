@@ -1,4 +1,6 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import { ALERT_TRIGGER_DEFAULTS } from "../defaults.ts";
 import { renderTriggerEmail } from "../render-email.ts";
 import { renderTriggerSlack } from "../render-slack.ts";
@@ -6,7 +8,6 @@ import {
   buildGraphAlertTemplateContext,
   type GraphAlertTemplateContext,
 } from "../template-context.ts";
-import { Temporal } from "@langwatch/time";
 
 function makeContext(
   overrides: Partial<Parameters<typeof buildGraphAlertTemplateContext>[0]> = {},

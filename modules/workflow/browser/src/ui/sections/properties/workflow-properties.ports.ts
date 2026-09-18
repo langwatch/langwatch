@@ -5,6 +5,7 @@ import type {
   HttpHeader,
   HttpMethod,
 } from "@langwatch/workflow-contract";
+
 import { WorkflowBasePropertiesPanel } from "../workflow-base-properties-panel.tsx";
 
 export type WorkflowVariable = { identifier: string; type: Field["type"] };
@@ -37,9 +38,7 @@ export type WorkflowPanelMappingSource = {
 
 export type WorkflowOutputsProps = {
   outputs: { identifier: string; type: Field["type"]; json_schema?: object }[];
-  onChange: (
-    outputs: { identifier: string; type: Field["type"]; json_schema?: object }[],
-  ) => void;
+  onChange: (outputs: { identifier: string; type: Field["type"]; json_schema?: object }[]) => void;
   canAddRemove?: boolean;
   readOnly?: boolean;
   title?: string;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { customEvaluatorTemplate } from "../custom-evaluator.template.ts";
 
 const node = (id: string) => {
@@ -46,9 +47,7 @@ describe("customEvaluatorTemplate", () => {
     /** @scenario Custom evaluator template lists details first on the end node */
     it("puts details first so the reasoning edge does not cross the verdict", () => {
       expect(
-        (node("end").data as { inputs: { identifier: string }[] }).inputs.map(
-          (i) => i.identifier,
-        ),
+        (node("end").data as { inputs: { identifier: string }[] }).inputs.map((i) => i.identifier),
       ).toEqual(["details", "passed", "score", "label"]);
     });
   });

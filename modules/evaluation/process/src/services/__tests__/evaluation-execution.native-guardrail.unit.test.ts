@@ -1,4 +1,3 @@
-import { describe, expect, it, vi } from "vitest";
 import {
   API_KEYS_AND_SECRETS_DETECTION,
   type EvaluatorApi,
@@ -7,7 +6,12 @@ import {
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { EvaluationExecutionService, type EvaluationExecutionDeps } from "../evaluation-execution.service.ts";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  EvaluationExecutionService,
+  type EvaluationExecutionDeps,
+} from "../evaluation-execution.service.ts";
 
 /**
  * Only executeNative and augmentResult are exercised by this dispatch path;

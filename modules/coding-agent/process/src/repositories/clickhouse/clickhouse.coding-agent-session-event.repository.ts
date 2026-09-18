@@ -1,12 +1,13 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type {
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
 } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
 import { nowInstant } from "@langwatch/time";
+
+import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
 import {
   clickHouseMomentOf,
   routingTenantOf,

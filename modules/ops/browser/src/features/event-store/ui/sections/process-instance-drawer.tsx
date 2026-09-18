@@ -1,16 +1,16 @@
 import { Button, CodeBlock, HStack, Spacer, Text } from "@chakra-ui/react";
-import { useState } from "react";
-import { Copy as LuCopy } from "lucide-react";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
-import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { api } from "../../../../behavior/ops-api.ts";
-import { ProcessInstanceContent } from "./process-instance-content.tsx";
-import { useProcessInstanceActions } from "../../behavior/use-process-instance-actions.ts";
+import { Copy as LuCopy } from "lucide-react";
+import { useState } from "react";
 
+import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster } from "../../../../behavior/ops-feedback.ts";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
+import { useProcessInstanceActions } from "../../behavior/use-process-instance-actions.ts";
+import { ProcessInstanceContent } from "./process-instance-content.tsx";
 interface Props {
   processName?: string;
   projectId?: string;

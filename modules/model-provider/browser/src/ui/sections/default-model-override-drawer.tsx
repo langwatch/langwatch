@@ -1,17 +1,13 @@
-import type { WireOf } from "@langwatch/api/web";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 /**
  * `defaultModelOverride`: "Inherit" on the wire is key absence. The Langy pill sync helper is
  * missing on purpose (importing `@langwatch/langy-browser` back would cycle), so an open panel
  * keeps the outgoing model stale until remounted.
  */
-
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
+import type { WireOf } from "@langwatch/api/web";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
-import { Drawer } from "@langwatch/design-system/drawer";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   buildCustomModelDisplayNames,
@@ -21,6 +17,8 @@ import {
   type ModelDefaultInheritedValues,
   type ModelDefaultSnapshot,
 } from "@langwatch/model-provider-contract";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";

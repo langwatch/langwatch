@@ -1,5 +1,5 @@
-import type { TenantSource } from "@langwatch/system-migrations";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { TenantSource } from "@langwatch/system-migrations";
 
 export class PrismaProjectTenantSourceRepository implements TenantSource {
   readonly #prisma: PrismaClient;

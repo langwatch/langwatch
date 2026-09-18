@@ -1,9 +1,9 @@
-import type { WorkflowService } from "@langwatch/workflow-process";
 import {
   singleEvaluationResultSchema,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import type { ExecutionStatus } from "@langwatch/workflow-contract";
+import type { WorkflowService } from "@langwatch/workflow-process";
 import { z } from "zod";
 
 const workflowExecutionResponseSchema = z.object({

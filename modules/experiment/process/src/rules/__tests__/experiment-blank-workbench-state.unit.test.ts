@@ -1,13 +1,14 @@
-/**
- * The blank workbench the REST create call builds, compared against the client default.
- * Keeps server-side and browser definitions from drifting.
- */
-import { describe, expect, it } from "vitest";
 import {
   createInitialState,
   extractPersistedState,
   persistedEvaluationsV3StateSchema,
 } from "@langwatch/experiment-contract";
+/**
+ * The blank workbench the REST create call builds, compared against the client default.
+ * Keeps server-side and browser definitions from drifting.
+ */
+import { describe, expect, it } from "vitest";
+
 import { createBlankWorkbenchState } from "../experiment-blank-workbench-state.rules.ts";
 
 describe("the blank workbench state", () => {

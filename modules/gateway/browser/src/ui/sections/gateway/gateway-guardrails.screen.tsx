@@ -1,4 +1,3 @@
-import type { Instant } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -16,9 +15,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Archive, Pencil, Plus, Shield } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -26,9 +22,14 @@ import type {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
 } from "@langwatch/gateway-contract";
-import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import type { Instant } from "@langwatch/time";
+import { Archive, Pencil, Plus, Shield } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
 import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
 type GuardrailRow = {
   id: string;
@@ -440,7 +441,6 @@ function GuardrailDrawer({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. block PII on requests"
-                
               />
             </Field.Root>
 

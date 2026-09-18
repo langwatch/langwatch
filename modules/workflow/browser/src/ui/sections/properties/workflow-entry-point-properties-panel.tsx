@@ -1,11 +1,12 @@
 import { Button, HStack, Spacer, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { Entry, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import { ArrowRight, Database, Flag, Folder, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import type { Entry, Field } from "@langwatch/workflow-contract";
 import type {
   WorkflowBasePropertiesPanelProps,
   WorkflowVariablesProps,

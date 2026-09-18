@@ -3,8 +3,9 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
 import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it } from "vitest";
+
 import {
   collapseRedundantScopes,
   ProviderScopeChips,

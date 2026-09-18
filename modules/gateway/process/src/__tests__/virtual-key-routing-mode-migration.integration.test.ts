@@ -6,9 +6,10 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Prisma,PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 

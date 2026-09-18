@@ -1,17 +1,18 @@
+import { AgentOfflineError } from "@langwatch/agent-contract";
+import { UNNAMED_FAILURE } from "@langwatch/experiment-contract";
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 /**
  * What a workbench column sends to a connected agent, and what it reads back.
  *
  * @see specs/experiments-v3/connected-agent-target.feature
  */
 import { describe, expect, it } from "vitest";
-import { AgentOfflineError } from "@langwatch/agent-contract";
-import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+
 import {
   buildConnectedCall,
   connectedCallFailure,
   connectedOutputText,
 } from "../experiment-connected-target.process.ts";
-import { UNNAMED_FAILURE } from "@langwatch/experiment-contract";
 
 const definitions: ScenarioParameterDefinition[] = [
   { name: "model", type: "string", options: ["gpt-5", "gpt-5-mini"] },

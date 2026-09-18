@@ -11,7 +11,11 @@ export class MemoryAuthzCutoverRepository extends AuthzCutoverRepository {
     super();
   }
 
-  async findCutover({ organizationId }: { organizationId: string }): Promise<AuthzCutoverRow | null> {
+  async findCutover({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<AuthzCutoverRow | null> {
     const row = this.memory.cutovers.get(organizationId);
     return row ? { status: row.status, occurredAt: row.occurredAt } : null;
   }

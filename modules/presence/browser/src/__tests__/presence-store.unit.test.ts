@@ -1,9 +1,10 @@
+import type { PresenceSession } from "@langwatch/presence-contract";
 /**
  * What the presence store keeps for peers vs. the local session.
  * See modules/presence/specs/presence.feature.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { PresenceSession } from "@langwatch/presence-contract";
+
 import {
   selectPeersMatching,
   selectPeersOnConversation,

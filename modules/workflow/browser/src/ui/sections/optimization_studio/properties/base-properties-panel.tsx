@@ -1,5 +1,9 @@
+import { toaster } from "@langwatch/browser-host/toaster";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import { ComponentIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
 import type { ComponentProps } from "react";
 
+import { HoverableBigText } from "../../hoverable-big-text.tsx";
 import {
   FieldsDefinition,
   FieldsForm,
@@ -8,11 +12,6 @@ import {
   WorkflowPropertySectionTitle,
   type WorkflowPropertySectionTitleProps,
 } from "../../workflow-base-properties-panel.tsx";
-
-import { HoverableBigText } from "../../hoverable-big-text.tsx";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { ComponentIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
 import { OptimizationStudioLLMConfigField } from "./llm-configs/optimization-studio-llm-config-field.tsx";
 
 export { FieldsDefinition, FieldsForm, PropertyField };

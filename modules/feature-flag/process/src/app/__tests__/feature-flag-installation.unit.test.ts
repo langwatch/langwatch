@@ -1,8 +1,4 @@
-import {
-  FeatureFlagApi,
-  resolveFeatureFlagConfig,
-  UnknownFeatureFlagError,
-} from "@langwatch/feature-flag-contract";
+import { FeatureFlagApi, UnknownFeatureFlagError } from "@langwatch/feature-flag-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
@@ -18,7 +14,7 @@ const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(featureFlagServer)])
-    .withConfig({ "feature-flag": resolveFeatureFlagConfig({}) })
+    .withConfig({ "feature-flag": { forceEnable: [], overrides: {}, legacy: {} } })
     .provide({
       authz: createFeatureFlagTestAuthz(),
       project: createFeatureFlagTestProjects(),

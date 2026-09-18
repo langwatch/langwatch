@@ -1,5 +1,6 @@
 import { Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { retentionCategories, type RetentionCategory } from "@langwatch/data-retention-contract";
+
 import { CATEGORY_LABELS } from "../../model/retention-constants.ts";
 import { formatBytes, formatDays } from "../../model/retention-format.ts";
 import { renderPolicySummary } from "../../model/retention-grouping.ts";

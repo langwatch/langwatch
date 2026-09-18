@@ -1,4 +1,4 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -9,15 +9,9 @@ const unsafeSwitch = z
   .optional()
   .transform((value) => value === true || value === "1");
 
-export const webhookServerConfigDefinition = RuntimeConfig.define({
-  allowInsecureLocalUrls: Config.value(unsafeSwitch, {
-    env: "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS",
-  }),
-  allowAmbientAwsCredentials: Config.value(unsafeSwitch, {
-    env: "WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS",
-  }),
-});
+export const webhookConfig = Config.define((c) => ({
+  allowInsecureLocalUrls: c.env("WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS", unsafeSwitch),
+  allowAmbientAwsCredentials: c.env("WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS", unsafeSwitch),
+}));
 
-export type WebhookServerConfig = ConfigValue<typeof webhookServerConfigDefinition>;
-
-export const webhookServerConfigSchema = compileRuntimeConfig(webhookServerConfigDefinition);
+export type WebhookServerConfig = ConfigOf<typeof webhookConfig>;

@@ -1,4 +1,5 @@
 import { Badge, Box, Button, Card, HStack, Table, Text } from "@chakra-ui/react";
+
 import type { SubscriberHealthRow } from "../../model/subscriber-health.ts";
 
 function EventTypesCell({ eventTypes }: { eventTypes: readonly string[] }) {

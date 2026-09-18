@@ -5,12 +5,13 @@
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { describe, expect, it } from "vitest";
-
 import {
   LangWatchQLGranularityTooFineError,
-  LangWatchQLReservedGranularityTypeError,LWQL_GRANULARITY_STEPS
+  LangWatchQLReservedGranularityTypeError,
+  LWQL_GRANULARITY_STEPS,
 } from "@langwatch/analytics-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   LWQL_GRANULARITY_MAX_BUCKETS,
   LangWatchQLTimeWindowService,

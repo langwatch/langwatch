@@ -80,9 +80,7 @@ function resolveLocal({
     base.replace(/\.js$/, ".ts"),
   ];
   return (
-    candidates.find(
-      (candidate) => existsSync(candidate) && statSync(candidate).isFile(),
-    ) ?? null
+    candidates.find((candidate) => existsSync(candidate) && statSync(candidate).isFile()) ?? null
   );
 }
 
@@ -127,9 +125,7 @@ const featureSourceFiles = (directory: string): string[] =>
     }
     // A declaration file is erased too, so it is never in a chunk.
     if (entry.name.endsWith(".d.ts")) return [];
-    return EXTENSIONS.some((extension) => entry.name.endsWith(extension))
-      ? [path]
-      : [];
+    return EXTENSIONS.some((extension) => entry.name.endsWith(extension)) ? [path] : [];
   });
 
 describe("where the Vega runtime can be reached from", () => {
@@ -154,20 +150,17 @@ describe("where the Vega runtime can be reached from", () => {
       });
 
       /** @scenario "The lazy Vega wrapper defers its own module, on the dashboard widget" */
-      it.each(
-        LAZY_BOUNDARIES.map((boundary) => [boundary.wrapper, boundary]),
-      )("keeps %s free of everything it defers", (_name, {
-        wrapper,
-        deferred,
-        specifier,
-      }) => {
-        const walk = walkStaticGraph(wrapper);
+      it.each(LAZY_BOUNDARIES.map((boundary) => [boundary.wrapper, boundary]))(
+        "keeps %s free of everything it defers",
+        (_name, { wrapper, deferred, specifier }) => {
+          const walk = walkStaticGraph(wrapper);
 
-        expect(reachesVega(walk)).toBe(false);
-        expect(walk.files).not.toContain(deferred);
-        // It is a lazy import, and nothing else would defer anything.
-        expect(readFileSync(wrapper, "utf8")).toContain(specifier);
-      });
+          expect(reachesVega(walk)).toBe(false);
+          expect(walk.files).not.toContain(deferred);
+          // It is a lazy import, and nothing else would defer anything.
+          expect(readFileSync(wrapper, "utf8")).toContain(specifier);
+        },
+      );
     });
   });
 
@@ -180,17 +173,13 @@ describe("where the Vega runtime can be reached from", () => {
     describe("when its specifiers are collected", () => {
       it("records the runtime import that the type-only line precedes", () => {
         expect(
-          specifiersOf(
-            'export type Foo = string;\nimport vegaEmbed from "vega-embed";\n',
-          ),
+          specifiersOf('export type Foo = string;\nimport vegaEmbed from "vega-embed";\n'),
         ).toEqual(["vega-embed"]);
       });
 
       it("records it even where no semicolon closes the type-only line", () => {
         expect(
-          specifiersOf(
-            'export type Foo = string\nimport vegaEmbed from "vega-embed"\n',
-          ),
+          specifiersOf('export type Foo = string\nimport vegaEmbed from "vega-embed"\n'),
         ).toEqual(["vega-embed"]);
       });
 
@@ -199,9 +188,7 @@ describe("where the Vega runtime can be reached from", () => {
       });
 
       it("still reads a specifier across a multi-line brace list", () => {
-        expect(
-          specifiersOf('import {\n  a,\n  b,\n} from "vega-lite";\n'),
-        ).toEqual(["vega-lite"]);
+        expect(specifiersOf('import {\n  a,\n  b,\n} from "vega-lite";\n')).toEqual(["vega-lite"]);
       });
     });
   });

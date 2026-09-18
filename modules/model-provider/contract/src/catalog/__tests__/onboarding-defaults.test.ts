@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { buildProviderOnboardingDefaultPlan } from "../onboarding-defaults.ts";
 
 describe("provider onboarding default plans", () => {

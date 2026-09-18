@@ -1,9 +1,14 @@
 import { Badge, Button, HStack, Text, VStack, Wrap } from "@chakra-ui/react";
-import { Building2, Folder, UserLock, Users } from "lucide-react";
-import { useMemo } from "react";
+import {
+  ProviderScopeChips,
+  ScopeChipPicker,
+  type ScopeTriadEntry,
+} from "@langwatch/authz-browser-kit/scope-picker";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { ProviderScopeChips,ScopeChipPicker,type ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import { Building2, Folder, UserLock, Users } from "lucide-react";
+import { useMemo } from "react";
+
 import { ViewTracesButton } from "../elements/view-traces-button.tsx";
 
 /**

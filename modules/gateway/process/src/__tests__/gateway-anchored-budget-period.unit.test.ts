@@ -4,11 +4,12 @@
  * for it must honor (cycle arithmetic itself: anchoredBudgetCycles.unit.test.ts).
  */
 
+import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
+
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 
 describe("budgetPeriodFloorMs on an anchored budget", () => {
   const anchor = Temporal.Instant.from("2026-06-17T09:00:00.000Z");

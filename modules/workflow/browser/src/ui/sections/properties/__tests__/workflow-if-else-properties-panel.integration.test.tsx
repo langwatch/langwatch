@@ -2,12 +2,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { VariablesSection } from "@langwatch/prompt-browser-kit/variables";
+import type { Component } from "@langwatch/workflow-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Component } from "@langwatch/workflow-contract";
-import { VariablesSection } from "@langwatch/prompt-browser-kit/variables";
 
 const mockSetNodeParameter = vi.fn();
 const mockSetNode = vi.fn();
@@ -30,7 +30,10 @@ vi.mock("@xyflow/react", () => ({
 }));
 
 import { IfElsePropertiesPanel } from "../workflow-if-else-properties-panel.tsx";
-import type { WorkflowVariablesProps, WorkflowCodeEditorProps } from "../workflow-properties.ports.ts";
+import type {
+  WorkflowVariablesProps,
+  WorkflowCodeEditorProps,
+} from "../workflow-properties.ports.ts";
 
 const createIfElseNode = (overrides: Partial<Component> = {}): Node<Component> => ({
   id: "gate",

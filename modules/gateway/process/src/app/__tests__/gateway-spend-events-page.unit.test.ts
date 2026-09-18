@@ -8,6 +8,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GatewayApp } from "../gateway.app.ts";
@@ -79,6 +80,9 @@ function fakePrisma(): PrismaClient {
   } as unknown as PrismaClient;
 }
 
+/** No handle is ever resolved through it in these tests. */
+const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
+
 /** The slice of the application this surface reaches, and nothing else. */
 function gatewayAppStub(): GatewayApp {
   return GatewayApp.create({
@@ -103,6 +107,7 @@ function gatewayAppStub(): GatewayApp {
       spendSettlementGraceMs: void 0,
     },
     resources: new ResourceScope(),
+    secrets: noSecrets,
   });
 }
 

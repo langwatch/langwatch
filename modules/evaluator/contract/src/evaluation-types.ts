@@ -1,5 +1,6 @@
-import { z } from "zod";
 import { filterFieldsEnum } from "@langwatch/analytics-contract";
+import { z } from "zod";
+
 import type {
   EvaluationResult,
   EvaluationResultError,

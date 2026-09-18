@@ -1,3 +1,4 @@
+import type { LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 /**
  * The default-deny fallthrough, exercised rather than asserted about. The rule under test is
  * the one the whole design rests on: a node kind, a field, or an enumerated value the walk does
@@ -12,7 +13,6 @@ import {
 } from "../../rules/langwatch-ql-parser.rules.ts";
 import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
-import type { LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 
 const POLICY = {
   allowedTables: ["analytics.traces"],

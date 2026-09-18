@@ -1,14 +1,15 @@
+import { fromDate } from "@langwatch/time";
 /**
  * Unit coverage for the CLI login key mint mechanics: re-login and racing logins never
  * leave more than one active key per device label.
  * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
-import type { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
+
 import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
 import { ApiKeyCliService } from "../api-key-cli.service.ts";
-import { fromDate } from "@langwatch/time";
+import type { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
+import type { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
 
 const OLD_KEY = {
   id: "apikey-old",

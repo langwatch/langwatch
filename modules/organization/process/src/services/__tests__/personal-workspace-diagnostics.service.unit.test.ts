@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { PersonalWorkspaceDiagnosticsAdapter } from "../personal-workspace-diagnostics.service.ts";
 
 describe("PersonalWorkspaceDiagnosticsAdapter", () => {

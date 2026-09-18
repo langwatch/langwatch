@@ -1,3 +1,4 @@
+import type { LangWatchQLProtections, LangWatchQLRunCaller } from "@langwatch/analytics-contract";
 /**
  * What one member may read of a project's content, per LangWatchQL's catalogue: three booleans
  * from two independent sources -- costs from AuthZ, captured content from the SAME resolved
@@ -12,10 +13,9 @@ import {
   type DataPrivacyApi,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
 import { NotFoundError } from "@langwatch/handled-error";
+import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { LangWatchQLProtections, LangWatchQLRunCaller } from "@langwatch/analytics-contract";
 
 const logger: Pick<Logger, "error"> = createLogger("langwatch:analytics:workbench-protections");
 

@@ -4,12 +4,14 @@
  * crashed on undefined errors (defaultFeatures, systemProviders, exists).
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { ResourceScope } from "@langwatch/kernel";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
+
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import { ModelProviderApp } from "../model-provider.app.ts";
 
@@ -112,12 +114,16 @@ function createRealModelProviderApp(): ModelProviderApp {
       redis: fakeRedis(),
     },
     config: {
-      isSaas: false,
-      egress: { blockLocal: true, allowedHosts: [], verifyTls: true },
-      executionProxyBaseUrl: "http://nlp-engine-not-configured.invalid",
-      environment: {},
+      blockLocalHttpCalls: true,
+      allowedProxyHosts: [],
+      nlpServiceUrl: undefined,
+      defaultModel: undefined,
     },
     resources: new ResourceScope(),
+    secrets: SecretsResolver.over(SecretsChain.start({ environment: {} })).scopeTo(
+      "model-provider",
+      [],
+    ),
   });
 }
 

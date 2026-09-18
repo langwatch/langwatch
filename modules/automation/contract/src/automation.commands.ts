@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import type { AutomationAction, AutomationKind } from "./automation.ts";
 import { triggerActionSchema, triggerKindSchema } from "./trigger.ts";
 

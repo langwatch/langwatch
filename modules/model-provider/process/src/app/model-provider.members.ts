@@ -59,9 +59,7 @@ export abstract class ModelProviderCredentialPolicy {
     incoming: { key: string; value: string }[];
     stored: { key: string; value: string }[];
   }): { key: string; value: string }[];
-  abstract maskHeaders(
-    value: { key: string; value: string }[],
-  ): { key: string; value: string }[];
+  abstract maskHeaders(value: { key: string; value: string }[]): { key: string; value: string }[];
 }
 
 /** OAuth exchange boundary owned by the application runtime. */

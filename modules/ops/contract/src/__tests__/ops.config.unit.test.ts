@@ -1,9 +1,10 @@
-import { RuntimeConfig } from "@langwatch/config";
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { opsServerConfigDefinition } from "../ops.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "ops", definition: opsServerConfigDefinition, source }).value;
+import { opsConfig } from "../ops.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({ owners: [{ name: "ops", config: opsConfig }], environment }).ops;
 
 describe("ops server configuration", () => {
   describe("given a deployment says nothing about backup metrics", () => {

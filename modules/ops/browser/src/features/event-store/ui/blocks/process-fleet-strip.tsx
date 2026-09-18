@@ -1,5 +1,6 @@
 import { HStack } from "@chakra-ui/react";
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
+
 import { formatCount } from "../../../../model/ops-formatters.ts";
 import { LinkedStat } from "../elements/dashboard-linked-stat.tsx";
 

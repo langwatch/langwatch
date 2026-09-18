@@ -3,11 +3,9 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { HandledError } from "@langwatch/handled-error";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
-import {
-  GithubPullRequestStatusService,
-  MAX_STATUS_REFS,
-} from "../github-pull-request-status.service.ts";
+
 import type {
   GithubAppTokenCache,
   GithubInstallationDetails,
@@ -15,19 +13,22 @@ import type {
   GithubPullRequestSummary,
   MintInstallationTokenInput,
 } from "../../app/github.app.ts";
-import { GithubRedis } from "../../repositories/redis/github-redis.connection.ts";
+import { GithubRateLimitedError } from "../../channels/http/http.github-api.channel.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubPullRequestRow,
   NullGithubPullRequestsRepository,
   type RefreshGithubPullRequestSnapshotInput,
 } from "../../repositories/github-pull-requests.repository.ts";
+import { GithubRedis } from "../../repositories/redis/github-redis.connection.ts";
+import { GithubPullRequestStatusCacheRedisRepository } from "../../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { GithubInstallationAccessService } from "../github-installation-access.service.ts";
 import { GithubInstallationsService } from "../github-installations.service.ts";
-import { GithubPullRequestStatusCacheRedisRepository } from "../../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
+import {
+  GithubPullRequestStatusService,
+  MAX_STATUS_REFS,
+} from "../github-pull-request-status.service.ts";
 import { TestOrganizationService } from "./fixtures/github-services.fixture.ts";
-import { Temporal, nowInstant, toDate } from "@langwatch/time";
-import { GithubRateLimitedError } from "../../channels/http/http.github-api.channel.ts";
 
 const REF = {
   repositoryHost: "github.com",

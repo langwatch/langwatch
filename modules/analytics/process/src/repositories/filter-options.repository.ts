@@ -4,6 +4,7 @@
  * at the call ({@link FilterService}) instead of failing on its first query.
  */
 import type { FilterField } from "@langwatch/analytics-contract";
+
 import type { ClickHouseFilterQueryParams } from "./clickhouse/clickhouse.filter-shapes.mapper.ts";
 
 /** One option a filter picker offers, with how many rows carry it. */

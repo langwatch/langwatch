@@ -3,7 +3,8 @@
  * @see specs/nlp-go/studio-lambda-cache.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { NlpLambdaArnResolver,NlpLambdaArnCache } from "../../app/workflow.app.ts";
+
+import type { NlpLambdaArnResolver, NlpLambdaArnCache } from "../../app/workflow.app.ts";
 import {
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
   NlpLambdaRuntimeService,

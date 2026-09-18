@@ -1,19 +1,20 @@
 import { Field, Tabs, Text, VStack } from "@chakra-ui/react";
 import type {
   AgentInputBinding as FieldMapping,
-  Field as Variable,HttpAuth,HttpHeader,HttpMethod
+  Field as Variable,
+  HttpAuth,
+  HttpHeader,
+  HttpMethod,
 } from "@langwatch/agent-contract";
+import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
+import type { ReactNode } from "react";
+
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
 import { BodyTemplateEditor } from "../elements/http-body-template-editor.tsx";
 import { HeadersConfigSection } from "../elements/http-headers-config-section.tsx";
-import { HttpTestPanel } from "./http-test-panel.tsx";
 import { OutputPathInput } from "../elements/http-output-path-input.tsx";
 import { SessionPathInput } from "../elements/http-session-path-input.tsx";
-import type { ReactNode } from "react";
-import type {
-  HttpTestErrorExplanation,
-  HttpTestResult,
-} from "@langwatch/agent-contract/http-test";
+import { HttpTestPanel } from "./http-test-panel.tsx";
 
 export interface RenderScenarioMappingsInput {
   inputs: Variable[];

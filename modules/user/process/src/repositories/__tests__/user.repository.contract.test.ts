@@ -1,10 +1,10 @@
+import { fromDate } from "@langwatch/time";
 /**
  * @vitest-environment node
  * Account contract tested across all backends (memory + Postgres).
  * @see modules/user/specs/user.feature
  */
 import { describe, expect, it } from "vitest";
-import { fromDate } from "@langwatch/time";
 
 import { MemoryUserRepositories } from "../memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../user.repositories.ts";

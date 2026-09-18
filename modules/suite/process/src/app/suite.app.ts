@@ -1,15 +1,45 @@
+import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contract";
 /**
  * The suite feature's application: what both of its doors call.
  */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
-import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
-import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contract";
-import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
-import { ScenarioApi, type ScenarioApi as ScenarioApiType,type RunActor,type ScenarioRunConfig,type ScenarioTestSuite,type ScenarioTestSuiteCreateInput,type ScenarioTestSuiteIdInput,type ScenarioTestSuiteUpdateInput,type SimulationExternalSetSummary,type SimulationProjectDateRangeInput } from "@langwatch/scenario-contract";
-import { SuiteApi, SuiteNotFoundError, type SuiteRunParameters, type SuiteRunResult, SuiteScopeNotAllowedError, type SuiteTarget, type CreateSuiteCommand, type StartSuiteRunCommandData, type Suite, type SuiteArchivedNamesInput, type SuiteIdInput, type SuiteRunAllInput, type SuiteRunAllResult, type SuiteRunInput, type SuiteRunPlanInput, type SuiteRunPlanResult, type UpdateSuiteCommand } from "@langwatch/suite-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { z } from "zod";
+import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
+import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
+import {
+  ScenarioApi,
+  type ScenarioApi as ScenarioApiType,
+  type RunActor,
+  type ScenarioRunConfig,
+  type ScenarioTestSuite,
+  type ScenarioTestSuiteCreateInput,
+  type ScenarioTestSuiteIdInput,
+  type ScenarioTestSuiteUpdateInput,
+  type SimulationExternalSetSummary,
+  type SimulationProjectDateRangeInput,
+} from "@langwatch/scenario-contract";
+import {
+  SuiteApi,
+  SuiteNotFoundError,
+  type SuiteRunParameters,
+  type SuiteRunResult,
+  SuiteScopeNotAllowedError,
+  type SuiteTarget,
+  type CreateSuiteCommand,
+  type StartSuiteRunCommandData,
+  type Suite,
+  type SuiteArchivedNamesInput,
+  type SuiteIdInput,
+  type SuiteRunAllInput,
+  type SuiteRunAllResult,
+  type SuiteRunInput,
+  type SuiteRunPlanInput,
+  type SuiteRunPlanResult,
+  type UpdateSuiteCommand,
+} from "@langwatch/suite-contract";
+import type { Instant } from "@langwatch/time";
+
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
 import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
@@ -17,7 +47,6 @@ import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import { SuiteService } from "../services/suite.service.ts";
 import { buildSuiteInfrastructure } from "./suite-composition.build.ts";
-import type { Instant } from "@langwatch/time";
 
 /**
  * The project exists but no organization can be resolved behind it.
@@ -51,12 +80,14 @@ export interface SuiteAppDependencies {
 }
 
 /**
- * This App's own config: the deployment's public origin, for `platformUrl`.
- * Optional and defaulted to `{}`, so a deployment naming no `suite` slice
- * still boots rather than failing to parse an absent object.
+ * Shapes restated rather than imported from `@langwatch/process-stores`: a
+ * module depends on contracts. `publicBaseUrl` is the process's own fact,
+ * absent where the deployment named no `BASE_HOST`.
  */
-const suiteAppConfigSchema = z.object({ publicBaseUrl: z.string().optional() }).default({});
-export type SuiteAppConfig = z.infer<typeof suiteAppConfigSchema>;
+type SuiteProcessMembers = Readonly<{
+  clickhouse: ClickHouseQueryClient;
+  publicBaseUrl: string | undefined;
+}>;
 
 /**
  * The run projection reads from ClickHouse only, so this module reads the
@@ -65,8 +96,8 @@ export type SuiteAppConfig = z.infer<typeof suiteAppConfigSchema>;
  */
 type SuiteSetup = FeatureSetup<
   typeof SuiteApp.dependencies,
-  MembersRead<typeof SuiteApp.reads>,
-  SuiteAppConfig,
+  SuiteProcessMembers,
+  undefined,
   SuiteRepositories
 >;
 
@@ -78,12 +109,15 @@ export class SuiteApp implements SuiteApi {
     prompts: PromptApi,
     projects: ProjectApi,
   };
-  static readonly reads = reads("clickhouse");
-  static readonly configSchema = suiteAppConfigSchema;
+  /** Both names are from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["clickhouse", "publicBaseUrl"] as const;
 
   static create(setup: SuiteSetup): SuiteApp {
-    const { members, dependencies, repositories, config } = setup;
-    const infrastructure = buildSuiteInfrastructure({ agents: dependencies.agents, config });
+    const { members, dependencies, repositories } = setup;
+    const infrastructure = buildSuiteInfrastructure({
+      agents: dependencies.agents,
+      publicBaseUrl: members.publicBaseUrl,
+    });
     const runRepository = ClickHouseSuiteRunRepository.create({
       clickhouse: members.clickhouse,
       defaultRetentionDays: infrastructure.defaultRetentionDays,
@@ -116,7 +150,10 @@ export class SuiteApp implements SuiteApi {
     generateId?: () => string;
     now?: () => Instant;
   }): SuiteApp {
-    const defaults = buildSuiteInfrastructure({ agents: setup.dependencies.agents, config: {} });
+    const defaults = buildSuiteInfrastructure({
+      agents: setup.dependencies.agents,
+      publicBaseUrl: undefined,
+    });
     const infrastructure = { ...defaults, ...setup.infrastructure };
 
     const suites = SuiteService.create({

@@ -11,6 +11,7 @@ const { loggerMock } = vi.hoisted(() => ({
 vi.mock("@langwatch/observability", () => ({ createLogger: () => loggerMock }));
 
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
+
 import {
   runSignInRouterShadow,
   type SignInRouterMode,

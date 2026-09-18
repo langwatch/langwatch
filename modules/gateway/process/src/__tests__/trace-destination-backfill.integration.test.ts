@@ -5,11 +5,12 @@
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;

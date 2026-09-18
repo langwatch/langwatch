@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+
 import type { AnnotationView } from "./model/annotation-view.ts";
 
 export type AnnotationScreenLoader = () => Promise<{

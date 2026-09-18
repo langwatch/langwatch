@@ -1,8 +1,9 @@
-import { useCallback } from "react";
 import { toaster } from "@langwatch/browser-host/toaster";
 import type { BaseComponent } from "@langwatch/workflow-contract";
-import { reportableExecutionFailure } from "./execution-state-error.ts";
+import { useCallback } from "react";
+
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { reportableExecutionFailure } from "./execution-state-error.ts";
 
 export const useAlertOnComponent = () => {
   const { selectedNode, propertiesExpanded, setSelectedNode, setPropertiesExpanded } =

@@ -1,8 +1,8 @@
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+
 import { ProjectApp } from "./app/project.app.ts";
-import { projectRepositories } from "./repositories/project-repositories.registry.ts";
 import type { CodingAgentActivityRepository } from "./repositories/coding-agent-activity.repository.ts";
 import {
   PrismaCodingAgentActivityRepository,
@@ -12,15 +12,16 @@ import {
   PrismaProjectRepository,
   type PrismaProjectDatabase,
 } from "./repositories/prisma/prisma.project.repository.ts";
+import { projectRepositories } from "./repositories/project-repositories.registry.ts";
 import {
   GovernanceInternalProjectService,
   type ProjectOldestTeam,
 } from "./services/governance-internal-project.service.ts";
-import { ProjectMetadataService } from "./services/project-metadata.service.ts";
 import {
   type ProjectCredentials,
   ProjectCredentialsService,
 } from "./services/project-credentials.service.ts";
+import { ProjectMetadataService } from "./services/project-metadata.service.ts";
 import {
   ProjectService,
   type ProjectDiagnostics,

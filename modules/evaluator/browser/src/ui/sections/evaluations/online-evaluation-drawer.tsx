@@ -11,11 +11,33 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { WireOf } from "@langwatch/api/web";
+import {
+  getComplexProps,
+  getDrawerStack,
+  navigateToDrawer,
+  setFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-browser/evaluator-editor-callbacks";
+import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-browser/mapping-validation";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
+import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { LuListTree } from "react-icons/lu";
+import { z } from "zod";
+
+import type {
+  CheckPrecondition,
+  CheckPreconditionFields,
+  CheckPreconditionRule,
+} from "../../../model/evaluations/types.ts";
 import {
   DEFAULT_PRECONDITION,
   fieldRequiresKey,
@@ -26,38 +48,18 @@ import {
   isRuleAllowedForField,
   RULE_LABELS,
 } from "../../../model/preconditions/precondition-field-utils.ts";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
-import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-browser/evaluator-editor-callbacks";
-import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-browser/mapping-validation";
-import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
-import {
-  getComplexProps,
-  getDrawerStack,
-  navigateToDrawer,
-  setFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "@langwatch/browser-host/drawer";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type {
-  CheckPrecondition,
-  CheckPreconditionFields,
-  CheckPreconditionRule,
-} from "../../../model/evaluations/types.ts";
-import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
-import type { WireOf } from "@langwatch/api/web";
 
 /** An evaluator as the drawer holds one: off a query, so its instants are strings. */
 type WireEvaluatorWithFields = WireOf<EvaluatorWithFields>;
-import type { MappingState, TRACE_MAPPINGS } from "@langwatch/dataset-contract";
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared.tsx";
+import type { MappingState, TRACE_MAPPINGS } from "@langwatch/dataset-contract";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import { EvaluatorSelectionBox } from "../../elements/evaluations/evaluator-selection-box.tsx";
 import { StepRadio } from "../../elements/evaluations/step-button.tsx";
+import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared.tsx";
 
 const evaluatorSettingsSchema = z.record(z.string(), z.json());
 import { deserializeMappingStateToUI } from "../../../model/evaluations/deserialize-mapping-state-to-ui.ts";

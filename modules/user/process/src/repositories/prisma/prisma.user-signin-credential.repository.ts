@@ -5,6 +5,7 @@ import type {
   UnlinkUserAccountOutcome,
   UserLinkedAccount,
 } from "@langwatch/user-contract";
+
 import type {
   UserCredentialAccount,
   UserCredentialRepository,

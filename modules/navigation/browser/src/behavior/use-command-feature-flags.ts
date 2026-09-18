@@ -1,11 +1,12 @@
 import { useMemo } from "react";
-import { useNavigationHost } from "../model/navigation-host.ts";
+
+import type { Command } from "../model/command-bar-types.ts";
 import {
   type CommandFeatureFlagValues,
   filterCommandsByFeatureFlags,
   topLevelNavigationCommands,
 } from "../model/command-catalogue.ts";
-import type { Command } from "../model/command-bar-types.ts";
+import { useNavigationHost } from "../model/navigation-host.ts";
 
 /** Flags for command list, asked through host so palette and sidebar see the same answer */
 export function useCommandFeatureFlags(): CommandFeatureFlagValues {

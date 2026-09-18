@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
+
 import type {
   DatasetReference,
   EvaluatorConfig,
   TargetConfig,
 } from "../../../experiment-workbench.ts";
-import type { ExecutionScope } from "../types.ts";
 import {
   buildExecutionRequest,
   comparisonDependencies,
   type ExecutionRequestState,
   planComparisonSeeding,
 } from "../build-execution-request.ts";
+import type { ExecutionScope } from "../types.ts";
 
 const dataset = (): DatasetReference => ({
   id: "ds-1",

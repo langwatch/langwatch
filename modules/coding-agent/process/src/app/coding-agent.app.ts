@@ -29,8 +29,8 @@ import {
 } from "@langwatch/coding-agent-contract";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { ProjectApi } from "@langwatch/project-contract";
 /** The coding-agent application shared by all transports. */
 import type { SpanDetail } from "@langwatch/trace-contract";
 

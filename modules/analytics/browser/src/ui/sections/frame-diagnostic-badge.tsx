@@ -5,9 +5,8 @@
  */
 
 import { Box } from "@chakra-ui/react";
-import { TriangleAlert } from "lucide-react";
-
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TriangleAlert } from "lucide-react";
 
 import type { ChartFrameLogEntry } from "../../behavior/frame-bridge.ts";
 
@@ -18,10 +17,7 @@ export function FrameDiagnosticBadge({
 }) {
   if (!diagnostic) return null;
   return (
-    <Tooltip
-      content={`This widget reported a problem: ${diagnostic.text}`}
-      showArrow
-    >
+    <Tooltip content={`This widget reported a problem: ${diagnostic.text}`} showArrow>
       <Box
         position="absolute"
         top={1}

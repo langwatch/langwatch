@@ -7,6 +7,8 @@ import {
   AnalyticsApi,
   LangWatchQLNotEnabledError,
   type AnalyticsApi as AnalyticsApiContract,
+  type DashboardWidget,
+  type DashboardWidgetDefinitionInput,
   type LangWatchQLBudgetOverflowMode,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
@@ -30,38 +32,17 @@ import {
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinitionUpdate,
 } from "@langwatch/dashboard-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
-import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";
-import { z } from "zod";
 
-import type { WorkbenchAccess, WorkbenchCaller } from "./dashboard.members.ts";
-import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
+import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
+import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
 import { DashboardService } from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.service.ts";
-
-/**
- * `BASE_HOST`, this deployment's public origin, for the address a saved
- * dashboard opens at. Defaults to none rather than refusing at boot — the
- * deleted `createPlatformUrlBuilder` answered an absent origin the same way.
- */
-const dashboardAppZodSchema = z.object({
-  baseHost: z.string().default(""),
-});
-export type DashboardAppConfig = z.infer<typeof dashboardAppZodSchema>;
-
-/**
- * A process with no dashboard-specific config slice hands this module
- * `undefined`, not `{}` — guarded the same way `featureFlagAppConfigSchema`
- * does, so an absent slice resolves to defaults instead of refusing to parse.
- */
-const dashboardAppConfigSchema: FeatureConfigSchema<DashboardAppConfig> = {
-  parse: (value: unknown): DashboardAppConfig =>
-    dashboardAppZodSchema.parse((value ?? {}) as Record<string, unknown>),
-};
+import type { WorkbenchAccess, WorkbenchCaller } from "./dashboard.members.ts";
 
 type DashboardDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
@@ -69,10 +50,17 @@ type DashboardDependencies = Readonly<{
   projects: typeof ProjectApi;
 }>;
 
+/**
+ * Shapes restated rather than imported: a module depends on contracts.
+ * `publicBaseUrl` is the process's own fact, drilled in — absent where the
+ * deployment named no `BASE_HOST`.
+ */
+type DashboardMembers = Readonly<{ publicBaseUrl: string | undefined }>;
+
 type DashboardSetup = FeatureSetup<
   DashboardDependencies,
-  MembersRead<typeof DashboardApp.reads>,
-  DashboardAppConfig,
+  DashboardMembers,
+  undefined,
   DashboardRepositories
 >;
 
@@ -113,12 +101,13 @@ export class DashboardApp implements DashboardApi {
     automation: AutomationApi,
     projects: ProjectApi,
   };
-  static readonly configSchema: FeatureConfigSchema<DashboardAppConfig> = dashboardAppConfigSchema;
-  static readonly reads = reads();
+  static readonly reads = ["publicBaseUrl"] as const;
 
   #dashboards: DashboardService;
   #charts: SavedWorkbenchChartService;
   #savedViews: SavedViewService;
+  #widgets: DashboardWidgetService;
+  #analytics: AnalyticsApiContract;
   #automation: AutomationApiContract;
   #projects: ProjectApiContract;
   #workbenchAccess: WorkbenchAccess;
@@ -130,14 +119,21 @@ export class DashboardApp implements DashboardApi {
       dashboards: DashboardService;
       charts: SavedWorkbenchChartService;
       savedViews: SavedViewService;
+      widgets: DashboardWidgetService;
     }>,
-    peers: Readonly<{ automation: AutomationApiContract; projects: ProjectApiContract }>,
+    peers: Readonly<{
+      analytics: AnalyticsApiContract;
+      automation: AutomationApiContract;
+      projects: ProjectApiContract;
+    }>,
     workbench: Readonly<{ access: WorkbenchAccess; caller: WorkbenchCaller }>,
     publicBaseUrl: string | undefined,
   ) {
     this.#dashboards = services.dashboards;
     this.#charts = services.charts;
     this.#savedViews = services.savedViews;
+    this.#widgets = services.widgets;
+    this.#analytics = peers.analytics;
     this.#automation = peers.automation;
     this.#projects = peers.projects;
     this.#workbenchAccess = workbench.access;
@@ -162,10 +158,15 @@ export class DashboardApp implements DashboardApi {
           analytics,
         }),
         savedViews: SavedViewService.create({ repository: setup.repositories.savedViews }),
+        widgets: DashboardWidgetService.create(setup.repositories.dashboardWidgets),
       },
-      { automation: setup.dependencies.automation, projects: setup.dependencies.projects },
+      {
+        analytics,
+        automation: setup.dependencies.automation,
+        projects: setup.dependencies.projects,
+      },
       { access: workbenchAccess, caller: workbenchCaller },
-      setup.config.baseHost === "" ? undefined : setup.config.baseHost,
+      setup.members.publicBaseUrl,
     );
   }
 
@@ -287,6 +288,78 @@ export class DashboardApp implements DashboardApi {
     layouts: { graphId: string; layout: GraphLayout }[];
   }): Promise<{ success: true }> {
     return this.#dashboards.batchUpdateGraphLayouts(input);
+  }
+
+  // -- custom chart widgets --------------------------------------------------
+
+  /**
+   * The rollout gate over the widget surface. Analytics owns what a widget
+   * means, so it owns whether the project may author one at all.
+   */
+  assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void> {
+    return this.#analytics.assertCustomChartPlaygroundEnabled(input);
+  }
+
+  /** Every custom chart widget in the project. */
+  listDashboardWidgets(input: { projectId: string }): Promise<DashboardWidget[]> {
+    return this.#widgets.getAll(input);
+  }
+
+  /** One custom chart widget. */
+  getDashboardWidget(input: { projectId: string; id: string }): Promise<DashboardWidget> {
+    return this.#widgets.getById(input);
+  }
+
+  /** A new widget on the unplaced authoring grid. */
+  createDashboardWidget(
+    input: { projectId: string; name: string } & DashboardWidgetDefinitionInput,
+  ): Promise<DashboardWidget> {
+    return this.#widgets.createWidget({
+      projectId: input.projectId,
+      input: { name: input.name, code: input.code, queries: input.queries },
+    });
+  }
+
+  /** A widget's name, its code, or its queries. */
+  updateDashboardWidget(
+    input: {
+      projectId: string;
+      id: string;
+      name?: string;
+    } & Partial<DashboardWidgetDefinitionInput>,
+  ): Promise<DashboardWidget> {
+    return this.#widgets.updateWidget({
+      projectId: input.projectId,
+      id: input.id,
+      input: {
+        ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.code === undefined ? {} : { code: input.code }),
+        ...(input.queries === undefined ? {} : { queries: input.queries }),
+      },
+    });
+  }
+
+  /** Puts one widget on a dashboard, below whatever it would collide with. */
+  assignDashboardWidgetToDashboard(input: {
+    projectId: string;
+    id: string;
+    dashboardId: string;
+  }): Promise<DashboardWidget> {
+    return this.#widgets.assignToDashboard(input);
+  }
+
+  /** Removes one widget. */
+  deleteDashboardWidget(input: { projectId: string; id: string }): Promise<void> {
+    return this.#widgets.deleteWidget(input);
+  }
+
+  /** Where a reader opens the dashboards list a widget lands on. */
+  dashboardWidgetPlatformUrl(input: { projectSlug: string }): string {
+    return dashboardPlatformUrl({
+      publicBaseUrl: this.#publicBaseUrl,
+      projectSlug: input.projectSlug,
+      path: "/analytics/reports",
+    });
   }
 
   // -- the alert watching a graph -------------------------------------------

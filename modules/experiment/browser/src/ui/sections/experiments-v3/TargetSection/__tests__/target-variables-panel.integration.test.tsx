@@ -3,7 +3,6 @@
  * @vitest-environment jsdom
  */
 import "@testing-library/jest-dom/vitest";
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

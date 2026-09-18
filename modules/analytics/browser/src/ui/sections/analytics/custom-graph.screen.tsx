@@ -17,6 +17,14 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { type RotatingColorSet, rotatingColors } from "@langwatch/design-system/rotating-colors";
+import { Select } from "@langwatch/design-system/select";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { chakraComponents, Select as MultiSelect, type SingleValue } from "chakra-react-select";
 import React, { type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
 import {
@@ -45,27 +53,13 @@ import {
 } from "react-hook-form";
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
-import { CodeSnippet } from "../../../ui/elements/code-snippet.tsx";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Menu } from "@langwatch/design-system/menu";
-import { Select } from "@langwatch/design-system/select";
-import { Switch } from "@langwatch/design-system/switch";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useFilterParams } from "../../../behavior/use-filter-params.ts";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-  summaryGraphTypes,
-} from "../../../ui/sections/custom-graph.tsx";
-import { FilterIconWithBadge } from "../../../ui/sections/filter-icon-with-badge.tsx";
-import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
-import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
-import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-toggle.tsx";
+
+import { analyticsApi, type AnalyticsFilterOption } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsPeriod } from "../../../behavior/use-analytics-period.ts";
-import { AnalyticsPeriodPicker } from "../../../ui/sections/analytics-period-picker.tsx";
-import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
-import { getRawColorValue } from "@langwatch/design-system/color-mode";
+import { useFilterParams } from "../../../behavior/use-filter-params.ts";
+import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
+import type { FilterField } from "../../../model/analytics-filter-definition.ts";
+import { filterOutEmptyFilters, type FilterParam } from "../../../model/analytics-filter-params.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import {
   analyticsGroups,
@@ -84,14 +78,21 @@ import type {
   PipelineFields,
   SharedFiltersInput,
 } from "../../../model/analytics-vocabulary.ts";
-import { filterOutEmptyFilters, type FilterParam } from "../../../model/analytics-filter-params.ts";
-import type { FilterField } from "../../../model/analytics-filter-definition.ts";
-import { analyticsApi, type AnalyticsFilterOption } from "../../../behavior/analytics-api.ts";
-import { type RotatingColorSet, rotatingColors } from "@langwatch/design-system/rotating-colors";
 import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../model/string-casing.ts";
+import { CodeSnippet } from "../../../ui/elements/code-snippet.tsx";
+import { AnalyticsPeriodPicker } from "../../../ui/sections/analytics-period-picker.tsx";
+import {
+  CustomGraph,
+  type CustomGraphInput,
+  summaryGraphTypes,
+} from "../../../ui/sections/custom-graph.tsx";
+import { FilterIconWithBadge } from "../../../ui/sections/filter-icon-with-badge.tsx";
+import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
+import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-toggle.tsx";
+import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
 
 /** Which of the builder's two addresses this render is. */
 export type CustomGraphScreenMode = "new" | "edit";

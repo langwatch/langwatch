@@ -1,7 +1,8 @@
 import { userFullProfileSchema } from "@langwatch/user-contract";
 import { z } from "zod";
-import { annotationSchema, annotationUserSchema } from "./annotation.schemas.ts";
+
 import { annotationScoreNameSchema } from "./annotation-score.schemas.ts";
+import { annotationSchema, annotationUserSchema } from "./annotation.schemas.ts";
 
 export const annotationWithUserSummarySchema = z
   .object({ ...annotationSchema.shape, user: annotationUserSchema.nullable() })

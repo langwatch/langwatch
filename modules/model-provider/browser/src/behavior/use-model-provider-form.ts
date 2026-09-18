@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   modelProviders as modelProvidersRegistry,
-  type ModelProviderEditorValue as MaybeStoredModelProvider,type CustomModelEntry
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+  type CustomModelEntry,
 } from "@langwatch/model-provider-contract";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { hasUserModifiedAnyCredential, headerSignature } from "../model/model-provider-helpers.ts";
 
 // Mirrors the server's deriveDefaultName. Kept here so the drawer can

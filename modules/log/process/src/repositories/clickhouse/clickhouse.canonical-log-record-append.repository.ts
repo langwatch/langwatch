@@ -3,6 +3,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
+
 import { CanonicalLogRecordAppendRepository } from "../canonical-log-record-append.repository.ts";
 
 /**

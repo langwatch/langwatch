@@ -52,10 +52,10 @@
   "dependencies": {
     "@chakra-ui/react": "catalog:",
     "@hookform/resolvers": "catalog:",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
     "@tanstack/react-virtual": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",

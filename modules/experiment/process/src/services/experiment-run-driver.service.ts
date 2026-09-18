@@ -4,27 +4,28 @@
  * and cell primitives stay on the orchestrator; this is the order they happen in.
  */
 
-import { createLogger } from "@langwatch/observability";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type {
   EvaluationV3Event,
   ExecutionCell,
   ExecutionSummary,
 } from "@langwatch/experiment-contract";
 import { generateHumanReadableId } from "@langwatch/experiment-contract";
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import { createLogger } from "@langwatch/observability";
 import type { RunActor } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
+
 import { buildStripScoreEvaluatorIds } from "../eventing/experiment-evaluator-score-filter.process.ts";
-import { createEventStream } from "../eventing/experiment-run-event-stream.process.ts";
 import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
+import { createEventStream } from "../eventing/experiment-run-event-stream.process.ts";
 import type { OrchestratorInput } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { ExperimentRunLoopService, type PhaseTwoPlan } from "./experiment-run-loop.service.ts";
+import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
 import { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
-import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
 import { ExperimentTargetDataService } from "./experiment-target-data.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** The agent fields the ownership check reads. */
 export type ExperimentConnectedAgentSubject = {

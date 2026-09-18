@@ -5,6 +5,7 @@
  */
 
 import { createHash } from "node:crypto";
+
 import {
   AUTHZ_ENGINE_MIGRATION_NAME,
   roleKeyForTeamRole,
@@ -14,6 +15,7 @@ import {
   type RoleFact,
 } from "@langwatch/authz-contract";
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+
 import type {
   AuthzMigrationRepository,
   ExternalMemberFact,
@@ -27,12 +29,12 @@ import type {
   RoleHeadRow,
   ShareLinkFactRow,
 } from "../repositories/authz-migration.repository.ts";
-import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";
 import {
   AuthzGrantMapper,
   PRINCIPAL_TO_DB,
   SHARE_LINK_PERMISSION,
 } from "../repositories/prisma/prisma.authz-grant.mapper.ts";
+import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";
 
 export { AUTHZ_ENGINE_MIGRATION_NAME };
 
@@ -463,7 +465,11 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       heads,
     });
     return {
-      outstanding: [...grants.outstanding, ...roles.outstanding, ...resources.outstanding].toSorted(),
+      outstanding: [
+        ...grants.outstanding,
+        ...roles.outstanding,
+        ...resources.outstanding,
+      ].toSorted(),
       diffs: [...grants.diffs, ...roles.diffs, ...resources.diffs],
     };
   }
@@ -809,7 +815,9 @@ export class AuthzExpectedFactsMapper {
       });
     }
 
-    for (const member of externalMembers.slice().toSorted((a, b) => a.userId.localeCompare(b.userId))) {
+    for (const member of externalMembers
+      .slice()
+      .toSorted((a, b) => a.userId.localeCompare(b.userId))) {
       const principal = { type: "user" as const, id: member.userId };
       facts.push({
         grantId: AuthzGrantIdentity.deriveGrantId({

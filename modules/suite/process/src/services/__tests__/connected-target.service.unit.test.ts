@@ -1,11 +1,5 @@
-/**
- * @vitest-environment node
- * @see specs/agents/connected-agents.feature
- */
-import { describe, expect, it, vi } from "vitest";
 import { connectedAgentSelectability } from "@langwatch/agent-contract";
 import type { Agent, AgentReferenceState, AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 import {
@@ -13,12 +7,18 @@ import {
   type RunPlanConfigInput,
   type Suite,
 } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+/**
+ * @vitest-environment node
+ * @see specs/agents/connected-agents.feature
+ */
+import { describe, expect, it, vi } from "vitest";
 
+import type { SuiteExecution } from "../../app/suite.app.ts";
+import type { SuiteRunReadRepository } from "../../repositories/suite-run.repository.ts";
+import type { SuiteRepository } from "../../repositories/suite.repository.ts";
 import { ConnectedTargetService } from "../connected-target.service.ts";
 import { SuiteService } from "../suite.service.ts";
-import type { SuiteExecution } from "../../app/suite.app.ts";
-import type { SuiteRepository } from "../../repositories/suite.repository.ts";
-import type { SuiteRunReadRepository } from "../../repositories/suite-run.repository.ts";
 
 const projectId = "project_1";
 

@@ -1,16 +1,20 @@
+import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
+import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
-import { EvaluationService } from "../evaluation.service.ts";
-import type { EvaluationExecution, EvaluationInputsResolution } from "../../app/evaluation.members.ts";
+
+import type {
+  EvaluationExecution,
+  EvaluationInputsResolution,
+} from "../../app/evaluation.members.ts";
 import { EvaluationRunRepository } from "../../repositories/evaluation.repository.ts";
 import {
   MonitorPerformanceRepository,
   type MonitorPerformanceBucket,
 } from "../../repositories/monitor-performance.repository.ts";
-import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
+import { EvaluationService } from "../evaluation.service.ts";
 
 const run: EvaluationRunData = {
   evaluationId: "evaluation_1",

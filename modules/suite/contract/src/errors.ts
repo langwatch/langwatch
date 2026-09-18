@@ -12,11 +12,11 @@ export class SuiteFieldIdentifierInvalidError extends HandledError {
   declare readonly code: "suite_field_identifier_invalid";
 
   constructor({ identifier }: { identifier: string }) {
-    super(
-      "suite_field_identifier_invalid",
-      `"${identifier}" is not a valid field identifier.`,
-      { httpStatus: 422, fault: "customer", meta: { identifier } },
-    );
+    super("suite_field_identifier_invalid", `"${identifier}" is not a valid field identifier.`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { identifier },
+    });
     this.name = "SuiteFieldIdentifierInvalidError";
   }
 }
@@ -71,13 +71,7 @@ export class SuiteEvaluatorMappingInvalidError extends HandledError {
 export class SuiteFieldInUseError extends HandledError {
   declare readonly code: "suite_field_in_use";
 
-  constructor({
-    identifier,
-    evaluatorIds,
-  }: {
-    identifier: string;
-    evaluatorIds: string[];
-  }) {
+  constructor({ identifier, evaluatorIds }: { identifier: string; evaluatorIds: string[] }) {
     super(
       "suite_field_in_use",
       `The field "${identifier}" is still read by an evaluator mapping.`,

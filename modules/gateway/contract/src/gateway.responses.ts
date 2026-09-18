@@ -3,7 +3,11 @@
  * reading and development/test validation.
  */
 import { z } from "zod";
-import { gatewayCacheRuleActionSchema, gatewayCacheRuleMatchersSchema } from "./gateway-cache-rule.ts";
+
+import {
+  gatewayCacheRuleActionSchema,
+  gatewayCacheRuleMatchersSchema,
+} from "./gateway-cache-rule.ts";
 import { resourceMetadataSchema } from "./gateway.resource-metadata.ts";
 
 const virtualKeyScopeEntrySchema = z

@@ -31,6 +31,8 @@ import {
   type UpdateGatewayGuardrailInput,
 } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { nowInstant } from "@langwatch/time";
+
 import {
   GatewayBudgetRepository,
   type ArchiveBudgetInput,
@@ -38,12 +40,12 @@ import {
   type BudgetCheckResult,
   type BudgetListWithHealth,
   type CreateBudgetInput,
-  type UpdateBudgetInput,type GatewayBudgetScope
+  type UpdateBudgetInput,
+  type GatewayBudgetScope,
 } from "../repositories/gateway-budget.repository.ts";
 import { GatewayBudgetScopeReachService } from "./gateway-budget-scope-reach.service.ts";
 import { GatewayCacheRuleService } from "./gateway-cache-rule.service.ts";
 import { GatewayGuardrailService } from "./gateway-guardrail.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 export type { GatewayBudgetScopeReachInput } from "@langwatch/gateway-contract";
 

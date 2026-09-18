@@ -1,3 +1,6 @@
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { z } from "zod";
+
 import {
   claimOrganizationBillingCustomerInputSchema,
   addOrganizationTeamMemberInputSchema,
@@ -8,8 +11,6 @@ import {
   organizationBillingProfileSchema,
   type OrganizationService,
 } from "../index.ts";
-import { describe, expect, expectTypeOf, it } from "vitest";
-import { z } from "zod";
 
 describe("OrganizationService contract", () => {
   it("requires a non-empty organization id", () => {

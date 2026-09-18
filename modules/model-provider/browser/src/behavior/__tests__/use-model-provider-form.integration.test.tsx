@@ -2,14 +2,14 @@
  * @vitest-environment jsdom
  */
 
-import { act, cleanup, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import "@testing-library/jest-dom/vitest";
 import {
   type CustomModelEntry,
   MASKED_KEY_PLACEHOLDER,
   type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the api module
 const mockMutateAsync = vi.fn().mockResolvedValue({});

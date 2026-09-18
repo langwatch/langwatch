@@ -25,7 +25,7 @@
     "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
     "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts",
     "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts",
-    "./src/adapters/postgres.gateway-transaction.adapter.ts",
+    "./src/app/postgres.gateway-transaction.ts",
     "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts",
     "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts",
     "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts",
@@ -121,6 +121,9 @@
     },
     {
       "path": "../../../packages/redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

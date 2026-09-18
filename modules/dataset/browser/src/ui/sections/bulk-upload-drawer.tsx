@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+
 import { datasetApi } from "../../behavior/dataset-api.ts";
 import {
   abortPendingUpload,
@@ -58,8 +59,8 @@ import {
   type BulkUploadTransport,
   useBulkUpload,
 } from "../../behavior/use-bulk-upload.ts";
-import { invalidColumnNameKeys } from "../../model/column-validation.ts";
 import { reorderColumnsBySourceHeader } from "../../model/column-reorder.ts";
+import { invalidColumnNameKeys } from "../../model/column-validation.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { formatFileSize } from "../../model/parse-tabular-file.ts";
 import { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "../elements/column-type-select.tsx";
@@ -361,7 +362,7 @@ function EditableName({
     return (
       <Input
         size="sm"
-        
+
         value={draft}
         fontWeight="medium"
         aria-label="Dataset name"

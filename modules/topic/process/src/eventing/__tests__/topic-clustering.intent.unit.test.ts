@@ -1,6 +1,7 @@
 import type { IntentContext } from "@langwatch/eventing";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   createTopicClusteringRunHandler,
   type TopicClusteringDispatchDeps,

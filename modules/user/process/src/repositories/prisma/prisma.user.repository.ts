@@ -1,3 +1,6 @@
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
 import {
   userAccountInfoSchema,
   userFullProfileSchema,
@@ -21,9 +24,7 @@ import {
   type CreatedUser,
   type SetFirstUserPasswordResult,
 } from "@langwatch/user-contract";
-import { PrismaRepository } from "@langwatch/prisma-client";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { toDate, type Instant } from "@langwatch/time";
+
 import type {
   CreateCredentialUserRow,
   CreatePasskeyUserRow,

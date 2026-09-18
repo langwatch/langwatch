@@ -15,14 +15,16 @@ import type {
   OperatorFeatureFlag as StoredOperatorFeatureFlag,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
+
 import { readableDate } from "./model/display-formatters.ts";
 
 /** One flag as the BROWSER receives it: `updatedAt` arrives as an ISO string. */
 export type OperatorFeatureFlag = Omit<StoredOperatorFeatureFlag, "updatedAt"> & {
   updatedAt: string | null;
 };
-import { useMemo, useState } from "react";
 import { Switch } from "@langwatch/design-system/switch";
+import { useMemo, useState } from "react";
+
 import { FeatureFlagRulesDialog } from "./feature-flag-rules-dialog.tsx";
 import { summarizeTargeting, targetingLabel } from "./model/targeting-summary.ts";
 

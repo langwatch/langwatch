@@ -9,7 +9,6 @@ import { OpsApi, opsProcessTrpc } from "@langwatch/ops-contract";
 import { OPS_MANAGE, OPS_VIEW, opsOperatorFact } from "#transport/ops-operator.trpc";
 
 export const opsProcessTrpcTransport = defineTrpcRouter(OpsApi, opsProcessTrpc)
-
   .procedure("getAggregateProcessManagers")
   .withFacts(opsOperatorFact)
   .serviceAuthorized(OPS_VIEW)

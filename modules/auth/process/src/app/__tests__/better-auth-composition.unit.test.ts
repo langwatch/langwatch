@@ -1,3 +1,5 @@
+import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
+import { AuthUnavailableError } from "@langwatch/auth-contract";
 /**
  * The module composes the deployment's ONE Better Auth instance, and the
  * session verification every door on the process reads runs through it.
@@ -5,11 +7,10 @@
  * @see specs/auth/auth-rest-family-mounted.feature
  */
 import { createLogger } from "@langwatch/observability";
-import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
-import { AuthUnavailableError } from "@langwatch/auth-contract";
-import { AuthApp, type AuthAppConfig } from "../auth.app.ts";
+import { AuthApp } from "../auth.app.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 const BROWSER_SESSION = {
@@ -26,9 +27,15 @@ const VERIFIED: VerifiedBrowserSession = {
   user: { id: "user_1" },
 } as VerifiedBrowserSession;
 
-function appFor(config: Partial<AuthAppConfig> = {}): AuthApp {
+/** `named` supplies NEXTAUTH_SECRET and NEXTAUTH_URL together, or neither. */
+function appFor(named = false): AuthApp {
   return AuthApp.create({
-    config: { processName: "langwatch-api", isSaas: false, ...config },
+    config: {
+      sessionUrl: named ? BROWSER_SESSION.baseUrl : undefined,
+      mfaEnrollmentOpen: BROWSER_SESSION.mfaEnrollmentOpen,
+      passkeysEnabled: BROWSER_SESSION.passkeysEnabled,
+      passkeyHandleSecret: BROWSER_SESSION.passkeyHandleSecret,
+    },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
       users: new TestUserApi({}) as never,
@@ -42,15 +49,26 @@ function appFor(config: Partial<AuthAppConfig> = {}): AuthApp {
       prisma: {} as never,
       redis: null as never,
       rateLimiter: { check: async () => ({ allowed: true }) } as never,
+      secrets: {
+        find: (key: string) =>
+          named && key === "NEXTAUTH_SECRET" ? BROWSER_SESSION.secret : undefined,
+        read: (key: string) => {
+          throw new Error(`test double does not stub secrets.read("${key}")`);
+        },
+      },
+      publicBaseUrl: undefined,
       identityEmails: undefined as never,
       rateLimit: undefined as never,
       route: undefined as never,
       signUp: null,
       invites: null,
       authProvider: undefined as never,
+      federatedProvider: undefined,
+      isSaas: false,
       processName: "langwatch-api",
     },
     resources: { own: () => undefined } as never,
+    secrets: {} as never,
   });
 }
 
@@ -74,13 +92,13 @@ describe("given a deployment that named no browser-session identity", () => {
 
 describe("given a deployment that named one", () => {
   it("composes exactly one instance, shared by every caller", () => {
-    const app = appFor({ browserSession: BROWSER_SESSION });
+    const app = appFor(true);
 
     expect(app.betterAuth()).toBe(app.betterAuth());
   });
 
   it("verifies a browser session through that instance and accepts what it accepts", async () => {
-    const app = appFor({ browserSession: BROWSER_SESSION });
+    const app = appFor(true);
     const getSession = vi.fn(async () => VERIFIED);
     app.betterAuth().api.getSession = getSession as never;
 
@@ -91,7 +109,7 @@ describe("given a deployment that named one", () => {
   });
 
   it("refuses a session that instance rejects, without raising", async () => {
-    const app = appFor({ browserSession: BROWSER_SESSION });
+    const app = appFor(true);
     app.betterAuth().api.getSession = (async () => null) as never;
 
     await expect(
@@ -102,7 +120,7 @@ describe("given a deployment that named one", () => {
 
 describe("when the born-finalized entrance is reached", () => {
   it("refuses by name rather than signing somebody up outside the birth context", async () => {
-    const app = appFor({ browserSession: BROWSER_SESSION });
+    const app = appFor(true);
 
     await expect(app.runWithIdentityBirth(async () => "unreached")).rejects.toThrowError(
       /identity birth context/,

@@ -1,6 +1,7 @@
 import { Box, Flex, IconButton, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronUp, Copy, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import {
   SPAN_TYPE_COLORS,

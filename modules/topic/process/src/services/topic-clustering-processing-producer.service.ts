@@ -7,6 +7,7 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
+
 import {
   classifyClusteringError,
   type TopicClusteringDispatchDeps,

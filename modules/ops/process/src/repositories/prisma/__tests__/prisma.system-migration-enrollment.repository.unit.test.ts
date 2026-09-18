@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
+
 import { PrismaSystemMigrationEnrollmentRepository } from "../prisma.system-migration-enrollment.repository.ts";
 
 function knownRequestError(code: string) {

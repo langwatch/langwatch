@@ -1,8 +1,9 @@
+import { z } from "zod";
+
 /** Connected-agent presence and ownership displayed by the management UI (ADR-128). */
 import type { AgentWithFields } from "./agent.ts";
 import type { ConnectedAgentConfig } from "./config/connected.ts";
 import type { ConnectedAgentSelectability } from "./connected-agent.selectable.ts";
-import { z } from "zod";
 
 /** The SDK that registered an agent, as the card prints it. */
 export const connectedAgentSdkSchema = z.object({

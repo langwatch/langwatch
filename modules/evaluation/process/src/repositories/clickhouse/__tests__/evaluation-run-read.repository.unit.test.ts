@@ -1,6 +1,7 @@
 /** @vitest-environment node */
 /** Spec: specs/evaluations/trace-evaluations-read.feature */
 import { describe, expect, it, vi } from "vitest";
+
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";
 
 const TENANT = "tenant_1";
@@ -39,7 +40,10 @@ describe("EvaluationRunClickHouseReadRepository.findTraceEvaluations", () => {
         },
       ]);
 
-      const result = await repository.findTraceEvaluations({ tenantId: TENANT, traceIds: ["trace_1"] });
+      const result = await repository.findTraceEvaluations({
+        tenantId: TENANT,
+        traceIds: ["trace_1"],
+      });
 
       const sql = query.mock.calls[0]?.[0]?.query ?? "";
       for (const column of ["ScheduledAt", "StartedAt", "CompletedAt"]) {

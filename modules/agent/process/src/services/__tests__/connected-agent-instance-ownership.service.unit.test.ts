@@ -1,12 +1,13 @@
 import { PROTOCOL_VERSION, type RegisterFrame } from "@langwatch/agent-contract";
 import { SessionStateStoreFactory, type SessionStateStore } from "@langwatch/redis-client";
 import { describe, expect, it } from "vitest";
+
 import { MemoryAgentRepository } from "../../repositories/memory/memory.agent.repository.ts";
 import { AgentService } from "../agent.service.ts";
-import { ConnectedAgentRuntimeService } from "../connected-agent-runtime.service.ts";
-import { ConnectedAgentRegistrationService } from "../connected-agent-registration.service.ts";
-import { AgentSessionService } from "../connected-agent-session.service.ts";
 import { LongPollTransportService } from "../connected-agent-long-poll.service.ts";
+import { ConnectedAgentRegistrationService } from "../connected-agent-registration.service.ts";
+import { ConnectedAgentRuntimeService } from "../connected-agent-runtime.service.ts";
+import { AgentSessionService } from "../connected-agent-session.service.ts";
 
 const frame: RegisterFrame = {
   type: "register",

@@ -57,8 +57,8 @@
       "default": "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts"
     },
     "./composition/gateway-transactions": {
-      "types": "./dist/adapters/postgres.gateway-transaction.adapter.d.ts",
-      "default": "./src/adapters/postgres.gateway-transaction.adapter.ts"
+      "types": "./dist/app/postgres.gateway-transaction.d.ts",
+      "default": "./src/app/postgres.gateway-transaction.ts"
     },
     "./composition/gateway-virtual-key-direct-budgets": {
       "types": "./dist/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.d.ts",
@@ -101,7 +101,7 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
@@ -110,9 +110,10 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

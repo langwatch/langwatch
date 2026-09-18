@@ -7,13 +7,14 @@ import type {
   PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
-import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
+
 import {
   OrganizationInviteRepository,
   type InviteWithOrganization,
   type InviteWithRequester,
   type WriteInviteInput,
 } from "../organization-invite.repository.ts";
+import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
 
 /** A root client, or the transaction-scoped client `$transaction` hands back. */
 type InviteClient = PrismaClient | Prisma.TransactionClient;

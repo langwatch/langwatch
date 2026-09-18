@@ -5,10 +5,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry.ts";
-import { repeatOverRegisteredColumns, transformCreatedFields } from "./fixtures/valid/index.ts";
 import { validateVegaLiteSpec } from "../validate-vega-lite-spec.ts";
 import { VEGA_LITE_SCHEMA_URL as S } from "../vega-lite-schema.ts";
+import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry.ts";
+import { repeatOverRegisteredColumns, transformCreatedFields } from "./fixtures/valid/index.ts";
 
 const validate = (spec: unknown) =>
   validateVegaLiteSpec({

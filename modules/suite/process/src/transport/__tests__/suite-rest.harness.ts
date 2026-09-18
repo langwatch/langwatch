@@ -455,13 +455,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
   // as the root the other two are routed into.
   const hono = runtime.mount(createRunPlansRest().router(), mount(renderHandled));
   hono.route("/", runtime.mount(createTestSuitesRest().router(), mount(renderHandled)));
-  hono.route(
-    "/",
-    runtime.mount(
-      createSuitesAliasRest().router(),
-      mount(renderHandled),
-    ),
-  );
+  hono.route("/", runtime.mount(createSuitesAliasRest().router(), mount(renderHandled)));
 
   const send = (
     method: string,

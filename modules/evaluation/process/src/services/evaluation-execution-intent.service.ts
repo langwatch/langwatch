@@ -1,9 +1,10 @@
-import type { Command } from "@langwatch/eventing";
 import type {
   ExecuteEvaluationCommandData,
   EvaluationProcessingEvent,
 } from "@langwatch/evaluation-contract";
+import type { Command } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+
 import {
   type EvaluationExecutionIntent,
   type ExecuteEvaluationCommandDeps,

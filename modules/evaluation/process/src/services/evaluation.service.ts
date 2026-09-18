@@ -20,13 +20,11 @@ import {
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import type {
-  EvaluationExecution,
-  EvaluationInputsResolution,
-} from "../app/evaluation.members.ts";
+
+import type { EvaluationExecution, EvaluationInputsResolution } from "../app/evaluation.members.ts";
+import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository.ts";
 import { MonitorPerformanceService } from "./monitor-performance.service.ts";
-import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 
 export type EvaluationServiceOptions = {
   repository: EvaluationRunRepository;

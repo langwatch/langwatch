@@ -1,10 +1,11 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { forwardRef, useMemo } from "react";
-import { COMMAND_BAR_MAX_HEIGHT } from "../../model/command-bar-constants.ts";
-import type { ListItem } from "../../model/command-icon-info.ts";
+
 import { useTopLevelNavigationCommands } from "../../behavior/use-command-feature-flags.ts";
 import type { FilteredProject } from "../../behavior/use-filtered-projects.ts";
+import { COMMAND_BAR_MAX_HEIGHT } from "../../model/command-bar-constants.ts";
 import type { Command, RecentItem, SearchResult } from "../../model/command-bar-types.ts";
+import type { ListItem } from "../../model/command-icon-info.ts";
 import { CommandGroup } from "../blocks/command-group.tsx";
 
 interface CommandBarResultsProps {

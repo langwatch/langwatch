@@ -1,3 +1,7 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { ScenarioTestSuiteNotFoundError } from "@langwatch/scenario-contract";
 /**
  * Resolving what a suite run covers: the scenarios its scope names, the targets it points at,
  * and the human labels a run plan is titled with.
@@ -13,12 +17,9 @@ import {
   type SuiteTarget,
   SuiteNotFoundError,
 } from "@langwatch/suite-contract";
-import type { AgentApi } from "@langwatch/agent-contract";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
-import { ScenarioTestSuiteNotFoundError } from "@langwatch/scenario-contract";
-import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service.ts";
+
 import { isAgentTarget } from "../rules/suite-target.rules.ts";
+import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service.ts";
 import type { SuiteServiceOptions } from "./suite.service.ts";
 
 export class SuiteRunScopeService {

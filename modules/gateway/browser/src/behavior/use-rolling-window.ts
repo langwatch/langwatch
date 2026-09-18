@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { useEffect, useMemo, useState } from "react";
 /**
  * A rolling `[now - days, now)` window that ticks every minute to keep queries fresh.
  * Quantizing to the minute prevents unnecessary refetches on every render.

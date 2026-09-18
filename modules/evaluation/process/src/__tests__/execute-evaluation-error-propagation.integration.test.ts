@@ -4,8 +4,9 @@
  * @see specs/evaluators/evaluator-error-propagation.feature
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationExecutionResult } from "@langwatch/evaluation-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,

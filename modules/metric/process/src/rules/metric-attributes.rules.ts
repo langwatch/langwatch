@@ -1,5 +1,6 @@
 import { compareOrdinal } from "@langwatch/eventing";
 import { otlpAnyValueSchema, type OtlpAnyValue } from "@langwatch/otlp";
+
 import { integerDecimal } from "./metric-numbers.rules.ts";
 import { isRecord, stableStringify, type UnknownRecord } from "./metric-serialization.rules.ts";
 

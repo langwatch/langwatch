@@ -10,11 +10,11 @@ import type { OpsOperator } from "@langwatch/ops-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createOpsTestApp, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
-import type { OpsSystemMigrationRunner } from "../ops.app.ts";
+import { opsTrpcTestMembers } from "../../transport/__tests__/ops.trpc.harness.ts";
 import { opsOperatorFact } from "../../transport/ops-operator.trpc.ts";
 import { opsPlatformTrpcTransport } from "../../transport/ops-platform.trpc.ts";
-import { opsTrpcTestMembers } from "../../transport/__tests__/ops.trpc.harness.ts";
+import type { OpsSystemMigrationRunner } from "../ops.app.ts";
+import { createOpsTestApp, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
 
 /**
  * Every stub is typed from the runner itself. A stub typed
@@ -78,22 +78,19 @@ function callerFor(operator: OpsOperator) {
 
   // The name the grain is recorded under: tRPC hands the handler no path, and
   // the application is what the grain is asked of.
-  const named = new Proxy(
-    router.createCaller({ actor: { id: operator.id }, operator }),
-    {
-      get: (target, property: string) => {
-        const procedure = Reflect.get(target, property) as unknown;
+  const named = new Proxy(router.createCaller({ actor: { id: operator.id }, operator }), {
+    get: (target, property: string) => {
+      const procedure = Reflect.get(target, property) as unknown;
 
-        if (typeof procedure !== "function") return procedure;
+      if (typeof procedure !== "function") return procedure;
 
-        return (...args: unknown[]) => {
-          current = property;
+      return (...args: unknown[]) => {
+        current = property;
 
-          return (procedure as (...values: unknown[]) => unknown).call(target, ...args);
-        };
-      },
+        return (procedure as (...values: unknown[]) => unknown).call(target, ...args);
+      };
     },
-  );
+  });
 
   return named;
 }

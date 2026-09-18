@@ -4,10 +4,10 @@
  * offered steps are accepted on input, or a hand-typed URL could error.
  */
 
-import { useCallback, useMemo } from "react";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-
 import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
+import { useCallback, useMemo } from "react";
+
 import { useAnalyticsHost } from "../model/analytics-host.ts";
 
 /** The query parameter the whole picker state is encoded into. */

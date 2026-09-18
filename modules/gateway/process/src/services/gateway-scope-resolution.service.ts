@@ -1,12 +1,12 @@
+import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 /**
  * Resolves the eligible model-provider set and order for a virtual key in two passes: eligibility
  * takes every provider reachable through the upward scope cascade, skipping disabled and
  * soft-deleted rows, and ordering follows the routing policy or else fallback priority.
  */
 import { isDispatchableProvider } from "@langwatch/model-provider-contract";
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 
+import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 import type {
   EligibleModelProvider,
   GatewayScopeResolutionRepository,

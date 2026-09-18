@@ -9,11 +9,9 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  ConnectedAgentsSection,
-  OFFLINE_AGENT_TEST_COPY,
-} from "../connected-agents-section.tsx";
+
 import type { ConnectedAgentBrowser as ConnectedAgentView } from "../../../model/agent-client.ts";
+import { ConnectedAgentsSection, OFFLINE_AGENT_TEST_COPY } from "../connected-agents-section.tsx";
 
 type ConnectedAgentInstance = ConnectedAgentView["instances"][number];
 
@@ -267,9 +265,7 @@ describe("<ConnectedAgentsSection />", () => {
       const onTest = vi.fn();
       renderSection([agent({ status: "offline", instances: [] })], { onTest });
 
-      await userEvent.click(
-        screen.getByRole("button", { name: "Actions for support-agent" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "Actions for support-agent" }));
 
       const test = await screen.findByRole("menuitem", { name: "Test agent" });
       expect(test).toHaveAttribute("aria-disabled", "true");
@@ -278,9 +274,7 @@ describe("<ConnectedAgentsSection />", () => {
       expect(onTest).not.toHaveBeenCalled();
 
       await userEvent.hover(test);
-      expect(await screen.findByRole("tooltip")).toHaveTextContent(
-        OFFLINE_AGENT_TEST_COPY,
-      );
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(OFFLINE_AGENT_TEST_COPY);
     });
   });
 
@@ -289,17 +283,13 @@ describe("<ConnectedAgentsSection />", () => {
       const onTest = vi.fn();
       renderSection([agent()], { onTest });
 
-      await userEvent.click(
-        screen.getByRole("button", { name: "Actions for support-agent" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "Actions for support-agent" }));
 
       const test = await screen.findByRole("menuitem", { name: "Test agent" });
       expect(test).not.toHaveAttribute("aria-disabled", "true");
 
       await userEvent.click(test);
-      expect(onTest).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "agent_1" }),
-      );
+      expect(onTest).toHaveBeenCalledWith(expect.objectContaining({ id: "agent_1" }));
     });
   });
 });

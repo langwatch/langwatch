@@ -18,8 +18,5 @@ export type DataRetentionPlan = Readonly<{
 
 /** Resolves the plan one organization's retention writes are gated by. */
 export interface DataRetentionPlanResolver {
-  getPlan(input: {
-    organizationId: string;
-    userId: string | null;
-  }): Promise<DataRetentionPlan>;
+  getPlan(input: { organizationId: string; userId: string | null }): Promise<DataRetentionPlan>;
 }

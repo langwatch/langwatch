@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
 import {
   buildMetricRollups,
   type CanonicalMetricDataPoint,
   MAX_DENSE_BUCKET_SPAN,
 } from "@langwatch/metric-contract";
+import { describe, expect, it } from "vitest";
+
 import { point } from "../app/__tests__/metric.fixture.ts";
 
 /** At scale 0 the base is 2, so bucket i covers (2^i, 2^(i+1)]. */

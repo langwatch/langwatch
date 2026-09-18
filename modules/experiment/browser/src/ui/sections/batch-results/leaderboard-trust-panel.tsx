@@ -5,12 +5,12 @@ import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { LuCheck, LuInfo, LuTriangleAlert } from "react-icons/lu";
 
 import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
+import type { SampleAdequacy } from "../../../model/batch-evaluation-results.sample-adequacy.ts";
 import {
   type JudgeIndependence,
   VERBOSITY_NOTABLE_RATIO,
   type VerbosityProfile,
 } from "../batch-evaluation-results.judge-bias.ts";
-import type { SampleAdequacy } from "../../../model/batch-evaluation-results.sample-adequacy.ts";
 
 export type LeaderboardTrustPanelProps = {
   leaderboard: BTLeaderboard;

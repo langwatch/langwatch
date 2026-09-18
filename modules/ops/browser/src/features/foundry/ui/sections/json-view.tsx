@@ -1,8 +1,9 @@
 import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
-import type { Monaco } from "@monaco-editor/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import type { Monaco } from "@monaco-editor/react";
 import { Check, Copy, RotateCcw, WrapText } from "lucide-react";
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
+
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import type { SpanConfig } from "../../model/foundry-types.ts";
 import { traceConfigJsonSchema } from "../../model/trace-config.schema.ts";

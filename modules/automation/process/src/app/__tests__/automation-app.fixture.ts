@@ -1,27 +1,27 @@
-import { automationServerConfigSchema } from "@langwatch/automation-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
+import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { MonitorApi } from "@langwatch/monitor-contract";
+import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { vi } from "vitest";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
-import { AutomationApp, type AutomationInfrastructure } from "../automation.app.ts";
-import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
-import type { AutomationClock } from "../automation.members.ts";
+
 import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
-import type { AutomationLogger } from "../../services/automation-graph-runtime.service.ts";
-import type { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
-import type { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
-import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
-import type { AutomationRunaway } from "../../repositories/automation-runaway.repository.ts";
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
-import type { AutomationRunawaySignals } from "../../services/automation-runaway-signals.service.ts";
+import type { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { AutomationRunaway } from "../../repositories/automation-runaway.repository.ts";
+import type { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
+import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
+import type { AutomationLogger } from "../../services/automation-graph-runtime.service.ts";
+import type { AutomationRunawaySignals } from "../../services/automation-runaway-signals.service.ts";
+import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
+import { AutomationApp, type AutomationInfrastructure } from "../automation.app.ts";
+import type { AutomationClock } from "../automation.members.ts";
 
 export function createCanonicalAutomationApp(): {
   app: AutomationApp;
@@ -201,7 +201,7 @@ export function createCanonicalAutomationApp(): {
   };
   return {
     app: AutomationApp.fromInfrastructure({
-      repositories: PostgresAutomationRepositories.create({ prisma: database, clock }),
+      repositories: PostgresAutomationRepositories.create({ prisma: database }),
       dependencies: {
         analytics,
         monitors,
@@ -218,9 +218,11 @@ export function createCanonicalAutomationApp(): {
       },
       infrastructure: members,
       config: {
-        ...automationServerConfigSchema.parse({}),
-        baseHost: "",
-        unsubscribeSecret: undefined,
+        emailHourlyCap: 100,
+        tenantDailyCap: 10_000,
+        persistDailyCapFree: 50,
+        persistDailyCapPaid: 500,
+        persistDailyCapEnterprise: 5_000,
       },
     }),
     triggerCreate,

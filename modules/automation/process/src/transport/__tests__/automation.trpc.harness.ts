@@ -20,7 +20,8 @@ export function automationTrpcTestMembers(
 ): TrpcRuntimeMembers<AutomationTrpcTestContext> {
   return {
     identity: {
-      caller: (ctx) => (ctx.actor ? { actor: { type: "user", id: ctx.actor.id } } : { actor: null }),
+      caller: (ctx) =>
+        ctx.actor ? { actor: { type: "user", id: ctx.actor.id } } : { actor: null },
     },
     authorization: {
       forRequest: () => ({

@@ -4,9 +4,10 @@
  * to ensure both replicas answer from the same Redis instance.
  */
 import { createLogger } from "@langwatch/observability";
-import type { Redis } from "ioredis";
-import { ExperimentRunAbortRepository } from "../experiment-run-abort.repository.ts";
 import { nowInstant } from "@langwatch/time";
+import type { Redis } from "ioredis";
+
+import { ExperimentRunAbortRepository } from "../experiment-run-abort.repository.ts";
 
 const logger = createLogger("langwatch:experiment:run-abort");
 

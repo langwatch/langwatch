@@ -4,6 +4,17 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import {
+  organizationAuditLogPageSchema,
+  organizationCreatedSchema,
+  organizationInviteAcceptedSchema,
+  organizationInviteResentSchema,
+  organizationInvitesCreatedSchema,
+  organizationListedInvitesSchema,
+  organizationMemberRoleChangedSchema,
+  organizationUserRowsSchema,
+  organizationWriteAckSchema,
+} from "./organization.responses.ts";
+import {
   organizationApiAcceptInviteInputSchema,
   organizationApiAuditLogsInputSchema,
   organizationApiCreateInvitesInputSchema,
@@ -17,17 +28,6 @@ import {
   organizationApiUpdateTeamMemberRoleInputSchema,
   organizationApiWithMembersInputSchema,
 } from "./organization.trpc-schemas.ts";
-import {
-  organizationAuditLogPageSchema,
-  organizationCreatedSchema,
-  organizationInviteAcceptedSchema,
-  organizationInviteResentSchema,
-  organizationInvitesCreatedSchema,
-  organizationListedInvitesSchema,
-  organizationMemberRoleChangedSchema,
-  organizationUserRowsSchema,
-  organizationWriteAckSchema,
-} from "./organization.responses.ts";
 import { organizationIntentSchema } from "./organization.ts";
 
 /**

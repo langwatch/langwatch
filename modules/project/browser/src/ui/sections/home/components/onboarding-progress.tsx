@@ -13,10 +13,15 @@ import {
   LuUsers,
   LuWorkflow,
 } from "react-icons/lu";
+
 import { homeApi } from "../../../../behavior/home-api.ts";
-import { HomeCard } from "./home-card.tsx";
-import { HOME_SECTION_GAP, HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header.tsx";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import { HomeCard } from "./home-card.tsx";
+import {
+  HOME_SECTION_GAP,
+  HOME_SECTION_PADDING,
+  HomeSectionHeader,
+} from "./home-section-header.tsx";
 
 export type OnboardingStepKey =
   | "createProject"

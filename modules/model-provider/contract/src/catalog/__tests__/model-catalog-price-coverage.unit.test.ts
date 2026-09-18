@@ -4,6 +4,7 @@
  * product: the request is metered, the spend row settles, and the amount is zero. 1. Missing.
  */
 import { describe, expect, it } from "vitest";
+
 import { estimateCost, matchModelCost } from "../../model-cost.ts";
 import type { ModelCostRate } from "../../model-provider.ts";
 import {

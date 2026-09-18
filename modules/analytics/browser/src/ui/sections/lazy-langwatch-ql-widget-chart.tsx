@@ -8,7 +8,6 @@
 import { HStack, Spinner, Text } from "@chakra-ui/react";
 
 import { lazyBoundary } from "../elements/lazy-boundary.tsx";
-
 import type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart.tsx";
 
 export type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart.tsx";

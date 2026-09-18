@@ -14,17 +14,8 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx"
-  ],
-  "exclude": [
-    "**/__tests__/**",
-    "**/__mocks__/**",
-    "**/tests/**",
-    "**/*.test.*",
-    "**/*.spec.*"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
       "path": "../../../packages/api/tsconfig.build.json"

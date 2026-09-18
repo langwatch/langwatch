@@ -12,17 +12,18 @@ import {
   ValidationError,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
-import type {
-  ExperimentRunState,
-  ExperimentRunStateData,
-} from "../../eventing/experiment-run-state.projection.ts";
+import { Temporal, toDate } from "@langwatch/time";
+
 import {
   makeExperimentRunKey,
   parseExperimentRunKey,
 } from "../../eventing/experiment-run-key.process.ts";
+import type {
+  ExperimentRunState,
+  ExperimentRunStateData,
+} from "../../eventing/experiment-run-state.projection.ts";
+import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
-import { Temporal, toDate } from "@langwatch/time";
 
 /**
  * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an

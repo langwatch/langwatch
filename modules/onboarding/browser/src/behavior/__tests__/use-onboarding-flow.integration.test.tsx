@@ -5,6 +5,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { OnboardingScreenIndex } from "../types.ts";
 import { useOnboardingFlow } from "../use-onboarding-flow.ts";
 

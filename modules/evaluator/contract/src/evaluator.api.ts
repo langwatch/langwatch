@@ -3,7 +3,8 @@
  * reach it — `evaluators.*` tRPC and `/api/evaluators` REST — so a rule
  * here binds both; callers arrive as `actorId`, never a session.
  */
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type { CodeEvaluatorExecutionInput } from "./code-evaluator.ts";
 import type { EvaluatorIdOrSlugInput, ResolvedEvaluatorExecution } from "./evaluator-execution.ts";
 import type {

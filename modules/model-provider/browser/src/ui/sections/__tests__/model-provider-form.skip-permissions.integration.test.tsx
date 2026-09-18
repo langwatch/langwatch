@@ -99,8 +99,9 @@ vi.mock("@langwatch/browser-host/feature-flag", () => ({
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
 import { modelProviders } from "@langwatch/model-provider-contract";
-import { EditModelProviderForm } from "../model-provider-form.tsx";
+
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
 import { keyedRow, makePrimeQueries } from "./model-provider-drawer-harness.tsx";
 
 const primeQueries = makePrimeQueries({

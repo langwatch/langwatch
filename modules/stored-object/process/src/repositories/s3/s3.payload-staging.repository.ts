@@ -7,8 +7,9 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sd
 import type { S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Logger } from "@langwatch/observability";
-import { PayloadStaging, type StagedPayload } from "#repositories/payload-staging.repository";
 import { nowInstant } from "@langwatch/time";
+
+import { PayloadStaging, type StagedPayload } from "#repositories/payload-staging.repository";
 
 /** Which bucket, on which connection, one project's staged bodies belong in. */
 export type PayloadStagingS3Target = Readonly<{ bucket: string; client: S3Client }>;

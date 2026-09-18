@@ -4,9 +4,9 @@
  * Used by both RunRow and GroupRow headers.
  */
 
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../model/scenario-run-status-config.ts";
 import type { RunGroupSummary } from "../../../model/run-history-transforms.ts";
 import { worstStatus } from "../../../model/run-history-transforms.ts";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../model/scenario-run-status-config.ts";
 import { STATUS_ICON_CONFIG } from "../../../model/status-icons.ts";
 
 export function SummaryStatusIcon({ summary }: { summary: RunGroupSummary }) {

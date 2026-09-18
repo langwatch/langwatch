@@ -1,19 +1,22 @@
 import { mappingsReadEvaluationsSource } from "@langwatch/dataset-contract";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorApi,
-  type EvaluatorTypes,
-  type SingleEvaluationResult,isNativeEvaluatorType,codeEvaluatorIdFromCheckType
-} from "@langwatch/evaluator-contract";
+import type { MappingState } from "@langwatch/dataset-contract";
 import {
   type EvaluationExecutionResult,
   EvaluatorConfigError,
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
 } from "@langwatch/evaluation-contract";
-import type { MappingState } from "@langwatch/dataset-contract";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorApi,
+  type EvaluatorTypes,
+  type SingleEvaluationResult,
+  isNativeEvaluatorType,
+  codeEvaluatorIdFromCheckType,
+} from "@langwatch/evaluator-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
+
 import {
   type EvaluationExecutionTelemetry,
   type EvaluationLangevals,
@@ -23,14 +26,14 @@ import {
   type EvaluationTraceRead,
   type EvaluationWorkflowExecutor,
 } from "../app/evaluation.members.ts";
-import { type EvaluatorInstallEnvironment } from "../rules/evaluator-availability-service.rules.ts";
-import { hasThreadMappings } from "../rules/evaluation-thread-mapping-service.rules.ts";
-import { EvaluationDataService } from "./evaluation-data.service.ts";
-import { executionResultOf } from "../rules/evaluation-execution-result.rules.ts";
 import {
   maxCausalityDepthOfSpans,
   tryExtractParentTraceForNlpgo,
 } from "../rules/evaluation-causality.rules.ts";
+import { executionResultOf } from "../rules/evaluation-execution-result.rules.ts";
+import { hasThreadMappings } from "../rules/evaluation-thread-mapping-service.rules.ts";
+import { type EvaluatorInstallEnvironment } from "../rules/evaluator-availability-service.rules.ts";
+import { EvaluationDataService } from "./evaluation-data.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {

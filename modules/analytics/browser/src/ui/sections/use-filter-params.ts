@@ -1,12 +1,13 @@
-import { readUiStorage } from "@langwatch/browser-host/storage";
-import qs from "qs";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { URL_QS_PARSE_OPTIONS } from "../../model/utils/qs-parse-options.ts";
 import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
-import { filterOutEmptyFilters } from "./analytics/utils.ts";
+import { readUiStorage } from "@langwatch/browser-host/storage";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import qs from "qs";
+
 import { availableFilters } from "../../model/filters/registry.ts";
 import type { FilterField } from "../../model/filters/types.ts";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { URL_QS_PARSE_OPTIONS } from "../../model/qs-parse-options.ts";
+import { filterOutEmptyFilters } from "./analytics/utils.ts";
 
 export type FilterParam =
   | string[]

@@ -1,4 +1,5 @@
 import type { BugReport } from "@langwatch/ops-contract";
+
 import type { BugReportNotifier } from "../app/ops.app.ts";
 
 /**

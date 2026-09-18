@@ -1,5 +1,5 @@
-import { prepareMetricDataPoints } from "../canonical-metric.service.ts";
 import type { MetricRedaction } from "../../app/metric.members.ts";
+import { prepareMetricDataPoints } from "../canonical-metric.service.ts";
 
 export const noRedaction: MetricRedaction = { redactMetricAttributes: async () => {} };
 

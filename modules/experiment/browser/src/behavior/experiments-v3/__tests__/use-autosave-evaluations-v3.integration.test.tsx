@@ -81,11 +81,12 @@ vi.mock("../../../model/posthog-error-capture.ts", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
+import { extractPersistedState } from "@langwatch/experiment-contract";
 // Import hook after mocks
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
 import { captureException } from "../../../model/posthog-error-capture.ts";
 import { useAutosaveEvaluationsV3 } from "../use-autosave-evaluations-v3.ts";
-import { extractPersistedState } from "@langwatch/experiment-contract";
 
 const queryClient = new QueryClient({
   defaultOptions: {

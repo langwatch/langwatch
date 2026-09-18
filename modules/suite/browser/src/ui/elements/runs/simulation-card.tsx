@@ -1,10 +1,11 @@
 import { Box, Card, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { SimulationStatusOverlay } from "./simulation-status-overlay.tsx";
+
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,
 } from "../../../model/scenario-run-status-config.ts";
+import { SimulationStatusOverlay } from "./simulation-status-overlay.tsx";
 
 export interface SimulationCardMessage {
   role: "agent" | "user";

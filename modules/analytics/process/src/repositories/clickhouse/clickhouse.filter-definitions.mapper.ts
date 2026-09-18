@@ -1,5 +1,6 @@
-import { evaluationRunDataSchema } from "@langwatch/evaluation-contract";
 import type { FilterField } from "@langwatch/analytics-contract";
+import { evaluationRunDataSchema } from "@langwatch/evaluation-contract";
+
 import {
   ATTRIBUTE_KEYS,
   buildEvaluationRunsConditions,

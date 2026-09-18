@@ -1,5 +1,6 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { ROLE_KIND, type Role } from "@langwatch/role-contract";
+
 import type { RoleRepository } from "../role.repository.ts";
 
 type StoredRole = {

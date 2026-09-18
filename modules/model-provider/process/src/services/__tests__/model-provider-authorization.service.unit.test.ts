@@ -2,10 +2,11 @@
 // this question and disagree on PROJECT (`project:update` vs `project:manage`), so this test
 // exists to make drift between them a deliberate edit, not a silent divergence.
 
-import { describe, expect, it } from "vitest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it } from "vitest";
+
 import { ModelProviderAuthorizationService } from "../model-provider-authorization.service.ts";
 
 /** Records what was asked of authz, and answers however the test wants. */

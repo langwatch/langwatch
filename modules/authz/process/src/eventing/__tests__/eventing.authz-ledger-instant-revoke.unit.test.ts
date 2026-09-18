@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { RedisAuthzEpochRepository } from "../../repositories/redis/redis.authz-epoch.repository.ts";
 import { ACTOR, ORG_ID, harness } from "./support/eventing.authz-ledger-fork.harness.ts";
 

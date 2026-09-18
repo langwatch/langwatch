@@ -23,10 +23,6 @@ export type {
   McpAuthorizationCollaborators,
   McpAuthorizeProject,
 } from "./services/mcp-authorization.service.ts";
-export {
-  type McpAuthorizeApi,
-  mcpAuthorizeApprover,
-  mcpAuthorizeRest,
-} from "./transport/mcp-authorize.rest.ts";
+export { type McpAuthorizeApi, mcpAuthorizeRest } from "./transport/mcp-authorize.rest.ts";
 export { hostedMcpServer } from "./hosted-mcp.server.ts";
-export type { HostedMcpConfig, HostedMcpInfrastructure } from "./hosted-mcp.server.ts";
+export type { HostedMcpInfrastructure } from "./hosted-mcp.server.ts";

@@ -5,12 +5,16 @@
  * @see specs/migration/authz-grants-rollout.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AuthzCutoverFailureReporter } from "../authz-cutover-telemetry.service.ts";
+
 import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,
 } from "../../repositories/prisma/prisma.authz-cutover.repository.ts";
-import { AuthzCutoverGateService, ENGINE_GATE_CACHE_TTL_MS } from "../authz-cutover-gate.service.ts";
+import {
+  AuthzCutoverGateService,
+  ENGINE_GATE_CACHE_TTL_MS,
+} from "../authz-cutover-gate.service.ts";
+import { AuthzCutoverFailureReporter } from "../authz-cutover-telemetry.service.ts";
 
 const ORGANIZATION_ID = "org_acme";
 

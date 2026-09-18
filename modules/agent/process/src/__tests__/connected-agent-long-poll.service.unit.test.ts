@@ -1,5 +1,3 @@
-import type { AgentService } from "../services/agent.service.ts";
-import { createConnectedAgentFixture,createLongPollFixture } from "./connected-agent.fixture.ts";
 /**
  * The HTTP long-poll transport with no datastore: the empty answer after
  * the poll wait, delivery once, and the register refusal with no Redis.
@@ -12,14 +10,17 @@ import {
   PRESENCE_TTL_SECONDS,
   PROTOCOL_VERSION,
 } from "@langwatch/agent-contract";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import type { StoredCall } from "@langwatch/agent-contract";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { callKey, httpSessionKey, pendingKey } from "../rules/connected-agent-keys.rules.ts";
-import type { StoredCall } from "@langwatch/agent-contract";
+import type { AgentService } from "../services/agent.service.ts";
 import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import { AgentSessionService } from "../services/connected-agent-session.service.ts";
+import { createConnectedAgentFixture, createLongPollFixture } from "./connected-agent.fixture.ts";
 
 const projectId = "project_poll";
 const instanceId = "inst_poll";

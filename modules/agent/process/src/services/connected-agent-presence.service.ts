@@ -12,6 +12,7 @@ import {
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
+
 import type { ConnectedAgentRuntime, LiveInstance } from "./connected-agent-runtime.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:presence");

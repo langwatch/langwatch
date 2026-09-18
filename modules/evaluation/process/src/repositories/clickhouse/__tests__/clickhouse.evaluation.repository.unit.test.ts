@@ -1,13 +1,14 @@
+import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { SecurityError } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { ClickHouseEvaluationRepository } from "../evaluation.repository.ts";
+
+import type { EvaluationRetentionFloor } from "../../../app/evaluation.members.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseInsert,
   EvaluationClickHouseQuery,
 } from "../evaluation-clickhouse-client.ts";
-import type { EvaluationRetentionFloor } from "../../../app/evaluation.members.ts";
-import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import { ClickHouseEvaluationRepository } from "../evaluation.repository.ts";
 
 const run: EvaluationRunData = {
   evaluationId: "evaluation_1",

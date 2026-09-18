@@ -1,5 +1,3 @@
-import { EventUtils } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
 import {
   evaluationRunDataSchema,
   evaluationSummarySchema,
@@ -9,13 +7,16 @@ import {
   type EvaluationSummary,
   type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
+import { EventUtils } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
 import type { EvaluationRetentionFloor } from "../../app/evaluation.members.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseResolver,
 } from "./evaluation-clickhouse-client.ts";
 import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repository.ts";
-import { nowInstant } from "@langwatch/time";
 
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;

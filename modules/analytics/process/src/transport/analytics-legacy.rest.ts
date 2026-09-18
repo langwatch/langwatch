@@ -18,8 +18,8 @@ import {
 } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import { resolveRequestBound } from "@langwatch/plans";
-import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>

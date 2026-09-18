@@ -1,12 +1,16 @@
 /** Renders scenario runs as grid or list with virtualization above a threshold. */
 
 import { Grid, VStack } from "@chakra-ui/react";
+import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
-import { ScenarioGridCard } from "../elements/runs/scenario-grid-card.tsx";
-import { type ScenarioRunContextRenderer, ScenarioTargetRow } from "../elements/runs/scenario-target-row.tsx";
+
 import type { ViewMode } from "../../behavior/use-run-history-store.ts";
+import { ScenarioGridCard } from "../elements/runs/scenario-grid-card.tsx";
+import {
+  type ScenarioRunContextRenderer,
+  ScenarioTargetRow,
+} from "../elements/runs/scenario-target-row.tsx";
 
 const VIRTUALIZE_THRESHOLD = 30;
 const GRID_CARD_HEIGHT = 200;

@@ -1,3 +1,4 @@
+import { publicRoute } from "@langwatch/api/access";
 /**
  * The server half of `user.*`, acting on the session's own account — most
  * ask no permission; the organization-scoped ones take `organization:view`.
@@ -9,7 +10,6 @@ import {
   defineTrpcRouter,
   type TrpcHandlerActor,
 } from "@langwatch/api/trpc";
-import { publicRoute } from "@langwatch/api/access";
 import { UserApi, userTrpc, type UserCaller } from "@langwatch/user-contract";
 
 /** Why every account procedure below asks for no permission. */

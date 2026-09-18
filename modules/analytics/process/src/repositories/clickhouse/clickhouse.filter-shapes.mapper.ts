@@ -11,6 +11,7 @@ import type {
   AnalyticsFilterValue as FilterParam,
   FilterField,
 } from "@langwatch/analytics-contract";
+
 import type { FilterOption } from "../filter-options.repository.ts";
 
 export type ClickHouseFilterQueryParams = {

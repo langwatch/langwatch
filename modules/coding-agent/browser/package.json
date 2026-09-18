@@ -62,11 +62,11 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "numeral": "catalog:",

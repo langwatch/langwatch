@@ -1,32 +1,32 @@
+import {
+  GithubInstallationConflictError,
+  GithubInstallationNotFromFlowError,
+  type GithubRepository,
+} from "@langwatch/github-contract";
+import { Temporal, nowInstant } from "@langwatch/time";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  GithubInstallationConflictError,
-  GithubInstallationNotFromFlowError,
-  type GithubRepository,
-} from "@langwatch/github-contract";
-import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache.ts";
-import {
   type GithubInstallationDetails,
   type GithubInstallationToken,
   type MintInstallationTokenInput,
 } from "../../app/github.app.ts";
+import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache.ts";
+import {
+  GithubInstallationNotFoundError,
+  GithubRateLimitedError,
+} from "../../channels/http/http.github-api.channel.ts";
+import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture.ts";
+import { GithubInstallationAccessService } from "../../services/github-installation-access.service.ts";
+import { GithubInstallationsService } from "../../services/github-installations.service.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
   UpsertGithubInstallationInput,
 } from "../github-installations.repository.ts";
-import { GithubInstallationsService } from "../../services/github-installations.service.ts";
-import { GithubInstallationAccessService } from "../../services/github-installation-access.service.ts";
-import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture.ts";
-import { Temporal, nowInstant } from "@langwatch/time";
-import {
-  GithubInstallationNotFoundError,
-  GithubRateLimitedError,
-} from "../../channels/http/http.github-api.channel.ts";
 
 function makeRepo(rows: GithubInstallationRow[] = []): GithubInstallationsRepository & {
   upsert: ReturnType<typeof vi.fn>;

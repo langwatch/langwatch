@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Real Postgres + real ClickHouse. Month total and budget standing are different
@@ -7,14 +8,13 @@ import { nowInstant, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
-import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
-import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts";
+import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
 import {
   ALL_KEY_IDS,
   BUDGET_BOTH_MANAGED_ID,

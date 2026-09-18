@@ -1,8 +1,8 @@
 import type { PresenceSession, PresenceUser } from "@langwatch/presence-contract";
 
- // Local reimplementation of the app's `getColorForString` algorithm keeps
- // avatar colours stable without importing app-only utilities. See
- // `@langwatch/experiment-browser`'s `getColorForString` for the same precedent.
+// Local reimplementation of the app's `getColorForString` algorithm keeps
+// avatar colours stable without importing app-only utilities. See
+// `@langwatch/experiment-browser`'s `getColorForString` for the same precedent.
 const COLOR_NAMES = [
   "orange",
   "blue",

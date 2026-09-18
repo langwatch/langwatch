@@ -1,6 +1,5 @@
-import { generate } from "@langwatch/ksuid";
-
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { generate } from "@langwatch/ksuid";
 
 /**
  * The app's KSUID resource for an inline dataset row (`KSUID_RESOURCES.RECORD`).

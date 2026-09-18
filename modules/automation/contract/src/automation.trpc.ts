@@ -26,12 +26,12 @@ import {
   automationApiWebhookDeliveriesInputSchema,
 } from "./automation.trpc-schemas.ts";
 import { testFireResultSchema } from "./test-fire.ts";
-import { triggerSchema } from "./trigger.ts";
 import {
   reportScheduleStatusSchema,
   triggerFireRowSchema,
   triggerFireStatsSchema,
 } from "./trigger.queries.ts";
+import { triggerSchema } from "./trigger.ts";
 import { webhookDeliveryRowSchema } from "./webhook-delivery.ts";
 
 export const automationTrpc = defineTrpcContract("automation")

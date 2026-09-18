@@ -6,6 +6,7 @@
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+
 import type { ClickHouseClient } from "@clickhouse/client";
 
 /**

@@ -2,9 +2,10 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+
 import { AnnotationCard } from "../annotation-card.tsx";
 
 const SCORE_NAMES = new Map([

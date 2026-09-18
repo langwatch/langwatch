@@ -14,7 +14,9 @@ export class ClickhouseExperimentClickHouseRepository extends ExperimentClickHou
     super();
   }
 
-  static create(resolver: ExperimentEventingClickHouseResolver): ClickhouseExperimentClickHouseRepository {
+  static create(
+    resolver: ExperimentEventingClickHouseResolver,
+  ): ClickhouseExperimentClickHouseRepository {
     return new ClickhouseExperimentClickHouseRepository(resolver);
   }
 

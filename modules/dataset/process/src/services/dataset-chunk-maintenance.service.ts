@@ -4,8 +4,16 @@
  * schema changes. Both hold the per-dataset advisory lock for their whole run.
  */
 
+import {
+  DatasetConflictError,
+  DatasetTooLargeToEditColumnsError,
+  convertRowsToColumnTypes,
+  type DatasetColumns,
+  type DatasetRecordEntry,
+} from "@langwatch/dataset-contract";
+
+import { type DatasetStorage } from "../app/dataset.app.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
-import { chunkedMeta, chunkMetaOf, toSingleJsonl } from "../rules/dataset-chunking.rules.ts";
 import {
   MAX_INMEMORY_COLUMN_EDIT_BYTES,
   type DatasetMutationRecord,
@@ -16,14 +24,7 @@ import {
   recomputeOffsets,
   toChunkLines,
 } from "../rules/dataset-chunk-lines.rules.ts";
-import { type DatasetStorage } from "../app/dataset.app.ts";
-import {
-  DatasetConflictError,
-  DatasetTooLargeToEditColumnsError,
-  convertRowsToColumnTypes,
-  type DatasetColumns,
-  type DatasetRecordEntry,
-} from "@langwatch/dataset-contract";
+import { chunkedMeta, chunkMetaOf, toSingleJsonl } from "../rules/dataset-chunking.rules.ts";
 
 export class DatasetChunkMaintenanceService {
   static create(options: { datasets: DatasetContentRepository }): DatasetChunkMaintenanceService {

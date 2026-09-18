@@ -9,18 +9,19 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { toDate } from "@langwatch/time";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { toDate } from "@langwatch/time";
 import { Database, Eye, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { z } from "zod";
+
+import type { AnnotationRow, AnnotationUser, DisplayMoment } from "../../model/annotation-row.ts";
 import { AnnotationAvatarGroup } from "../elements/annotation-avatar-group.tsx";
 import { AnnotationCommentsChip } from "../elements/annotation-comments-chip.tsx";
 import { AnnotationSuggestionsChip } from "../elements/annotation-suggestions-chip.tsx";
-import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import type { AnnotationRow, AnnotationUser,DisplayMoment } from "../../model/annotation-row.ts";
 
 const ChakraButton = chakra("button");
 

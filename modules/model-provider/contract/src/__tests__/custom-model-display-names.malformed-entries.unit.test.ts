@@ -1,7 +1,8 @@
-/** Guard that malformed JSON entries don't crash or leak keys (#5837 AC5b). */
-import { describe, expect, it } from "vitest";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
+/** Guard that malformed JSON entries don't crash or leak keys (#5837 AC5b). */
+import { describe, expect, it } from "vitest";
+
 import { makeProvider } from "./model-provider.test-helpers.ts";
 
 describe("given a row whose custom entry has a non-string display name", () => {

@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
+
+import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { EventUtils } from "@langwatch/eventing";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
-import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import { createHash } from "node:crypto";
+
 import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 
 /** A moment as a ClickHouse statement carries it. The client serialises this into

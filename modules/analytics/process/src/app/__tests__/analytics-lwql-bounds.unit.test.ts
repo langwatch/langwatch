@@ -9,8 +9,8 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import { resolveRequestBound } from "@langwatch/plans";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -61,6 +61,7 @@ function harness() {
     members: {
       clickhouse: createApiFixture<ClickHouseQueryClient>(),
       rateLimiter: windowLimiter(),
+      publicBaseUrl: "https://app.langwatch.test",
     },
     config: {
       langwatchQl: {
@@ -70,9 +71,9 @@ function harness() {
         database: void 0,
         tenantSetting: void 0,
       },
-      publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
+    secrets: {} as never,
   });
 
   const execute = (projectId: string) =>

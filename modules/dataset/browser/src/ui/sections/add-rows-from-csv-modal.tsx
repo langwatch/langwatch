@@ -10,9 +10,10 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { generate } from "@langwatch/ksuid";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+
 import { datasetApi } from "../../behavior/dataset-api.ts";
-import { useDatasetHost } from "../../model/dataset-host.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../model/convert-record-values.ts";
+import { useDatasetHost } from "../../model/dataset-host.ts";
 import { TabularFileDropzone } from "./tabular-file-dropzone.tsx";
 
 /** The value that maps a dataset column to nothing at all. */

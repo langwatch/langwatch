@@ -1,11 +1,13 @@
 import type {
+  DashboardWidget,
+  DashboardWidgetDefinitionInput,
   LangWatchQLBudgetOverflowMode,
   LangWatchQLProtections,
   LangWatchQLQueryResult,
   LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import type { Trigger } from "@langwatch/automation-contract";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { Dashboard, DashboardSummary } from "./dashboard.ts";
 import type { Graph, GraphLayout } from "./graph.ts";
@@ -69,6 +71,32 @@ export interface DashboardApi {
     projectId: string;
     layouts: { graphId: string; layout: GraphLayout }[];
   }): Promise<{ success: true }>;
+
+  /**
+   * Custom chart widgets: a third kind of card on the same grid, whose
+   * definition analytics owns and whose placement this feature stores.
+   */
+  assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
+  listDashboardWidgets(input: { projectId: string }): Promise<DashboardWidget[]>;
+  getDashboardWidget(input: { projectId: string; id: string }): Promise<DashboardWidget>;
+  createDashboardWidget(
+    input: { projectId: string; name: string } & DashboardWidgetDefinitionInput,
+  ): Promise<DashboardWidget>;
+  updateDashboardWidget(
+    input: {
+      projectId: string;
+      id: string;
+      name?: string;
+    } & Partial<DashboardWidgetDefinitionInput>,
+  ): Promise<DashboardWidget>;
+  assignDashboardWidgetToDashboard(input: {
+    projectId: string;
+    id: string;
+    dashboardId: string;
+  }): Promise<DashboardWidget>;
+  deleteDashboardWidget(input: { projectId: string; id: string }): Promise<void>;
+  /** The deep link back to the dashboards list for a playground widget. */
+  dashboardWidgetPlatformUrl(input: { projectSlug: string }): string;
 
   /** The alert automations watching a set of charts, with their secrets stripped. */
   getAlertsForGraphs(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]>;

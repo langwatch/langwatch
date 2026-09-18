@@ -1,7 +1,8 @@
 import { ResourceScope } from "@langwatch/kernel";
-import type { SecretEncryption } from "../secret.app.ts";
+
 import { MemorySecretRepositories } from "../../repositories/memory/memory.secret.repositories.ts";
 import type { SecretRepositories } from "../../repositories/secret.repositories.ts";
+import type { SecretEncryption } from "../secret.app.ts";
 import { SecretApp } from "../secret.app.ts";
 
 /**

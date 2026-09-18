@@ -3,7 +3,12 @@
  * services (`app/postgres-authz.build.ts` composes from repositories): a
  * test states the slice it exercises, and the builder refuses the rest.
  */
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import type {
+  AuthzGrantsService,
+  AuthzServerConfig,
+  AuthzService,
+} from "@langwatch/authz-contract";
+
 import { AuthzApp } from "../authz.app.ts";
 
 function statedOrRefusing<Service extends object>(name: string, stated: object): Service {
@@ -21,10 +26,12 @@ export function createAuthzTestApp(
   services: Readonly<{
     permissions?: Partial<AuthzService>;
     grants?: Partial<AuthzGrantsService>;
+    config?: AuthzServerConfig | undefined;
   }> = {},
 ): AuthzApp {
   return AuthzApp.fromServices({
     permissions: statedOrRefusing<AuthzService>("permissions", services.permissions ?? {}),
     grants: statedOrRefusing<AuthzGrantsService>("grants", services.grants ?? {}),
+    config: services.config,
   });
 }

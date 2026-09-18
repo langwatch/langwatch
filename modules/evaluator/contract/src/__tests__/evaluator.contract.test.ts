@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   API_KEYS_AND_SECRETS_DETECTION,
   AVAILABLE_EVALUATORS,

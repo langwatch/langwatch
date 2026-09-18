@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { type Disposition, EMPTY_AUDIENCE, type ResolvedAudience } from "../data-privacy.ts";
 import {
   describeAudience,
   type EffectiveRestriction,
@@ -8,7 +9,6 @@ import {
   needsAudienceFacts,
   type ViewerFacts,
 } from "../data-privacy.visibility.ts";
-import { type Disposition, EMPTY_AUDIENCE, type ResolvedAudience } from "../data-privacy.ts";
 
 function audience(partial: Partial<ResolvedAudience>): ResolvedAudience {
   return { ...EMPTY_AUDIENCE, ...partial };

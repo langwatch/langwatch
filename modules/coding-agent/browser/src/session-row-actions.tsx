@@ -1,8 +1,7 @@
 import { Button } from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
 import { MoreVertical } from "lucide-react";
 import type React from "react";
-
-import { Menu } from "@langwatch/design-system/menu";
 
 import type { SessionListRow } from "./session-list-row.ts";
 

@@ -42,9 +42,7 @@ export abstract class CodingAgentActivityHost {
   abstract failed(failure: CodingAgentFailure): void;
 }
 
-const CodingAgentActivityHostContext = createContext<CodingAgentActivityHost | undefined>(
-  void 0,
-);
+const CodingAgentActivityHostContext = createContext<CodingAgentActivityHost | undefined>(void 0);
 
 /** Publishes the host to every activity table below it. */
 export const CodingAgentActivityHostProvider = CodingAgentActivityHostContext.Provider;

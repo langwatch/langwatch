@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
-import { memo, useEffect, useState } from "react";
 import { codeToHtmlDark } from "@langwatch/design-system/shiki";
+import { memo, useEffect, useState } from "react";
+
 import { AnsiText } from "./terminal-ansi-text.tsx";
 import { TERMINAL_FONT_STACK } from "./terminal-palette.ts";
 

@@ -12,6 +12,13 @@
 
 import { defineTrpcContract } from "@langwatch/api/contract";
 
+import {
+  apiKeyTrpcCreateInputSchema,
+  apiKeyTrpcNameByIdInputSchema,
+  apiKeyTrpcOrganizationScopeSchema,
+  apiKeyTrpcRevokeInputSchema,
+  apiKeyTrpcUpdateInputSchema,
+} from "./api-key-trpc.schemas.ts";
 import { apiKeyListEntrySchema, namedApiKeyBindingSchema } from "./api-key.list.ts";
 import {
   apiKeyMintedSchema,
@@ -22,13 +29,6 @@ import {
   apiKeyUpdatedSchema,
   apiKeyUserSchema,
 } from "./api-key.responses.ts";
-import {
-  apiKeyTrpcCreateInputSchema,
-  apiKeyTrpcNameByIdInputSchema,
-  apiKeyTrpcOrganizationScopeSchema,
-  apiKeyTrpcRevokeInputSchema,
-  apiKeyTrpcUpdateInputSchema,
-} from "./api-key-trpc.schemas.ts";
 
 export const apiKeyTrpc = defineTrpcContract("apiKey")
   .query("myBindings")

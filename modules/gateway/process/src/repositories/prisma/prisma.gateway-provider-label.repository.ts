@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { GatewayProviderLabelRepository } from "../gateway-provider-label.repository.ts";
 
 export class PrismaGatewayProviderLabelRepository extends GatewayProviderLabelRepository {

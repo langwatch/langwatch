@@ -1,5 +1,6 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { ModelProviderEvidenceRepository } from "../model-provider-evidence.repository.ts";
 
 type Database = Pick<PrismaClient, "modelProvider">;

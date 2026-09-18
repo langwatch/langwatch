@@ -1,9 +1,9 @@
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { hasDSLChanged, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 
-import { hasDSLChanged, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import { serializeWorkflow } from "../../behavior/workflow-store.ts";
 

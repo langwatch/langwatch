@@ -1,5 +1,6 @@
 /** Invitation ceremony: non-fatal paths preserve membership as durable outcome. */
 
+import { HandledError } from "@langwatch/handled-error";
 import {
   InviteAlreadyAcceptedError,
   InviteExpiredError,
@@ -17,7 +18,6 @@ import {
   type OrganizationInviteResent,
   type OrganizationListedInvite,
 } from "@langwatch/organization-contract";
-import { HandledError } from "@langwatch/handled-error";
 
 import type {
   OrganizationInvitations,

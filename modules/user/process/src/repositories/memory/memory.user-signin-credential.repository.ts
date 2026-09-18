@@ -3,6 +3,7 @@ import type {
   UnlinkUserAccountOutcome,
   UserLinkedAccount,
 } from "@langwatch/user-contract";
+
 import type {
   UserCredentialAccount,
   UserCredentialRepository,
@@ -31,9 +32,7 @@ export class MemoryUserCredentialRepository implements UserCredentialRepository 
     this.#database = database;
   }
 
-  static create(
-    input: Readonly<{ database: MemoryUserDatabase }>,
-  ): MemoryUserCredentialRepository {
+  static create(input: Readonly<{ database: MemoryUserDatabase }>): MemoryUserCredentialRepository {
     return new MemoryUserCredentialRepository(input.database);
   }
 

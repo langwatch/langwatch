@@ -4,7 +4,8 @@
  * late confirmation later supersedes. Built through the runtime's own applier.
  */
 
-import { type ProcessEventEnvelope,
+import {
+  type ProcessEventEnvelope,
   buildIntentHandlers,
   buildProcessDefinition,
   buildProcessManager,
@@ -13,9 +14,8 @@ import { type ProcessEventEnvelope,
   type ProcessDefinition,
   ProcessManagerService,
   SCHEDULE_ARM_EVENT_TYPE,
-  SCHEDULED_SINGLETON_PROJECT_ID } from "@langwatch/eventing";
-import { nanoid } from "nanoid";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+  SCHEDULED_SINGLETON_PROJECT_ID,
+} from "@langwatch/eventing";
 import type {
   OpenAdmission,
   SpendSettlementProcessDeps,
@@ -26,6 +26,8 @@ import {
   SPEND_SETTLEMENT_PROCESS_NAME,
   spendSettlementPM,
 } from "@langwatch/gateway-process";
+import { nanoid } from "nanoid";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ns = `settle-pm-${nanoid(8)}`;
 const T0 = Date.UTC(2026, 6, 21, 9, 0, 0);

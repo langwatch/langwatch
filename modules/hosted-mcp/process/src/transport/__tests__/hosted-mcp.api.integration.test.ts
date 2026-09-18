@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { join, resolve } from "node:path";
+
 import {
   afterAll,
   afterEach,
@@ -16,6 +17,7 @@ import {
   type MockInstance,
   vi,
 } from "vitest";
+
 import {
   createMcpHandler,
   HeaderMcpClientAddressAdapter,

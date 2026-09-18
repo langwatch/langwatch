@@ -1,7 +1,7 @@
+import { neutralizeFormula } from "@langwatch/csv";
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
 
-import { neutralizeFormula } from "@langwatch/csv";
 import { csvFileName } from "../../model/annotation-export.ts";
 
 describe("the annotation export formula guard", () => {

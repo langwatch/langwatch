@@ -1,6 +1,7 @@
 import { ALL_PERMISSIONS, permissionSatisfiedBy } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import {
   categorizablePermissions,
   categoryPermissions,

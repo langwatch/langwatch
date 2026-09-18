@@ -1,13 +1,13 @@
-import { RuntimeConfig } from "@langwatch/config";
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { modelProviderServerConfigDefinition } from "../model-provider.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({
-    name: "model-provider",
-    definition: modelProviderServerConfigDefinition,
-    source,
-  }).value;
+import { modelProviderConfig } from "../model-provider.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({
+    owners: [{ name: "model-provider", config: modelProviderConfig }],
+    environment,
+  })["model-provider"];
 
 describe("model provider server configuration", () => {
   describe("given the deployment sets no allowlist", () => {

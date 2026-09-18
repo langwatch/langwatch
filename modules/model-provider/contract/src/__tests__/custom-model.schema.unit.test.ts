@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import {
   customModelEntrySchema,
   isLegacyCustomModels,
   toLegacyCompatibleCustomModels,
 } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
 
 describe("customModelEntrySchema", () => {
   describe("when given a valid chat model entry", () => {

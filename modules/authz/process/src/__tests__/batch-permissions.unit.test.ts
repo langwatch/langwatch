@@ -1,5 +1,6 @@
 import type { CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
@@ -111,9 +112,7 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
       makeReader({
         findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
         findApiKeyBindings: vi.fn().mockResolvedValue([binding("ADMIN", "proj-0")]),
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue([binding("VIEWER", "proj-0")]),
       });
 

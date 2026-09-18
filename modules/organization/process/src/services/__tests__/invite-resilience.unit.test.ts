@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { InviteNotFoundError } from "@langwatch/organization-contract";
-import { InviteService } from "../invite.service.ts";
-import { resolveInviteDisplayStatus } from "../../rules/invite-display-status.rules.ts";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
+import { resolveInviteDisplayStatus } from "../../rules/invite-display-status.rules.ts";
+import { InviteService } from "../invite.service.ts";
 
 /**
  * D11 — resilient invitations (specs/identity/resilient-invitations.feature).

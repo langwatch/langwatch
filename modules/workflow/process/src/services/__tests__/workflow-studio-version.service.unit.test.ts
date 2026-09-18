@@ -5,6 +5,7 @@ import {
   type WorkflowVersion,
 } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
+
 import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
 import { WorkflowStudioVersionService } from "../workflow-studio-version.service.ts";
 
@@ -34,8 +35,7 @@ class RenamingDsl implements WorkflowStudioDsl {
 class RecordingAgentMapping implements WorkflowAgentMapping {
   readonly recomputed: { projectId: string; workflowId: string; dsl: StudioWorkflow }[] = [];
 
-  constructor(private readonly outcome: Promise<void> = Promise.resolve()) {
-  }
+  constructor(private readonly outcome: Promise<void> = Promise.resolve()) {}
 
   recompute(input: { projectId: string; workflowId: string; dsl: StudioWorkflow }): Promise<void> {
     this.recomputed.push(input);

@@ -40,11 +40,11 @@ export interface ZodIssue {
 
 export interface ZodErrorStructure {
   issues: (ZodIssue & {
-      unionErrors?: {
-        issues: ZodIssue[];
-        name: string;
-      }[];
-    })[];
+    unionErrors?: {
+      issues: ZodIssue[];
+      name: string;
+    }[];
+  })[];
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Real signed route: MISSING degrades one record; unreadable DB fails the batch, drainer retries.
@@ -7,10 +8,8 @@ import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import type { GatewaySpendRating } from "../../app/gateway.members.ts";
+import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import {
   mountGatewayInternalRest,
   signedGatewayRequest,

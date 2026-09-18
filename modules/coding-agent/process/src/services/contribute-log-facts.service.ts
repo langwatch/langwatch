@@ -1,5 +1,3 @@
-import type { Command, CommandHandler } from "@langwatch/eventing";
-import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import {
   type ContributeLogFactsCommandData,
   contributeLogFactsCommandDataSchema,
@@ -11,10 +9,13 @@ import {
   SESSION_CONTEXT_EVENT,
   type SessionWorkingContext,
   workingContextOfFacts,
-  type LogFactsContributedEvent
+  type LogFactsContributedEvent,
 } from "@langwatch/coding-agent-contract";
-import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
+
 import { CodingAgentSessionEventsMapProjection } from "../eventing/coding-agent-session-events.projection.ts";
+import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
 
 /** Log facts contribution with stamped context; stamping exclusive to this lane. */
 export class EventingContributeLogFactsAdapter implements CommandHandler<

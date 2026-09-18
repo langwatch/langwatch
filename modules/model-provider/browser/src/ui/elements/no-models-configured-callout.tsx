@@ -4,8 +4,8 @@
  * See specs/model-providers/no-models-empty-state.feature.
  */
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { ArrowUpRight } from "lucide-react";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
+import { ArrowUpRight } from "lucide-react";
 
 interface Props {
   size?: "sm" | "md" | "full";

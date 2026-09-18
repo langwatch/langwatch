@@ -5,10 +5,8 @@
  */
 import { nowInstant, toDate } from "@langwatch/time";
 import type { Workflow } from "@langwatch/workflow-contract";
-import {
-  WorkflowRowRepository,
-  type WorkflowRowDraft,
-} from "../workflow-row.repository.ts";
+
+import { WorkflowRowRepository, type WorkflowRowDraft } from "../workflow-row.repository.ts";
 import type { WorkflowMemoryStore } from "./workflow-memory.store.ts";
 
 export class WorkflowRowMemoryRepository extends WorkflowRowRepository {

@@ -10,6 +10,7 @@ import {
 } from "@langwatch/automation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import { RecordTriggerMatchCommand } from "../automation.pipeline.ts";
 
 const TENANT_ID = createTenantId("project_1");

@@ -119,9 +119,7 @@ export function inMemoryDatasetToNodeDataset(dataset: StudioInMemoryDataset): No
       };
 }
 
-export const simpleRecordListToNodeDataset = (
-  records: Record<string, unknown>[],
-): NodeDataset => {
+export const simpleRecordListToNodeDataset = (records: Record<string, unknown>[]): NodeDataset => {
   const columnsFirst = transpostRowsFirstToColumnsFirstWithoutId(records);
   return {
     inline: {

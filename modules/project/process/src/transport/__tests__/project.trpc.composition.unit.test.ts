@@ -1,3 +1,4 @@
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The `project.*` namespace against the composition-built app — same defect
@@ -5,10 +6,9 @@
  * every procedure throws. Spec: specs/projects/projects-browser-door.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi, type Project, type ProjectWithTeam } from "@langwatch/project-contract";
-import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
 import { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";
@@ -18,8 +18,8 @@ import { describe, expect, it, vi } from "vitest";
 import { ProjectApp } from "../../app/project.app.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
-import type { IntegrationsChecksApi } from "../integrations-checks.trpc.ts";
 import type { ProjectHomeApi } from "../home.trpc.ts";
+import type { IntegrationsChecksApi } from "../integrations-checks.trpc.ts";
 import type { ProjectBrowserApi } from "../project.trpc.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
 import { projectTrpcTestMembers, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";

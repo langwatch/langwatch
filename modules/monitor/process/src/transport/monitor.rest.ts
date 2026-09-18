@@ -64,130 +64,132 @@ export function createMonitorsRest(): Readonly<{
   namespace: string;
   router: () => RestTransportDeclaration<MonitorApi>;
 }> {
-  return defineRestRouter(MonitorApi)
-    .withNamespace("monitors")
-    .withVersion(MANAGEMENT_API_VERSION)
+  return (
+    defineRestRouter(MonitorApi)
+      .withNamespace("monitors")
+      .withVersion(MANAGEMENT_API_VERSION)
 
-    .get("/", "getApiMonitors")
-    .withPermission("evaluations:view")
-    .withOutput(z.array(monitorRestResponseSchema))
-    .withDocs({
-      tags: ["Monitors"],
-      description: "List all online evaluation monitors for the project",
-    })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, scope }, project) =>
-      (await app.list({ projectId: scope.id })).map((monitor) =>
-        monitorWire({ app, projectSlug: project.projectSlug, monitor }),
-      ),
-    )
+      .get("/", "getApiMonitors")
+      .withPermission("evaluations:view")
+      .withOutput(z.array(monitorRestResponseSchema))
+      .withDocs({
+        tags: ["Monitors"],
+        description: "List all online evaluation monitors for the project",
+      })
+      .withMiddleware(projectRestFacts)
+      .handle(async ({ app, scope }, project) =>
+        (await app.list({ projectId: scope.id })).map((monitor) =>
+          monitorWire({ app, projectSlug: project.projectSlug, monitor }),
+        ),
+      )
 
-    .get("/:id", "getApiMonitorsById")
-    .withParams(monitorRestIdParamsSchema)
-    .withPermission("evaluations:view")
-    .withOutput(monitorRestResponseSchema)
-    .withDocs({
-      tags: ["Monitors"],
-      description: "Get a monitor by its ID",
-      responses: notFound,
-    })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) =>
-      monitorWire({
-        app,
-        projectSlug: project.projectSlug,
-        monitor: await app.getById({ id: input.id, projectId: scope.id }),
-      }),
-    )
-
-    // `:create`, matching the tRPC twin the platform's own "create monitor"
-    // button calls. `:manage` still satisfies this through the permission
-    // hierarchy, so no existing caller loses access. Deletion stays on
-    // `:manage` below, where the destructive line sits.
-    .post("/", "postApiMonitors")
-    .withInput(monitorRestCreateInputSchema)
-    .withPermission("evaluations:create")
-    .withOutput(monitorRestResponseSchema)
-    .withStatus(201)
-    .withDocs({
-      tags: ["Monitors"],
-      description: "Create a new online evaluation monitor",
-    })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) =>
-      monitorWire({
-        app,
-        projectSlug: project.projectSlug,
-        monitor: await app.create({
-          projectId: scope.id,
-          name: input.name,
-          checkType: input.checkType,
-          executionMode: input.executionMode,
-          preconditions: input.preconditions,
-          parameters: input.parameters,
-          mappings: input.mappings,
-          sample: input.sample,
-          ...(input.evaluatorId === undefined ? {} : { evaluatorId: input.evaluatorId }),
-          level: input.level,
-          ...(input.threadIdleTimeout === undefined
-            ? {}
-            : { threadIdleTimeout: input.threadIdleTimeout }),
+      .get("/:id", "getApiMonitorsById")
+      .withParams(monitorRestIdParamsSchema)
+      .withPermission("evaluations:view")
+      .withOutput(monitorRestResponseSchema)
+      .withDocs({
+        tags: ["Monitors"],
+        description: "Get a monitor by its ID",
+        responses: notFound,
+      })
+      .withMiddleware(projectRestFacts)
+      .handle(async ({ app, input, scope }, project) =>
+        monitorWire({
+          app,
+          projectSlug: project.projectSlug,
+          monitor: await app.getById({ id: input.id, projectId: scope.id }),
         }),
-      }),
-    )
+      )
 
-    .patch("/:id", "patchApiMonitorsById")
-    .withParams(monitorRestIdParamsSchema)
-    .withInput(monitorRestUpdateInputSchema)
-    .withPermission("evaluations:update")
-    .withOutput(monitorRestResponseSchema)
-    .withDocs({
-      tags: ["Monitors"],
-      description: "Update a monitor (name, enabled state, settings, etc.)",
-      responses: notFound,
-    })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) => {
-      const { id, ...changes } = input;
+      // `:create`, matching the tRPC twin the platform's own "create monitor"
+      // button calls. `:manage` still satisfies this through the permission
+      // hierarchy, so no existing caller loses access. Deletion stays on
+      // `:manage` below, where the destructive line sits.
+      .post("/", "postApiMonitors")
+      .withInput(monitorRestCreateInputSchema)
+      .withPermission("evaluations:create")
+      .withOutput(monitorRestResponseSchema)
+      .withStatus(201)
+      .withDocs({
+        tags: ["Monitors"],
+        description: "Create a new online evaluation monitor",
+      })
+      .withMiddleware(projectRestFacts)
+      .handle(async ({ app, input, scope }, project) =>
+        monitorWire({
+          app,
+          projectSlug: project.projectSlug,
+          monitor: await app.create({
+            projectId: scope.id,
+            name: input.name,
+            checkType: input.checkType,
+            executionMode: input.executionMode,
+            preconditions: input.preconditions,
+            parameters: input.parameters,
+            mappings: input.mappings,
+            sample: input.sample,
+            ...(input.evaluatorId === undefined ? {} : { evaluatorId: input.evaluatorId }),
+            level: input.level,
+            ...(input.threadIdleTimeout === undefined
+              ? {}
+              : { threadIdleTimeout: input.threadIdleTimeout }),
+          }),
+        }),
+      )
 
-      return monitorWire({
-        app,
-        projectSlug: project.projectSlug,
-        monitor: await app.patch({ id, projectId: scope.id, changes }),
-      });
-    })
+      .patch("/:id", "patchApiMonitorsById")
+      .withParams(monitorRestIdParamsSchema)
+      .withInput(monitorRestUpdateInputSchema)
+      .withPermission("evaluations:update")
+      .withOutput(monitorRestResponseSchema)
+      .withDocs({
+        tags: ["Monitors"],
+        description: "Update a monitor (name, enabled state, settings, etc.)",
+        responses: notFound,
+      })
+      .withMiddleware(projectRestFacts)
+      .handle(async ({ app, input, scope }, project) => {
+        const { id, ...changes } = input;
 
-    // Enabling or disabling changes the monitor that already exists — an `:update`.
-    .post("/:id/toggle", "postApiMonitorsByIdToggle")
-    .withParams(monitorRestIdParamsSchema)
-    .withInput(monitorRestToggleInputSchema)
-    .withPermission("evaluations:update")
-    .withOutput(monitorRestToggledSchema)
-    .withDocs({
-      tags: ["Monitors"],
-      description: "Enable or disable a monitor",
-      responses: notFound,
-    })
-    .handle(async ({ app, input, scope }) => {
-      await app.toggle({ id: input.id, projectId: scope.id, enabled: input.enabled });
+        return monitorWire({
+          app,
+          projectSlug: project.projectSlug,
+          monitor: await app.patch({ id, projectId: scope.id, changes }),
+        });
+      })
 
-      return { id: input.id, enabled: input.enabled };
-    })
+      // Enabling or disabling changes the monitor that already exists — an `:update`.
+      .post("/:id/toggle", "postApiMonitorsByIdToggle")
+      .withParams(monitorRestIdParamsSchema)
+      .withInput(monitorRestToggleInputSchema)
+      .withPermission("evaluations:update")
+      .withOutput(monitorRestToggledSchema)
+      .withDocs({
+        tags: ["Monitors"],
+        description: "Enable or disable a monitor",
+        responses: notFound,
+      })
+      .handle(async ({ app, input, scope }) => {
+        await app.toggle({ id: input.id, projectId: scope.id, enabled: input.enabled });
 
-    // Destruction deliberately stays at `:manage`.
-    .delete("/:id", "deleteApiMonitorsById")
-    .withParams(monitorRestIdParamsSchema)
-    .withPermission("evaluations:manage")
-    .withOutput(monitorRestDeletedSchema)
-    .withDocs({
-      tags: ["Monitors"],
-      description: "Delete a monitor",
-      responses: notFound,
-    })
-    .handle(async ({ app, input, scope }) => {
-      await app.delete({ id: input.id, projectId: scope.id });
+        return { id: input.id, enabled: input.enabled };
+      })
 
-      return { id: input.id, deleted: true };
-    })
-    .build();
+      // Destruction deliberately stays at `:manage`.
+      .delete("/:id", "deleteApiMonitorsById")
+      .withParams(monitorRestIdParamsSchema)
+      .withPermission("evaluations:manage")
+      .withOutput(monitorRestDeletedSchema)
+      .withDocs({
+        tags: ["Monitors"],
+        description: "Delete a monitor",
+        responses: notFound,
+      })
+      .handle(async ({ app, input, scope }) => {
+        await app.delete({ id: input.id, projectId: scope.id });
+
+        return { id: input.id, deleted: true };
+      })
+      .build()
+  );
 }

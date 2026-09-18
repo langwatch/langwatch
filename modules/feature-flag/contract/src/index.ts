@@ -16,8 +16,8 @@ export {
   deriveFeatureFlagEnvVarName,
   resolveFeatureFlagEnvOverride,
 } from "./feature-flag-environment.ts";
-export type { FeatureFlagConfig } from "./feature-flag.config.ts";
-export { resolveFeatureFlagConfig } from "./feature-flag.config.ts";
+export type { FeatureFlagConfig, FeatureFlagServerConfig } from "./feature-flag.config.ts";
+export { featureFlagConfig } from "./feature-flag.config.ts";
 export { FEATURE_FLAG_CACHE_TTL_MS, KILL_SWITCH_CACHE_TTL_MS } from "./feature-flag-constants.ts";
 export type {
   FeatureFlagRule,
@@ -129,5 +129,5 @@ export {
   publicAnonymousFlagMapSchema,
 } from "./public-anonymous-feature-flags.ts";
 export { FRONTEND_FEATURE_FLAGS } from "./frontend-feature-flags.ts";
-export { VOICE_AGENTS_DISABLED_MESSAGE } from "./voiceAgents.message.ts";
+export { VOICE_AGENTS_DISABLED_MESSAGE, VOICE_AGENTS_FLAG_KEY } from "./voiceAgents.message.ts";
 export * from "./feature-flag.api.ts";

@@ -1,5 +1,5 @@
-import type { GithubRedis } from "./github-redis.connection.ts";
 import { GithubInstallNonceRepository } from "../github-install-nonce.repository.ts";
+import type { GithubRedis } from "./github-redis.connection.ts";
 
 /**
  * The Redis tier. The connection is nullable because this module's Redis
@@ -7,9 +7,7 @@ import { GithubInstallNonceRepository } from "../github-install-nonce.repository
  * flow reads that as "replay cannot be judged here" rather than refusing every install.
  */
 export class GithubInstallNonceRedisRepository extends GithubInstallNonceRepository {
-  static create(parts: {
-    redis: GithubRedis | null;
-  }): GithubInstallNonceRedisRepository {
+  static create(parts: { redis: GithubRedis | null }): GithubInstallNonceRedisRepository {
     return new GithubInstallNonceRedisRepository(parts.redis);
   }
 

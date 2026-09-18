@@ -1,5 +1,6 @@
 import { Button } from "@chakra-ui/react";
 import { Bird } from "lucide-react";
+
 import { Link } from "../../../../ui/elements/gateway-link.tsx";
 
 /**

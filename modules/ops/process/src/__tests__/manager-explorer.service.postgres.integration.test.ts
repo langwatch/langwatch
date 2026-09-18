@@ -4,12 +4,13 @@
  * Spec: specs/ops/dead-letter-recovery.feature
  */
 import { randomUUID } from "node:crypto";
+
 import type {
   AuditLogApi,
   AuditLogHistoryEntry,
   RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -18,11 +19,12 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaProcessStore } from "@langwatch/eventing/server";
-import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import type { OpsEventingIntrospection } from "../app/ops.app.ts";
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
-import type { OpsEventingIntrospection } from "../app/ops.app.ts";
+import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 
 /** The audit log this suite records on: the same rows, written straight to Postgres. */
 class PrismaAuditLogTestSink implements AuditLogApi {

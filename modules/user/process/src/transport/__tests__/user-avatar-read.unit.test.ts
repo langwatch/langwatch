@@ -181,7 +181,8 @@ const renderHandled: ErrorHandler = (error, c) => {
   const handled = error as { status?: number; httpStatus?: number; code?: string };
   const status = handled.status ?? handled.httpStatus;
 
-  if (typeof status === "number") return c.json({ error: handled.code ?? "error" }, status as never);
+  if (typeof status === "number")
+    return c.json({ error: handled.code ?? "error" }, status as never);
 
   return c.json({ error: String(error) }, 500);
 };

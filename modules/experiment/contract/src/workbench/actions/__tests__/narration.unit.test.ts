@@ -3,6 +3,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
+
 import { WORKBENCH_ACTION_KINDS } from "../manifest.ts";
 import {
   narrateWorkbenchAction,

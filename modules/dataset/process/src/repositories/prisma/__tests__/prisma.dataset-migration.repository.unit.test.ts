@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
+
 import { describe, expect, it, vi } from "vitest";
-import { PrismaDatasetMigrationRepository } from "../prisma.dataset-migration.repository.ts";
-import { AzureDatasetStorageAdapter } from "../../../services/azure.dataset-storage.service.ts";
+
 import {
   type DatasetAzureConfigResolver,
   DatasetStorageResolver,
@@ -14,6 +14,8 @@ import {
   type ChunkOffset,
   type DatasetChunk,
 } from "../../../rules/dataset-chunking.rules.ts";
+import { AzureDatasetStorageAdapter } from "../../../services/azure.dataset-storage.service.ts";
+import { PrismaDatasetMigrationRepository } from "../prisma.dataset-migration.repository.ts";
 
 type DatasetLayout = { contentLayout: string; useS3: boolean };
 type Fingerprint = { count: number; maxUpdatedAt: Date | null };

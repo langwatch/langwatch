@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 
 const mockSetNode = vi.fn();
 let mockNodes: unknown[] = [];

@@ -4,11 +4,11 @@
  * Node drawer header menu (Duplicate/Delete) for component nodes only.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Component } from "@langwatch/workflow-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Component } from "@langwatch/workflow-contract";
 
 const mockDuplicateNode = vi.fn();
 const mockDeleteNode = vi.fn();

@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentNotFoundError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
-import type { UserApi } from "@langwatch/user-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { createAgentAppFixture } from "./agent.fixture.ts";
+import type { UserApi } from "@langwatch/user-contract";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { ConnectedAgentService } from "../../services/connected-agent.service.ts";
+import { createAgentAppFixture } from "./agent.fixture.ts";
 
 const register = {
   id: "agent_one",
@@ -64,10 +65,8 @@ describe("AgentApp.call", () => {
       instance: { instanceId: "private_instance", hostname: "laptop", label: null },
     });
     const { app, resources } = createAgentAppFixture({
-      config: {
-        publicBaseUrl: "https://langwatch.test",
-        connected: { replicaCount: 1, relayMaxPayloadMb: void 0 },
-      },
+      config: { replicaCount: 1, relayMaxPayloadMb: void 0 },
+      members: { publicBaseUrl: "https://langwatch.test" },
     });
     await app.registerConnected(register);
     const signal = new AbortController().signal;

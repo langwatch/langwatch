@@ -1,6 +1,7 @@
 /** Disambiguate labels: different projects with same name need unique filter labels. */
 
 import { describe, expect, it } from "vitest";
+
 import { disambiguateLabels } from "../disambiguate-labels.ts";
 
 describe("given a list of labels", () => {

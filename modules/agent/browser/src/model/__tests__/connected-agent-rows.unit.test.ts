@@ -4,8 +4,9 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import type { ConnectedAgentBrowser as ConnectedAgentView } from "../agent-client.ts";
 import { describe, expect, it } from "vitest";
+
+import type { ConnectedAgentBrowser as ConnectedAgentView } from "../agent-client.ts";
 import {
   environmentTone,
   instanceCountLabel,

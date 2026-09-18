@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { assertAnalyticsServerConfig } from "../analytics.config.ts";
 
 const identity = {

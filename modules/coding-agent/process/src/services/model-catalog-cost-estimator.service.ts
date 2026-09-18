@@ -3,6 +3,7 @@ import {
   getStaticModelCostRates,
   type ModelCostEstimateInput,
 } from "@langwatch/model-provider-contract";
+
 import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
 
 /** Cost from static catalog; frozen twin of ModelProviderCostsService.estimate. */
@@ -11,8 +12,7 @@ export class ModelCatalogCostEstimatorAdapter implements CodingAgentCostEstimato
     return new ModelCatalogCostEstimatorAdapter();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   estimateCost(input: ModelCostEstimateInput): number {
     return estimateModelCost(input, getStaticModelCostRates());

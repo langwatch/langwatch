@@ -1,5 +1,6 @@
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP,

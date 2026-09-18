@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { compareOrdinal } from "@langwatch/eventing";
 import {
   DEFAULT_LOG_COMMAND_SHARDS,
@@ -11,10 +13,14 @@ import {
   type LogProviderKind,
 } from "@langwatch/log-contract";
 import { normalizeOtlpAttributeMap } from "@langwatch/otlp";
-import { createHash } from "node:crypto";
-import { z } from "zod";
-import { type LogPreparer, type LogPreparationInput,type LogRedaction } from "../app/log.members.ts";
 import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
+
+import {
+  type LogPreparer,
+  type LogPreparationInput,
+  type LogRedaction,
+} from "../app/log.members.ts";
 
 type UnknownRecord = Record<string, unknown>;
 type PIIRedactionLevel = LogPiiRedactionLevel;
@@ -45,8 +51,7 @@ type StringRef = {
  * uniqueness) and carry the owning attribute name so redaction NAME rules can fire.
  */
 export class CanonicalLogAdapter implements LogPreparer {
-  private constructor(private readonly redaction: LogRedaction) {
-  }
+  private constructor(private readonly redaction: LogRedaction) {}
 
   static create(options: { redaction: LogRedaction }): CanonicalLogAdapter {
     return new CanonicalLogAdapter(options.redaction);

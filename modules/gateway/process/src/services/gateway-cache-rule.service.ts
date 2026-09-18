@@ -9,6 +9,7 @@ import {
   type GatewayCacheRuleResource,
   type UpdateGatewayCacheRuleInput,
 } from "@langwatch/gateway-contract";
+
 import { GatewayCacheRuleRepository } from "../repositories/gateway-cache-rule.repository.ts";
 
 /** Private cache-rule collaborator owned by the singular Gateway service. */
@@ -31,7 +32,10 @@ export class GatewayCacheRuleService {
     return this.repository.findPage(input);
   }
 
-  findById(input: { id: string; organizationId: string }): Promise<GatewayCacheRuleResource | null> {
+  findById(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource | null> {
     return this.repository.findById(input);
   }
 

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 /**
  * What one reported DSPy step becomes before storage: examples hashed, LLM
  * calls priced against the project's own cost rules, and the largest ones
@@ -13,7 +15,6 @@ import {
   matchModelCost,
   type ModelCostRate,
 } from "@langwatch/model-provider-contract";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 
 /**

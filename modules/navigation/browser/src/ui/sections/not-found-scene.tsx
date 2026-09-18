@@ -4,10 +4,11 @@
  */
 
 import { Box, Button, Center, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { ArrowLeft, Home, Settings } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useColorMode, useColorModeValue } from "@langwatch/design-system/color-mode";
 import { SimpleSlider } from "@langwatch/design-system/slider";
+import { ArrowLeft, Home, Settings } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import {

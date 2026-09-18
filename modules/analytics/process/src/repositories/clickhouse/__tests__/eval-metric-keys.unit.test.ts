@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { EVAL_METRIC_KEYS, isEvalMetricKey } from "../clickhouse.timeseries-query-shared.mapper.ts";
 
 describe("isEvalMetricKey", () => {

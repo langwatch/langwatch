@@ -1,3 +1,4 @@
+import { useAutomationStore } from "./automation-store.ts";
 import {
   cadenceIsSet,
   conditionsAreSet,
@@ -7,7 +8,6 @@ import {
   presetLabels,
   subjectIsSet,
 } from "./draft-model.ts";
-import { useAutomationStore } from "./automation-store.ts";
 
 /**
  * Selectors. Each subscribes to the minimum slice it needs so a

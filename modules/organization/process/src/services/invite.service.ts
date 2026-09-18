@@ -1,25 +1,29 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { normalizeIdentifierValue } from "@langwatch/identity-contract";
-import { type OrganizationInvite, OrganizationUserRole,InviteNotFoundError,TeamUserRole } from "@langwatch/organization-contract";
-import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
-
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { OrganizationInviteMail } from "../app/organization.members.ts";
-import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
+import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import {
-  resolveInviteDisplayStatus,
-  type InviteDisplayStatus,
-} from "../rules/invite-display-status.rules.ts";
+  type OrganizationInvite,
+  OrganizationUserRole,
+  InviteNotFoundError,
+  TeamUserRole,
+} from "@langwatch/organization-contract";
+
+import type { OrganizationInviteMail } from "../app/organization.members.ts";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import {
   type InviteAssignableRoles,
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules.ts";
-
-import { InviteCreationService } from "./invite-creation.service.ts";
+import {
+  resolveInviteDisplayStatus,
+  type InviteDisplayStatus,
+} from "../rules/invite-display-status.rules.ts";
+import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import { InviteAcceptanceService } from "./invite-acceptance.service.ts";
-import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
+import { InviteCreationService } from "./invite-creation.service.ts";
 import { InviteLifecycleService } from "./invite-lifecycle.service.ts";
+import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
 
 /**
  * Team assignment input for invite creation.
@@ -279,14 +283,14 @@ export class InviteService {
 
   async listInvites({ organizationId }: { organizationId: string }): Promise<
     (OrganizationInvite & {
-        inviteUrl: string;
-        displayStatus: InviteDisplayStatus;
-        requestedByUser: {
-          id: string;
-          name: string | null;
-          email: string | null;
-        } | null;
-      })[]
+      inviteUrl: string;
+      displayStatus: InviteDisplayStatus;
+      requestedByUser: {
+        id: string;
+        name: string | null;
+        email: string | null;
+      } | null;
+    })[]
   > {
     const invites = await this.invites.findListableInvites({ organizationId });
 

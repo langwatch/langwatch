@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
   INDEFINITE_RETENTION_DAYS,

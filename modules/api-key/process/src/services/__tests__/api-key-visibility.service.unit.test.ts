@@ -4,8 +4,9 @@
  * limit it THROWS rather than truncating into a complete-looking list.
  */
 
-import { describe, expect, it } from "vitest";
 import { ProjectVisibilityTooWideError } from "@langwatch/api-key-contract";
+import { describe, expect, it } from "vitest";
+
 import { ApiKeyVisibilityService } from "../api-key-visibility.service.ts";
 
 type Binding = { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };

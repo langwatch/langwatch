@@ -1,8 +1,3 @@
-/**
- * Pure deterministic resolver over CollectedGrants; walk order here, other
- * rules in siblings (ADR-092 §2). Legacy quirks tagged for staged removal.
- */
-import { scopeChain, type ScopeChainLink } from "./scope.ts";
 import type {
   AuthzDecision,
   AuthzScopeRef,
@@ -10,6 +5,11 @@ import type {
   CollectedGrants,
   ResourceGrant,
 } from "./authz.ts";
+/**
+ * Pure deterministic resolver over CollectedGrants; walk order here, other
+ * rules in siblings (ADR-092 §2). Legacy quirks tagged for staged removal.
+ */
+import { scopeChain, type ScopeChainLink } from "./scope.ts";
 import {
   findBindingsStep,
   type DecideContext,

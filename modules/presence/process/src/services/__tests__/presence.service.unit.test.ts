@@ -1,5 +1,6 @@
 import type { PresenceSession } from "@langwatch/presence-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   createPresenceTestProjects,
   RecordingPresenceBroadcast,

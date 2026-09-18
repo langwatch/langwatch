@@ -4,6 +4,7 @@
  * being posted inline into a 6 MB Lambda cap that fails opaquely.
  */
 import { PayloadStagingUnavailableError } from "@langwatch/stored-object-contract";
+
 import { PayloadStaging, type StagedPayload } from "#repositories/payload-staging.repository";
 
 export class AbsentPayloadStagingAdapter extends PayloadStaging {

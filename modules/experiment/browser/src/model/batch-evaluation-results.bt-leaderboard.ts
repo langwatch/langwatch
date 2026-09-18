@@ -4,7 +4,11 @@
  */
 
 import { quantile } from "@langwatch/experiment-contract";
-import { type Comparability, computeComparability } from "./batch-evaluation-results.comparability.ts";
+
+import {
+  type Comparability,
+  computeComparability,
+} from "./batch-evaluation-results.comparability.ts";
 import { mulberry32 } from "./random.mulberry32.ts";
 
 export type PairwiseComparison = {

@@ -53,8 +53,7 @@ function isAiSemanticCodingAgentSpan({
     return (
       spanName === CODEX_TURN_SPAN ||
       hasGenAi ||
-      (spanName === CODEX_TURN_REQUEST_SPAN &&
-        attributeKeys.includes(CODEX_HELPER_THREAD_STAMP))
+      (spanName === CODEX_TURN_REQUEST_SPAN && attributeKeys.includes(CODEX_HELPER_THREAD_STAMP))
     );
   }
   if (scopeName === OPENCODE_SCOPE) {

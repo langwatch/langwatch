@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   availableGroupByOptions,
   computeBatchRunSummary,

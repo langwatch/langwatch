@@ -1,11 +1,14 @@
 import { createHash } from "node:crypto";
+
 import type { GithubRepository } from "@langwatch/github-contract";
 
-import type { GithubHost } from "./github.members.ts";
+import {
+  HttpGithubApiAdapter,
+  GithubInstallationNotFoundError,
+} from "../channels/http/http.github-api.channel.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
 import type { GithubRedis } from "../repositories/redis/github-redis.connection.ts";
 import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
-import { HttpGithubApiAdapter,GithubInstallationNotFoundError } from "../channels/http/http.github-api.channel.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
 import {
   GITHUB_READ_PULL_PERMISSIONS,
@@ -17,6 +20,7 @@ import {
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
 } from "./github.app.ts";
+import type { GithubHost } from "./github.members.ts";
 
 const INSTALLATION_TOKEN_CACHE_TTL_SEC = 50 * 60;
 const LIVENESS_RECHECK_TTL_SEC = 5 * 60;

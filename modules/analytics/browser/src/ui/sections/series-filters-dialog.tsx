@@ -5,9 +5,8 @@
  */
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
-
 import { Dialog } from "@langwatch/design-system/dialog";
+import { useEffect, useState } from "react";
 
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../../model/analytics-filter-params.ts";

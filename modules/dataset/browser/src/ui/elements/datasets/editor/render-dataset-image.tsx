@@ -1,6 +1,5 @@
-import type { ReactNode } from "react";
-
 import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
+import type { ReactNode } from "react";
 
 /**
  * How an "image" dataset cell is drawn, injected by every table host through

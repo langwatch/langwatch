@@ -1,3 +1,4 @@
+import type { EvaluationDispatchData } from "@langwatch/evaluation-contract";
 /**
  * The value rules the public evaluation doors apply before anything is run or
  * recorded: the evaluator's input, the pairwise translation, the verdict fields
@@ -9,7 +10,6 @@ import {
   coerceEvaluatorScalar,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import type { EvaluationDispatchData } from "@langwatch/evaluation-contract";
 import {
   eSBatchEvaluationTargetTypeSchema,
   type ESBatchEvaluationRESTParams,

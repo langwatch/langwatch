@@ -1,9 +1,11 @@
 import { z } from "zod";
+
 import {
   codeAgentConfigSchema,
   connectedAgentConfigSchema,
   httpAgentConfigSchema,
   signatureAgentConfigSchema,
+  voiceAgentConfigSchema,
   workflowAgentConfigSchema,
 } from "./config/index.ts";
 import { fieldSchema } from "./fields.ts";
@@ -61,6 +63,11 @@ export const agentSchema = z.discriminatedUnion("type", [
     type: z.literal("connected"),
     config: connectedAgentConfigSchema,
   }),
+  z.object({
+    ...agentRecordSchema.shape,
+    type: z.literal("voice"),
+    config: voiceAgentConfigSchema,
+  }),
 ]);
 
 export const agentViewSchema = z.discriminatedUnion("type", [
@@ -88,6 +95,11 @@ export const agentViewSchema = z.discriminatedUnion("type", [
     ...agentViewRecordSchema.shape,
     type: z.literal("connected"),
     config: connectedAgentConfigSchema,
+  }),
+  z.object({
+    ...agentViewRecordSchema.shape,
+    type: z.literal("voice"),
+    config: voiceAgentConfigSchema,
   }),
 ]);
 

@@ -5,8 +5,8 @@
  */
 import { z } from "zod";
 
-import { apiKeyPermissionSchema, apiKeyRoleSchema, apiKeyScopeTypeSchema } from "./api-key.ts";
 import { API_KEY_PERMISSION_MODES, refineRestrictedPermissions } from "./api-key.permissions.ts";
+import { apiKeyPermissionSchema, apiKeyRoleSchema, apiKeyScopeTypeSchema } from "./api-key.ts";
 
 const bindingSchema = z.object({
   role: apiKeyRoleSchema.describe(

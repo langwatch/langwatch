@@ -5,21 +5,20 @@
  */
 
 import { Button, Field, Heading, Input, Text } from "@chakra-ui/react";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { applyHandledErrorToForm } from "@langwatch/browser-host/errors";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { FormServerError } from "@langwatch/handled-error/views";
 import { useState } from "react";
 import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { useDebounce } from "use-debounce";
 
-import { Drawer } from "@langwatch/design-system/drawer";
-import { useDrawer } from "@langwatch/browser-host/drawer";
-import { InputGroup } from "@langwatch/design-system/input-group";
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
-import { applyHandledErrorToForm } from "@langwatch/browser-host/errors";
-import { FormServerError } from "@langwatch/handled-error/views";
-
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
-import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import { toLLMModelCostRow, type LLMModelCostRow } from "../../model/llm-model-cost-row.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import { exactModelMatchRegex, isSafeRegex } from "../../model/safe-regex.ts";
 import {
   LLMModelCostMatchingSpans,

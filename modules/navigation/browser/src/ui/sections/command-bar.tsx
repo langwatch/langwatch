@@ -1,9 +1,13 @@
-import { useState } from "react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
+import { useState } from "react";
+
 import { useCommandBar } from "../../behavior/command-bar-context.ts";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
+import {
+  COMMAND_BAR_MAX_WIDTH,
+  COMMAND_BAR_TOP_MARGIN,
+} from "../../model/command-bar-constants.ts";
 import { CommandPalette } from "./command-palette.tsx";
-import { COMMAND_BAR_MAX_WIDTH, COMMAND_BAR_TOP_MARGIN } from "../../model/command-bar-constants.ts";
 
 /** Cmd+K palette surface. Behaviors live in CommandPalette component. */
 export function CommandBar() {

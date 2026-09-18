@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import type { AutomationEmailCapRepository } from "../repositories/automation-email-cap.repository.ts";
 import type { Instant } from "@langwatch/time";
+
+import type { AutomationEmailCapRepository } from "../repositories/automation-email-cap.repository.ts";
 
 const logger = createLogger("langwatch:outbox:emailHourlyCap");
 

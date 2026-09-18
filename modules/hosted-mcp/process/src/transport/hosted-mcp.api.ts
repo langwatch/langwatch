@@ -8,7 +8,7 @@
 
 import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { generate } from "@langwatch/ksuid";
+
 import {
   handlerManagedAuth,
   publicEndpoint,
@@ -17,16 +17,18 @@ import {
 } from "@langwatch/api";
 import type { Credential } from "@langwatch/api/access";
 import { registerRoutePolicy } from "@langwatch/api/rest";
+import { generate } from "@langwatch/ksuid";
 import { getConfig, initConfig, runWithConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import type { HostedMcpRedis,HostedMcpDependencies } from "../app/hosted-mcp-members.ts";
+
+import type { HostedMcpRedis, HostedMcpDependencies } from "../app/hosted-mcp-members.ts";
 import { McpOAuthClientRegistryService } from "../services/mcp-oauth-client-registry.service.ts";
 import { McpRateLimitService } from "../services/mcp-rate-limit.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:mcp");
 

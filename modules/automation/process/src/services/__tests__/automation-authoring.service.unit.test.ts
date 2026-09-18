@@ -1,3 +1,4 @@
+import type { Trigger } from "@langwatch/automation-contract";
 /**
  * @vitest-environment node
  * The authoring behaviour the tRPC transport used to carry: daily-cap
@@ -8,13 +9,12 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { Trigger } from "@langwatch/automation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { AutomationAuthoringService } from "../automation-authoring.service.ts";
 import { AutomationRulesService } from "../automation-rules.service.ts";
 import type { AutomationService } from "../automation.service.ts";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 /** The authoring service over exactly the reads and writes a case names. */
 function authoring(automation: Partial<AutomationService>) {

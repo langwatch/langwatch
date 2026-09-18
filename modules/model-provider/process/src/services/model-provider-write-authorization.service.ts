@@ -4,6 +4,7 @@ import {
   type ModelDefaultApiKeyPrincipal,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
+
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 
 /**

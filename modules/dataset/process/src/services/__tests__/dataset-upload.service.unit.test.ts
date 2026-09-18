@@ -1,14 +1,15 @@
+import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment node
  * What an uploaded file BECOMES: rows parsed from CSV/JSONL/JSON array,
  * coerced to declared column types. Repositories/storage are fakes here.
  */
 import { describe, expect, it } from "vitest";
-import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
+
 import type { DatasetStorage, DatasetStorageResolver } from "../../app/dataset.app.ts";
-import type { DatasetRow } from "../../repositories/dataset.repository.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
+import type { DatasetRow } from "../../repositories/dataset.repository.ts";
 import { DatasetUploadService } from "../dataset-upload.service.ts";
 
 const PROJECT_ID = "project-1";

@@ -1,9 +1,10 @@
-import { InvalidRuntimeConfigError, RuntimeConfig } from "@langwatch/config";
+import { ConfigParseError, parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { assertAuthServerConfig, authServerConfigDefinition } from "../auth.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "auth", definition: authServerConfigDefinition, source }).value;
+import { assertAuthServerConfig, authServerConfig } from "../auth.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({ owners: [{ name: "auth", config: authServerConfig }], environment }).auth;
 
 describe("auth server configuration", () => {
   describe("given the passkey switch is written the way the deployment reads it", () => {
@@ -18,7 +19,7 @@ describe("auth server configuration", () => {
   describe("given the passkey switch is written a way nothing reads", () => {
     /** @scenario "An unreadable switch is refused instead of read as off" */
     it("refuses the boot rather than leaving the surface quietly off", () => {
-      expect(() => read({ PASSKEYS_ENABLED: "true" })).toThrow(InvalidRuntimeConfigError);
+      expect(() => read({ PASSKEYS_ENABLED: "true" })).toThrow(ConfigParseError);
     });
   });
 

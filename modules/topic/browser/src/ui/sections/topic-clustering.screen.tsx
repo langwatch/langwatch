@@ -16,16 +16,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { nowInstant } from "@langwatch/time";
 import type {
   ClusteringErrorCode,
   TopicClusteringRunMode,
   TopicClusteringSkipReason,
 } from "@langwatch/topic-contract";
 import { useState } from "react";
+
 import { topicApi } from "../../behavior/topic-api.ts";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { useTopicHost } from "../../model/topic-host.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * The server sends bare strings for codes/reasons/modes; these lookups narrow them back onto

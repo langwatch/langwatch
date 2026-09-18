@@ -1,6 +1,7 @@
 import { AnalyticsService } from "@langwatch/analytics-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,

@@ -1,9 +1,9 @@
 "use client";
 
 import { passkeyClient } from "@better-auth/passkey/client";
+import { nowInstant } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
 import { type ReactElement, type ReactNode, useCallback, useEffect, useState } from "react";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * The passkey plugin is declared unconditionally, and the METHOD SET decides whether anyone is

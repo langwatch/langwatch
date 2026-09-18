@@ -6,9 +6,9 @@
  * @see specs/analytics/lwql-api.feature
  */
 
+import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
 import { LWQL_POSTGRES_CATALOG } from "./lwql-postgres-view-catalog.rules.ts";
-import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 
 /**
  * How long after a write a row can be missing from these views. The projections are folded by

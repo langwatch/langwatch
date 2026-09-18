@@ -3,10 +3,11 @@
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 
 // `test-setup.ts` stubs the router compat layer with an empty query, which
 // would make every case here run under the default relative period instead of
@@ -18,14 +19,13 @@ vi.mock(
   async () => await vi.importActual<object>("~/utils/compat/next-router"),
 );
 
-import { LangWatchQLWorkbench } from "../langwatch-ql-workbench-panel.tsx";
-
 import {
   handledErrorEnvelope,
   lwqlResult,
   SCHEMA_DATASET_NAMES,
   SCHEMA_RESPONSE,
 } from "../../../__tests__/lwql-fixtures.ts";
+import { LangWatchQLWorkbench } from "../langwatch-ql-workbench-panel.tsx";
 
 const harness = vi.hoisted(() => ({
   mutation: vi.fn(),

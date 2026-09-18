@@ -4,6 +4,7 @@
  * pickers must not offer a registry model that credential can't run.
  */
 import { describe, expect, it } from "vitest";
+
 import { providersWithoutRegistryModels } from "../model-selector.tsx";
 
 const apRow = {

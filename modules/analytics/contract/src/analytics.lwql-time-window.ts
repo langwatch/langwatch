@@ -30,8 +30,7 @@ export type LangWatchQLTimeWindowParameter = (typeof LWQL_TIME_WINDOW_PARAMETERS
  * Granularity multiplier in seconds; unit fixed because ClickHouse compiles
  * INTERVAL 1 HOUR to a function name, not a bound value.
  */
-export const LWQL_PERIOD_GRANULARITY_PARAMETER =
-  "dashboard_context_granularity_seconds";
+export const LWQL_PERIOD_GRANULARITY_PARAMETER = "dashboard_context_granularity_seconds";
 
 /** Reserved surface parameters: window bounds and granularity. */
 export const LWQL_SURFACE_PARAMETERS = [

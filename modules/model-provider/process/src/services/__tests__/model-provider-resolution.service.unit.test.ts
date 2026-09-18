@@ -2,12 +2,13 @@
 // (licensed only for Langy and FAST assists) is stepped over elsewhere with a distinct reason
 // from "you have not configured one" — the two send the customer to different places.
 
-import { describe, expect, it } from "vitest";
 import {
   ModelNotConfiguredError,
   ModelProviderInvalidError,
   ModelRestrictedForFeatureError,
 } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
+
 import { ModelProviderResolutionService } from "../model-provider-resolution.service.ts";
 
 const PLAYGROUND = "prompt.create_default";

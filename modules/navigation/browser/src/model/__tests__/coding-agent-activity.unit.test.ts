@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 /**
  * @vitest-environment node
  * @unit
@@ -5,7 +6,7 @@
  * @see specs/coding-agent/project-menu-links.feature
  */
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@langwatch/time";
+
 import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../coding-agent-activity.ts";
 
 const NOW = Temporal.Instant.from("2026-08-16T12:00:00.000Z");

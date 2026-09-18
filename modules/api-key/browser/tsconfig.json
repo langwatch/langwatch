@@ -40,10 +40,10 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

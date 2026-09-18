@@ -1,7 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
+
 import { PrismaTopicClusteringRepository } from "../../repositories/prisma/prisma.topic-clustering.repository.ts";
+import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
 
 // ADR-051 one-time topic-model seed: Prisma stub routes all calls through a stand-in for the
 // real tenancy guard to observe and test the accept/reject rule (not blindly answered).

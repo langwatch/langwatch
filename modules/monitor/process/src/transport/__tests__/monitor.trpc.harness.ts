@@ -1,9 +1,9 @@
+import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * The process members a mounted monitor declaration runs on, as a test supplies
  * them: one signed-in person, and an authorization answer the test decides.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
 export type MonitorTrpcTestContext = { actor: { id: string } };
 

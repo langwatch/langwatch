@@ -28,6 +28,14 @@ export const userWeb = defineWebModule("user")
       path: "/me/budget/request",
       load: () => import("./ui/sections/personal-workspace/personal-budget-request.screen.tsx"),
     },
+    // The same two workspaces scoped to one project; the application's table
+    // owns these addresses, so only the loader is declared here.
+    "pages/[project]/sessions": {
+      load: () => import("./ui/sections/personal-workspace/project-sessions.screen.tsx"),
+    },
+    "pages/[project]/pull-requests": {
+      load: () => import("./ui/sections/personal-workspace/project-pull-requests.screen.tsx"),
+    },
     // Placed by the application's settings table until a settings anchor
     // accepts declared routes; the loader is this module's either way.
     "pages/settings/profile": {

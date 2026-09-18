@@ -1,8 +1,9 @@
 import { Button, HStack, Icon, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Crosshair, RotateCcw, Trash2 } from "lucide-react";
+
+import type { AnnotationFormState } from "../../model/annotation-form-types.ts";
 import { DiffCounts, DiffPanel, useOutputDiff } from "./annotation-output-diff.tsx";
 import { ScoreFields } from "./annotation-score-fields.tsx";
-import type { AnnotationFormState } from "../../model/annotation-form-types.ts";
 
 export function AnnotateBody({ state }: { state: AnnotationFormState }) {
   return (
@@ -18,7 +19,7 @@ export function AnnotateBody({ state }: { state: AnnotationFormState }) {
         <AnchorLine label={state.anchorLabel} />
       </VStack>
 
-      <CommentField value={state.comment} onChange={state.setComment}  />
+      <CommentField value={state.comment} onChange={state.setComment} />
 
       <ScoreFields state={state} />
     </VStack>
@@ -109,7 +110,6 @@ export function SuggestBody({
         resize="none"
         fontSize="sm"
         lineHeight="1.6"
-        
       />
 
       <HStack gap={2}>
@@ -181,7 +181,6 @@ function CommentField({
         minHeight="64px"
         maxHeight="64px"
         resize="none"
-        
       />
     </VStack>
   );

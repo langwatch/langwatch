@@ -31,11 +31,11 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "motion": "catalog:"

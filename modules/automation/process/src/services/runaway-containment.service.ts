@@ -3,12 +3,13 @@ import {
   RUNAWAY_PAUSE_REASON,
   type AutomationPersistCapBreach,
 } from "@langwatch/automation-contract";
-import { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
-import { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
-import { AutomationRunawaySignals } from "./automation-runaway-signals.service.ts";
-import type { AutomationClock } from "../app/automation.members.ts";
-import { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { toDate, type Instant } from "@langwatch/time";
+
+import type { AutomationClock } from "../app/automation.members.ts";
+import { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
+import { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
+import { TriggerRepository } from "../repositories/trigger.repository.ts";
+import { AutomationRunawaySignals } from "./automation-runaway-signals.service.ts";
 
 export { RUNAWAY_PAUSE_REASON };
 

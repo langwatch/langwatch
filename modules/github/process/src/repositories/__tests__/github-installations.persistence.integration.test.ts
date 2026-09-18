@@ -1,6 +1,4 @@
-import { nanoid } from "nanoid";
-import { afterAll, afterEach, describe, expect, it } from "vitest";
-
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -9,9 +7,11 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaGithubInstallationsRepository } from "../prisma/prisma.github-installations.repository.ts";
+import { nanoid } from "nanoid";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
+
 import type { UpsertGithubInstallationInput } from "../github-installations.repository.ts";
-import { createLogger } from "@langwatch/observability";
+import { PrismaGithubInstallationsRepository } from "../prisma/prisma.github-installations.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

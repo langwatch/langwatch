@@ -1,5 +1,6 @@
-import { createLogger } from "@langwatch/observability";
 import type { CanonicalLogRecord, LogApi, LogPreparation } from "@langwatch/log-contract";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   NON_BILLABLE_ATTR,
   type LogTraceContribution,
@@ -10,8 +11,8 @@ import {
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
+
 import type { LogTraceIoExtractor } from "../app/log.members.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * Every field optional, all the way down.

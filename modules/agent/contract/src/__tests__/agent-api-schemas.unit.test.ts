@@ -3,6 +3,7 @@
  * @see modules/agent/specs/package-boundary.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { createAgentCommandSchema, createAgentRequestSchema } from "../agent.commands.ts";
 import { agentTypeSchema } from "../config/index.ts";
 

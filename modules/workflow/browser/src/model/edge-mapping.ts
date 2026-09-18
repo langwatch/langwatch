@@ -1,6 +1,6 @@
-import type { Edge, Node } from "@xyflow/react";
-import type { Component, ComponentType, Field } from "@langwatch/workflow-contract";
 import { nowInstant } from "@langwatch/time";
+import type { Component, ComponentType, Field } from "@langwatch/workflow-contract";
+import type { Edge, Node } from "@xyflow/react";
 
 export type StudioMappingField = {
   name: string;

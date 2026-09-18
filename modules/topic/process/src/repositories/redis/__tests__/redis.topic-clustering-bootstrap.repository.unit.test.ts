@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import {
   BOOTSTRAP_CLAIM_TTL_SECONDS,
   RedisTopicClusteringBootstrapRepository,
@@ -64,7 +65,10 @@ describe("given a rate-limited topic clustering bootstrap", () => {
       // This is what makes calling it on every ingest affordable.
       const topicCommands = commands();
       const { redis } = fakeRedis();
-      const gate = RedisTopicClusteringBootstrapRepository.create({ redis, commands: topicCommands });
+      const gate = RedisTopicClusteringBootstrapRepository.create({
+        redis,
+        commands: topicCommands,
+      });
 
       await gate.claimAndBootstrap("project-1");
       await gate.claimAndBootstrap("project-1");
@@ -78,7 +82,10 @@ describe("given a rate-limited topic clustering bootstrap", () => {
     it("is claimed independently", async () => {
       const topicCommands = commands();
       const { redis } = fakeRedis();
-      const gate = RedisTopicClusteringBootstrapRepository.create({ redis, commands: topicCommands });
+      const gate = RedisTopicClusteringBootstrapRepository.create({
+        redis,
+        commands: topicCommands,
+      });
 
       await gate.claimAndBootstrap("project-1");
       await gate.claimAndBootstrap("project-2");

@@ -1,4 +1,3 @@
-import { type FoldProjectionOptions, type FoldProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
@@ -13,6 +12,13 @@ import {
   verdictPassedOf,
   verdictScoreOf,
 } from "@langwatch/evaluation-contract";
+import {
+  type FoldProjectionOptions,
+  type FoldProjectionStore,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
+
 import { type EvaluationAnalyticsData } from "./evaluation-analytics-row.projection.ts";
 
 export type {

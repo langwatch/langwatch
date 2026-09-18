@@ -4,9 +4,10 @@
  * @see specs/rbac/role-bindings-rest-api.feature
  */
 import { RoleBindingScopeType, TeamUserRole } from "@langwatch/prisma-client/generated";
-import { describe, expect, it } from "vitest";
-import { optimisticBindingWire } from "../role-binding-read-back.rules.ts";
 import { Temporal, toDate } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import { optimisticBindingWire } from "../role-binding-read-back.rules.ts";
 
 const AT = Temporal.Instant.from("2026-08-18T09:00:00.000Z");
 

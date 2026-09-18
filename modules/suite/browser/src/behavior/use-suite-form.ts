@@ -1,7 +1,4 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
 import type { FieldMapping } from "@langwatch/scenario-contract";
 import {
   SCENARIOS_SCOPE,
@@ -12,6 +9,9 @@ import {
   type SuiteTarget,
   suiteTargetSchema,
 } from "@langwatch/suite-contract";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import {
   filterScenarios,

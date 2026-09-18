@@ -2,8 +2,8 @@
  * The quantile both confidence intervals are read from.
  */
 
-import { describe, expect, it } from "vitest";
 import { quantile } from "@langwatch/experiment-contract";
+import { describe, expect, it } from "vitest";
 
 describe("quantile", () => {
   describe("given a position that lands between two samples", () => {

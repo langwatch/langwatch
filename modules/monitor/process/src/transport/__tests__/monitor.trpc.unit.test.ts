@@ -1,3 +1,4 @@
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The `monitors.*` procedures over the real runtime and the real application:
@@ -5,7 +6,6 @@
  * that reach the wire.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
@@ -211,9 +211,7 @@ describe("the monitors tRPC namespace", () => {
     it("answers with no rows rather than querying evaluations for an empty project", async () => {
       const { caller, performance } = mount();
 
-      await expect(
-        caller.getPerformanceForProject({ projectId: PROJECT_ID }),
-      ).resolves.toEqual([]);
+      await expect(caller.getPerformanceForProject({ projectId: PROJECT_ID })).resolves.toEqual([]);
       expect(performance.queries).toEqual([]);
     });
 
@@ -228,7 +226,9 @@ describe("the monitors tRPC namespace", () => {
         timeZone: "Europe/Berlin",
       });
       const query = performance.queries[0]!;
-      expect(query.previousStartMs).toBe(query.currentStartMs - (query.endMs - query.currentStartMs));
+      expect(query.previousStartMs).toBe(
+        query.currentStartMs - (query.endMs - query.currentStartMs),
+      );
     });
 
     it("refuses a reader who may see evaluations but not analytics", async () => {

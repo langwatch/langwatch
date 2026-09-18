@@ -62,8 +62,8 @@ vi.mock("../../../behavior/use-model-provider-api-key-validation.ts", () => ({
   }),
 }));
 
-import { EditModelProviderForm } from "../model-provider-form.tsx";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { EditModelProviderForm } from "../model-provider-form.tsx";
 import { inputFor, keyedRow, makePrimeQueries, Wrapper } from "./model-provider-drawer-harness.tsx";
 
 const primeQueries = makePrimeQueries({

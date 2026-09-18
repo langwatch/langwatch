@@ -110,8 +110,8 @@ vi.mock("../../../behavior/model-provider-api.ts", () => {
   };
 });
 
-import { EditModelProviderDrawer } from "../edit-model-provider-drawer.tsx";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { EditModelProviderDrawer } from "../edit-model-provider-drawer.tsx";
 
 const OPEN_FOR_A_NEW_OPENAI_KEY = (
   <EditModelProviderDrawer providerKey="openai" modelProviderId="new" projectId="proj-1" />

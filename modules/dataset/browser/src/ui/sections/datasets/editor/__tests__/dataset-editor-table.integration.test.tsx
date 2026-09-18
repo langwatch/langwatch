@@ -2,11 +2,11 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { DatasetEditorTable, type InMemoryDataset } from "../dataset-editor-table.tsx";
 
 // ── Mocks ────────────────────────────────────────────────────────────

@@ -5,7 +5,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 

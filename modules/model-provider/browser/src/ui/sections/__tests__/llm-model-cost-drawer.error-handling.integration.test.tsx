@@ -73,8 +73,8 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
   },
 }));
 
-import { LLMModelCostDrawer } from "../llm-model-cost-drawer.tsx";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { LLMModelCostDrawer } from "../llm-model-cost-drawer.tsx";
 
 const REPORTED = new Error("Lite member restricted");
 

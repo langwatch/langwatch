@@ -1,5 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo } from "react";
+
 import { DIFF_TOKENS, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 import type { PatchHunk } from "./terminal-tool-spans.ts";
 

@@ -7,10 +7,9 @@
 import { Accordion, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 
-import type { DashboardWidgetQuery } from "../../model/dashboard-widget-definition.ts";
-
-import { DashboardWidgetQueryRow } from "./dashboard-widget-query-row.tsx";
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
+import type { DashboardWidgetQuery } from "../../model/dashboard-widget-definition.ts";
+import { DashboardWidgetQueryRow } from "./dashboard-widget-query-row.tsx";
 
 /** The name a newly-added query gets, deduped against its siblings. */
 export function nextQueryName(existing: DashboardWidgetQuery[]): string {

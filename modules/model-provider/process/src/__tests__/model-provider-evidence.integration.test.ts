@@ -6,7 +6,8 @@
  * @see specs/home/onboarding-progress-backend.feature
  */
 import { randomBytes } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -14,11 +15,12 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { createLogger } from "@langwatch/observability";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
-import { PostgresModelProviderEvidenceAdapter } from "../services/model-provider-evidence-service.composition.ts";
+import { cleanupTestRows } from "@langwatch/test-harness";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { ModelCostProject } from "../app/model-provider.members.ts";
+import { PostgresModelProviderEvidenceAdapter } from "../services/model-provider-evidence-service.composition.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

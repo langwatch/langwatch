@@ -8,22 +8,28 @@ import {
   parseAutomationFiltersWire,
   parseTriggerTemplatesWire,
   type NotificationCadence,
-  TriggerAction,defaultsForSourceKind,EXAMPLE_MATCHES,TEMPLATE_VARIABLES,renderTriggerEmail,renderTriggerSlack,renderWebhookBody,
+  TriggerAction,
+  defaultsForSourceKind,
+  EXAMPLE_MATCHES,
+  TEMPLATE_VARIABLES,
+  renderTriggerEmail,
+  renderTriggerSlack,
+  renderWebhookBody,
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
   buildTemplateContext,
   type GraphAlertTemplateContext,
   type ReportTemplateContext,
-  type TemplateContext
+  type TemplateContext,
 } from "@langwatch/automation-contract";
-import { Mail, Send } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { CLIENT_PROVIDERS, type NotifyPreview } from "./client-providers.ts";
-import { type ConfigFormCtx } from "../../../../model/provider-types.ts";
-import { readHandledError } from "../../../../model/handled-error.ts";
+import { nowInstant } from "@langwatch/time";
+import { Mail, Send } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+
+import { api } from "../../../../behavior/automation-api.ts";
 import {
   useAutomationToaster,
   useDescribeError,
@@ -34,10 +40,25 @@ import {
   useFeatureFlag,
   useOrganizationTeamProject,
 } from "../../../../behavior/automation-session.ts";
-import { api } from "../../../../behavior/automation-api.ts";
-import { MainSectionList } from "./main-section-list.tsx";
+import { readHandledError } from "../../../../model/handled-error.ts";
+import { type ConfigFormCtx } from "../../../../model/provider-types.ts";
+import {
+  ALERT_TEMPLATE_VARIABLES,
+  REPORT_TEMPLATE_VARIABLES,
+} from "../../../liquid-editor/index.ts";
+import {
+  consumeDraftKeptOnSubFlowReturn,
+  isHandingOverToSubFlow,
+} from "../../behavior/sub-flow.ts";
+import {
+  useConditionsSet,
+  useConfigComplete,
+  useDraft,
+  useSection,
+} from "./automation-selectors.ts";
+import { useAutomationStore } from "./automation-store.ts";
+import { CLIENT_PROVIDERS, type NotifyPreview } from "./client-providers.ts";
 import { ConfigurationSecondaryDrawer } from "./configuration-secondary-drawer.tsx";
-import { ALERT_TEMPLATE_VARIABLES,REPORT_TEMPLATE_VARIABLES } from "../../../liquid-editor/index.ts";
 import {
   type AutomationDraft,
   actionParamsFromDraft,
@@ -52,19 +73,8 @@ import {
   subjectIsSet,
   templatesFromDraft,
 } from "./draft-model.ts";
+import { MainSectionList } from "./main-section-list.tsx";
 import { useGraphAlertLabels } from "./use-graph-alert-labels.ts";
-import { useAutomationStore } from "./automation-store.ts";
-import {
-  consumeDraftKeptOnSubFlowReturn,
-  isHandingOverToSubFlow,
-} from "../../behavior/sub-flow.ts";
-import {
-  useConditionsSet,
-  useConfigComplete,
-  useDraft,
-  useSection,
-} from "./automation-selectors.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** Maps template-validation field metadata to the editor-specific headline. */
 const TEMPLATE_FIELD_TITLES: Record<string, string> = {

@@ -1,8 +1,8 @@
 import { Alert, Button, Code, HStack, VStack } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Copy } from "lucide-react";
 import { useState } from "react";
 
-import { Dialog } from "@langwatch/design-system/dialog";
 import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 
 /**

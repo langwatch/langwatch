@@ -4,7 +4,9 @@
  * Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { createHmac } from "crypto";
+
 import { describe, expect, it } from "vitest";
+
 import { GatewayElevenLabsWebhookService } from "../../services/gateway-elevenlabs-webhook.service.ts";
 
 const SECRET = "wsec_test";

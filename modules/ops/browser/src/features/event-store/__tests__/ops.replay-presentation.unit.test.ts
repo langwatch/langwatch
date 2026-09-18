@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { parseActiveProjections } from "../model/replay-presentation.ts";
 
 describe("parseActiveProjections", () => {

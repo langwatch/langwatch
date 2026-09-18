@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   isWorkbenchActionKind,
   WORKBENCH_ACTION_KINDS,

@@ -1,4 +1,5 @@
 import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
+
 import type { AutomationGraphDelivery } from "../app/automation.members.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
@@ -12,8 +13,7 @@ export class AutomationGraphDeliveryService implements AutomationGraphDelivery {
     private readonly triggers: TriggerRepository,
     private readonly suppressions: EmailSuppressionRepository,
     private readonly webhookDeliveries: WebhookDeliveryRepository,
-  ) {
-  }
+  ) {}
 
   static create(input: {
     triggers: TriggerRepository;

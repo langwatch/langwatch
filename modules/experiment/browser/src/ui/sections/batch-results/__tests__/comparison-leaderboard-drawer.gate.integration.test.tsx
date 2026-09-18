@@ -1,12 +1,10 @@
 import "@testing-library/jest-dom/vitest";
-
 // @vitest-environment jsdom
 /**
  * The expanded leaderboard is addressable via URL, reachable without the
  * chart's expand affordance.
  * @see specs/experiments/comparison-leaderboard.feature
  */
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -21,8 +19,11 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn() }),
 }));
 
+import type {
+  BatchComparisonColumn,
+  BatchResultRow,
+} from "../../batch-evaluation-results.types.ts";
 import { ComparisonLeaderboardDrawer } from "../comparison-leaderboard-drawer.tsx";
-import type { BatchComparisonColumn, BatchResultRow } from "../../batch-evaluation-results.types.ts";
 
 const VARIANTS = ["target-1", "target-2", "target-3"];
 

@@ -1,6 +1,7 @@
 import { guardOrganizationId } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
+
 import { PrismaImpersonationRepository } from "../prisma.admin.repository.ts";
 
 /**

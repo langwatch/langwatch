@@ -4,14 +4,13 @@
  * @see specs/security/resource-scope-permission-checks.feature
  */
 
-// @vitest-environment node
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   apiErrorBody,
   createRestRuntime,
   type IdempotentRunner,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
+import { PermissionDeniedError } from "@langwatch/authz-contract";
 import {
   GatewayApi,
   type GatewayBudgetResource,
@@ -19,15 +18,15 @@ import {
   type GatewayCacheRuleResource,
   type GatewayVirtualKeySnakeDto,
 } from "@langwatch/gateway-contract";
-import { PermissionDeniedError } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { Prisma } from "@langwatch/prisma-client/generated";
+// @vitest-environment node
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
-
 import { gatewayPlatformRest } from "../gateway-platform.rest.ts";
 
 const PROJECT_ID = "project_caller";
@@ -44,9 +43,14 @@ function statefulIdempotency(): IdempotentRunner {
   return async ({ operation, scopeId, key, handler }) => {
     const receiptKey = `${operation}:${scopeId}:${key}`;
     const stored = key ? receipts.get(receiptKey) : undefined;
-    if (stored) return { isReplayed: true, status: stored.status, serializedBody: stored.serializedBody };
+    if (stored)
+      return { isReplayed: true, status: stored.status, serializedBody: stored.serializedBody };
     const response = await handler();
-    if (key) receipts.set(receiptKey, { status: response.status, serializedBody: await response.clone().text() });
+    if (key)
+      receipts.set(receiptKey, {
+        status: response.status,
+        serializedBody: await response.clone().text(),
+      });
     return { isReplayed: false, status: response.status, response };
   };
 }
@@ -56,7 +60,12 @@ const onError: RestErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
     const status = (error.httpStatus ?? 500) as ContentfulStatusCode;
     return c.json(
-      apiErrorBody({ status: status as number, code: error.code, message: error.message, meta: error.meta }),
+      apiErrorBody({
+        status: status as number,
+        code: error.code,
+        message: error.message,
+        meta: error.meta,
+      }),
       status,
     );
   }

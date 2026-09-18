@@ -8,6 +8,7 @@ import {
 } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { toDate, toEpochMs } from "@langwatch/time";
 
 import type { GithubAppTokenCache } from "../app/github.app.ts";
 import type {
@@ -15,7 +16,6 @@ import type {
   GithubInstallationsRepository,
 } from "../repositories/github-installations.repository.ts";
 import type { GithubInstallationAccessService } from "./github-installation-access.service.ts";
-import { toDate, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:github:installations");
 

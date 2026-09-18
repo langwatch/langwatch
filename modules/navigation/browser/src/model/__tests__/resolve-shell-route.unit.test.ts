@@ -1,6 +1,7 @@
 /** Product and scope resolver; written after platform sweep; cases: settings/personal/boundary */
 
 import { describe, expect, it } from "vitest";
+
 import { resolveShellRoute } from "../resolve-shell-route.ts";
 
 function resolve(

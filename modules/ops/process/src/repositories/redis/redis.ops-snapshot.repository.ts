@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+
 import {
   type DetailSnapshot,
   type LiveSnapshot,
@@ -6,6 +7,7 @@ import {
   tryParseDetailSnapshot,
   tryParseLiveSnapshot,
 } from "@langwatch/ops-contract";
+
 import { type OpsSnapshotRedis } from "../../app/ops.app.ts";
 import { OpsSnapshotRepository } from "../observe/ops-snapshot.repository.ts";
 

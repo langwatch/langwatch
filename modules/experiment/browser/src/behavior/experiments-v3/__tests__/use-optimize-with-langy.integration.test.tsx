@@ -38,10 +38,11 @@ vi.mock("@langwatch/workflow-browser/feature-flag", () => ({
 
 import { useLangyContextTargetStore } from "@langwatch/langy-browser/surfaces/langy-context";
 import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+
+import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
 import { TargetHeader } from "../../../ui/sections/experiments-v3/TargetSection/target-header.tsx";
 import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
 import { useOptimizeWithLangy } from "../use-optimize-with-langy.ts";
-import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
 
 const promptTarget: TargetConfig = {
   id: "target-baseline",

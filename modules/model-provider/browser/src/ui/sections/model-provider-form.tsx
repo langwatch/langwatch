@@ -1,19 +1,25 @@
 import { Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { Switch } from "@langwatch/design-system/switch";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import {
+  skipListToInput,
+  type ModelProviderEditorValue,
+  modelProviders as modelProvidersRegistry,
+} from "@langwatch/model-provider-contract";
+import type { TimeInput } from "@langwatch/time";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { skipListToInput,
-  type ModelProviderEditorValue,
-  modelProviders as modelProvidersRegistry } from "@langwatch/model-provider-contract";
+
+import { useModelProviderToaster } from "../../behavior/model-provider-feedback.ts";
 import {
   findModelProviderById,
   isResolvableProviderId,
   useAllModelProvidersList,
 } from "../../behavior/use-all-model-providers-list.ts";
 import { useCredentialProbeGate } from "../../behavior/use-credential-probe-gate.ts";
-import { useDrawer } from "@langwatch/browser-host/drawer";
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useModelProviderApiKeyValidation } from "../../behavior/use-model-provider-api-key-validation.ts";
 import { useModelProviderForm } from "../../behavior/use-model-provider-form.ts";
 import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings.ts";
@@ -27,8 +33,6 @@ import {
 } from "../../model/model-provider-helpers.ts";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../model/zod-field-errors.ts";
 import { SmallLabel } from "../elements/small-label.tsx";
-import { Switch } from "@langwatch/design-system/switch";
-import { useModelProviderToaster } from "../../behavior/model-provider-feedback.ts";
 import { useCodexCodingDefaultsAskStore } from "./codex-coding-defaults-ask.tsx";
 import { CodexSignIn } from "./codex-sign-in.tsx";
 import {
@@ -48,7 +52,6 @@ import { CustomModelInputSection } from "./model-provider-custom-model-input.tsx
 import { ExtraHeadersSection } from "./model-provider-extra-headers-section.tsx";
 import { ModelProviderRoutingSection } from "./model-provider-routing-section.tsx";
 import { ProviderScopeSection } from "./model-provider-scope-section.tsx";
-import type { TimeInput } from "@langwatch/time";
 
 /**
  * The message the server attached to the skip-permissions field, or null when

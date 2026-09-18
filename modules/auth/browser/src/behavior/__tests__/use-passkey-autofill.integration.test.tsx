@@ -18,13 +18,7 @@ vi.mock("../auth-client.tsx", () => ({
 
 import { usePasskeyAutofill } from "../use-passkey-autofill.ts";
 
-function Door({
-  enabled,
-  onError,
-}: {
-  enabled: boolean;
-  onError?: (error: unknown) => void;
-}) {
+function Door({ enabled, onError }: { enabled: boolean; onError?: (error: unknown) => void }) {
   usePasskeyAutofill({ enabled, onError });
   return (
     <div>

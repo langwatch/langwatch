@@ -1,5 +1,6 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ExperimentRunWorkflowVersion } from "@langwatch/experiment-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 
 /** Only what this repository touches. */

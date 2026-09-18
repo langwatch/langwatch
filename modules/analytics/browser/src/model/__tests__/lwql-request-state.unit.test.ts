@@ -4,17 +4,15 @@
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
+import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
-
+import { lwqlResult } from "../../__tests__/lwql-fixtures.ts";
 import {
   createLangWatchQLRequestController,
   type LangWatchQLExecuteRequest,
 } from "../lwql-request-controller.ts";
 import { isLangWatchQLResultStale, lwqlActionLabel } from "../lwql-request-state.ts";
-
-import { lwqlResult } from "../../__tests__/lwql-fixtures.ts";
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -151,7 +149,9 @@ describe("the LangWatchQL request machine", () => {
         controller.runQuery();
 
         expect(calls[0]!.request.granularitySeconds).toBe(60);
-        expect(calls[0]!.request.parameters ?? {}).not.toHaveProperty("dashboard_context_granularity_seconds");
+        expect(calls[0]!.request.parameters ?? {}).not.toHaveProperty(
+          "dashboard_context_granularity_seconds",
+        );
       });
 
       /** @scenario "Changing the granularity step marks the result stale and restores Run query" */

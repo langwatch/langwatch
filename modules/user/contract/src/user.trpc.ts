@@ -6,14 +6,6 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 
 import {
-  createdUserSchema,
-  identityVerificationCompletedSchema,
-  userAccountInfoSchema,
-  userAvatarResultSchema,
-  userSsoStatusSchema,
-  userTourPreferenceSchema,
-} from "./user.ts";
-import {
   userApiBudgetIncreaseRequestedSchema,
   userApiHasPasswordSchema,
   userApiHomePagePickerStateSchema,
@@ -38,6 +30,14 @@ import {
   userApiUnlinkAccountInputSchema,
   userApiUserInputSchema,
 } from "./user.schemas.ts";
+import {
+  createdUserSchema,
+  identityVerificationCompletedSchema,
+  userAccountInfoSchema,
+  userAvatarResultSchema,
+  userSsoStatusSchema,
+  userTourPreferenceSchema,
+} from "./user.ts";
 
 export const userTrpc = defineTrpcContract("user")
   // The account predates itself here: `register` is the signup form's backend

@@ -1,10 +1,3 @@
-import type { WireOf } from "@langwatch/api/web";
-/**
- * "Edit API key": the same ceiling as create, on a key that already
- * exists. Selections are clamped TWICE — a stored or pre-existing level
- * can sit above what the caller now holds, else save fails `api_key_scope_violation`.
- */
-
 import {
   Button,
   Heading,
@@ -15,6 +8,11 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+/**
+ * "Edit API key": the same ceiling as create, on a key that already
+ * exists. Selections are clamped TWICE — a stored or pre-existing level
+ * can sit above what the caller now holds, else save fails `api_key_scope_violation`.
+ */
 import {
   computePermissionsFromSelections,
   PERMISSION_CATEGORIES,
@@ -23,9 +21,10 @@ import {
   type ApiKeyTrpcRoleBinding,
   type NamedApiKeyBinding,
 } from "@langwatch/api-key-contract";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
+import type { WireOf } from "@langwatch/api/web";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useEffect, useMemo, useState } from "react";
+
 import {
   bindingsToPermissionMode,
   bindingsToScopes,
@@ -42,6 +41,7 @@ import {
   PermissionCounter,
   type PermissionSelection,
 } from "../blocks/permission-category-list.tsx";
+import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type ApiKeyRow = WireOf<ApiKeyListEntry>;

@@ -1,4 +1,3 @@
-import { readableDate } from "../../../model/readable-date.ts";
 import {
   Alert,
   Badge,
@@ -12,6 +11,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { UiSlot } from "@langwatch/browser-host/slots";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   History,
   MoreVertical,
@@ -24,18 +27,16 @@ import {
   Webhook,
 } from "lucide-react";
 import { useState } from "react";
-import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { UiSlot } from "@langwatch/browser-host/slots";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Menu } from "@langwatch/design-system/menu";
-import { WebhookDeliveriesDrawer } from "../../../features/webhooks/ui/sections/webhook-deliveries-drawer.tsx";
-import { WebhookDestinationCell } from "../../../features/webhooks/ui/elements/webhook-destination-cell.tsx";
-import { WebhookEndpointDrawer } from "../../../features/webhooks/ui/sections/webhook-endpoint-drawer.tsx";
-import { WebhookSecretDialog } from "../../../features/webhooks/ui/sections/webhook-secret-dialog.tsx";
-import { useActivePlan,useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+
 import { api, type RouterOutputs } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import { useActivePlan, useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { WebhookDestinationCell } from "../../../features/webhooks/ui/elements/webhook-destination-cell.tsx";
+import { WebhookDeliveriesDrawer } from "../../../features/webhooks/ui/sections/webhook-deliveries-drawer.tsx";
+import { WebhookEndpointDrawer } from "../../../features/webhooks/ui/sections/webhook-endpoint-drawer.tsx";
+import { WebhookSecretDialog } from "../../../features/webhooks/ui/sections/webhook-secret-dialog.tsx";
+import { readableDate } from "../../../model/readable-date.ts";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
 type EndpointView = RouterOutputs["webhookEndpoints"]["list"][number];
 type EventTypesView = RouterOutputs["webhookEndpoints"]["eventTypes"];

@@ -1,3 +1,9 @@
+import {
+  type SqlSourcePosition,
+  type LangWatchQLClause,
+  type LangWatchQLViolationCode,
+} from "@langwatch/analytics-contract";
+
 /**
  * LangWatchQL AST validator: defense in depth behind the database's own row-policy isolation.
  * An allowlist over node KINDS and FIELDS -- unlisted is refused -- so new parser syntax on an
@@ -10,7 +16,6 @@ import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
 } from "./langwatch-ql-functions.rules.ts";
-import { type SqlSourcePosition,type LangWatchQLClause,type LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
 import {

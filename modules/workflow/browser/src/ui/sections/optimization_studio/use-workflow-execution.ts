@@ -1,12 +1,13 @@
-import { createLogger } from "@langwatch/observability/browser";
-import { useCallback, useEffect, useState } from "react";
 import { toaster } from "@langwatch/browser-host/toaster";
+import { createLogger } from "@langwatch/observability/browser";
+import { nowInstant } from "@langwatch/time";
 import { generateOtelTraceId } from "@langwatch/trace-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
-import { usePostEvent } from "./use-post-event.tsx";
+import { useCallback, useEffect, useState } from "react";
+
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import { nowInstant } from "@langwatch/time";
+import { usePostEvent } from "./use-post-event.tsx";
 
 const logger = createLogger("langwatch:studio:execution");
 

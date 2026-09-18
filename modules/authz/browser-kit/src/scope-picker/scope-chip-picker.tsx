@@ -8,10 +8,11 @@ import {
   VStack,
   Wrap,
 } from "@chakra-ui/react";
+import { Select } from "@langwatch/design-system/select";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Boxes, Building2, CheckCheck, Folder, Search, UserLock, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { SmallLabel } from "@langwatch/design-system/small-label";
-import { Select } from "@langwatch/design-system/select";
+
 import { ProviderScopeChips } from "./provider-scope-chips.tsx";
 
 /**

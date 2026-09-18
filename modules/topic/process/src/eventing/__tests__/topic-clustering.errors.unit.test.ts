@@ -1,6 +1,7 @@
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { describe, expect, it } from "vitest";
 import { CLUSTERING_ERROR_CODES, ClusteringError } from "@langwatch/topic-contract";
+import { describe, expect, it } from "vitest";
+
 import { classifyClusteringError } from "../topic-clustering.intent.ts";
 
 // Classification decided at the throw site; tests check the contract.

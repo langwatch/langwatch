@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuditLogApi, AuditLogHistoryEntry } from "@langwatch/audit-log-contract";
+import { createLogger } from "@langwatch/observability";
+import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
-import { createLogger } from "@langwatch/observability";
+import { describe, expect, it, vi } from "vitest";
+
 import { agentWorkflowCopyFixture, createAgentAppFixture } from "./agent.fixture.ts";
 
 const reference = { id: "agent_1", projectId: "project_1" };

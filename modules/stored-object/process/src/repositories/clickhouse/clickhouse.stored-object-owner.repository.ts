@@ -17,7 +17,9 @@ export class ClickHouseStoredObjectOwnerRepository extends StoredObjectOwnerRepo
     return new ClickHouseStoredObjectOwnerRepository(instanceDirectory);
   }
 
-  private constructor(private readonly instanceDirectory: StoredObjectOwnerInstanceDirectoryRepository) {
+  private constructor(
+    private readonly instanceDirectory: StoredObjectOwnerInstanceDirectoryRepository,
+  ) {
     super();
   }
 

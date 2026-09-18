@@ -1,11 +1,9 @@
 import { Text, VStack } from "@chakra-ui/react";
-
 import { PullRequestsTable } from "@langwatch/coding-agent-browser/surfaces/activity";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
-import { withCodingAgentHost } from "../coding-agent-host-provider.tsx";
-
 import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
+import { withCodingAgentHost } from "../coding-agent-host-provider.tsx";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 
 /**

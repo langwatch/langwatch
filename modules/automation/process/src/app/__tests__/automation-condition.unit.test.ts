@@ -5,8 +5,8 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createCanonicalAutomationApp } from "./automation-app.fixture.ts";
 import type { AutomationApp } from "../automation.app.ts";
+import { createCanonicalAutomationApp } from "./automation-app.fixture.ts";
 
 const CREATED = { id: "trigger_new", triggerKind: "AUTOMATION" };
 

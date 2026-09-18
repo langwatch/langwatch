@@ -6,6 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { SuiteRunConfirmationDialog } from "../ui/elements/dialogs/suite-run-confirmation-dialog.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

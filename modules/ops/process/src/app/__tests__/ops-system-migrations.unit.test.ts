@@ -2,9 +2,10 @@ import { guardOrganizationId } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
-import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
+
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
+import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
+import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
 import { OpsSystemMigrations } from "../ops-system-migrations.ts";
 
 const IDENTIFIER_BACKFILL = "identity-d01-identifier-backfill";
@@ -257,9 +258,7 @@ describe("project-rooted migration composition", () => {
 
     await expect(adapter.runPass({})).resolves.toMatchObject({ finalized: 1 });
 
-    expect(migrateTenant).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: "project_1" }),
-    );
+    expect(migrateTenant).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "project_1" }));
     expect(checkpoint).toHaveBeenCalledWith({
       migrationName: name,
       tenantId: "project_1",

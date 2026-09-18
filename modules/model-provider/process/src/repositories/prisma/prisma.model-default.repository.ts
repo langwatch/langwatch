@@ -1,13 +1,14 @@
 import {
-  type ModelDefaultConfig as PrismaModelDefaultConfig,
-  type ModelDefaultConfigScope,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
-import {
   modelDefaultConfigSchema,
   type ModelDefaultConfig,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
+import {
+  type ModelDefaultConfig as PrismaModelDefaultConfig,
+  type ModelDefaultConfigScope,
+  PrismaClient,
+} from "@langwatch/prisma-client/generated";
+
 import type {
   ModelDefaultConfigSaveInput,
   ModelDefaultRepository,

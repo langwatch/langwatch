@@ -1,4 +1,5 @@
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
+
 import { graphAlertSweepIntentSchema } from "./graph-alert-sweep.intent.ts";
 
 export const GRAPH_ALERT_SWEEP_PROCESS_NAME = "graphAlertSweep" as const;

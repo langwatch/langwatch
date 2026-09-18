@@ -1,11 +1,9 @@
 import "@testing-library/jest-dom/vitest";
-
 // @vitest-environment jsdom
 /**
  * The picker that adds a column to an evaluation.
  * @see specs/experiments-v3/target-type-selector.feature
  */
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

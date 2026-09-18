@@ -1,4 +1,5 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
+
 import type { AutomationClock } from "../app/automation.members.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 

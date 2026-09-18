@@ -15,7 +15,11 @@ import { HandledError } from "@langwatch/handled-error";
 
 import { createAutomationRest } from "../automation.rest.ts";
 import { slackAutomationRest, slackAutomationRestErrors } from "../slack-trigger.rest.ts";
-import { unsubscribeCallerAddress, unsubscribeRest, unsubscribeRestErrors } from "../unsubscribe.rest.ts";
+import {
+  unsubscribeCallerAddress,
+  unsubscribeRest,
+  unsubscribeRestErrors,
+} from "../unsubscribe.rest.ts";
 
 /** The project every credentialed request in these suites is authenticated for. */
 export const TEST_PROJECT = { id: "project_1", slug: "acme" } as const;

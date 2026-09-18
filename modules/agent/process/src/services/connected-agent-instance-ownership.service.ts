@@ -6,6 +6,7 @@ import {
   STICKY_PIN_TTL_SECONDS,
 } from "@langwatch/agent-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+
 import { instanceOwnerKey } from "../rules/connected-agent-keys.rules.ts";
 
 // Ownership outlives sessions, pending calls and sticky pins, including after disconnect.

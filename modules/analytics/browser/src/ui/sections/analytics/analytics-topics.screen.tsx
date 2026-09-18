@@ -1,8 +1,9 @@
 import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
+
+import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { CustomGraph, type CustomGraphInput } from "../../../ui/sections/custom-graph.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
-import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { TopicsSelector } from "../../../ui/sections/topics-selector.tsx";
 
 // Time unit conversion constants

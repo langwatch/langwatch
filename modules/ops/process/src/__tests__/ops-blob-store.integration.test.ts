@@ -1,5 +1,5 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import { createTenantId } from "@langwatch/eventing";
 import {
   blobHolderSetKey,
@@ -7,17 +7,18 @@ import {
   LEGACY_HOLDER_LEASE_GUARD,
   redisBlobKey,
 } from "@langwatch/group-queue/operational";
-import Redis, { type Redis as RedisClient } from "ioredis";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import type { SchedulerOpsRepository } from "../repositories/process/scheduler-ops.repository.ts";
-import { OpsOperations } from "../app/ops-operations.ts";
-import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
-import type { QueuePayloadDecoder } from "../app/ops.app.ts";
-import type { OpsService } from "../services/ops.service.ts";
-import type { BrowserSessionApi } from "@langwatch/auth-contract";
-import type { UserApi } from "@langwatch/user-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
+import Redis, { type Redis as RedisClient } from "ioredis";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+
+import { OpsOperations } from "../app/ops-operations.ts";
+import type { QueuePayloadDecoder } from "../app/ops.app.ts";
+import type { SchedulerOpsRepository } from "../repositories/process/scheduler-ops.repository.ts";
+import type { OpsService } from "../services/ops.service.ts";
+import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;

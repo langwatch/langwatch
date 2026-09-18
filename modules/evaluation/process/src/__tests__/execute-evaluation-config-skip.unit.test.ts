@@ -9,9 +9,10 @@
  * individually via the `@scenario` annotations below.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationProcessingEvent } from "@langwatch/evaluation-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,

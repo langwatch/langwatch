@@ -1,8 +1,7 @@
 import { Button, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { type Control, type UseFormRegister, useFieldArray } from "react-hook-form";
-
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 
 import type { RoutingPolicyFormValues } from "../../model/routing-policy-form.ts";
 

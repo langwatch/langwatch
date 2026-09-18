@@ -1,5 +1,10 @@
-import { ApiKeyScopeViolationError,apiKeyPermissionSchema,type ApiKeyScope } from "@langwatch/api-key-contract";
+import {
+  ApiKeyScopeViolationError,
+  apiKeyPermissionSchema,
+  type ApiKeyScope,
+} from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 type ResolvedScope =

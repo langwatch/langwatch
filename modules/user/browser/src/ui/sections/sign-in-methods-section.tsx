@@ -5,6 +5,7 @@
 import { Box, Button, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { KeyRound, X } from "lucide-react";
 import { useState } from "react";
+
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import {

@@ -6,6 +6,7 @@ import {
   type RoleBindingScopeType,
 } from "@langwatch/authz-contract";
 import { z } from "zod";
+
 import {
   AuthzBindingRepository,
   type AuthzBindingScopeRow,

@@ -3,10 +3,10 @@
  */
 
 import { Box, Field, HStack, RadioGroup, VStack } from "@chakra-ui/react";
-import type { PropsWithChildren } from "react";
 import { Code } from "lucide-react";
+import type { PropsWithChildren } from "react";
+
 import type { ProjectHostProject as Project } from "../../model/project-host.ts";
-import { RadioCard } from "../elements/radio-card.tsx";
 import { Azure } from "../elements/icons/azure.tsx";
 import { DSPy } from "../elements/icons/ds-py.tsx";
 import { LangChainParrot } from "../elements/icons/lang-chain-parrot.tsx";
@@ -15,6 +15,7 @@ import { PuzzleIcon } from "../elements/icons/puzzle-icon.tsx";
 import { Python } from "../elements/icons/python.tsx";
 import { TypeScript } from "../elements/icons/type-script.tsx";
 import { Vercel } from "../elements/icons/vercel.tsx";
+import { RadioCard } from "../elements/radio-card.tsx";
 
 export type ProjectFormData = {
   name: string;

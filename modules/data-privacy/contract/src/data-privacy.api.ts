@@ -1,11 +1,12 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
+import type { DataPrivacySnapshot } from "./data-privacy.snapshot.ts";
 import type {
   DataPrivacyConfig,
   DataPrivacyPolicy,
   DataPrivacyScope,
   ResolvedDataPrivacy,
 } from "./data-privacy.ts";
-import type { DataPrivacySnapshot } from "./data-privacy.snapshot.ts";
 
 /**
  * The signed-in person a scoped privacy write is decided for. Only the id

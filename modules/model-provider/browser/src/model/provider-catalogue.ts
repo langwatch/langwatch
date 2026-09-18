@@ -8,8 +8,9 @@ import {
   modelProviders as modelProvidersRegistry,
   providerDeprecation,
 } from "@langwatch/model-provider-contract";
-import { broadestScopeRank } from "./scope-breadth.ts";
+
 import type { ModelProviderAvailableScopes } from "./model-provider-host.ts";
+import { broadestScopeRank } from "./scope-breadth.ts";
 
 /** A provider type the add menu offers, in the order it offers them. */
 export type AddableProvider = {

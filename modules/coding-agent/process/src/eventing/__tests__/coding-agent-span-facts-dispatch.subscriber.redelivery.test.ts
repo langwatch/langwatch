@@ -4,14 +4,14 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 
-import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
 import {
-  SpanNormalizationPipelineService,
-  storedSpanReadBack,
-  TraceCanonicalisationService,
-} from "@langwatch/trace-process/testing";
+  type ContributeSpanFactsCommandData,
+  parseSpanFactsLiftedPayload,
+  SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
+  SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
+  type SpanFactsLiftedPayload,
+} from "@langwatch/coding-agent-contract";
+import { createTenantId } from "@langwatch/eventing";
 import {
   makeSpanReferencedPayload,
   type SpanReferencedPayload,
@@ -24,12 +24,13 @@ import {
   type TraceProcessingEvent,
 } from "@langwatch/trace-contract";
 import {
-  type ContributeSpanFactsCommandData,
-  parseSpanFactsLiftedPayload,
-  SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
-  SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
-  type SpanFactsLiftedPayload,
-} from "@langwatch/coding-agent-contract";
+  SpanNormalizationPipelineService,
+  storedSpanReadBack,
+  TraceCanonicalisationService,
+} from "@langwatch/trace-process/testing";
+import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
+
 import type { CodingAgentTraceProcessor } from "../../app/coding-agent.members.ts";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../coding-agent-span-facts-dispatch.subscriber.ts";
 

@@ -1,3 +1,4 @@
+import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -39,11 +40,12 @@ function fakeUserRedis(): RedisConnection {
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(userServer)])
-    .withConfig({ user: { passkeysEnabled: false, baseUrl: null } })
+    .withMembers({ passkeysEnabled: false, publicBaseUrl: undefined })
     .withRelational(fakeUserPrisma())
     .withKeyvalue(fakeUserRedis())
     .provide({
       auth: createUserTestAuth(),
+      identity: createApiFixture<IdentityApi>(),
       organization: createUserTestOrganizations(),
       ops: createUserTestOps(),
       project: createApiFixture<ProjectApi>(),

@@ -5,6 +5,7 @@
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";
+
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 
 type LinkProps = {

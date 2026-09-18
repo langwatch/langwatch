@@ -2,8 +2,16 @@
 
 export { NavigationShell } from "./sections/navigation-shell.tsx";
 export { ShellPageBody, planManagementHref } from "./sections/shell-page-body.tsx";
-export { ProductSidebar, SidebarContent, type SidebarSurface } from "./sections/product-sidebar.tsx";
-export { MainMenuSections, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./sections/main-menu.tsx";
+export {
+  ProductSidebar,
+  SidebarContent,
+  type SidebarSurface,
+} from "./sections/product-sidebar.tsx";
+export {
+  MainMenuSections,
+  MENU_WIDTH_COMPACT,
+  MENU_WIDTH_EXPANDED,
+} from "./sections/main-menu.tsx";
 export { PersonalSidebarLinks } from "./sections/personal-sidebar.tsx";
 export { AppHeaderUserMenu } from "./sections/app-header-user-menu.tsx";
 export { NavigationLink } from "./elements/navigation-link.tsx";

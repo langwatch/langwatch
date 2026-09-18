@@ -4,9 +4,10 @@
  * back as "no", and the hashed secret has to stay on the server side of the boundary.
  */
 
-import { describe, expect, it } from "vitest";
 import { ApiKeyNotFoundError, LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { fromDate, type Instant } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
 import { ApiKeyTokenResolutionService } from "../api-key-token-resolution.service.ts";
 
 const CURRENT_TOKEN = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;

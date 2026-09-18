@@ -4,18 +4,16 @@
  * Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
 
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
-
-import { GatewayJwtService } from "../../services/gateway-jwt.service.ts";
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
+import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
+import { GatewayJwtService } from "../../services/gateway-jwt.service.ts";
 import { VirtualKeyService } from "../../services/virtual-key.service.ts";
-
 import { PostgresVirtualKeyAdapter } from "../../testing.ts";
 import {
   mountGatewayInternalRest,

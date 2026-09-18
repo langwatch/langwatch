@@ -3,9 +3,10 @@
  * doesn't include MainMenu column (deleted with DashboardLayout).
  */
 
+import { nowInstant } from "@langwatch/time";
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
-import { nowInstant } from "@langwatch/time";
+
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../../model/coding-agent-activity.ts";
 import { featureIcons } from "../../model/feature-icons.ts";

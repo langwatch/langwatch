@@ -1,10 +1,3 @@
-import { type Instant, nowInstant, toDate } from "@langwatch/time";
-/**
- * Shared DTO shape for GatewayBudget on the public REST wire (budget
- * counterpart to gateway-virtual-key-dto.adapter.ts). Lives outside the
- * route file so the money/availability rules can be asserted directly.
- */
-
 import {
   type GatewayBudgetWithSeats,
   effectiveBudgetPeriod,
@@ -15,6 +8,12 @@ import {
   metadataFromRow,
   type ResourceMetadata,
 } from "@langwatch/gateway-contract";
+/**
+ * Shared DTO shape for GatewayBudget on the public REST wire (budget
+ * counterpart to gateway-virtual-key-dto.adapter.ts). Lives outside the
+ * route file so the money/availability rules can be asserted directly.
+ */
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 /**
  * Spend in both units, or null when it can't be honestly carried:

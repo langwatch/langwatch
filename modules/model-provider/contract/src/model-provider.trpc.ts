@@ -6,13 +6,6 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
-import {
-  modelDefaultEffectiveSchema,
-  modelDefaultInheritedValuesSchema,
-  modelDefaultSnapshotSchema,
-  modelProviderCodexStatusSchema,
-  modelProviderCredentialVerdictSchema,
-} from "./model-provider.ts";
 import { modelProviderListEntrySchema } from "./model-provider-list-entry.ts";
 import {
   modelDefaultConfigDeleteTrpcInputSchema,
@@ -39,6 +32,13 @@ import {
   modelProviderValidateApiKeyTrpcInputSchema,
   modelProviderValidateKeyWithCustomUrlTrpcInputSchema,
 } from "./model-provider.trpc-schemas.ts";
+import {
+  modelDefaultEffectiveSchema,
+  modelDefaultInheritedValuesSchema,
+  modelDefaultSnapshotSchema,
+  modelProviderCodexStatusSchema,
+  modelProviderCredentialVerdictSchema,
+} from "./model-provider.ts";
 
 export const modelProviderTrpc = defineTrpcContract("modelProvider")
   // Every read here answers the MASKED projection: a decrypted credential is

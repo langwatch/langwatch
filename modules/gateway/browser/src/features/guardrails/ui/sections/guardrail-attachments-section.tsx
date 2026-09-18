@@ -1,10 +1,10 @@
 import { Badge, Box, Button, HStack, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useEffect, useMemo, useState } from "react";
 
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { Link } from "../../../../ui/elements/gateway-link.tsx";
 import { api } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster, useShowErrorToast } from "../../../../behavior/gateway-feedback.ts";
+import { Link } from "../../../../ui/elements/gateway-link.tsx";
 
 type GuardrailDirectionEnum = "PRE" | "POST" | "STREAM_CHUNK";
 type WireDirection = "pre" | "post" | "stream_chunk";

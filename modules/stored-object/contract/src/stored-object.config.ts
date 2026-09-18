@@ -1,56 +1,42 @@
-import {
-  Config,
-  compileRuntimeConfig,
-  environmentOneOrTrueSchema,
-  RuntimeConfig,
-  type ConfigValue,
-} from "@langwatch/config";
+import { Config, environmentOneOrTrueSchema, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
- * Selects backend storage (S3 or Azure) for externalized bytes.
- * Auth modes and per-org routes are interpreted per-backend, not in config.
+ * Selects backend storage (S3 or Azure) for externalized bytes. Credentials
+ * resolve through the process's `secrets` member (ADR-132), never this slice.
  */
-export const storedObjectServerConfigDefinition = RuntimeConfig.define({
-  backend: Config.value(z.enum(["s3", "azure"]).optional(), { env: "STORED_OBJECTS_BACKEND" }),
-  localFilesystemRoot: Config.value(z.string().optional(), {
-    env: "LANGWATCH_LOCAL_STORAGE_PATH",
-  }),
+export const storedObjectConfig = Config.define((c) => ({
+  backend: c.env("STORED_OBJECTS_BACKEND", z.enum(["s3", "azure"]).optional()),
+  localFilesystemRoot: c.env("LANGWATCH_LOCAL_STORAGE_PATH", z.string().optional()),
   /** Whether the Azure container reaps an orphaned trace spool object. */
-  azureSpoolRetentionConfirmed: Config.value(environmentOneOrTrueSchema, {
-    env: "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
-  }),
+  azureSpoolRetentionConfirmed: c.env(
+    "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
+    environmentOneOrTrueSchema,
+  ),
+  /** `accessKeyId`, `secretAccessKey` and `sessionToken` are secret handles, not leaves. */
   s3: {
-    bucket: Config.value(z.string().optional(), { env: "S3_BUCKET_NAME" }),
-    endpoint: Config.value(z.string().optional(), { env: "S3_ENDPOINT" }),
-    region: Config.value(z.string().optional(), { env: "S3_REGION" }),
-    accessKeyId: Config.value(z.string().optional(), { env: "S3_ACCESS_KEY_ID" }),
-    secretAccessKey: Config.value(z.string().optional(), { env: "S3_SECRET_ACCESS_KEY" }),
-    sessionToken: Config.value(z.string().optional(), { env: "S3_SESSION_TOKEN" }),
+    bucket: c.env("S3_BUCKET_NAME", z.string().optional()),
+    endpoint: c.env("S3_ENDPOINT", z.string().optional()),
+    region: c.env("S3_REGION", z.string().optional()),
   },
+  /** `accountKey` is a secret handle, not a leaf. */
   azure: {
-    authMode: Config.value(z.string().optional(), { env: "AZURE_BLOB_AUTH_MODE" }),
-    accountName: Config.value(z.string().optional(), { env: "AZURE_BLOB_ACCOUNT_NAME" }),
-    accountKey: Config.value(z.string().optional(), { env: "AZURE_BLOB_ACCOUNT_KEY" }),
-    container: Config.value(z.string().optional(), { env: "AZURE_BLOB_CONTAINER" }),
-    endpoint: Config.value(z.string().optional(), { env: "AZURE_BLOB_ENDPOINT" }),
-    authorityHost: Config.value(z.string().optional(), { env: "AZURE_BLOB_AUTHORITY_HOST" }),
-    tokenAudience: Config.value(z.string().optional(), { env: "AZURE_BLOB_TOKEN_AUDIENCE" }),
-    allowInsecureTokenEndpointForTests: Config.value(z.string().optional(), {
-      env: "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS",
-    }),
+    authMode: c.env("AZURE_BLOB_AUTH_MODE", z.string().optional()),
+    accountName: c.env("AZURE_BLOB_ACCOUNT_NAME", z.string().optional()),
+    container: c.env("AZURE_BLOB_CONTAINER", z.string().optional()),
+    endpoint: c.env("AZURE_BLOB_ENDPOINT", z.string().optional()),
+    authorityHost: c.env("AZURE_BLOB_AUTHORITY_HOST", z.string().optional()),
+    tokenAudience: c.env("AZURE_BLOB_TOKEN_AUDIENCE", z.string().optional()),
+    allowInsecureTokenEndpointForTests: c.env(
+      "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS",
+      z.string().optional(),
+    ),
     identity: {
-      tenantId: Config.value(z.string().optional(), { env: "AZURE_TENANT_ID" }),
-      clientId: Config.value(z.string().optional(), { env: "AZURE_CLIENT_ID" }),
-      federatedTokenFile: Config.value(z.string().optional(), {
-        env: "AZURE_FEDERATED_TOKEN_FILE",
-      }),
+      tenantId: c.env("AZURE_TENANT_ID", z.string().optional()),
+      clientId: c.env("AZURE_CLIENT_ID", z.string().optional()),
+      federatedTokenFile: c.env("AZURE_FEDERATED_TOKEN_FILE", z.string().optional()),
     },
   },
-});
+}));
 
-export type StoredObjectServerConfig = ConfigValue<typeof storedObjectServerConfigDefinition>;
-
-export const storedObjectServerConfigSchema = compileRuntimeConfig(
-  storedObjectServerConfigDefinition,
-);
+export type StoredObjectServerConfig = ConfigOf<typeof storedObjectConfig>;

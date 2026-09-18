@@ -1,13 +1,14 @@
 import { Box, Card } from "@chakra-ui/react";
-import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
-import { LangWatchQLDashboardWidget } from "./langwatch-ql-dashboard-widget.tsx";
+import type { LangWatchQLGranularityStep, FilterField } from "@langwatch/analytics-contract";
+
+import { chartGridCardHeightPx } from "../../model/chart-grid.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds.ts";
-import type { LangWatchQLGranularityStep,FilterField } from "@langwatch/analytics-contract";
+import type { DashboardWidgetDraft } from "../../model/dashboard-widget-definition.ts";
+import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
 import { DashboardWidgetFrame } from "./dashboard-widget-frame.tsx";
 import { DashboardWidgetInPlaceEditor } from "./dashboard-widget-in-place-editor.tsx";
-import type { DashboardWidgetDraft } from "../../model/dashboard-widget-definition.ts";
-import { chartGridCardHeightPx } from "../../model/chart-grid.ts";
 import { GraphCardHeader } from "./graph-card-header.tsx";
+import { LangWatchQLDashboardWidget } from "./langwatch-ql-dashboard-widget.tsx";
 import { useDraggableGraphCard } from "./use-draggable-graph-card";
 
 interface GraphData {

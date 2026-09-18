@@ -1,7 +1,8 @@
+import { fieldSchema, nameToId } from "@langwatch/workflow-contract";
 import type { Edge, Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
-import { fieldSchema, nameToId } from "@langwatch/workflow-contract";
+
 import {
   getWorkflow,
   serializeWorkflow,

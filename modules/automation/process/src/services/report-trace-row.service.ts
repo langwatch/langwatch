@@ -1,6 +1,6 @@
 import { type ReportTraceRow, reportSnippet } from "@langwatch/automation-contract";
-import type { TraceListItem } from "@langwatch/trace-contract";
 import { Temporal } from "@langwatch/time";
+import type { TraceListItem } from "@langwatch/trace-contract";
 
 export class ReportTraceRowService {
   static create(): ReportTraceRowService {

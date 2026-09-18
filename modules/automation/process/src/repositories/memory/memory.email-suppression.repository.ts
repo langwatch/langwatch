@@ -1,6 +1,7 @@
 import type { EmailSuppression } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import { EmailSuppressionRepository } from "../email-suppression.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 

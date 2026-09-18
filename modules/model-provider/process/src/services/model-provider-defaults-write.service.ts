@@ -9,15 +9,14 @@ import {
   type ModelDefaultConfigWriteInput,
   type ModelDefaultDeleteInput,
 } from "@langwatch/model-provider-contract";
+
 import type {
   ModelProviderCatalog,
-  ModelProviderIdService
+  ModelProviderIdService,
 } from "../app/model-provider.members.ts";
-import type {
-  ModelDefaultRepository
-} from "../repositories/model-default.repository.ts";
-import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
+import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
+import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
 
 type ModelProviderDefaultsWriteOptions = {
   defaults: ModelDefaultRepository;

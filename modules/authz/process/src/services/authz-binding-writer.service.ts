@@ -25,6 +25,7 @@ import {
 // One class, one status: an organization's membership is the organization
 // feature's fact, and every surface answers this refusal 422.
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
+
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type {
   AuthzBindingRepository,

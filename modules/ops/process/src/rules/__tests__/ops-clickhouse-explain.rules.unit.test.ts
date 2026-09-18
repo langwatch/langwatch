@@ -135,7 +135,9 @@ describe("buildExplainQuery", () => {
     });
 
     it("does not treat `;` inside a string as multi-statement", () => {
-      expect(buildExplainQuery(`SELECT name FROM stored_spans WHERE name = 'a;b'`).wrapped).toBeDefined();
+      expect(
+        buildExplainQuery(`SELECT name FROM stored_spans WHERE name = 'a;b'`).wrapped,
+      ).toBeDefined();
     });
 
     it("treats a quoted block-comment marker as data", () => {

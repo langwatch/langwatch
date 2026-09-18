@@ -4,9 +4,11 @@
  * @see specs/nlp-go/studio-lambda-cache.feature
  */
 import type { Logger } from "@langwatch/observability";
+
 import {
   type NlpLambdaArnResolver,
-  type NlpLambdaArnEntry,type NlpLambdaArnCache
+  type NlpLambdaArnEntry,
+  type NlpLambdaArnCache,
 } from "../app/workflow.app.ts";
 
 /** The shared key one project's ARN is filed under. */

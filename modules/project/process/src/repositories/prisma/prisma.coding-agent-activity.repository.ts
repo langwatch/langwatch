@@ -1,8 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { toDate, type Instant } from "@langwatch/time";
-import type { CodingAgentActivityRepository } from "../coding-agent-activity.repository.ts";
+
 import { codingAgentActivityStaleBefore } from "../../rules/coding-agent-activity.rules.ts";
+import type { CodingAgentActivityRepository } from "../coding-agent-activity.repository.ts";
 
 /**
  * The one model the coding-agent activity seam reads and writes. Naming it

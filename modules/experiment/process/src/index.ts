@@ -101,9 +101,7 @@ export {
 } from "./eventing/experiment-cell-workflow.process.ts";
 export {
   experimentV3Rest,
-  experimentV3AliasRest,
   type ExperimentV3RestApi,
-  type ExperimentV3AliasApi,
   experimentWorkbenchCredential,
 } from "./transport/experiment-v3.rest.ts";
 export type {

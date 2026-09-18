@@ -1,7 +1,8 @@
-import { useMemo } from "react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/browser-trpc/workflow-api";
+import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
+import { useMemo } from "react";
+
 import type { EvaluatorConfig } from "../../model/experiments-v3/types.ts";
 
 /**

@@ -2,9 +2,8 @@
  * LeaderboardStep — numbered section wrapper for the leaderboard drawer.
  */
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { LuInfo } from "react-icons/lu";
-
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { LuInfo } from "react-icons/lu";
 
 export type LeaderboardStepProps = {
   index: number;

@@ -9,7 +9,6 @@ import { OpsApi, opsQueueTrpc } from "@langwatch/ops-contract";
 import { OPS_MANAGE, OPS_VIEW, opsOperatorFact } from "#transport/ops-operator.trpc";
 
 export const opsQueueTrpcTransport = defineTrpcRouter(OpsApi, opsQueueTrpc)
-
   .procedure("listGroups")
   .withFacts(opsOperatorFact)
   .serviceAuthorized(OPS_VIEW)

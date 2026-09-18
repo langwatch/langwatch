@@ -4,11 +4,11 @@ import type {
   BTLeaderboard,
   BTLeaderboardEntry,
 } from "../../../../model/batch-evaluation-results.bt-leaderboard.ts";
+import type { SampleAdequacy } from "../../../../model/batch-evaluation-results.sample-adequacy.ts";
 import type {
   JudgeIndependence,
   VerbosityProfile,
 } from "../../batch-evaluation-results.judge-bias.ts";
-import type { SampleAdequacy } from "../../../../model/batch-evaluation-results.sample-adequacy.ts";
 import { buildTrustChecks, type LeaderboardTrustPanelProps } from "../leaderboard-trust-panel.tsx";
 import { DEFAULT_WARN_THRESHOLD } from "../pairwise-leaderboard.tsx";
 

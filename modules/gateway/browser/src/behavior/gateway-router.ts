@@ -4,6 +4,7 @@
  */
 
 import { useMemo } from "react";
+
 import { useGatewayHost } from "../model/gateway-host.ts";
 
 export type GatewayRouter = {

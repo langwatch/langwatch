@@ -12,6 +12,16 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
+import { Select } from "@langwatch/design-system/select";
+import { SmallLabel } from "@langwatch/design-system/small-label";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import type { Entry } from "@langwatch/workflow-contract";
+import { checkIsEvaluator } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
 import { CheckSquare, Info, TrendingUp } from "react-feather";
@@ -23,27 +33,16 @@ import {
   useForm,
 } from "react-hook-form";
 
-import { SmallLabel } from "@langwatch/design-system/small-label";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { Select } from "@langwatch/design-system/select";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
-import { useOptimizationExecution } from "./use-optimization-execution.ts";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import type { Entry } from "@langwatch/workflow-contract";
 import { OPTIMIZERS } from "../../../model/optimizers.ts";
 import { trainTestSplit } from "../../../model/studio-dataset.utils.ts";
-import { checkIsEvaluator } from "@langwatch/workflow-contract";
-
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
 import { useVersionState } from "./history.tsx";
 import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/optimization-studio-llm-config-field.tsx";
+import { useOptimizationExecution } from "./use-optimization-execution.ts";
 import { VersionToBeUsed } from "./version-to-be-used.tsx";
 
 const optimizerOptions: {

@@ -1,13 +1,14 @@
-// Permission ceiling, binding derivation, row summaries. Moved from platform/app; injects
-// getTeamRolePermissions to avoid testing authz-contract.
-// Spec: specs/api-keys/scope-based-permissions.feature
-import { builtinRolePermissions } from "@langwatch/authz-contract";
-import { describe, expect, it } from "vitest";
 import {
   categorizablePermissions,
   categoryPermissions,
   PERMISSION_CATEGORIES,
 } from "@langwatch/api-key-contract";
+// Permission ceiling, binding derivation, row summaries. Moved from platform/app; injects
+// getTeamRolePermissions to avoid testing authz-contract.
+// Spec: specs/api-keys/scope-based-permissions.feature
+import { builtinRolePermissions } from "@langwatch/authz-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   bindingsToPermissionMode,
   bindingsToScopes,

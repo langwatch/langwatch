@@ -7,6 +7,7 @@
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderCostsService } from "../services/model-provider-costs.service.ts";

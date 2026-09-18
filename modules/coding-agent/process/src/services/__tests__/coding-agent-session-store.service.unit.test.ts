@@ -1,13 +1,14 @@
-// Store adapter's durable dedup (ADR-066); threads appliedEventIds into
-// writes and reads back through getWithApplied for cold-cache retry dedup.
-// @see specs/coding-agent/session-aggregate.feature
-import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import type {
   CodingAgentProjectionPersistence,
   CodingAgentSession,
 } from "@langwatch/coding-agent-contract";
+// Store adapter's durable dedup (ADR-066); threads appliedEventIds into
+// writes and reads back through getWithApplied for cold-cache retry dedup.
+// @see specs/coding-agent/session-aggregate.feature
+import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { EventingCodingAgentSessionStoreAdapter } from "../coding-agent-session-store.service.ts";
+
+import { CodingAgentSessionStateProjection } from "../../eventing/coding-agent-session-state.projection.ts";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP,
@@ -15,7 +16,7 @@ import {
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
 } from "../../eventing/coding-agent-session.projection.ts";
-import { CodingAgentSessionStateProjection } from "../../eventing/coding-agent-session-state.projection.ts";
+import { EventingCodingAgentSessionStoreAdapter } from "../coding-agent-session-store.service.ts";
 
 const tenantId = createTenantId("tenant-1");
 

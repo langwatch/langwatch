@@ -1,8 +1,9 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { AlertCircle, Check, Cloud, CloudOff, RefreshCw } from "lucide-react";
-import type { ReactNode } from "react";
 import type { AutosaveState } from "@langwatch/dataset-browser/dataset-table";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { AlertCircle, Check, Cloud, CloudOff, RefreshCw } from "lucide-react";
+import type { ReactNode } from "react";
+
 import { AUTOSAVE_OUT_OF_DATE_REASON } from "../../../model/experiments-v3/constants.ts";
 
 type AutosaveStatusProps = {

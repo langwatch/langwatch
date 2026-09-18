@@ -26,6 +26,20 @@ import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Folder, HelpCircle, Plus, UserLock, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+
+import {
+  CATEGORY_LABELS,
+  DISPOSITION_LABELS,
+  describeAudienceSelection,
+  inheritedHint,
+  PII_VALUE_LABELS,
+  SCOPE_ICON,
+} from "../../model/data-privacy-labels.ts";
+import {
+  attributePatternError,
+  customSecretPatternError,
+  secretPatternError,
+} from "../../model/data-privacy-patterns.ts";
 import {
   buildRuleConfig,
   configsEqual,
@@ -47,19 +61,6 @@ import {
   STRICT_ADDED_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_SUMMARY,
 } from "../../model/pii-entity-labels.ts";
-import {
-  CATEGORY_LABELS,
-  DISPOSITION_LABELS,
-  describeAudienceSelection,
-  inheritedHint,
-  PII_VALUE_LABELS,
-  SCOPE_ICON,
-} from "../../model/data-privacy-labels.ts";
-import {
-  attributePatternError,
-  customSecretPatternError,
-  secretPatternError,
-} from "../../model/data-privacy-patterns.ts";
 import { AudiencePicker } from "../elements/audience-picker.tsx";
 import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group.tsx";
 

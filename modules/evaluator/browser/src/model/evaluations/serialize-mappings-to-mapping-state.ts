@@ -1,15 +1,15 @@
-/**
- * Serializes UI field mappings to the MappingState persisted on
- * monitors. Thread sources (THREAD_MAPPINGS, SERVER_ONLY_THREAD_SOURCES,
- * or sourceId "thread") are marked `type: "thread"`.
- */
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
 import {
   type MappingState,
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPINGS,
   type TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
+/**
+ * Serializes UI field mappings to the MappingState persisted on
+ * monitors. Thread sources (THREAD_MAPPINGS, SERVER_ONLY_THREAD_SOURCES,
+ * or sourceId "thread") are marked `type: "thread"`.
+ */
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
 
 export function serializeMappingsToMappingState(
   mappings: Record<string, UIFieldMapping>,

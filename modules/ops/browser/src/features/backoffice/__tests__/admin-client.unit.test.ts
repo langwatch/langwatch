@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
 import { adminClient, impersonateUser } from "../../../index.ts";
 
 /**

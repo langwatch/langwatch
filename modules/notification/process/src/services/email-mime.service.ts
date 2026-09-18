@@ -1,5 +1,6 @@
-import type { EmailAttachment } from "../channels/email-delivery.channel.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { EmailAttachment } from "../channels/email-delivery.channel.ts";
 
 /** Maximum bytes one RFC 2047 encoded-word can carry: wrapper is 12 chars,
  *  word max is 75 (RFC 2047 §2) leaving 63 for base64, padded to a multiple

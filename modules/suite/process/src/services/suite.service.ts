@@ -1,4 +1,11 @@
-import type { ConnectedPresenceReader } from "./connected-target.service.ts";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import {
+  jsonValueSchema,
+  ScenarioTestSuiteNotFoundError,
+  type ScenarioTestSuite,
+  type ScenarioApi,
+} from "@langwatch/scenario-contract";
 import {
   createSuiteCommandSchema,
   suiteArchivedNamesInputSchema,
@@ -24,20 +31,14 @@ import {
   type SuiteRunStateInput,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
-import type { AgentApi } from "@langwatch/agent-contract";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import {
-  jsonValueSchema,
-  ScenarioTestSuiteNotFoundError,
-  type ScenarioTestSuite,
-  type ScenarioApi,
-} from "@langwatch/scenario-contract";
-import type { SuiteExecution } from "../app/suite.app.ts";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
-import type { SuiteRepository } from "../repositories/suite.repository.ts";
+
+import type { SuiteExecution } from "../app/suite.app.ts";
 import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
-import { SuiteRunService } from "./suite-run.service.ts";
+import type { SuiteRepository } from "../repositories/suite.repository.ts";
 import { defaultSuiteId, isAgentTarget, suiteSlugOf } from "../rules/suite-target.rules.ts";
+import type { ConnectedPresenceReader } from "./connected-target.service.ts";
+import { SuiteRunService } from "./suite-run.service.ts";
 
 const archivedSlugSuffix = "--archived";
 

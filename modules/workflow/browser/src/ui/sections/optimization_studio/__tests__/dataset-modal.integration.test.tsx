@@ -95,8 +95,9 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   },
 }));
 
-import { _useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import type { Entry } from "@langwatch/workflow-contract";
+
+import { _useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { DatasetModal } from "../dataset-modal.tsx";
 
 const ENTRY_NODE = {

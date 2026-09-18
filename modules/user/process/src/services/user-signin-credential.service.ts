@@ -5,7 +5,8 @@ import type {
   UserLinkedAccount,
   UserPasswordRotationOutcome,
 } from "@langwatch/user-contract";
-import type { UserPasswordHasher } from "../app/user.app.ts";
+
+import type { UserPasswordHasher } from "../app/user.members.ts";
 import type { UserCredentialRepository } from "../repositories/user-signin-credential.repository.ts";
 
 /**

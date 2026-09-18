@@ -1,12 +1,16 @@
 import { Badge, Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { ChevronDown, ChevronRight, ExternalLink, Link2 } from "lucide-react";
 import * as React from "react";
 import { lazy, Suspense, useEffect, useMemo, useRef, type ComponentProps } from "react";
 import { FaSlack } from "react-icons/fa";
+
 import { AutomationMarkdown as Markdown } from "../../../../ui/elements/automation-markdown.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { monacoBackgroundFor, trapEscapeInsideEditor,useMonacoTheme,
+import {
+  monacoBackgroundFor,
+  trapEscapeInsideEditor,
+  useMonacoTheme,
   clearLiquidMarkers,
   clearModelVariables,
   LIQUID_JSON_LANGUAGE_ID,
@@ -16,7 +20,8 @@ import { monacoBackgroundFor, trapEscapeInsideEditor,useMonacoTheme,
   setModelVariables,
   setupLiquidJsonSchema,
   type VariableInfo as MonacoVariableInfo,
-  validateLiquidModel } from "../../../liquid-editor/index.ts";
+  validateLiquidModel,
+} from "../../../liquid-editor/index.ts";
 
 export type VariableInfo = MonacoVariableInfo;
 

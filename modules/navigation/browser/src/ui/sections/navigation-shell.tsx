@@ -5,6 +5,7 @@
 
 import { Box, HStack } from "@chakra-ui/react";
 import { useEffect, type ReactNode } from "react";
+
 import {
   useNavigationShellState,
   type NavigationShellReadyState,

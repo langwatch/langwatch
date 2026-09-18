@@ -1,4 +1,5 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type {
   PresenceCursorEvent,
   PresenceCursorSubscription,
@@ -12,6 +13,11 @@ import type {
 
 /** Portable cancellation shape; browser and Node AbortSignals satisfy it. */
 export type PresenceStreamSignal = unknown;
+export type PresenceProjectEvent = Readonly<{
+  projectId: string;
+  channel: "export_progress";
+  event: string;
+}>;
 
 /** Who else is looking at this project, where they are, and where their cursor is. */
 export interface PresenceApi {
@@ -31,6 +37,7 @@ export interface PresenceApi {
   getTenantEmitter(tenantId: string): PresenceTenantEmitter;
   /** {@link PresenceBroadcastFabric}: releases the tenant emitter a subscription borrowed. */
   cleanupTenantEmitter(tenantId: string): void;
+  publishProjectEvent(input: PresenceProjectEvent): Promise<void>;
 }
 
 export const PresenceApi = moduleApi<PresenceApi>()("presence");

@@ -1,7 +1,6 @@
 import { Badge, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import type React from "react";
-
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type React from "react";
 
 import type { SessionPullRequest } from "../session-list-row.ts";
 import { MissingValue } from "./missing-value.tsx";

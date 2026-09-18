@@ -3,6 +3,7 @@ import { createErrorHandler } from "@langwatch/api";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { SecretApi } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
+
 import { createSecretTestApp } from "../../app/__tests__/secret.fixture.ts";
 import { SECRET_REST_VERSION, secretRest, secretsAliasRest } from "../secret.rest.ts";
 

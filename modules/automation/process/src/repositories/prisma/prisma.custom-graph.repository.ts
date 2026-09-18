@@ -1,6 +1,7 @@
 import type { CustomGraph, CustomGraphNameRef } from "@langwatch/automation-contract";
-import { CustomGraphRepository } from "../custom-graph.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import { CustomGraphRepository } from "../custom-graph.repository.ts";
 
 const BUILDER_CHART_KIND = "builder";
 
@@ -19,10 +20,7 @@ export class PrismaCustomGraphRepository extends CustomGraphRepository {
     return new PrismaCustomGraphRepository(database);
   }
 
-  async findById(input: {
-    customGraphId: string;
-    projectId: string;
-  }): Promise<CustomGraph | null> {
+  async findById(input: { customGraphId: string; projectId: string }): Promise<CustomGraph | null> {
     return (await this.database.customGraph.findUnique({
       where: {
         id: input.customGraphId,

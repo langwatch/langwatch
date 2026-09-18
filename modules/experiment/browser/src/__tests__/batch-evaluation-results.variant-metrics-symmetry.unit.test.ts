@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { computeVariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics.ts";
 import type { BatchResultRow } from "../ui/sections/batch-evaluation-results.types.ts";
+import { computeVariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics.ts";
 
 /**
  * The paired cost/duration intervals decide dominance, and dominance is a statement

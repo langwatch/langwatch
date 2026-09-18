@@ -1,6 +1,7 @@
 import { HandledError, remediation } from "@langwatch/handled-error";
-import type { AgentType } from "./config/index.ts";
 import { z } from "zod";
+
+import type { AgentType } from "./config/index.ts";
 
 /** No agent with that id; ADR-045 maps it to 404 with actionable remediation. */
 export class AgentNotFoundError extends HandledError {
@@ -151,7 +152,7 @@ const agentNotFoundProblemSchema = z.object({
 const invalidAgentConfigProblemSchema = z.object({
   error: z.literal("invalid_agent_config"),
   message: z.string(),
-  agentType: z.enum(["signature", "code", "workflow", "http", "connected"]),
+  agentType: z.enum(["signature", "code", "workflow", "http", "connected", "voice"]),
   issues: z.unknown().optional(),
 });
 

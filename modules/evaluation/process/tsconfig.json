@@ -84,7 +84,7 @@
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
-      "path": "../../workflow/server/tsconfig.build.json"
+      "path": "../../workflow/process/tsconfig.build.json"
     }
   ]
 }

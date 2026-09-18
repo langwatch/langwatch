@@ -8,6 +8,7 @@ import {
 } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 
@@ -107,10 +108,7 @@ export class MemoryTriggerRepository extends TriggerRepository {
     return Promise.resolve(row ?? null);
   }
 
-  findByCustomGraphIds(input: {
-    projectId: string;
-    customGraphIds: string[];
-  }): Promise<Trigger[]> {
+  findByCustomGraphIds(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]> {
     if (input.customGraphIds.length === 0) return Promise.resolve([]);
     return Promise.resolve(
       this.rows().filter(

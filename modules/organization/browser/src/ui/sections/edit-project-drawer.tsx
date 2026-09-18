@@ -11,11 +11,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useMemo } from "react";
-import { Controller, type SubmitHandler, useForm } from "react-hook-form";
-
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Select } from "@langwatch/design-system/select";
+import { useCallback, useMemo } from "react";
+import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 
 import { applyHandledErrorToForm, FormServerError } from "../../behavior/handled-error-form.tsx";
 import { api } from "../../behavior/organization-api.ts";

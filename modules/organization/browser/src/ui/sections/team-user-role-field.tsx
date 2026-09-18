@@ -1,13 +1,14 @@
 import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
+import { Select } from "@langwatch/design-system/select";
 import { useMemo } from "react";
-import { type OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
+
 import { api } from "../../behavior/organization-api.ts";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   isTeamRoleAllowedForOrganizationRole,
   type TeamRoleValue,
 } from "../../model/member-role-constraints.ts";
-import { Select } from "@langwatch/design-system/select";
+import { type OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 
 export type RoleOption = {
   label: string;

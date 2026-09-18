@@ -8,6 +8,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ApiKeyHostProvider } from "../../model/api-key-host.ts";
 import { FIRST_TRACE_REDIRECT_DELAY_MS } from "../../model/first-trace-policy.ts";
 import { FakeApiKeyHost } from "../../testing.tsx";

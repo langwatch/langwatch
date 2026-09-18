@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   createNotificationCommandSchema,
   notificationRecentQuerySchema,
@@ -6,8 +7,8 @@ import {
   type Notification,
   type NotificationRecentQuery,
 } from "@langwatch/notification-contract";
-import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import type { NotificationRepository } from "../notification.repository.ts";
 
 export class MemoryNotificationRepository implements NotificationRepository {

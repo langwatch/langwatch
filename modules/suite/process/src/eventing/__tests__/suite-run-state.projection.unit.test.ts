@@ -1,13 +1,17 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import { SUITE_RUN_EVENT_TYPES, SUITE_RUN_EVENT_VERSIONS } from "@langwatch/suite-contract";
 import type {
   SuiteRunItemCompletedEvent,
   SuiteRunItemStartedEvent,
   SuiteRunStartedEvent,
 } from "@langwatch/suite-contract";
-import { type SuiteRunStateData, SuiteRunStateFoldProjection } from "../suite-run-state.projection.ts";
+import { describe, expect, it } from "vitest";
+
+import {
+  type SuiteRunStateData,
+  SuiteRunStateFoldProjection,
+} from "../suite-run-state.projection.ts";
 
 const noopStore: FoldProjectionStore<SuiteRunStateData> = {
   store: async () => {},

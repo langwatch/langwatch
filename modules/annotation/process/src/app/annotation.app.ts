@@ -35,22 +35,23 @@ import {
 } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import {
   OrganizationApi,
   UserNotInOrganizationError,
   type User as OrganizationMember,
 } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+import { fromDate, nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile } from "@langwatch/user-contract";
-import { createLogger } from "@langwatch/observability";
-import { generate } from "@langwatch/ksuid";
-import { fromDate, nowInstant } from "@langwatch/time";
 import { z } from "zod";
+
 import type { AnnotationRepositories } from "#repositories/annotation.repositories";
-import { AnnotationService } from "#services/annotation.service";
 import { AnnotationQueueService } from "#services/annotation-queue.service";
 import { AnnotationScoreService } from "#services/annotation-score.service";
+import { AnnotationService } from "#services/annotation.service";
 
 /**
  * Everything the process hands this module, one member per key: repositories

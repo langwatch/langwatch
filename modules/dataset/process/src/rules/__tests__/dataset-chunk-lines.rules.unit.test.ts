@@ -1,10 +1,11 @@
+import { DatasetNotReadyError, DuplicateRecordIdError } from "@langwatch/dataset-contract";
 /**
  * The arithmetic and shape rules a chunked dataset's writes depend on: every row carries a
  * unique id, the offset index is the running sum of prior chunks, and a dataset that is not
  * ready is never mutated.
  */
 import { describe, expect, it } from "vitest";
-import { DatasetNotReadyError, DuplicateRecordIdError } from "@langwatch/dataset-contract";
+
 import {
   assertReady,
   isChunkLine,

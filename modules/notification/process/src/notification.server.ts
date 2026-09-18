@@ -1,5 +1,5 @@
-import type { Logger } from "@langwatch/observability";
 import { defineServerModule } from "@langwatch/kernel";
+import type { Logger } from "@langwatch/observability";
 
 import { NotificationApp } from "./app/notification.app.ts";
 import type {

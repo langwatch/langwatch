@@ -4,8 +4,9 @@
  */
 
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
+
 import { NavigationHostProvider } from "../../model/navigation-host.ts";
 import { StubNavigationHost } from "../../testing.tsx";
 import { useReachableProducts } from "../use-reachable-products.ts";

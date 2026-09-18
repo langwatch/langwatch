@@ -1,5 +1,5 @@
-import type { PersonalFeatures } from "@langwatch/organization-contract";
 import { createModuleApi } from "@langwatch/api/web";
+import type { PersonalFeatures } from "@langwatch/organization-contract";
 
 export type PersonalWorkspaceFeaturesApiMap = {
   personalWorkspaceFeatures: {

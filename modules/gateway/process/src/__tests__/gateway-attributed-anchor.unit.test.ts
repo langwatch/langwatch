@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it, vi } from "vitest";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { GatewayScopeOrgMismatchError } from "../index.ts";
 
 /**

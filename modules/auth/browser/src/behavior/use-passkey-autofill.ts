@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
-import { authClient, navigate, safeRedirectTarget } from "./auth-client.tsx";
+
 import { rememberLastUsedMethod } from "../model/last-used-method.ts";
 import {
   isCeremonyAbandoned,
   passkeyFailureFrom,
   readPasskeyErrorCode,
 } from "../model/passkey-failure.ts";
+import { authClient, navigate, safeRedirectTarget } from "./auth-client.tsx";
 
 /**
  * The waiting half: ask whether the browser can do this, then leave a

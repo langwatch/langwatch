@@ -1,7 +1,8 @@
 import type { ProcessStore } from "@langwatch/eventing";
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "../eventing/topic-clustering.process.ts";
 import { Temporal, type Instant } from "@langwatch/time";
+
 import type { TopicClusteringScheduleReader } from "../app/topic.app.ts";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "../eventing/topic-clustering.process.ts";
 
 /** Reads Topic's durable wake from the generic process-manager store. */
 export class EventingTopicClusteringScheduleService implements TopicClusteringScheduleReader {

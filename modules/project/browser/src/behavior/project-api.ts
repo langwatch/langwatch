@@ -4,6 +4,7 @@
  */
 
 import { createModuleApi } from "@langwatch/api/web";
+
 import type { ProjectHostOrganization, ProjectHostProject } from "../model/project-host.ts";
 
 export type ProjectApiMap = {
@@ -16,13 +17,13 @@ export type ProjectApiMap = {
       query: {
         input: { isDemo: boolean };
         output: (ProjectHostOrganization & {
-            slug: string;
-            teams: {
-              id: string;
-              name: string;
-              projects: ProjectHostProject[];
-            }[];
-          })[];
+          slug: string;
+          teams: {
+            id: string;
+            name: string;
+            projects: ProjectHostProject[];
+          }[];
+        })[];
       };
     };
 

@@ -8,8 +8,8 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
-import { GatewayAgentCacheService } from "../gateway-agent-cache.service.ts";
 import { MemoryGatewayAgentCacheEntryRepository } from "../../repositories/redis/redis.gateway-agent-cache.repository.ts";
+import { GatewayAgentCacheService } from "../gateway-agent-cache.service.ts";
 
 const encryption = {
   encrypt: (value: string) => `sealed:${value}`,

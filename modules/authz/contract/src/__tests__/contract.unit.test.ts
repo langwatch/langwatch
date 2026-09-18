@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
+
 import * as contract from "../index.ts";
 import {
   ALL_PERMISSIONS,

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeEngineCpuPercent, type RedisCpuSample } from "../rules/ops-redis-engine-cpu.rules.ts";
+
+import {
+  computeEngineCpuPercent,
+  type RedisCpuSample,
+} from "../rules/ops-redis-engine-cpu.rules.ts";
 
 const prev = (overrides: Partial<RedisCpuSample> = {}): RedisCpuSample => ({
   userSec: 100,

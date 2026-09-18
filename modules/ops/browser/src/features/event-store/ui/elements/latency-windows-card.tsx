@@ -1,5 +1,6 @@
 import { Card, HStack, Table, Text } from "@chakra-ui/react";
 import type { LatencyWindowPercentiles, LatencyWindows } from "@langwatch/ops-contract";
+
 import { formatCount, formatMs } from "../../../../model/ops-formatters.ts";
 
 const WINDOW_ROWS: { key: keyof LatencyWindows; label: string }[] = [

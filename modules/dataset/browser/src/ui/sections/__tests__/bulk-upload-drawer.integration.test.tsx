@@ -1,3 +1,4 @@
+import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment jsdom
  * Integration tests for bulk upload drawer. User-visible behavior of spec
@@ -6,7 +7,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
+
 import { renderWithDatasetHost } from "../../../testing.tsx";
 
 const requestDirectUpload = vi.fn();

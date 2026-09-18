@@ -1,10 +1,10 @@
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
@@ -240,7 +240,7 @@ function noopClickHouse(): ClickHouseQueryClient {
 }
 
 type DataRetentionTestInfrastructure = DataRetentionInfrastructure &
-  Readonly<{ clickhouse: ClickHouseQueryClient }>;
+  Readonly<{ clickhouse: ClickHouseQueryClient; nodeEnvironment: string | undefined }>;
 
 export function createDataRetentionTestInfrastructure(
   overrides: Partial<DataRetentionTestInfrastructure> = {},
@@ -250,6 +250,7 @@ export function createDataRetentionTestInfrastructure(
     plans: overrides.plans ?? MemoryRetentionPlans.create(),
     redis: overrides.redis ?? null,
     clickhouse: overrides.clickhouse ?? noopClickHouse(),
+    nodeEnvironment: overrides.nodeEnvironment ?? "test",
   };
 }
 
@@ -276,9 +277,10 @@ export function createDataRetentionTestApp(
       users: input.dependencies?.users ?? createDataRetentionTestUsers(),
     },
     config: {
-      platformDefaultRetentionDays:
-        input.platformDefaultRetentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      platformDefaultDays: input.platformDefaultRetentionDays?.toString(),
     },
     resources: new ResourceScope(),
+    // No handle is ever resolved through it in these tests.
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 }

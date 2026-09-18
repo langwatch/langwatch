@@ -4,12 +4,13 @@
  */
 
 import { useMemo } from "react";
-import { buildPairwiseComparisons } from "./batch-evaluation-results.pairwise.ts";
+
 import {
   type BTLeaderboard,
   type BTLeaderboardOptions,
   computeBTLeaderboard,
 } from "../../model/batch-evaluation-results.bt-leaderboard.ts";
+import { buildPairwiseComparisons } from "./batch-evaluation-results.pairwise.ts";
 import type { BatchComparisonColumn } from "./batch-evaluation-results.types.ts";
 
 /**

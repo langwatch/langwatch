@@ -1,9 +1,10 @@
-import { RuntimeConfig } from "@langwatch/config";
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { authzServerConfigDefinition } from "../authz.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "authz", definition: authzServerConfigDefinition, source }).value;
+import { authzServerConfig } from "../authz.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({ owners: [{ name: "authz", config: authzServerConfig }], environment }).authz;
 
 describe("authz server configuration", () => {
   describe("given the epoch cache switch carries the deployment's own spelling", () => {

@@ -6,18 +6,19 @@ import {
   loginKeyExpiresAt,
   CLI_LOGIN_KEY_NAME_PREFIX,
   type CliKeyScopeSummary,
-  type CliKeySelection
+  type CliKeySelection,
 } from "@langwatch/api-key-contract";
 import {
   ALL_PERMISSIONS,
   isRegistryPermission,
   type AuthzPermission,
 } from "@langwatch/authz-contract";
+import { Temporal, fromDate, type Instant } from "@langwatch/time";
+
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
-import { Temporal, fromDate, type Instant } from "@langwatch/time";
 
 export class ApiKeyCliService {
   static create(

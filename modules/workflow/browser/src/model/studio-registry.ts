@@ -3,7 +3,6 @@ import {
   evaluatorDisplayName,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-
 import type {
   BaseComponent,
   Code,

@@ -9,6 +9,7 @@
 import type { IntentContext } from "@langwatch/eventing";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+
 import type {
   IntentExecutor,
   SendBatchPayload,

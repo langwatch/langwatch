@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
@@ -11,6 +10,8 @@ import {
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
 } from "@langwatch/evaluation-contract";
+import { describe, expect, it } from "vitest";
+
 import { EvaluationAnalyticsFoldProjection } from "../eventing/evaluation-analytics-fold.projection.ts";
 import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
 

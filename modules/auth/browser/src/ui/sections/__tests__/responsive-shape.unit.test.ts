@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 /** Pins responsive prop contract to source; jsdom cannot see compiled Chakra props. */

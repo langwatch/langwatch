@@ -7,6 +7,7 @@ import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { ReportScheduleField } from "../ui/elements/report-schedule-field.tsx";
 
 // The viewer's locale is non-deterministic across machines/CI, so pin the

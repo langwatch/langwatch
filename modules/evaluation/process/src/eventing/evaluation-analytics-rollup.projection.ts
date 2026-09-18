@@ -1,10 +1,14 @@
-import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
 import {
   type EvaluationCompletedEvent,
   type EvaluationReportedEvent,
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
 } from "@langwatch/evaluation-contract";
+import {
+  type AppendStore,
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "@langwatch/eventing";
 import { Temporal, toDate } from "@langwatch/time";
 
 /** A moment as a ClickHouse statement carries it. The client serialises this into

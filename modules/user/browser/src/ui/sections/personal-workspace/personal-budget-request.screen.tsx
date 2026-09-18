@@ -10,9 +10,9 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { formatBudgetUsd } from "@langwatch/gateway-browser/surfaces/budget-overview";
 import { AlertTriangle, CheckCircle2, Mail, TrendingUp } from "lucide-react";
 import { useState } from "react";
-import { formatBudgetUsd } from "@langwatch/gateway-browser/surfaces/budget-overview";
 
 import { api } from "../../../behavior/personal-workspace-api.ts";
 import { useShowErrorToast } from "../../../behavior/personal-workspace-feedback.ts";

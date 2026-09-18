@@ -10,6 +10,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -146,6 +147,9 @@ function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
   return overrides as ProjectApi;
 }
 
+/** No handle is ever resolved through it in these tests. */
+const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
+
 function callerFor(budgets: Record<string, unknown>[]) {
   const app = GatewayApp.create({
     dependencies: {
@@ -188,6 +192,7 @@ function callerFor(budgets: Record<string, unknown>[]) {
       spendSettlementGraceMs: void 0,
     },
     resources: new ResourceScope(),
+    secrets: noSecrets,
   });
   const trpc = initTRPC.context<GatewayTrpcTestContext>().create();
   const router = createTrpcRuntime<GatewayTrpcTestContext>({

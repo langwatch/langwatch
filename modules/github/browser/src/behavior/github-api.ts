@@ -4,8 +4,8 @@
  * `@langwatch/api/web` import is the only one in the package.
  */
 
-import type { githubTrpc } from "@langwatch/github-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { githubTrpc } from "@langwatch/github-contract";
 
 export type GithubApiMap = ContractApiMap<typeof githubTrpc>;
 

@@ -1,7 +1,6 @@
 import { Button, Center, EmptyState, Flex, Spinner } from "@chakra-ui/react";
-import { Database } from "lucide-react";
-
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
+import { Database } from "lucide-react";
 
 import { BlobTable } from "../blocks/blob-table.tsx";
 

@@ -3,6 +3,7 @@
  */
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
+
 import { SuiteRunProcessingPipelineAdapter } from "./suite-run-processing.service.ts";
 
 /** Why the stand-in below refuses, in the process's own words. */
@@ -31,9 +32,9 @@ class ProducerOnlyFoldStore<TState> implements FoldProjectionStore<TState> {
 /**
  * Builds the suite-run-processing definition for a process that only sends commands on it.
  */
-function buildSuiteRunProcessingProducerPipeline(
-  input: { processName: string },
-): ReturnType<typeof SuiteRunProcessingPipelineAdapter.create> {
+function buildSuiteRunProcessingProducerPipeline(input: {
+  processName: string;
+}): ReturnType<typeof SuiteRunProcessingPipelineAdapter.create> {
   return SuiteRunProcessingPipelineAdapter.create({
     suiteRunStateFoldStore: new ProducerOnlyFoldStore<SuiteRunStateData>(
       input.processName,

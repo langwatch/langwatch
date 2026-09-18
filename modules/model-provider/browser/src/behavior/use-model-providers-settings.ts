@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   getModelMetadataForFrontend,
   mergeCustomModelMetadata,
   type ModelMetadataForFrontend,
 } from "@langwatch/model-provider-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useMemo } from "react";
 
 export type { ModelMetadataForFrontend };
 

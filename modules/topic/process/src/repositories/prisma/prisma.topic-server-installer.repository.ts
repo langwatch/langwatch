@@ -1,42 +1,46 @@
-import type { ProcessStore,StateProjectionStore } from "@langwatch/eventing";
+import type { ProcessStore, StateProjectionStore } from "@langwatch/eventing";
 import { EventSourcing } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
 import type { TopicApi, TopicClusteringModels } from "@langwatch/topic-contract";
 import { type AssignTopicCommandData, TraceTopicAssignment } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
+
+import type {
+  TopicClusteringClickHouseResolver,
+  TopicClusteringLangevalsKind,
+  TopicClusteringLangevals,
+  TopicClusteringCommands,
+} from "../../app/topic.members.ts";
+import type { TopicClusteringRunHistoryData } from "../../eventing/topic-clustering-run-history.projection.ts";
+import type { TopicClusteringRunStatusData } from "../../eventing/topic-clustering-run-status.projection.ts";
 import {
-  EventingTopicClusteringCommandsService,
-  EventingTopicClusteringOutcomeCommandsService,
-} from "../../services/topic-clustering-commands.service.ts";
-import { EventingTopicClusteringScheduleService } from "../../services/topic-clustering-schedule.service.ts";
-import {
-  createTopicClusteringProcessingPipeline,
-  type TopicClusteringProcessingPipelineDeps,
-} from "../../services/topic-clustering-eventing.service.ts";
-import { RedisTopicClusteringBootstrapRepository } from "../redis/redis.topic-clustering-bootstrap.repository.ts";
+  TopicClusteringRunner,
+  type TopicClusteringRunnerDeps,
+} from "../../eventing/topic-clustering-runner.intent.ts";
 import {
   classifyClusteringError,
   type TopicClusteringMetrics,
   type TopicClusteringRun,
 } from "../../eventing/topic-clustering.intent.ts";
-import {
-  TopicClusteringRunner,
-  type TopicClusteringRunnerDeps,
-} from "../../eventing/topic-clustering-runner.intent.ts";
+import type { TopicModelData } from "../../eventing/topic-model.projection.ts";
 import { LegacyImportTopicClusteringMigration } from "../../migrations/legacy-import.topic-clustering.migration.ts";
-import type { TopicClusteringClickHouseResolver,
-  TopicClusteringLangevalsKind,
-  TopicClusteringLangevals,TopicClusteringCommands } from "../../app/topic.members.ts";
-import type { TopicClusteringDatabase } from "./prisma.topic-clustering.repository.ts";
+import {
+  EventingTopicClusteringCommandsService,
+  EventingTopicClusteringOutcomeCommandsService,
+} from "../../services/topic-clustering-commands.service.ts";
+import {
+  createTopicClusteringProcessingPipeline,
+  type TopicClusteringProcessingPipelineDeps,
+} from "../../services/topic-clustering-eventing.service.ts";
+import { EventingTopicClusteringScheduleService } from "../../services/topic-clustering-schedule.service.ts";
+import { TopicService } from "../../services/topic.service.ts";
+import { RedisTopicClusteringBootstrapRepository } from "../redis/redis.topic-clustering-bootstrap.repository.ts";
+import type { TopicClusteringRepository } from "../topic-clustering.repository.ts";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./prisma.topic-clustering-run-history-projection.repository.ts";
 import { PrismaTopicClusteringRunProjectionRepository } from "./prisma.topic-clustering-run-projection.repository.ts";
+import type { TopicClusteringDatabase } from "./prisma.topic-clustering.repository.ts";
 import { PrismaTopicModelProjectionRepository } from "./prisma.topic-model-projection.repository.ts";
 import { PostgresTopicRepositories } from "./prisma.topic.repositories.ts";
-import type { TopicClusteringRepository } from "../topic-clustering.repository.ts";
-import type { TopicClusteringRunHistoryData } from "../../eventing/topic-clustering-run-history.projection.ts";
-import type { TopicClusteringRunStatusData } from "../../eventing/topic-clustering-run-status.projection.ts";
-import type { TopicModelData } from "../../eventing/topic-model.projection.ts";
-import { TopicService } from "../../services/topic.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** The clustering pipeline's Postgres persistence, keyed as the registry expects it. */
 export interface TopicClusteringPersistence {

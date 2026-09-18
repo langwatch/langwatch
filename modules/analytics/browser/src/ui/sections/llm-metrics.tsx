@@ -1,11 +1,12 @@
 import { Card, Grid, GridItem, Heading, HStack, IconButton, Tabs } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUpRight } from "lucide-react";
+
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { analyticsMetrics } from "../../model/analytics-registry.ts";
+import { Link } from "../elements/analytics-link.tsx";
 import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
 import { LLMSummary } from "./llm-summary.tsx";
-import { Link } from "../elements/analytics-link.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

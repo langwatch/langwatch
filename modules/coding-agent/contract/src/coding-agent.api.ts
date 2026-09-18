@@ -1,4 +1,14 @@
-import type { CodingAgentSessionLookupInput,
+import { moduleApi } from "@langwatch/kernel/module-api";
+import type { SpanDetail } from "@langwatch/trace-contract";
+
+import type { LogContentKey } from "./coding-agent-log-content.ts";
+import type {
+  CodingAgentTracePullRequestInput,
+  CodingAgentTracePullRequestLink,
+} from "./coding-agent-trace-pull-request.ts";
+import type { CodingAgentTranscript, TranscriptLogRecord } from "./coding-agent-transcript.ts";
+import type {
+  CodingAgentSessionLookupInput,
   CodingAgentGithubConnection,
   CodingAgentPersonalPullRequestUsage,
   CodingAgentPullRequestDetail,
@@ -12,15 +22,8 @@ import type { CodingAgentSessionLookupInput,
   CodingAgentSessionListRow,
   CodingAgentSessionsListInput,
   CodingAgentUsageTotals,
-  CodingAgentUsageTotalsInput } from "./coding-agent.ts";
-import { moduleApi } from "@langwatch/kernel";
-import type { SpanDetail } from "@langwatch/trace-contract";
-import type { CodingAgentTranscript, TranscriptLogRecord } from "./coding-agent-transcript.ts";
-import type { LogContentKey } from "./coding-agent-log-content.ts";
-import type {
-  CodingAgentTracePullRequestInput,
-  CodingAgentTracePullRequestLink,
-} from "./coding-agent-trace-pull-request.ts";
+  CodingAgentUsageTotalsInput,
+} from "./coding-agent.ts";
 
 export type CodingAgentCallerScope =
   | { readonly kind: "user"; readonly userId: string }

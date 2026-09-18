@@ -1,5 +1,6 @@
 import { AuthzEngine, type CollectedGrants, type ResourceGrant } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   binding,
   grantOn,

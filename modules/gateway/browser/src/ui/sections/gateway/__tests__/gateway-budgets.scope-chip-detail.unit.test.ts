@@ -1,10 +1,10 @@
+import { scopeChipTooltip } from "@langwatch/authz-browser-kit/scope-picker";
 /**
  * @vitest-environment node
  * The detail string that feeds the scope chip tooltip.
  */
 import { describe, expect, it } from "vitest";
 
-import { scopeChipTooltip } from "@langwatch/authz-browser-kit/scope-picker";
 import { scopeChipDetail } from "../gateway-budgets.screen.tsx";
 
 describe("scopeChipDetail", () => {

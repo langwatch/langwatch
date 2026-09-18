@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { AutomationClient } from "../automation-client.ts";
 describe("AutomationClient", () => {
   it("validates trigger rows at the browser boundary", async () => {

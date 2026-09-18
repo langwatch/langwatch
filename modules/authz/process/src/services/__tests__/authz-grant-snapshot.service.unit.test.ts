@@ -4,6 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { AuthzGrantSnapshotService } from "../authz-grant-snapshot.service.ts";
 
 type Options = {

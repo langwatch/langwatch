@@ -7,9 +7,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import type { FilterField } from "../../../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../../../model/analytics-filter-params.ts";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { SeriesFiltersDialog } from "../series-filters-dialog.tsx";
 
 vi.mock("../../../behavior/use-filter-params.ts", () => ({

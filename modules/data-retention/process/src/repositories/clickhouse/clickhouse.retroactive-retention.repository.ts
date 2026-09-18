@@ -1,12 +1,13 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   RetroactiveMutationInProgressError,
   retroactiveMutationProgressSchema,
   type RetentionCategory,
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
-import { z } from "zod";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { z } from "zod";
+
 import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
 import {
   eventLogRetentionCategoryFromMutationCommand,

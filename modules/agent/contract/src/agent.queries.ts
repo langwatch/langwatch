@@ -1,7 +1,8 @@
 import { z } from "zod";
+
+import { agentResponseSchema } from "./agent-rest.schemas.ts";
 import { agentSchema, agentViewSchema, agentWithFieldsSchema } from "./agent.ts";
 import { agentTypeSchema } from "./config/index.ts";
-import { agentResponseSchema } from "./agent-rest.schemas.ts";
 
 export const agentPaginationSchema = z.object({
   page: z.number().int().positive(),
@@ -83,7 +84,7 @@ export const agentListViewSchema = z.object({
 export const archivedAgentViewSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.enum(["signature", "code", "workflow", "http", "connected"]),
+  type: z.enum(["signature", "code", "workflow", "http", "connected", "voice"]),
   archivedAt: z.date(),
 });
 

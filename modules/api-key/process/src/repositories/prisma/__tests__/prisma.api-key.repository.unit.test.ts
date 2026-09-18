@@ -5,9 +5,10 @@
  * these cases pin both listings to the contract's list, not to today's names.
  */
 import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
-import { describe, expect, it, vi } from "vitest";
-import { PrismaApiKeyRepository, type PrismaApiKeyDatabase } from "../prisma.api-key.repository.ts";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { PrismaApiKeyRepository, type PrismaApiKeyDatabase } from "../prisma.api-key.repository.ts";
 
 function repositoryWithSpy() {
   const findMany = vi.fn(async () => []);

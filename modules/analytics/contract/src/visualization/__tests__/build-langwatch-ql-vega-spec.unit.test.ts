@@ -4,16 +4,16 @@
  */
 import { describe, expect, it } from "vitest";
 
-import callerSuppliedDatasets from "./fixtures/adversarial/caller-supplied-datasets.json";
-import usermetaEmbedOptions from "./fixtures/adversarial/usermeta-embed-options.json";
-import barOverQueryResult from "./fixtures/valid/bar-over-query-result.json";
-import lookupBetweenRegisteredDatasets from "./fixtures/valid/lookup-between-registered-datasets.json";
 import {
   buildLangWatchQLVegaSpec,
   mergeConfig,
   referencedDatasetNames,
 } from "../build-langwatch-ql-vega-spec.ts";
 import type { LangWatchQLDataset } from "../visualization-types.ts";
+import callerSuppliedDatasets from "./fixtures/adversarial/caller-supplied-datasets.json";
+import usermetaEmbedOptions from "./fixtures/adversarial/usermeta-embed-options.json";
+import barOverQueryResult from "./fixtures/valid/bar-over-query-result.json";
+import lookupBetweenRegisteredDatasets from "./fixtures/valid/lookup-between-registered-datasets.json";
 
 const QUERY_ROWS: LangWatchQLDataset = [
   { model: "gpt-5-mini", total: 3 },

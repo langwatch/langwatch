@@ -17,10 +17,9 @@
  */
 
 import { Box, HStack, Input, Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface EditableWidgetNameInputProps {
   draft: string;

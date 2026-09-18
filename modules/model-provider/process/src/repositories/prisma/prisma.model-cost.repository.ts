@@ -1,11 +1,12 @@
-import { type CustomLLMModelCost, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   modelCostSchema,
   type ModelCost,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import type { ModelCostRepository } from "../model-cost.repository.ts";
+import { type CustomLLMModelCost, PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules.ts";
+import type { ModelCostRepository } from "../model-cost.repository.ts";
 
 type Database = Pick<PrismaClient, "customLLMModelCost">;
 

@@ -6,6 +6,7 @@ import {
   type TopicNamesInput,
   type TopicProjectInput,
 } from "@langwatch/topic-contract";
+
 import type { TopicClusteringStatusRecord, TopicRepository } from "../topic.repository.ts";
 import type { TopicMemoryStore } from "./topic-memory.store.ts";
 

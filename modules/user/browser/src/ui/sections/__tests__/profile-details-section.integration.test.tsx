@@ -6,6 +6,7 @@
 
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
 import type { FakePersonalHostOptions } from "../../../testing.tsx";
 import { ProfileDetailsSection } from "../profile-details-section.tsx";

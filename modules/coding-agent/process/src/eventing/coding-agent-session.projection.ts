@@ -1,6 +1,3 @@
-import { type FoldProjectionOptions, type FoldProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
-import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
@@ -10,15 +7,24 @@ import {
   spanFactsContributedEventSchema,
 } from "@langwatch/coding-agent-contract";
 import {
+  type FoldProjectionOptions,
+  type FoldProjectionStore,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+
+import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
+import { CodingAgentSessionLogProjection } from "./coding-agent-session-log.projection.ts";
+import { CodingAgentSessionMetricProjection } from "./coding-agent-session-metric.projection.ts";
+import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";
+import {
   type CodingAgentSessionData,
   type MetricSeriesFact,
   type SessionTitleSource,
   CodingAgentSessionStateProjection,
   sessionTitleSourceSchema,
 } from "./coding-agent-session-state.projection.ts";
-import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";
-import { CodingAgentSessionLogProjection } from "./coding-agent-session-log.projection.ts";
-import { CodingAgentSessionMetricProjection } from "./coding-agent-session-metric.projection.ts";
 
 /** Session fold; spans multiple traces via provider session key or trace id fallback. */
 const codingAgentSessionEvents = [

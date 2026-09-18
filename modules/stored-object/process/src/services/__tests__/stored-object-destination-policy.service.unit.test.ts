@@ -3,11 +3,14 @@
  * Tests for StoredObjectDestinationPolicyAdapter — BYOC-first destination precedence.
  */
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   AzureBackendMisconfiguredError,
-  type AzureBlobCredentialsConfig,AzureBlobCredentialsAdapter
+  type AzureBlobCredentialsConfig,
+  AzureBlobCredentialsAdapter,
 } from "../azure-blob-credentials.service.ts";
 const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 import {

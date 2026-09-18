@@ -1,5 +1,6 @@
 import { chakra } from "@chakra-ui/react";
 import { Fragment, memo, useMemo } from "react";
+
 import { type AnsiSegment, type AnsiStyle, parseAnsi } from "./terminal-ansi-parser.ts";
 import { ansiColorToken, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 

@@ -1,5 +1,6 @@
 import { DispatchError, isDispatchError } from "@langwatch/eventing";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import {
   createSettlementFixture,
   settlementContext,

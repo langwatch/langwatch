@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { AnnotationAvatarGroup } from "../../elements/annotation-avatar-group.tsx";
 import { AnnotationScoresChip } from "../../elements/annotation-scores-chip.tsx";
 

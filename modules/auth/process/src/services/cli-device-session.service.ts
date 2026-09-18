@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 /**
  * The RFC 8628 device grant's state: device codes, their user-code index, the poll window,
  * and the access/refresh token pair a completed grant mints.
@@ -8,10 +10,9 @@ import {
   cliRefreshTokenKey,
   cliUserTokensIndexKey,
 } from "@langwatch/auth-contract";
-import { randomBytes } from "node:crypto";
+import { nowInstant } from "@langwatch/time";
 
 import type { CliDeviceSessionRepository } from "../repositories/cli-device-session.repository.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** Redis key prefix for device-code records. */
 const DEVICE_CODE_PREFIX = "lwcli:device:";

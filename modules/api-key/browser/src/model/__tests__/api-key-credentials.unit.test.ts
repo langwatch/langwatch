@@ -3,8 +3,9 @@
 // Spec: specs/api-keys/token-created-snippets.feature
 
 import { describe, expect, it } from "vitest";
-import { buildMcpJson, formatEnvLines, maskApiKey, maskSecret } from "../api-key-snippets.ts";
+
 import { apiKeyRowAnchorId, apiKeySettingsHref } from "../api-key-anchor.ts";
+import { buildMcpJson, formatEnvLines, maskApiKey, maskSecret } from "../api-key-snippets.ts";
 
 const TOKEN = "sk-lw-averyrealsecrettokenvalue";
 

@@ -7,6 +7,7 @@
 
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelsSection } from "../default-models-section.tsx";
 import "@testing-library/jest-dom/vitest";

@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import type { RetentionScopeGroup } from "../retention-grouping.ts";
 import { retentionRemovalPreviewQuery } from "../retention-removal-preview.ts";
 

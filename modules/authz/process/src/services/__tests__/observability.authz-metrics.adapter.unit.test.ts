@@ -3,6 +3,7 @@
  */
 import { Registry } from "prom-client";
 import { describe, expect, it } from "vitest";
+
 import { ObservabilityAuthzMetricsAdapter } from "../authz-metrics.service.ts";
 import { ObservabilityAuthzRevocationAdapter } from "../authz-revocation-telemetry.service.ts";
 

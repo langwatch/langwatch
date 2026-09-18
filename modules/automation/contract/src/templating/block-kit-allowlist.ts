@@ -479,9 +479,7 @@ function findSanitizedDataTable(block: Record<string, unknown>): Record<string, 
   return out;
 }
 
-function findSanitizedGatedBlock(
-  block: Record<string, unknown>,
-): Record<string, unknown> | null {
+function findSanitizedGatedBlock(block: Record<string, unknown>): Record<string, unknown> | null {
   switch (block.type) {
     case "alert":
       return findSanitizedAlert(block);

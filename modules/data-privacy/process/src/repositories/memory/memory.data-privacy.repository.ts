@@ -8,6 +8,7 @@ import {
 } from "@langwatch/data-privacy-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import type { DataPrivacyPolicyRepository } from "../data-privacy.repository.ts";
 
 const DATA_PRIVACY_POLICY_KSUID_RESOURCE = "privacy";

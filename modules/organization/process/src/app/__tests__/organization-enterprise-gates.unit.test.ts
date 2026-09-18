@@ -5,15 +5,23 @@
  * @see specs/features/enterprise-feature-guards.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  ServerOrganizationApp,
+  type ServerOrganizationAppDependencies,
+} from "../organization.app.ts";
 import type { OrganizationPlanGate } from "../organization.members.ts";
-import { ServerOrganizationApp, type ServerOrganizationAppDependencies } from "../organization.app.ts";
 
 const ORGANIZATION_ID = "org-1";
-const TEAM = { id: "team-1", name: "Engineering", slug: "engineering", organizationId: ORGANIZATION_ID };
+const TEAM = {
+  id: "team-1",
+  name: "Engineering",
+  slug: "engineering",
+  organizationId: ORGANIZATION_ID,
+};
 const CALLER: OrganizationCaller = { id: "user-1", name: "Sam", email: "sam@acme.test" };
 
 /** The refusal a deployment without the capability answers with. */

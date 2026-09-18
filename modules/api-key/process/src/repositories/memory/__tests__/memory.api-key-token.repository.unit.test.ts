@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
 import {
   API_KEY_PREFIX,
   getTokenType,
   INGEST_KEY_PREFIX,
   splitApiKeyToken,
 } from "@langwatch/api-key-contract";
+import { describe, expect, it } from "vitest";
+
 import { ApiKeyTokenAdapter } from "../memory.api-key-token.repository.ts";
 
 const PEPPER = "test-pepper";

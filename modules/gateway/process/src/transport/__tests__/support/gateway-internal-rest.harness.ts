@@ -11,15 +11,15 @@ import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
+  buildGatewayCanonicalString,
+  computeGatewaySignature,
+  GatewayInternalIdentity,
+} from "../../../services/gateway-internal-identity.service.ts";
+import {
   GatewayInternalProtocolService,
   type GatewayInternalProtocolMembers,
 } from "../../../services/gateway-internal-protocol.service.ts";
-import {
-  buildGatewayCanonicalString,
-  computeGatewaySignature,
-  gatewayInternalRest,
-  gatewayInternalSignature,
-} from "../../gateway-internal.rest.ts";
+import { gatewayInternalRest } from "../../gateway-internal.rest.ts";
 
 /**
  * Sequential-hex HMAC fixture, not a credential; allowlisted by path in
@@ -94,17 +94,12 @@ export function mountGatewayInternalRest(
     "GatewayApi",
   );
   const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("this family resolves no framework credential");
-      },
-    },
+    identity: GatewayInternalIdentity.create(secret),
   });
 
   return runtime.mount(gatewayInternalRest.router(), {
     app: () => app,
     onError: renderUnexpected,
-    middleware: [gatewayInternalSignature(() => secret)],
   });
 }
 

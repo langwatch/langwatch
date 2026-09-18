@@ -50,7 +50,7 @@ const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
  * see the handoff. Default preserves the deleted schema's producer-role default.
  */
 type IdentityMembers = MembersRead<readonly ["prisma", "eventing"]> &
-  Readonly<{ registersPipelines: boolean }>;
+  Readonly<{ producesPipelines: boolean }>;
 
 type IdentitySetup = FeatureSetup<Record<string, never>, IdentityMembers, IdentityConfig> &
   Readonly<{ repositories: IdentityRepositories }>;
@@ -79,14 +79,14 @@ export class IdentityApp implements IdentityApi {
   static readonly config = identityConfig;
   /** `registersPipelines` is named raw so the process can answer it through
    * `withMember`/`withMembers` (see {@link IdentityMembers}). */
-  static readonly reads = [...reads("prisma", "eventing"), "registersPipelines"] as const;
+  static readonly reads = [...reads("prisma", "eventing"), "producesPipelines"] as const;
 
   static create(setup: IdentitySetup): IdentityApp {
     const infrastructure = buildIdentityInfrastructure({
       prisma: setup.members.prisma,
       eventing: setup.members.eventing,
       adminEmails: setup.config.adminEmails,
-      registersPipelines: setup.members.registersPipelines,
+      registersPipelines: setup.members.producesPipelines,
     });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create(

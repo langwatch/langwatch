@@ -1,4 +1,7 @@
-import type { MetricDataPointPreparation, MetricPiiRedactionLevel } from "@langwatch/metric-contract";
+import type {
+  MetricDataPointPreparation,
+  MetricPiiRedactionLevel,
+} from "@langwatch/metric-contract";
 export type MetricPreparationInput = {
   tenantId: string;
   organizationId: string;
@@ -6,7 +9,6 @@ export type MetricPreparationInput = {
   piiRedactionLevel: MetricPiiRedactionLevel;
   acceptedAt?: number;
 };
-
 
 export interface MetricPreparation {
   prepare(input: MetricPreparationInput): Promise<MetricDataPointPreparation>;

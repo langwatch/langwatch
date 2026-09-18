@@ -1,4 +1,5 @@
 import type { AggregationTemporality, MetricKind } from "@langwatch/metric-contract";
+
 import { isRecord, type UnknownRecord } from "./metric-serialization.rules.ts";
 
 /** The OTLP field name carrying each kind's data container. */

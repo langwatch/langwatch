@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { EvaluationNameAutoslugService } from "../evaluation-name-autoslug.service.ts";
 
 const evaluationNameAutoslug = (name: string): string =>

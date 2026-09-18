@@ -11,13 +11,14 @@ import type {
   Trigger,
 } from "@langwatch/automation-contract";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
+import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
+
 import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
 import { AutomationSlackProvider } from "../../services/automation-slack-secrets.service.ts";
 import { ReportChartService } from "../report-chart.service.ts";
 import { ReportDispatchService, type ReportDispatchDeps } from "../report-dispatch.service.ts";
 import { ReportTraceRowService } from "../report-trace-row.service.ts";
-import { fromDate } from "@langwatch/time";
 
 const BASE_HOST = "https://app.langwatch.test";
 const PROJECT = { id: "project-1", name: "Checkout", slug: "checkout" };

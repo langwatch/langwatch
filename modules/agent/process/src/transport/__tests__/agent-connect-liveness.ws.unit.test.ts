@@ -1,4 +1,3 @@
-import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fixture.ts";
 /**
  * The gateway's own heartbeat: an unanswered ping retires the socket, and a
  * mid-registration close leaves nothing behind (ADR-128, "Transport").
@@ -7,13 +6,16 @@ import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fix
 import { createServer, type Server, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { Duplex } from "node:stream";
+
 import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
+import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import { ConnectedAgentRuntimeService } from "../../services/connected-agent-runtime.service.ts";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+
+import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fixture.ts";
 import type { ConnectedAgentCredentials } from "../../services/connected-agent-credential.service.ts";
-import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
+import { ConnectedAgentRuntimeService } from "../../services/connected-agent-runtime.service.ts";
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
 import { ConnectGatewayFixture } from "./agent-connect-gateway.fixture.ts";
 

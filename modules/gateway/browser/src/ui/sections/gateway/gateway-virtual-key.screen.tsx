@@ -1,4 +1,3 @@
-import { readableDate } from "../../../model/readable-date.ts";
 import {
   Badge,
   Box,
@@ -14,7 +13,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { keepPreviousData } from "../../../model/keep-previous-data.ts";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import {
   ArrowLeft,
@@ -37,40 +40,37 @@ import {
   YAxis,
 } from "recharts";
 
-import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { api } from "../../../behavior/gateway-api.ts";
+import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { useRollingWindow } from "../../../behavior/use-rolling-window.ts";
+import { GuardrailAttachmentsSection } from "../../../features/guardrails/ui/sections/guardrail-attachments-section.tsx";
+import {
+  firstEligibleDefaultModel,
+  type OrgModelProvider,
+} from "../../../features/virtual-keys/model/eligible-model-providers.ts";
+import { resolveTracesHrefForKey } from "../../../features/virtual-keys/model/traces-href-for-key.ts";
+import {
+  formatExpiry,
+  isExpired,
+} from "../../../features/virtual-keys/model/virtual-key-expiration.ts";
 import {
   ConfigureModelProvidersLink,
   EligibleModelProvidersPreview,
   EligibleModelProvidersSummary,
 } from "../../../features/virtual-keys/ui/blocks/eligible-model-providers-preview.tsx";
-import {
-  firstEligibleDefaultModel,
-  type OrgModelProvider,
-} from "../../../features/virtual-keys/model/eligible-model-providers.ts";
-import { GuardrailAttachmentsSection } from "../../../features/guardrails/ui/sections/guardrail-attachments-section.tsx";
-import { resolveTracesHrefForKey } from "../../../features/virtual-keys/model/traces-href-for-key.ts";
+import { VirtualKeyOwnershipReadOnly } from "../../../features/virtual-keys/ui/blocks/virtual-key-ownership-section.tsx";
 import {
   type VirtualKeyDetail,
   VirtualKeyEditDrawer,
 } from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
-import { VirtualKeyOwnershipReadOnly } from "../../../features/virtual-keys/ui/blocks/virtual-key-ownership-section.tsx";
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
 import { VirtualKeyUsageSnippet } from "../../../features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx";
-import {
-  formatExpiry,
-  isExpired,
-} from "../../../features/virtual-keys/model/virtual-key-expiration.ts";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+import { keepPreviousData } from "../../../model/keep-previous-data.ts";
+import { readableDate } from "../../../model/readable-date.ts";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
-import { useRollingWindow } from "../../../behavior/use-rolling-window.ts";
-import { api } from "../../../behavior/gateway-api.ts";
-import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
 function VirtualKeyDetailPage() {
   const showErrorToast = useShowErrorToast();
@@ -234,8 +234,7 @@ function VirtualKeyDetailPage() {
 
   const guardrailAttachments = useMemo(
     () =>
-      ((vk?.config as { guardrailAttachments?: unknown } | null)?.guardrailAttachments ??
-        []) as {
+      ((vk?.config as { guardrailAttachments?: unknown } | null)?.guardrailAttachments ?? []) as {
         direction: "pre" | "post" | "stream_chunk";
         guardrailIds: string[];
       }[],

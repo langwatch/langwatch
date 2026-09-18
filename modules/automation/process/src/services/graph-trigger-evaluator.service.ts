@@ -2,8 +2,9 @@ import type {
   GraphTriggerEvaluationReason,
   GraphTriggerEvaluationResult,
 } from "@langwatch/automation-contract";
-import { GraphTriggerIncidentService } from "./graph-trigger-incident.service.ts";
+
 import { GraphTriggerEvaluationPlanService } from "./graph-trigger-evaluation-plan.service.ts";
+import { GraphTriggerIncidentService } from "./graph-trigger-incident.service.ts";
 import { GraphTriggerSeriesEvaluationService } from "./graph-trigger-series-evaluation.service.ts";
 import type { GraphTriggerEvaluationDeps } from "./trigger-evaluator.service.ts";
 

@@ -5,8 +5,8 @@
  */
 import { z } from "zod";
 
-import { lwqlTimeWindowSchema, type LangWatchQLProtections } from "./analytics.lwql.ts";
 import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
+import { lwqlTimeWindowSchema, type LangWatchQLProtections } from "./analytics.lwql.ts";
 
 /**
  * The caller-specific content gates the catalog understands, as a value a
@@ -33,12 +33,7 @@ export const MAX_LWQL_LENGTH = 50_000;
  * anything structured would be one whose shape a declared ClickHouse type
  * cannot describe.
  */
-export const lwqlParameterValueSchema = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.null(),
-]);
+export const lwqlParameterValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
 /**
  * The datapoint step a caller may request, as every door accepts it — one of

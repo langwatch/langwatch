@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { FullLogo } from "../elements/icons/full-logo.tsx";
 

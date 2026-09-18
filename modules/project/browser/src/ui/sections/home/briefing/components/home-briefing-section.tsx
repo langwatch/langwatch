@@ -1,11 +1,12 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { LangyPanelSurface } from "@langwatch/langy-browser/surfaces/asaplangy";
 import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+
+import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
 import { useLangyBriefing } from "../hooks/use-langy-briefing.ts";
 import type { BriefingReceipt } from "../types.ts";
 import { HomeOverviewCard } from "./home-overview-card.tsx";
 import { LangyBriefing } from "./langy-briefing.tsx";
-import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
 
 /**
  * The briefing sheet that leads the home: Langy's read AND the project's numbers on ONE Langy

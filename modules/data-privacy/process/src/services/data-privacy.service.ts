@@ -1,4 +1,3 @@
-import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import {
   DepartmentScopeOwnershipUnavailableError,
   dataPrivacyConfigSchema,
@@ -9,12 +8,14 @@ import {
   type DataPrivacyScope,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import safe from "safe-regex2";
+
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
 import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service.ts";
 import { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 
 export class DataPrivacyService {
   private constructor(

@@ -1,4 +1,5 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type {
   AuthenticatedExperimentTarget,
   ExperimentCatalogueEntry,
@@ -8,7 +9,6 @@ import type {
 } from "./feature-flag-experiment.ts";
 import type { FeatureFlagRules } from "./feature-flag-rules.ts";
 import type { FeatureFlagTarget } from "./feature-flag-target.ts";
-import type { FeatureFlagKey } from "./feature-flag.ts";
 import type {
   ExperimentEnrolmentForCaller,
   ExperimentTenantPolicyForCaller,
@@ -19,6 +19,7 @@ import type {
   OperatorFeatureFlagCatalogue,
   OrganizationFeatureFlagsForCaller,
 } from "./feature-flag.schemas.ts";
+import type { FeatureFlagKey } from "./feature-flag.ts";
 import type { FrontendFeatureFlag } from "./frontend-feature-flags.ts";
 import type { PublicAnonymousFlagMap } from "./public-anonymous-feature-flags.ts";
 

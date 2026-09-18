@@ -1,11 +1,12 @@
 import { Box, Center, Link, Table, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal } from "@langwatch/time";
 import { ExternalLink } from "react-feather";
+
+import { analyticsApi } from "../../behavior/analytics-api.ts";
+import { useFilterParams } from "../../behavior/use-filter-params.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { traceDetailsAddress } from "../../model/analytics-overlay-address.ts";
-import { useFilterParams } from "../../behavior/use-filter-params.ts";
-import { analyticsApi } from "../../behavior/analytics-api.ts";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { SummaryMetricValue } from "../elements/summary-metric.tsx";
 
 function voteGlyph(vote: number | null | undefined): string {

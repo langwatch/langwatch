@@ -1,25 +1,26 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type {
   CustomGraph,
   GraphTriggerEvaluationReason,
   Trigger,
 } from "@langwatch/automation-contract";
-import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import {
-  GRAPH_TRIGGER_MAX_RESULT_ROWS,
-  type GraphTriggerEvaluationDeps,
-  type TimeseriesResult,
-  type ProjectIdentity,
-} from "../services/trigger-evaluator.service.ts";
-import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service.ts";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { GraphAlertDispatchResult } from "../app/automation.members.ts";
 import {
   type GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
 } from "../repositories/graph-trigger-sent.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
-import { type Instant, Temporal, toDate } from "@langwatch/time";
+import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service.ts";
+import {
+  GRAPH_TRIGGER_MAX_RESULT_ROWS,
+  type GraphTriggerEvaluationDeps,
+  type TimeseriesResult,
+  type ProjectIdentity,
+} from "../services/trigger-evaluator.service.ts";
 
 class DispatchError extends Error {
   constructor(options: { message: string; retryable: boolean }) {

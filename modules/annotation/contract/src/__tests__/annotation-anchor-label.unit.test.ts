@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { describeAnnotationAnchor } from "../index.ts";
 
 const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";

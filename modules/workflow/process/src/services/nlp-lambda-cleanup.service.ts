@@ -5,6 +5,7 @@
  */
 import type { Logger } from "@langwatch/observability";
 import { Temporal, nowInstant, type Instant } from "@langwatch/time";
+
 import type { NlpLambdaFleet } from "../app/workflow.app.ts";
 import { NLP_LAMBDA_NAME_PREFIX } from "../rules/nlp-lambda-config.rules.ts";
 

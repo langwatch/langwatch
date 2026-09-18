@@ -4,13 +4,14 @@
  * source of truth on cloud, and the organization's own claim still refuses a concurrent pass.
  */
 
-import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import {
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationNotAvailableOnInstallationError,
   MigrationPassAlreadyRunningError,
   MigrationRunRequiresEnrollmentError,
 } from "@langwatch/ops-contract";
+import type { TenantMigrationStatus } from "@langwatch/system-migrations";
+
 import {
   statusOfMemberSummary,
   type SystemMigrationsServiceDependencies,

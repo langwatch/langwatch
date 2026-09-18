@@ -1,5 +1,9 @@
+import {
+  LangWatchQLUnparseableError,
+  LangWatchQLNotPermittedError,
+} from "@langwatch/analytics-contract";
 import type { HandledError } from "@langwatch/handled-error";
-import { LangWatchQLUnparseableError, LangWatchQLNotPermittedError } from "@langwatch/analytics-contract";
+
 import type { RejectedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
 /** Names a refusal from the validator as the handled error the boundary ships. */

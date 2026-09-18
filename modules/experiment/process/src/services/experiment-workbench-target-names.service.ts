@@ -1,5 +1,5 @@
-import { createLogger } from "@langwatch/observability";
 import { pickTargetName, type TargetConfig } from "@langwatch/experiment-contract";
+import { createLogger } from "@langwatch/observability";
 import type { PromptApi } from "@langwatch/prompt-contract";
 
 /**

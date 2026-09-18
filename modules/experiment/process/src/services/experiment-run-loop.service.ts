@@ -4,8 +4,9 @@
  * it — and the concurrency limit both phases share, so progress stays honest across the two.
  */
 
-import { createLogger } from "@langwatch/observability";
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
+import { createLogger } from "@langwatch/observability";
+
 import { createSemaphore } from "../eventing/experiment-run-semaphore.process.ts";
 
 const logger = createLogger("langwatch:experiment:run-loop");

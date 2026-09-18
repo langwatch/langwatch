@@ -1,22 +1,21 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
+import { Prisma } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * History folded by an older rollup view must survive the rebuild that
  * replaced it. Spec: specs/ai-gateway/budgets.feature
  */
 import { type Instant, nowInstant } from "@langwatch/time";
-import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { Prisma } from "@langwatch/prisma-client/generated";
-import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
-
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
+import { replayGooseMigrationUp, replayRollupRebuild } from "./support/goose-migration-replay.ts";
 import {
   startMigratedGatewayClickHouse,
   type MigratedClickHouse,
 } from "./support/migrated-clickhouse.harness.ts";
-import { replayGooseMigrationUp, replayRollupRebuild } from "./support/goose-migration-replay.ts";
 
 const suffix = nanoid(8);
 const TENANT_ID = `proj-rebuild-${suffix}`;

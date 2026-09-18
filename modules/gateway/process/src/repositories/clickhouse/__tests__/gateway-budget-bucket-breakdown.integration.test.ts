@@ -3,20 +3,21 @@
  * @vitest-environment node
  */
 
+import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
+import { PROVIDER_BUCKET_SEPARATOR } from "@langwatch/gateway-contract";
+import { Prisma } from "@langwatch/prisma-client/generated";
 import { type Instant, nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/gateway-contract";
-import { Prisma } from "@langwatch/prisma-client/generated";
-import {
-  createTestClickHouseClient,
-  testClickHouseUrl,
-} from "./support/clickhouse-endpoint.support.ts";
+
 import {
   type BucketSpend,
   GatewayBudgetClickHouseRepository,
 } from "../clickhouse.gateway-budget.repository.ts";
-import { PROVIDER_BUCKET_SEPARATOR } from "@langwatch/gateway-contract";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "./support/clickhouse-endpoint.support.ts";
 
 const chUrl = testClickHouseUrl();
 

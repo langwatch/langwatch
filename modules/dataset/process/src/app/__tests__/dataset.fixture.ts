@@ -1,17 +1,17 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import { ResourceScope } from "@langwatch/kernel";
+import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
-import type { DatasetAppConfig, DatasetInfrastructure } from "../dataset.app.ts";
-import { DatasetApp } from "../dataset.app.ts";
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
 import { DatasetRequestBoundsService } from "../../services/dataset-request-bounds.service.ts";
+import type { DatasetInfrastructure } from "../dataset.app.ts";
+import { DatasetApp } from "../dataset.app.ts";
 
 /** One experiment, as this feature reads it: a name to borrow and an id. */
 export function datasetTestExperiment(
@@ -92,13 +92,13 @@ export function createDatasetTestApp(
   input: Readonly<{
     repositories?: DatasetRepositories;
     members?: DatasetInfrastructure;
+    publicBaseUrl?: string;
     dependencies?: Partial<{
       experiments: ExperimentApi;
       permissions: AuthzApi;
       projects: ProjectApi;
       entitlement: EntitlementApi;
     }>;
-    config?: DatasetAppConfig;
   }> = {},
 ): DatasetApp {
   return DatasetApp.create({
@@ -109,8 +109,9 @@ export function createDatasetTestApp(
       projects: input.dependencies?.projects ?? createDatasetTestProjects(),
       entitlement: input.dependencies?.entitlement ?? createDatasetTestEntitlement(),
     },
-    members: input.members ?? {},
-    config: input.config ?? {},
+    members: { ...input.members, publicBaseUrl: input.publicBaseUrl },
+    config: undefined,
     resources: new ResourceScope(),
+    secrets: {} as never,
   });
 }

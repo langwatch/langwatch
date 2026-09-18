@@ -1,8 +1,9 @@
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+
 import { type LoadedTurn, mergeSessionTurns } from "../trace/terminal-session-scrollback.ts";
 import { type TerminalToolSpan } from "../trace/terminal-tool-spans.ts";
 

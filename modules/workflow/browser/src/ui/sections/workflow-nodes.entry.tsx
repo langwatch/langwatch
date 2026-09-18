@@ -1,8 +1,9 @@
 import { HStack, Text } from "@chakra-ui/react";
+import type { Component, Entry } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
 import { Database } from "react-feather";
-import type { Component, Entry } from "@langwatch/workflow-contract";
+
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 import { ComponentNode, NodeSectionTitle } from "./workflow-nodes.tsx";
 

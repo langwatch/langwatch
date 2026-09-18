@@ -11,16 +11,19 @@ import type {
   OrganizationInviteRepository,
   WriteInviteInput,
 } from "../../repositories/organization-invite.repository.ts";
-import { InviteSendThrottleService } from "../../services/invite-send-throttle.service.ts";
-import { InviteService } from "../../services/invite.service.ts";
+import { PrismaOrganizationUserDirectoryRepository } from "../../repositories/prisma/prisma.organization-user-directory.repository.ts";
 import {
   FakeInviteRateLimit,
   makeInviteDeps,
   makeOrganization,
 } from "../../services/__tests__/support/invite-fakes.ts";
+import { InviteSendThrottleService } from "../../services/invite-send-throttle.service.ts";
+import { InviteService } from "../../services/invite.service.ts";
 import { InviteServiceOrganizationInvitations } from "../organization-composition.build.ts";
-import { ServerOrganizationApp, type ServerOrganizationAppDependencies } from "../organization.app.ts";
-import { PrismaOrganizationUserDirectoryRepository } from "../../repositories/prisma/prisma.organization-user-directory.repository.ts";
+import {
+  ServerOrganizationApp,
+  type ServerOrganizationAppDependencies,
+} from "../organization.app.ts";
 
 const ORGANIZATION_ID = "org-1";
 const BASE_HOST = "https://app.langwatch.test";
@@ -35,12 +38,20 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
   const teamsInOrganization = options.teamsInOrganization;
 
   const repository: OrganizationInviteRepository = {
-    tryFindOrganizationWithMembers: async () => ({ ...makeOrganization({ id: ORGANIZATION_ID }), members: [] }),
+    tryFindOrganizationWithMembers: async () => ({
+      ...makeOrganization({ id: ORGANIZATION_ID }),
+      members: [],
+    }),
     tryFindMemberEmail: async () => null,
     tryFindOpenInviteForEmail: async () => null,
     findCustomRolePermissions: async () => [],
     tryFindPersonalTeamInScopes: async () => null,
-    findTeamIdsInOrganization: async ({ teamIds }: { teamIds: string[]; organizationId: string }) =>
+    findTeamIdsInOrganization: async ({
+      teamIds,
+    }: {
+      teamIds: string[];
+      organizationId: string;
+    }) =>
       teamsInOrganization === undefined
         ? teamIds
         : teamIds.filter((teamId: string) => teamsInOrganization.includes(teamId)),
@@ -70,21 +81,31 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
       Array.from(invites.values())
         .filter((invite) => invite.organizationId === organizationId)
         .map((invite) => ({ ...invite, requestedByUser: null })),
-    revokeOpenInvite: async ({ inviteId, organizationId }: { inviteId: string; organizationId: string }) => {
+    revokeOpenInvite: async ({
+      inviteId,
+      organizationId,
+    }: {
+      inviteId: string;
+      organizationId: string;
+    }) => {
       const invite = invites.get(inviteId);
-      if (!invite || invite.organizationId !== organizationId || invite.status !== "PENDING") return 0;
+      if (!invite || invite.organizationId !== organizationId || invite.status !== "PENDING")
+        return 0;
       invites.set(inviteId, { ...invite, status: "REVOKED" });
 
       return 1;
     },
     tryFindInviteByCodeWithOrganization: async ({ inviteCode }: { inviteCode: string }) => {
-      const invite = Array.from(invites.values()).find((candidate) => candidate.inviteCode === inviteCode);
+      const invite = Array.from(invites.values()).find(
+        (candidate) => candidate.inviteCode === inviteCode,
+      );
       if (!invite) return null;
 
       return { ...invite, organization: makeOrganization({ id: invite.organizationId }) };
     },
-    withTransaction: async (write: (transaction: OrganizationInviteRepository) => Promise<unknown>) =>
-      write(repository),
+    withTransaction: async (
+      write: (transaction: OrganizationInviteRepository) => Promise<unknown>,
+    ) => write(repository),
   } as unknown as OrganizationInviteRepository;
 
   return repository;
@@ -95,7 +116,9 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
 function invitations(options: { teamsInOrganization?: readonly string[] } = {}) {
   const repository = fakeInviteRepository(options);
   const throttle = InviteSendThrottleService.create(new FakeInviteRateLimit());
-  const service = InviteService.create(makeInviteDeps({ invites: repository, throttle, baseHost: BASE_HOST }));
+  const service = InviteService.create(
+    makeInviteDeps({ invites: repository, throttle, baseHost: BASE_HOST }),
+  );
 
   return InviteServiceOrganizationInvitations.create({
     invites: service,
@@ -132,7 +155,9 @@ describe("given the invitation member the process composes", () => {
       expect(listed[0]!.role).toBe("MEMBER");
       expect(listed[0]!.inviteCode).toEqual(created.invites[0]!.invite.inviteCode);
       expect(listed[0]!.displayStatus).toBe("PENDING");
-      expect(listed[0]!.inviteUrl).toBe(`${BASE_HOST}/invite/accept?inviteCode=${listed[0]!.inviteCode}`);
+      expect(listed[0]!.inviteUrl).toBe(
+        `${BASE_HOST}/invite/accept?inviteCode=${listed[0]!.inviteCode}`,
+      );
     });
   });
 

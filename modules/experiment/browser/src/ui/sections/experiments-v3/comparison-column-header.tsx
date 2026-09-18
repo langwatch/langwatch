@@ -1,13 +1,17 @@
 import { Box, Button, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  computeComparisonAggregate,
+  toComparisonConfig,
+  disambiguateNames,
+} from "@langwatch/experiment-contract";
 import { CircleAlert, Swords } from "lucide-react";
 import { useMemo } from "react";
 
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useOpenComparisonEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name.ts";
-import { computeComparisonAggregate,toComparisonConfig,disambiguateNames } from "@langwatch/experiment-contract";
 import { getEvaluatorMissingMappings } from "../../../model/experiments-v3/mapping-validation.ts";
 import { ComparisonScoreboard } from "../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
 

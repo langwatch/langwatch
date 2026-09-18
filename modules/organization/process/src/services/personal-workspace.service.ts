@@ -18,14 +18,15 @@ import {
   type PersonalWorkspaceFeaturesInput,
   type PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
-import type {
-  OrganizationRepository,
-  PersonalWorkspaceFeatureProject,
-} from "../repositories/organization.repository.ts";
+
 import type {
   PersonalWorkspaceDiagnostics,
   PersonalWorkspaceIdentity,
 } from "../app/organization.members.ts";
+import type {
+  OrganizationRepository,
+  PersonalWorkspaceFeatureProject,
+} from "../repositories/organization.repository.ts";
 
 const ALL_PERSONAL_FEATURES_DISABLED: PersonalFeatures = {
   evaluations: false,

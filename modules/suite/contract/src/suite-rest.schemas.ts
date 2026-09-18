@@ -1,5 +1,6 @@
-import { z } from "zod";
 import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
+import { z } from "zod";
+
 import { suiteTargetSchema } from "./suite.ts";
 
 /** What a query string may say for yes and for no. Compared case-folded. */

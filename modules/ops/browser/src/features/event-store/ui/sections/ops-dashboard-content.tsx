@@ -1,12 +1,19 @@
 import { Card, Text, VStack } from "@chakra-ui/react";
 import type { DashboardData } from "@langwatch/ops-contract";
+import { useMemo } from "react";
+
+import { api } from "../../../../behavior/ops-api.ts";
+import {
+  AnomaliesCard,
+  BlockedCard,
+  DlqCard,
+  GroupsCard,
+  PipelineTreeCard,
+} from "../../../queue/index.ts";
 import { HealthLine } from "../elements/dashboard-health-line.tsx";
 import { LatencyWindowsCard } from "../elements/latency-windows-card.tsx";
 import { ThroughputChart } from "../elements/throughput-chart.tsx";
 import { TopErrorsCard } from "../elements/top-errors-card.tsx";
-import { useMemo } from "react";
-import { AnomaliesCard, BlockedCard, DlqCard, GroupsCard, PipelineTreeCard } from "../../../queue/index.ts";
-import { api } from "../../../../behavior/ops-api.ts";
 import { ActiveOperationsSection } from "./active-operations-panel.tsx";
 import { PausedCard } from "./paused-panel.tsx";
 import { StatStrip } from "./stat-strip.tsx";

@@ -1,8 +1,8 @@
 /** Derives overdue status (ADR-091); most important fact—calendar loop behind/stopped.
  * Page previously just rendered nextRunAt text. */
 
-import { toEpochMs } from "@langwatch/time";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
+import { toEpochMs } from "@langwatch/time";
 
 export interface SchedulerJobLike {
   nextRunAt: string;

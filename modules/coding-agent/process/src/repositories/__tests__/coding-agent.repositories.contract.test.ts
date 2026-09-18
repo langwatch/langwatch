@@ -5,9 +5,10 @@
  * always; the ClickHouse tier joins the table where an endpoint is declared.
  */
 import { describe, expect, it } from "vitest";
-import { MemoryCodingAgentRepositories } from "../memory/memory.coding-agent.repositories.ts";
-import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
+
 import { session, sessionEventRecord } from "../../__tests__/fixtures/coding-agent.fixture.ts";
+import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
+import { MemoryCodingAgentRepositories } from "../memory/memory.coding-agent.repositories.ts";
 
 const backends: readonly { name: string; create: () => CodingAgentRepositories }[] = [
   { name: "memory", create: () => MemoryCodingAgentRepositories.create() },

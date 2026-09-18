@@ -1,4 +1,13 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/browser-host/drawer";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import {
@@ -11,15 +20,6 @@ import {
   type Variable,
   VariablesSection,
 } from "@langwatch/prompt-browser-kit/variables";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "@langwatch/browser-host/drawer";
-import { showErrorToast } from "@langwatch/browser-host/errors";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { rewriteCodeSignature } from "@langwatch/workflow-browser/code-agent";
 import { CodeEditor } from "@langwatch/workflow-browser/surfaces/code-editor-transport";
 import { useEffect, useRef, useState } from "react";

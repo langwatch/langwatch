@@ -3,6 +3,7 @@
 import { Badge, Box, Kbd, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Search } from "lucide-react";
 import { useRef, useState } from "react";
+
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
 import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
@@ -26,13 +27,13 @@ import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
   SHELL_SIDEBAR_WIDTH_EXPANDED,
 } from "../../model/shell-layout.ts";
-import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
 import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link.tsx";
-import { SidebarSection } from "./sidebar-section.tsx";
 import { SupportMenu } from "../blocks/support-menu.tsx";
 import { ThemeToggle } from "../blocks/theme-toggle.tsx";
+import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
 import { MainMenuSections } from "./main-menu.tsx";
 import { PersonalSidebarLinks } from "./personal-sidebar.tsx";
+import { SidebarSection } from "./sidebar-section.tsx";
 import { UsageIndicator } from "./usage-indicator.tsx";
 
 export type SidebarSurface = ProductId | "settings";

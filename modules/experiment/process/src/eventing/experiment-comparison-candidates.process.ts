@@ -3,9 +3,10 @@
  * Moving them is what brings the comparison plan service under the module ceiling.
  */
 
-import { ExperimentExecutionDataService } from "../services/experiment-execution-data.service.ts";
 import { disambiguateNames, type TargetConfig } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
+
+import { ExperimentExecutionDataService } from "../services/experiment-execution-data.service.ts";
 
 /**
  * Structured-output narrowing: digs into a candidate's output at the

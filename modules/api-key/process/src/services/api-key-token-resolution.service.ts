@@ -1,4 +1,5 @@
-import { ApiKeyNotFoundError,
+import {
+  ApiKeyNotFoundError,
   apiKeyTokenResolutionInputSchema,
   getTokenType,
   organizationApiKeyResolutionInputSchema,
@@ -9,11 +10,13 @@ import { ApiKeyNotFoundError,
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   API_KEY_PREFIX,
-  LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
+  LANGY_SESSION_API_KEY_NAME,
+} from "@langwatch/api-key-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
+import { Temporal, fromDate, nowInstant } from "@langwatch/time";
+
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
-import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;

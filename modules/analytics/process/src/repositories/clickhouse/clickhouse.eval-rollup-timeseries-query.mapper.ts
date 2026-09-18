@@ -4,10 +4,13 @@
  * aggregation compositions; anything unsupported throws (programmer error).
  */
 
-import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
-import type { AnalyticsAggregation,
+import type {
+  AnalyticsAggregation,
   AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
+  BuiltAnalyticsQuery,
+} from "@langwatch/analytics-contract";
+
+import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
   dateTrunc,
   type EvalMetricKey,

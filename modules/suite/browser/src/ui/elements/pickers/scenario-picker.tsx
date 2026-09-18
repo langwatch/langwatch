@@ -5,10 +5,10 @@
  */
 
 import { Badge, Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { AlertTriangle, Plus, X } from "lucide-react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { AlertTriangle, Plus, X } from "lucide-react";
 
 function ScenarioLabels({ labels }: { labels: string[] }) {
   if (labels.length === 0) return null;

@@ -17,6 +17,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+import { Secret } from "@langwatch/secrets";
 
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
@@ -107,6 +108,10 @@ export class DataPrivacyApp implements DataPrivacyApi {
     permissions: AuthzApi,
   };
   static readonly reads = ["dataPrivacy"] as const;
+  /** Points at the DLP service account's JSON key file; never read here. */
+  static readonly secrets = {
+    googleApplicationCredentials: Secret.load("GOOGLE_APPLICATION_CREDENTIALS", { optional: true }),
+  } as const;
 
   #privacy: DataPrivacyService;
   #redaction: OtlpSpanPiiRedactionService | null;

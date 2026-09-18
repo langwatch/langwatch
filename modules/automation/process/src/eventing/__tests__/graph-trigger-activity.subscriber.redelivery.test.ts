@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { graphTriggerActivityGroupKey } from "../graph-trigger-activity.subscriber.ts";
 
 /**

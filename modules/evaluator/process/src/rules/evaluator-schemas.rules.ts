@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
+import { z } from "zod";
 
 const evaluatorFieldSchema = z.object({
   identifier: z.string(),

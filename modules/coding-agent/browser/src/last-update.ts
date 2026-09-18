@@ -1,6 +1,7 @@
-import { formatShortDate } from "./short-date.ts";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { nowInstant } from "@langwatch/time";
+
+import { formatShortDate } from "./short-date.ts";
 
 /** A day, the point where "how long ago" stops beating "which day". */
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;

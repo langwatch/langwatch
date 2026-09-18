@@ -5,8 +5,6 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 
-import type { TenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import {
   contributeLogFactsCommandDataSchema,
   contributeMetricFactsCommandDataSchema,
@@ -16,13 +14,16 @@ import {
   CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE,
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
-  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE
+  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
 } from "@langwatch/coding-agent-contract";
+import type { TenantId } from "@langwatch/eventing";
+import { describe, expect, it } from "vitest";
+
+import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
+import type { CodingAgentSessionContextMemoRepository } from "../../repositories/session-context-memo.repository.ts";
 import { EventingContributeLogFactsAdapter } from "../contribute-log-facts.service.ts";
 import { EventingContributeMetricFactsAdapter } from "../contribute-metric-facts.service.ts";
 import { EventingContributeSpanFactsAdapter } from "../contribute-span-facts.service.ts";
-import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
-import type { CodingAgentSessionContextMemoRepository } from "../../repositories/session-context-memo.repository.ts";
 
 const TENANT = "tenant-1";
 const SESSION = "8f2c9a1e-session";

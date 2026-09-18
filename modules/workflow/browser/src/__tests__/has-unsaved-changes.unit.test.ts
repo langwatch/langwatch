@@ -1,8 +1,9 @@
+import type { Component, Evaluator, Signature } from "@langwatch/workflow-contract";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import type { Component, Evaluator, Signature } from "@langwatch/workflow-contract";
+
 import { hasUnsavedChanges } from "../model/unsaved-changes.ts";
 
 describe("hasUnsavedChanges", () => {

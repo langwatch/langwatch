@@ -6,7 +6,6 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
@@ -16,6 +15,7 @@ import {
   afterUserCreate,
   tryBeforeAccountCreate,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 
 class LicensedFederation implements BetterAuthFederation {
   federationCapable(): boolean {

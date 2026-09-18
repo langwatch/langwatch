@@ -34,25 +34,19 @@ describe("buildGoEvaluationSnippet", () => {
   describe("given fields drawn from the required and optional lists", () => {
     describe("when a field appears only in the required list", () => {
       it("renders that field in the request data", () => {
-        expect(renderedDataFields(buildSnippet({ fields: ["input"] }))).toEqual(
-          ["input"],
-        );
+        expect(renderedDataFields(buildSnippet({ fields: ["input"] }))).toEqual(["input"]);
       });
     });
 
     describe("when a field appears only in the optional list", () => {
       it("renders that field in the request data", () => {
-        expect(
-          renderedDataFields(buildSnippet({ fields: ["contexts"] })),
-        ).toEqual(["contexts"]);
+        expect(renderedDataFields(buildSnippet({ fields: ["contexts"] }))).toEqual(["contexts"]);
       });
     });
 
     describe("when a field is named by both lists", () => {
       it("renders that field exactly once", () => {
-        const fields = renderedDataFields(
-          buildSnippet({ fields: ["output", "input", "output"] }),
-        );
+        const fields = renderedDataFields(buildSnippet({ fields: ["output", "input", "output"] }));
 
         expect(fields).toEqual(["input", "output"]);
       });
@@ -60,9 +54,7 @@ describe("buildGoEvaluationSnippet", () => {
 
     describe("when a field is named by neither list", () => {
       it("leaves that field out of the request data", () => {
-        const fields = renderedDataFields(
-          buildSnippet({ fields: ["input", "output"] }),
-        );
+        const fields = renderedDataFields(buildSnippet({ fields: ["input", "output"] }));
 
         expect(fields).not.toContain("expected_output");
         expect(fields).not.toContain("contexts");
@@ -90,13 +82,7 @@ describe("buildGoEvaluationSnippet", () => {
   });
 
   describe("given every renderable field is requested", () => {
-    const everyField = [
-      "input",
-      "output",
-      "contexts",
-      "expected_output",
-      "conversation",
-    ];
+    const everyField = ["input", "output", "contexts", "expected_output", "conversation"];
 
     it("renders the data entries in the documented order", () => {
       expect(renderedDataFields(buildSnippet({ fields: everyField }))).toEqual([
@@ -110,13 +96,9 @@ describe("buildGoEvaluationSnippet", () => {
 
     describe("when the caller supplies the fields in a different order", () => {
       it("renders the same order regardless of the caller's ordering", () => {
-        const reversed = renderedDataFields(
-          buildSnippet({ fields: [...everyField].reverse() }),
-        );
+        const reversed = renderedDataFields(buildSnippet({ fields: [...everyField].reverse() }));
 
-        expect(reversed).toEqual(
-          renderedDataFields(buildSnippet({ fields: everyField })),
-        );
+        expect(reversed).toEqual(renderedDataFields(buildSnippet({ fields: everyField })));
       });
     });
   });
@@ -175,8 +157,7 @@ describe("buildGoEvaluationSnippet", () => {
   });
 
   describe("given the evaluator runs as a guardrail", () => {
-    const guardrail = () =>
-      buildSnippet({ fields: ["input"], isGuardrail: true });
+    const guardrail = () => buildSnippet({ fields: ["input"], isGuardrail: true });
 
     it("flags the request as a guardrail call", () => {
       expect(guardrail()).toContain(`"as_guardrail": true,`);
@@ -199,8 +180,7 @@ describe("buildGoEvaluationSnippet", () => {
   });
 
   describe("given the evaluator runs as a plain evaluation", () => {
-    const evaluation = () =>
-      buildSnippet({ fields: ["input"], isGuardrail: false });
+    const evaluation = () => buildSnippet({ fields: ["input"], isGuardrail: false });
 
     it("omits the guardrail flag and the guardrail decode", () => {
       const snippet = evaluation();
@@ -241,9 +221,7 @@ describe("buildGoEvaluationSnippet", () => {
 
   describe("given the evaluator name", () => {
     it("sends the name the evaluation is recorded under", () => {
-      expect(buildSnippet({ name: "Toxicity Check" })).toContain(
-        `"name": "Toxicity Check",`,
-      );
+      expect(buildSnippet({ name: "Toxicity Check" })).toContain(`"name": "Toxicity Check",`);
     });
   });
 });

@@ -1,15 +1,15 @@
-import { TRPCError } from "@trpc/server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { VirtualKeyWithScopes,GuardrailAttachment } from "@langwatch/gateway-contract";
+import type { VirtualKeyWithScopes, GuardrailAttachment } from "@langwatch/gateway-contract";
 import {
   GatewayGuardrailProjectMismatchError,
   GatewayScopeOrgMismatchError,
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
+import { TRPCError } from "@trpc/server";
+
 import type { GatewayScopePermissions } from "../app/gateway.members.ts";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
-
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 /**

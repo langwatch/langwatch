@@ -12,6 +12,7 @@ import {
   type ToggleAnnotationScoreInput,
   type UpsertAnnotationScoreInput,
 } from "@langwatch/annotation-contract";
+
 import type { AnnotationScoreRepository } from "../repositories/annotation-score.repository.ts";
 
 export class AnnotationScoreService {

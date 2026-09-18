@@ -1,5 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
+
 import { GithubPullRequestEventRules } from "../github-pull-request-event.rules.ts";
 
 const protocol = GithubPullRequestEventRules.create();

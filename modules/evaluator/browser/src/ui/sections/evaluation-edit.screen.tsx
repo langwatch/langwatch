@@ -10,17 +10,16 @@ import {
   Spacer,
   VStack,
 } from "@chakra-ui/react";
-import { useState } from "react";
-import { MoreVertical } from "react-feather";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import CheckConfigForm, {
-  type CheckConfigFormData,
-} from "./checks/check-config-form.tsx";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { useState } from "react";
+import { MoreVertical } from "react-feather";
+
+import CheckConfigForm, { type CheckConfigFormData } from "./checks/check-config-form.tsx";
 
 /**
  * The legacy online-evaluation edit form, at `/:project/evaluations/:id/edit`. WHY THIS

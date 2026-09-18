@@ -5,11 +5,17 @@
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
 import { describe, expect, it } from "vitest";
-import { type NlpLambdaFunctionReader,type NlpLambdaStreamInvoke,type NlpLambdaStreamChunk,
+
+import {
+  type NlpLambdaFunctionReader,
+  type NlpLambdaStreamInvoke,
+  type NlpLambdaStreamChunk,
   type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
-  type StagedNlpPayload,type WorkflowStudioStreamInput } from "../../app/workflow.app.ts";
-import { LambdaWorkflowStudioStreamAdapter } from "../../adapters/lambda.workflow-studio-stream.adapter.ts";
+  type StagedNlpPayload,
+  type WorkflowStudioStreamInput,
+} from "../../app/workflow.app.ts";
+import { LambdaWorkflowStudioStreamChannel } from "../aws/aws.lambda-workflow-studio-stream.channel.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";
 
@@ -60,8 +66,7 @@ class ScriptedInvoke implements NlpLambdaStreamInvoke {
   readonly payloads: string[] = [];
   signal: AbortSignal | undefined;
 
-  constructor(private readonly script: readonly NlpLambdaStreamChunk[]) {
-  }
+  constructor(private readonly script: readonly NlpLambdaStreamChunk[]) {}
 
   invokeStream(input: {
     functionArn: string;
@@ -105,7 +110,7 @@ function adapter(options: {
 
   return {
     functions,
-    subject: LambdaWorkflowStudioStreamAdapter.create({
+    subject: LambdaWorkflowStudioStreamChannel.create({
       functions,
       invoke: options.invoke,
       staging: options.staging,

@@ -1,7 +1,6 @@
 import { Button, Grid, Heading, HStack, Separator } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { studioWorkflowSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { ChevronLeft, File, Upload } from "react-feather";
 import {
   Fragment,
   useCallback,
@@ -11,6 +10,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from "react";
+import { ChevronLeft, File, Upload } from "react-feather";
 
 import { TEMPLATES } from "../../model/templates/templates.registry.ts";
 

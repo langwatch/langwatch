@@ -1,12 +1,12 @@
 import { Badge, HStack } from "@chakra-ui/react";
-import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PopoverAnchor,
   PopoverBody,
   PopoverContent,
   PopoverRoot,
 } from "@langwatch/design-system/popover";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Flags a feature as legacy with an inline, dismissable explanation, so

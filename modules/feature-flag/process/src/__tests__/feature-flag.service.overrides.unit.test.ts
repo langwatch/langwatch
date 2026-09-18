@@ -3,15 +3,18 @@
  * environment override and the force-enable list — and what an unregistered
  * key resolves to.
  */
-import { resolveFeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
+
+import {
+  createFeatureFlagTestService,
+  resolveTestFeatureFlagConfig,
+} from "../app/__tests__/feature-flag.fixture.ts";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 const SYSTEM_TARGET = { kind: "system" } as const;
-function buildService(source: Readonly<Record<string, unknown>> = {}) {
+function buildService(source: Readonly<Record<string, string | undefined>> = {}) {
   return createFeatureFlagTestService({
-    config: resolveFeatureFlagConfig(source),
+    config: resolveTestFeatureFlagConfig(source),
   });
 }
 
@@ -71,7 +74,7 @@ describe("FeatureFlagService", () => {
 
     /** @scenario "Environment overrides are fixed when the process boots" */
     it("is fixed for the lifetime of the composed service", async () => {
-      const source: Record<string, unknown> = {};
+      const source: Record<string, string | undefined> = {};
       const { service } = buildService(source);
 
       await expect(service.isEnabled(SYSTEM_FLAG, SYSTEM_TARGET)).resolves.toBe(false);

@@ -1,5 +1,3 @@
-import { readableDate } from "../../../model/readable-date.ts";
-import { toEpochMs } from "@langwatch/time";
 import {
   Badge,
   Box,
@@ -14,16 +12,19 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { keepPreviousData } from "../../../model/keep-previous-data.ts";
-import { ReceiptText, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
-import { Link } from "../../../ui/elements/gateway-link.tsx";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
+import { toEpochMs } from "@langwatch/time";
+import { ReceiptText, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+import { api, type RouterOutputs } from "../../../behavior/gateway-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { useRollingWindow } from "../../../behavior/use-rolling-window.ts";
-import { api, type RouterOutputs } from "../../../behavior/gateway-api.ts";
+import { keepPreviousData } from "../../../model/keep-previous-data.ts";
+import { readableDate } from "../../../model/readable-date.ts";
+import { Link } from "../../../ui/elements/gateway-link.tsx";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
 const PRESETS: { label: string; days: number }[] = [
   { label: "Last 24h", days: 1 },

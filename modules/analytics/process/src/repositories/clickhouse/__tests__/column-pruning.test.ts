@@ -1,10 +1,11 @@
+import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 /**
  * Tests for ClickHouse analytics column pruning: queries select only the
  * columns they need, avoiding wide reads like ComputedInput/ComputedOutput.
  * @see specs/analytics/clickhouse-column-pruning.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { AnalyticsSeries } from "@langwatch/analytics-contract";
+
 import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.ts";
 import { fieldMappings, TRACE_IDENTITY_COLUMNS } from "../clickhouse.field-mappings.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";

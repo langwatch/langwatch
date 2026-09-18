@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules.ts";
 
 describe("normalizeErrorMessage", () => {

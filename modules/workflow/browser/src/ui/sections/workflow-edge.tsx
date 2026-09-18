@@ -1,7 +1,7 @@
 import { BaseEdge, type EdgeProps, getBezierPath } from "@xyflow/react";
 
-import { selectionColor } from "./workflow-nodes.tsx";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
+import { selectionColor } from "./workflow-nodes.tsx";
 
 /**
  * Default Workflow canvas edge. React Flow and the color-mode implementation

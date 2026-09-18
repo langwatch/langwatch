@@ -6,9 +6,10 @@ import {
   type UpdateTriggerCommand,
 } from "@langwatch/automation-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+
+import type { AutomationClock } from "../../app/automation.members.ts";
 import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository.ts";
 import { mapTriggerRow } from "./prisma.trigger.mapper.ts";
-import type { AutomationClock } from "../../app/automation.members.ts";
 
 function toPrismaJsonValue(value: unknown): Prisma.InputJsonValue | null {
   if (value === null) return null;

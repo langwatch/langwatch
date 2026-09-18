@@ -48,8 +48,8 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   },
 }));
 
-import Studio from "../studio.screen.tsx";
 import { FakeWorkflowHost } from "../../../testing.tsx";
+import Studio from "../studio.screen.tsx";
 
 // The screen binds the studio's two module-scope singletons (feedback and
 // error reporting) to the mounted host on render, so it needs a host above it

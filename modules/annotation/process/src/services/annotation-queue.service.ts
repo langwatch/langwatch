@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   type AnnotationQueueCaller,
   type AnnotationQueueItem,
@@ -13,14 +12,15 @@ import {
   type AnnotationQueueConfiguration,
   type AnnotationQueueDetail,
   type AnnotationQueueListEntry,
-  type AnnotationQueueScope
+  type AnnotationQueueScope,
 } from "@langwatch/annotation-contract";
+import { z } from "zod";
+
 import {
   type AnnotationQueueItemRepository,
   type CreateAnnotationQueueItemsInput,
   type ListQueueItemsByUserInput,
 } from "#repositories/annotation-queue-item.repository";
-
 import type { AnnotationQueueRepository } from "#repositories/annotation-queue.repository";
 
 const RESERVED_QUEUE_SLUGS = new Set(["all", "me", "my-queue"]);

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+
 import {
   CachedLuaScript,
   GROUP_QUEUE_REGISTRY_KEY,
@@ -13,7 +14,6 @@ import {
   splitEnvelope,
   TTL_HELPER_LUA,
 } from "@langwatch/group-queue/operational";
-import { normalizeErrorMessage } from "../../rules/ops-error-normalizer.rules.ts";
 import { createLogger } from "@langwatch/observability";
 import type {
   ErrorCluster,
@@ -22,11 +22,13 @@ import type {
   ParkedTenant,
   QueueInfo,
 } from "@langwatch/ops-contract";
+import { nowInstant } from "@langwatch/time";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
+
 import { type QueuePayloadDecoder } from "../../app/ops.app.ts";
+import { normalizeErrorMessage } from "../../rules/ops-error-normalizer.rules.ts";
 import { QueueRepository } from "../process/queue.repository.ts";
-import { nowInstant } from "@langwatch/time";
 import type {
   BlockedSummary,
   DlqGroupInfo,

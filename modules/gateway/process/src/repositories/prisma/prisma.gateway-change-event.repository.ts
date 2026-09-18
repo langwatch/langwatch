@@ -5,6 +5,7 @@
  */
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
+
 import {
   type GatewayChangeEvents,
   type AppendGatewayChangeEventInput,
@@ -20,8 +21,7 @@ export class PrismaGatewayChangeEventsRepository implements GatewayChangeEvents 
     return new PrismaGatewayChangeEventsRepository(database);
   }
 
-  constructor(private readonly prisma: GatewayChangeEventDatabase) {
-  }
+  constructor(private readonly prisma: GatewayChangeEventDatabase) {}
 
   async append(
     input: AppendGatewayChangeEventInput,

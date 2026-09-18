@@ -9,7 +9,6 @@ import { dSPyRunsSummarySchema, dSPyStepSchema } from "./experiment-legacy.ts";
 import { experimentRunWithItemsSchema } from "./experiment-run.ts";
 import { persistedEvaluationsV3StateSchema } from "./experiment-workbench-persistence.ts";
 import { workbenchSaveResultSchema } from "./experiment-workbench-version.ts";
-import { experimentSchema } from "./experiment.ts";
 import {
   experimentArchivedSchema,
   experimentCopiedSchema,
@@ -23,6 +22,7 @@ import {
   experimentWorkbenchVersionProbeSchema,
   experimentWorkbenchVersionsPageSchema,
 } from "./experiment.responses.ts";
+import { experimentSchema } from "./experiment.ts";
 
 /** Every procedure here is asked at one project, named by the input. */
 const projectScopeSchema = z.object({ projectId: z.string() });
@@ -41,7 +41,8 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .mutation("saveExperiment")
   .withInput(
-    z.object({ ...projectScopeSchema.shape,
+    z.object({
+      ...projectScopeSchema.shape,
       experimentId: z.string().optional(),
       workbenchState: legacyWorkbenchStateSchema,
       dsl: studioWorkflowSchema,
@@ -56,7 +57,8 @@ export const experimentsTrpc = defineTrpcContract("experiments")
    */
   .mutation("saveEvaluationsV3")
   .withInput(
-    z.object({ ...projectScopeSchema.shape,
+    z.object({
+      ...projectScopeSchema.shape,
       experimentId: z.string().optional(),
       state: persistedEvaluationsV3StateSchema,
       expectedVersion: z.number().int().optional(),
@@ -87,7 +89,8 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .query("listWorkbenchVersions")
   .withInput(
-    z.object({ ...projectScopeSchema.shape,
+    z.object({
+      ...projectScopeSchema.shape,
       experimentId: z.string(),
       limit: z.number().int().min(1).max(100).optional(),
       cursor: z.number().int().optional(),
@@ -97,13 +100,21 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .mutation("commitWorkbenchVersion")
   .withInput(
-    z.object({ ...projectScopeSchema.shape, experimentId: z.string(), commitMessage: z.string().min(1) }),
+    z.object({
+      ...projectScopeSchema.shape,
+      experimentId: z.string(),
+      commitMessage: z.string().min(1),
+    }),
   )
   .withOutput(workbenchSaveResultSchema)
 
   .mutation("restoreWorkbenchVersion")
   .withInput(
-    z.object({ ...projectScopeSchema.shape, experimentId: z.string(), version: z.number().int().min(1) }),
+    z.object({
+      ...projectScopeSchema.shape,
+      experimentId: z.string(),
+      version: z.number().int().min(1),
+    }),
   )
   .withOutput(workbenchSaveResultSchema)
 
@@ -116,7 +127,8 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .query("getExperimentBySlugOrId")
   .withInput(
-    z.object({ ...projectScopeSchema.shape,
+    z.object({
+      ...projectScopeSchema.shape,
       experimentId: z.string().optional(),
       experimentSlug: z.string().optional(),
     }),
@@ -125,7 +137,11 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .query("getExperimentWithDSLBySlug")
   .withInput(
-    z.object({ ...projectScopeSchema.shape, experimentSlug: z.string(), randomSeed: z.number().optional() }),
+    z.object({
+      ...projectScopeSchema.shape,
+      experimentSlug: z.string(),
+      randomSeed: z.number().optional(),
+    }),
   )
   .withOutput(experimentWithDslSchema)
 
@@ -135,7 +151,8 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .query("getAllForEvaluationsList")
   .withInput(
-    z.object({ ...projectScopeSchema.shape,
+    z.object({
+      ...projectScopeSchema.shape,
       pageOffset: z.number().optional(),
       pageSize: z.number().optional(),
     }),
@@ -175,7 +192,8 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .query("getExperimentDSPyStep")
   .withInput(
-    z.object({ ...projectScopeSchema.shape,
+    z.object({
+      ...projectScopeSchema.shape,
       experimentSlug: z.string(),
       runId: z.string(),
       index: z.string(),

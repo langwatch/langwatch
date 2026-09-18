@@ -4,11 +4,13 @@
  * specs/api-keys/token-created-snippets.feature
  */
 
-import { isShikiLangReady, normalizeShikiLang } from "@langwatch/design-system/shiki";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { isShikiLangReady, normalizeShikiLang } from "@langwatch/design-system/shiki";
 import { describe, expect, it } from "vitest";
+
 import {
   CODE_ASSISTANTS,
   TOKEN_SNIPPET_LANGUAGES,

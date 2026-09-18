@@ -4,11 +4,11 @@
  * edit/remove version see `experiments-v3/components/TargetSection/evaluator-chip.tsx`.
  */
 import { Box, Circle, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
-import { LuChevronRight, LuCircleX } from "react-icons/lu";
-
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
 import { type ParsedEvaluationResult, parseEvaluationResult } from "@langwatch/evaluator-contract";
+import { LuChevronRight, LuCircleX } from "react-icons/lu";
+
 import { EVALUATION_STATUS_COLORS, getStatusLabel } from "../../../model/evaluation-results.ts";
 
 export type EvaluationStatus = ParsedEvaluationResult["status"];

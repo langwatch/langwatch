@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+
 import type { CodingAgentSessionDisplay } from "../trace/session-display.ts";
-import { deriveSessionSignals, formatCompact, formatShortDuration } from "../trace/session-signals.ts";
+import {
+  deriveSessionSignals,
+  formatCompact,
+  formatShortDuration,
+} from "../trace/session-signals.ts";
 
 /** A healthy session: nothing to report. */
 function session(

@@ -1,4 +1,5 @@
 import type { Alert } from "@chakra-ui/react";
+
 import { SlugAlert } from "./slug-alert.tsx";
 
 /** Shows the Dataset name that already owns a proposed slug. */

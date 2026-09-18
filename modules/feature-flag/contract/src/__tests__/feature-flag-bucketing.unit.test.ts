@@ -4,6 +4,7 @@
  * same people.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   BUCKET_COUNT,
   bucketForSubject,

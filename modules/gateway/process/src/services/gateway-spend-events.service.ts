@@ -1,3 +1,5 @@
+import type { SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
+
 import type {
   GatewaySpendEvents,
   SpendBucket,
@@ -5,7 +7,6 @@ import type {
   SpendGroupByKey,
   SpendSummaryRow,
 } from "../repositories/gateway-spend-events.repository.ts";
-import type { SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
 
 export class GatewaySpendEventsService {
   private constructor(private readonly repository: GatewaySpendEvents) {}

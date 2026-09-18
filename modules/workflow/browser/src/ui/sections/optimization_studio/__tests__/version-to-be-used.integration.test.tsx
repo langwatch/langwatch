@@ -60,9 +60,7 @@ function Harness({ children }: { children: ReactNode }) {
   return (
     <ChakraProvider value={defaultSystem}>
       <FormProvider {...form}>
-        <form
-          onSubmit={form.handleSubmit(() => undefined)}
-        >
+        <form onSubmit={form.handleSubmit(() => undefined)}>
           {children}
           <button type="submit">Submit</button>
         </form>

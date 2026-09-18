@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
-import { ModelProviderCredentialsMigrateTask } from "../model-provider-credentials-migrate.task.ts";
 import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules.ts";
+import { ModelProviderCredentialsMigrateTask } from "../model-provider-credentials-migrate.task.ts";
 
 /** A cipher with the deployment's shape and none of its cryptography. */
 class ReversingCipher extends ModelProviderCredentialCipher {

@@ -1,3 +1,4 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   classifyClickHouseError,
   createTenantId,
@@ -17,7 +18,7 @@ import {
   type SuiteRunStateData,
   type SuiteRunStateInput,
 } from "@langwatch/suite-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+
 import { SuiteRunReadRepository } from "../suite-run.repository.ts";
 
 export type SuiteRunClickHouseRepositoryOptions = {

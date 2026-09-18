@@ -11,12 +11,13 @@ import type {
   ResourceGrant,
   ShareableResourceKind,
 } from "@langwatch/authz-contract";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
+
 import type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
   ShareLinkRow,
 } from "../repositories/authz-read.repository.ts";
-import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 
 export type AuthzCollectorOptions = {
   reader: AuthzReadRepository;

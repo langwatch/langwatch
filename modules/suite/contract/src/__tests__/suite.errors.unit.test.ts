@@ -1,4 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
+import { describe, expect, it } from "vitest";
+
 import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
@@ -7,7 +9,6 @@ import {
   SuiteNameTakenError,
   SuiteNotFoundError,
 } from "../index.ts";
-import { describe, expect, it } from "vitest";
 
 describe("Suite errors", () => {
   it("exposes stable handled-error codes and HTTP status", () => {

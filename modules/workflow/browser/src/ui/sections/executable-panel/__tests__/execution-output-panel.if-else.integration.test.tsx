@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { ExecutionState } from "@langwatch/workflow-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ExecutionState } from "@langwatch/workflow-contract";
 
 vi.mock("../../../../behavior/use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({ isRedacted: false, isLoading: false }),

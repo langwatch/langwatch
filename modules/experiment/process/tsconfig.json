@@ -99,7 +99,7 @@
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
-      "path": "../../prompt/server/tsconfig.build.json"
+      "path": "../../prompt/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

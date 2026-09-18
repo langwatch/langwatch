@@ -1,4 +1,5 @@
 import { defineServerModule } from "@langwatch/kernel";
+
 import { SecretApp } from "./app/secret.app.ts";
 import { secretRepositories } from "./repositories/secret-repositories.registry.ts";
 import { secretRest, secretsAliasRest } from "./transport/secret.rest.ts";

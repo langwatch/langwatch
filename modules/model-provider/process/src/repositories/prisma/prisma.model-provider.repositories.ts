@@ -4,9 +4,10 @@
  * name `ProcessMembers` keys, and no `"credentials"` entry exists among them.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
-import type { ModelProviderRepositories } from "../model-provider.repositories.ts";
 import { EncryptedModelProviderCredentialAdapter } from "../../services/encrypted.model-provider-api-key-credential.service.ts";
+import type { ModelProviderRepositories } from "../model-provider.repositories.ts";
 import { PrismaModelCostRepository } from "./prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "./prisma.model-default.repository.ts";
 import { PrismaModelProviderEvidenceRepository } from "./prisma.model-provider-evidence.repository.ts";
@@ -25,10 +26,7 @@ export class PostgresModelProviderRepositories {
       cipher: members.encryption,
     });
     return {
-      providers: PrismaModelProviderRepository.create(
-        members.prisma,
-        credentials,
-      ),
+      providers: PrismaModelProviderRepository.create(members.prisma, credentials),
       defaults: PrismaModelDefaultRepository.create(members.prisma),
       costs: PrismaModelCostRepository.create(members.prisma),
       evidence: PrismaModelProviderEvidenceRepository.create(members.prisma),

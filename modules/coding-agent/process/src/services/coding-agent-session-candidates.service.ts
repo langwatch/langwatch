@@ -1,4 +1,5 @@
 import type { CodingAgentSessionBranchRecord } from "@langwatch/coding-agent-contract";
+
 import type { CodingAgentBillingPolicy } from "../app/coding-agent.members.ts";
 import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";

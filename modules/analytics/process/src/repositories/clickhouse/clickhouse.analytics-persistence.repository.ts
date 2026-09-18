@@ -1,5 +1,4 @@
-import { EventUtils, SecurityError } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
+import type { ClickHouseSettings } from "@clickhouse/client";
 import {
   analyticsEvaluationReadInputSchema,
   analyticsEvaluationRollupAppendBatchInputSchema,
@@ -15,8 +14,10 @@ import {
   type AnalyticsEvaluationRollupAppendInput,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
-import type { ClickHouseSettings } from "@clickhouse/client";
+import { EventUtils, SecurityError } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
+
 import { AnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
 
 const SLIM_TABLE = "evaluation_analytics";

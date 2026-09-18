@@ -74,7 +74,6 @@ vi.mock("../components/welcome-header.tsx", () => ({
   useTimeOfDay: () => "morning",
 }));
 
-import { HomePage } from "../home-screen.tsx";
 import {
   ProjectHomeHostProvider,
   ProjectHomeHost,
@@ -85,6 +84,7 @@ import {
   type ProjectHomeProject,
   type ProjectHomeUser,
 } from "../../../../model/project-home-host.ts";
+import { HomePage } from "../home-screen.tsx";
 
 /**
  * The narrowest host the page can be drawn against. The composition is

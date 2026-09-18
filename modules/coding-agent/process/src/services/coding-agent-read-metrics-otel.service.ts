@@ -1,4 +1,5 @@
 import { histogram, type HistogramHandle } from "@langwatch/observability/metrics";
+
 import type {
   CodingAgentReadMetrics,
   CodingAgentSessionListReadOutcome,
@@ -18,8 +19,7 @@ export class OtelCodingAgentReadMetricsAdapter implements CodingAgentReadMetrics
     );
   }
 
-  private constructor(private readonly readDuration: HistogramHandle) {
-  }
+  private constructor(private readonly readDuration: HistogramHandle) {}
 
   observeSessionListRead(input: {
     table: string;

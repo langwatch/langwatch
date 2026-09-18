@@ -1,15 +1,16 @@
 /** Collapsible row for grouped scenario runs, with header sticky positioning. */
 
 import { Box, HStack, Text } from "@chakra-ui/react";
+import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
-import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
-import { BatchSection } from "./batch-section.tsx";
-import { RunMetricsSummary } from "../elements/runs/run-metrics-summary.tsx";
-import type { ScenarioRunContextRenderer } from "../elements/runs/scenario-target-row.tsx";
+
+import type { ViewMode } from "../../behavior/use-run-history-store.ts";
 import type { RunGroup, RunGroupSummary } from "../../model/run-history-transforms.ts";
 import { groupRunsByBatchId } from "../../model/run-history-transforms.ts";
-import type { ViewMode } from "../../behavior/use-run-history-store.ts";
+import { RunMetricsSummary } from "../elements/runs/run-metrics-summary.tsx";
+import type { ScenarioRunContextRenderer } from "../elements/runs/scenario-target-row.tsx";
+import { BatchSection } from "./batch-section.tsx";
 
 type GroupRowProps = {
   group: RunGroup;

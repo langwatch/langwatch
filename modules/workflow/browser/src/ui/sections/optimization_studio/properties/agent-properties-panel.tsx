@@ -10,6 +10,32 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  buildCodeConfig,
+  DEFAULT_CODE,
+  getCodeFromConfig,
+} from "@langwatch/agent-browser/agent-editors";
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import {
+  type FieldMapping,
+  type Variable,
+  VariablesSection,
+} from "@langwatch/prompt-browser-kit/variables";
+import {
+  CODE_OUTPUT_TYPES,
+  type Output,
+  OutputsSection,
+  type OutputType,
+} from "@langwatch/prompt-browser/outputs-section";
+import type {
+  HttpAuth,
+  HttpComponentConfig,
+  HttpHeader,
+  HttpMethod,
+  AgentComponent,
+  Field as DslField,
+} from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,33 +44,7 @@ import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
 import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index.ts";
-import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
-import {
-  CODE_OUTPUT_TYPES,
-  type Output,
-  OutputsSection,
-  type OutputType,
-} from "@langwatch/prompt-browser/outputs-section";
-import {
-  type FieldMapping,
-  type Variable,
-  VariablesSection,
-} from "@langwatch/prompt-browser-kit/variables";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
-import type {
-  HttpAuth,
-  HttpComponentConfig,
-  HttpHeader,
-  HttpMethod,AgentComponent,Field as DslField
-} from "@langwatch/workflow-contract";
-import {
-  buildCodeConfig,
-  DEFAULT_CODE,
-  getCodeFromConfig,
-} from "@langwatch/agent-browser/agent-editors";
-import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
   buildAgentNodeData,
@@ -57,6 +57,8 @@ import {
   buildAvailableSources,
   buildInputMappings,
 } from "../../../../model/edge-mapping.ts";
+import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
+import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
 import { CodeEditorModal } from "../code/workflow-code-editor.transport.tsx";
 import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 

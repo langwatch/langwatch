@@ -1,8 +1,7 @@
 import { Box, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { formatDurationSeconds } from "@langwatch/coding-agent-browser/surfaces/agent-metrics";
-import numeral from "numeral";
-
 import { formatBudgetUsd } from "@langwatch/gateway-browser/surfaces/budget-overview";
+import numeral from "numeral";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 

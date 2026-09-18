@@ -11,6 +11,7 @@ import {
   WebhookEndpointsNotEntitledError,
 } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
+
 import { buildWebhookComposition } from "../webhook-composition.build.ts";
 
 const plan = (webhookEndpointsEnabled: boolean): Plan => ({

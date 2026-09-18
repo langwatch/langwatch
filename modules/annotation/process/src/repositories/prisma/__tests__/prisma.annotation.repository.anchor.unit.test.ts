@@ -2,6 +2,7 @@
  * See specs/traces-v2/anchored-comments.feature.
  */
 import { describe, expect, it, vi } from "vitest";
+
 import type { AnnotationDatabase } from "../prisma.annotation.repository.ts";
 import { PrismaAnnotationRepository } from "../prisma.annotation.repository.ts";
 

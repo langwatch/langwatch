@@ -11,7 +11,8 @@ export const experimentScreens = {
   experimentDetail: () => import("./ui/sections/experiments/experiment-detail.screen.tsx"),
   newWorkbench: () => import("./ui/sections/experiments/new-workbench.screen.tsx"),
   workbench: () => import("./ui/sections/experiments/workbench.screen.tsx"),
-  evaluationWizardRedirect: () => import("./ui/sections/experiments/evaluation-wizard-redirect.screen.tsx"),
+  evaluationWizardRedirect: () =>
+    import("./ui/sections/experiments/evaluation-wizard-redirect.screen.tsx"),
 } as const satisfies Record<string, ExperimentScreenLoader>;
 
 export type ExperimentScreenName = keyof typeof experimentScreens;

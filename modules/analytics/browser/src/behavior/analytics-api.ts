@@ -4,24 +4,23 @@
  * React Query cache.
  */
 
-import type { z } from "zod";
-
 import type {
   analyticsTrpc,
   analyticsLwqlTrpc,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 import {
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
   graphDetailSchema,
   graphListItemSchema,
 } from "@langwatch/dashboard-contract";
-import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
+import type { z } from "zod";
 
-import type { ChartGridPlacement } from "../model/chart-grid.ts";
 import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
+import type { ChartGridPlacement } from "../model/chart-grid.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
 /** Dashboard owns these wire schemas; WireOf maps persisted values to their transport representation. */

@@ -1,12 +1,12 @@
+import { usdToNanoUsd } from "@langwatch/gateway-contract";
 /**
  * Aggregate read-side queries for AI Gateway usage surfaces. Spend comes from trace_summaries, not
  * the budget ledger, which writes once per applicable budget and never for an uncapped key. Every
  * read spans the org's projects, since traces land in the key's resolved trace destination.
  */
 import { type Instant, toDate } from "@langwatch/time";
-import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
-import type { GatewayBudgetSpend,GatewayVirtualKeySpend } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpend, GatewayVirtualKeySpend } from "../app/gateway.members.ts";
 
 /**
  * The one project read these surfaces make: which tenants an org's gateway traces can land in.

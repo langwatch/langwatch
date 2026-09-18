@@ -1,6 +1,7 @@
 /** Public environment: whether deployment can send email for invitations. */
 
 import { useMemo } from "react";
+
 import { useOrganizationHost } from "../model/organization-host.ts";
 
 export type OrganizationPublicEnvReading = {

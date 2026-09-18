@@ -19,6 +19,7 @@ import {
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import type {
   ProjectRepository,
   ProjectWithOrgAdmin,

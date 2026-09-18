@@ -10,10 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { BudgetOverviewList } from "@langwatch/gateway-browser/surfaces/budget-overview";
+import { toEpochMs } from "@langwatch/time";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
-import { BudgetOverviewList } from "@langwatch/gateway-browser/surfaces/budget-overview";
-import { Checkbox } from "@langwatch/design-system/checkbox";
 
 import { api } from "../../../behavior/personal-workspace-api.ts";
 import {
@@ -31,7 +32,6 @@ import { DevicesPanel } from "../devices-panel.tsx";
 import { HomePagePicker } from "../home-page-picker.tsx";
 import { PersonalOtlpEndpointPanel } from "../personal-otlp-endpoint-panel.tsx";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
-import { toEpochMs } from "@langwatch/time";
 
 /** The personal keys carry ISO timestamps; the ladder counts milliseconds. */
 const fmtRelative = (iso: string | null): string => formatRelativeTime(iso ? toEpochMs(iso) : null);

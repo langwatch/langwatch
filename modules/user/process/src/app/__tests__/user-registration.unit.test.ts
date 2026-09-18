@@ -4,10 +4,17 @@
  * owns the `signed_up` milestone - and a rejected registration tracks nothing.
  * @see specs/licensing/sso-license-gating.feature
  */
-import { EmailAlreadyRegisteredError, UserRegistrationNotAvailableError } from "@langwatch/user-contract";
+import {
+  EmailAlreadyRegisteredError,
+  UserRegistrationNotAvailableError,
+} from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { createUserTestApp, createUserTestInfrastructure } from "./user.fixture.ts";
+import {
+  createUserTestApp,
+  createUserTestAuth,
+  createUserTestInfrastructure,
+} from "./user.fixture.ts";
 
 function register(app: ReturnType<typeof createUserTestApp>, email = "a@x.com") {
   return app.registerCredentialAccount({
@@ -83,13 +90,7 @@ describe("registering a credential account", () => {
     /** @scenario "A fresh unlicensed deployment bootstraps via email signup" */
     it("registers the account through the signup form's own path", async () => {
       const app = createUserTestApp({
-        members: {
-          deployment: {
-            authProvider: vi.fn(async () => "email"),
-            offersPasskeys: () => false,
-            findBaseUrl: () => null,
-          },
-        },
+        dependencies: { auth: createUserTestAuth("email") },
       });
 
       await expect(register(app, "operator@example.com")).resolves.toMatchObject({
@@ -102,13 +103,7 @@ describe("registering a credential account", () => {
     /** @scenario "A licensed deployment cannot mint password accounts" */
     it("refuses direct registration", async () => {
       const app = createUserTestApp({
-        members: {
-          deployment: {
-            authProvider: vi.fn(async () => "auth0"),
-            offersPasskeys: () => false,
-            findBaseUrl: () => null,
-          },
-        },
+        dependencies: { auth: createUserTestAuth("auth0") },
       });
 
       await expect(register(app, "operator@example.com")).rejects.toBeInstanceOf(

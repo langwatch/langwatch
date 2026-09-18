@@ -9,25 +9,25 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo } from "react";
-import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
-import { UserAvatar } from "../../elements/user-avatar.tsx";
-
-import { HistoryIcon } from "@langwatch/model-provider-browser/history-icon";
-import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { HistoryIcon } from "@langwatch/model-provider-browser/history-icon";
 import {
   hasDSLChanged,
   parseStudioWorkflow,
   type Project,
   studioWorkflowSchema,
 } from "@langwatch/workflow-contract";
+import { useCallback, useEffect, useMemo } from "react";
+import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
+
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
+import { UserAvatar } from "../../elements/user-avatar.tsx";
 import { NewVersionFields } from "./version-to-be-used.tsx";
 
 export function History() {
@@ -181,10 +181,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       <Popover.CloseTrigger />
       <Popover.Body padding={0}>
         <FormProvider {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            style={{ width: "100%", padding: "20px" }}
-          >
+          <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%", padding: "20px" }}>
             <VStack align="start" width="full">
               <NewVersionFields canSaveOverride={canSaveNewVersion} />
               <Tooltip

@@ -57,4 +57,3 @@ export class LangWatchQLNotPermittedError extends HandledError {
     this.name = "LangWatchQLNotPermittedError";
   }
 }
-

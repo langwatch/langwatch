@@ -1,12 +1,10 @@
 import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
 
 import type { WebhookDestination } from "../app/webhook.app.ts";
-import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
+import type { SqsWebhookSender } from "../channels/sqs/sqs.webhook-destination.channel.ts";
 import { HttpWebhookDestinationAdapter } from "./http.webhook-destination.service.ts";
-import {
-  type AwsClientConfigResolver,
-  SqsWebhookDestinationAdapter,
-} from "./sqs.webhook-destination.service.ts";
+import { SqsWebhookDestinationAdapter } from "./sqs.webhook-destination.service.ts";
+import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
 
 /**
  * What a process must hold before it can deliver to either transport.
@@ -14,7 +12,7 @@ import {
 export type WebhookDestinationDeps = Readonly<{
   egress: WebhookEgressService;
   allowInsecureLocal: boolean;
-  awsClientConfig: AwsClientConfigResolver;
+  sqs: SqsWebhookSender;
   /**
    * The counter the hourly dispatch cap is kept in. The HTTPS transport reads it off the egress
    * service; a queue send never passes through that sender, so it has to be handed the same
@@ -48,7 +46,7 @@ export class WebhookDestinationAdapter {
             externalId: config.externalId,
             accessKeyId: config.accessKeyId,
             secretAccessKey: config.secretAccessKey,
-            awsClientConfig: this.deps.awsClientConfig,
+            channel: this.deps.sqs,
             ...(this.deps.rateLimiter ? { rateLimiter: this.deps.rateLimiter } : {}),
           },
         });

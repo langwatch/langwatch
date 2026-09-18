@@ -1,3 +1,4 @@
+import type { TrpcContract } from "@langwatch/api/contract";
 /**
  * @vitest-environment node
  * What the ops surface answers, over the real runtime and a real `OpsApp`.
@@ -5,18 +6,17 @@
  * is a blank card rather than an error.
  */
 import { bindTrpcFact, createTrpcRuntime, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import type { TrpcContract } from "@langwatch/api/contract";
-import type { OpsCapability } from "@langwatch/ops-process";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
+import type { OpsCapability } from "@langwatch/ops-process";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { createOpsTestApp, OPS_STAFF_ADDRESS } from "../../app/__tests__/ops.fixture.ts";
 import { opsDashboardTrpcTransport } from "../ops-dashboard.trpc.ts";
 import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
+import { opsOperatorFact } from "../ops-operator.trpc.ts";
 import { opsPlatformTrpcTransport } from "../ops-platform.trpc.ts";
 import { opsQueueTrpcTransport } from "../ops-queue.trpc.ts";
-import { opsOperatorFact } from "../ops-operator.trpc.ts";
 import { opsTrpcTestMembers } from "./ops.trpc.harness.ts";
 
 type OpsAnswersContext = { actor: { id: string }; operator: OpsOperator | null };

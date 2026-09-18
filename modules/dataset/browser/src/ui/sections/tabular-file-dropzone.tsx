@@ -3,6 +3,7 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useState, type DragEvent, type ReactNode } from "react";
+
 import { formatFileSize, parseTabularFileToRows } from "../../model/parse-tabular-file.ts";
 import {
   DROPZONE_DOTTED_STYLE,

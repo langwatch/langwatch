@@ -13,6 +13,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -22,14 +24,13 @@ import {
   useFieldArray,
   useWatch,
 } from "react-hook-form";
-import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { ProjectAvatar } from "../elements/project-avatar.tsx";
-import { Link } from "../elements/link.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
+import { api, type RouterOutputs } from "../../behavior/organization-api.ts";
 import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import { api, type RouterOutputs } from "../../behavior/organization-api.ts";
+import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
+import { Link } from "../elements/link.tsx";
+import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
 /**
  * One team as this form reads it: whatever `team.getTeamWithMembers` answers.
@@ -37,10 +38,15 @@ import { api, type RouterOutputs } from "../../behavior/organization-api.ts";
  * serves a browser-shaped team (no accounting columns) plus its projects.
  */
 type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
-import { HorizontalFormControl } from "../elements/horizontal-form-control.tsx";
 import { Select } from "@langwatch/design-system/select";
-import { TeamRoleSelect, type TeamUserRoleForm, teamRolesOptions } from "./team-user-role-field.tsx";
+
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
+import { HorizontalFormControl } from "../elements/horizontal-form-control.tsx";
+import {
+  TeamRoleSelect,
+  type TeamUserRoleForm,
+  teamRolesOptions,
+} from "./team-user-role-field.tsx";
 
 function TeamProjectsBody({
   team,

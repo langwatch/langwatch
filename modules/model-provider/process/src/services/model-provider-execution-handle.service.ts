@@ -1,5 +1,4 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModel } from "ai";
 import {
   expandLatestAlias,
   isCodexModel,
@@ -8,15 +7,14 @@ import {
   type ModelProviderAlternateResolution,
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
+import type { LanguageModel } from "ai";
+
+import type { ModelCostProject, ModelProviderCodexHandle } from "../app/model-provider.members.ts";
 import {
   getProjectModelProviders,
   type LegacyModelProviderExecution,
   prepareLitellmParams,
 } from "../rules/legacy-model-provider.rules.ts";
-import type {
-  ModelCostProject,
-  ModelProviderCodexHandle,
-} from "../app/model-provider.members.ts";
 
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.

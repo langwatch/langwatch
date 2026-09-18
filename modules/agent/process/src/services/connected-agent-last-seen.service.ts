@@ -1,6 +1,7 @@
 import { LAST_SEEN_WRITE_INTERVAL_MS } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
+
 import type { AgentService } from "./agent.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:presence");

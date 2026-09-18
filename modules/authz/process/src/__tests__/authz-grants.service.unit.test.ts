@@ -5,7 +5,12 @@ import {
   OffboardIncompleteError,
 } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
 import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
+import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
+import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.stub.ts";
+import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 import {
   type AuthzGrantRepository,
   BindingMissingError,
@@ -14,10 +19,6 @@ import {
 } from "../repositories/authz-grant.repository.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
-import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.stub.ts";
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
-import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
-import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 
 const ORG = "org-1";
 const OTHER_ORG = "org-other";
@@ -146,9 +147,7 @@ describe("AuthzGrantsService.attach", () => {
   describe("when the custom role belongs to another organization", () => {
     it("rejects the attach", async () => {
       const repository = makeRepository({
-        findCustomRole: vi
-          .fn()
-          .mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
+        findCustomRole: vi.fn().mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
       });
       const { service } = makeService(repository);
 
@@ -472,9 +471,7 @@ describe("AuthzGrantsService.update", () => {
     /** @scenario "A role binding can never reference another organization's custom role" */
     it("rejects with the same tenancy rule as attach", async () => {
       const repository = makeRepository({
-        findCustomRole: vi
-          .fn()
-          .mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
+        findCustomRole: vi.fn().mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
       });
       const { service } = makeService(repository);
       await expect(

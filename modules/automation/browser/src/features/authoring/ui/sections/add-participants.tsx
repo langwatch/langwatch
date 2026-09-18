@@ -16,6 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { Select } from "@langwatch/design-system/select";
 import { Users } from "react-feather";
+
 import { api } from "../../../../behavior/automation-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
 import { ParticipantAvatar } from "../elements/participant-avatar.tsx";

@@ -22,9 +22,11 @@ import {
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { ApiKeyBindingId } from "./api-key-binding-id.service.ts";
+import type { Instant } from "@langwatch/time";
+
 import type { ApiKeyTokenRepository } from "../repositories/api-key-token.repository.ts";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import type { ApiKeyBindingId } from "./api-key-binding-id.service.ts";
 import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
 import { ApiKeyCliService } from "./api-key-cli.service.ts";
 import { ApiKeyEnrichmentService } from "./api-key-enrichment.service.ts";
@@ -33,7 +35,6 @@ import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
 import { ApiKeyVisibilityService } from "./api-key-visibility.service.ts";
 import type { LegacyApiKeyGrantService } from "./legacy-api-key-grant.service.ts";
-import type { Instant } from "@langwatch/time";
 
 export type ApiKeyDependencies = {
   authz: AuthzApi;

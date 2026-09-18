@@ -5,13 +5,14 @@
 
 import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import {
   isHeldOutIdentifierAttribute,
   redactAttributeNative,
   redactStringNative,
 } from "@langwatch/redaction/pii";
-import { createLogger } from "@langwatch/observability";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+
 import type { PIICheckOptions } from "../app/data-privacy.members.ts";
 import type {
   OtlpSpanPiiRedactionServiceDependencies,

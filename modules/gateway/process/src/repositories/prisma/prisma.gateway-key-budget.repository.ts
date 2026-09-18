@@ -1,13 +1,14 @@
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
-import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
+
 import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
 import {
   GatewayKeyBudgetRepository,
   type GatewayKeyBudgetFields,
   type GatewayKeyBudgetScope,
 } from "../gateway-key-budget.repository.ts";
-import { toDate, type Instant } from "@langwatch/time";
+import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 
 /** The client slice a key's own caps are written through. */
 export type GatewayKeyBudgetDatabase = Pick<PrismaClient, "gatewayBudget">;

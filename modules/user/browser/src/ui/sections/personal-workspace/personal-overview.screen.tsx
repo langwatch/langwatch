@@ -1,6 +1,5 @@
 import { Box, Heading, HStack, SimpleGrid, Spacer, Text, VStack } from "@chakra-ui/react";
-import numeral from "numeral";
-import { useState } from "react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type BudgetOverviewItemView,
   BudgetExceededBanner,
@@ -11,20 +10,21 @@ import {
   isBudgetNearLimit,
   spentSubline,
 } from "@langwatch/gateway-browser/surfaces/budget-overview";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import numeral from "numeral";
+import { useState } from "react";
 
 import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
 import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
 } from "../../blocks/personal-traces-empty-state.tsx";
-import { PersonalWorkspaceViewOnlyNotice } from "../personal-workspace-view-only-notice.tsx";
 import { Link } from "../../elements/personal-link.tsx";
 import { AiToolsPortal } from "../ai-tools-portal.tsx";
 import { CodingAgentUsageContent } from "../coding-agent-usage-content.tsx";
 import { ConnectYourAgentButton } from "../connect-your-agent-button.tsx";
 import { PersonalRecentTracesTable } from "../personal-recent-traces-table.tsx";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
+import { PersonalWorkspaceViewOnlyNotice } from "../personal-workspace-view-only-notice.tsx";
 import { TraceIngestSection } from "../trace-ingest-section.tsx";
 
 // /me/usage frequently surfaces sub-cent spend; defer to the shared

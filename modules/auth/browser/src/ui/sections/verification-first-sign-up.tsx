@@ -1,20 +1,22 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useEffect, useRef, useState } from "react";
-import { AuthCard } from "../elements/auth-card.tsx";
-import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import { readHandledError } from "../../model/read-handled-error.ts";
+
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn } from "../../behavior/auth-client.tsx";
-import Link from "../elements/router-link.tsx";
-import { useSearchParams } from "../../behavior/use-route.ts";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
+import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.ts";
 import type { FrontDoorDepth } from "../../model/ground-palette.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
 import { readLastUsedMethodId, rememberPendingMethod } from "../../model/last-used-method.ts";
+import { readHandledError } from "../../model/read-handled-error.ts";
+import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import Link from "../elements/router-link.tsx";
+import { SuccessPulse } from "../elements/success-pulse.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
@@ -25,7 +27,6 @@ import {
   SignInMethodPicker,
 } from "./sign-in-method-picker.tsx";
 import { SignUpCredentialForm } from "./sign-up-credential-form.tsx";
-import { SuccessPulse } from "../elements/success-pulse.tsx";
 
 /**
  * Where a new account goes before it makes an organization: the

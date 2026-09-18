@@ -1,10 +1,11 @@
+import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 /**
  * @vitest-environment node
  * A rethrow here is not this repository's outcome to claim — the worker
  * queue above it owns retries and terminal error logging.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
+
 import type { MetricClickHouseClient } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 
 const logger = vi.hoisted(() => ({

@@ -93,9 +93,7 @@ describe("given the project's experiments over REST", () => {
       const { send } = mountExperimentRest({
         app: {
           getPage: async () => ({ experiments: [experiment], totalHits: 9 }),
-          withRunAggregates: async () => [
-            { experiment, runsCount: 0, lastRunAt: null },
-          ],
+          withRunAggregates: async () => [{ experiment, runsCount: 0, lastRunAt: null }],
         },
       });
 
@@ -221,7 +219,10 @@ describe("given the project's experiments over REST", () => {
 
       await send("/api/experiments", { method: "POST", body: {} });
 
-      expect(createEvaluationsV3).toHaveBeenCalledWith({ projectId: PROJECT_ID }, expect.anything());
+      expect(createEvaluationsV3).toHaveBeenCalledWith(
+        { projectId: PROJECT_ID },
+        expect.anything(),
+      );
     });
 
     // WIRE DELTA: the imperative family answered 400 here. The declaration
@@ -254,7 +255,10 @@ describe("given the project's experiments over REST", () => {
     it("authenticates before it authorizes", async () => {
       const checked: string[] = [];
       const { send } = mountExperimentRest({
-        app: { getPage: async () => ({ experiments: [], totalHits: 0 }), withRunAggregates: async () => [] },
+        app: {
+          getPage: async () => ({ experiments: [], totalHits: 0 }),
+          withRunAggregates: async () => [],
+        },
         checked,
       });
 

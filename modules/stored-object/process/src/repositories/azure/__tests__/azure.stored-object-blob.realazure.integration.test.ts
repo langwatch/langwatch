@@ -3,8 +3,13 @@
  * @vitest-environment node
  */
 import crypto from "node:crypto";
-import { mintAzureBlobStoredObjectUri,ObjectNotFoundError } from "@langwatch/stored-object-contract";
+
+import {
+  mintAzureBlobStoredObjectUri,
+  ObjectNotFoundError,
+} from "@langwatch/stored-object-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
 import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 

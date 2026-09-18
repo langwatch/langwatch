@@ -53,24 +53,25 @@ import {
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
 } from "@langwatch/experiment-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
+
+import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository.ts";
+import type { ExperimentRunRepository } from "../repositories/experiment-run.repository.ts";
 import {
   ArchivedExperimentWriteError,
   type ExperimentRepository,
 } from "../repositories/experiment.repository.ts";
-import type { ExperimentRunRepository } from "../repositories/experiment-run.repository.ts";
-import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository.ts";
 import { isPostgresUniqueConflict } from "../rules/postgres-unique-conflict.rules.ts";
 import { ExperimentSlugService } from "./experiment-slug.service.ts";
+import {
+  ExperimentWorkbenchReferencesService,
+  type ExperimentWorkbenchReferenceServices,
+} from "./experiment-workbench-references.service.ts";
 import {
   ExperimentWorkbenchService,
   NoopExperimentWorkbenchUpdates,
   type ExperimentWorkbenchUpdates,
 } from "./experiment-workbench.service.ts";
-import {
-  ExperimentWorkbenchReferencesService,
-  type ExperimentWorkbenchReferenceServices,
-} from "./experiment-workbench-references.service.ts";
-import { nowInstant, type Instant } from "@langwatch/time";
 
 /**
  * Private boundary between the canonical Experiment service and the app's
@@ -442,9 +443,7 @@ export class ExperimentService {
     return this.workbench.createEvaluationsV3(input);
   };
 
-  commitWorkbenchVersion = (
-    input: CommitWorkbenchVersionInput,
-  ): Promise<WorkbenchSaveResult> => {
+  commitWorkbenchVersion = (input: CommitWorkbenchVersionInput): Promise<WorkbenchSaveResult> => {
     return this.workbench.commitWorkbenchVersion(input);
   };
 
@@ -452,9 +451,7 @@ export class ExperimentService {
     return this.workbench.listWorkbenchVersions(input);
   }
 
-  restoreWorkbenchVersion = (
-    input: RestoreWorkbenchVersionInput,
-  ): Promise<WorkbenchSaveResult> => {
+  restoreWorkbenchVersion = (input: RestoreWorkbenchVersionInput): Promise<WorkbenchSaveResult> => {
     return this.workbench.restoreWorkbenchVersion(input);
   };
 

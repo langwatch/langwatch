@@ -1,4 +1,5 @@
 import type { Logger } from "@langwatch/observability";
+
 import { type PersonalWorkspaceDiagnostics } from "../app/organization.members.ts";
 
 /**
@@ -10,8 +11,7 @@ export class PersonalWorkspaceDiagnosticsAdapter implements PersonalWorkspaceDia
     return new PersonalWorkspaceDiagnosticsAdapter(logger);
   }
 
-  private constructor(private readonly logger: Pick<Logger, "warn">) {
-  }
+  private constructor(private readonly logger: Pick<Logger, "warn">) {}
 
   warn(message: string, context: Record<string, unknown>): void {
     this.logger.warn(context, message);

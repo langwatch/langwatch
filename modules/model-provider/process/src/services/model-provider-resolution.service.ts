@@ -15,12 +15,9 @@ import {
   type ModelProviderAlternateResolution,
   type ModelProviderResolution,
 } from "@langwatch/model-provider-contract";
-import type {
-  ModelProviderCatalog
-} from "../app/model-provider.members.ts";
-import type {
-  ModelDefaultRepository
-} from "../repositories/model-default.repository.ts";
+
+import type { ModelProviderCatalog } from "../app/model-provider.members.ts";
+import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type ResolutionOptions = {

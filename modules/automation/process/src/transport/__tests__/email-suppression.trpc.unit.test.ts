@@ -16,7 +16,9 @@ import {
   type AutomationTrpcTestContext,
 } from "./automation.trpc.harness.ts";
 
-function mount(options: { app?: Partial<AutomationApi>; permits?: (name: string) => boolean } = {}) {
+function mount(
+  options: { app?: Partial<AutomationApi>; permits?: (name: string) => boolean } = {},
+) {
   const trpc = initTRPC.context<AutomationTrpcTestContext>().create();
   const router = createTrpcRuntime<AutomationTrpcTestContext>({
     root: trpc,
@@ -55,7 +57,9 @@ describe("the email suppression tRPC namespace", () => {
         const view = { projectName: "Acme", triggerName: "Nightly", email: "a***@acme.test" };
         const { anonymous } = mount({ app: { resolveUnsubscribeView: async () => view } });
 
-        await expect(anonymous.resolveUnsubscribeToken({ token: "t_valid" })).resolves.toEqual(view);
+        await expect(anonymous.resolveUnsubscribeToken({ token: "t_valid" })).resolves.toEqual(
+          view,
+        );
       });
     });
 

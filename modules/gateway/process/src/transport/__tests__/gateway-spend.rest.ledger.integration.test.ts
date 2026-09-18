@@ -1,34 +1,32 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import type { SpendEventRow } from "@langwatch/gateway-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Real ClickHouse + real Postgres. Pins insert-order paging, the tenant fence, and
  * rollup/end-user arithmetic. Spec: gateway-spend-rest.feature, billing-spend-events.feature.
  */
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
-import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { GatewayEndUserCapsAdapter } from "../../app/gateway-end-user-caps.composition.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
-
-import { FixedGatewaySettlementPolicyService } from "../../services/fixed-gateway-settlement-policy.service.ts";
-import { GatewayEndUserCapsAdapter } from "../../adapters/gateway-end-user-caps.adapter.ts";
-import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
-import { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
-import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
+import { FixedGatewaySettlementPolicyService } from "../../services/fixed-gateway-settlement-policy.service.ts";
 import { GatewaySpendEventsService } from "../../services/gateway-spend-events.service.ts";
 import {
   gatewaySpendBillingPlanGate,
   gatewaySpendRest,
   type GatewaySpendApp,
 } from "../gateway-spend.rest.ts";
-
-import type { SpendEventRow } from "@langwatch/gateway-contract";
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();

@@ -1,9 +1,12 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
-import type { MetricRollupSourcePoint, MetricSequencePoint,
+import type {
+  MetricRollupSourcePoint,
+  MetricSequencePoint,
   AggregationTemporality,
   CanonicalMetricDataPoint,
   MetricKind,
-  MetricRollupRow } from "@langwatch/metric-contract";
+  MetricRollupRow,
+} from "@langwatch/metric-contract";
 import { Temporal, toDate } from "@langwatch/time";
 
 /**
@@ -363,13 +366,7 @@ export class MetricDataPointMapper {
     };
   }
 
-  static rollupRow({
-    row,
-    retentionDays,
-  }: {
-    row: MetricRollupRow;
-    retentionDays: number;
-  }): {
+  static rollupRow({ row, retentionDays }: { row: MetricRollupRow; retentionDays: number }): {
     TenantId: string;
     SeriesId: string;
     MetricName: string;

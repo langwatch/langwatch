@@ -1,17 +1,22 @@
 import "@testing-library/jest-dom/vitest";
-
 // @vitest-environment jsdom
 /**
  * Tests for ComparisonCharts component
  */
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ComparisonCharts, computeRunMetrics, computeTargetMetrics } from "../comparison-charts.tsx";
-import type { BatchEvaluationData, ComparisonRunData } from "../../batch-evaluation-results.types.ts";
+import type {
+  BatchEvaluationData,
+  ComparisonRunData,
+} from "../../batch-evaluation-results.types.ts";
+import {
+  ComparisonCharts,
+  computeRunMetrics,
+  computeTargetMetrics,
+} from "../comparison-charts.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

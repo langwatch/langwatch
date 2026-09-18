@@ -4,9 +4,9 @@
  *   ("A page that cannot save refuses the action instead of reporting success")
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { LangyUiActionHandlers } from "@langwatch/langy-browser/langy-ui-actions";
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LangyUiActionHandlers } from "@langwatch/langy-browser/langy-ui-actions";
 
 const captured = vi.hoisted(() => ({
   handlers: undefined as LangyUiActionHandlers | undefined,

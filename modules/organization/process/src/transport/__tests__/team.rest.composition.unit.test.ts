@@ -16,8 +16,8 @@ import type {
   OrganizationSettingsSecret,
 } from "../../app/organization.members.ts";
 import { MemoryGroupRepository } from "../../repositories/memory/memory.group.repository.ts";
-import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { MemoryOrganizationMembershipRepository } from "../../repositories/memory/memory.organization-membership.repository.ts";
+import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import { MemoryTeamRepository } from "../../repositories/memory/memory.team.repository.ts";
 import { OrganizationMembershipService } from "../../services/organization-membership.service.ts";
@@ -27,6 +27,8 @@ import {
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
 } from "../../services/resource-identifiers.service.ts";
+import { TestAuthzApi } from "./support/test-authz-api.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 import {
   CREDENTIAL,
   ORGANIZATION_ID,
@@ -35,8 +37,6 @@ import {
   mountTeamsRestApplication,
   type TeamRestRefusal,
 } from "./team.rest.harness.ts";
-import { TestAuthzApi } from "./support/test-authz-api.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
 
 const OTHER_ORGANIZATION_ID = "organization-other";
 const SHARED_TEAM_ID = "team_shared";
@@ -360,7 +360,10 @@ describe("given the teams REST family over the application the composition build
         data: { id: string }[];
         pagination: { page: number; limit: number; total: number };
       };
-      expect(body.data.map((team) => team.id).toSorted()).toEqual([PERSONAL_TEAM_ID, SHARED_TEAM_ID]);
+      expect(body.data.map((team) => team.id).toSorted()).toEqual([
+        PERSONAL_TEAM_ID,
+        SHARED_TEAM_ID,
+      ]);
       expect(body.pagination).toMatchObject({ page: 1, limit: 50 });
     });
 

@@ -3,8 +3,8 @@
  */
 
 import { Button, HStack, Text } from "@chakra-ui/react";
-import { Drawer } from "@langwatch/design-system/drawer";
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Database } from "lucide-react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";

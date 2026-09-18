@@ -3,9 +3,9 @@
  * Per-person template: each person gets their own cap and headcount.
  */
 import { cleanup, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const listQuery = vi.hoisted(() => vi.fn());
 

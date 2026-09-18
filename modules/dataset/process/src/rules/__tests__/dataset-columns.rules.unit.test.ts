@@ -1,9 +1,10 @@
+import { InvalidColumnError } from "@langwatch/dataset-contract";
 /**
  * A write naming a column the dataset does not define is refused rather than silently dropped,
  * so a caller never reads a success for data nothing stored.
  */
 import { describe, expect, it } from "vitest";
-import { InvalidColumnError } from "@langwatch/dataset-contract";
+
 import { assertKnownColumns } from "../dataset-columns.rules.ts";
 
 describe("assertKnownColumns", () => {

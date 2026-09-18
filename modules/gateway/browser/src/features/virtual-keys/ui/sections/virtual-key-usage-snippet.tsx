@@ -9,9 +9,10 @@ import {
   useTabs,
   VStack,
 } from "@chakra-ui/react";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
-import { useColorMode } from "@langwatch/design-system/color-mode";
+
 import { useGatewayDeployment } from "../../../../behavior/gateway-session.ts";
 import { resolveSnippetGatewayBaseUrl } from "../../model/gateway-snippet-url.ts";
 

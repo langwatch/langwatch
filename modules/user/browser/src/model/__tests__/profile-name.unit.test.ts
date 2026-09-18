@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { profileNameMaySave, sanitizeProfileName } from "../profile-name.ts";
 
 describe("given a name that is only whitespace", () => {

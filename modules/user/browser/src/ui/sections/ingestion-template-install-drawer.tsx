@@ -1,8 +1,7 @@
 import { Alert, Badge, Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-
-import { Drawer } from "@langwatch/design-system/drawer";
 
 import { usePersonalToaster } from "../../behavior/personal-workspace-feedback.ts";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";

@@ -4,9 +4,10 @@
  * (scopeType, scopeId). Shared so one team never renders under two names.
  */
 import { scopeTargetKey } from "@langwatch/gateway-contract";
-import type { ProjectIdentity } from "@langwatch/project-contract";
-import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectIdentity } from "@langwatch/project-contract";
+
+import type { GatewayVirtualKeyProjectScope } from "../gateway-budget.repository.ts";
 
 /** The client slice scope-target expansion reads. */
 export type GatewayBudgetScopeTargetDatabase = Pick<

@@ -1,18 +1,23 @@
 import { Alert, Button, Spacer } from "@chakra-ui/react";
-import type { ConnectedAgentBrowser } from "../../model/agent-client.ts";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { toEpochMs } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, type ReactNode } from "react";
+
 import { agentApi } from "../../behavior/agent-api.ts";
+import type { ConnectedAgentBrowser } from "../../model/agent-client.ts";
+import {
+  useAgentManagementHost,
+  type AgentManagementHost,
+} from "../../model/agent-management-host.ts";
 import { getAgentEditorDrawer } from "../../model/get-agent-editor-drawer.ts";
-import { AgentTypeSelectorDrawer, type AgentType } from "./agent-type-selector-drawer.tsx";
-import { AgentHistoryDrawer } from "./agent-history-drawer.tsx";
 import { AgentArchiveDialog } from "../blocks/agent-archive-dialog.tsx";
+import { AgentCard } from "../blocks/agent-card.tsx";
 import { AgentPushDialog } from "../blocks/agent-push-dialog.tsx";
 import { AgentReplicateDialog } from "../blocks/agent-replicate-dialog.tsx";
 import { ConnectedAgentsSection } from "../blocks/connected-agents-section.tsx";
-import { AgentCard } from "../blocks/agent-card.tsx";
+import { AgentHistoryDrawer } from "./agent-history-drawer.tsx";
 import {
   type AgentManagementCard,
   AgentManagementPage,
@@ -23,11 +28,7 @@ import {
   type AgentPushDialogInput,
   type AgentWithFields,
 } from "./agent-management-page.tsx";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import {
-  useAgentManagementHost,
-  type AgentManagementHost,
-} from "../../model/agent-management-host.ts";
+import { AgentTypeSelectorDrawer, type AgentType } from "./agent-type-selector-drawer.tsx";
 
 export const AGENT_HISTORY_QUERY_KEY = "history";
 

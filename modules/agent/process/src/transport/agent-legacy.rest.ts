@@ -73,7 +73,10 @@ export const agentLegacyRest: Readonly<{
   // not this one's twin, so claiming the twin would publish two declarations at
   // one address.
   .withAddressing("dated", { v1Twin: false })
-  .withDeprecated({ successor: AGENTS_ALIAS_SUCCESSOR, notice: `superseded by ${AGENTS_ALIAS_SUCCESSOR}` })
+  .withDeprecated({
+    successor: AGENTS_ALIAS_SUCCESSOR,
+    notice: `superseded by ${AGENTS_ALIAS_SUCCESSOR}`,
+  })
 
   .get("/", "listAgents")
   .withQuery(agentRestQuerySchema)

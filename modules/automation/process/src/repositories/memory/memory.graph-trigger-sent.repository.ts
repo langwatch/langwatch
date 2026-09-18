@@ -1,5 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import type { Instant } from "@langwatch/time";
+
 import {
   GraphTriggerSentRepository,
   type AnalyticsMetricSource,
@@ -27,9 +28,7 @@ export class MemoryGraphTriggerSentRepository extends GraphTriggerSentRepository
   }
 
   findProjectsWithOpenGraphTriggerSent(): Promise<Set<string>> {
-    return Promise.resolve(
-      new Set(this.open().map((incident) => incident.projectId)),
-    );
+    return Promise.resolve(new Set(this.open().map((incident) => incident.projectId)));
   }
 
   findGraphTriggerSource(params: {

@@ -1,4 +1,6 @@
-import { type Command, type CommandHandler,
+import {
+  type Command,
+  type CommandHandler,
   type AppendStore,
   createTenantId,
   defineAggregate,
@@ -8,7 +10,8 @@ import { type Command, type CommandHandler,
   type EventSubscriberDefinition,
   EventUtils,
   type Projection,
-  type StaticPipelineDefinition } from "@langwatch/eventing";
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
 import type {
   CanonicalMetricDataPoint,
   MetricDataPointReceivedEvent,
@@ -26,16 +29,17 @@ import {
   RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
   recordMetricDataPointCommandDataSchema,
 } from "@langwatch/metric-contract";
+
 import { MetricDataPointStorageMapProjection } from "../eventing/metric-data-point-storage.projection.ts";
 import { MetricSeriesCatalogMapProjection } from "../eventing/metric-series-catalog.projection.ts";
 import { MetricTimeRollupMapProjection } from "../eventing/metric-time-rollup.projection.ts";
 import type { MetricDataPointAppendRepository } from "../repositories/metric-data-point-append.repository.ts";
+import { sha256 } from "../rules/metric-serialization.rules.ts";
 import {
   MetricDataPointAppendStore,
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "../stores/metric-projection/metric-projection.store.ts";
-import { sha256 } from "../rules/metric-serialization.rules.ts";
 
 export interface MetricProcessingPipelineDeps {
   metricDataPointAppendStore: AppendStore<CanonicalMetricDataPoint>;

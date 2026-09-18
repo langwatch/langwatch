@@ -1,3 +1,5 @@
+import { EventEmitter } from "node:events";
+
 /**
  * Builds what `apps/api/src/features/experiment/experiment.composition.ts`
  * (deleted by b383462d96) used to hand-compose. See the handoff for the run
@@ -8,23 +10,33 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
-import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
-import { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
-import { ExperimentService } from "../services/experiment.service.ts";
-import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
-import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
-import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { generate } from "@langwatch/ksuid";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { Logger } from "@langwatch/observability";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type { WorkflowService } from "@langwatch/workflow-process";
-import { generate } from "@langwatch/ksuid";
 
+import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
+import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
+import { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
+import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
+import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
+import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
+import type {
+  ExecutionDataServices,
+  ExperimentWorkflowDsl,
+} from "../services/experiment-execution-data.service.ts";
+import { ExperimentService } from "../services/experiment.service.ts";
+import type {
+  ExperimentV3RunLoop,
+  ExperimentWorkbenchObserver,
+  ExperimentWorkbenchPermissions,
+} from "./experiment-workbench.members.ts";
 import type {
   ExperimentAppDependencies,
   ExperimentBroadcast,
@@ -33,17 +45,6 @@ import type {
   ExperimentPermissions,
   ExperimentWorkflowAuthoring,
 } from "./experiment.app.ts";
-import type {
-  ExperimentV3RunLoop,
-  ExperimentWorkbenchObserver,
-  ExperimentWorkbenchPermissions,
-} from "./experiment-workbench.members.ts";
-import type {
-  ExecutionDataServices,
-  ExperimentWorkflowDsl,
-} from "../services/experiment-execution-data.service.ts";
-import type { MonitorApi } from "@langwatch/monitor-contract";
-import { EventEmitter } from "node:events";
 
 /**
  * The retention floor a DSPy run read is bounded by. Fixed, exactly as the

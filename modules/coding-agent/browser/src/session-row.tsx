@@ -1,17 +1,17 @@
 import { Table } from "@chakra-ui/react";
-import { ActiveAndWaitingCell } from "./cells/active-and-waiting-cell.tsx";
+import type React from "react";
+
 import { AgentLabel } from "./agent-label.tsx";
+import { ActiveAndWaitingCell } from "./cells/active-and-waiting-cell.tsx";
 import { CompactionsCell } from "./cells/compactions-cell.tsx";
 import { ContextCell } from "./cells/context-cell.tsx";
 import { MISSING_VALUE } from "./cells/missing-value.tsx";
 import { PullRequestsCell } from "./cells/pull-requests-cell.tsx";
 import { SessionNameCell } from "./cells/session-name-cell.tsx";
-import { SessionRowActions } from "./session-row-actions.tsx";
 import { TokenCostCell } from "./cells/token-cost-cell.tsx";
-import type { SessionListRow, SessionPullRequest } from "./session-list-row.ts";
-import type React from "react";
-
 import { formatLastUpdate } from "./last-update.ts";
+import type { SessionListRow, SessionPullRequest } from "./session-list-row.ts";
+import { SessionRowActions } from "./session-row-actions.tsx";
 
 /**
  * One session, read left to right. The whole row is the target that opens the

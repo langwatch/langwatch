@@ -1,6 +1,7 @@
+import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
 import { RetroactiveMutationInProgressError } from "@langwatch/data-retention-contract";
 import { describe, expect, it } from "vitest";
-import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+
 import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroactive-retention.repository.ts";
 
 /**

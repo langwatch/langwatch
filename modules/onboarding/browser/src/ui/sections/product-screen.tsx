@@ -2,14 +2,14 @@ import { Box } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
-import { LoadingScreen } from "../blocks/loading-screen.tsx";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import { useProjectBySlugOrLatest } from "../../behavior/use-project-by-slug-or-latest.ts";
-import { OnboardingContainer } from "../blocks/onboarding-container.tsx";
 
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useProductFlow } from "../../behavior/use-product-flow.ts";
+import { useProjectBySlugOrLatest } from "../../behavior/use-project-by-slug-or-latest.ts";
+import { LoadingScreen } from "../blocks/loading-screen.tsx";
+import { OnboardingContainer } from "../blocks/onboarding-container.tsx";
 import { ScreenLifecycle } from "../elements/screen-lifecycle.tsx";
 import { ActiveProjectProvider } from "./active-project-context.tsx";
-import { useProductFlow } from "../../behavior/use-product-flow.ts";
 import { useCreateProductScreens } from "./create-product-screens.tsx";
 
 export const ProductScreen: React.FC = () => {

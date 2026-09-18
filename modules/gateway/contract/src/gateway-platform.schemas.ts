@@ -61,9 +61,7 @@ export const gatewayVirtualKeyDtoSchema = z.object({
     ),
   external_id: z.string().nullable(),
   metadata: z.record(z.string(), z.string()),
-  scopes: z.array(
-    z.object({ scope_type: gatewayVkScopeTypeSchema, scope_id: z.string() }),
-  ),
+  scopes: z.array(z.object({ scope_type: gatewayVkScopeTypeSchema, scope_id: z.string() })),
   routing_policy_id: z.string().nullable(),
   routing_mode: gatewayRoutingModeWireSchema,
   config: z.unknown(),

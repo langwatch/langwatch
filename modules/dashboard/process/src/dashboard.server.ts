@@ -1,14 +1,15 @@
+import { langWatchQLCallerProtections } from "@langwatch/analytics-process";
 import {
   bindRestMiddleware,
   credentialPrincipalOfToken,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { langWatchQLCallerProtections } from "@langwatch/analytics-process";
 import { defineServerModule } from "@langwatch/kernel";
 
 import { DashboardApp } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
 import { dashboardRest } from "./transport/dashboard.rest.ts";
+import { dashboardWidgetRest, dashboardWidgetUrl } from "./transport/dashboard-widget.rest.ts";
 import { dashboardTrpcTransport } from "./transport/dashboard.trpc.ts";
 import { graphRest } from "./transport/graph.rest.ts";
 import { graphTrpcTransport } from "./transport/graph.trpc.ts";
@@ -24,6 +25,7 @@ export const dashboardServer = defineServerModule("dashboard")
   .withApp(DashboardApp)
   .withTransports(
     dashboardRest,
+    dashboardWidgetRest,
     graphRest,
     savedWorkbenchChartRest,
     dashboardTrpcTransport,
@@ -35,7 +37,7 @@ export const dashboardServer = defineServerModule("dashboard")
   // own project content protections, and the deployment's deep link back into
   // the analytics workbench — both resolved through the peer analytics app,
   // exactly as the query door itself resolves the first.
-  .withTransportFacts(({ dependencies }) => [
+  .withTransportFacts(({ app, dependencies }) => [
     bindRestMiddleware(langWatchQLCallerProtections, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
 
@@ -46,6 +48,11 @@ export const dashboardServer = defineServerModule("dashboard")
     }),
     bindRestMiddleware(savedWorkbenchChartUrl, (context) =>
       dependencies.analytics.savedWorkbenchChartPlatformUrl({
+        projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
+      }),
+    ),
+    bindRestMiddleware(dashboardWidgetUrl, (context) =>
+      app.dashboardWidgetPlatformUrl({
         projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
       }),
     ),

@@ -6,13 +6,14 @@
  * @see specs/coding-agent/personal-usage.feature
  */
 
+import type { ContributeMetricFactsCommandData } from "@langwatch/coding-agent-contract";
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
   type MetricProcessingEvent,
 } from "@langwatch/metric-contract";
-import type { ContributeMetricFactsCommandData } from "@langwatch/coding-agent-contract";
+import { describe, expect, it } from "vitest";
+
 import { createCodingAgentMetricFactsDispatchSubscriber } from "../coding-agent-metric-facts-dispatch.subscriber.ts";
 
 const SERIES_ID = "a".repeat(64);

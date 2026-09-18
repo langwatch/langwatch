@@ -1,6 +1,6 @@
 import type { AuthRepositories } from "../auth.repositories.ts";
-import { MemoryAuthDatabase } from "./memory.auth.database.ts";
 import { MemoryAuthSessionRepository } from "./memory.auth-session.repository.ts";
+import { MemoryAuthDatabase } from "./memory.auth.database.ts";
 import { MemorySignUpVerificationTokenRepository } from "./memory.signup-verification-token.repository.ts";
 
 /** Both twins over ONE store, so a session written here is read back here. */

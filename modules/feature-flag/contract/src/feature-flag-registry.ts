@@ -1,14 +1,15 @@
 import { z } from "zod";
+
+import {
+  findExperimentDefinitionViolations,
+  type FeatureFlagExperiment,
+} from "./feature-flag-experiment.ts";
 import {
   FEATURE_FLAG_FAMILIES,
   FEATURE_FLAGS,
   type FeatureFlagDefinition,
   type FeatureFlagFamily,
 } from "./feature-flag.ts";
-import {
-  findExperimentDefinitionViolations,
-  type FeatureFlagExperiment,
-} from "./feature-flag-experiment.ts";
 import { FRONTEND_FEATURE_FLAGS, type FrontendFeatureFlag } from "./frontend-feature-flags.ts";
 import {
   PUBLIC_ANONYMOUS_FEATURE_FLAGS,

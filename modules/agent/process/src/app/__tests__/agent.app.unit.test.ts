@@ -1,8 +1,9 @@
-import { describe, expect, it, onTestFinished } from "vitest";
 import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { UserApi } from "@langwatch/user-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
+import { describe, expect, it, onTestFinished } from "vitest";
+
 import { createAgentAppFixture } from "./agent.fixture.ts";
 
 const projectId = "project_1";
@@ -25,10 +26,8 @@ const connected = {
 describe("AgentApp connected views", () => {
   it("reports the parameters and live instance registered through its connected runtime", async () => {
     const { app, resources } = createAgentAppFixture({
-      config: {
-        publicBaseUrl: "https://langwatch.test",
-        connected: { replicaCount: 1, relayMaxPayloadMb: void 0 },
-      },
+      config: { replicaCount: 1, relayMaxPayloadMb: void 0 },
+      members: { publicBaseUrl: "https://langwatch.test" },
       apiKeys: createApiFixture<ApiKeyApi>({
         findResolvedToken: async () => ({
           type: "legacyProjectKey",

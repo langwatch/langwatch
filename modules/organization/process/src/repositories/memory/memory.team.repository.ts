@@ -7,6 +7,7 @@ import {
   type OrganizationTeamPage,
 } from "@langwatch/organization-contract";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import { TeamRepository } from "../team.repository.ts";
 import type { MemoryOrganizationDatabase, MemoryTeamRow } from "./memory.organization.database.ts";
 

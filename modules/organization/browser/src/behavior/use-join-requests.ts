@@ -1,7 +1,8 @@
 import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { useCallback, useMemo, useState } from "react";
-import { api } from "./organization-api.ts";
+
 import type { PendingJoinRequest } from "../model/pending-join-request.ts";
+import { api } from "./organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
 
 /** Join-request state: queries, mutations, and settings; returns props not JSX. */

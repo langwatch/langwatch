@@ -1,17 +1,15 @@
+import type {
+  CodingAgentSession,
+  CodingAgentSessionBranchRecord,
+} from "@langwatch/coding-agent-contract";
+import type { GithubApi, GithubPullRequest } from "@langwatch/github-contract";
 /**
  * @vitest-environment node
  * @unit
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it, vi, type Mock } from "vitest";
-import type {
-  CodingAgentSession,
-  CodingAgentSessionBranchRecord,
-} from "@langwatch/coding-agent-contract";
-import type { GithubApi, GithubPullRequest } from "@langwatch/github-contract";
-import type { CodingAgentBillingPolicy } from "../../app/coding-agent.members.ts";
-import { CodingAgentFeatureService } from "../coding-agent.service.ts";
-import type { SessionModelTotalsRow } from "../../repositories/coding-agent-session-event.repository.ts";
+
 import {
   TestClock,
   TestEvents,
@@ -24,6 +22,9 @@ import {
   pullRequest,
   session,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
+import type { CodingAgentBillingPolicy } from "../../app/coding-agent.members.ts";
+import type { SessionModelTotalsRow } from "../../repositories/coding-agent-session-event.repository.ts";
+import { CodingAgentFeatureService } from "../coding-agent.service.ts";
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 5, 1);
@@ -148,8 +149,9 @@ function findAllByBranchesLike(rows: GithubPullRequest[]) {
 }
 
 class FunctionBillingPolicy implements CodingAgentBillingPolicy {
-  constructor(private readonly isNonBillable: (input: { sourceType: string }) => Promise<boolean>) {
-  }
+  constructor(
+    private readonly isNonBillable: (input: { sourceType: string }) => Promise<boolean>,
+  ) {}
 
   isSourceNonBillable(input: { sourceType: string }): Promise<boolean> {
     return this.isNonBillable(input);

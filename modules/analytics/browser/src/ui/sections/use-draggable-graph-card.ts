@@ -1,12 +1,13 @@
-import { useMemo, useState } from "react";
 import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
+import { useMemo, useState } from "react";
+
+import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import { useShowErrorToast } from "../../behavior/analytics-feedback.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "../../model/chart-kinds.ts";
 import {
   dashboardWidgetDefinitionSchema,
   type DashboardWidgetDraft,
 } from "../../model/dashboard-widget-definition.ts";
-import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import type { GraphData } from "./draggable-graph-card.tsx";
 
 /**

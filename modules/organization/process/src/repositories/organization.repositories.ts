@@ -1,11 +1,12 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { TenantDirectory } from "@langwatch/clickhouse-client";
+
+import type { PersonalTeamScopeReader } from "../services/personal-team-scope.service.ts";
+import type { TenantOwnershipReader } from "../services/tenant-directory.service.ts";
 import type { GroupRepository } from "./group.repository.ts";
 import type { OrganizationMembershipRepository } from "./organization-membership.repository.ts";
 import type { OrganizationRepository } from "./organization.repository.ts";
 import type { TeamRepository } from "./team.repository.ts";
-import type { PersonalTeamScopeReader } from "../services/personal-team-scope.service.ts";
-import type { TenantOwnershipReader } from "../services/tenant-directory.service.ts";
 
 /**
  * The rows the organization module owns and constructs through

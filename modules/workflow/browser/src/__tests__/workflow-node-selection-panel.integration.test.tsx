@@ -1,8 +1,7 @@
+import type { Component } from "@langwatch/workflow-contract";
 /** @vitest-environment jsdom */
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { Component } from "@langwatch/workflow-contract";
 
 const captured = vi.hoisted<{ component: Component | null }>(() => ({ component: null }));
 

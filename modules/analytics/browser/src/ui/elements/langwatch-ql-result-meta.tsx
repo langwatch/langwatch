@@ -5,10 +5,10 @@
  */
 
 import { HStack, Text } from "@chakra-ui/react";
-
 // Reused rather than reimplemented — the same rounding and the same unit
 // symbols a member sees elsewhere in the product.
 import type { LangWatchQLStatistics } from "@langwatch/analytics-contract";
+
 import { formatBytes, formatNumber } from "../../model/format.ts";
 
 export interface LangWatchQLResultMetaProps {

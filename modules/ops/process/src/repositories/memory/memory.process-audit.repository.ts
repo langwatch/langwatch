@@ -1,7 +1,11 @@
 import { generate } from "@langwatch/ksuid";
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
-import { ProcessAuditRepository, type ProcessControlAction } from "../process/ops-audit.repository.ts";
+
+import {
+  ProcessAuditRepository,
+  type ProcessControlAction,
+} from "../process/ops-audit.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
 const PROCESS_AUDIT_KSUID_RESOURCE = "procaudit";

@@ -1,9 +1,9 @@
+import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
 /**
  * The membership half's rules, over doubled ports.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
-import { OrganizationMembershipService } from "../organization-membership.service.ts";
+
 import type {
   OrganizationGrantCache,
   OrganizationPromptSeed,
@@ -11,6 +11,7 @@ import type {
   OrganizationSessionRevocation,
 } from "../../app/organization.members.ts";
 import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
+import { OrganizationMembershipService } from "../organization-membership.service.ts";
 
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();

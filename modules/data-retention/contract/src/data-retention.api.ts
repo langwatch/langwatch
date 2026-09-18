@@ -1,4 +1,6 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
+import type { RetentionPolicySnapshot, RetentionStorageUsage } from "./data-retention.snapshot.ts";
 import type {
   KillRetroactiveMutationInput,
   PinTraceInput,
@@ -13,7 +15,6 @@ import type {
   StorageMeterTenantsInput,
   UnpinTraceInput,
 } from "./data-retention.ts";
-import type { RetentionPolicySnapshot, RetentionStorageUsage } from "./data-retention.snapshot.ts";
 
 /**
  * The signed-in person a governed retention operation is decided for. Only the

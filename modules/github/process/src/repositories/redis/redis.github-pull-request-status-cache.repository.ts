@@ -1,9 +1,9 @@
-import type { GithubRedis } from "./github-redis.connection.ts";
-import { GithubPullRequestStatusCacheRepository } from "../github-pull-request-status-cache.repository.ts";
 import type {
   GithubPullRequestRef,
   GithubPullRequestStatus,
 } from "../../services/github-pull-request-status.service.ts";
+import { GithubPullRequestStatusCacheRepository } from "../github-pull-request-status-cache.repository.ts";
+import type { GithubRedis } from "./github-redis.connection.ts";
 
 const STATUS_CACHE_TTL_SEC = 60;
 const STATUSES: readonly string[] = ["open", "draft", "merged", "closed"];
@@ -14,9 +14,7 @@ const STATUSES: readonly string[] = ["open", "draft", "merged", "closed"];
  * is what a cold cache does anyway.
  */
 export class GithubPullRequestStatusCacheRedisRepository extends GithubPullRequestStatusCacheRepository {
-  static create(parts: {
-    redis: GithubRedis | null;
-  }): GithubPullRequestStatusCacheRedisRepository {
+  static create(parts: { redis: GithubRedis | null }): GithubPullRequestStatusCacheRedisRepository {
     return new GithubPullRequestStatusCacheRedisRepository(parts.redis);
   }
 

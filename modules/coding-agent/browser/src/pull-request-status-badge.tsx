@@ -1,5 +1,5 @@
 import { Badge } from "@chakra-ui/react";
-import { readableDate } from "./short-date.ts";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { IconType } from "react-icons";
 import {
   LuGitMerge,
@@ -8,9 +8,8 @@ import {
   LuGitPullRequestDraft,
 } from "react-icons/lu";
 
-import { Tooltip } from "@langwatch/design-system/tooltip";
-
 import { PULL_REQUEST_STATUS_LABELS, type PullRequestStatus } from "./pull-request-status.ts";
+import { readableDate } from "./short-date.ts";
 
 /**
  * A pull request's state, drawn the way GitHub draws it: a solid badge in

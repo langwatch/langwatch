@@ -1,6 +1,7 @@
 import type { PresenceSession } from "@langwatch/presence-contract";
-import { PresenceRepository } from "../presence.repository.ts";
 import { nowInstant } from "@langwatch/time";
+
+import { PresenceRepository } from "../presence.repository.ts";
 
 interface StoredEntry {
   session: PresenceSession;

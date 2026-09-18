@@ -4,6 +4,7 @@
 
 import { EditModelProviderForm } from "@langwatch/model-provider-browser/edit-model-provider-form";
 import type React from "react";
+
 import { useOnboardingHost } from "../../../model/onboarding-host.ts";
 
 interface ModelProviderSetupProps {

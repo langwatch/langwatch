@@ -1,21 +1,16 @@
 import { Button } from "@chakra-ui/react";
 import {
-  Clock,
-  Edit,
-  LayoutDashboard,
-  MoreVertical,
-  Trash2,
-} from "lucide-react";
-import { Menu } from "@langwatch/design-system/menu";
-import { toaster } from "@langwatch/design-system/toaster";
-import {
   describeLangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
 } from "@langwatch/analytics-contract";
-import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "./langwatch-ql-dashboard-widget.tsx";
-import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { Menu } from "@langwatch/design-system/menu";
+import { toaster } from "@langwatch/design-system/toaster";
+import { Clock, Edit, LayoutDashboard, MoreVertical, Trash2 } from "lucide-react";
+
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import { useShowErrorToast } from "../../behavior/analytics-feedback.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "./langwatch-ql-dashboard-widget.tsx";
 
 /**
  * How each offered datapoint step is named in the menu: the noun form, because
@@ -50,8 +45,7 @@ function useAddToDashboardHandler({
     { enabled: showAddToDashboard && isDashboardWidget },
   );
   const assignDashboard = api.dashboardWidgets.assignDashboard.useMutation();
-  const alreadyOnDashboard =
-    !!dashboard.data && dashboardId === dashboard.data.id;
+  const alreadyOnDashboard = !!dashboard.data && dashboardId === dashboard.data.id;
 
   const handleAddToDashboard = () => {
     if (!dashboard.data) return;
@@ -138,14 +132,13 @@ export function GraphCardMenu({
   isDeleting,
 }: GraphCardMenuProps) {
   const host = useAnalyticsHost();
-  const { hasDashboard, isAssigning, handleAddToDashboard } =
-    useAddToDashboardHandler({
-      projectId,
-      graphId,
-      dashboardId,
-      showAddToDashboard,
-      isDashboardWidget,
-    });
+  const { hasDashboard, isAssigning, handleAddToDashboard } = useAddToDashboardHandler({
+    projectId,
+    graphId,
+    dashboardId,
+    showAddToDashboard,
+    isDashboardWidget,
+  });
 
   // Only a builder graph navigates away to edit. A dashboard widget edits in
   // place through `onEdit` (the builder can't read its sandboxed author-code
@@ -187,10 +180,7 @@ export function GraphCardMenu({
           <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
             <Menu.TriggerItem value="granularity">
               <Clock /> Datapoints (
-              {granularityLabel(
-                granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
-              )}
-              )
+              {granularityLabel(granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS)})
             </Menu.TriggerItem>
             <Menu.Content>
               {LWQL_GRANULARITY_STEPS.map((step) => (
@@ -200,9 +190,7 @@ export function GraphCardMenu({
                   onClick={() => onGranularityChange(step)}
                 >
                   {granularityLabel(step)}
-                  {step ===
-                    (granularitySeconds ??
-                      LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS) && " ✓"}
+                  {step === (granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS) && " ✓"}
                 </Menu.Item>
               ))}
             </Menu.Content>

@@ -3,6 +3,7 @@ import type {
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
 } from "@langwatch/coding-agent-contract";
+
 import {
   CodingAgentSessionEventRepository,
   type SessionModelTotalsRow,
@@ -57,8 +58,7 @@ export class MemoryCodingAgentSessionEventRepository extends CodingAgentSessionE
 
     return {
       events: page.map(asEvent),
-      nextCursor:
-        more && last ? { timeUnixMs: last.timeUnixMs, recordId: last.recordId } : null,
+      nextCursor: more && last ? { timeUnixMs: last.timeUnixMs, recordId: last.recordId } : null,
     };
   }
 
@@ -120,10 +120,7 @@ function asEvent(record: CodingAgentSessionEventRecord): CodingAgentSessionEvent
   return event;
 }
 
-function isAfter(
-  record: CodingAgentSessionEventRecord,
-  cursor: CodingAgentSessionCursor,
-): boolean {
+function isAfter(record: CodingAgentSessionEventRecord, cursor: CodingAgentSessionCursor): boolean {
   if (record.timeUnixMs !== cursor.timeUnixMs) return record.timeUnixMs > cursor.timeUnixMs;
   return record.recordId > cursor.recordId;
 }

@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
 import {
   migrateDSLVersion,
   studioClientEventSchema,
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   type WorkflowId,
   type WorkflowNlpRuntime,
@@ -24,8 +25,7 @@ class TestWorkflowNlpRuntime implements WorkflowNlpRuntime {
     private readonly dispatchNlp: (
       input: WorkflowNlpDispatchInput,
     ) => Promise<WorkflowNlpDispatchResponse>,
-  ) {
-  }
+  ) {}
 
   dispatch(input: WorkflowNlpDispatchInput): Promise<WorkflowNlpDispatchResponse> {
     return this.dispatchNlp(input);

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { ModelProviderExecution } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
+
 import { toLegacyExecutionProvider } from "../legacy-model-provider.rules.ts";
 
 describe("toLegacyExecutionProvider", () => {

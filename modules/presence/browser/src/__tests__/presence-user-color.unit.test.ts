@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { PresenceSession, PresenceUser } from "@langwatch/presence-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   presenceDisplayName,
   presenceSessionColor,

@@ -1,9 +1,10 @@
 // Run plan config and comparison keys.
 
 import type { RunParameterValues } from "@langwatch/scenario-contract";
+
 import { type SuiteScope, suiteScopeSchema } from "./suite.scope.ts";
-import { targetIdentityKey, targetSortKey } from "./target-key.ts";
 import type { SuiteTarget } from "./suite.ts";
+import { targetIdentityKey, targetSortKey } from "./target-key.ts";
 
 /** Everything a run plan holds beside its name. */
 export type PlanConfig = {
@@ -106,5 +107,7 @@ export function normalizePlanScope({
 
   const coversEvery =
     activeTestSuiteIds.length > 0 && activeTestSuiteIds.every((id) => named.has(id));
-  return coversEvery ? { mode: "all" } : { mode: "test_suites", testSuiteIds: [...named].toSorted() };
+  return coversEvery
+    ? { mode: "all" }
+    : { mode: "test_suites", testSuiteIds: [...named].toSorted() };
 }

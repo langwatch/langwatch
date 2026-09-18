@@ -4,9 +4,8 @@
  * promises nothing; safe for the client to import — only zod and a constant, never Prisma.
  */
 
-import { z } from "zod";
-
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
+import { z } from "zod";
 
 /** The version this build writes, and the only one it reads. */
 export const DASHBOARD_WIDGET_DEFINITION_VERSION = 1;
@@ -35,11 +34,7 @@ export const DASHBOARD_CONTEXT_PARAMETER_PREFIX = "dashboard_context_";
  * mutates the prototype chain rather than adding an own key, so the bound value would be
  * silently lost (and, for `__proto__`, is a prototype-pollution vector).
  */
-const FORBIDDEN_PARAMETER_NAMES = new Set([
-  "__proto__",
-  "constructor",
-  "prototype",
-]);
+const FORBIDDEN_PARAMETER_NAMES = new Set(["__proto__", "constructor", "prototype"]);
 
 /**
  * Bound automatically by the executor from the page's window/granularity — never an
@@ -50,8 +45,7 @@ export const RESERVED_PARAMETERS = [
   {
     name: "dashboard_context_period_start",
     type: "DateTime",
-    description:
-      "Start of the dashboard's selected time range — bound automatically.",
+    description: "Start of the dashboard's selected time range — bound automatically.",
   },
   {
     name: "dashboard_context_period_end",
@@ -126,10 +120,7 @@ export const dashboardWidgetQuerySchema = z.object({
       "Query name must look like an identifier (letters, digits, underscore; not starting with a digit)",
     ),
   sql: z.string().min(1).max(MAX_LWQL_LENGTH),
-  parameters: z
-    .array(queryParameterDeclarationSchema)
-    .max(MAX_PARAMETERS_PER_QUERY)
-    .optional(),
+  parameters: z.array(queryParameterDeclarationSchema).max(MAX_PARAMETERS_PER_QUERY).optional(),
 });
 
 /**
@@ -137,10 +128,7 @@ export const dashboardWidgetQuerySchema = z.object({
  * and the REST routes the CLI/Langy use. Both validate against the SAME bounds so neither
  * persists an unbounded blob that only `present()` would catch after the write (CWE-770).
  */
-export const dashboardWidgetNameSchema = z
-  .string()
-  .min(1)
-  .max(MAX_WIDGET_NAME_LENGTH);
+export const dashboardWidgetNameSchema = z.string().min(1).max(MAX_WIDGET_NAME_LENGTH);
 export const dashboardWidgetCodeSchema = z.string().min(1).max(MAX_CODE_LENGTH);
 export const dashboardWidgetQueriesSchema = z
   .array(dashboardWidgetQuerySchema)
@@ -156,9 +144,7 @@ export type DashboardWidgetQueryParameterDeclaration = z.infer<
   typeof queryParameterDeclarationSchema
 >;
 export type DashboardWidgetQuery = z.infer<typeof dashboardWidgetQuerySchema>;
-export type DashboardWidgetDefinition = z.infer<
-  typeof dashboardWidgetDefinitionSchema
->;
+export type DashboardWidgetDefinition = z.infer<typeof dashboardWidgetDefinitionSchema>;
 
 /**
  * A widget's editable draft — a persisted definition's `code`/`queries` plus the name that
@@ -207,9 +193,7 @@ export function validateDashboardWidgetQueryParams({
   const declared = query.parameters ?? [];
   const declaredNames = new Set(declared.map((p) => p.name));
 
-  const undeclared = Object.keys(params).filter(
-    (key) => !declaredNames.has(key),
-  );
+  const undeclared = Object.keys(params).filter((key) => !declaredNames.has(key));
   if (undeclared.length > 0) {
     const [first] = undeclared;
     if (first?.startsWith(DASHBOARD_CONTEXT_PARAMETER_PREFIX)) {
@@ -228,9 +212,7 @@ export function validateDashboardWidgetQueryParams({
         code: "dashboard_widget_query_undeclared_param",
         title: "Unknown query parameter",
         message: `This query does not declare a parameter named "${first}". Declared: ${
-          declared.length > 0
-            ? declared.map((p) => p.name).join(", ")
-            : "(none)"
+          declared.length > 0 ? declared.map((p) => p.name).join(", ") : "(none)"
         }.`,
       },
     };
@@ -238,8 +220,7 @@ export function validateDashboardWidgetQueryParams({
 
   // Null-prototype so a declared name that slipped past the schema still can
   // never reach `Object.prototype`; the assign below adds only own keys.
-  const validated: Record<string, DashboardWidgetQueryParamValue> =
-    Object.create(null);
+  const validated: Record<string, DashboardWidgetQueryParamValue> = Object.create(null);
   for (const declaration of declared) {
     const resolved = resolveDeclaredParam({
       declaration,

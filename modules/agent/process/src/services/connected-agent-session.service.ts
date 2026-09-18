@@ -23,10 +23,11 @@ import {
   type ReplyNudge,
   type StoredCall,
   type StoredResult,
-  storedCallSchema
+  storedCallSchema,
 } from "@langwatch/agent-contract";
-import type { AgentService } from "./agent.service.ts";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
 import { resultCapViolation } from "../rules/connected-agent-caps.rules.ts";
 import {
   callAckKey,
@@ -35,14 +36,14 @@ import {
   replyChannel,
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
-import { ConnectedAgentRegistrationService } from "./connected-agent-registration.service.ts";
-import { ConnectedAgentLastSeenService } from "./connected-agent-last-seen.service.ts";
-import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
-import { nowInstant } from "@langwatch/time";
+import type { AgentService } from "./agent.service.ts";
 import {
   type ConnectedAgentCredentials,
   type ResolvedConnectCredential,
 } from "./connected-agent-credential.service.ts";
+import { ConnectedAgentLastSeenService } from "./connected-agent-last-seen.service.ts";
+import { ConnectedAgentRegistrationService } from "./connected-agent-registration.service.ts";
+import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:session");
 
@@ -163,7 +164,11 @@ export class AgentSessionService {
     // `frame` is the error's own precomputed refused frame (for the REST
     // boundary's flat body); the socket gateway builds its own below, from
     // the reason and whatever meta is left.
-    const { reason, frame: _frame, ...meta } = refused.meta as {
+    const {
+      reason,
+      frame: _frame,
+      ...meta
+    } = refused.meta as {
       reason: RefusedCode;
       frame?: unknown;
     } & Record<string, unknown>;

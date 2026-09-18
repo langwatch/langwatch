@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { validateModelAliasesAgainstBoundProviders } from "../virtual-key-alias-validation.ts";
 
 describe("validateModelAliasesAgainstBoundProviders", () => {

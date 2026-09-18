@@ -10,6 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { SERIF } from "@langwatch/langy-browser/surfaces/asaplangy";
+import { LangyMark } from "@langwatch/langy-browser/surfaces/langy-mark";
+import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { getIsMac } from "@langwatch/navigation-browser/surfaces/command-bar";
 import { MeshGradient } from "@paper-design/shaders-react";
 import {
   motion,
@@ -31,11 +36,7 @@ import {
 } from "react";
 import type { IconType } from "react-icons";
 import { LuArrowLeft, LuArrowRight, LuMic, LuZap } from "react-icons/lu";
-import { SERIF } from "@langwatch/langy-browser/surfaces/asaplangy";
-import { getIsMac } from "@langwatch/navigation-browser/surfaces/command-bar";
-import { LangyMark } from "@langwatch/langy-browser/surfaces/langy-mark";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
-import { useColorModeValue } from "@langwatch/design-system/color-mode";
+
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 // ---- Timing knobs -------------------------------------------------------

@@ -6,6 +6,7 @@
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { NavigationHostProvider } from "../../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../../model/product-memory.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";

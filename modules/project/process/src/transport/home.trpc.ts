@@ -4,8 +4,8 @@
  * the deployment's reader walks the trail and the door asks for one person's rows.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { homeTrpc, type RecentItem } from "@langwatch/project-contract";
-import { moduleApi } from "@langwatch/kernel";
 
 /**
  * What the home door reaches. The strip is not the project's own read: the

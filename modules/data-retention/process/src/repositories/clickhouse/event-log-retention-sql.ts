@@ -1,3 +1,4 @@
+import { retentionCategories, type RetentionCategory } from "@langwatch/data-retention-contract";
 /**
  * ClickHouse SQL for `event_log`'s per-row retention classification. Derived
  * from the same exhaustive aggregate map ingestion stamps rows with, so a
@@ -9,7 +10,6 @@ import {
   RETENTION_CLASS_BY_AGGREGATE_TYPE,
   type EventLogRetentionClass,
 } from "@langwatch/data-retention-contract/event-log-retention-policy";
-import { retentionCategories, type RetentionCategory } from "@langwatch/data-retention-contract";
 
 function sqlStringLiteral(value: string): string {
   const escaped = value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -60,7 +60,8 @@ export function eventLogRetentionCategorySqlPredicate(category: RetentionCategor
   }
 
   return (
-    `${finiteGuard} AND ` + `AggregateType IN (${aggregateTypeListSql(aggregateTypesFor(category))})`
+    `${finiteGuard} AND ` +
+    `AggregateType IN (${aggregateTypeListSql(aggregateTypesFor(category))})`
   );
 }
 

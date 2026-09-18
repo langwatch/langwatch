@@ -923,9 +923,9 @@ describe("the api-keys REST family", () => {
         },
       });
 
-      expect(
-        (await send("/api/api-keys/nonexistent-key-id", { method: "DELETE" })).status,
-      ).toBe(404);
+      expect((await send("/api/api-keys/nonexistent-key-id", { method: "DELETE" })).status).toBe(
+        404,
+      );
     });
   });
 });

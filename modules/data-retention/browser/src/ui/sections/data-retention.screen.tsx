@@ -35,8 +35,13 @@ import {
 import { Menu } from "@langwatch/design-system/menu";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import { dataRetentionApi } from "../../behavior/data-retention-api.ts";
-import { RETENTION_SCOPE_QUERY_KEY, useDataRetentionHost, type DataRetentionHostApi } from "../../model/data-retention-host.ts";
+import {
+  RETENTION_SCOPE_QUERY_KEY,
+  useDataRetentionHost,
+  type DataRetentionHostApi,
+} from "../../model/data-retention-host.ts";
 import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "../../model/retention-constants.ts";
 import { formatDays } from "../../model/retention-format.ts";
 import {
@@ -60,13 +65,7 @@ export default function DataRetentionScreen() {
   return <DataRetentionPage host={host} projectId={projectId} />;
 }
 
-function DataRetentionPage({
-  host,
-  projectId,
-}: {
-  host: DataRetentionHostApi;
-  projectId: string;
-}) {
+function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; projectId: string }) {
   const { organizationId, teamId } = host.scope();
   const utils = dataRetentionApi.useUtils();
   const rulesQuery = dataRetentionApi.dataRetention.getRules.useQuery({ projectId });

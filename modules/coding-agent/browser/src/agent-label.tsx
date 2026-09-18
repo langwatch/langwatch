@@ -1,6 +1,6 @@
 import { HStack, Image, Text } from "@chakra-ui/react";
-import { assistantKindOfAgent } from "./assistant-identity.ts";
 
+import { assistantKindOfAgent } from "./assistant-identity.ts";
 import { ASSISTANT_PRESETS } from "./assistant-presets.ts";
 
 /**

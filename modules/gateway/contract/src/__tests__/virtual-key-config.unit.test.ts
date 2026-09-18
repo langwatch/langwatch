@@ -1,16 +1,15 @@
-/**
- * @vitest-environment node
- * VK tag normalization keeps the Label facet bounded for REST API and drawer input.
- * Spec: specs/ai-gateway/span-shape.feature
- */
-import { describe, expect, it } from "vitest";
-
 import {
   normalizeVkTags,
   parseVirtualKeyConfig,
   VK_TAG_MAX_LENGTH,
   VK_TAGS_MAX_COUNT,
 } from "@langwatch/gateway-contract";
+/**
+ * @vitest-environment node
+ * VK tag normalization keeps the Label facet bounded for REST API and drawer input.
+ * Spec: specs/ai-gateway/span-shape.feature
+ */
+import { describe, expect, it } from "vitest";
 
 function isWellFormed(value: string): boolean {
   try {

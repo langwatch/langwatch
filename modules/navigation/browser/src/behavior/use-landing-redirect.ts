@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef } from "react";
 import { carryLangyConversation } from "@langwatch/langy-contract";
+import { useCallback, useEffect, useRef } from "react";
+
 import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
 import { useNavigationHost } from "../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../model/product-memory.ts";
-import { resolveLandingDestination } from "../model/resolve-landing-destination.ts";
 import type { ProductId } from "../model/products.ts";
+import { resolveLandingDestination } from "../model/resolve-landing-destination.ts";
 import { navigationApi } from "./navigation-api.ts";
 import { useLlmOpsProjectSlug } from "./use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "./use-reachable-products.ts";

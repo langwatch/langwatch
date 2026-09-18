@@ -10,6 +10,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
+import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
+import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
 import { format, nowInstant } from "@langwatch/time";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
@@ -39,25 +41,24 @@ import type {
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
-import { describeError } from "../../model/describe-error.ts";
-import { availableFilters } from "../../model/analytics-filter-catalogue.ts";
-import type { FilterField } from "../../model/analytics-filter-definition.ts";
-import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
-import { useAnalyticsHost } from "../../model/analytics-host.ts";
+
+import { analyticsApi } from "../../behavior/analytics-api.ts";
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
 import { useFilterParams } from "../../behavior/use-filter-params.ts";
 import { useGetRotatingColorForCharts } from "../../behavior/use-rotating-chart-color.ts";
+import { availableFilters } from "../../model/analytics-filter-catalogue.ts";
+import type { FilterField } from "../../model/analytics-filter-definition.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { getGroup, getMetric, type timeseriesSeriesInput } from "../../model/analytics-registry.ts";
-import { analyticsApi } from "../../behavior/analytics-api.ts";
-import { buildMetadataFilterParams } from "../../model/metadata-filter-params.ts";
-import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
 import type { Unpacked } from "../../model/analytics-value-types.ts";
-import { Delayed } from "../elements/delayed.tsx";
+import { formatChartDate } from "../../model/chart-date.ts";
+import { describeError } from "../../model/describe-error.ts";
+import { buildMetadataFilterParams } from "../../model/metadata-filter-params.ts";
+import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/series-group-name.ts";
 import { ChartErrorState } from "../elements/chart-error-state.tsx";
 import { ChartTooltip } from "../elements/chart-tooltip.tsx";
-import { formatChartDate } from "../../model/chart-date.ts";
+import { Delayed } from "../elements/delayed.tsx";
 import { SummaryMetric } from "../elements/summary-metric.tsx";
-import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/series-group-name.ts";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -805,7 +806,9 @@ const CustomGraph_ = React.memo(
 
     if (["bar", "horizontal_bar"].includes(input.graphType) && input.timeScale === "full") {
       const summaryData = shapeDataForSummary(input, seriesByKey, timeseries, nameForSeries);
-      const sortedCurrentData = [...(summaryData.current ?? [])].toSorted((a, b) => b.value - a.value);
+      const sortedCurrentData = [...(summaryData.current ?? [])].toSorted(
+        (a, b) => b.value - a.value,
+      );
 
       const longestName = Math.max(...summaryData.current.map((entry) => entry.name.length));
 

@@ -42,7 +42,7 @@
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
-      "path": "../../trace/server/tsconfig.build.json"
+      "path": "../../trace/process/tsconfig.build.json"
     }
   ]
 }

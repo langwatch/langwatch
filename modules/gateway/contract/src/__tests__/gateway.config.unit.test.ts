@@ -1,10 +1,13 @@
-import { RuntimeConfig } from "@langwatch/config";
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { gatewayServerConfigDefinition } from "../gateway.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "gateway", definition: gatewayServerConfigDefinition, source })
-    .value;
+import { gatewayConfig } from "../gateway.config.ts";
+
+const read = (source: Record<string, string | undefined>) =>
+  parseProcessConfig({
+    owners: [{ name: "gateway", config: gatewayConfig }],
+    environment: source,
+  }).gateway;
 
 describe("gateway server configuration", () => {
   describe("given a deployment sets nothing", () => {

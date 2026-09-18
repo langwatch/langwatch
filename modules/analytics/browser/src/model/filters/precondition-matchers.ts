@@ -1,5 +1,6 @@
-import type { CheckPreconditionRule } from "@langwatch/evaluator-contract/evaluation-types";
 import type { PreconditionField } from "@langwatch/analytics-contract";
+import type { CheckPreconditionRule } from "@langwatch/evaluator-contract/evaluation-types";
+
 import { availableFilters } from "./registry.ts";
 import type { FilterField } from "./types.ts";
 

@@ -12,12 +12,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Select } from "@langwatch/design-system/select";
 import { Plus } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { type Control, Controller, type SubmitHandler, useForm } from "react-hook-form";
-
-import { Select } from "@langwatch/design-system/select";
 
 import { applyHandledErrorToForm, HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
 import { api } from "../../behavior/organization-api.ts";

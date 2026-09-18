@@ -1,4 +1,5 @@
-import { type AgentCallSignal,
+import {
+  type AgentCallSignal,
   AgentBusyError,
   AgentCallFailedError,
   AgentCallTimeoutError,
@@ -17,10 +18,17 @@ import { type AgentCallSignal,
   type InstanceNudge,
   type StoredCall,
   type StoredResultError,
-  storedResultSchema } from "@langwatch/agent-contract";
+  storedResultSchema,
+} from "@langwatch/agent-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { nowInstant } from "@langwatch/time";
 
+import {
+  pinnedInstance,
+  chooseInstance,
+} from "../rules/connected-agent-instance-selection.rules.ts";
 import {
   callKey,
   instanceChannel,
@@ -28,16 +36,9 @@ import {
   resultKey,
   threadPinKey,
 } from "../rules/connected-agent-keys.rules.ts";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { nowInstant } from "@langwatch/time";
-import { type DispatchParams, type LiveInstance } from "./connected-agent-runtime.service.ts";
-
-import {
-  pinnedInstance,
-  chooseInstance,
-} from "../rules/connected-agent-instance-selection.rules.ts";
-import { ConnectedAgentReplyService } from "./connected-agent-reply.service.ts";
 import type { ConnectedAgentRegistryService } from "./connected-agent-registry.service.ts";
+import { ConnectedAgentReplyService } from "./connected-agent-reply.service.ts";
+import { type DispatchParams, type LiveInstance } from "./connected-agent-runtime.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:dispatcher");
 

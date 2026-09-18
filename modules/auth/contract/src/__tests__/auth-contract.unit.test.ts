@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { browserSessionSchema, verifiedBrowserSessionSchema } from "@langwatch/auth-contract";
+import { describe, expect, it } from "vitest";
 
 describe("Auth contract", () => {
   it("defines the Better Auth-compatible browser-session boundary", () => {

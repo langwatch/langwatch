@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { Field } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
+
 import { datasetColumnTypeToFieldType, fieldsToDatasetColumns } from "../studio-dataset.utils.ts";
 
 describe("studio-dataset.utils column/field type conversion", () => {

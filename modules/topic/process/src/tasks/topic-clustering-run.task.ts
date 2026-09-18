@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 import { nowInstant } from "@langwatch/time";
+
 import type {
   TopicClusteringPageOutcome,
   TopicClusteringRun,

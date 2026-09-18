@@ -3,6 +3,9 @@ import { z } from "zod";
 /** The house id scheme's kind for a chart-builder graph. */
 export const GRAPH_KSUID_RESOURCE = "graph";
 
+/** The house id scheme's kind for a custom chart widget on the same grid. */
+export const DASHBOARD_WIDGET_KSUID_RESOURCE = "widget";
+
 export const graphIdSchema = z.string().min(1);
 export const graphNameSchema = z.string().trim().min(1).max(255);
 export const graphPayloadSchema = z.record(z.string(), z.unknown());

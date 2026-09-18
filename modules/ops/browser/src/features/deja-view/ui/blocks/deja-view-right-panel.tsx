@@ -1,4 +1,5 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
+
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import type { EventResult } from "../../model/deja-view-types.ts";
 

@@ -8,8 +8,9 @@ import {
   type DatasetNameInput,
   type DatasetNameResult,
 } from "@langwatch/dataset-contract";
-import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
+
 import type { DatasetRepository } from "../repositories/dataset.repository.ts";
+import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
 
 const MAX_NAME_CANDIDATES = 10_000;
 

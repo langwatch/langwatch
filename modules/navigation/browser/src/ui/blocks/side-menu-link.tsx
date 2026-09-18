@@ -4,6 +4,7 @@ import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { useEffect, useRef } from "react";
+
 import { BetaPill } from "../elements/beta-pill.tsx";
 import { LegacyPill } from "../elements/legacy-pill.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";

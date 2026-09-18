@@ -3,10 +3,11 @@
  * (`repositories/_timeseries-row-parser.ts`).
  */
 
-import { describe, expect, it } from "vitest";
-import { buildMetricAlias } from "../clickhouse/clickhouse.metric-translator.mapper.ts";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 import { buildSeriesName } from "@langwatch/analytics-contract";
+import { describe, expect, it } from "vitest";
+
+import { buildMetricAlias } from "../clickhouse/clickhouse.metric-translator.mapper.ts";
 import { parseTimeseriesRows } from "../clickhouse/clickhouse.timeseries-row-parser.mapper.ts";
 
 const alias = (series: AnalyticsSeries, index: number) =>

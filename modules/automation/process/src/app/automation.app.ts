@@ -1,10 +1,12 @@
+import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 /**
  * The automation feature's application: the one typed thing all five of its
  * doors are given, so one operation serves a browser, an API key and a job.
  * @see adrs/001-automation-service-boundary.md
  */
 import {
-  automationServerConfigSchema,
+  automationServerConfig,
   AutomationApi as AutomationApiToken,
   InvalidUnsubscribeTokenError,
   UnsubscribeLinkInvalidError,
@@ -39,51 +41,50 @@ import {
   type UpdateTriggerCommand,
   type WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
-import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
 import {
   MonitorApi,
   type Monitor,
   type MonitorApi as MonitorApiContract,
 } from "@langwatch/monitor-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
-import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { z } from "zod";
-import { buildAutomationInfrastructure } from "./automation-composition.build.ts";
 
-import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
-import type { AutomationClock } from "./automation.members.ts";
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
+import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
+import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
+import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
+import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
+import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
+import { automationPlatformUrl } from "../rules/automation-platform-url.rules.ts";
+import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
 import type {
   AutomationDispatchError,
   AutomationHeartbeat,
   AutomationLogger,
 } from "../services/automation-graph-runtime.service.ts";
-import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
-import type { AutomationWebhookStoredParams } from "../services/automation-webhook-secrets.service.ts";
-import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
-import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
-import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
-import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
-import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
-import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
-import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
-import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
-import { AutomationService } from "../services/automation.service.ts";
-import { AutomationTemplateService } from "../services/automation-template.service.ts";
-import { ReportScheduleService } from "../services/report-schedule.service.ts";
-import { AutomationGraphService } from "../services/trigger-graph.service.ts";
 import {
   AutomationRulesService,
   type AutomationProjectIdentity,
 } from "../services/automation-rules.service.ts";
+import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
+import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
+import { AutomationTemplateService } from "../services/automation-template.service.ts";
+import type { AutomationWebhookStoredParams } from "../services/automation-webhook-secrets.service.ts";
+import { AutomationService } from "../services/automation.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
 import type { AutomationPersistCapRedis } from "../services/persist-cap.service.ts";
-import { automationPlatformUrl } from "../rules/automation-platform-url.rules.ts";
+import { ReportScheduleService } from "../services/report-schedule.service.ts";
+import { AutomationGraphService } from "../services/trigger-graph.service.ts";
+import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
+import {
+  buildAutomationInfrastructure,
+  type AutomationProcessMembers,
+} from "./automation-composition.build.ts";
+import type { AutomationClock } from "./automation.members.ts";
 
 export type { AutomationWebhookStoredParams };
 export type { AutomationProjectIdentity };
@@ -201,27 +202,6 @@ const UNSUBSCRIBE_WINDOW_SECONDS = 60;
 const UNSUBSCRIBE_RESOLVE_MAX = 30;
 const UNSUBSCRIBE_CONFIRM_MAX = 10;
 
-/**
- * Persist-daily ceilings from contract plus baseHost and unsubscribeSecret config;
- * defaults are empty origin (relative paths) and no secret.
- */
-const automationAppExtraConfigSchema = z.object({
-  baseHost: z.string().default(""),
-  unsubscribeSecret: z.string().optional(),
-});
-export type AutomationAppConfig = AutomationServerConfig &
-  z.infer<typeof automationAppExtraConfigSchema>;
-
-/** Parses the contract's own fields and this app's two extra ones from the same input. */
-const automationAppConfigSchema: { parse(value: unknown): AutomationAppConfig } = {
-  parse(value: unknown): AutomationAppConfig {
-    return {
-      ...automationServerConfigSchema.parse(value),
-      ...automationAppExtraConfigSchema.parse(value),
-    };
-  },
-};
-
 type AutomationDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
   monitors: typeof MonitorApi;
@@ -237,8 +217,8 @@ type AutomationRuntimeDependencies = ResolvedTokens<AutomationDependencies>;
 
 type AutomationSetup = FeatureSetup<
   AutomationDependencies,
-  MembersRead<typeof AutomationApp.reads>,
-  AutomationAppConfig
+  AutomationProcessMembers,
+  AutomationServerConfig
 > &
   Readonly<{ repositories: AutomationRepositories }>;
 
@@ -263,9 +243,15 @@ export class AutomationApp implements AutomationApi {
     projects: ProjectApi,
     auditLog: AuditLogApi,
   };
-  static readonly configSchema: { parse(value: unknown): AutomationAppConfig } =
-    automationAppConfigSchema;
-  static readonly reads = reads("prisma", "redis", "logger", "encryption");
+  static readonly config = automationServerConfig;
+  static readonly reads = [
+    "prisma",
+    "redis",
+    "logger",
+    "encryption",
+    "publicBaseUrl",
+    "unsubscribeSecret",
+  ] as const;
 
   /**
    * Builds this process's own {@link AutomationInfrastructure} from the
@@ -275,7 +261,6 @@ export class AutomationApp implements AutomationApi {
   static create(setup: AutomationSetup): AutomationApp {
     const infrastructure = buildAutomationInfrastructure({
       members: setup.members,
-      config: setup.config,
       auditLog: setup.dependencies.auditLog,
     });
 
@@ -296,7 +281,7 @@ export class AutomationApp implements AutomationApi {
     infrastructure: AutomationInfrastructure;
     dependencies: AutomationRuntimeDependencies;
     repositories: AutomationRepositories;
-    config: AutomationAppConfig;
+    config: AutomationServerConfig;
   }): AutomationApp {
     const { infrastructure: members, dependencies, repositories, config } = setup;
 
@@ -323,7 +308,7 @@ export class AutomationApp implements AutomationApi {
       heartbeat: members.heartbeat,
       runaway: members.runaway,
       clock: members.clock,
-      baseHost: config.baseHost,
+      baseHost: members.publicBaseUrl ?? "",
     });
     const automation = AutomationService.create({
       triggers: repositories.triggers,
@@ -342,7 +327,7 @@ export class AutomationApp implements AutomationApi {
       clock: members.clock,
       graph,
       templates: AutomationTemplateService.create({
-        baseHost: config.baseHost,
+        baseHost: members.publicBaseUrl ?? "",
         delivery: members.testFire,
       }),
       persistCaps,
@@ -435,10 +420,7 @@ export class AutomationApp implements AutomationApi {
   }
 
   /** Refuses a graph alert whose graph is not this project's. */
-  assertCustomGraphInProject(input: {
-    customGraphId: string;
-    projectId: string;
-  }): Promise<void> {
+  assertCustomGraphInProject(input: { customGraphId: string; projectId: string }): Promise<void> {
     return this.#rules.assertCustomGraphInProject(input);
   }
 
@@ -677,7 +659,10 @@ export class AutomationApp implements AutomationApi {
     const view = await this.#automation.findUnsubscribeView({ token: input.token });
 
     if (!view) {
-      throw new UnsubscribeLinkInvalidError("This unsubscribe link is invalid or has expired.", 404);
+      throw new UnsubscribeLinkInvalidError(
+        "This unsubscribe link is invalid or has expired.",
+        404,
+      );
     }
 
     return view;

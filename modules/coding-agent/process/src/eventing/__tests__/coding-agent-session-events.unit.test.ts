@@ -1,9 +1,10 @@
-import type { AppendStore, Event } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   type LogFactsContributedEvent,
 } from "@langwatch/coding-agent-contract";
+import type { AppendStore, Event } from "@langwatch/eventing";
+import { describe, expect, it } from "vitest";
+
 import {
   type CodingAgentSessionEventRecord,
   CodingAgentSessionEventsMapProjection,

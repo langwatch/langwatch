@@ -6,21 +6,27 @@
 import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import {
   isHeldOutIdentifierAttribute,
   redactAttributeNative,
   redactStringNative,
 } from "@langwatch/redaction/pii";
+import type {
+  PIIRedactionLevel,
+  OtlpAnyValue,
+  OtlpKeyValue,
+  OtlpResource,
+  OtlpSpan,
+} from "@langwatch/trace-contract";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
+
+import { OtlpRecordPiiRedactionService } from "./otlp-record-pii-redaction.service.ts";
 import {
   DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
   type OtlpSpanPiiRedactionServiceDependencies,
   PiiRedactionPolicyService,
 } from "./pii-redaction-policy.service.ts";
-
-import { createLogger } from "@langwatch/observability";
-import type { PIIRedactionLevel,OtlpAnyValue,OtlpKeyValue,OtlpResource,OtlpSpan } from "@langwatch/trace-contract";
-import { OtlpRecordPiiRedactionService } from "./otlp-record-pii-redaction.service.ts";
-import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 /**
  * A collected string value with a back-reference for applying the redacted result.
@@ -339,9 +345,7 @@ export class OtlpSpanPiiRedactionService {
         attr.value.stringValue !== null &&
         attr.value.stringValue.length > 0
       ) {
-        if (
-          isHeldOutIdentifierAttribute({ key: attr.key, value: attr.value.stringValue })
-        ) {
+        if (isHeldOutIdentifierAttribute({ key: attr.key, value: attr.value.stringValue })) {
           continue;
         }
 

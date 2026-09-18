@@ -1,5 +1,6 @@
-import { fromDate } from "@langwatch/time";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
+
 import {
   GatewayTraceDestinationReportRepository,
   type TraceDestinationKeyRow,

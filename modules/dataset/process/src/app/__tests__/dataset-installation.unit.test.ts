@@ -26,7 +26,7 @@ import {
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(datasetServer)])
-    .withConfig({ dataset: {} })
+    .withMember("publicBaseUrl", undefined)
     .withMember("content", createApiFixture<DatasetContent>())
     .withMember("queue", createApiFixture<DatasetNormalizeQueue>())
     .withMember("storage", createApiFixture<DatasetUpload>())

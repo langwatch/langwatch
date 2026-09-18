@@ -2,6 +2,7 @@
  * The five series the content-addressed store publishes, on Prometheus.
  */
 import { Counter, Histogram, register } from "prom-client";
+
 import { type StoredObjectsTelemetry } from "../app/stored-object.members.ts";
 
 // Counter: every storeFromBytes call, whatever it went on to do.

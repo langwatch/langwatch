@@ -4,19 +4,19 @@
  * the enforcement stack, and the service re-checks org membership itself, failing closed.
  */
 
-import { nowInstant, toDate } from "@langwatch/time";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/gateway-contract";
+import { scopeTargetKey, GatewayWindow } from "@langwatch/gateway-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 
+import { budgetSpendTargetsFor, type GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import {
   type ApplicableBudget,
   GatewayApplicableBudgetsService,
 } from "./gateway-applicable-budgets.service.ts";
-import { budgetSpendTargetsFor, type GatewayBudgetSpend } from "../app/gateway.members.ts";
-import { scopeTargetKey, GatewayWindow } from "@langwatch/gateway-contract";
-import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
-import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
 /**

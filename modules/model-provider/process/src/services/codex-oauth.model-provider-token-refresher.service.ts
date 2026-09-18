@@ -6,8 +6,9 @@ import {
   type CodexTokenKeys,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { CodexTokenRefresher } from "../app/model-provider.members.ts";
 import { nowInstant } from "@langwatch/time";
+
+import { CodexTokenRefresher } from "../app/model-provider.members.ts";
 
 /**
  * OpenAI's device-code flow (codex CLI's own client id) so requests bill the ChatGPT plan.

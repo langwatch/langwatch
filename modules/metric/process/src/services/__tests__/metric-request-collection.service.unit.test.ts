@@ -1,13 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
-import { CanonicalMetricService } from "../canonical-metric.service.ts";
-import { MetricService } from "../metric.service.ts";
 import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import type { MetricRedaction } from "../../app/metric.members.ts";
+import { CanonicalMetricService } from "../canonical-metric.service.ts";
 import {
   type MetricRequestCollectionResult,
   MetricRequestCollectionService,
 } from "../metric-request-collection.service.ts";
-import type { MetricRedaction } from "../../app/metric.members.ts";
+import { MetricService } from "../metric.service.ts";
 
 /** The request context below asks for no redaction, so the port never rewrites. */
 const disabledRedaction: MetricRedaction = { redactMetricAttributes: async () => {} };

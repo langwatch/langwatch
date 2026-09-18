@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { FEATURE_FLAG_REGISTRY } from "../feature-flag-registry.ts";
 import { FRONTEND_FEATURE_FLAGS } from "../frontend-feature-flags.ts";
 
@@ -13,7 +14,9 @@ describe("frontend feature flags", () => {
   describe("when a flag is exposed to the frontend via tRPC", () => {
     /** @scenario "a flag the web UI can read is registered, so operators keep the lever" */
     it("resolves to a registry definition so operators can target it per organization", () => {
-      const unregistered = FRONTEND_FEATURE_FLAGS.filter((key) => !FEATURE_FLAG_REGISTRY.resolve(key));
+      const unregistered = FRONTEND_FEATURE_FLAGS.filter(
+        (key) => !FEATURE_FLAG_REGISTRY.resolve(key),
+      );
 
       expect(unregistered).toEqual([]);
     });

@@ -4,21 +4,34 @@
  */
 import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
-import type { Logger } from "@langwatch/observability";
 import type { ResourceOwnership } from "@langwatch/kernel";
+import type { Logger } from "@langwatch/observability";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import {
   mintStoredObjectUri,
   StoredObjectOwnerResolver,
   StoredObjectCapabilityUnavailableError,
   type StoredObjectDeliveryCapability,
+  type StoredObjectServerConfig,
 } from "@langwatch/stored-object-contract";
-import { AzureBlobCredentialsAdapter } from "../services/azure-blob-credentials.service.ts";
+
 import { AzureBlobStoredObjectDriverAdapter } from "../repositories/azure/azure.stored-object-blob.repository.ts";
-import { PrismaStoredObjectProjectOrganizationRepository } from "../repositories/prisma/prisma.stored-object-project-organization.repository.ts";
-import { PrometheusStoredObjectsTelemetryAdapter } from "../services/prometheus.stored-objects-telemetry.service.ts";
+import { ClickHouseStoredObjectsRepository } from "../repositories/clickhouse/stored-objects.repository.ts";
 import { StoredObjectBlobFilesystemRepository } from "../repositories/filesystem/filesystem.stored-object-blob.repository.ts";
+import { PrismaStoredObjectProjectOrganizationRepository } from "../repositories/prisma/prisma.stored-object-project-organization.repository.ts";
 import { StoredObjectBlobS3Repository } from "../repositories/s3/s3.stored-object-blob.repository.ts";
+import type { StoredObjectStorageDriver } from "../repositories/stored-object-blob.repository.ts";
+import { AzureBlobCredentialsAdapter } from "../services/azure-blob-credentials.service.ts";
+import { PrometheusStoredObjectsTelemetryAdapter } from "../services/prometheus.stored-objects-telemetry.service.ts";
+import {
+  StoredObjectDestinationPolicyAdapter,
+  StoredObjectProjectS3Config,
+} from "../services/stored-object-destination-policy.service.ts";
+import { StoredObjectStorageRegistryAdapter } from "../services/stored-object-storage-registry.service.ts";
+import { StoredObjectStorageRuntimeAdapter } from "../services/stored-object-storage-runtime.service.ts";
+import { StoredObjectStoragePortAdapter } from "../services/stored-object-storage.service.ts";
+import { StoredObjectsService, deriveStoredObjectId } from "../services/stored-objects.service.ts";
+import type { StoredObjectInfrastructure } from "./stored-object.app.ts";
 import {
   StoredObjectDelivery,
   StoredObjectUploadTokenCodec,
@@ -27,23 +40,26 @@ import {
   type StoredObjectsClickHouse,
   type StoredObjectsClickHouseClient,
 } from "./stored-object.members.ts";
-import {
-  StoredObjectDestinationPolicyAdapter,
-  StoredObjectProjectS3Config,
-} from "../services/stored-object-destination-policy.service.ts";
-import { StoredObjectStoragePortAdapter } from "../services/stored-object-storage.service.ts";
-import { StoredObjectStorageRegistryAdapter } from "../services/stored-object-storage-registry.service.ts";
-import { StoredObjectStorageRuntimeAdapter } from "../services/stored-object-storage-runtime.service.ts";
-import type { StoredObjectStorageDriver } from "../repositories/stored-object-blob.repository.ts";
-import { StoredObjectsService, deriveStoredObjectId } from "../services/stored-objects.service.ts";
-import { ClickHouseStoredObjectsRepository } from "../repositories/clickhouse/stored-objects.repository.ts";
-import type { StoredObjectAppConfig,StoredObjectInfrastructure } from "./stored-object.app.ts";
 
 /** What `buildStoredObjectInfrastructure` reads off the process's own members. */
 export type StoredObjectProcessMembers = Readonly<{
   prisma: ProcessMembers["prisma"];
   clickhouse: ClickHouseQueryClient;
   logger: Logger;
+  secrets: ProcessMembers["secrets"];
+  /** The process's own fact (§6), for the Azure insecure-token-endpoint gate. */
+  nodeEnvironment: string | undefined;
+}>;
+
+/**
+ * The deployment's own S3 credentials, resolved once through the secrets
+ * member (ADR-132) rather than read from config — a per-org route's own pair
+ * still takes precedence, per field, ahead of these.
+ */
+type StoredObjectS3DeploymentSecrets = Readonly<{
+  accessKeyId: string | undefined;
+  secretAccessKey: string | undefined;
+  sessionToken: string | undefined;
 }>;
 
 /** These match deleted composition; direct upload is not composed here. */
@@ -86,13 +102,32 @@ class NoOutboundProxyResolver extends OutboundProxyResolver {
 }
 
 /**
+ * One organization's own S3 account, keyed by organization id. No config
+ * primitive today declares a dynamic, tenant-keyed env-name set (see the
+ * handoff) — always empty until that primitive lands.
+ */
+type StoredObjectS3RouteTable = Readonly<
+  Record<
+    string,
+    Readonly<{
+      endpoint?: string;
+      bucket?: string;
+      accessKeyId?: string;
+      secretAccessKey?: string;
+    }>
+  >
+>;
+
+/**
  * Which S3 account a project's objects belong in. THE PROJECT'S ORGANIZATION
  * IS RE-READ ON EVERY RESOLUTION, deliberately.
  */
 class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
   constructor(
     private readonly projectOrganizations: PrismaStoredObjectProjectOrganizationRepository,
-    private readonly storage: StoredObjectAppConfig,
+    private readonly storage: StoredObjectServerConfig,
+    private readonly routes: StoredObjectS3RouteTable,
+    private readonly deploymentSecrets: StoredObjectS3DeploymentSecrets,
   ) {}
 
   /**
@@ -105,8 +140,8 @@ class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
     const { s3 } = this.storage;
 
     const endpoint = route?.endpoint ?? s3.endpoint;
-    const accessKeyId = route?.accessKeyId ?? s3.accessKeyId;
-    const secretAccessKey = route?.secretAccessKey ?? s3.secretAccessKey;
+    const accessKeyId = route?.accessKeyId ?? this.deploymentSecrets.accessKeyId;
+    const secretAccessKey = route?.secretAccessKey ?? this.deploymentSecrets.secretAccessKey;
     // Credentials only when BOTH halves of an explicit pair are present:
     // passing a partial pair short-circuits the SDK's own provider chain, which
     // is what breaks IRSA on a keyless deployment.
@@ -127,7 +162,9 @@ class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
             credentials: {
               accessKeyId: accessKeyId!,
               secretAccessKey: secretAccessKey!,
-              ...(s3.sessionToken ? { sessionToken: s3.sessionToken } : {}),
+              ...(this.deploymentSecrets.sessionToken
+                ? { sessionToken: this.deploymentSecrets.sessionToken }
+                : {}),
             },
           }
         : {}),
@@ -141,10 +178,10 @@ class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
   }
 
   private async tryRoute(projectId: string) {
-    if (Object.keys(this.storage.routes).length === 0) return null;
+    if (Object.keys(this.routes).length === 0) return null;
     const organizationId = await this.projectOrganizations.findOrganizationId(projectId);
     if (!organizationId) return null;
-    return this.storage.routes[organizationId] ?? null;
+    return this.routes[organizationId] ?? null;
   }
 }
 
@@ -245,17 +282,29 @@ class StoredObjectOwnerAbsence extends StoredObjectOwnerResolver {
 /** Builds the {@link StoredObjectInfrastructure} `StoredObjectApp.create` composes over. */
 export function buildStoredObjectInfrastructure(input: {
   members: StoredObjectProcessMembers;
-  config: StoredObjectAppConfig;
+  config: StoredObjectServerConfig;
   resources: ResourceOwnership;
 }): StoredObjectInfrastructure {
   const { members, config: storage } = input;
+  // No config primitive today declares a dynamic, tenant-keyed env-name set
+  // (config-schema-nuke-batch-c handoff) — always empty until one lands.
+  const routes: StoredObjectS3RouteTable = {};
 
   const aws = AwsClientProcessRuntime.create({ outboundProxy: new NoOutboundProxyResolver() });
   input.resources.own("api stored-object aws client runtime", () => aws.close());
 
+  const deploymentS3Secrets: StoredObjectS3DeploymentSecrets = {
+    accessKeyId: members.secrets.find("S3_ACCESS_KEY_ID"),
+    secretAccessKey: members.secrets.find("S3_SECRET_ACCESS_KEY"),
+    sessionToken: members.secrets.find("S3_SESSION_TOKEN"),
+  };
+  const azureAccountKey = members.secrets.find("AZURE_BLOB_ACCOUNT_KEY");
+
   const targets = new StoredObjectS3Targets(
     PrismaStoredObjectProjectOrganizationRepository.create(members.prisma),
     storage,
+    routes,
+    deploymentS3Secrets,
   );
   const destinations = StoredObjectDestinationPolicyAdapter.create({
     selection: {
@@ -286,10 +335,20 @@ export function buildStoredObjectInfrastructure(input: {
   // so an install with no Azure block configured is not made to fail at boot over a
   // backend it does not use. The resolver's `purpose: "read"` is what lets an
   // operator who migrated OFF Azure keep reading what was written before.
+
+  // Fail-closed: the insecure-endpoint escape hatch never activates in
+  // production, whatever this variable is set to.
+  const allowInsecureTokenEndpointForTests =
+    members.nodeEnvironment !== "production" &&
+    storage.azure.allowInsecureTokenEndpointForTests === "1";
   const azureForProject = (): StoredObjectStorageDriver =>
     AzureBlobStoredObjectDriverAdapter.create(
       AzureBlobCredentialsAdapter.resolveAzureCredentials({
-        config: storage.azure,
+        config: {
+          ...storage.azure,
+          accountKey: azureAccountKey,
+          allowInsecureTokenEndpointForTests,
+        },
         purpose: "read",
         identity: storage.azure.identity,
       }),

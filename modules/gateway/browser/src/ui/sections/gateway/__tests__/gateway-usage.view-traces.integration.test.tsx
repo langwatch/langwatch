@@ -4,11 +4,11 @@
  * Spec: specs/ai-gateway/virtual-keys.feature
  */
 import { cleanup, screen } from "@testing-library/react";
+import type React from "react";
+import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
-import "@testing-library/jest-dom/vitest";
-import type React from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,

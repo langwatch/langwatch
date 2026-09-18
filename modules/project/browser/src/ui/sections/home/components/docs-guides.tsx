@@ -9,6 +9,7 @@ import {
   LuScroll,
   LuSquareCode,
 } from "react-icons/lu";
+
 import { HomeCard } from "./home-card.tsx";
 import {
   HOME_SECTION_GAP,

@@ -5,6 +5,7 @@
  */
 
 import * as os from "node:os";
+
 import { createLogger } from "@langwatch/observability";
 import type {
   DashboardData,
@@ -14,14 +15,15 @@ import type {
   QueueInfo,
   RedisInfo,
 } from "@langwatch/ops-contract";
-import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules.ts";
-import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
+import { nowInstant } from "@langwatch/time";
+
 import type { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
+import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules.ts";
+import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules.ts";
 import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
 import { OpsMetricsPublicationService } from "./ops-metrics-publication.service.ts";
 import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
-import { nowInstant } from "@langwatch/time";
 import {
   METRICS_COLLECT_INTERVAL_MS,
   OpsMetricsWindowService,

@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -6,8 +7,8 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import { nanoid } from "nanoid";
-import { createLogger } from "@langwatch/observability";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { WorkflowDslService } from "../../../services/workflow-dsl.service.ts";
 import { PrismaWorkflowRepository } from "../prisma.workflow.repository.ts";
 

@@ -1,11 +1,12 @@
+import type { FilterField, PreconditionTraceData } from "@langwatch/analytics-contract";
+import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 /**
  * @vitest-environment node
  * Recovered with the matcher itself: the subject moved but the contract
  * (#4805 fail-closed cases, metric-boundary parity) did not — don't drop them.
  */
 import { describe, expect, it } from "vitest";
-import type { FilterField, PreconditionTraceData } from "@langwatch/analytics-contract";
-import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+
 import { LegacyFilterMatchingService } from "../legacy-filter-matching.service.ts";
 
 const SUBJECT = LegacyFilterMatchingService.create();

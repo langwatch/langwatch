@@ -5,9 +5,8 @@
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { useState } from "react";
-
 import { Popover } from "@langwatch/design-system/popover";
+import { useState } from "react";
 
 import {
   type LangWatchQLCell,

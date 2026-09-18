@@ -5,6 +5,7 @@
  */
 
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
+
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { AvatarUploadControl } from "./avatar-upload-control.tsx";
 

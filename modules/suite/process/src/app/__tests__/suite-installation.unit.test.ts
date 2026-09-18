@@ -31,8 +31,8 @@ function analyticalWithoutStore(): ClickHouseQueryClient {
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(suiteServer)])
-    .withConfig({ suite: {} })
     .withAnalytical(analyticalWithoutStore())
+    .withMembers({ publicBaseUrl: undefined })
     .provide({
       scenario: createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),
       agent: createApiFixture<AgentApi>({}),

@@ -1,6 +1,10 @@
 import { useMemo } from "react";
-import { useNavigationHost } from "../model/navigation-host.ts";
-import { planManagementHref } from "../model/plan-management-href.ts";
+
+import {
+  MIN_CATEGORY_MATCH_LENGTH,
+  MIN_SEARCH_QUERY_LENGTH,
+} from "../model/command-bar-constants.ts";
+import type { Command } from "../model/command-bar-types.ts";
 import {
   actionCommands,
   filterCommands,
@@ -9,9 +13,9 @@ import {
   supportCommands,
   themeCommands,
 } from "../model/command-catalogue.ts";
-import { MIN_CATEGORY_MATCH_LENGTH, MIN_SEARCH_QUERY_LENGTH } from "../model/command-bar-constants.ts";
 import { getPageCommands } from "../model/command-page-commands.ts";
-import type { Command } from "../model/command-bar-types.ts";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import { planManagementHref } from "../model/plan-management-href.ts";
 import { useCommandFeatureFlags } from "./use-command-feature-flags.ts";
 
 export interface FilteredCommands {

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  * @integration
@@ -5,16 +7,19 @@
  * multi-series handling; verifies data point landing and affected-bucket computation.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   METRIC_ROLLUP_INTERVAL_MS,
   type CanonicalMetricDataPoint,
 } from "@langwatch/metric-contract";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { point } from "../app/__tests__/metric.fixture.ts";
 import type { MetricClickHouseClient } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { MetricDataPointClickHouseRepository } from "../repositories/clickhouse/clickhouse.metric-data-point.repository.ts";
-import { deleteMigratedTenantRows, startMigratedClickHouse } from "./migrated-clickhouse.harness.ts";
+import {
+  deleteMigratedTenantRows,
+  startMigratedClickHouse,
+} from "./migrated-clickhouse.harness.ts";
 
 let ch: ClickHouseClient;
 let repo: MetricDataPointClickHouseRepository;

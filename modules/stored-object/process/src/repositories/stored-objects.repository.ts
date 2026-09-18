@@ -16,10 +16,7 @@ export abstract class StoredObjectsRepository {
    */
   abstract insert: (params: { projectId: string; row: StoredObject }) => Promise<void>;
 
-  abstract tryFindById: (params: {
-    projectId: string;
-    id: string;
-  }) => Promise<StoredObject | null>;
+  abstract tryFindById: (params: { projectId: string; id: string }) => Promise<StoredObject | null>;
 
   abstract findAllByProject: (params: {
     projectId: string;

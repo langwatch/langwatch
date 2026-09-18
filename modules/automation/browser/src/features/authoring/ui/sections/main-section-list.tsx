@@ -1,10 +1,11 @@
 import { VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { AutomationNameField } from "../elements/name-field.tsx";
-import { AutomationSeveritySection } from "../blocks/severity-section.tsx";
+
 import { AutomationTypePicker, type AutomationSource } from "../blocks/automation-type-picker.tsx";
-import { useAutomationStore } from "./automation-store.ts";
+import { AutomationSeveritySection } from "../blocks/severity-section.tsx";
+import { AutomationNameField } from "../elements/name-field.tsx";
 import { useConfigComplete, useDraft } from "./automation-selectors.ts";
+import { useAutomationStore } from "./automation-store.ts";
 import { CadenceSection } from "./cadence-section-adapter.tsx";
 import { DeliveryPicker } from "./delivery-picker.tsx";
 import { SubjectSection } from "./subject-section.tsx";

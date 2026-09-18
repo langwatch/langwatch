@@ -29,21 +29,20 @@ function toBudgetRow<
   };
 }
 
+import { attributedUserBucketScopeId } from "@langwatch/gateway-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
-
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
-import { attributedUserBucketScopeId } from "@langwatch/gateway-contract";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 

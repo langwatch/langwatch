@@ -23,8 +23,8 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "zod": "catalog:"
   },

@@ -5,6 +5,7 @@
 
 import { Box, Button, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { AtSign, KeyRound, X } from "lucide-react";
+
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { isRemovableMethod, providerDisplayName } from "../../model/sign-in-methods.ts";

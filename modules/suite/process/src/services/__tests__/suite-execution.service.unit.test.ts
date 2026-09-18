@@ -1,6 +1,7 @@
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+
 import type { SuiteRunCommands } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
 

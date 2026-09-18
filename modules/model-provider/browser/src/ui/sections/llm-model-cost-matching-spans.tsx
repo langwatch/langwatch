@@ -5,20 +5,19 @@
  */
 
 import { Badge, Box, chakra, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { keepPreviousData } from "@tanstack/react-query";
-import { LuExternalLink, LuMoveRight } from "react-icons/lu";
-
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import { ProviderIcon } from "@langwatch/model-provider-browser-kit/provider-icons";
 import type {
   CostRuleMatchingSpansPreview,
   CostRulePreviewSampleSpan,
 } from "@langwatch/model-provider-contract";
+import { keepPreviousData } from "@tanstack/react-query";
+import { LuExternalLink, LuMoveRight } from "react-icons/lu";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import { formatRelativeTimeAgo } from "../../model/relative-time.ts";
 import { isSafeRegex } from "../../model/safe-regex.ts";
-import { useModelProviderHost } from "../../model/model-provider-host.ts";
-import { ProviderIcon } from "@langwatch/model-provider-browser-kit/provider-icons";
 
 export interface MatchingSpansPreviewInput {
   regex: string;

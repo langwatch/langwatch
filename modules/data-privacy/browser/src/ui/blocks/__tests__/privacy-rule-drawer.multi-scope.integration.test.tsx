@@ -3,14 +3,15 @@
  * Spec: specs/data-privacy/policy-configuration.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type DataPrivacyScopeAvailable,
   PLATFORM_DEFAULT_DATA_PRIVACY,
 } from "@langwatch/data-privacy-contract";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type React from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { PrivacyRuleDrawer } from "../privacy-rule-drawer.tsx";
 import type { PrivacyScopeEntry } from "../privacy-rule-drawer.tsx";
 

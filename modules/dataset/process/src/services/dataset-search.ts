@@ -41,9 +41,7 @@ export const measureRowsBytes = (rows: unknown[]): number => {
  * is nothing to search for. Whitespace-only input is "no search" rather than a
  * search for a space, which would match almost every row.
  */
-export const normalizeDatasetSearch = (
-  search: string | undefined | null,
-): string | undefined => {
+export const normalizeDatasetSearch = (search: string | undefined | null): string | undefined => {
   const trimmed = search?.trim();
   return trimmed ? trimmed : undefined;
 };
@@ -70,8 +68,7 @@ export const matchesDatasetSearch = ({
   return Object.values(entry).some((value) => {
     if (value === null || value === undefined) return false;
 
-    const haystack =
-      typeof value === "string" ? value : safeStringifyValue(value);
+    const haystack = typeof value === "string" ? value : safeStringifyValue(value);
 
     return haystack.toLowerCase().includes(needle);
   });

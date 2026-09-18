@@ -1,10 +1,11 @@
-import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
 import type {
   EvaluationProcessingEvent,
   ExecuteEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import { verdictPassedOf, verdictScoreOf } from "@langwatch/evaluation-contract";
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+
 import { type EvaluationExecutionReceipt } from "../app/evaluation.members.ts";
 import type { PreparedEvaluation } from "./evaluation-execution-preparation.service.ts";
 import {

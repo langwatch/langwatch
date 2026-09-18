@@ -1,4 +1,5 @@
 import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-contract";
+
 import { CodingAgentTraceSessionRepository } from "../coding-agent-trace-session.repository.ts";
 import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
 
@@ -26,9 +27,8 @@ export class MemoryCodingAgentTraceSessionRepository extends CodingAgentTraceSes
     traceId: string;
   }): Promise<CodingAgentTraceSessionRecord | null> {
     return (
-      this.memory.traceSessions.get(
-        MemoryCodingAgentDatabase.key(input.tenantId, input.traceId),
-      ) ?? null
+      this.memory.traceSessions.get(MemoryCodingAgentDatabase.key(input.tenantId, input.traceId)) ??
+      null
     );
   }
 }

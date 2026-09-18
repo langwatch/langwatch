@@ -10,6 +10,7 @@ import {
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
 } from "@langwatch/ops-contract";
+
 import {
   sample,
   type MigrationEnrollmentRecord,
@@ -49,11 +50,7 @@ export class SystemMigrationEnrollmentService {
    * targeted run and rollback all act on an organization the operator found
    * by name rather than by pasting an id.
    */
-  async searchOrganizations({
-    query,
-  }: {
-    query: string;
-  }): Promise<{ id: string; name: string }[]> {
+  async searchOrganizations({ query }: { query: string }): Promise<{ id: string; name: string }[]> {
     const trimmed = query.trim();
     if (trimmed.length === 0) {
       return [];

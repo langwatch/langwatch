@@ -1,4 +1,5 @@
 import { Text } from "@chakra-ui/react";
+
 import { useSideMenuDensity } from "./side-menu-density.tsx";
 
 /**

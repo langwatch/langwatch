@@ -3,8 +3,6 @@
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import type { Dataset } from "@langwatch/dataset-contract";
-import { HandledError } from "@langwatch/handled-error";
-import { generate } from "@langwatch/ksuid";
 import {
   ExperimentApi,
   ExperimentDspyStepNotFoundError,
@@ -13,6 +11,8 @@ import {
   type DSPyStep,
   type SaveExperimentInput,
 } from "@langwatch/experiment-contract";
+import { HandledError } from "@langwatch/handled-error";
+import { generate } from "@langwatch/ksuid";
 import {
   parseStudioWorkflow,
   studioWorkflowSchema,
@@ -276,9 +276,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
       workbenchState: workbenchState.state,
       version: workbenchState.version,
       updatedAt: workbenchState.updatedAt,
-      ...(workbenchState.actorLabel !== undefined
-        ? { actorLabel: workbenchState.actorLabel }
-        : {}),
+      ...(workbenchState.actorLabel !== undefined ? { actorLabel: workbenchState.actorLabel } : {}),
       ...(workbenchState.runId !== undefined ? { runId: workbenchState.runId } : {}),
     };
   })
@@ -296,9 +294,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
       updatedAt: workbenchState.updatedAt,
       // Who wrote the version the probing tab is comparing against. A tab that
       // has to tell its reader their work is out of date owes them the name.
-      ...(workbenchState.actorLabel !== undefined
-        ? { actorLabel: workbenchState.actorLabel }
-        : {}),
+      ...(workbenchState.actorLabel !== undefined ? { actorLabel: workbenchState.actorLabel } : {}),
       // The run that wrote it, when a run did. A tab coming back from the
       // background adopts a version its own run wrote rather than standing
       // down over a write it already holds every cell of.
@@ -308,9 +304,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
 
   .procedure("onExperimentUpdate")
   .withPermission("experiments:view")
-  .handle(({ app, input, signal }) =>
-    app.watchUpdates({ projectId: input.projectId, signal }),
-  )
+  .handle(({ app, input, signal }) => app.watchUpdates({ projectId: input.projectId, signal }))
 
   .procedure("listWorkbenchVersions")
   .withPermission("experiments:view")
@@ -544,9 +538,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
     // monitor it was published as - is one act, and it is the application's. A
     // second door sequencing the same three writes is a second chance to
     // sequence them differently.
-    app
-      .archive({ projectId: input.projectId, id: input.experimentId })
-      .catch(mapExperimentError),
+    app.archive({ projectId: input.projectId, id: input.experimentId }).catch(mapExperimentError),
   )
 
   .procedure("copy")

@@ -1,14 +1,20 @@
+import { toaster } from "@langwatch/browser-host/toaster";
 import { createLogger } from "@langwatch/observability/browser";
+import { nowInstant } from "@langwatch/time";
+import { generateOtelTraceId } from "@langwatch/trace-contract";
+import type {
+  BaseComponent,
+  Component,
+  Field,
+  StudioClientEvent,
+} from "@langwatch/workflow-contract";
+import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { generateOtelTraceId } from "@langwatch/trace-contract";
-import type { BaseComponent, Component, Field,StudioClientEvent } from "@langwatch/workflow-contract";
-import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
+
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { useAlertOnComponent } from "./use-alert-on-component.ts";
 import { usePostEvent } from "./use-post-event.tsx";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:studio:componentExecution");
 

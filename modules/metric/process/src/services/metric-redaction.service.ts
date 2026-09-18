@@ -1,7 +1,7 @@
-import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
-
 import type { MetricPiiRedactionLevel } from "@langwatch/metric-contract";
+
 import type { MetricRedaction } from "../app/metric.members.ts";
+import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
 
 type StringRef = {
   owner: UnknownRecord;

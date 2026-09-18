@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { SLACK_APP_MANIFEST } from "../ui/sections/slack.client.tsx";
 
 describe("Slack app manifest", () => {

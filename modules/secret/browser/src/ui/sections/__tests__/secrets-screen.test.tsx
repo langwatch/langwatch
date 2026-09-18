@@ -10,6 +10,7 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { FakeSecretHost, renderWithSecretHost } from "../../../testing.tsx";
 import SecretsScreen from "../secrets-screen.tsx";
 

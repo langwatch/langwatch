@@ -1,10 +1,11 @@
+import type { EvaluationsV3State, ExecutionScope } from "@langwatch/experiment-contract";
 /**
  * Cell generation: turning a workbench state + a run scope into the
  * concrete list of cells a run executes.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
 import { describe, expect, it } from "vitest";
-import type { EvaluationsV3State, ExecutionScope } from "@langwatch/experiment-contract";
+
 import { ExperimentCellPlanService } from "../experiment-cell-plan.service.ts";
 
 const cellPlan = ExperimentCellPlanService.create();

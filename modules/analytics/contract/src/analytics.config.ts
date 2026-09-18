@@ -1,21 +1,21 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
  * RESTRICTED ClickHouse identity for member SQL workbench—all five leaves
  * required together.
  */
-export const analyticsServerConfigDefinition = RuntimeConfig.define({
+export const analyticsServerConfig = Config.define((c) => ({
   langwatchQl: {
-    url: Config.value(z.string().optional(), { env: "LWQL_CLICKHOUSE_URL" }),
-    username: Config.value(z.string().optional(), { env: "LWQL_CLICKHOUSE_USER" }),
-    password: Config.value(z.string().optional(), { env: "LWQL_CLICKHOUSE_PASSWORD" }),
-    database: Config.value(z.string().optional(), { env: "LWQL_DATABASE" }),
-    tenantSetting: Config.value(z.string().optional(), { env: "LWQL_TENANT_SETTING" }),
+    url: c.env("LWQL_CLICKHOUSE_URL", z.string().optional()),
+    username: c.env("LWQL_CLICKHOUSE_USER", z.string().optional()),
+    password: c.env("LWQL_CLICKHOUSE_PASSWORD", z.string().optional()),
+    database: c.env("LWQL_DATABASE", z.string().optional()),
+    tenantSetting: c.env("LWQL_TENANT_SETTING", z.string().optional()),
   },
-});
+}));
 
-export type AnalyticsServerConfig = ConfigValue<typeof analyticsServerConfigDefinition>;
+export type AnalyticsServerConfig = ConfigOf<typeof analyticsServerConfig>;
 
 /** Named so a partial set can be reported by variable rather than by field. */
 export const LANGWATCH_QL_ENV_NAMES = {
@@ -25,8 +25,6 @@ export const LANGWATCH_QL_ENV_NAMES = {
   database: "LWQL_DATABASE",
   tenantSetting: "LWQL_TENANT_SETTING",
 } as const;
-
-export const analyticsServerConfigSchema = compileRuntimeConfig(analyticsServerConfigDefinition);
 
 /**
  * Refuses a SQL workbench identity that is half configured, naming only the

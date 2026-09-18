@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
+
 import { deliverSchema } from "../../rules/webhook-delivery-contract.rules.ts";
 
 describe("the deliver intent payload", () => {

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  applyEntryInputDefaults,
+  entryInlineWithDefaults,
+} from "../studio-entry-input-defaults.ts";
 import type { Field, StudioWorkflow } from "../studio-workflow.ts";
-import { applyEntryInputDefaults, entryInlineWithDefaults } from "../studio-entry-input-defaults.ts";
 
 const inline = (records: Record<string, unknown[]>) => ({
   records,

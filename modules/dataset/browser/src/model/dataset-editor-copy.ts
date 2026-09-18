@@ -25,9 +25,7 @@ export const formatSearchRecordCount = ({
   total?: number;
 }): string =>
   total === undefined
-    ? `${formatRecordCount(matched)} matching ${
-        matched === 1 ? "record" : "records"
-      }`
+    ? `${formatRecordCount(matched)} matching ${matched === 1 ? "record" : "records"}`
     : `${formatRecordCount(matched)} of ${formatRecordCount(total)} records`;
 
 /** The count chip with no search in effect: "679 records", "1 record". */
@@ -47,8 +45,7 @@ export const searchFailedMessage = (search: string): string =>
  * searched text — with a debounce between typing and results, the user
  * needs to see which search this belongs to.
  */
-export const noSearchMatchesMessage = (search: string): string =>
-  `No records match “${search}”.`;
+export const noSearchMatchesMessage = (search: string): string => `No records match “${search}”.`;
 
 /**
  * Tooltip on the truncated-read count chip: a large dataset loads up to a

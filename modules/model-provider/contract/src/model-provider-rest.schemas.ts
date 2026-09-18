@@ -135,5 +135,14 @@ export type ApiResponseModelDefaults = z.infer<typeof apiResponseModelDefaultsSc
 // `/api/playground`
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The conversation, as the browser's chat transport posts it. */
-export const playgroundRestBodySchema = z.object({ messages: z.array(z.unknown()) });
+/** The conversation posted by the browser; project and model remain request headers. */
+export const playgroundRestBodySchema = z.object({
+  messages: z.array(z.unknown()),
+});
+
+/** The target and optional system prompt carried by the released playground wire contract. */
+export const playgroundRestHeadersSchema = z.object({
+  "x-project-id": z.string().nullable().optional(),
+  "x-model": z.string().nullable().optional(),
+  "x-system-prompt": z.string().nullable().optional(),
+});

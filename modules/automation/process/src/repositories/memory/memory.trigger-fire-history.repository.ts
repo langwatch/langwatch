@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
 import { toDate, type Instant } from "@langwatch/time";
+
 import { TriggerFireHistoryRepository } from "../trigger-fire-history.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 
@@ -56,8 +57,7 @@ export class MemoryTriggerFireHistoryRepository extends TriggerFireHistoryReposi
           current.lastFiredAt === null || current.lastFiredAt < fire.createdAt
             ? fire.createdAt
             : current.lastFiredAt,
-        recentFireCount:
-          current.recentFireCount + (fire.createdAt.getTime() >= since ? 1 : 0),
+        recentFireCount: current.recentFireCount + (fire.createdAt.getTime() >= since ? 1 : 0),
         currentlyFiring: current.currentlyFiring || fire.resolvedAt === null,
       });
     }

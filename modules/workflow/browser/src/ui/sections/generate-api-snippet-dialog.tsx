@@ -1,14 +1,14 @@
 import { Button, HStack, useDisclosure, VStack } from "@chakra-ui/react";
-import type { PrismLanguage } from "../../model/prism-language.ts";
+import { Menu } from "@langwatch/design-system/menu";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+import type { Snippet, Target } from "@langwatch/prompt-browser/api-snippet";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import React, { createContext, useContext, useMemo, useState } from "react";
 
-import type { Snippet, Target } from "@langwatch/prompt-browser/api-snippet";
-import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
+import type { PrismLanguage } from "../../model/prism-language.ts";
 import { RenderCode } from "./code/render-code.tsx";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { Menu } from "@langwatch/design-system/menu";
-import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 
 /**
  * A language tab for the segmented language picker. When `tabs` is provided the dialog

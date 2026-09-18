@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+
 import { AuthzEpochRepository } from "../../authz-epoch.repository.ts";
 
 export class StubAuthzEpoch extends AuthzEpochRepository {

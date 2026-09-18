@@ -2,12 +2,13 @@
  * The key a pull request is stored and found under.
  */
 
+import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
 } from "../prisma.github-pull-requests.repository.ts";
-import { Temporal, toDate } from "@langwatch/time";
 
 type Call = { method: string; args: Record<string, unknown> };
 

@@ -9,19 +9,12 @@ import {
   type RoutingDecision,
   type SignInMethodPolicy,
 } from "@langwatch/identity-contract";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { Logger } from "@langwatch/observability";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
-import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
-import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
-import {
-  createBetterAuthTransport,
-  isEmailPasswordEnabled,
-  type BetterAuthTransport,
-} from "../channels/http/http.better-auth.channel.ts";
+
 import {
   BetterAuthAnnouncements,
   BetterAuthFederation,
@@ -31,8 +24,16 @@ import {
   type BetterAuthAccountRow,
   type PendingOrganizationInvite,
 } from "../channels/better-auth.channel.ts";
+import {
+  createBetterAuthTransport,
+  isEmailPasswordEnabled,
+  type BetterAuthTransport,
+} from "../channels/http/http.better-auth.channel.ts";
 import type { SignUpVerification } from "../channels/http/http.passkey-sign-up.channel.ts";
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
+import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
+import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
+import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
 
 /** The deployment's browser-session identity: present whole, or not at all. */
 export type BetterAuthDeploymentIdentity = Readonly<{

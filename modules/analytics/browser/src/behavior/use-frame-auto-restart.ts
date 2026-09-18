@@ -32,8 +32,7 @@ export interface FrameAutoRestart {
   readonly restartNow: () => void;
 }
 
-const isHidden = () =>
-  typeof document !== "undefined" && document.visibilityState === "hidden";
+const isHidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
 
 export function useFrameAutoRestart({
   onRestart,

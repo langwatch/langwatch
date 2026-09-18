@@ -1,4 +1,5 @@
 import type { RedisConnection } from "@langwatch/redis-client";
+
 import type { PresenceRepositories } from "../presence.repositories.ts";
 import { RedisPresenceRepository } from "./redis.presence.repository.ts";
 

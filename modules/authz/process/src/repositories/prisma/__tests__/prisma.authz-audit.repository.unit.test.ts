@@ -1,11 +1,12 @@
+import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import type { AuthzAuditRow } from "../../authz-audit-trail.repository.ts";
 import {
   type AuthzAuditDatabase,
   type AuthzAuditInsert,
   PrismaAuthzAuditRepository,
 } from "../prisma.authz-audit.repository.ts";
-import { Temporal, toDate } from "@langwatch/time";
 
 const ROW: AuthzAuditRow = {
   id: "authz-evt-event_1",

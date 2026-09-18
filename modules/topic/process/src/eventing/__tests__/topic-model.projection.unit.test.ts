@@ -1,5 +1,6 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import type { TopicClusteringTopicsRecordedEvent } from "../../services/topic-events.service.ts";
 import { type TopicModelData, TopicModelFoldProjection } from "../topic-model.projection.ts";
 

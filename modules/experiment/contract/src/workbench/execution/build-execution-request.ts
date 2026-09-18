@@ -1,6 +1,5 @@
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
-import { carriedOverCells } from "./run-results.ts";
-import type { CarriedOverCell, ExecutionRequest, ExecutionScope } from "./types.ts";
+
 import type {
   DatasetReference,
   EvaluationResults,
@@ -9,6 +8,8 @@ import type {
 } from "../../experiment-workbench.ts";
 import { type CellId, computeExecutionCells } from "../execution-scope.ts";
 import { toComparisonConfig } from "../normalize-comparison.ts";
+import { carriedOverCells } from "./run-results.ts";
+import type { CarriedOverCell, ExecutionRequest, ExecutionScope } from "./types.ts";
 
 /**
  * The request one workbench run sends, built from state alone. Pure and

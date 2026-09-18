@@ -1,4 +1,5 @@
 import { defineServerModule } from "@langwatch/kernel";
+
 import type { DataPrivacyDirectoryReader } from "./app/data-privacy.app.ts";
 import { DataPrivacyApp } from "./app/data-privacy.app.ts";
 import { dataPrivacyRepositories } from "./repositories/data-privacy-repositories.registry.ts";

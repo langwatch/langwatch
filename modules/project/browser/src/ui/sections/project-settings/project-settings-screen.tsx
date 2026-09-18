@@ -13,16 +13,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import isEqual from "lodash-es/isEqual";
-import { useState } from "react";
-import { Lock } from "lucide-react";
-import {
-  Controller,
-  type SubmitHandler,
-  type UseFormGetFieldState,
-  type UseFormRegister,
-  useForm,
-} from "react-hook-form";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
@@ -32,15 +22,26 @@ import {
   DepartmentPicker,
   useDepartmentColumn,
 } from "@langwatch/organization-browser/surfaces/department-picker";
+import isEqual from "lodash-es/isEqual";
+import { Lock } from "lucide-react";
+import { useState } from "react";
+import {
+  Controller,
+  type SubmitHandler,
+  type UseFormGetFieldState,
+  type UseFormRegister,
+  useForm,
+} from "react-hook-form";
+
 import { api } from "../../../behavior/project-api.ts";
+import type { OrganizationIntent } from "../../../model/prisma-types.ts";
 import {
   useProjectHost,
   type ProjectHostOrganization,
   type ProjectHostProject,
 } from "../../../model/project-host.ts";
-import { HorizontalFormControl } from "../../../ui/elements/horizontal-form-control.tsx";
-import type { OrganizationIntent } from "../../../model/prisma-types.ts";
 import { ProjectTechStackIcon, TechStackSelector } from "../../../ui/blocks/tech-stack.tsx";
+import { HorizontalFormControl } from "../../../ui/elements/horizontal-form-control.tsx";
 
 type OrganizationFormData = {
   name: string;

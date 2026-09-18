@@ -1,8 +1,12 @@
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { describe, expect, it, vi } from "vitest";
 import { PayloadStagingUnavailableError } from "@langwatch/stored-object-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  PayloadStagingS3TargetRepository,
+  S3PayloadStagingAdapter,
+} from "#repositories/s3/s3.payload-staging.repository";
 import { AbsentPayloadStagingAdapter } from "#services/absent-payload-staging.service";
-import { PayloadStagingS3TargetRepository, S3PayloadStagingAdapter } from "#repositories/s3/s3.payload-staging.repository";
 
 function s3(): { client: S3Client; sent: unknown[] } {
   const client = new S3Client({

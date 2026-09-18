@@ -1,5 +1,3 @@
-import type { SuiteRunParameters, SuiteRunResult, SuiteTarget } from "@langwatch/suite-contract";
-import { getSuiteSetId, hasParameterOverrides, targetKeyOf } from "@langwatch/suite-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   type ResolvedRunModels,
@@ -11,6 +9,9 @@ import {
   withNote,
   withResolvedModels,
 } from "@langwatch/scenario-contract";
+import type { SuiteRunParameters, SuiteRunResult, SuiteTarget } from "@langwatch/suite-contract";
+import { getSuiteSetId, hasParameterOverrides, targetKeyOf } from "@langwatch/suite-contract";
+
 import { type SuiteExecution, type SuiteRunCommands } from "../app/suite.app.ts";
 import { deriveBatchRunId, deriveScenarioRunId } from "../rules/suite-run-identity.rules.ts";
 import type { SuiteRunModelsResolver } from "./suite-run-models.service.ts";
@@ -69,8 +70,7 @@ export class SuiteExecutionService implements SuiteExecution {
     private readonly commands: SuiteRunCommands,
     private readonly scenarios: ScenarioApi,
     private readonly resolveRunModels?: SuiteRunModelsResolver,
-  ) {
-  }
+  ) {}
 
   async execute(input: SuiteExecutionRequest): Promise<SuiteRunResult> {
     const { parameters, secrets } = await this.resolveParameters(input);

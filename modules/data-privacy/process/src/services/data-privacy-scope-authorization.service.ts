@@ -11,6 +11,7 @@ import {
   type DataPrivacyScopeType,
 } from "@langwatch/data-privacy-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
+
 import type { DataPrivacyDirectoryReader } from "../app/data-privacy.app.ts";
 import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
 

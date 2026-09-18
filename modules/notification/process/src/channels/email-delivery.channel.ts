@@ -114,17 +114,13 @@ export class EmailProviderConfigurationError extends Error {
  * The api and the worker each derive it while parsing their own configuration,
  * and must land on the same answer or one of them fails SPF.
  */
-export function resolveDefaultFrom(input: {
-  emailDefaultFrom?: string;
-  baseHost: string;
-}): string {
+export function resolveDefaultFrom(input: { emailDefaultFrom?: string; baseHost: string }): string {
   if (input.emailDefaultFrom) {
     return input.emailDefaultFrom;
   }
 
   const hostname = hostnameOf(input.baseHost);
-  const sendsAsLangWatch =
-    hostname.includes("app.langwatch.ai") || hostname.includes("localhost");
+  const sendsAsLangWatch = hostname.includes("app.langwatch.ai") || hostname.includes("localhost");
 
   if (sendsAsLangWatch) {
     return "LangWatch <contact@langwatch.ai>";

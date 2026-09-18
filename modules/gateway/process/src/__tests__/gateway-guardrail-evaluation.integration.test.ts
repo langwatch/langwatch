@@ -1,3 +1,10 @@
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type {
+  EnabledGuardrailMonitor,
+  MonitorEnabledGuardrailInput,
+  MonitorApi,
+} from "@langwatch/monitor-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
  * Real Postgres; only the evaluator call is injected. Guards the old always-allow stub regressing.
@@ -6,15 +13,9 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type {
-  EnabledGuardrailMonitor,
-  MonitorEnabledGuardrailInput,MonitorApi
-} from "@langwatch/monitor-contract";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
+import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;

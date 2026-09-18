@@ -1,16 +1,16 @@
-import type { EventSubscriberDefinition } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
-import {
-  METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
-  scalarsFromCanonicalAttributes,
-  type MetricProcessingEvent,
-} from "@langwatch/metric-contract";
 import type { ContributeMetricFactsCommandData } from "@langwatch/coding-agent-contract";
 import {
   detectCodingAgent,
   isCodingAgentMetricName,
   resolveConversationKey,
 } from "@langwatch/coding-agent-contract";
+import type { EventSubscriberDefinition } from "@langwatch/eventing";
+import {
+  METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+  scalarsFromCanonicalAttributes,
+  type MetricProcessingEvent,
+} from "@langwatch/metric-contract";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:coding-agent:metric-facts-dispatch");
 

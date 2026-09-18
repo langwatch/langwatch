@@ -1,5 +1,5 @@
-import type { SpanDetail } from "@langwatch/trace-contract";
 import { isModelCallSpan, readString } from "@langwatch/coding-agent-contract";
+import type { SpanDetail } from "@langwatch/trace-contract";
 
 /**
  * The handful of facts a coding agent prints above the prompt at session

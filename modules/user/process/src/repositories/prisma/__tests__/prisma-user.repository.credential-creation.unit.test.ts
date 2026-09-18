@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { fromDate } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
 import { PrismaUserRepository, type UserDatabase } from "../prisma.user.repository.ts";
 
 /** The issuer the deployment states, carried down with each credential write. */

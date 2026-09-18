@@ -12,6 +12,7 @@ import {
   type RoleBindingScopeType,
   type TeamUserRole,
 } from "@langwatch/authz-contract";
+
 import { ScopeLineageRepository } from "./authz-read.repository.ts";
 import type { AuthzReadRepository } from "./authz-read.repository.ts";
 

@@ -5,6 +5,7 @@ import {
   type CodingAgentSessionMetricSeriesRecord,
   type CodingAgentTraceSessionRecord,
 } from "@langwatch/coding-agent-contract";
+
 import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
 
 /**

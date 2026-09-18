@@ -42,8 +42,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ProjectApi } from "@langwatch/project-contract";
 
@@ -75,29 +74,16 @@ export interface DatasetInfrastructure {
 }
 
 /**
- * The deployment's own process data, not behavior: the public origin
- * `platformUrl` builds a link under. Optional, because not every install
- * serves the REST family at all.
+ * Shapes restated rather than imported: a module depends on contracts.
+ * `publicBaseUrl` is the process's own fact, drilled in — absent where the
+ * deployment named no `BASE_HOST`. `platformUrl` refuses by name when it is.
  */
-export interface DatasetAppConfig {
-  readonly publicBaseUrl?: string;
-}
-
-const datasetAppConfigSchema: FeatureConfigSchema<DatasetAppConfig> = {
-  parse: (value: unknown): DatasetAppConfig => {
-    if (value === undefined) return {};
-    const config = value as DatasetAppConfig;
-    if (config.publicBaseUrl !== undefined && typeof config.publicBaseUrl !== "string") {
-      throw new Error('The "dataset" config slice\'s publicBaseUrl must be a string when present.');
-    }
-    return config;
-  },
-};
+type DatasetMembers = Readonly<{ publicBaseUrl: string | undefined }> & DatasetInfrastructure;
 
 type DatasetSetup = FeatureSetup<
   typeof DatasetApp.dependencies,
-  MembersRead<typeof DatasetApp.reads> & DatasetInfrastructure,
-  DatasetAppConfig,
+  DatasetMembers,
+  undefined,
   DatasetRepositories
 >;
 
@@ -132,13 +118,18 @@ export class DatasetApp implements DatasetApi {
     /** The tier-effective bounds the record writes refuse above. */
     entitlement: EntitlementApi,
   };
-  static readonly configSchema = datasetAppConfigSchema;
   /**
-   * No ProcessMembers member: everything this feature reads beyond its own
-   * repositories is either a peer API (`dependencies`) or the optional,
-   * process-specific bag in {@link DatasetInfrastructure}.
+   * `publicBaseUrl` is the process's own fact; the rest are the optional,
+   * process-specific collaborators in {@link DatasetInfrastructure} — every
+   * name a composition may `withMember` must be declared here too.
    */
-  static readonly reads = reads();
+  static readonly reads = [
+    "publicBaseUrl",
+    "storageResolver",
+    "storage",
+    "queue",
+    "content",
+  ] as const;
 
   #datasets: DatasetService;
   #normalization: DatasetNormalizationService | null;
@@ -150,8 +141,7 @@ export class DatasetApp implements DatasetApi {
   private constructor(
     repositories: DatasetRepositories,
     dependencies: DatasetSetup["dependencies"],
-    members: DatasetInfrastructure,
-    config: DatasetAppConfig,
+    members: DatasetMembers,
   ) {
     const resolver = members.storageResolver;
 
@@ -202,11 +192,11 @@ export class DatasetApp implements DatasetApi {
     this.#batchEvaluations = repositories.batchEvaluations;
     this.#experiments = dependencies.experiments;
     this.#permissions = dependencies.permissions;
-    this.#publicBaseUrl = config.publicBaseUrl;
+    this.#publicBaseUrl = members.publicBaseUrl;
   }
 
-  static create({ repositories, dependencies, members, config }: DatasetSetup): DatasetApp {
-    return new DatasetApp(repositories, dependencies, members, config);
+  static create({ repositories, dependencies, members }: DatasetSetup): DatasetApp {
+    return new DatasetApp(repositories, dependencies, members);
   }
 
   // ── Datasets ─────────────────────────────────────────────────────────────

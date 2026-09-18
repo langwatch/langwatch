@@ -1,11 +1,12 @@
 import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import type { RecordMetricDataPointCommandData } from "@langwatch/metric-contract";
 import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
   RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
 } from "@langwatch/metric-contract";
+import { describe, expect, it } from "vitest";
+
 import { RecordMetricDataPointCommand } from "../metric-processing.service.ts";
 
 describe("RecordMetricDataPointCommand", () => {

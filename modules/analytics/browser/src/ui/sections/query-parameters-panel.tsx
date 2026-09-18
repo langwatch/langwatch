@@ -10,23 +10,10 @@
  * adapter shape, rather than hand-duplicating the row markup.
  */
 
-import {
-  Badge,
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Input,
-  Stack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, chakra, HStack, Input, Stack, Text, VStack } from "@chakra-ui/react";
+import { FieldTypeSelect, VariableTypeIcon } from "@langwatch/prompt-browser-kit/variables";
 import { Plus, Trash2 } from "lucide-react";
 
-import {
-  FieldTypeSelect,
-  VariableTypeIcon,
-} from "@langwatch/prompt-browser-kit/variables";
 import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
@@ -95,14 +82,7 @@ function DashboardContextRow({
       <Box flexShrink={0}>
         <VariableTypeIcon type={reserved.type} size={14} />
       </Box>
-      <Text
-        fontSize="12px"
-        fontFamily="mono"
-        flex={1}
-        minWidth={0}
-        truncate
-        color="fg.muted"
-      >
+      <Text fontSize="12px" fontFamily="mono" flex={1} minWidth={0} truncate color="fg.muted">
         {reserved.name}
       </Text>
       <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
@@ -220,12 +200,7 @@ export function QueryParametersPanel({
   return (
     <VStack align="stretch" gap={3} width="full">
       <Box>
-        <Text
-          fontSize="11px"
-          fontWeight="600"
-          color="fg.muted"
-          marginBottom={1}
-        >
+        <Text fontSize="11px" fontWeight="600" color="fg.muted" marginBottom={1}>
           Dashboard context · provided by the dashboard · read-only
         </Text>
         <Stack gap={1}>
@@ -242,12 +217,7 @@ export function QueryParametersPanel({
       </Box>
 
       <Box>
-        <Text
-          fontSize="11px"
-          fontWeight="600"
-          color="fg.muted"
-          marginBottom={1}
-        >
+        <Text fontSize="11px" fontWeight="600" color="fg.muted" marginBottom={1}>
           Parameters · declared by you
         </Text>
         <Stack gap={2}>

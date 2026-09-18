@@ -1,5 +1,6 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayBudget as GatewayBudgetRow } from "@langwatch/gateway-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { GatewayBudgetOverviewRepository } from "../gateway-budget-overview.repository.ts";
 import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 

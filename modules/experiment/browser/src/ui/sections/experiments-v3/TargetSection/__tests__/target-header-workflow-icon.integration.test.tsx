@@ -4,7 +4,6 @@
  * @see specs/agents/workflow-agent-as-target.feature
  */
 import "@testing-library/jest-dom/vitest";
-
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -1,7 +1,7 @@
 import type { GithubRepositories } from "../github.repositories.ts";
-import { MemoryGithubDatabase } from "./memory.github.database.ts";
 import { MemoryGithubInstallationsRepository } from "./memory.github-installations.repository.ts";
 import { MemoryGithubPullRequestsRepository } from "./memory.github-pull-requests.repository.ts";
+import { MemoryGithubDatabase } from "./memory.github.database.ts";
 
 export class MemoryGithubRepositories {
   static readonly requires = [] as const;

@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
+
 import type { LangWatchQLNames } from "../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
@@ -47,9 +48,9 @@ function catalogViewNames(): string[] {
  * array to generate GRANT statements, and their order affects the output.
  */
 function catalogSourceTables(): string[] {
-  return viewProvisioning.sourceTables({ names: NAMES, sourceDatabase: NAMES.database }).map(
-    (table) => table.table,
-  );
+  return viewProvisioning
+    .sourceTables({ names: NAMES, sourceDatabase: NAMES.database })
+    .map((table) => table.table);
 }
 
 describe("given the Go LWQL manifest and the application catalog", () => {

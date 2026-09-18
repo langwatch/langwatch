@@ -4,9 +4,10 @@
  * already carries the scopes and confirmations that go with them.
  */
 
-import { toEpochMs } from "@langwatch/time";
 import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { toEpochMs } from "@langwatch/time";
 import { useEffect } from "react";
+
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { formatRelativeTime } from "../../model/relative-time.ts";
@@ -36,9 +37,7 @@ export function PersonalApiKeysSummary() {
 
   if (!organizationId) return null;
 
-  const mine = (keys.data ?? []).filter(
-    (key) => key.userId === userId && key.revokedAt === null,
-  );
+  const mine = (keys.data ?? []).filter((key) => key.userId === userId && key.revokedAt === null);
 
   return (
     <VStack align="stretch" gap={3} width="full" data-testid="personal-api-keys-summary">
@@ -64,8 +63,7 @@ export function PersonalApiKeysSummary() {
                 {permissionLabel(key.permissionMode)}
               </Badge>
               <Text fontSize="xs" color="fg.muted">
-                Last used{" "}
-                {formatRelativeTime(key.lastUsedAt ? toEpochMs(key.lastUsedAt) : null)}
+                Last used {formatRelativeTime(key.lastUsedAt ? toEpochMs(key.lastUsedAt) : null)}
               </Text>
             </HStack>
           ))}

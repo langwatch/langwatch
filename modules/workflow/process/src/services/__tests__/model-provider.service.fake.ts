@@ -27,6 +27,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve({});
   }
 
+  runPlaygroundCompletion(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
   findProviderForProject(): Promise<null> {
     return Promise.resolve(null);
   }

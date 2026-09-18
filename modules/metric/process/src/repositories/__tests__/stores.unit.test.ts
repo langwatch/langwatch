@@ -1,14 +1,14 @@
 import type { BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
+import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { MetricDataPointRepository } from "../metric-data-point.repository.ts";
 
 import {
   MetricDataPointAppendStore,
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "../../stores/metric-projection/metric-projection.store.ts";
-import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
+import type { MetricDataPointRepository } from "../metric-data-point.repository.ts";
 
 function makeRepository() {
   const calls = {

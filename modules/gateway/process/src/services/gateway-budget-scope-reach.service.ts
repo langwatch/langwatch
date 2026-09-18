@@ -1,4 +1,5 @@
 import type { TraceDestinationProject } from "@langwatch/project-contract";
+
 import type {
   GatewayBudgetScope,
   GatewayBudgetScopeReach,

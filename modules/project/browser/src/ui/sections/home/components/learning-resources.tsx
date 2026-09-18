@@ -1,6 +1,7 @@
 import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
 import { nowInstant, toDate } from "@langwatch/time";
+import type { ReactNode } from "react";
+
 import { LEGAL_LINKS } from "../../../../model/legal-links.ts";
 import { Link } from "../../../../ui/elements/app-link.tsx";
 

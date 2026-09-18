@@ -1,3 +1,5 @@
+import type { WorkflowField } from "@langwatch/workflow-contract";
+
 /**
  * Pure generator for the "Run via API" snippets across multiple languages.
  * Single source of truth for both optimization-studio and evaluations-v3 workbench.
@@ -7,7 +9,6 @@ import {
   exampleParameterValue,
   PLACEHOLDER_PARAMETERS,
 } from "../evaluate-api-snippet.ts";
-import type { WorkflowField } from "@langwatch/workflow-contract";
 
 export type RunSnippetLang = "python" | "typescript" | "go" | "shell";
 export type RunSnippetDataSource = "attached" | "inline" | "dataset_id";
@@ -239,13 +240,10 @@ function toGoMapEntries({
   indent: string;
 }): string {
   const entries = Object.entries(record).map(
-    ([key, value]) =>
-      [`${JSON.stringify(key)}:`, JSON.stringify(value)] as const,
+    ([key, value]) => [`${JSON.stringify(key)}:`, JSON.stringify(value)] as const,
   );
   const width = Math.max(...entries.map(([key]) => key.length));
-  return entries
-    .map(([key, value]) => `${indent}${key.padEnd(width)} ${value},`)
-    .join("\n");
+  return entries.map(([key, value]) => `${indent}${key.padEnd(width)} ${value},`).join("\n");
 }
 
 /** The body literal passed to json.Marshal, varying by data source. */
@@ -277,14 +275,8 @@ function goRequestBody({
  */
 function buildGoSnippet(input: BuildRunSnippetInput): string {
   const { baseUrl, dataSource, datasetName } = input;
-  const parametersExample = buildParametersExample(
-    input.entryFields,
-    input.datasetColumns,
-  );
-  const inlineRow = buildInlineExampleRow(
-    input.entryFields,
-    input.datasetColumns,
-  );
+  const parametersExample = buildParametersExample(input.entryFields, input.datasetColumns);
+  const inlineRow = buildInlineExampleRow(input.entryFields, input.datasetColumns);
   const comment = dataSourceComment({
     dataSource,
     datasetName,

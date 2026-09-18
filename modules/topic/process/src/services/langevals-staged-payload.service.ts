@@ -1,8 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  type LangevalsPayloadStaging,
-  STAGED_PAYLOAD_HEADER,
-} from "../app/topic.members.ts";
+
+import { type LangevalsPayloadStaging, STAGED_PAYLOAD_HEADER } from "../app/topic.members.ts";
 
 const logger = createLogger("langwatch:langevals:stagedFetch");
 

@@ -1,10 +1,11 @@
 import { createLogger } from "@langwatch/observability";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
+
 import {
   type AuthzRevocationReason,
   AuthzRevocationTelemetry,
 } from "../../services/authz-revocation-telemetry.service.ts";
 import type { AuthzDatabase } from "../authz-read.repository.ts";
-import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:authz:revocation");
 

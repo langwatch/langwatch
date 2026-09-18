@@ -3,7 +3,7 @@
  *
  * `POST /api/mcp/authorize` over the real declaration and approval service.
  */
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { createRestRuntime } from "@langwatch/api/rest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { HostedMcpRedis } from "../../app/hosted-mcp-members.ts";
@@ -12,7 +12,7 @@ import {
   MCP_AUTHORIZE_PERMISSION,
   type McpApprover,
 } from "../../services/mcp-authorization.service.ts";
-import { mcpAuthorizeApprover, mcpAuthorizeRest } from "../mcp-authorize.rest.ts";
+import { mcpAuthorizeRest } from "../mcp-authorize.rest.ts";
 
 const PROJECT_ID = "project-1";
 const CLIENT_ID = "mcp_client_1";
@@ -63,6 +63,8 @@ function harnessFor(options: { held: readonly string[]; approver?: McpApprover |
 
   const runtime = createRestRuntime({
     identity: {
+      identifyOptional: () =>
+        approver ? { actor: { type: "user", id: approver.user.id }, scope: null } : null,
       authenticate: () => {
         throw new Error("This family resolves its own credential.");
       },
@@ -71,9 +73,7 @@ function harnessFor(options: { held: readonly string[]; approver?: McpApprover |
 
   const app = runtime.mount(mcpAuthorizeRest.router(), {
     app: () => ({ approve: (request) => authorization.approve(request) }),
-    credential: "public",
     onError: (error, context) => context.json({ error: String(error) }, 500),
-    facts: [bindRestMiddleware(mcpAuthorizeApprover, () => approver)],
   });
 
   return { app, probed, stored };

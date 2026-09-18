@@ -2,6 +2,7 @@
  * filters when opening over a filtered view. */
 
 import { useCallback, useMemo } from "react";
+
 import { useOpsHost } from "../model/ops-host.ts";
 
 export type OpsOverlay = {

@@ -11,8 +11,7 @@ export class GithubHostService implements GithubHost {
     return new GithubHostService(config);
   }
 
-  private constructor(private readonly config: GithubHostConfig) {
-  }
+  private constructor(private readonly config: GithubHostConfig) {}
 
   getHost(): string {
     const configured = (this.config.host ?? "").trim().toLowerCase();

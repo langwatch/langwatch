@@ -4,6 +4,7 @@
  * (organization / team / project) instead of only ever showing the project on the top nav.
  */
 import type { RetentionStorageUsage, ScopeAssignment } from "@langwatch/data-retention-contract";
+
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
 import type { RetentionActor } from "./data-retention-policy.service.ts";
 import type { RetentionPermissionsService } from "./retention-permissions.service.ts";

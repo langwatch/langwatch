@@ -63,8 +63,8 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
   },
 }));
 
-import { LLMModelCostDrawer } from "../llm-model-cost-drawer.tsx";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import { LLMModelCostDrawer } from "../llm-model-cost-drawer.tsx";
 
 function renderDrawer(props: { id?: string; prefillModel?: string; prefillRegex?: string } = {}) {
   const host = new FakeModelProviderHost({

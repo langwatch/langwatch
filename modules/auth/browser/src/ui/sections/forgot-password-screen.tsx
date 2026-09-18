@@ -3,13 +3,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
+
 import { authClient } from "../../behavior/auth-client.tsx";
-import Link from "../../ui/elements/router-link.tsx";
+import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { CheckYourEmail } from "../../ui/elements/check-your-email.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../../ui/elements/front-door-field.tsx";
-import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import Link from "../../ui/elements/router-link.tsx";
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
 

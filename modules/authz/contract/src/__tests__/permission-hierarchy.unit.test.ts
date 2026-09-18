@@ -4,6 +4,7 @@
  * Spec: modules/authz/specs/permission-resolution.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { permissionSatisfiedBy } from "../registry.ts";
 
 const satisfies = (granted: readonly string[], requested: string): boolean =>

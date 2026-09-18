@@ -12,7 +12,5 @@ const OWN_VERIFICATION_RECORD =
 export const identityTrpcTransport = defineTrpcRouter(UserApi, identityTrpc)
   .procedure("completeVerification")
   .noPermission({ reason: OWN_VERIFICATION_RECORD })
-  .handle(({ app, actor, input }) =>
-    app.completeEmailVerification({ userId: actor.id, ...input }),
-  )
+  .handle(({ app, actor, input }) => app.completeEmailVerification({ userId: actor.id, ...input }))
   .build();

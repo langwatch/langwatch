@@ -1,18 +1,9 @@
-import { moduleApi } from "@langwatch/kernel";
 import type { AuthzAccessBreakdownOutput } from "@langwatch/authz-contract";
-import type { Instant } from "@langwatch/time";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
-import type {
-  EnrichedAuditLog,
-  GetOrganizationBillingProfileInput,
-  GetOrganizationIdByTeamIdInput,
-  GetOrganizationMembersInput,
-  GetOldestTeamInput,
-  OrganizationBillingProfile,
-  OrganizationIntent,
-  UpdateOrganizationSettingsInput,
-  UpdateOrganizationSettingsResult,
-} from "./organization.ts";
+import type { Instant } from "@langwatch/time";
+
+import type { GroupDetail, GroupListItem, GroupMembershipView } from "./group.responses.ts";
 import type {
   AddOrganizationGroupBindingInput,
   ApplyOrganizationGroupEditsInput,
@@ -31,6 +22,56 @@ import type {
   RemoveOrganizationGroupBindingInput,
 } from "./group.ts";
 import type {
+  JoinRequestFiled,
+  JoinRequestJoining,
+  JoinRequestJoiningChanged,
+  JoinRequestMine,
+  JoinRequestPending,
+} from "./join-request.responses.ts";
+import type { OrganizationInitialized } from "./onboarding.responses.ts";
+import type { OnboardingInitializeOrganizationInput } from "./onboarding.trpc.ts";
+import type {
+  OrganizationInviteAccepted,
+  OrganizationInviteCreated,
+  OrganizationInviteResent,
+  OrganizationListedInvite,
+} from "./organization.responses.ts";
+import type {
+  Organization,
+  CustomRole,
+  OrganizationUser,
+  OrganizationUserRole,
+  ProjectRow,
+  Team,
+  TeamUser,
+  User,
+} from "./organization.rows.ts";
+import type {
+  OrganizationApiCreateInvitesInput,
+  OrganizationApiInviteScope,
+  OrganizationApiUpdateTeamMemberRoleInput,
+} from "./organization.trpc-schemas.ts";
+import type {
+  EnrichedAuditLog,
+  GetOrganizationBillingProfileInput,
+  GetOrganizationIdByTeamIdInput,
+  GetOrganizationMembersInput,
+  GetOldestTeamInput,
+  OrganizationBillingProfile,
+  OrganizationIntent,
+  UpdateOrganizationSettingsInput,
+  UpdateOrganizationSettingsResult,
+} from "./organization.ts";
+import type {
+  FindPersonalWorkspaceInput,
+  EnsuredPersonalWorkspace,
+  PersonalFeatures,
+  PersonalWorkspaceInput,
+  PersonalWorkspace,
+  PersonalWorkspaceFeaturesInput,
+} from "./personal-workspace.ts";
+import type { TeamWithProjects } from "./team.responses.ts";
+import type {
   CreateOrganizationTeamWithMembersInput,
   CreateOrganizationTeamInput,
   AddOrganizationTeamMemberInput,
@@ -48,46 +89,6 @@ import type {
   RemoveOrganizationTeamMemberInput,
   UpdateOrganizationTeamWithMembersInput,
 } from "./team.ts";
-import type {
-  Organization,
-  CustomRole,
-  OrganizationUser,
-  OrganizationUserRole,
-  ProjectRow,
-  Team,
-  TeamUser,
-  User,
-} from "./organization.rows.ts";
-import type {
-  JoinRequestFiled,
-  JoinRequestJoining,
-  JoinRequestJoiningChanged,
-  JoinRequestMine,
-  JoinRequestPending,
-} from "./join-request.responses.ts";
-import type { OnboardingInitializeOrganizationInput } from "./onboarding.trpc.ts";
-import type { OrganizationInitialized } from "./onboarding.responses.ts";
-import type {
-  OrganizationInviteAccepted,
-  OrganizationInviteCreated,
-  OrganizationInviteResent,
-  OrganizationListedInvite,
-} from "./organization.responses.ts";
-import type {
-  OrganizationApiCreateInvitesInput,
-  OrganizationApiInviteScope,
-  OrganizationApiUpdateTeamMemberRoleInput,
-} from "./organization.trpc-schemas.ts";
-import type { GroupDetail, GroupListItem, GroupMembershipView } from "./group.responses.ts";
-import type { TeamWithProjects } from "./team.responses.ts";
-import type {
-  FindPersonalWorkspaceInput,
-  EnsuredPersonalWorkspace,
-  PersonalFeatures,
-  PersonalWorkspaceInput,
-  PersonalWorkspace,
-  PersonalWorkspaceFeaturesInput,
-} from "./personal-workspace.ts";
 
 export interface OrganizationCaller {
   readonly id: string;
@@ -197,9 +198,7 @@ export interface OrganizationApi {
     team: { id: string; slug: string; name: string };
   }>;
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
-  findProvisioningSummary(
-    organizationId: string,
-  ): Promise<OrganizationProvisioningSummary | null>;
+  findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
   /**
    * Provisions an organization end to end: it, its first team, a bootstrap

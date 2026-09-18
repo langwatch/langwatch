@@ -5,8 +5,9 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+
+import { type DatasetStorage } from "../app/dataset.app.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
-import { type ChunkOffset, toSingleJsonl } from "../rules/dataset-chunking.rules.ts";
 import {
   type DatasetMutationRecord,
   assertReady,
@@ -14,7 +15,7 @@ import {
   readOffsets,
   recomputeOffsets,
 } from "../rules/dataset-chunk-lines.rules.ts";
-import { type DatasetStorage } from "../app/dataset.app.ts";
+import { type ChunkOffset, toSingleJsonl } from "../rules/dataset-chunking.rules.ts";
 
 const logger = createLogger("langwatch:datasets:mutations");
 

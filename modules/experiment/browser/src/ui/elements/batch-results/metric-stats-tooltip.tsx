@@ -1,9 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
-import {
-  computeMetricStats,
-  type MetricStats,
-} from "@langwatch/experiment-contract";
+import { computeMetricStats, type MetricStats } from "@langwatch/experiment-contract";
 
 export { computeMetricStats, type MetricStats };
 

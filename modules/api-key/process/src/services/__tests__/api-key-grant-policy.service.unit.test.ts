@@ -4,9 +4,10 @@
  * scope.
  */
 
-import { describe, expect, it } from "vitest";
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import type { ApiKeyScope } from "@langwatch/api-key-contract";
+import { describe, expect, it } from "vitest";
+
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 
 type Fakes = {

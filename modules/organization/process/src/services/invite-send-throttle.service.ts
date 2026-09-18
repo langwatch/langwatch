@@ -2,8 +2,9 @@
  * How often one invitation may put mail in somebody's inbox (D11).
  */
 import { InviteThrottledError } from "@langwatch/organization-contract";
-import type { OrganizationInviteRateLimit } from "../app/organization.members.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { OrganizationInviteRateLimit } from "../app/organization.members.ts";
 
 export const INVITE_SEND_WINDOW_SECONDS = 60 * 60;
 export const INVITE_SENDS_PER_WINDOW = 3;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { AesGcmSecretEncryptionAdapter } from "../aes-gcm-secret-encryption.service.ts";
 
 const KEY = "0f".repeat(32);

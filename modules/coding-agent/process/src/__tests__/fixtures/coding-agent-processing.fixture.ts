@@ -113,6 +113,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve({});
   }
 
+  runPlaygroundCompletion(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
   upsert(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");
   }

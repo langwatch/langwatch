@@ -10,6 +10,7 @@ import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ApiKeyHostProvider } from "../../../model/api-key-host.ts";
 import { FakeApiKeyHost, renderWithApiKeyHost } from "../../../testing.tsx";
 import CliAuthScreen from "../cli-auth-screen.tsx";

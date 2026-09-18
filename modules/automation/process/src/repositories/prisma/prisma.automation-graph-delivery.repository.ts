@@ -1,17 +1,14 @@
 import type { AutomationClock } from "../../app/automation.members.ts";
+import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
 import {
   PrismaEmailSuppressionRepository,
   type EmailSuppressionDatabase,
 } from "./prisma.email-suppression.repository.ts";
-import {
-  PrismaTriggerRepository,
-  type TriggerDatabase,
-} from "./prisma.trigger.repository.ts";
+import { PrismaTriggerRepository, type TriggerDatabase } from "./prisma.trigger.repository.ts";
 import {
   PrismaWebhookDeliveryRepository,
   type WebhookDeliveryDatabase,
 } from "./prisma.webhook-delivery.repository.ts";
-import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
 
 /** Process-composition shim for graph delivery's Automation persistence. */
 export class PostgresAutomationGraphDeliveryAdapter {

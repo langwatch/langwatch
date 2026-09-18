@@ -1,5 +1,3 @@
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { type Instant, toDate } from "@langwatch/time";
 import {
   datasetColumnsSchema,
   datasetSchema,
@@ -7,6 +5,9 @@ import {
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { type Instant, toDate } from "@langwatch/time";
+
 import type {
   DatasetCreateInput,
   DatasetRepository,
@@ -61,7 +62,11 @@ export class PrismaDatasetRepository
     return row ? toDataset(row) : null;
   }
 
-  async findAll(input: { projectId: string; page: number; limit: number }): Promise<DatasetSummary[]> {
+  async findAll(input: {
+    projectId: string;
+    page: number;
+    limit: number;
+  }): Promise<DatasetSummary[]> {
     const rows = await this.database.dataset.findMany({
       where: { projectId: input.projectId, archivedAt: null },
       orderBy: { createdAt: "desc" },

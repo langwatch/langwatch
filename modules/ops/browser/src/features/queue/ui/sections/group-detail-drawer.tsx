@@ -1,19 +1,20 @@
 import { CodeBlock } from "@chakra-ui/react";
-import { useState } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { GroupDrawerHeader } from "../elements/queue-group-drawer-header.tsx";
-import { GroupDetailContent } from "./queue-group-detail-content.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
-import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { useState } from "react";
+
 import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import {
   grafanaGroupLogsUrl,
   grafanaGroupTracesUrl,
   grafanaTraceUrl,
 } from "../../../../model/grafana-links.ts";
-import { GroupActionConfirms, GroupDrawerActions } from "./group-action-confirms.tsx";
 import { useGroupActions } from "../../behavior/use-group-actions.ts";
+import { GroupDrawerHeader } from "../elements/queue-group-drawer-header.tsx";
+import { GroupActionConfirms, GroupDrawerActions } from "./group-action-confirms.tsx";
+import { GroupDetailContent } from "./queue-group-detail-content.tsx";
 
 interface Props {
   queueName?: string;

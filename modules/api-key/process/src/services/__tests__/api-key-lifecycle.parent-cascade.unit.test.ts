@@ -5,9 +5,10 @@
  */
 import { ApiKeyAlreadyRevokedError, isApiKeyRevocationCause } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
+
+import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
-import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
 
 const ORG_ID = "org_1";
 const USER_ID = "user_1";

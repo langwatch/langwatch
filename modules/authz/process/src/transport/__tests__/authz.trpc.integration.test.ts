@@ -1,3 +1,4 @@
+import type { TrpcContractHandlerArguments, TrpcProcedureFactory } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The application's `authz.*` procedures, bound to a declaration a process
@@ -5,7 +6,6 @@
  * Spec: modules/authz/specs/package-boundary.feature
  */
 import type { AuthzApi, AuthzScopeRef, AuthzService } from "@langwatch/authz-contract";
-import type { TrpcContractHandlerArguments, TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAuthzTestApp } from "../../app/__tests__/authz.fixture.ts";

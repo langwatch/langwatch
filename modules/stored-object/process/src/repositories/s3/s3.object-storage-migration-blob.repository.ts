@@ -1,4 +1,5 @@
 import type { Readable } from "node:stream";
+
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -8,6 +9,7 @@ import {
 } from "@aws-sdk/client-s3";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
+
 import { S3UriRules } from "#rules/s3-uri.rules";
 const { parseS3Uri } = S3UriRules;
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";

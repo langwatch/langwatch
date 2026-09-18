@@ -38,16 +38,17 @@ import {
   type GrantableAuthzScopeRef,
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
+
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
-import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
+import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type {
   AuthzGrantRepository,
   BindingPrincipalWhere,
   RoleBindingWrite,
 } from "../repositories/authz-grant.repository.ts";
-import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
 import { AuthzBindingWriterService } from "./authz-binding-writer.service.ts";
+import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
 import { AuthzOffboardingService } from "./authz-offboarding.service.ts";
 
 /**

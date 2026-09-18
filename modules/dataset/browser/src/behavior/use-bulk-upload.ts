@@ -1,10 +1,18 @@
+import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
+import { detectFileFormat } from "@langwatch/dataset-contract";
 /** Fire-and-forget orchestrator (not a React effect): closing drawer doesn't
  * abort in-flight files.
  */
 import { generate } from "@langwatch/ksuid";
 import { useCallback, useRef, useState } from "react";
-import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
-import { detectFileFormat } from "@langwatch/dataset-contract";
+
+import { baseNameFromFilename, batchDedupeNames, bumpName } from "../model/batch-name-dedup.ts";
+import { parseHeaderColumns } from "../model/parse-header-columns.ts";
+import {
+  runWithConcurrency,
+  uploadSingleFile,
+  type UploadSingleFileDeps,
+} from "./bulk-upload-orchestrator.ts";
 import {
   abortPendingUpload,
   finalizeDirectUpload,
@@ -12,13 +20,6 @@ import {
   requestDirectUpload,
   retryDatasetNormalize,
 } from "./direct-upload.ts";
-import { parseHeaderColumns } from "../model/parse-header-columns.ts";
-import { baseNameFromFilename, batchDedupeNames, bumpName } from "../model/batch-name-dedup.ts";
-import {
-  runWithConcurrency,
-  uploadSingleFile,
-  type UploadSingleFileDeps,
-} from "./bulk-upload-orchestrator.ts";
 
 /** Files prepared at once; the rest queue (the "queues the rest" behaviour). */
 export const BULK_UPLOAD_CONCURRENCY = 3;

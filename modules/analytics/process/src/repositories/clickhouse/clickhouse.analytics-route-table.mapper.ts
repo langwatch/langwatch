@@ -4,7 +4,12 @@
  * table, invariants and rationale: ADR-034.
  */
 
-import type { AnalyticsSeries,AnalyticsAggregation } from "@langwatch/analytics-contract";
+import type { AnalyticsSeries, AnalyticsAggregation } from "@langwatch/analytics-contract";
+
+import {
+  type AnalyticsMetricSource,
+  getMetricSource,
+} from "../../rules/analytics-field-availability.rules.ts";
 import {
   PAYLOAD_BLOCKLIST_EXACT,
   PAYLOAD_BLOCKLIST_PREFIXES,
@@ -15,10 +20,6 @@ import {
   type EvalMetricKey,
   hasFilterValues,
 } from "./clickhouse.timeseries-query-shared.mapper.ts";
-import {
-  type AnalyticsMetricSource,
-  getMetricSource,
-} from "../../rules/analytics-field-availability.rules.ts";
 
 /** The six destination tables routed between. */
 export type AnalyticsTable =

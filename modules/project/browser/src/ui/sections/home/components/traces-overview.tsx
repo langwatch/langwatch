@@ -1,13 +1,17 @@
 import { Box, chakra, Grid, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
+import { analyticsMetrics } from "@langwatch/analytics-browser/surfaces/analytics-registry";
+import {
+  CustomGraph,
+  type CustomGraphInput,
+} from "@langwatch/analytics-browser/surfaces/custom-graph";
 import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
-import { analyticsMetrics } from "@langwatch/analytics-browser/surfaces/analytics-registry";
-import { CustomGraph, type CustomGraphInput } from "@langwatch/analytics-browser/surfaces/custom-graph";
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
+
+import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { Link } from "../../../../ui/elements/app-link.tsx";
 import { HomeCard } from "./home-card.tsx";
 import { HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header.tsx";
-import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 const QUICK_STARTS = [
   {

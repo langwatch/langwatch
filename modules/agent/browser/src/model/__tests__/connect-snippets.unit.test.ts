@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { pythonSnippet, typescriptSnippet } from "../connect-snippets.ts";
 
 describe("connect snippets", () => {

@@ -1,6 +1,6 @@
+import { nowInstant, toDate } from "@langwatch/time";
 import { Cron } from "croner";
 import { z } from "zod";
-import { nowInstant, toDate } from "@langwatch/time";
 
 export const MIN_REPORT_INTERVAL_MS = 15 * 60 * 1000;
 const GAP_PROBE_RUNS = 5;
@@ -128,13 +128,7 @@ export function findReportFromTriggerRow(
 }
 
 /** The next few fires a cron would produce, or null when it does not parse. */
-function findNextRuns({
-  cron,
-  timezone,
-}: {
-  cron: string;
-  timezone: string;
-}): Date[] | null {
+function findNextRuns({ cron, timezone }: { cron: string; timezone: string }): Date[] | null {
   let scheduled: Cron;
   try {
     scheduled = new Cron(cron, { timezone });

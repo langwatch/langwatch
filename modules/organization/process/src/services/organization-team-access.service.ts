@@ -13,6 +13,7 @@ import {
   type OrganizationTeamAccessMember,
   type OrganizationTeamAccessProject,
 } from "@langwatch/organization-contract";
+
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
 import { TEAM_ROLE_PRIORITY } from "../rules/team-membership-plan.rules.ts";

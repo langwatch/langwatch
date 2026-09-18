@@ -4,24 +4,24 @@
  * editing.
  */
 import { Box, Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import {
+  DatasetEditorTable,
+  type InMemoryDataset,
+} from "@langwatch/dataset-browser/dataset-editor-table";
+import { DatasetPickerList } from "@langwatch/dataset-browser/dataset-picker-list";
+import { UploadCSVDrawer } from "@langwatch/dataset-browser/upload-csv-drawer";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+import type { Component, Entry } from "@langwatch/workflow-contract";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
-import { DatasetPickerList } from "@langwatch/dataset-browser/dataset-picker-list";
-import {
-  DatasetEditorTable,
-  type InMemoryDataset,
-} from "@langwatch/dataset-browser/dataset-editor-table";
-import { UploadCSVDrawer } from "@langwatch/dataset-browser/upload-csv-drawer";
-import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import type { Component, Entry } from "@langwatch/workflow-contract";
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import {
   datasetColumnsToFields,
   inMemoryDatasetToNodeDataset,

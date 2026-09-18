@@ -1,5 +1,6 @@
-import type { Cluster, Redis } from "ioredis";
 import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
+import type { Cluster, Redis } from "ioredis";
+
 import {
   CodingAgentSessionContextMemoRepository,
   SESSION_CONTEXT_MEMO_TTL_SECONDS,

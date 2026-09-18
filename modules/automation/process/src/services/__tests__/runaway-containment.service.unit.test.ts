@@ -1,14 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
 import type {
   AutomationLimitNextStep,
   AutomationPersistCapBreach,
   AutomationRunawayTrigger,
 } from "@langwatch/automation-contract";
-import { AutomationRunaway } from "../../repositories/automation-runaway.repository.ts";
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
 import { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
+import { AutomationRunaway } from "../../repositories/automation-runaway.repository.ts";
 import { AutomationRunawaySignals } from "../automation-runaway-signals.service.ts";
 import { RunawayContainmentService, RUNAWAY_PAUSE_REASON } from "../runaway-containment.service.ts";
-import { Temporal } from "@langwatch/time";
 
 class TestRunawaySignals
   extends AutomationRunaway
@@ -163,7 +164,9 @@ describe("runaway containment policy", () => {
     await service.handle(filtered());
 
     expect(signals.paused).not.toHaveBeenCalled();
-    expect(signals.emailed).toHaveBeenCalledWith(expect.objectContaining({ kind: "ceiling_reached" }));
+    expect(signals.emailed).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "ceiling_reached" }),
+    );
     expect(signals.emailed).toHaveBeenCalledTimes(1);
   });
 

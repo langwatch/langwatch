@@ -38,31 +38,29 @@ function toBudgetRow<
   };
 }
 
+import { budgetAppliesToProvider } from "@langwatch/gateway-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
-
-import { budgetAppliesToProvider } from "@langwatch/gateway-contract";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { VirtualKeyService } from "../services/virtual-key.service.ts";
+import { PostgresVirtualKeyAdapter } from "../testing.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
-import { PostgresVirtualKeyAdapter } from "../testing.ts";
-
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
-import { GatewayConfigAssemblyAdapter } from "../adapters/postgres.gateway-config-assembly.adapter.ts";
+import { GatewayConfigAssemblyAdapter } from "../app/gateway-config-assembly.composition.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 /**

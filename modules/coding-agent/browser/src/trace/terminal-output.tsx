@@ -1,6 +1,7 @@
 import { Box, Text } from "@chakra-ui/react";
-import { memo, useCallback, useMemo, useState } from "react";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
+import { memo, useCallback, useMemo, useState } from "react";
+
 import { stripAnsi } from "./terminal-ansi-parser.ts";
 import { AnsiText } from "./terminal-ansi-text.tsx";
 import { TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";

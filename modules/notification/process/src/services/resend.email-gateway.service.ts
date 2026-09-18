@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
+
 import {
   type EmailContent,
   EmailGateway,

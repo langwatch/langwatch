@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   API_KEY_PERMISSION_MODES,
   API_KEY_PREFIX,
@@ -9,6 +8,7 @@ import {
   getTokenType,
   splitApiKeyToken,
 } from "@langwatch/api-key-contract";
+import { describe, expect, it } from "vitest";
 
 describe("API-key contract", () => {
   it("recognizes current and legacy token classes", () => {

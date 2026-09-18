@@ -6,10 +6,6 @@
  */
 
 import { Badge, Box, Button, chakra, HStack, Spinner, Stack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
-
-import { SearchInput } from "@langwatch/design-system/search-input";
 // The leaf module, never the barrel: `timeWindow.ts` is import-free precisely
 // so the browser can read the same names the database is bound with, while the
 // barrel would drag the executor and the remediation registry in with it.
@@ -17,6 +13,9 @@ import {
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_START_PARAMETER,
 } from "@langwatch/analytics-contract";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import {
   filterLangWatchQLSchemaModel,

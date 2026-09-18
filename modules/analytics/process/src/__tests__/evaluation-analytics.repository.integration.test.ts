@@ -1,11 +1,13 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @integration
  * @vitest-environment node
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { randomUUID } from "node:crypto";
-import { afterAll, describe, expect, it } from "vitest";
 import type { AnalyticsEvaluationRow } from "@langwatch/analytics-contract";
+import { afterAll, describe, expect, it } from "vitest";
+
 import { ClickHouseAnalyticsEvaluationRepository } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;

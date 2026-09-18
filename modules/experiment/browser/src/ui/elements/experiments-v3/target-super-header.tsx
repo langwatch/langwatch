@@ -1,8 +1,8 @@
 import { Button, Skeleton, Text } from "@chakra-ui/react";
+import { LLMIcon } from "@langwatch/design-system/icons";
 import { Plus } from "lucide-react";
 import React from "react";
 
-import { LLMIcon } from "@langwatch/design-system/icons";
 import { PulsingDot } from "./pulsing-dot.tsx";
 import { SuperHeader } from "./super-header.tsx";
 

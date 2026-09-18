@@ -3,6 +3,7 @@
 import { Button, Portal, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Check, ChevronsUpDown } from "lucide-react";
+
 import { useProductFlagsByOrganization } from "../../behavior/use-product-flags-by-organization.ts";
 import { useNavigationHost, type NavigationOrganization } from "../../model/navigation-host.ts";
 import type { ProductId } from "../../model/products.ts";

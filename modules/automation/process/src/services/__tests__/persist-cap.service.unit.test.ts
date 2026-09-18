@@ -1,17 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const planMock = vi.hoisted(() => ({
   getActivePlan: vi.fn<EntitlementApi["getActivePlan"]>(),
   resolveOrganizationId: vi.fn(),
 }));
+import { Temporal } from "@langwatch/time";
+
+import { SettlementProjectService } from "../../fixtures/settlement.fixtures.ts";
 // No Redis is injected here, so these exercise the in-memory fallback. The
 // counting contract is the same either way; what differs is the blast radius
 // when Redis is down, which the email caps already pin.
 // The TTL cache would otherwise carry one test's plan answer into the next.
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
-import { SettlementProjectService } from "../../fixtures/settlement.fixtures.ts";
-import { Temporal } from "@langwatch/time";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";

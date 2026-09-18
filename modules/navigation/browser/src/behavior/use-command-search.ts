@@ -1,9 +1,9 @@
 import { BookText, Bot, Percent, Table, Workflow } from "lucide-react";
 import { useMemo } from "react";
 import { useDebounceValue } from "usehooks-ts";
-import { useNavigationHost } from "../model/navigation-host.ts";
-import { navigationApi } from "./navigation-api.ts";
+
 import { MIN_SEARCH_QUERY_LENGTH, SEARCH_DEBOUNCE_MS } from "../model/command-bar-constants.ts";
+import type { SearchResult } from "../model/command-bar-types.ts";
 import {
   agentPath,
   findEntityByPrefix,
@@ -11,7 +11,8 @@ import {
   isTraceId,
   traceIcon,
 } from "../model/command-entity-registry.ts";
-import type { SearchResult } from "../model/command-bar-types.ts";
+import { useNavigationHost } from "../model/navigation-host.ts";
+import { navigationApi } from "./navigation-api.ts";
 
 /**
  * Detects whether the query is an entity ID and returns navigation info.

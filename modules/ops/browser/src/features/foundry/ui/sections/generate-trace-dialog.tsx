@@ -1,6 +1,4 @@
 import { Box, Button, Flex, Input, Text, VStack } from "@chakra-ui/react";
-import { Sparkles } from "lucide-react";
-import { useState } from "react";
 import {
   PopoverBody,
   PopoverContent,
@@ -9,11 +7,14 @@ import {
 } from "@langwatch/design-system/popover";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Switch } from "@langwatch/design-system/switch";
+import { Sparkles } from "lucide-react";
+import { useState } from "react";
+
 import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
-import type { GeneratorOptions, PromptRef } from "../../model/trace-generator.ts";
-import { generateTrace } from "../../model/trace-generator.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { useFoundryPrompts } from "../../behavior/use-foundry-prompts.ts";
+import type { GeneratorOptions, PromptRef } from "../../model/trace-generator.ts";
+import { generateTrace } from "../../model/trace-generator.ts";
 
 const DEPTH_PRESETS = [
   { label: "Shallow", value: 4 },

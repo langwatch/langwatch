@@ -18,13 +18,14 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+
 import { readableDate } from "../../model/display-formatters.ts";
-import { isSecurityKey, passkeyLabel } from "../../model/sign-in-methods.ts";
 import {
   usePersonalWorkspaceHost,
   type HeldPasskey,
   type PasskeyOutcome,
 } from "../../model/personal-workspace-host.ts";
+import { isSecurityKey, passkeyLabel } from "../../model/sign-in-methods.ts";
 
 function RenamePasskeyDialog({
   passkey,

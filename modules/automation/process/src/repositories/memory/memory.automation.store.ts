@@ -6,6 +6,7 @@ import type {
   WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
+
 import type { AnalyticsMetricSource } from "../graph-trigger-sent.repository.ts";
 
 /** One claimed send: the row `claimSend` writes once per trigger and trace. */

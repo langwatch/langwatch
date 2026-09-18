@@ -1,11 +1,12 @@
 // The actor must be authorized against the scopes of the provider that was FOUND, not against
 // anything the caller sent — that's the case carrying the most weight here, not the plain refusals.
 
-import { describe, expect, it } from "vitest";
 import {
   ModelProviderAnchorRequiredError,
   ModelProviderNotFoundError,
 } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
+
 import { ModelProviderCommandService } from "../model-provider-command.service.ts";
 
 const EXISTING = {

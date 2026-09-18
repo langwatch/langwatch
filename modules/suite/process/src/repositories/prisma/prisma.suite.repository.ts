@@ -1,5 +1,5 @@
-import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { isUniqueConstraintError } from "@langwatch/prisma-client/errors";
+import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   CLI_EPHEMERAL_LABEL,
   parseSuiteScope,
@@ -14,6 +14,7 @@ import {
   type SuiteScope,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
+
 import { SuiteRepository } from "../suite.repository.ts";
 
 /**

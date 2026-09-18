@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
 /**
@@ -15,7 +16,9 @@ export default defineConfig({
       },
       {
         find: /^@langwatch\/eventing$/,
-        replacement: fileURLToPath(new URL("../../../packages/eventing/src/index.ts", import.meta.url)),
+        replacement: fileURLToPath(
+          new URL("../../../packages/eventing/src/index.ts", import.meta.url),
+        ),
       },
       {
         find: /^@langwatch\/handled-error$/,

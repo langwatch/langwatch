@@ -17,8 +17,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { MailX, Trash2 } from "lucide-react";
+
 import { notificationApi } from "../../behavior/notification-api.ts";
-import { EMAIL_SUPPRESSIONS_MANAGE_PERMISSION, useNotificationHost } from "../../model/notification-host.ts";
+import {
+  EMAIL_SUPPRESSIONS_MANAGE_PERMISSION,
+  useNotificationHost,
+} from "../../model/notification-host.ts";
 import { readableDate } from "../../model/readable-date.ts";
 
 export default function EmailSuppressionsScreen() {

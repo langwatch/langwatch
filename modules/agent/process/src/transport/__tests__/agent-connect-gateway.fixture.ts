@@ -1,10 +1,11 @@
 import { agentConnectCredentialsSchema, relayPayloadCaps } from "@langwatch/agent-contract";
 import { WebSocketProtocol, type ConnectUpgradeRouter } from "@langwatch/api";
+
+import { ConnectedAgentConnectionService } from "../../services/connected-agent-connection.service.ts";
 import {
   AgentSessionService,
   type SessionCoreOptions,
 } from "../../services/connected-agent-session.service.ts";
-import { ConnectedAgentConnectionService } from "../../services/connected-agent-connection.service.ts";
 import { CONNECT_PATH } from "../agent-connect.ws.ts";
 
 export class ConnectGatewayFixture {

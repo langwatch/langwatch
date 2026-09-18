@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
 import {
   createInitialState,
   type DatasetReference,
@@ -9,6 +8,7 @@ import {
   type LocalPromptConfig,
   type TargetConfig,
 } from "../../../model/experiments-v3/types.ts";
+import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
 
 describe("useEvaluationsV3Store", () => {
   beforeEach(() => {

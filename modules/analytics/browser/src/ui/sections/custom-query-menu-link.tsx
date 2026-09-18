@@ -5,8 +5,8 @@
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { MenuLink } from "../elements/analytics-menu-link.tsx";
 import { analyticsApi } from "../../behavior/analytics-api.ts";
+import { MenuLink } from "../elements/analytics-menu-link.tsx";
 
 export interface CustomQueryMenuLinkProps {
   projectId: string;

@@ -8,14 +8,14 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LangWatchQLEditor } from "../langwatch-ql-editor.tsx";
-import { LWQL_LANGUAGE_ITEMS } from "../../../model/lwql-language-items.ts";
-import { lwqlSchemaModel } from "../../../model/lwql-schema-model.ts";
 import {
   SCHEMA_AVAILABLE_COLUMN_NAMES,
   SCHEMA_DATASET_NAMES,
   SCHEMA_RESPONSE,
 } from "../../../__tests__/lwql-fixtures.ts";
+import { LWQL_LANGUAGE_ITEMS } from "../../../model/lwql-language-items.ts";
+import { lwqlSchemaModel } from "../../../model/lwql-schema-model.ts";
+import { LangWatchQLEditor } from "../langwatch-ql-editor.tsx";
 
 interface CompletionProvider {
   provideCompletionItems: (

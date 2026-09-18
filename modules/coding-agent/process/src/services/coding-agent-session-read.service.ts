@@ -15,6 +15,7 @@ import {
   normalizeMetricName,
   normalizeTokenType,
 } from "@langwatch/coding-agent-contract";
+
 import type { CodingAgentClock } from "../app/coding-agent.members.ts";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";

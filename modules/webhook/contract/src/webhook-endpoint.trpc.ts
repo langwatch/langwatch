@@ -6,6 +6,7 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
+import { webhookEventTypeSchema } from "./webhook.events.ts";
 import {
   webhookDeliveryPageSchema,
   webhookDestinationKindSchema,
@@ -13,7 +14,6 @@ import {
   webhookEndpointViewSchema,
   webhookEndpointWithSecretSchema,
 } from "./webhook.ts";
-import { webhookEventTypeSchema } from "./webhook.events.ts";
 
 /** Every procedure on this surface names the organization it acts within. */
 export const webhookEndpointOrganizationScopeSchema = z.object({

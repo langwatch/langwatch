@@ -1,9 +1,10 @@
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 /**
  * Which target columns a run renders.
  * @see specs/batch-evaluation-results/target-column-identity.feature
  */
 import { describe, expect, it } from "vitest";
-import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
+
 import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
 
 const TARGETS = [

@@ -7,6 +7,8 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { Temporal } from "@langwatch/time";
+
 import {
   MAINTENANCE_INTERVAL_MS,
   MAINTENANCE_PROCESS_KEY,
@@ -15,7 +17,6 @@ import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
 } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDeliveryProcessDeps } from "./webhook-delivery.service.ts";
-import { Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
 

@@ -6,14 +6,12 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
-
-import { LangWatchQLResultTable } from "../langwatch-ql-result-table.tsx";
-
 import { lwqlResult } from "../../../__tests__/lwql-fixtures.ts";
+import { LangWatchQLResultTable } from "../langwatch-ql-result-table.tsx";
 
 /** The height the stubbed viewport reports, in pixels. */
 const VIEWPORT_HEIGHT = 480;

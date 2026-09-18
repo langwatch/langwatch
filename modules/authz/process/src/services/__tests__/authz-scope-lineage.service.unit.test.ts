@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ScopeLineageRepository } from "../../repositories/authz-read.repository.ts";
 import { AuthzScopeLineageService } from "../authz-scope-lineage.service.ts";
 

@@ -9,7 +9,6 @@ import {
   DescribeLogGroupsCommand,
   DescribeLogStreamsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
-import { Temporal, type Instant } from "@langwatch/time";
 import {
   DeleteFunctionCommand,
   GetFunctionCommand,
@@ -17,6 +16,8 @@ import {
   ListFunctionsCommand,
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";
+import { Temporal, type Instant } from "@langwatch/time";
+
 import type { NlpLambdaFleet, NlpLambdaFunction } from "../../app/workflow.app.ts";
 
 const LOG_GROUP_ROOT = "/aws/lambda/";

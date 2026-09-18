@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import type { GithubHost,GithubProjectActivity } from "../app/github.members.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
+
+import type { GithubHost, GithubProjectActivity } from "../app/github.members.ts";
 import type {
   BranchMappingTarget,
   GithubBranchMappingService,

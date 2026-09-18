@@ -8,6 +8,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";
 import { createFeatureFlagTestApp } from "./feature-flag.fixture.ts";
 

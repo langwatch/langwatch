@@ -1,5 +1,5 @@
-import type { WebhookEnvelope } from "@langwatch/webhook-contract";
 import type { Instant } from "@langwatch/time";
+import type { WebhookEnvelope } from "@langwatch/webhook-contract";
 
 export type WebhookSpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
 

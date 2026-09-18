@@ -1,29 +1,30 @@
-import {
-  HostedMcpApi,
-  type HostedMcpApiContract,
-} from "@langwatch/hosted-mcp-contract";
+import { HostedMcpApi, type HostedMcpApiContract } from "@langwatch/hosted-mcp-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { z } from "zod";
+
 import { createMcpHandler, type McpHandler } from "../transport/hosted-mcp.api.ts";
 import type { HostedMcpDependencies } from "./hosted-mcp-members.ts";
 
+/**
+ * Shapes restated rather than imported: a module depends on contracts.
+ * `publicBaseUrl` is the process's own fact — this feature's entire former
+ * config slice was `baseHost`, so it declares no config at all now.
+ */
 export type HostedMcpInfrastructure = Readonly<{
   mcp: Omit<HostedMcpDependencies, "baseHost">;
+  publicBaseUrl: string | undefined;
 }>;
-
-export type HostedMcpConfig = Readonly<{ baseHost: string }>;
 
 type HostedMcpSetup = FeatureSetup<
   Readonly<Record<never, never>>,
   HostedMcpInfrastructure,
-  HostedMcpConfig
+  undefined
 >;
 
 /** Owns the hosted MCP session transport's collaborators for one process. */
 export class HostedMcpApp implements HostedMcpApiContract {
   static readonly contract = HostedMcpApi;
   static readonly dependencies = {} as const;
-  static readonly configSchema = z.object({ baseHost: z.string().min(1) });
+  static readonly reads = ["mcp", "publicBaseUrl"] as const;
 
   #dependencies: HostedMcpDependencies;
 
@@ -31,8 +32,15 @@ export class HostedMcpApp implements HostedMcpApiContract {
     this.#dependencies = dependencies;
   }
 
-  static create({ members, config }: HostedMcpSetup): HostedMcpApp {
-    return new HostedMcpApp({ ...members.mcp, baseHost: config.baseHost });
+  /** Refuses by name: a deployment naming no `BASE_HOST` cannot mount MCP. */
+  static create({ members }: HostedMcpSetup): HostedMcpApp {
+    if (members.publicBaseUrl === undefined) {
+      throw new Error(
+        "The hosted MCP endpoint needs a public base URL, but this deployment named no BASE_HOST",
+      );
+    }
+
+    return new HostedMcpApp({ ...members.mcp, baseHost: members.publicBaseUrl });
   }
 
   createHandler(): McpHandler {

@@ -4,8 +4,8 @@ import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 
-import { vscodeThemeName } from "./workflow-code-editor.tsx";
 import { validateLiquidCondition } from "../../../model/code/liquid-condition.ts";
+import { vscodeThemeName } from "./workflow-code-editor.tsx";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 

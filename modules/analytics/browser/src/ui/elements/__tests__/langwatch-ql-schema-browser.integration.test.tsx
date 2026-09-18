@@ -8,10 +8,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { LangWatchQLSchemaBrowser } from "../langwatch-ql-schema-browser.tsx";
-import { lwqlSchemaModel } from "../../../model/lwql-schema-model.ts";
-
 import { SCHEMA_DATASET_NAMES, SCHEMA_RESPONSE } from "../../../__tests__/lwql-fixtures.ts";
+import { lwqlSchemaModel } from "../../../model/lwql-schema-model.ts";
+import { LangWatchQLSchemaBrowser } from "../langwatch-ql-schema-browser.tsx";
 
 function renderBrowser(onInsert = vi.fn()) {
   const model = lwqlSchemaModel(SCHEMA_RESPONSE);

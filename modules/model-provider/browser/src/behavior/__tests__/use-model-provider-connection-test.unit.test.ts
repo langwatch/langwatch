@@ -4,9 +4,9 @@
  * Spec: specs/model-providers/credential-validation.feature
  */
 
+import type { ModelProviderCredentialVerdict } from "@langwatch/model-provider-contract";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ModelProviderCredentialVerdict } from "@langwatch/model-provider-contract";
 
 /**
  * Typed against the contract, not bare `vi.fn()`, so a shape the contract stops

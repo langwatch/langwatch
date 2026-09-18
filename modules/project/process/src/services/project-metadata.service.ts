@@ -5,8 +5,9 @@ import {
   type ProjectWithTeam,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import type { ProjectDiagnostics } from "./project.service.ts";
+
 import type { ProjectRepository } from "../repositories/project.repository.ts";
+import type { ProjectDiagnostics } from "./project.service.ts";
 
 /**
  * Five repository-only operations for ingestion: reads and one write, composed

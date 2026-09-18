@@ -5,8 +5,9 @@
  * @see specs/scenarios/scenario-fields.feature
  */
 
-import { describe, expect, it } from "vitest";
 import { type EvaluatorAttachment, evaluatorInputSpecsOf } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   SuiteEvaluatorMappingInvalidError,
   SuiteEvaluatorNotFoundError,
@@ -22,9 +23,7 @@ import {
   readSuiteFieldDefinitions,
 } from "../suite-evaluators";
 
-const attachment = (
-  overrides: Partial<EvaluatorAttachment> = {},
-): EvaluatorAttachment => ({
+const attachment = (overrides: Partial<EvaluatorAttachment> = {}): EvaluatorAttachment => ({
   id: "att_1",
   evaluatorId: "eval_1",
   required: true,
@@ -60,12 +59,12 @@ describe("suite fields on a write", () => {
   describe("when the identifiers follow the grammar", () => {
     /** @scenario "A field identifier is lowercase letters, digits and underscores" */
     it("accepts the declaration and refuses one with spaces or capitals", () => {
-      expect(
-        readSuiteFieldDefinitions([{ identifier: "golden_sql", type: "text" }]),
-      ).toEqual([{ identifier: "golden_sql", type: "text" }]);
-      expect(() =>
-        readSuiteFieldDefinitions([{ identifier: "Golden SQL", type: "text" }]),
-      ).toThrow(SuiteFieldIdentifierInvalidError);
+      expect(readSuiteFieldDefinitions([{ identifier: "golden_sql", type: "text" }])).toEqual([
+        { identifier: "golden_sql", type: "text" },
+      ]);
+      expect(() => readSuiteFieldDefinitions([{ identifier: "Golden SQL", type: "text" }])).toThrow(
+        SuiteFieldIdentifierInvalidError,
+      );
     });
   });
 
@@ -219,10 +218,7 @@ describe("the attachments a run carries", () => {
           attachment({ id: "plan_only", evaluatorId: "eval_2" }),
         ],
       });
-      expect(merged.map((entry) => entry.id)).toEqual([
-        "suite_copy",
-        "plan_only",
-      ]);
+      expect(merged.map((entry) => entry.id)).toEqual(["suite_copy", "plan_only"]);
     });
   });
 });
@@ -245,17 +241,13 @@ describe("the mappings a run still misses", () => {
         evaluatorsById,
       });
       expect(missing).toHaveLength(1);
-      expect(missing[0]?.inputs.map((input) => input.id)).toEqual([
-        "expected_output",
-      ]);
+      expect(missing[0]?.inputs.map((input) => input.id)).toEqual(["expected_output"]);
     });
   });
 
   describe("when only an optional input has no mapping", () => {
     it("reports nothing", () => {
-      expect(
-        findMissingMappings({ attachments: [attachment()], evaluatorsById }),
-      ).toEqual([]);
+      expect(findMissingMappings({ attachments: [attachment()], evaluatorsById })).toEqual([]);
     });
   });
 

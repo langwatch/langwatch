@@ -25,8 +25,8 @@ vi.mock("../behavior/personal-workspace-api.ts", () => ({
   },
 }));
 
-import { AiToolsPortal } from "../ui/sections/ai-tools-portal.tsx";
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../testing.tsx";
+import { AiToolsPortal } from "../ui/sections/ai-tools-portal.tsx";
 
 // The portal's permission gate is the only host input the empty-state branches
 // read; flip it per test via this mutable flag.

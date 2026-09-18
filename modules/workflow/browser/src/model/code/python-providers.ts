@@ -1,9 +1,14 @@
 import type { Monaco } from "@monaco-editor/react";
+
 import { registerCodeActions } from "./python-provider.code-actions.ts";
 import { registerCompletion } from "./python-provider.completion.ts";
 import { registerFormatter } from "./python-provider.formatter.ts";
 import { registerHover } from "./python-provider.hover.ts";
-import type { ContractRef, PythonContract, PythonProviderHandle } from "./python-provider.shared.ts";
+import type {
+  ContractRef,
+  PythonContract,
+  PythonProviderHandle,
+} from "./python-provider.shared.ts";
 import { registerSignatureHelp } from "./python-provider.signature-help.ts";
 import { registerValidator } from "./python-provider.validator.ts";
 

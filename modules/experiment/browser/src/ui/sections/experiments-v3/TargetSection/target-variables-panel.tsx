@@ -1,17 +1,17 @@
 // Target input variables and their sources (datasets and chained target outputs).
 
 import { Text, VStack } from "@chakra-ui/react";
-import type { Field } from "@langwatch/workflow-contract";
 import {
   VariablesSection,
   type FieldMapping as VariableFieldMapping,
   type Variable,
 } from "@langwatch/prompt-browser-kit/variables";
+import type { Field } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
+import { buildTargetAvailableSources } from "../../../../behavior/experiments-v3/target-available-sources.ts";
 import { useResolveTargetName } from "../../../../behavior/experiments-v3/use-resolve-target-name.ts";
 import { getUsedFields } from "../../../../model/experiments-v3/mapping-validation.ts";
-import { buildTargetAvailableSources } from "../../../../behavior/experiments-v3/target-available-sources.ts";
 import type {
   DatasetReference,
   FieldMapping,

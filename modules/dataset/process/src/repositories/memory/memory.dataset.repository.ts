@@ -6,10 +6,12 @@ import {
 } from "@langwatch/dataset-contract";
 import { toDate, type Instant } from "@langwatch/time";
 
-import type { DatasetRow,
+import type {
+  DatasetRow,
   DatasetCreateInput,
   DatasetRepository,
-  DatasetUpdateInput } from "../dataset.repository.ts";
+  DatasetUpdateInput,
+} from "../dataset.repository.ts";
 import { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
 /** The same projection the Prisma twin returns rows through. */

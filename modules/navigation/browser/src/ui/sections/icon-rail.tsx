@@ -3,6 +3,7 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
 import { Settings as SettingsIcon } from "lucide-react";
+
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";

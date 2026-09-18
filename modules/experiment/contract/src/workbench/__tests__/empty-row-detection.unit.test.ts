@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { filterEmptyRows, getNonEmptyRowIndices, isRowEmpty } from "../empty-row-detection.ts";
 
 describe("isRowEmpty", () => {

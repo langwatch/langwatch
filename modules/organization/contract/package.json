@@ -23,8 +23,8 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/project-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

@@ -3,7 +3,13 @@
  */
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { addTarget, removeTarget, setTargetPrompt, updateTargetModel } from "../transforms/index.ts";
+
+import {
+  addTarget,
+  removeTarget,
+  setTargetPrompt,
+  updateTargetModel,
+} from "../transforms/index.ts";
 import { baseState, refusalCode } from "./workbench-fixtures.ts";
 
 describe("addTarget", () => {

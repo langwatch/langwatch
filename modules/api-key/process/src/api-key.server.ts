@@ -1,19 +1,22 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
+
 import { ApiKeyApp } from "./app/api-key.app.ts";
 import { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
+import { apiKeyRepositories } from "./repositories/api-key-repositories.registry.ts";
 import { ApiKeyTokenAdapter } from "./repositories/memory/memory.api-key-token.repository.ts";
 import {
   PrismaApiKeyRepository,
   type PrismaApiKeyDatabase,
 } from "./repositories/prisma/prisma.api-key.repository.ts";
-import { apiKeyRepositories } from "./repositories/api-key-repositories.registry.ts";
 import { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service.ts";
 import {
   EventingAgentSandboxMaintenanceAdapter,
   type AgentSandboxMaintenancePipelineDeps,
 } from "./services/agent-sandbox-maintenance.service.ts";
+import { CliLoginKeyReapService } from "./services/cli-login-key-reap.service.ts";
 import { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
 import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
 
@@ -35,6 +38,26 @@ export function createAgentSandboxKeyReapService(options: {
 }): AgentSandboxKeyReapService {
   return AgentSandboxKeyReapService.create({
     repository: PrismaApiKeyRepository.create({ prisma: options.database }),
+    now: options.now,
+  });
+}
+
+/** The expired CLI-login-key sweep over the installed app and its own repository. */
+export function createCliLoginKeyReapService(options: {
+  database: PrismaApiKeyDatabase;
+  apiKeys: ApiKeyApi;
+  now?: () => Instant;
+}): CliLoginKeyReapService {
+  return CliLoginKeyReapService.create({
+    repository: PrismaApiKeyRepository.create({ prisma: options.database }),
+    revoke: ({ id, organizationId, userId }) =>
+      options.apiKeys.revoke({
+        id,
+        organizationId,
+        callerUserId: userId,
+        callerIsAdmin: true,
+        cause: "expired",
+      }),
     now: options.now,
   });
 }

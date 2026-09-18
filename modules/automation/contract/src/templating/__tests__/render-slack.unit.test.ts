@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { TEST_FIRE_NOTICE } from "../banner.ts";
 import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE } from "../defaults.ts";
 import { renderTriggerSlack } from "../render-slack.ts";

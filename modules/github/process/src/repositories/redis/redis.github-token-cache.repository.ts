@@ -1,9 +1,10 @@
 import { randomBytes } from "node:crypto";
+
 import { nowInstant } from "@langwatch/time";
 
-import type { GithubRedis } from "./github-redis.connection.ts";
 import type { GithubHost } from "../../app/github.members.ts";
 import { GithubTokenCacheRepository } from "../github-token-cache.repository.ts";
+import type { GithubRedis } from "./github-redis.connection.ts";
 
 const LOCK_TTL_SEC = 15;
 const LOCK_RETRY_MS = 100;

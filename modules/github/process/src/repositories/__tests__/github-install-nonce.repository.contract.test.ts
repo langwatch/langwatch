@@ -5,19 +5,20 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { GithubInstallNonceRepository } from "../github-install-nonce.repository.ts";
-import { MemoryGithubDatabase } from "../memory/memory.github.database.ts";
 import { MemoryGithubInstallNonceRepository } from "../memory/memory.github-install-nonce.repository.ts";
+import { MemoryGithubDatabase } from "../memory/memory.github.database.ts";
 
 const NONCE = "nonce-one";
 const OTHER_NONCE = "nonce-two";
 
-const backends: readonly Readonly<{ name: string; create: () => GithubInstallNonceRepository }>[] = [
-  {
-    name: "memory",
-    create: () =>
-      MemoryGithubInstallNonceRepository.create({ memory: MemoryGithubDatabase.create() }),
-  },
-];
+const backends: readonly Readonly<{ name: string; create: () => GithubInstallNonceRepository }>[] =
+  [
+    {
+      name: "memory",
+      create: () =>
+        MemoryGithubInstallNonceRepository.create({ memory: MemoryGithubDatabase.create() }),
+    },
+  ];
 
 describe.each(backends)("given the $name installation nonces", (backend) => {
   let nonces: GithubInstallNonceRepository;

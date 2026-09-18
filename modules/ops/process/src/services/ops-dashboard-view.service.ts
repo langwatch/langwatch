@@ -5,6 +5,7 @@
  */
 
 import * as os from "node:os";
+
 import type {
   DashboardData,
   RedisInfo,
@@ -13,10 +14,11 @@ import type {
   QueueInfo,
   QueueSummaryInfo,
 } from "@langwatch/ops-contract";
+import { nowInstant } from "@langwatch/time";
+
 import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules.ts";
 import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
 import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 export class OpsDashboardViewService {
   private constructor() {}

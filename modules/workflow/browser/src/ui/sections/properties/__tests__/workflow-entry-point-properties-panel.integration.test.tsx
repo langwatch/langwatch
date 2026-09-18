@@ -2,12 +2,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { VariablesSection } from "@langwatch/prompt-browser-kit/variables";
+import type { Entry } from "@langwatch/workflow-contract";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Entry } from "@langwatch/workflow-contract";
-import { VariablesSection } from "@langwatch/prompt-browser-kit/variables";
 
 const mockSetNode = vi.fn();
 const mockSetSelectedNode = vi.fn();
@@ -163,9 +163,7 @@ describe("EntryPointPropertiesPanel", () => {
           (u) => Array.isArray(u.data.outputs) && u.data.outputs.length === 1,
         );
         expect(update).toBeTruthy();
-        expect((update!.data.outputs as { identifier: string }[])[0]!.identifier).toBe(
-          "query",
-        );
+        expect((update!.data.outputs as { identifier: string }[])[0]!.identifier).toBe("query");
         // setNode merges data shallowly - dataset is not part of the
         // update, so the attachment survives.
         expect("dataset" in update!.data).toBe(false);

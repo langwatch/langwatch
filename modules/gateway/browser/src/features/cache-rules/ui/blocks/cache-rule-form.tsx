@@ -10,7 +10,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 
 export type CacheRuleFormState = {

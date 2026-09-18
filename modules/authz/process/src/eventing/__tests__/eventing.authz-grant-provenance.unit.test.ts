@@ -4,8 +4,9 @@
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { StubAuthzEpoch } from "../../repositories/__tests__/support/authz-epoch.stub.ts";
+
 import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
+import { StubAuthzEpoch } from "../../repositories/__tests__/support/authz-epoch.stub.ts";
 import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository.ts";
 import { AuthzGrantsService } from "../../services/authz-grants.service.ts";
 import { ORG_ID, harness } from "./support/eventing.authz-ledger-fork.harness.ts";

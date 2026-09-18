@@ -1,8 +1,10 @@
-import type { CustomGraph, ReportChart, ReportSource } from "@langwatch/automation-contract";
 import type {
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
+import type { CustomGraph, ReportChart, ReportSource } from "@langwatch/automation-contract";
+import { Temporal, toDate, toEpochMs } from "@langwatch/time";
+
 import {
   bucketKeysOf,
   chartTypeOf,
@@ -12,7 +14,6 @@ import {
   trendChartOf,
   type ReportGraphInput,
 } from "../rules/report-chart.rules.ts";
-import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 /** Minutes per bucket at or above which a bucket is a whole day. */
 const DAY_SCALE_MINUTES = 1440;

@@ -6,8 +6,9 @@
 
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { BrowserSessionsSection } from "../browser-sessions-section.tsx";
+
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
+import { BrowserSessionsSection } from "../browser-sessions-section.tsx";
 
 afterEach(() => cleanup());
 

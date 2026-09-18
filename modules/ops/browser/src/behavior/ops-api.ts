@@ -3,7 +3,6 @@
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
  */
 
-import type { TimeInput } from "@langwatch/time";
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   opsDashboardTrpc,
@@ -13,6 +12,7 @@ import type {
   opsQueueTrpc,
 } from "@langwatch/ops-contract";
 import type { promptTrpc } from "@langwatch/prompt-contract";
+import type { TimeInput } from "@langwatch/time";
 
 /** One organization, as the Foundry's project picker reads the graph. */
 export type OpsOrganizationGraph = {

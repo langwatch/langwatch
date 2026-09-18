@@ -4,16 +4,6 @@
  */
 
 import {
-  AVAILABLE_EVALUATORS,
-  isCodeEvaluatorCheckType,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
-import {
-  EvaluatorConfigError,
-  EvaluatorNotFoundError,
-  TraceNotEvaluatableError,
-} from "@langwatch/evaluation-contract";
-import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
   mapTraceToDatasetEntry,
@@ -23,9 +13,19 @@ import {
   THREAD_MAPPINGS,
   type TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
+import {
+  EvaluatorConfigError,
+  EvaluatorNotFoundError,
+  TraceNotEvaluatableError,
+} from "@langwatch/evaluation-contract";
+import {
+  AVAILABLE_EVALUATORS,
+  isCodeEvaluatorCheckType,
+  type EvaluatorTypes,
+} from "@langwatch/evaluator-contract";
 import { type Trace } from "@langwatch/trace-contract";
+
 import type { EvaluationTraceProtections } from "../app/evaluation.members.ts";
-import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service.ts";
 import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
@@ -34,6 +34,7 @@ import {
   findUnavailability,
   unavailableEvaluatorMessage,
 } from "../rules/evaluator-availability-service.rules.ts";
+import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {

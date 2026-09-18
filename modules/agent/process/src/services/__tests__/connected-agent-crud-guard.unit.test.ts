@@ -3,6 +3,7 @@ import {
   type RegisterConnectedAgentInput,
 } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
+
 import { MemoryAgentRepository } from "../../repositories/memory/memory.agent.repository.ts";
 import { AgentService } from "../agent.service.ts";
 

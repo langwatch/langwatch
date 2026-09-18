@@ -74,13 +74,13 @@
       "path": "../../../packages/group-queue/tsconfig.build.json"
     },
     {
-      "path": "../../metric/server/tsconfig.build.json"
+      "path": "../../metric/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
-      "path": "../../trace/server/tsconfig.build.json"
+      "path": "../../trace/process/tsconfig.build.json"
     }
   ]
 }

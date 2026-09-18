@@ -1,4 +1,8 @@
-import type { ModelProviderApi, ModelProviderCredentialVerdict } from "@langwatch/model-provider-contract";
+import type {
+  ModelProviderApi,
+  ModelProviderCredentialVerdict,
+} from "@langwatch/model-provider-contract";
+
 import { ModelProviderCredentialProbe } from "../app/model-provider.members.ts";
 
 /**

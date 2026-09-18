@@ -7,7 +7,6 @@
  */
 
 import { HStack, Stack, Text } from "@chakra-ui/react";
-
 import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 
 /** The one code whose meaning is "what you are reading is incomplete". */

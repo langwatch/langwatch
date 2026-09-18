@@ -1,5 +1,5 @@
-import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
 import {
   RoleBindingScopeType,
   TeamUserRole,
@@ -8,6 +8,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
+
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type {
   BetterAuthAnnouncements,

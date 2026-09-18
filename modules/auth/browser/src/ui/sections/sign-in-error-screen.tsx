@@ -1,11 +1,12 @@
 import { Alert, Button, Card, Container, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect } from "react";
+
 import { isSameOrigin, useSession } from "../../behavior/auth-client.tsx";
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
-import Link from "../../ui/elements/router-link.tsx";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
-import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import Link from "../../ui/elements/router-link.tsx";
 
 /**
  * BetterAuth emits granular low-level error codes (e.g. `email_doesn't_match`,

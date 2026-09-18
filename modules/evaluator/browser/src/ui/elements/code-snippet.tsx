@@ -5,8 +5,8 @@
  */
 
 import { ClientOnly, CodeBlock, IconButton } from "@chakra-ui/react";
-import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { useShikiAdapter } from "@langwatch/design-system/shiki";
 
 export function CodeSnippet({ code, language }: { code: string; language: string }) {
   const { colorMode } = useColorMode();

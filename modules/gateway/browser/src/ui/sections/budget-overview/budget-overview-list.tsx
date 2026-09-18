@@ -1,10 +1,10 @@
-import { readableDate } from "../../../model/readable-date.ts";
-import { toEpochMs } from "@langwatch/time";
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { toEpochMs } from "@langwatch/time";
 import { Info } from "lucide-react";
 
 import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { readableDate } from "../../../model/readable-date.ts";
 
 /**
  * The /me rendering of budgetOverview API: one row per budget binding

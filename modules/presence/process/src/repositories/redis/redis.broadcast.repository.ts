@@ -1,11 +1,13 @@
-import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 import { EventEmitter } from "events";
+
+import { createLogger } from "@langwatch/observability";
+import { BroadcasterNotActiveError } from "@langwatch/presence-contract";
+import { nowInstant } from "@langwatch/time";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { BroadcasterNotActiveError } from "@langwatch/presence-contract";
-import { BroadcastTenantRateLimiterAdapter } from "../../services/broadcast-tenant-rate-limiter.service.ts";
+
 import type { PresenceBroadcast, PresenceEmitter } from "../../app/presence.app.ts";
+import { BroadcastTenantRateLimiterAdapter } from "../../services/broadcast-tenant-rate-limiter.service.ts";
 
 export type BroadcastEventType =
   | "trace_updated"

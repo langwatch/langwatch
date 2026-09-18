@@ -8,7 +8,6 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { scenarioTestSuiteSchema } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
-import { suiteSchema } from "./suite.ts";
 import {
   createSuiteTrpcInputSchema,
   createTestSuiteTrpcInputSchema,
@@ -30,6 +29,7 @@ import {
   testSuiteTrpcIdInputSchema,
   updateSuiteTrpcInputSchema,
 } from "./suite-trpc.schemas.ts";
+import { suiteSchema } from "./suite.ts";
 
 export const suiteTrpc = defineTrpcContract("suites")
   .mutation("create")

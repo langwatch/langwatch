@@ -1,4 +1,5 @@
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
+
 import { webhookDeliveryPruneIntentSchema } from "./webhook-delivery-prune.intent.ts";
 
 export const WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME = "webhookDeliveryPrune" as const;

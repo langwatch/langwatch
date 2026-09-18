@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createHash } from "node:crypto";
+
 import type { JsonValue, NewOutboxMessage } from "@langwatch/eventing";
 import type { WebhookEndpointView, WebhookEnvelope } from "@langwatch/webhook-contract";
 

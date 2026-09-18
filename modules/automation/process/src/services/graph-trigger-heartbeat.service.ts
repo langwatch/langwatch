@@ -4,17 +4,15 @@
  */
 
 import { isNoDataPredicate, type GraphTriggerSweepCandidate } from "@langwatch/automation-contract";
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
+
 import type {
   AnalyticsMetricSource as RepositoryMetricSource,
   GraphTriggerSentRepository,
 } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type {
-  AutomationHeartbeat,
-  AutomationLogger,
-} from "./automation-graph-runtime.service.ts";
-import type { Instant } from "@langwatch/time";
+import type { AutomationHeartbeat, AutomationLogger } from "./automation-graph-runtime.service.ts";
 
 export type AnalyticsMetricSource = RepositoryMetricSource;
 export type ClickHouseClient = {

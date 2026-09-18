@@ -3,10 +3,12 @@
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import {
   PrismaAuthzBindingRepository,
@@ -32,7 +34,9 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
   const prisma = new PrismaClient({
     adapter: PrismaDriverAdapterService.create().create(DB_URL ?? "").adapter,
   });
-  const bindings = PrismaAuthzBindingRepository.create({ database: prisma as unknown as AuthzBindingDatabase });
+  const bindings = PrismaAuthzBindingRepository.create({
+    database: prisma as unknown as AuthzBindingDatabase,
+  });
   const writer = AuthzBindingWriterService.create({
     bindings,
     ledger: refusingLedger,

@@ -5,6 +5,7 @@
  */
 
 import { Box, Button, Flex, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { getEntryInputs } from "@langwatch/workflow-contract";
@@ -14,7 +15,6 @@ import { Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 /**

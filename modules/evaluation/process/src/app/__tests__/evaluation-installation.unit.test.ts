@@ -12,12 +12,10 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { evaluationServer } from "../../evaluation.server.ts";
-import { createEvaluationTestInfrastructure } from "./evaluation.fixture.ts";
 
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(evaluationServer)])
-    .withMember("evaluation", createEvaluationTestInfrastructure())
     .provide({
       workflow: createApiFixture<WorkflowApi>(),
       trace: createApiFixture<TraceApi>(),

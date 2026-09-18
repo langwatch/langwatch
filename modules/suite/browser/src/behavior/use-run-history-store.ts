@@ -1,6 +1,7 @@
 // Run history view state with groupBy and filters, synced to URL.
 
 import { create } from "zustand";
+
 import { RUN_GROUP_TYPES, type RunGroupType } from "../model/run-history-transforms.ts";
 
 function isValidGroupBy(value: unknown): value is RunGroupType {

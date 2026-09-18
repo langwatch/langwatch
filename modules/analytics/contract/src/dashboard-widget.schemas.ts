@@ -50,8 +50,7 @@ export const updateDashboardWidgetSchema = z
   // A PATCH naming nothing is a mistake worth reporting, and `code` without
   // `queries` (or the reverse) would write half a definition.
   .refine(
-    (body) =>
-      body.name !== undefined || (body.code !== undefined && body.queries !== undefined),
+    (body) => body.name !== undefined || (body.code !== undefined && body.queries !== undefined),
     "Provide a name, a full { code, queries } definition, or both.",
   )
   .refine(

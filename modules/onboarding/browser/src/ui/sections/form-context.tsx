@@ -1,6 +1,7 @@
+import type { OrganizationIntent } from "@langwatch/organization-contract";
 import type React from "react";
 import { createContext, useContext } from "react";
-import type { OrganizationIntent } from "@langwatch/organization-contract";
+
 import type {
   CompanySize,
   DesireType,

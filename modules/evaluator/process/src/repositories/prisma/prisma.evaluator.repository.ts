@@ -10,6 +10,7 @@ import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
+
 import type { EvaluatorRepository, PersistEvaluatorInput } from "../evaluator.repository.ts";
 
 const generateEvaluatorSlug = (name: string): string => {

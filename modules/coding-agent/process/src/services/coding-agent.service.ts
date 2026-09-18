@@ -22,16 +22,17 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { CodingAgentBillingPolicy,CodingAgentClock } from "../app/coding-agent.members.ts";
+
+import type { CodingAgentBillingPolicy, CodingAgentClock } from "../app/coding-agent.members.ts";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";
 import { SessionMetricSeriesRepository } from "../repositories/session-metric-series.repository.ts";
 import { CodingAgentPersonalPullRequestValuesService } from "./coding-agent-personal-pull-request-values.service.ts";
 import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
-import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
 import { CodingAgentPullRequestMappingBackfillService } from "./coding-agent-pull-request-mapping-backfill.service.ts";
 import { CodingAgentPullRequestReadService } from "./coding-agent-pull-request-read.service.ts";
+import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
 import { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service.ts";
 import { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service.ts";
 import { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";

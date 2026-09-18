@@ -1,11 +1,16 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi, ExecuteWorkflowComponentInput,ExecutionState } from "@langwatch/workflow-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type {
+  WorkflowApi,
+  ExecuteWorkflowComponentInput,
+  ExecutionState,
+} from "@langwatch/workflow-contract";
 /**
  * @vitest-environment node
  * @see specs/agents/http-agent-test-parity.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { createHttpProxyCaller } from "./http-proxy.fixture.ts";
 
 function harness(state: ExecutionState) {

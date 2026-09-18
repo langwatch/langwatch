@@ -5,9 +5,10 @@ import {
 } from "@langwatch/agent-contract";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import type { PersistAgentInput, RegisterPersistedAgentInput } from "../../agent.repository.ts";
-import { MemoryAgentRepository } from "../memory.agent.repository.ts";
 import { MemoryAgentRepositories } from "../memory.agent.repositories.ts";
+import { MemoryAgentRepository } from "../memory.agent.repository.ts";
 
 function agent(id: string, projectId = "project-a"): PersistAgentInput {
   return { id, projectId, name: id, type: "workflow", config: {} };

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { extractEmailDomain, isSsoProviderMatch } from "../sso-matching.ts";
 
 describe("isSsoProviderMatch", () => {

@@ -9,8 +9,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FoundryRuntimeProvider, type FoundryTransport } from "../behavior/foundry-runtime.tsx";
-import { PlaygroundContent } from "../ui/sections/playground-content.tsx";
 import { createDefaultTrace, useTraceStore } from "../behavior/trace.store.ts";
+import { PlaygroundContent } from "../ui/sections/playground-content.tsx";
 
 class ResizeObserverMock {
   observe(): void {}

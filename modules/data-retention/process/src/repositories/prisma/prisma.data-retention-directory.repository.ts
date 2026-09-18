@@ -5,6 +5,7 @@
  */
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import {
   type DataRetentionDirectoryReader,
   type RetentionOrganizationDirectory,

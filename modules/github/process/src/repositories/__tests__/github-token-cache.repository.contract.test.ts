@@ -5,8 +5,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { GithubTokenCacheRepository } from "../github-token-cache.repository.ts";
-import { MemoryGithubDatabase } from "../memory/memory.github.database.ts";
 import { MemoryGithubTokenCacheRepository } from "../memory/memory.github-token-cache.repository.ts";
+import { MemoryGithubDatabase } from "../memory/memory.github.database.ts";
 
 const INSTALLATION = "42";
 const OTHER_INSTALLATION = "43";
@@ -16,7 +16,8 @@ const OTHER_SCOPE = "scope-b";
 const backends: readonly Readonly<{ name: string; create: () => GithubTokenCacheRepository }>[] = [
   {
     name: "memory",
-    create: () => MemoryGithubTokenCacheRepository.create({ memory: MemoryGithubDatabase.create() }),
+    create: () =>
+      MemoryGithubTokenCacheRepository.create({ memory: MemoryGithubDatabase.create() }),
   },
 ];
 
@@ -38,9 +39,9 @@ describe.each(backends)("given the $name installation-token cache", (backend) =>
     });
 
     it("reads the token back under the same scope", async () => {
-      await expect(cache.findToken({ installationId: INSTALLATION, scopeKey: SCOPE })).resolves.toBe(
-        "ghs_one",
-      );
+      await expect(
+        cache.findToken({ installationId: INSTALLATION, scopeKey: SCOPE }),
+      ).resolves.toBe("ghs_one");
     });
 
     it("answers nothing for another scope of the same installation", async () => {

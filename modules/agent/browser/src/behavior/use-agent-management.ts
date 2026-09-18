@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { useEffect, useState } from "react";
+
 import type { AgentClient } from "../model/agent-client.ts";
 
 type AgentWithFields = WireOf<StoredAgentWithFields>;

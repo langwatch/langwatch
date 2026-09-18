@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { ProjectionsCard as ProjectionsCardView } from "../elements/projections-card.tsx";
-import { joinProjectionHealth } from "../../model/projection-health.ts";
+
 import { api } from "../../../../behavior/ops-api.ts";
+import { joinProjectionHealth } from "../../model/projection-health.ts";
+import { ProjectionsCard as ProjectionsCardView } from "../elements/projections-card.tsx";
 
 export function ProjectionsCard() {
   const registry = api.ops.listProjections.useQuery(undefined, {

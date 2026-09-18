@@ -1,5 +1,6 @@
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps } from "react";
+
 import NextLink from "./router-link.tsx";
 
 type LinkProps = {

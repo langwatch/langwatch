@@ -1,9 +1,10 @@
+import safe from "safe-regex2";
+
 import {
   modelCostEstimateInputSchema,
   type ModelCostEstimateInput,
   type ModelCostRate,
 } from "./model-provider.ts";
-import safe from "safe-regex2";
 
 const ATTR = {
   cacheReadTokens: "gen_ai.usage.cache_read.input_tokens",

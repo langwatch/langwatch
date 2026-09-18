@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { PrismaAuthzListingRepository } from "../prisma.authz-listing.repository.ts";
 

@@ -8,8 +8,11 @@
  * Spec: specs/migration/object-storage-provider-migration.feature
  */
 import { Readable } from "node:stream";
+
 import { mintS3StoredObjectUri } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
+
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 
 import {
   StoredObjectAzureDestination,
@@ -17,7 +20,6 @@ import {
   StoredObjectProjectS3Config,
   type StoredObjectStorageSelection,
 } from "../stored-object-destination-policy.service.ts";
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.service.ts";
 
 const INCOMPLETE_AZURE = "Azure Blob is configured with sharedKey auth and no account key";

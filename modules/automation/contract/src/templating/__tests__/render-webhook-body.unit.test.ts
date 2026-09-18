@@ -1,4 +1,6 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import { ALERT_TRIGGER_DEFAULTS, REPORT_TRIGGER_DEFAULTS } from "../defaults.ts";
 import { renderWebhookBody } from "../render-webhook-body.ts";
 import {
@@ -6,7 +8,6 @@ import {
   buildGraphAlertTemplateContext,
 } from "../template-context.ts";
 import { makeContext, makeMatch } from "./fixtures.ts";
-import { Temporal } from "@langwatch/time";
 
 // Trace content that would break out of a naive JSON template — the `| json`
 // discipline in the defaults must keep the envelope parseable.

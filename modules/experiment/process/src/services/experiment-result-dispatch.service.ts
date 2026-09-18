@@ -3,6 +3,8 @@
  * not live. Falsy outputs persist as values; only null/undefined become null.
  */
 
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type {
   ESBatchEvaluationTarget,
   EvaluationsV3State,
@@ -10,9 +12,8 @@ import type {
   RecordEvaluatorResultCommandData,
   RecordTargetResultCommandData,
 } from "@langwatch/experiment-contract";
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
+
 import {
   ExperimentExecutionDataService,
   type LoadedEvaluators,

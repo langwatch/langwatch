@@ -2,6 +2,7 @@
 
 import { chakra } from "@chakra-ui/react";
 import type { AnchorHTMLAttributes, ReactNode, Ref } from "react";
+
 import { useNavigationHost } from "../../model/navigation-host.ts";
 
 const Anchor = chakra("a");

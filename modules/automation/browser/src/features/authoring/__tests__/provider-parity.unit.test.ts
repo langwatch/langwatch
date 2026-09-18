@@ -1,19 +1,26 @@
-import { filterBlockKit,renderLiquid,EXAMPLE_MATCHES,
+import {
+  filterBlockKit,
+  renderLiquid,
+  EXAMPLE_MATCHES,
   buildExampleGraphAlertTemplateContext,
   buildReportTemplateContext,
   buildTemplateContext,
-  type GraphAlertTemplateContext,AlertType,TriggerAction } from "@langwatch/automation-contract";
+  type GraphAlertTemplateContext,
+  AlertType,
+  TriggerAction,
+} from "@langwatch/automation-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
+import {
+  SLACK_BLOCK_KIT_TEMPLATES,
+  type SlackBlockKitTemplateOption,
+} from "../../slack-templates/index.ts";
 import {
   ACTION_PROVIDERS,
   CLIENT_PROVIDERS,
   NOTIFY_PROVIDERS,
 } from "../ui/sections/client-providers.ts";
-import {
-  SLACK_BLOCK_KIT_TEMPLATES,
-  type SlackBlockKitTemplateOption,
-} from "../../slack-templates/index.ts";
-import { Temporal } from "@langwatch/time";
 
 /**
  * The browser provider registry enforces its client-facing invariants here.

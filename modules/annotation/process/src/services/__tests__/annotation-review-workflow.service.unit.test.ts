@@ -1,6 +1,6 @@
 import { AnnotationNotFoundError } from "@langwatch/annotation-contract";
 import { describe, expect, it, vi } from "vitest";
-import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
+
 import {
   createAnnotationTestApp,
   createAnnotationTestAuthz,
@@ -9,6 +9,7 @@ import {
   createAnnotationTestTraces,
   createAnnotationTestUsers,
 } from "../../app/__tests__/annotation.fixture.ts";
+import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
 
 const createInput = {
   actorId: "actor-1",
@@ -80,7 +81,9 @@ describe("AnnotationService review workflow", () => {
     harnessed.writeSuggestion.mockRejectedValue(new Error("overlay unavailable"));
 
     await expect(harnessed.app.createReview(createInput)).rejects.toThrow("overlay unavailable");
-    expect(await harnessed.repository.findAll({ projectId: "project-1", anchor: "all" })).toEqual([]);
+    expect(await harnessed.repository.findAll({ projectId: "project-1", anchor: "all" })).toEqual(
+      [],
+    );
   });
 
   it("keeps the existing anchor when updating a suggestion", async () => {
@@ -153,6 +156,8 @@ describe("AnnotationService review workflow", () => {
     });
 
     expect(deleted.id).toBe(created.id);
-    expect(await harnessed.repository.findAll({ projectId: "project-1", anchor: "all" })).toEqual([]);
+    expect(await harnessed.repository.findAll({ projectId: "project-1", anchor: "all" })).toEqual(
+      [],
+    );
   });
 });

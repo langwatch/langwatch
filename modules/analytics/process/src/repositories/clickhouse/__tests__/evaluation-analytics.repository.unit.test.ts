@@ -1,11 +1,13 @@
 import { env as nodeProcessEnv } from "node:process";
+
 import {
   type AnalyticsEvaluationReadMetrics,
   type AnalyticsEvaluationRow,
 } from "@langwatch/analytics-contract";
-import { describe, expect, it, vi } from "vitest";
 import { SecurityError } from "@langwatch/eventing";
+import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
+
 import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse.analytics-persistence.repository.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../clickhouse.analytics-persistence.repository.ts";
 

@@ -3,16 +3,21 @@
  */
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
+
 import { Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { redactStoredObjectStorageUri,ObjectNotFoundError } from "@langwatch/stored-object-contract";
+import {
+  redactStoredObjectStorageUri,
+  ObjectNotFoundError,
+} from "@langwatch/stored-object-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { StoredObjectStorageRepository } from "../repositories/stored-object-storage.repository.ts";
+
 import type { StoredObjectsTelemetry } from "../app/stored-object.members.ts";
-import type { StoredObject } from "../rules/stored-object-row.rules.ts";
+import type { StoredObjectStorageRepository } from "../repositories/stored-object-storage.repository.ts";
 import type { StoredObjectsRepository } from "../repositories/stored-objects.repository.ts";
-import { nowInstant, toDate } from "@langwatch/time";
+import type { StoredObject } from "../rules/stored-object-row.rules.ts";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");
 const logger = createLogger("langwatch:stored-objects:service");
@@ -41,7 +46,9 @@ function deriveStoredObjectId({
  */
 export type MintStorageUri = (args: { projectId: string; sha256: string }) => Promise<string>;
 
-type RegistryResolver = StoredObjectStorageRepository | ((projectId: string) => StoredObjectStorageRepository);
+type RegistryResolver =
+  | StoredObjectStorageRepository
+  | ((projectId: string) => StoredObjectStorageRepository);
 
 /** What the process composes this service from. */
 export type StoredObjectsServiceOptions = Readonly<{

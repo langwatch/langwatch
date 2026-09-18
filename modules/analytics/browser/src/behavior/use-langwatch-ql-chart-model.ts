@@ -5,12 +5,12 @@
  * @see ../components/LangWatchQLVegaLiteChart.tsx — the only consumer
  */
 
-import { useMemo, type RefObject } from "react";
-
-import { referencedDatasetNames,lwqlEmptyEncodingFailure,
+import {
+  referencedDatasetNames,
+  lwqlEmptyEncodingFailure,
   encodedFieldsByDataset,
-  scanLangWatchQLChartValues } from "@langwatch/analytics-contract/visualization";
-import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
+  scanLangWatchQLChartValues,
+} from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
@@ -18,8 +18,11 @@ import type {
   VegaValidationError,
   VegaValidationWarning,
   LangWatchQLVegaColorMode,
-  LangWatchQLVegaConfig
+  LangWatchQLVegaConfig,
 } from "@langwatch/analytics-contract/visualization";
+import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
+import { useMemo, type RefObject } from "react";
+
 import {
   type LangWatchQLVegaViewState,
   useLangWatchQLVegaView,

@@ -1,11 +1,16 @@
-import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
-import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
+import {
+  type AppendStore,
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "@langwatch/eventing";
 import {
   LOG_MAP_COALESCE_MAX_BATCH,
   type CanonicalLogRecordReceivedEvent,
   canonicalLogRecordReceivedEventSchema,
   type CanonicalLogRecord,
 } from "@langwatch/log-contract";
+
+import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
 
 const events = [canonicalLogRecordReceivedEventSchema] as const;
 

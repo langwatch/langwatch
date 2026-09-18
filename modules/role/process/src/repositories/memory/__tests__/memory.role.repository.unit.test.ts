@@ -6,8 +6,9 @@
  * same instances is what proves the memory backend works.
  */
 import { ROLE_KIND } from "@langwatch/role-contract";
-import { MemoryRoleRepository } from "../memory.role.repository.ts";
 import { describe, expect, it } from "vitest";
+
+import { MemoryRoleRepository } from "../memory.role.repository.ts";
 
 const ORGANIZATION_ID = "org-1";
 const ROLE_ID = "role-1";

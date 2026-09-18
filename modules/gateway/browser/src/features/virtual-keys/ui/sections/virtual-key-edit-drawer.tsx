@@ -10,12 +10,14 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
-
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { useEffect, useMemo, useState } from "react";
+
 import { api } from "../../../../behavior/gateway-api.ts";
+import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
 import {
   buildScopeHierarchy,
   type OrgModelProvider,
@@ -24,26 +26,18 @@ import {
 } from "../../model/eligible-model-providers.ts";
 import { resolveTracesHrefForKey } from "../../model/traces-href-for-key.ts";
 import {
+  expirationStateFromStored,
+  expiryFieldErrorFrom,
+  expiryIncompleteReason,
+  resolveExpiresAt,
+} from "../../model/virtual-key-expiration.ts";
+import {
   TAGS_CSV_MAX_LENGTH,
   VK_TAGS_FIELD_DESCRIPTION,
   parseTagsCsv,
   tagsBeyondLimitsNotice,
 } from "../../model/virtual-key-tags-field.ts";
-import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
-import {
-  budgetInvalidReason,
-  EMPTY_BUDGET,
-  VirtualKeyBudgetSection,
-  type VirtualKeyBudgetValue,
-  type VirtualKeyBudgetWindow,
-} from "./virtual-key-budget-section.tsx";
-import {
-  NEVER_EXPIRES,
-  VirtualKeyExpirationSection,
-  type VirtualKeyExpirationValue,
-} from "../elements/virtual-key-expiration-section.tsx";
 import { VirtualKeyOwnershipReadOnly } from "../blocks/virtual-key-ownership-section.tsx";
-import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import {
   ALL_PROVIDERS,
   type ProviderAccessValue,
@@ -52,16 +46,22 @@ import {
   VirtualKeyProviderAccessSection,
 } from "../blocks/virtual-key-provider-access-section.tsx";
 import {
+  NEVER_EXPIRES,
+  VirtualKeyExpirationSection,
+  type VirtualKeyExpirationValue,
+} from "../elements/virtual-key-expiration-section.tsx";
+import {
   routingValueFromKey,
   VirtualKeyRoutingSection,
   type VirtualKeyRoutingValue,
 } from "../elements/virtual-key-routing-section.tsx";
 import {
-  expirationStateFromStored,
-  expiryFieldErrorFrom,
-  expiryIncompleteReason,
-  resolveExpiresAt,
-} from "../../model/virtual-key-expiration.ts";
+  budgetInvalidReason,
+  EMPTY_BUDGET,
+  VirtualKeyBudgetSection,
+  type VirtualKeyBudgetValue,
+  type VirtualKeyBudgetWindow,
+} from "./virtual-key-budget-section.tsx";
 
 export type VirtualKeyDetail = {
   id: string;

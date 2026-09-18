@@ -1,3 +1,4 @@
+import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 /**
  * The organization surface the canonical contract does not carry: membership,
  * seats, role cascades, provisioning and the audit trail.
@@ -10,11 +11,12 @@ import {
   PricingModel,
   RoleBindingScopeType,
   type TeamUserRole,
-  type User,CannotRemoveSelfError,MemberNotFoundError
+  type User,
+  CannotRemoveSelfError,
+  MemberNotFoundError,
 } from "@langwatch/organization-contract";
-import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import slugify from "slugify";
-import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
 
 import {
   type OrganizationGrantCache,
@@ -35,7 +37,7 @@ import type {
   OrganizationMembershipRepository,
   OrganizationWithMembersAndTheirTeams,
 } from "../repositories/organization-membership.repository.ts";
-import { nowInstant, toDate } from "@langwatch/time";
+import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
 
 /** The KSUID resources an organization and its first team are born under. */
 const ORGANIZATION_KSUID_RESOURCE = "organization";

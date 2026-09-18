@@ -1,4 +1,5 @@
 import { type RefObject, useEffect, useRef } from "react";
+
 import { useEntranceSettled } from "../model/entrance.ts";
 
 /**

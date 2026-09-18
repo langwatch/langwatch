@@ -3,10 +3,7 @@
  * the platform app's `runtime/app/features/workflow.ts`: one create against
  * the workflow table, with the draft as the row.
  */
-import {
-  WorkflowRowRepository,
-  type WorkflowRowDraft,
-} from "../workflow-row.repository.ts";
+import { WorkflowRowRepository, type WorkflowRowDraft } from "../workflow-row.repository.ts";
 
 /** The one table this repository writes, named structurally. */
 export type WorkflowRowDatabase = {

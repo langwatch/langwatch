@@ -1,4 +1,5 @@
 import { createClient, type ClickHouseClient, type ClickHouseSettings } from "@clickhouse/client";
+
 import { findOpsConnection } from "../../rules/ops-clickhouse-explain.rules.ts";
 import {
   OpsExplainRepository,

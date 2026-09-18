@@ -1,10 +1,11 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogProcessingEvent } from "@langwatch/log-contract";
+
+import { LogProcessingAdapter, type LogProcessingPipeline } from "../../eventing/log.pipeline.ts";
 import {
   ClickHouseCanonicalLogRecordAppendRepository,
   type LogClickHouseClientResolver,
 } from "./clickhouse.canonical-log-record-append.repository.ts";
-import { LogProcessingAdapter, type LogProcessingPipeline } from "../../eventing/log.pipeline.ts";
 
 /**
  * Durable log processing for background workers (append-only). States consumer's

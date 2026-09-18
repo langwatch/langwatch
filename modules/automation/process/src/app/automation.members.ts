@@ -1,6 +1,18 @@
-import type { AutomationLimitNextStep, GraphTriggerEvaluationReason, GraphTriggerEvaluationResult, SlackPayload, Trigger, TriggerMatchRecordedEventData, TriggerSummary, WebhookActionParams, WebhookDeliveryInput, GraphAlertTemplateContext } from "@langwatch/automation-contract";
+import type {
+  AutomationLimitNextStep,
+  GraphTriggerEvaluationReason,
+  GraphTriggerEvaluationResult,
+  SlackPayload,
+  Trigger,
+  TriggerMatchRecordedEventData,
+  TriggerSummary,
+  WebhookActionParams,
+  WebhookDeliveryInput,
+  GraphAlertTemplateContext,
+} from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
 import type { TraceQueryClassification, TraceSummaryData } from "@langwatch/trace-contract";
+
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { LimitEmailKind } from "../channels/automation-runaway-notice.channel.ts";
@@ -10,9 +22,16 @@ import type { AutomationIntentRetention } from "../repositories/automation-inten
 import type { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
 import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { AutomationDatasetMapper } from "../services/automation-dataset-mapper.service.ts";
-import type { AutomationDispatchError, AutomationHeartbeat, AutomationLogger } from "../services/automation-graph-runtime.service.ts";
+import type {
+  AutomationDispatchError,
+  AutomationHeartbeat,
+  AutomationLogger,
+} from "../services/automation-graph-runtime.service.ts";
 import type { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
-import type { AutomationSlackBotTokenDecryptor, AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
+import type {
+  AutomationSlackBotTokenDecryptor,
+  AutomationSlackProvider,
+} from "../services/automation-slack-secrets.service.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
 import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 
@@ -26,7 +45,8 @@ export type {
   AutomationNotificationDelivery,
   AutomationSlackBotTokenDecryptor,
 };
-export interface AutomationInfrastructure {  automationClock: AutomationClock;
+export interface AutomationInfrastructure {
+  automationClock: AutomationClock;
   automationDatasetMapper: AutomationDatasetMapper;
   automationDispatchError: AutomationDispatchError;
   automationEmailCapStore: AutomationEmailCapStore;
@@ -55,11 +75,9 @@ export interface AutomationInfrastructure {  automationClock: AutomationClock;
   unsubscribeTokenVerifier: UnsubscribeTokenVerifier;
 }
 
-
 export interface AutomationClock {
   now(): Instant;
 }
-
 
 export interface AutomationEvaluationTriggerFilter {
   readsEvaluations(input: {
@@ -67,7 +85,6 @@ export interface AutomationEvaluationTriggerFilter {
     filterQuery: string | null;
   }): boolean;
 }
-
 
 export interface AutomationTriggerMatchRecorder {
   send(
@@ -83,10 +100,7 @@ export interface AutomationTriggerMatchRecorder {
  * which carries unused paths.
  */
 export interface AutomationEvaluationTraceSummary {
-  findSummary(input: {
-    projectId: string;
-    traceId: string;
-  }): Promise<TraceSummaryData | null>;
+  findSummary(input: { projectId: string; traceId: string }): Promise<TraceSummaryData | null>;
 }
 
 /**
@@ -145,16 +159,8 @@ export interface AutomationGraphDelivery {
     triggerId: string;
     emails: string[];
   }): Promise<string[]>;
-  isSendClaimed(input: {
-    triggerId: string;
-    traceId: string;
-    projectId: string;
-  }): Promise<boolean>;
-  claimSend(input: {
-    triggerId: string;
-    traceId: string;
-    projectId: string;
-  }): Promise<boolean>;
+  isSendClaimed(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean>;
+  claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean>;
   recordWebhookDelivery(input: WebhookDeliveryInput): Promise<void>;
 }
 
@@ -189,14 +195,8 @@ export type AutomationGraphNotifierInput = GraphAlertDispatchInput;
 
 export type AutomationGraphNotifierResult = GraphAlertDispatchResult;
 
-
-
 /** Outbound provider calls. Automation owns when and what to send; the process
  * adapter owns SDKs, HTTP policy, mail rendering members, and secrets. */
-
-
-
-
 
 export type AutomationWebhookStoredParams = {
   url: string;
@@ -209,19 +209,12 @@ export type AutomationWebhookStoredParams = {
   previousSigningSecretExpiresAt?: number;
 };
 
-
-
-
-
 export type ClaimLease = { key: string; token: string };
 
 /** Explicit members ports used by Automation's containment policy. */
 export interface AutomationRunawayPort {
   countProjectTraces24h(projectId: string): Promise<number>;
-  notificationRecipients(params: {
-    projectId: string;
-    triggerId: string;
-  }): Promise<string[]>;
+  notificationRecipients(params: { projectId: string; triggerId: string }): Promise<string[]>;
   sendLimitEmail(params: {
     to: string[];
     kind: LimitEmailKind;
@@ -249,8 +242,6 @@ export interface AutomationRunawayPort {
   info(fields: Record<string, unknown>, message: string): void;
 }
 
-
-
 export interface TestFireEmail {
   recipients: string[];
   subject: string;
@@ -277,13 +268,10 @@ export interface TestFireWebhook {
   triggerName: string;
 }
 
-
-
 /**
  * Automation listing for trace-alert path; narrows AutomationService to avoid 12
  * collaborators needed for authoring surface.
  */
-
 
 export interface AutomationEmailCapStore {
   claim(
@@ -306,7 +294,6 @@ export type ScheduledJobRecord = {
   active: boolean;
 };
 
-
 export interface ScheduledJobStorePort {
   upsertForTarget(input: {
     projectId: string;
@@ -327,12 +314,8 @@ export interface ScheduledJobStorePort {
   }): Promise<ScheduledJobRecord[]>;
 }
 
-
-
 export type UnsubscribeTokenPayload = {
   projectId: string;
   triggerId: string | null;
   email: string;
 };
-
-

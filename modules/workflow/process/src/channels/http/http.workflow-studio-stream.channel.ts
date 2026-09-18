@@ -1,7 +1,10 @@
 /**
  * Engine's streaming studio route; HTTP POST with SSE stream, no per-project Lambda routing.
  */
-import { type WorkflowStudioStream, type WorkflowStudioStreamInput } from "../../app/workflow.app.ts";
+import {
+  type WorkflowStudioStream,
+  type WorkflowStudioStreamInput,
+} from "../../app/workflow.app.ts";
 
 /** The engine's streaming studio route at a single configured address. */
 export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {

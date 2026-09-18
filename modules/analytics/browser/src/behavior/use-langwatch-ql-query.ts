@@ -5,12 +5,9 @@
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-import { analyticsApi } from "./analytics-api.ts";
-
-import { createLangWatchQLExecute } from "./lwql-execute.ts";
 import {
   createLangWatchQLRequestController,
   type LangWatchQLRequestController,
@@ -23,6 +20,8 @@ import {
   type LangWatchQLTimeWindowValues,
   lwqlActionLabel,
 } from "../model/lwql-request-state.ts";
+import { analyticsApi } from "./analytics-api.ts";
+import { createLangWatchQLExecute } from "./lwql-execute.ts";
 
 export interface UseLangWatchQLQuery {
   state: LangWatchQLRequestState;

@@ -3,7 +3,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type BuildRunSnippetInput, buildRunSnippet, type RunSnippetLang } from "../run-snippets.ts";
+import {
+  type BuildRunSnippetInput,
+  buildRunSnippet,
+  type RunSnippetLang,
+} from "../run-snippets.ts";
 
 const baseInput: Omit<BuildRunSnippetInput, "dataSource" | "lang"> = {
   kind: "experiment",
@@ -213,17 +217,13 @@ describe("buildRunSnippet", () => {
 
     it("authenticates with a bearer token, not the legacy auth header", () => {
       const snippet = go();
-      expect(snippet).toContain(
-        '"Authorization", "Bearer "+os.Getenv("LANGWATCH_API_KEY")',
-      );
+      expect(snippet).toContain('"Authorization", "Bearer "+os.Getenv("LANGWATCH_API_KEY")');
       expect(snippet).not.toContain("X-Auth-Token");
     });
 
     it("starts the run, polls it, then reads the per-row results back", () => {
       const snippet = go();
-      expect(snippet).toMatch(
-        /startPath\s+= "\/api\/experiments\/my-experiment\/run"/,
-      );
+      expect(snippet).toMatch(/startPath\s+= "\/api\/experiments\/my-experiment\/run"/);
       expect(snippet).toContain('baseURL + "/api/experiments/runs/" + runID');
       expect(snippet).toContain('"/api/experiments/runs/"+runID+"/results"');
     });

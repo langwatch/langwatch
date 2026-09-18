@@ -1,6 +1,7 @@
 // Testing surfaces paths for Agent Testing and Simulations interfaces.
 
 import { isOnPlatformSet } from "@langwatch/scenario-contract";
+
 import type { SuiteKind } from "./suite.kind.ts";
 
 /** The flag that decides which interface a project reads. */

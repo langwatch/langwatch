@@ -1,4 +1,5 @@
-import { type AgentCallSignal,
+import {
+  type AgentCallSignal,
   AgentRegisterRefusedError,
   AgentSessionUnknownError,
   CALL_KEY_SLACK_SECONDS,
@@ -13,16 +14,17 @@ import { type AgentCallSignal,
   type AgentConnectRegisterAnswer,
   type AgentConnectCredentials,
   registerFrameSchema,
-  type SdkFrame,type InstanceNudge } from "@langwatch/agent-contract";
+  type SdkFrame,
+  type InstanceNudge,
+} from "@langwatch/agent-contract";
 /**
  * The HTTP side of connected agents, for a process whose network blocks
  * WebSockets (ADR-128): the same frames over `register`/`poll`/`frames`.
  * Delivery is once only — a call is claimed under its own key before handout.
  */
-
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
-import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service.ts";
+
 import {
   callDeliveredKey,
   callKey,
@@ -30,6 +32,7 @@ import {
   pendingKey,
 } from "../rules/connected-agent-keys.rules.ts";
 import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
+import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service.ts";
 import { AgentSessionService, type SessionInfo } from "./connected-agent-session.service.ts";
 
 /** The most call ids a poll may announce as in flight. */

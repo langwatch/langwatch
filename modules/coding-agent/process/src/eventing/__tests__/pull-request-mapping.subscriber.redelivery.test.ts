@@ -1,18 +1,19 @@
+import type { CodingAgentProcessingEvent } from "@langwatch/coding-agent-contract";
 /**
  * @vitest-environment node
  * @unit
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { CodingAgentProcessingEvent } from "@langwatch/coding-agent-contract";
+
+import { buildTestCodingAgentProcessingPipeline } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { TestGithubService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import type { CodingAgentSessionState } from "../coding-agent-session.projection.ts";
 import {
   createPullRequestMappingHandler,
   createPullRequestMappingSubscriber,
   shouldMapPullRequests,
 } from "../pull-request-mapping.subscriber.ts";
-import { buildTestCodingAgentProcessingPipeline } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
-import { TestGithubService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 function foldState(over: Partial<CodingAgentSessionState> = {}): CodingAgentSessionState {
   return {

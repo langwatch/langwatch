@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
 import {
   LlmModelNotSetError,
   studioClientEventSchema,
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   type WorkflowLlmParameters,
   type WorkflowProjectEnvironment,

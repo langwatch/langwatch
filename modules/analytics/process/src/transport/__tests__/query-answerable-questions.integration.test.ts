@@ -7,16 +7,11 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { LocalFeatureApis } from "@langwatch/kernel";
 import { Temporal } from "@langwatch/time";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
-import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
-import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
-
-import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
-import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
@@ -25,7 +20,11 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
-import { LocalFeatureApis } from "@langwatch/kernel";
+import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
+import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import { AnalyticsQueryApi, langWatchQLCallerProtections, queryRest } from "../query.rest.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();

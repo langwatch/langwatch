@@ -7,7 +7,7 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
-import { datasetPageSchema, datasetRecordSchema,datasetRecordMutationResultSchema } from "./dataset.ts";
+import { datasetRecordEditorReadSchema, datasetRecordHeadReadSchema } from "./dataset.responses.ts";
 import {
   datasetRecordApiCreateInputSchema,
   datasetRecordApiDeleteManyInputSchema,
@@ -16,9 +16,10 @@ import {
   datasetRecordApiUpdateInputSchema,
 } from "./dataset.schemas.ts";
 import {
-  datasetRecordEditorReadSchema,
-  datasetRecordHeadReadSchema,
-} from "./dataset.responses.ts";
+  datasetPageSchema,
+  datasetRecordSchema,
+  datasetRecordMutationResultSchema,
+} from "./dataset.ts";
 
 /** What a batch delete answers: how many entries it removed. */
 export const datasetRecordsDeletedSchema = z.object({ count: z.number() }).strict();

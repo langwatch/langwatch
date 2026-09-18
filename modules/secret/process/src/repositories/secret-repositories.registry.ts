@@ -1,4 +1,5 @@
 import { defineRepositories } from "@langwatch/kernel";
+
 import { MemorySecretRepositories } from "./memory/memory.secret.repositories.ts";
 import { PostgresSecretRepositories } from "./prisma/prisma.secret.repositories.ts";
 

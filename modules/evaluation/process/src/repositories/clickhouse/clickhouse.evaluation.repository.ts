@@ -1,13 +1,14 @@
 import type { WorkflowApi } from "@langwatch/workflow-contract";
+
 import {
   type EvaluationExecution,
   type EvaluationInputsResolution,
   type EvaluationRetentionFloor,
 } from "../../app/evaluation.members.ts";
+import { EvaluationService } from "../../services/evaluation.service.ts";
 import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 import { ClickHouseEvaluationRepository } from "./evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "./monitor-performance.repository.ts";
-import { EvaluationService } from "../../services/evaluation.service.ts";
 
 export type EvaluationAdapterOptions = {
   resolveClickHouse: EvaluationClickHouseResolver;

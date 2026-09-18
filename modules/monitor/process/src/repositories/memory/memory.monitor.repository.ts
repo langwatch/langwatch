@@ -23,6 +23,7 @@ import {
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import type { MonitorRepository } from "../monitor.repository.ts";
 
 /** A stored row: the monitor, plus the evaluator name a listing reads off it. */
@@ -107,9 +108,8 @@ export class MemoryMonitorRepository implements MonitorRepository {
   }
 
   async findIdByName(input: { projectId: string; name: string }): Promise<string | undefined> {
-    return this.#rows.find(
-      (row) => row.projectId === input.projectId && row.name === input.name,
-    )?.id;
+    return this.#rows.find((row) => row.projectId === input.projectId && row.name === input.name)
+      ?.id;
   }
 
   async setEnabled(input: MonitorToggleInput): Promise<void> {

@@ -34,9 +34,7 @@ export interface ChartFrameDashboardContext {
  * A snapshot of the widget's author-declared parameters at their current (default) values --
  * there is no dashboard-side UI to override them yet. Delivered on `lw:init` only.
  */
-export type ChartFrameParamsSnapshot = Readonly<
-  Record<string, ChartQueryParamValue>
->;
+export type ChartFrameParamsSnapshot = Readonly<Record<string, ChartQueryParamValue>>;
 
 /**
  * A bound parameter's value the frame may supply to `LW.query` -- matches
@@ -138,11 +136,7 @@ export interface LwNavigateMessage {
 }
 
 /** Where a forwarded log/error line originated inside the frame. */
-export type ChartFrameLogSource =
-  | "console"
-  | "error"
-  | "unhandledrejection"
-  | "lw.error";
+export type ChartFrameLogSource = "console" | "error" | "unhandledrejection" | "lw.error";
 
 export interface LwLogMessage {
   readonly type: "lw:log";

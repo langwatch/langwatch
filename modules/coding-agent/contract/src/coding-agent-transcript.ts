@@ -1,15 +1,16 @@
-import { z } from "zod";
-import { detectCodingAgent, WITHHELD_PROMPT_TEXT } from "./telemetry/coding-agent-normalization.ts";
-import { codingAgentSchema, type CodingAgent } from "./telemetry/index.ts";
 import type { SpanDetail } from "@langwatch/trace-contract";
+import { z } from "zod";
+
 import { collectLogEntries } from "./coding-agent-transcript-log.ts";
+import { collectSpanEntries } from "./coding-agent-transcript-span.ts";
 import {
   type SpanReply,
   type TranscriptLogRecord,
   indexCodexToolLogsByCallId,
 } from "./coding-agent-transcript-state.ts";
-import { collectSpanEntries } from "./coding-agent-transcript-span.ts";
 import { readUnknown } from "./coding-agent-transcript-value.ts";
+import { detectCodingAgent, WITHHELD_PROMPT_TEXT } from "./telemetry/coding-agent-normalization.ts";
+import { codingAgentSchema, type CodingAgent } from "./telemetry/index.ts";
 
 const LOG_REPLY_FLUSH_SLACK_MS = 2_000;
 const PROMPT_STUB_SAME_TURN_MS = 2_000;

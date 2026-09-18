@@ -12,19 +12,19 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
 
-import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
-import { CacheRuleCreateDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-create-drawer.tsx";
-import { CacheRuleEditDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-edit-drawer.tsx";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Menu } from "@langwatch/design-system/menu";
-import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { CacheRuleCreateDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-create-drawer.tsx";
+import { CacheRuleEditDrawer } from "../../../features/cache-rules/ui/sections/cache-rule-edit-drawer.tsx";
+import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
 type CacheRuleListRow = {
   id: string;

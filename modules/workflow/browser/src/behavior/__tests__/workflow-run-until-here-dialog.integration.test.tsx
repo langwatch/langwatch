@@ -2,12 +2,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import type { Component, Entry } from "@langwatch/workflow-contract";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
-import type { Component, Entry } from "@langwatch/workflow-contract";
 import {
   getWorkflowEntryNode,
   type WorkflowDatasetPreviewProps,

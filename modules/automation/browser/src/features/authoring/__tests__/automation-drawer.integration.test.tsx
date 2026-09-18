@@ -6,6 +6,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { AutomationDrawer } from "../ui/sections/automation-drawer.tsx";
 import { useAutomationStore } from "../ui/sections/automation-store.ts";
 

@@ -1,7 +1,4 @@
-import type {
-  BatchEvaluationRecord,
-  BatchEvaluationSummary,
-} from "@langwatch/dataset-contract";
+import type { BatchEvaluationRecord, BatchEvaluationSummary } from "@langwatch/dataset-contract";
 
 import type { BatchEvaluationRepository } from "../batch-evaluation.repository.ts";
 import { MemoryDatasetDatabase, type MemoryBatchEvaluation } from "./memory.dataset.database.ts";

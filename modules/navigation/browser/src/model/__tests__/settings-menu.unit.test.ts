@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { settingsMenu, type SettingsMenuGates } from "../settings-menu.ts";
 
 const EVERYTHING_CLOSED: SettingsMenuGates = {

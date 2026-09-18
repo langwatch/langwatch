@@ -1,13 +1,18 @@
 import { Text, VStack } from "@chakra-ui/react";
-import type { DatasetActionParams,SavedTriggerRow } from "@langwatch/automation-contract";
+import type { DatasetActionParams, SavedTriggerRow } from "@langwatch/automation-contract";
+import { type DatasetColumns, datasetColumnsSchema } from "@langwatch/dataset-contract";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
-import { DatasetSelector } from "../blocks/dataset-selector.tsx";
-import { type DatasetColumns, datasetColumnsSchema } from "@langwatch/dataset-contract";
+
 import { api } from "../../../../behavior/automation-api.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
+import type {
+  ClientDef,
+  ConfigFormProps,
+  SummaryIdentity,
+} from "../../../../model/provider-types.ts";
 import { keepDraftOnSubFlowReturn, announceSubFlowDeparture } from "../../behavior/sub-flow.ts";
-import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../../../../model/provider-types.ts";
+import { DatasetSelector } from "../blocks/dataset-selector.tsx";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
  *  shape the dispatcher casts to `TraceMapping` — `source` names a

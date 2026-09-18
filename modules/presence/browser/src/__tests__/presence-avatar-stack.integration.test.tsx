@@ -2,9 +2,10 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
+import type { PresenceSession } from "@langwatch/presence-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { PresenceSession } from "@langwatch/presence-contract";
+
 import { PresenceAvatarStack } from "../index.ts";
 
 afterEach(cleanup);

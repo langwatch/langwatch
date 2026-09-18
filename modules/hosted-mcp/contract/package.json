@@ -20,7 +20,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@langwatch/kernel": "workspace:*"
+    "@langwatch/kernel": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

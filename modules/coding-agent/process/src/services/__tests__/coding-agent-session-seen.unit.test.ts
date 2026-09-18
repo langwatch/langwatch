@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 /**
  * The inline Sessions-destination stamp on the fold store's commit seam: one throttled,
  * error-swallowing project touch per window.
@@ -5,12 +6,11 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { TestClock, TestProjectService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import {
   CODING_AGENT_SESSION_SEEN_WINDOW_MS,
   CodingAgentSessionSeenService,
 } from "../coding-agent-session-seen.service.ts";
-import { Temporal } from "@langwatch/time";
-import { TestClock, TestProjectService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 function createFixture(at = 1_000_000) {
   const clock = new TestClock(at);

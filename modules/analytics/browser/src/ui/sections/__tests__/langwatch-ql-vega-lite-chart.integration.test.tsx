@@ -6,12 +6,6 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import type { ReactElement } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
-
-import { LangWatchQLVegaLiteChart } from "../langwatch-ql-vega-lite-chart.tsx";
 import {
   LangWatchQLVegaLoadBlockedError,
   langwatchVegaConfig,
@@ -20,6 +14,10 @@ import {
   type LangWatchQLDataset,
   type LangWatchQLDatasetColumn,
 } from "@langwatch/analytics-contract/visualization";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import {
   barOverQueryResult,
@@ -29,6 +27,7 @@ import {
   unknownField,
   unknownSchemaVersion,
 } from "../../../__tests__/lwql-fixtures.ts";
+import { LangWatchQLVegaLiteChart } from "../langwatch-ql-vega-lite-chart.tsx";
 
 const TOKENS: LangwatchVegaTokens = {
   fontFamily: "Inter",

@@ -1,10 +1,9 @@
-import { useCallback, useRef } from "react";
-
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import type { Component, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
+import { useCallback, useRef } from "react";
 
-import { useWorkflowStore } from "./use-workflow-store.ts";
 import { buildAgentNodeData } from "../model/agent-node-data.ts";
+import { useWorkflowStore } from "./use-workflow-store.ts";
 
 export type AgentPickerCallbacks = {
   onSelect: (agent: AgentWithFields) => void;

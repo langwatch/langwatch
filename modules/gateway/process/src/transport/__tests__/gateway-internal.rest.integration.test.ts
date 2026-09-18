@@ -18,9 +18,14 @@ import {
 } from "../../repositories/gateway-guardrail.repository.ts";
 import type { GatewayInternalStoreRepository } from "../../repositories/gateway-internal-store.repository.ts";
 import { GatewayGuardrailEvaluationService } from "../../services/gateway-guardrail-evaluation.service.ts";
+import {
+  buildGatewayCanonicalString,
+  computeGatewaySignature,
+} from "../../services/gateway-internal-identity.service.ts";
 import type { GatewaySpendCommandSender } from "../../services/gateway-internal-protocol.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
-import { buildGatewayCanonicalString, computeGatewaySignature } from "../gateway-internal.rest.ts";
+import { gatewayServer } from "../../gateway.server.ts";
+import { gatewayInternalRest } from "../gateway-internal.rest.ts";
 import {
   mountGatewayInternalRest,
   signedGatewayRequest,
@@ -135,6 +140,10 @@ const drainedOutcome = {
 };
 
 describe("the gateway internal control plane", () => {
+  it("publishes the signed control-plane family from the installed gateway module", () => {
+    expect(gatewayServer.transports).toContain(gatewayInternalRest);
+  });
+
   describe("given a request signed with the shared internal secret", () => {
     it("passes the HMAC gate and reaches the change feed", async () => {
       const changes = testChangeEvents();

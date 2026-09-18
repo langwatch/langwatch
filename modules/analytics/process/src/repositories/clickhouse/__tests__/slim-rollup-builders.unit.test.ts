@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../../rules/trace-signal.rules.ts";
 import { buildRollupTimeseriesQuery } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";

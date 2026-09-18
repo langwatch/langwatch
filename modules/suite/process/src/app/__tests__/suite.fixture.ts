@@ -9,10 +9,10 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import type { SuiteExecution } from "../suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import type { SuiteRepositories } from "../../repositories/suite.repositories.ts";
+import type { SuiteExecution } from "../suite.app.ts";
 import { SuiteApp } from "../suite.app.ts";
 
 /** A run that is accepted and scheduled nowhere, recording what it was handed. */
@@ -33,7 +33,9 @@ export class RecordingSuiteExecution implements SuiteExecution {
 }
 
 export function createSuiteTestRepositories(database?: MemorySuiteDatabase): SuiteRepositories {
-  return { suites: MemorySuiteRepository.create({ database: database ?? MemorySuiteDatabase.create() }) };
+  return {
+    suites: MemorySuiteRepository.create({ database: database ?? MemorySuiteDatabase.create() }),
+  };
 }
 
 /**

@@ -10,7 +10,12 @@ import {
   subtractMaps,
 } from "./exponential-bucket.ts";
 import { type BucketEntry, extendExtrema, resetOrGap } from "./rollup-row.ts";
-import { bigint, type MetricRollupSourcePoint, previousPoint, startsNewSequence } from "./sequence.ts";
+import {
+  bigint,
+  type MetricRollupSourcePoint,
+  previousPoint,
+  startsNewSequence,
+} from "./sequence.ts";
 
 /** A point re-expressed at the bucket's common scale and zero threshold. */
 interface NormalizedPoint {

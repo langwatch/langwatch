@@ -1,7 +1,8 @@
 import type { CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { AuthzReadRepository } from "../authz-read.repository.ts";
+
 import { AuthzService } from "../../services/authz.service.ts";
+import type { AuthzReadRepository } from "../authz-read.repository.ts";
 import { StubAuthzBindingRepository } from "./support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub.ts";
 import { makeReader } from "./support/authz-read.stub.ts";
@@ -46,9 +47,7 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
       makeReader({
         findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
         findApiKeyBindings: vi.fn().mockResolvedValue(projectBinding("ADMIN")),
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(projectBinding("VIEWER")),
       });
 
@@ -135,9 +134,7 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
   describe("given a user principal", () => {
     it("never looks for an owner", async () => {
       const reader = makeReader({
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(projectBinding("ADMIN")),
       });
 

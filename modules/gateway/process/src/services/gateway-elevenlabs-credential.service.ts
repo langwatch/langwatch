@@ -4,10 +4,11 @@
  * authz-context-taking model provider service does not fit. Nothing here throws.
  */
 
-import { createLogger } from "@langwatch/observability";
-import type { GatewayElevenLabsCredentialRepository } from "../repositories/gateway-elevenlabs-credential.repository.ts";
-import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 import { isElevenLabsHost } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
+
+import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
+import type { GatewayElevenLabsCredentialRepository } from "../repositories/gateway-elevenlabs-credential.repository.ts";
 
 const logger = createLogger("langwatch:gateway:elevenlabs-credential");
 

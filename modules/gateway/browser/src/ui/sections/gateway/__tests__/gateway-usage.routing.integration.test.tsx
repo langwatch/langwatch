@@ -3,12 +3,12 @@
  * Tests that query changes (date ranges, key filters) don't move the path or navigate.
  */
 import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type React from "react";
+import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
-import userEvent from "@testing-library/user-event";
-import "@testing-library/jest-dom/vitest";
-import type React from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../ui/sections/gateway-layout.tsx", () => ({
   default: ({ children }: { children: React.ReactNode }) => children,

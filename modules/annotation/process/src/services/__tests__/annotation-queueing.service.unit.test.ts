@@ -4,6 +4,7 @@ import {
   AnnotationQueueNameTakenError,
 } from "@langwatch/annotation-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   createAnnotationTestApp,
   createAnnotationTestAuthz,

@@ -1,10 +1,11 @@
+import type { EvaluationsV3State } from "@langwatch/experiment-contract";
 /**
  * Phase 2 cell generation: comparisons the user has not finished
  * configuring.
  * @see specs/experiments/comparison-leaderboard.feature
  */
 import { describe, expect, it } from "vitest";
-import type { EvaluationsV3State } from "@langwatch/experiment-contract";
+
 import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
 
 // Helper to create test state (partial state with just what generateCells needs)

@@ -1,5 +1,5 @@
-import type { BetterAuthOptions } from "better-auth";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { BetterAuthOptions } from "better-auth";
 
 type SecondaryStorage = NonNullable<BetterAuthOptions["secondaryStorage"]>;
 

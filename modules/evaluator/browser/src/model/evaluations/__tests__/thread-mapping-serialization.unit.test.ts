@@ -1,10 +1,11 @@
+import { SERVER_ONLY_THREAD_SOURCES } from "@langwatch/dataset-contract";
 /**
  * The round trip between the mapping UI's field mappings and the `MappingState` a monitor
  * stores, for the mixed trace + thread case.
  */
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
-import { SERVER_ONLY_THREAD_SOURCES } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
+
 import { deserializeMappingStateToUI } from "../deserialize-mapping-state-to-ui.ts";
 import { serializeMappingsToMappingState } from "../serialize-mappings-to-mapping-state.ts";
 

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
 import type { RelatedAgentEntities, AgentCascadeArchive } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
+import { useEffect, useState } from "react";
+
 import type { AgentBrowser } from "../model/agent-client.ts";
 
 export interface AgentListArchiveOptions {

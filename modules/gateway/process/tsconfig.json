@@ -83,6 +83,9 @@
       "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/task/tsconfig.build.json"
     },
     {

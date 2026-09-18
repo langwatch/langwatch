@@ -1,9 +1,10 @@
-import { InvalidRuntimeConfigError, RuntimeConfig } from "@langwatch/config";
+import { ConfigParseError, parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { agentServerConfigDefinition } from "../agent.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "agent", definition: agentServerConfigDefinition, source }).value;
+import { agentServerConfig } from "../agent.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({ owners: [{ name: "agent", config: agentServerConfig }], environment }).agent;
 
 describe("agent server configuration", () => {
   describe("given a deployment names no replica count", () => {
@@ -16,7 +17,7 @@ describe("agent server configuration", () => {
   describe("given a replica count that is not a positive whole number", () => {
     /** @scenario "An unreadable switch is refused instead of read as off" */
     it("refuses the boot", () => {
-      expect(() => read({ LANGWATCH_APP_REPLICAS: "0" })).toThrow(InvalidRuntimeConfigError);
+      expect(() => read({ LANGWATCH_APP_REPLICAS: "0" })).toThrow(ConfigParseError);
     });
   });
 });

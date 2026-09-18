@@ -1,10 +1,10 @@
-import { S3Client } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { once } from "node:events";
 import { PassThrough, Readable } from "node:stream";
+
+import { S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.service.ts";
-import { S3DatasetStorageAdapter } from "../s3.dataset-storage.service.ts";
+
 import type {
   DatasetAzureConfigResolver,
   DatasetS3ClientResolver,
@@ -12,6 +12,8 @@ import type {
   DatasetBlobDriver,
   DatasetS3Client,
 } from "../../app/dataset.app.ts";
+import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.service.ts";
+import { S3DatasetStorageAdapter } from "../s3.dataset-storage.service.ts";
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: vi.fn(),
@@ -71,8 +73,7 @@ class SequencedS3Resolver implements DatasetS3ClientResolver {
     return { ...next, release };
   });
 
-  constructor(private readonly configurations: DatasetS3Client[]) {
-  }
+  constructor(private readonly configurations: DatasetS3Client[]) {}
 }
 
 function streamS3Client(body: Readable): S3Client {

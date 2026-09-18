@@ -7,12 +7,11 @@
  */
 
 import { Button, Input, Stack, Text } from "@chakra-ui/react";
-import { ChevronDown, FolderOpen, MoreVertical, Save } from "lucide-react";
-import { useRef, useState } from "react";
-
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { ChevronDown, FolderOpen, MoreVertical, Save } from "lucide-react";
+import { useRef, useState } from "react";
 
 import type { SavedChartSummary } from "../../behavior/analytics-api.ts";
 

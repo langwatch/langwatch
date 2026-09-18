@@ -5,8 +5,9 @@
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import SsoConnectionsView from "../ui/sections/sso-connections-view.tsx";
+
 import { renderWithOpsHost } from "../../../testing.tsx";
+import SsoConnectionsView from "../ui/sections/sso-connections-view.tsx";
 
 const listState = vi.hoisted(() => ({
   current: {

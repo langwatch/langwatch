@@ -6,8 +6,9 @@
  * same instances is what proves the memory backend works.
  */
 import { instantiateRepositories } from "@langwatch/kernel";
-import { presenceRepositories } from "../../presence-repositories.registry.ts";
 import { describe, expect, it } from "vitest";
+
+import { presenceRepositories } from "../../presence-repositories.registry.ts";
 
 const PROJECT_ID = "project-1";
 const SESSION_ID = "session-1";
@@ -81,7 +82,9 @@ describe("given the memory-backed presence repositories", () => {
       const sessions = await repositories.sessions.listByProject(PROJECT_ID);
 
       expect(sessions).toHaveLength(2);
-      expect(sessions.map((s) => s.sessionId)).toEqual(expect.arrayContaining(["session-a", "session-b"]));
+      expect(sessions.map((s) => s.sessionId)).toEqual(
+        expect.arrayContaining(["session-a", "session-b"]),
+      );
     });
 
     it("removes a session", async () => {

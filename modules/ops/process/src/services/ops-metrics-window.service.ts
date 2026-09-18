@@ -12,9 +12,10 @@ import type {
   RedisInfo,
   ThroughputPoint,
 } from "@langwatch/ops-contract";
-import type { RedisCpuSample } from "../rules/ops-redis-engine-cpu.rules.ts";
-import type { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { OpsMetricsRepository } from "../repositories/observe/ops-metrics.repository.ts";
+import type { RedisCpuSample } from "../rules/ops-redis-engine-cpu.rules.ts";
 
 const logger = createLogger("langwatch:ops:metrics-window");
 
@@ -47,14 +48,14 @@ export interface PersistedMetricsState {
     }
   >;
   peakJobNames: [
-      string,
-      {
-        completedPerSec: number;
-        failedPerSec: number;
-        latencyP50Ms: number;
-        latencyP99Ms: number;
-      },
-    ][];
+    string,
+    {
+      completedPerSec: number;
+      failedPerSec: number;
+      latencyP50Ms: number;
+      latencyP99Ms: number;
+    },
+  ][];
   throughputBuffer: ThroughputPoint[];
   latestTotalCompleted: number;
   latestTotalFailed: number;

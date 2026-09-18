@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { PrismaGraphTriggerSentRepository } from "../prisma.graph-trigger-sent.repository.ts";
 
 describe("PrismaGraphTriggerSentRepository candidate discovery", () => {

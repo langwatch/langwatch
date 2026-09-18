@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Peer-importable browser helpers owned by the Analytics module.",
-  "files": ["src"],
+  "files": [
+    "src"
+  ],
   "type": "module",
   "exports": {
     "./period-selector": {
@@ -17,9 +19,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
     "react-feather": "catalog:",
     "react-icons": "catalog:"
   },

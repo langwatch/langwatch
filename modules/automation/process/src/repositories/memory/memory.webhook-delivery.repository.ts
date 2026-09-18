@@ -1,6 +1,7 @@
 import type { WebhookDeliveryInput, WebhookDeliveryRow } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
+
 import { WebhookDeliveryRepository } from "../webhook-delivery.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 
@@ -42,8 +43,7 @@ export class MemoryWebhookDeliveryRepository extends WebhookDeliveryRepository {
     return Promise.resolve(
       this.memory.webhookDeliveries
         .filter(
-          (entry) =>
-            entry.projectId === input.projectId && entry.row.triggerId === input.triggerId,
+          (entry) => entry.projectId === input.projectId && entry.row.triggerId === input.triggerId,
         )
         .map((entry) => entry.row)
         .toSorted((left, right) => right.firedAt.getTime() - left.firedAt.getTime())

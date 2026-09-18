@@ -3,8 +3,9 @@
  * from features not yet split. Segment names are load - bearing for React Query cache.
  */
 
-import type { codingAgentTrpc } from "@langwatch/coding-agent-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { codingAgentTrpc } from "@langwatch/coding-agent-contract";
+
 import type { PullRequestStatus } from "./pull-request-status.ts";
 
 /** One pull request the page is asking the current state of. */

@@ -5,53 +5,37 @@
       "id": "agent",
       "root": "modules/agent",
       "classification": "core",
-      "subjects": [
-        "agent"
-      ]
+      "subjects": ["agent"]
     },
     {
       "id": "analytics",
       "root": "modules/analytics",
       "classification": "core",
-      "subjects": [
-        "analytics"
-      ]
+      "subjects": ["analytics"]
     },
     {
       "id": "annotation",
       "root": "modules/annotation",
       "classification": "core",
-      "subjects": [
-        "annotation"
-      ]
+      "subjects": ["annotation"]
     },
     {
       "id": "api-key",
       "root": "modules/api-key",
       "classification": "core",
-      "subjects": [
-        "api-key"
-      ]
+      "subjects": ["api-key"]
     },
     {
       "id": "auth",
       "root": "modules/auth",
       "classification": "core",
-      "subjects": [
-        "auth",
-        "cli-bootstrap",
-        "cli-session",
-        "cli-token"
-      ]
+      "subjects": ["auth", "cli-bootstrap", "cli-session", "cli-token"]
     },
     {
       "id": "authz",
       "root": "modules/authz",
       "classification": "core",
-      "subjects": [
-        "authz",
-        "authz-grant"
-      ]
+      "subjects": ["authz", "authz-grant"]
     },
     {
       "id": "automation",
@@ -69,203 +53,139 @@
       "id": "coding-agent",
       "root": "modules/coding-agent",
       "classification": "core",
-      "subjects": [
-        "coding-agent"
-      ]
+      "subjects": ["coding-agent"]
     },
     {
       "id": "dashboard",
       "root": "modules/dashboard",
       "classification": "core",
-      "subjects": [
-        "dashboard",
-        "graph",
-        "saved-workbench-chart"
-      ]
+      "subjects": ["dashboard", "graph", "saved-workbench-chart"]
     },
     {
       "id": "data-privacy",
       "root": "modules/data-privacy",
       "classification": "core",
-      "subjects": [
-        "data-privacy"
-      ]
+      "subjects": ["data-privacy"]
     },
     {
       "id": "data-retention",
       "root": "modules/data-retention",
       "classification": "core",
-      "subjects": [
-        "data-retention"
-      ]
+      "subjects": ["data-retention"]
     },
     {
       "id": "dataset",
       "root": "modules/dataset",
       "classification": "core",
-      "subjects": [
-        "dataset",
-        "dataset-record"
-      ]
+      "subjects": ["dataset", "dataset-record"]
     },
     {
       "id": "entitlement",
       "root": "modules/entitlement",
       "classification": "core",
-      "subjects": [
-        "entitlement"
-      ]
+      "subjects": ["entitlement"]
     },
     {
       "id": "evaluation",
       "root": "modules/evaluation",
       "classification": "core",
-      "subjects": [
-        "evaluation"
-      ]
+      "subjects": ["evaluation"]
     },
     {
       "id": "evaluator",
       "root": "modules/evaluator",
       "classification": "core",
-      "subjects": [
-        "evaluator"
-      ]
+      "subjects": ["evaluator"]
     },
     {
       "id": "experiment",
       "root": "modules/experiment",
       "classification": "core",
-      "subjects": [
-        "experiment"
-      ]
+      "subjects": ["experiment"]
     },
     {
       "id": "feature-flag",
       "root": "modules/feature-flag",
       "classification": "core",
-      "subjects": [
-        "feature-flag"
-      ]
+      "subjects": ["feature-flag"]
     },
     {
       "id": "gateway",
       "root": "modules/gateway",
       "classification": "core",
-      "subjects": [
-        "gateway",
-        "personal-virtual-key",
-        "routing-policy",
-        "virtual-key"
-      ]
+      "subjects": ["gateway", "personal-virtual-key", "routing-policy", "virtual-key"]
     },
     {
       "id": "github",
       "root": "modules/github",
       "classification": "core",
-      "subjects": [
-        "github",
-        "github-installation",
-        "github-pull-request"
-      ]
+      "subjects": ["github", "github-installation", "github-pull-request"]
     },
     {
       "id": "hosted-mcp",
       "root": "modules/hosted-mcp",
       "classification": "core",
-      "subjects": [
-        "hosted-mcp",
-        "mcp-oauth"
-      ]
+      "subjects": ["hosted-mcp", "mcp-oauth"]
     },
     {
       "id": "identity",
       "root": "modules/identity",
       "classification": "core",
-      "subjects": [
-        "identity"
-      ]
+      "subjects": ["identity"]
     },
     {
       "id": "langy",
       "root": "modules/langy",
       "classification": "core",
-      "subjects": [
-        "conversation",
-        "credential",
-        "langy",
-        "message",
-        "relay",
-        "turn"
-      ]
+      "subjects": ["conversation", "credential", "langy", "message", "relay", "turn"]
     },
     {
       "id": "log",
       "root": "modules/log",
       "classification": "core",
-      "subjects": [
-        "log",
-        "log-ingestion"
-      ]
+      "subjects": ["log", "log-ingestion"]
     },
     {
       "id": "metric",
       "root": "modules/metric",
       "classification": "core",
-      "subjects": [
-        "metric",
-        "metric-ingestion"
-      ]
+      "subjects": ["metric", "metric-ingestion"]
     },
     {
       "id": "model-provider",
       "root": "modules/model-provider",
       "classification": "core",
-      "subjects": [
-        "model-provider"
-      ]
+      "subjects": ["model-provider"]
     },
     {
       "id": "monitor",
       "root": "modules/monitor",
       "classification": "core",
-      "subjects": [
-        "monitor"
-      ]
+      "subjects": ["monitor"]
     },
     {
       "id": "navigation",
       "root": "modules/navigation",
       "classification": "core",
-      "subjects": [
-        "navigation"
-      ]
+      "subjects": ["navigation"]
     },
     {
       "id": "notification",
       "root": "modules/notification",
       "classification": "core",
-      "subjects": [
-        "notification"
-      ]
+      "subjects": ["notification"]
     },
     {
       "id": "onboarding",
       "root": "modules/onboarding",
       "classification": "core",
-      "subjects": [
-        "onboarding"
-      ]
+      "subjects": ["onboarding"]
     },
     {
       "id": "ops",
       "root": "modules/ops",
       "classification": "core",
-      "subjects": [
-        "admin",
-        "impersonation",
-        "ops"
-      ]
+      "subjects": ["admin", "impersonation", "ops"]
     },
     {
       "id": "organization",
@@ -285,136 +205,97 @@
       "id": "platform-health",
       "root": "modules/platform-health",
       "classification": "core",
-      "subjects": [
-        "platform-health"
-      ]
+      "subjects": ["platform-health"]
     },
     {
       "id": "presence",
       "root": "modules/presence",
       "classification": "core",
-      "subjects": [
-        "presence"
-      ]
+      "subjects": ["presence"]
     },
     {
       "id": "project",
       "root": "modules/project",
       "classification": "core",
-      "subjects": [
-        "project"
-      ]
+      "subjects": ["project"]
     },
     {
       "id": "prompt",
       "root": "modules/prompt",
       "classification": "core",
-      "subjects": [
-        "prompt",
-        "prompt-tag",
-        "prompt-version"
-      ]
+      "subjects": ["prompt", "prompt-tag", "prompt-version"]
     },
     {
       "id": "role",
       "root": "modules/role",
       "classification": "core",
-      "subjects": [
-        "custom-role",
-        "role"
-      ]
+      "subjects": ["custom-role", "role"]
     },
     {
       "id": "scenario",
       "root": "modules/scenario",
       "classification": "core",
-      "subjects": [
-        "scenario",
-        "simulation"
-      ]
+      "subjects": ["scenario", "simulation"]
     },
     {
       "id": "secret",
       "root": "modules/secret",
       "classification": "core",
-      "subjects": [
-        "secret"
-      ]
+      "subjects": ["secret"]
     },
     {
       "id": "share",
       "root": "modules/share",
       "classification": "core",
-      "subjects": [
-        "share"
-      ]
+      "subjects": ["share"]
     },
     {
       "id": "stored-object",
       "root": "modules/stored-object",
       "classification": "core",
-      "subjects": [
-        "stored-object"
-      ]
+      "subjects": ["stored-object"]
     },
     {
       "id": "suite",
       "root": "modules/suite",
       "classification": "core",
-      "subjects": [
-        "suite"
-      ]
+      "subjects": ["suite"]
     },
     {
       "id": "topic",
       "root": "modules/topic",
       "classification": "core",
-      "subjects": [
-        "topic",
-        "topic-clustering"
-      ]
+      "subjects": ["topic", "topic-clustering"]
     },
     {
       "id": "trace",
       "root": "modules/trace",
       "classification": "core",
-      "subjects": [
-        "trace",
-        "trace-ingestion"
-      ]
+      "subjects": ["trace", "trace-ingestion"]
     },
     {
       "id": "user",
       "root": "modules/user",
       "classification": "core",
-      "subjects": [
-        "user",
-        "user-avatar"
-      ]
+      "subjects": ["user", "user-avatar"]
     },
     {
       "id": "workflow",
       "root": "modules/workflow",
       "classification": "core",
-      "subjects": [
-        "workflow"
-      ]
+      "subjects": ["workflow"]
     },
     {
       "id": "audit-log",
       "root": "modules/audit-log",
       "classification": "core",
-      "subjects": [
-        "audit-log"
-      ]
+      "subjects": ["audit-log"]
     },
     {
       "id": "billing",
       "root": "enterprise/modules/billing",
       "classification": "enterprise",
-      "subjects": [
-        "billing"
-      ]
+      "subjects": ["billing"]
     },
     {
       "id": "governance",
@@ -449,51 +330,37 @@
       "id": "licensing",
       "root": "enterprise/modules/licensing",
       "classification": "enterprise",
-      "subjects": [
-        "license",
-        "licensing"
-      ]
+      "subjects": ["license", "licensing"]
     },
     {
       "id": "managed-provider",
       "root": "enterprise/modules/managed-provider",
       "classification": "enterprise",
-      "subjects": [
-        "managed-model-provider",
-        "managed-provider"
-      ]
+      "subjects": ["managed-model-provider", "managed-provider"]
     },
     {
       "id": "saas",
       "root": "enterprise/modules/saas",
       "classification": "enterprise",
-      "subjects": [
-        "saas"
-      ]
+      "subjects": ["saas"]
     },
     {
       "id": "scim",
       "root": "enterprise/modules/scim",
       "classification": "enterprise",
-      "subjects": [
-        "scim"
-      ]
+      "subjects": ["scim"]
     },
     {
       "id": "sso",
       "root": "enterprise/modules/sso",
       "classification": "enterprise",
-      "subjects": [
-        "sso"
-      ]
+      "subjects": ["sso"]
     },
     {
       "id": "webhook",
       "root": "modules/webhook",
       "classification": "core",
-      "subjects": [
-        "webhook"
-      ]
+      "subjects": ["webhook"]
     }
   ]
 }

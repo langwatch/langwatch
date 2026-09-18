@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import slugify from "slugify";
+
 import {
   type GroupIdentity,
   type PersonalWorkspaceIdentity,
@@ -47,8 +48,7 @@ export class PersonalWorkspaceIdentityAdapter implements PersonalWorkspaceIdenti
     return new PersonalWorkspaceIdentityAdapter();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   create(input: { userId: string; organizationId: string }): PersonalWorkspaceResourceIds {
     const slugPrefix = input.userId.toLowerCase().slice(0, SLUG_USER_PREFIX_CHARS);
@@ -73,8 +73,7 @@ export class TeamIdentityAdapter implements TeamIdentity {
     return new TeamIdentityAdapter();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   createTeam(input: { name: string }): { teamId: string; slug: string } {
     const teamId = `team_${nanoid()}`;
@@ -99,8 +98,7 @@ export class GroupIdentityAdapter implements GroupIdentity {
     return new GroupIdentityAdapter();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   createGroupId(): string {
     return generate(GROUP_KSUID_RESOURCE).toString();

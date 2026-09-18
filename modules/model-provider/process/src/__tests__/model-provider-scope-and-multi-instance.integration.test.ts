@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 /**
  * Real-Postgres coverage for multi-instance provider rows: a second row at a different scope
  * instead of a silent overwrite, the atomic multi-scope write gate, cross-tenant read refusal,
@@ -6,16 +8,15 @@
  * @see specs/model-providers/scope-and-multi-instance.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
+
+import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
-import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
-import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
+import { ModelProviderExecutionService } from "../services/model-provider-execution.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
 import { ModelProviderQueryService } from "../services/model-provider-query.service.ts";
-import { ModelProviderExecutionService } from "../services/model-provider-execution.service.ts";
-import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
+import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import {
   DB_URL,
   IdentityModelProviderCredentialCodec,

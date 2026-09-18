@@ -1,14 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
-import {
-  AuthzCutoverFailureReporter,
-  type AuthzCutoverReadFailure,
-} from "../authz-cutover-telemetry.service.ts";
 import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,
 } from "../../repositories/prisma/prisma.authz-cutover.repository.ts";
-import { AuthzCutoverGateService, ENGINE_GATE_CACHE_TTL_MS } from "../authz-cutover-gate.service.ts";
+import {
+  AuthzCutoverGateService,
+  ENGINE_GATE_CACHE_TTL_MS,
+} from "../authz-cutover-gate.service.ts";
+import {
+  AuthzCutoverFailureReporter,
+  type AuthzCutoverReadFailure,
+} from "../authz-cutover-telemetry.service.ts";
 
 const ORG_ID = "org_gate";
 
@@ -96,9 +100,7 @@ describe("AuthzCutoverGateService", () => {
       reporter: new RecordingReporter(),
     });
 
-    await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(
-      occurredAt,
-    );
+    await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toEqual(occurredAt);
     await expect(adapter.findFinalizedAt({ organizationId: ORG_ID })).resolves.toBeNull();
   });
 
@@ -106,7 +108,9 @@ describe("AuthzCutoverGateService", () => {
     const adapter = AuthzCutoverGateService.create({
       repository: PrismaAuthzCutoverRepository.create({
         database: {
-          systemMigrationTenantState: { findUnique: vi.fn().mockRejectedValue(new Error("pg is down")) },
+          systemMigrationTenantState: {
+            findUnique: vi.fn().mockRejectedValue(new Error("pg is down")),
+          },
         } as AuthzCutoverDatabase,
       }),
       reporter: new RecordingReporter(),

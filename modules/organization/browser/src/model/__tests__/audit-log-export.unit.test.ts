@@ -4,12 +4,14 @@
  * `apps/ui/tests/ui-file-download.unit.test.ts`. Spec: specs/audit-log/audit-log.feature.
  */
 
-import { describe, expect, it } from "vitest";
-import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 import type { WireOf } from "@langwatch/api/web";
+import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
+import { describe, expect, it } from "vitest";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
+import { Temporal } from "@langwatch/time";
+
 import {
   auditLogCsvRow,
   auditLogCsvTable,
@@ -19,7 +21,6 @@ import {
   CSV_JSON_CAP,
   truncateJsonForCsv,
 } from "../audit-log-export.ts";
-import { Temporal } from "@langwatch/time";
 
 function row(overrides: Partial<EnrichedAuditLog> = {}): EnrichedAuditLog {
   return {

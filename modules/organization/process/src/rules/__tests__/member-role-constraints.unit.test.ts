@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
+import { describe, expect, it } from "vitest";
+
 import type { TeamRoleValue } from "../member-role-constraints.rules.ts";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,

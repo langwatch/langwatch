@@ -7,20 +7,21 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+
+import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import {
   CodexAccountService,
   CodexOAuthModelProviderTokenRefresherAdapter,
 } from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
-import { UnavailableModelProviderCredentialProbeAdapter } from "../../services/unavailable.model-provider-credential-probe.service.ts";
 import { PrefixedModelProviderIdAdapter } from "../../services/prefixed.model-provider-id.service.ts";
 import { RegistryModelProviderCatalogAdapter } from "../../services/registry.model-provider-catalog.service.ts";
+import { UnavailableModelProviderCredentialProbeAdapter } from "../../services/unavailable.model-provider-credential-probe.service.ts";
 import { UnmanagedModelProviderGatewayAdapter } from "../../services/unmanaged.model-provider-gateway.service.ts";
 import { VercelAiModelTranslationAdapter } from "../../services/vercel-ai.model-translation.service.ts";
 import { WindowedModelProviderConnectionRateLimiterAdapter } from "../../services/windowed.model-provider-connection-rate-limiter.service.ts";
-import type { ModelProviderCredentialProbe } from "../model-provider.members.ts";
-import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
-import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import { ModelProviderApp, type ModelProviderInfrastructure } from "../model-provider.app.ts";
+import type { ModelProviderCredentialProbe } from "../model-provider.members.ts";
 
 /** A suite that did not decide the issuer's answers must not reach one. */
 const refuseFetch: typeof fetch = () => {

@@ -12,6 +12,7 @@ import {
   type SuiteFieldDefinition,
   suiteFieldDefinitionsSchema,
 } from "@langwatch/scenario-contract";
+
 import {
   SuiteEvaluatorMappingInvalidError,
   SuiteEvaluatorNotFoundError,
@@ -25,15 +26,12 @@ import {
  * the first bad identifier by position; the error names the identifier
  * itself, which is what the editor shows.
  */
-export function readSuiteFieldDefinitions(
-  raw: unknown,
-): SuiteFieldDefinition[] {
+export function readSuiteFieldDefinitions(raw: unknown): SuiteFieldDefinition[] {
   const parsed = suiteFieldDefinitionsSchema.safeParse(raw);
   if (parsed.success) return parsed.data;
   const issue = parsed.error.issues[0];
   const index = typeof issue?.path[0] === "number" ? issue.path[0] : undefined;
-  const entry =
-    index !== undefined && Array.isArray(raw) ? raw[index] : undefined;
+  const entry = index !== undefined && Array.isArray(raw) ? raw[index] : undefined;
   const identifier =
     entry && typeof entry === "object" && "identifier" in entry
       ? String((entry as { identifier: unknown }).identifier)
@@ -102,9 +100,7 @@ export function assertFieldsNotInUse({
     const evaluatorIds = [
       ...new Set(
         attachments
-          .filter((attachment) =>
-            fieldIdentifiersReadBy([attachment]).has(identifier),
-          )
+          .filter((attachment) => fieldIdentifiersReadBy([attachment]).has(identifier))
           .map((attachment) => attachment.evaluatorId),
       ),
     ];

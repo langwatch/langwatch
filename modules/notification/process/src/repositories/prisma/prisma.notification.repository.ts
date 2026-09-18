@@ -6,8 +6,9 @@ import {
   type Notification,
   type NotificationRecentQuery,
 } from "@langwatch/notification-contract";
-import type { Prisma } from "@langwatch/prisma-client/generated";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+
 import type { NotificationRepository } from "../notification.repository.ts";
 
 export class PrismaNotificationRepository

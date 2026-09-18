@@ -35,12 +35,12 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/evaluator-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/time": "workspace:*",
     "nanoid": "catalog:",
     "zod": "catalog:"

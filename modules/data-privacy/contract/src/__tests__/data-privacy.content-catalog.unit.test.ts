@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CONTENT_CATEGORIES } from "../data-privacy.ts";
+
 import { CHAT_ARRAY_KEYS, CONTENT_KEY_CATALOG } from "../data-privacy.content-catalog.ts";
 import {
   DROPPED_ATTRIBUTES_MARKER_MAX_KEYS,
   PRIVACY_DROPPED_ATTRIBUTES_MARKER_ATTR,
   PRIVACY_DROPPED_MARKER_ATTR,
 } from "../data-privacy.markers.ts";
+import { CONTENT_CATEGORIES } from "../data-privacy.ts";
 
 /**
  * Spec: modules/data-privacy/specs/span-content-drop.feature
@@ -57,7 +58,9 @@ describe("CONTENT_KEY_CATALOG", () => {
 
       /** @scenario "Every content category has a key set" */
       it("covers all four categories", () => {
-        expect(Object.keys(CONTENT_KEY_CATALOG).toSorted()).toEqual([...CONTENT_CATEGORIES].toSorted());
+        expect(Object.keys(CONTENT_KEY_CATALOG).toSorted()).toEqual(
+          [...CONTENT_CATEGORIES].toSorted(),
+        );
       });
 
       /**

@@ -1,16 +1,14 @@
+import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
 /**
  * @vitest-environment jsdom
  * Tags field integration test in New virtual key drawer. Verifies the
  * explanation is reachable when typing a tag.
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
-
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
-
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import { VirtualKeyCreateDrawer } from "../ui/sections/virtual-key-create-drawer.tsx";
 
 vi.mock("../../../behavior/gateway-api.ts", () => ({

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { scalarsFromCanonicalAttributes } from "../index.ts";
 
 describe("scalarsFromCanonicalAttributes", () => {

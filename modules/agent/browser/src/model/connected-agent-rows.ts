@@ -4,6 +4,7 @@
  */
 
 import { formatDistanceStrict, nowInstant, toEpochMs, type TimeInput } from "@langwatch/time";
+
 import type { ConnectedAgentBrowser } from "./agent-client.ts";
 
 /** The scope a development card belongs to: a person, or a machine. */

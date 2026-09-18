@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
+
 import {
   type EmailContent,
   EmailGateway,

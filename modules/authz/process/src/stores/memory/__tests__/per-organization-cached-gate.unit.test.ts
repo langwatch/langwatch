@@ -1,5 +1,6 @@
 // Tests shared helper; logged throws, concurrent reads coalesce, invalidation racing.
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import {
   PerOrganizationCachedGateStore,
   type PerOrganizationCachedGateStoreOptions,

@@ -7,6 +7,7 @@
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor, languages } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
+
 import type { LangWatchQLEditorMarker } from "../model/lwql-failure.ts";
 import { LWQL_LANGUAGE_ITEMS } from "../model/lwql-language-items.ts";
 import {

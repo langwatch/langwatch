@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import type { OrganizationReading } from "../../model/organization-host.ts";
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../testing.tsx";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";

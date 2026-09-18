@@ -1,7 +1,8 @@
+import { toError } from "@langwatch/browser-host/errors";
 import { explainSerializedError } from "@langwatch/handled-error/presentation";
 import { createLogger } from "@langwatch/observability/browser";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { toError } from "@langwatch/browser-host/errors";
+
 import { FetchSSETimeoutError } from "./errors.ts";
 
 const logger = createLogger("sseClient");

@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import type {
   CallFrame,
   CancelFrame,
@@ -30,13 +31,20 @@ export const agentConnectRegisterOutputSchema = z.object({
   instanceToken: z.string().optional(),
 });
 export const agentConnectPollQuerySchema = z.object({
-  inFlight: z.string().max(200_000).optional().catch(void 0),
+  inFlight: z
+    .string()
+    .max(200_000)
+    .optional()
+    .catch(void 0),
 });
 export const agentConnectPollOutputSchema = z.object({
   frames: z.array(z.union([callFrameSchema, cancelFrameSchema])),
 });
 export const agentConnectFramesInputSchema = z.object({
-  frames: z.array(z.union([ackFrameSchema, resultFrameSchema, deregisterFrameSchema])).min(1).max(100),
+  frames: z
+    .array(z.union([ackFrameSchema, resultFrameSchema, deregisterFrameSchema]))
+    .min(1)
+    .max(100),
 });
 export const agentConnectFramesOutputSchema = z.object({ accepted: z.number().int() });
 

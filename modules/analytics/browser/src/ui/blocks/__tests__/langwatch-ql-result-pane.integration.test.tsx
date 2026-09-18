@@ -5,21 +5,19 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { LangWatchQLDiagnostic, LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangWatchQLDiagnostic, LangWatchQLQueryResult } from "@langwatch/analytics-contract";
-
+import { handledErrorEnvelope, lwqlResult } from "../../../__tests__/lwql-fixtures.ts";
 import { readHandledError } from "../../../model/handled-error.ts";
-import { LangWatchQLResultPane } from "../langwatch-ql-result-pane.tsx";
 import type {
   LangWatchQLAnswer,
   LangWatchQLRequestState,
 } from "../../../model/lwql-request-state.ts";
-
-import { handledErrorEnvelope, lwqlResult } from "../../../__tests__/lwql-fixtures.ts";
+import { LangWatchQLResultPane } from "../langwatch-ql-result-pane.tsx";
 
 const SUBMITTED_SQL = "SELECT trace_id FROM analytics.traces_daily";
 

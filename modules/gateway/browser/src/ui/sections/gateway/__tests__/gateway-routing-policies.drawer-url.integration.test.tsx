@@ -3,12 +3,12 @@
  * URL-routed editor; page side opens drawer, editor side rebuilds from policy id.
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type React from "react";
+import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx";
-import userEvent from "@testing-library/user-event";
-import "@testing-library/jest-dom/vitest";
-import type React from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { policies, organization } = vi.hoisted(() => ({
   organization: {

@@ -18,7 +18,9 @@ describe("the /api/auth REST family", () => {
     });
 
     it("keeps every path, operation id and method", () => {
-      expect(declaration.routes.map((route) => [route.path, route.operation, route.methods])).toEqual([
+      expect(
+        declaration.routes.map((route) => [route.path, route.operation, route.methods]),
+      ).toEqual([
         ["/api/auth/validate", "validateProjectAuthToken", ["post"]],
         ["/api/auth/session", "readBrowserAuthSession", ["get"]],
         ["/api/auth/logout", "endBrowserSessionAndRedirect", ["get"]],

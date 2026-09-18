@@ -1,3 +1,4 @@
+import type { LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 /**
  * The function-name allowlist, driven through the real ClickHouse parser. Two claims, and the
  * second is the one that is easy to fake.
@@ -7,7 +8,6 @@ import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
-import type { LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 
 const POLICY = {
   allowedTables: ["analytics.traces", "analytics.spans"],

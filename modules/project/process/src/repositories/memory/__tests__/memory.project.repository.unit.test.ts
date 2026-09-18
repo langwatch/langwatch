@@ -1,6 +1,7 @@
 import { ProjectNotFoundError, type Team } from "@langwatch/project-contract";
 import { fromDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { MemoryProjectDatabase } from "../memory.project.database.ts";
 import { MemoryProjectRepository } from "../memory.project.repository.ts";
 

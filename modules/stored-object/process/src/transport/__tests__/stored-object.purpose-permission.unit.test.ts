@@ -3,6 +3,7 @@
  * Read route authorizes by object purpose (traces:view vs scenarios:view).
  */
 import { describe, expect, it } from "vitest";
+
 import { requiredPermissionForPurpose } from "../stored-object-file.rest.ts";
 
 describe("requiredPermissionForPurpose", () => {

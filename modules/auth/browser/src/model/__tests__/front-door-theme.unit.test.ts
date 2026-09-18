@@ -1,9 +1,8 @@
+import { createDesignSystem } from "@langwatch/design-system/system";
 /**
  * Front door palette is a theme not stylesheet; tokens reach system and don't change other surfaces
  */
 import { describe, expect, it } from "vitest";
-
-import { createDesignSystem } from "@langwatch/design-system/system";
 
 import { frontDoorThemeConfig } from "../front-door-theme.ts";
 

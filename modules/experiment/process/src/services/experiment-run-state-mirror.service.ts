@@ -2,9 +2,10 @@
  * The run-state half of a streaming execution.
  */
 
+import type { EvaluationV3Event } from "@langwatch/experiment-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { EvaluationV3Event } from "@langwatch/experiment-contract";
+
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 
 const logger = createLogger("langwatch:experiment:run-state-mirror");

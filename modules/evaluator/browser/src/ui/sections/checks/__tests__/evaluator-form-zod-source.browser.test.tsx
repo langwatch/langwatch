@@ -14,12 +14,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { AVAILABLE_EVALUATORS, evaluatorsSchema } from "@langwatch/evaluator-contract";
 import "@testing-library/jest-dom/vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import type { z } from "zod";
-import { AVAILABLE_EVALUATORS, evaluatorsSchema } from "@langwatch/evaluator-contract";
 
 afterEach(() => cleanup());
 

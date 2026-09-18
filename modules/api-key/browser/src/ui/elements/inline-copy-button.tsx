@@ -8,6 +8,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Clipboard } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 
 export function InlineCopyButton({

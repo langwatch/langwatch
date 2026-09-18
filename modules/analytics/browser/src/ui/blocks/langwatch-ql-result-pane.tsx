@@ -5,11 +5,10 @@
  */
 
 import { Badge, Box, Button, HStack, Spinner, Stack, Text, VStack } from "@chakra-ui/react";
+import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import { type ReactNode, useId, useState } from "react";
 
-import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import { formatNumber } from "../../model/format.ts";
-
 import {
   type LangWatchQLFailure,
   LWQL_TIMEOUT_CODE,

@@ -1,14 +1,15 @@
-import { bindRestMiddleware,ForbiddenError } from "@langwatch/api/rest";
-import type { RedisConnection } from "@langwatch/redis-client";
-import { defineServerModule } from "@langwatch/kernel";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { bindRestCredential, bindRestMiddleware, ForbiddenError } from "@langwatch/api/rest";
 import type { GatewayRealtimeSession } from "@langwatch/gateway-contract";
+import { defineServerModule } from "@langwatch/kernel";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { nowInstant, type Instant } from "@langwatch/time";
+
 import { GatewayApp } from "./app/gateway.app.ts";
 import type {
   GatewayModelProviderCredentials,
   GatewaySpendConfirmation,
 } from "./app/gateway.members.ts";
-import { ModelCatalogGatewaySpendRatingService } from "./services/model-catalog-gateway-spend-rating.service.ts";
+import type { GatewayRealtimeSessionRepository } from "./repositories/gateway-realtime-session.repository.ts";
 import {
   PrismaGatewayElevenLabsCredentialRepository,
   type GatewayElevenLabsCredentialDatabase,
@@ -17,13 +18,13 @@ import {
   PrismaGatewayRealtimeSessionRepository,
   type GatewayRealtimeSessionDatabase,
 } from "./repositories/prisma/prisma.gateway-realtime-session.repository.ts";
-import type { GatewayRealtimeSessionRepository } from "./repositories/gateway-realtime-session.repository.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
 } from "./services/gateway-budget-change-dedupe.service.ts";
 import { GatewayElevenLabsCredentialService } from "./services/gateway-elevenlabs-credential.service.ts";
+import { GatewayInternalIdentity } from "./services/gateway-internal-identity.service.ts";
 import {
   elevenLabsConversationReportSchema,
   GatewayRealtimeSessionReconciliationService,
@@ -38,12 +39,15 @@ import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "./services/gateway-realtime-session.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "./services/model-catalog-gateway-spend-rating.service.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
 import { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
+import { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 import { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
+import { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 import { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
@@ -55,15 +59,22 @@ export const gatewayServer = defineServerModule("gateway")
   .withTransports(
     agentCacheRest,
     elevenLabsWebhookRest,
+    gatewayInternalRest,
     gatewayBudgetTrpcTransport,
     gatewayCacheRuleTrpcTransport,
     gatewayGuardrailTrpcTransport,
     gatewayPlatformRest,
     gatewaySpendRest,
+    gatewaySpendEventTrpcTransport,
     gatewayUsageTrpcTransport,
     virtualKeyTrpcTransport,
   )
-  .withTransportFacts(({ dependencies }) => [
+  .withTransportFacts(({ dependencies, members }) => [
+    // The gateway control plane is signed rather than bearer-authenticated.
+    // It owns the same declared secret as the data-plane client.
+    bindRestCredential("internalSecret", () =>
+      GatewayInternalIdentity.create(members.secrets.find("LW_GATEWAY_INTERNAL_SECRET")),
+    ),
     // The callback arrives publicly and the application verifies the raw bytes
     // against the provider row's own stored secret, so the header is all the
     // transport carries.

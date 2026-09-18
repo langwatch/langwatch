@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+
 import {
   ALERT_TRIGGER_DEFAULTS,
   renderTriggerEmail,
@@ -7,12 +8,16 @@ import {
   type SlackTemplateType,
 } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
-import type { AutomationClock,AutomationGraphDelivery,
+
+import type {
+  AutomationClock,
+  AutomationGraphDelivery,
   GraphAlertDispatchInput,
-  GraphAlertDispatchResult } from "../app/automation.members.ts";
+  GraphAlertDispatchResult,
+} from "../app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
-import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
+import type { AutomationEmailCapService } from "./email-cap.service.ts";
 
 function destinationHash(destination: string): string {
   return createHash("sha256").update(destination).digest("hex").slice(0, 16);

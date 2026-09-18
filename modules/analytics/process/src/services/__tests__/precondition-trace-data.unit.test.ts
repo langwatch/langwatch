@@ -1,10 +1,11 @@
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Recovered with the projection: these pin which attribute key each field
  * is spelled with, including the three legacy metadata spellings and order.
  */
 import { describe, expect, it } from "vitest";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+
 import { PreconditionTraceDataService } from "../precondition-trace-data.service.ts";
 
 const SUBJECT = PreconditionTraceDataService.create();

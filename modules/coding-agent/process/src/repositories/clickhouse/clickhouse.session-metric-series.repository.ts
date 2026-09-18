@@ -1,13 +1,11 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentSessionMetricSeriesRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import {
-  clickHouseMomentOf,
-  type ClickHouseMoment,
-} from "./clickhouse.mapper.ts";
+
 import { SessionMetricSeriesRepository as MetricSeriesRepository } from "../session-metric-series.repository.ts";
+import { clickHouseMomentOf, type ClickHouseMoment } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "session_metric_series" as const;
 

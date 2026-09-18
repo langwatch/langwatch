@@ -1,40 +1,46 @@
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * Auth module application: browser sessions and signed-out door. One application
  * for one person; reaches all state through member dependencies, not ambient.
  */
 import {
   AuthApi,
+  assertAuthServerConfig,
+  authServerConfig,
   AuthUnavailableError,
   AuthValidateRateLimitedError,
   type AuthApi as AuthApiContract,
+  type AuthServerConfig,
   type BrowserSession,
+  type CliAccessSession,
   type InviteLanding,
   type SignUpVerificationResult,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
-import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityEmailService, RoutingDecision } from "@langwatch/identity-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { resolveRequestBound } from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { resolveRequestBound } from "@langwatch/plans";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
-import { z } from "zod";
-import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
+
+import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
+import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
+import { RedisCliDeviceSessionRepository } from "../repositories/redis/redis.cli-device-session.repository.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
+import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
 import {
   SignUpVerificationService,
   type SignUpAccountDirectory,
   type SignUpAccountFactory,
   type SignUpVerificationMailer,
 } from "../services/signup-verification.service.ts";
-import type { AuthDirectory } from "./auth.members.ts";
 import type { AuthRestFederatedLogout, AuthRestSession } from "../transport/auth.rest.ts";
-import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
-import { buildBetterAuth } from "./auth-composition.build.ts";
+import { buildBetterAuth, type BetterAuthDeploymentIdentity } from "./auth-composition.build.ts";
+import type { AuthDirectory } from "./auth.members.ts";
 
 /**
  * The account rows sign-up reads and confirms. Auth owns neither: the `User`
@@ -64,11 +70,22 @@ export type AuthSignUpCollaborators = Readonly<{
 }>;
 
 /**
+ * The closed members this module reads through {@link reads}, restated as a
+ * named tuple so `publicBaseUrl` (a process fact, not one of the fourteen)
+ * can be appended to the runtime list below without losing this typing.
+ */
+const AUTH_CLOSED_READS = reads("logger", "prisma", "redis", "rateLimiter", "secrets");
+
+/**
  * Process-supplied infrastructure. Declared members required at boot;
  * front-door features need identity, organization, and mail peers.
  */
-export type AuthInfrastructure = MembersRead<typeof AuthApp.reads> &
+export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
   Readonly<{
+    /** The public base URL this process was deployed under, or absent where
+     * it named none — the process's own fact (`packages/process-server`),
+     * never a module-declared env spelling. */
+    publicBaseUrl: string | undefined;
     /** The address the identifier ledger holds for a person, where it holds
      * one. `undefined` until the front-door wiring lane supplies identity's
      * service — the session read then falls back to the stored user's own
@@ -100,44 +117,23 @@ export type AuthInfrastructure = MembersRead<typeof AuthApp.reads> &
     /** This deployment's sign-in mode, ADR-027's single source of truth.
      * `undefined` until the front-door wiring lane supplies it. */
     authProvider: (() => Promise<string>) | undefined;
+    /** The federated provider id Better Auth's federation gate reads — distinct
+     * from `authProvider` above (ADR-027's resolver). Unresolved; see the handoff. */
+    federatedProvider: string | undefined;
+    /** Whether this is the hosted product. OUT OF SCOPE for this port (an
+     * unsigned boolean granting entitlement has its own ruling) — left as a
+     * member exactly where the deleted `configSchema` left it. */
+    isSaas: boolean;
     /** Names this process in every refusal below. */
     processName: string;
     /** Process time, injected so session expiry has deterministic tests. */
     now?: (() => Instant) | undefined;
   }>;
 
-/**
- * Browser-session identity. Five fields travel together: Better Auth builds
- * callbacks from one base, so partial config signs everyone out while looking ok.
- */
-const browserSessionIdentitySchema = z.object({
-  secret: z.string().min(1),
-  baseUrl: z.string().min(1),
-  publicBaseUrl: z.string().optional(),
-  mfaEnrollmentOpen: z.boolean().default(false),
-  passkeysEnabled: z.boolean().default(false),
-  passkeyHandleSecret: z.string().min(1),
-});
-
-const authAppConfigSchema = z
-  .object({
-    /** Names this process in the sign-in door's refusals. */
-    processName: z.string().default("langwatch"),
-    /** Absent means this process composes no Better Auth instance at all. */
-    browserSession: browserSessionIdentitySchema.optional(),
-    /** `"email"`, or the federated provider id this deployment mounted. */
-    authProvider: z.string().optional(),
-    /** Whether this is the hosted product rather than a self-hosted install. */
-    isSaas: z.boolean().default(false),
-  })
-  .default({ processName: "langwatch", isSaas: false });
-
-export type AuthAppConfig = z.infer<typeof authAppConfigSchema>;
-
 type AuthSetup = FeatureSetup<
   typeof AuthApp.dependencies,
   AuthInfrastructure,
-  AuthAppConfig,
+  AuthServerConfig,
   AuthRepositories
 >;
 
@@ -150,18 +146,15 @@ export class AuthApp implements AuthApiContract {
     /** This deployment's flag store, for the born-finalized entrance. */
     featureFlags: FeatureFlagApi,
   };
-  static readonly configSchema = authAppConfigSchema;
-  /**
-   * Declared rather than cast: Better Auth's storage, hooks and cache need the
-   * first three, the token check's counter the fourth. A process that cannot
-   * supply one refuses at boot rather than composing a door on `undefined`.
-   */
-  static readonly reads = reads("logger", "prisma", "redis", "rateLimiter");
+  static readonly config = authServerConfig;
+  /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
+   * process's own fact. A process that cannot supply one refuses at boot. */
+  static readonly reads = [...AUTH_CLOSED_READS, "publicBaseUrl"] as const;
 
   readonly #sessions: BrowserSessionService;
+  readonly #cliSessions: CliDeviceSessionService;
   readonly #signUp: SignUpVerificationService | null;
   readonly #members: AuthInfrastructure;
-  readonly #config: AuthAppConfig;
   readonly #dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi };
   /**
    * The deployment's ONE Better Auth instance, or nothing where it named no
@@ -169,18 +162,20 @@ export class AuthApp implements AuthApiContract {
    * revoke sessions on the same application every other caller revokes through.
    */
   #betterAuth: BetterAuthTransport | null = null;
+  /** The identity {@link AuthApp.create} resolved, held for {@link baseUrl}. */
+  #browserSession: BetterAuthDeploymentIdentity | undefined;
 
   private constructor(
     sessions: BrowserSessionService,
+    cliSessions: CliDeviceSessionService,
     signUp: SignUpVerificationService | null,
     members: AuthInfrastructure,
-    config: AuthAppConfig,
     dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi },
   ) {
     this.#sessions = sessions;
+    this.#cliSessions = cliSessions;
     this.#signUp = signUp;
     this.#members = members;
-    this.#config = config;
     this.#dependencies = dependencies;
   }
 
@@ -196,13 +191,30 @@ export class AuthApp implements AuthApiContract {
         users: dependencies.users,
         now,
       }),
+      CliDeviceSessionService.create({
+        store: RedisCliDeviceSessionRepository.create(members.redis),
+      }),
       signUpVerification({ members, repositories, now, users: dependencies.users }),
       members,
-      config,
       { apiKeys: dependencies.apiKeys, featureFlags: dependencies.featureFlags },
     );
 
-    const identity = config.browserSession;
+    const sessionSecret = members.secrets.find("NEXTAUTH_SECRET");
+    assertAuthServerConfig(config, sessionSecret);
+
+    const identity: BetterAuthDeploymentIdentity | undefined =
+      config.sessionUrl && sessionSecret
+        ? {
+            secret: sessionSecret,
+            baseUrl: config.sessionUrl,
+            publicBaseUrl: members.publicBaseUrl,
+            mfaEnrollmentOpen: config.mfaEnrollmentOpen,
+            passkeysEnabled: config.passkeysEnabled,
+            passkeyHandleSecret: config.passkeyHandleSecret ?? sessionSecret,
+          }
+        : undefined;
+    app.#browserSession = identity;
+
     if (identity) {
       app.#betterAuth = buildBetterAuth({
         identity,
@@ -210,8 +222,8 @@ export class AuthApp implements AuthApiContract {
         redis: members.redis,
         auth: app,
         users: dependencies.users,
-        authProvider: config.authProvider,
-        isSaas: config.isSaas,
+        authProvider: members.federatedProvider,
+        isSaas: members.isSaas,
         logger: members.logger,
       });
     } else {
@@ -230,7 +242,7 @@ export class AuthApp implements AuthApiContract {
       throw new AuthUnavailableError({
         capability:
           "browser-session identity (NEXTAUTH_SECRET and NEXTAUTH_URL), so it composes no sign-in door",
-        processName: this.#config.processName,
+        processName: this.#members.processName,
       });
     }
 
@@ -302,7 +314,7 @@ export class AuthApp implements AuthApiContract {
    * operation rather than a getter: the feature-API proxy the sign-in door
    * reads this through serves operations only. */
   baseUrl(): string {
-    return this.#config.browserSession?.baseUrl ?? "";
+    return this.#browserSession?.baseUrl ?? "";
   }
 
   /**
@@ -320,7 +332,7 @@ export class AuthApp implements AuthApiContract {
       new AuthUnavailableError({
         capability:
           "identity birth context (@langwatch/identity-process publishes no BetterAuthIdentityBirthAdapter), so it cannot run a born-finalized sign-up",
-        processName: this.#config.processName,
+        processName: this.#members.processName,
       }),
     );
   }
@@ -329,6 +341,36 @@ export class AuthApp implements AuthApiContract {
     verified: VerifiedBrowserSession | null;
   }): Promise<BrowserSession | null> {
     return this.#sessions.tryResolveBrowserSession(input);
+  }
+
+  async findCliAccessSession(input: {
+    authorization: string | null | undefined;
+  }): Promise<CliAccessSession | null> {
+    const record = await this.#cliSessions.resolveAccessToken(input.authorization);
+    if (!record) return null;
+
+    return {
+      userId: record.user_id,
+      organizationId: record.organization_id,
+      ...(record.client_info
+        ? {
+            clientInfo: {
+              deviceLabel: record.client_info.device_label,
+              hostname: record.client_info.hostname,
+            },
+          }
+        : {}),
+    };
+  }
+
+  revokeCliAccessToken(input: {
+    authorization: string | null | undefined;
+    userId: string;
+  }): Promise<void> {
+    return this.#cliSessions.revokeAccessToken({
+      authHeader: input.authorization,
+      userId: input.userId,
+    });
   }
 
   revokeAllBrowserSessions(input: { userId: string }): Promise<void> {

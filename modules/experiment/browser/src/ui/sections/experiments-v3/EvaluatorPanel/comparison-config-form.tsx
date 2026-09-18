@@ -1,25 +1,27 @@
 import { Box, Button, Field, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
-import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFormContext, useWatch } from "react-hook-form";
-
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Menu } from "@langwatch/design-system/menu";
 import { Switch } from "@langwatch/design-system/switch";
+import { disambiguateNames } from "@langwatch/experiment-contract";
 import {
   type AvailableSource,
   type FieldMapping,
   VariableMappingInput,
 } from "@langwatch/prompt-browser-kit/variables";
+import { Plus, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
 
-import { useTargetName, useTargetNames } from "../../../../behavior/experiments-v3/use-target-name.ts";
+import {
+  useTargetName,
+  useTargetNames,
+} from "../../../../behavior/experiments-v3/use-target-name.ts";
 import { useTargetOutputs } from "../../../../behavior/experiments-v3/use-target-outputs.ts";
+import { balancedColumns } from "../../../../model/experiments-v3/balanced-columns.ts";
 import type {
   ComparisonEvaluatorConfig,
   TargetConfig,
 } from "../../../../model/experiments-v3/types.ts";
-import { balancedColumns } from "../../../../model/experiments-v3/balanced-columns.ts";
-import { disambiguateNames } from "@langwatch/experiment-contract";
 
 type Metric = "cost" | "duration";
 type VariantOutputOption = {

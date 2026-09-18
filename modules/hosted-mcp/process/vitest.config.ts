@@ -1,5 +1,5 @@
-import { configDefaults } from "vitest/config";
 import { defineModuleVitestConfig } from "@langwatch/test-harness/vitest-config";
+import { configDefaults } from "vitest/config";
 
 /**
  * The unit lane, split by DEPENDENCY rather than by file name: the two suites

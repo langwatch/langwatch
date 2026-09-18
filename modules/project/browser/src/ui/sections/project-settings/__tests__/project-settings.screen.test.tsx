@@ -50,7 +50,12 @@ vi.mock("@langwatch/organization-browser/surfaces/department-picker", () => ({
   DepartmentPicker: () => null,
 }));
 
-import { anOrganization, aProject, FakeProjectHost, renderWithProjectHost } from "../../../../testing.tsx";
+import {
+  anOrganization,
+  aProject,
+  FakeProjectHost,
+  renderWithProjectHost,
+} from "../../../../testing.tsx";
 import ProjectSettingsScreen from "../project-settings-screen.tsx";
 
 beforeEach(() => vi.clearAllMocks());

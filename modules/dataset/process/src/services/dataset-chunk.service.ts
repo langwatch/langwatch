@@ -4,14 +4,11 @@
  * advisory lock (Decision 9 / I-COUNT); this class keeps append, edit and locate.
  */
 
+import { type DatasetColumns } from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
+
+import { type DatasetStorage } from "../app/dataset.app.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
-import {
-  type ChunkedDatasetMeta,
-  type ChunkOffset,
-  chunkedMeta,
-  chunkMetaOf,
-} from "../rules/dataset-chunking.rules.ts";
 import {
   type ChunkLine,
   type DatasetMutationRecord,
@@ -21,8 +18,12 @@ import {
   readOffsets,
   toChunkLines,
 } from "../rules/dataset-chunk-lines.rules.ts";
-import { type DatasetStorage } from "../app/dataset.app.ts";
-import { type DatasetColumns } from "@langwatch/dataset-contract";
+import {
+  type ChunkedDatasetMeta,
+  type ChunkOffset,
+  chunkedMeta,
+  chunkMetaOf,
+} from "../rules/dataset-chunking.rules.ts";
 import { DatasetChunkDeleteService } from "./dataset-chunk-delete.service.ts";
 import { DatasetChunkMaintenanceService } from "./dataset-chunk-maintenance.service.ts";
 

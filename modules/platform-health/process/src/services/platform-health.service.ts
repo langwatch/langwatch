@@ -1,10 +1,10 @@
+import { createLogger } from "@langwatch/observability";
 import type {
   PlatformHealthCheck,
   PlatformHealthCheckName,
   PlatformHealthQuery,
   PlatformHealthReport,
 } from "@langwatch/platform-health-contract";
-import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { SubsystemProbe } from "../app/platform-health.members.ts";

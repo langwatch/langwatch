@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { fromDate } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
 import { automationRepositories } from "../automation-repositories.registry.ts";
 import { MemoryAutomationRepositories } from "../memory/memory.automation.repositories.ts";
 
@@ -13,7 +14,10 @@ const trigger = {
 
 describe("given the memory automation repositories", () => {
   it("declares a postgres and a memory tier", () => {
-    expect(Object.keys(automationRepositories.definitions).toSorted()).toEqual(["memory", "postgres"]);
+    expect(Object.keys(automationRepositories.definitions).toSorted()).toEqual([
+      "memory",
+      "postgres",
+    ]);
   });
 
   describe("when a trigger is written", () => {

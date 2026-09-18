@@ -1,31 +1,30 @@
 import {
-  bindRestMiddleware,
-  credentialPrincipalOfToken,
-  projectCredentialOfRequest,
-} from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
-import { AnalyticsApp } from "./app/analytics.app.ts";
-import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
-import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
-import { analyticsRest } from "./transport/analytics.rest.ts";
-import { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
-import { dashboardWidgetRest, dashboardWidgetUrl } from "./transport/dashboard-widget.rest.ts";
-import { langWatchQLCallerProtections, queryRest } from "./transport/query.rest.ts";
-
-import {
   analyticsFilterValueSchema,
   type AnalyticsEvaluationReadMetrics,
   type AnalyticsService,
   type AnalyticsTripwire,
 } from "@langwatch/analytics-contract";
+import {
+  bindRestMiddleware,
+  credentialPrincipalOfToken,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
+import { defineServerModule } from "@langwatch/kernel";
 import { z } from "zod";
-import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
+
 import { AnalyticsAdapter } from "./app/analytics-composition.build.ts";
-import { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
-import { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
-import { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules.ts";
+import { AnalyticsApp } from "./app/analytics.app.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "./repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import type { GenerateFilterConditionsResult } from "./repositories/clickhouse/clickhouse.filter-shapes.mapper.ts";
+import { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules.ts";
+import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
+import { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
+import { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
+import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
+import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
+import { analyticsRest } from "./transport/analytics.rest.ts";
+import { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
+import { langWatchQLCallerProtections, queryRest } from "./transport/query.rest.ts";
 
 export type { AnalyticsInfrastructure } from "./app/analytics.app.ts";
 
@@ -35,7 +34,6 @@ export const analyticsServer = defineServerModule("analytics")
     analyticsRest,
     analyticsLegacyRest,
     queryRest,
-    dashboardWidgetRest,
     analyticsTrpcTransport,
     analyticsLwqlTrpcTransport,
   )
@@ -50,15 +48,10 @@ export const analyticsServer = defineServerModule("analytics")
         credential: credentialPrincipalOfToken(credential),
       });
     }),
-    bindRestMiddleware(dashboardWidgetUrl, (context) =>
-      app.dashboardWidgetPlatformUrl({
-        projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
-      }),
-    ),
   ]);
 
 /**
- * The tenant-bound session both analytics repositories read through. It opens
+ * The tenant-bound session analytics' ClickHouse reads run through. It opens
  * the seams below: thin factories over the private services and rules, so a
  * composition root never names one directly.
  */

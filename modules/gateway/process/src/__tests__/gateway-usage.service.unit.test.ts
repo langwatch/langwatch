@@ -1,17 +1,17 @@
+import type {
+  GatewayTraceRow,
+  GatewayUsageBucket,
+  GatewayVirtualKeySpend,
+} from "@langwatch/gateway-process";
+import { Prisma } from "@langwatch/prisma-client/generated";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
-import { Prisma } from "@langwatch/prisma-client/generated";
 
 import {
   GatewayUsageService,
   type GatewayUsageProjects,
   type GatewayUsageVirtualKeys,
 } from "../services/gateway-usage.service.ts";
-import type {
-  GatewayTraceRow,
-  GatewayUsageBucket,
-  GatewayVirtualKeySpend,
-} from "@langwatch/gateway-process";
 
 type TraceStub = Pick<GatewayTraceRow, "virtualKeyId" | "costUsd" | "occurredAt"> & {
   model?: string;

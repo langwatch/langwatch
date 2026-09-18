@@ -1,4 +1,4 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -10,17 +10,15 @@ const onSwitch = z
   .optional()
   .transform((value) => value === "on");
 
-export const authServerConfigDefinition = RuntimeConfig.define({
-  sessionUrl: Config.value(z.string().optional(), { env: "NEXTAUTH_URL" }),
-  mfaEnrollmentOpen: Config.value(onSwitch, { env: "MFA_ENROLLMENT_OPEN" }),
-  passkeysEnabled: Config.value(onSwitch, { env: "PASSKEYS_ENABLED" }),
+export const authServerConfig = Config.define((c) => ({
+  sessionUrl: c.env("NEXTAUTH_URL", z.string().optional()),
+  mfaEnrollmentOpen: c.env("MFA_ENROLLMENT_OPEN", onSwitch),
+  passkeysEnabled: c.env("PASSKEYS_ENABLED", onSwitch),
   /** Absent falls back to the session secret; a passkey handle must stay stable. */
-  passkeyHandleSecret: Config.value(z.string().optional(), { env: "PASSKEY_HANDLE_SECRET" }),
-});
+  passkeyHandleSecret: c.env("PASSKEY_HANDLE_SECRET", z.string().optional()),
+}));
 
-export type AuthServerConfig = ConfigValue<typeof authServerConfigDefinition>;
-
-export const authServerConfigSchema = compileRuntimeConfig(authServerConfigDefinition);
+export type AuthServerConfig = ConfigOf<typeof authServerConfig>;
 
 /**
  * Refuses a browser session that is half configured. `sessionSecret` now

@@ -1,16 +1,20 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
-import { ClickHouseCodingAgentRepositories } from "../clickhouse/clickhouse.coding-agent.repositories.ts";
-import { CodingAgentProjectionPersistenceService } from "../../services/coding-agent-projection-persistence.service.ts";
+
+import type {
+  CodingAgentProjectActivity,
+  CodingAgentPullRequestMapping,
+} from "../../app/coding-agent.members.ts";
 import { SystemCodingAgentClockAdapter } from "../../services/coding-agent-clock.service.ts";
+import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-cost-metrics.service.ts";
+import { CodingAgentProjectionPersistenceService } from "../../services/coding-agent-projection-persistence.service.ts";
+import { ModelCatalogCostEstimatorAdapter } from "../../services/model-catalog-cost-estimator.service.ts";
+import { ClickHouseCodingAgentRepositories } from "../clickhouse/clickhouse.coding-agent.repositories.ts";
 import {
   EventingCodingAgentProcessingAdapter,
   type CodingAgentProcessingPipeline,
 } from "./redis.coding-agent-session-pipeline.repository.ts";
-import { ModelCatalogCostEstimatorAdapter } from "../../services/model-catalog-cost-estimator.service.ts";
-import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-cost-metrics.service.ts";
-import type { CodingAgentProjectActivity,CodingAgentPullRequestMapping } from "../../app/coding-agent.members.ts";
 
 export type RedisCodingAgentProcessingRepositoryOptions = {
   /**

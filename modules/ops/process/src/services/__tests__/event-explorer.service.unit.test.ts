@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EventExplorerService } from "../event-explorer.service.ts";
-import type {
-  EventExplorerRepository,
-  RawEventRow,
-} from "../../repositories/observe/event-explorer.repository.ts";
+
 import type {
   OpsEventingIntrospection,
   OpsDejaViewProjection,
   OpsProjectionMetadata,
 } from "../../app/ops.app.ts";
+import type {
+  EventExplorerRepository,
+  RawEventRow,
+} from "../../repositories/observe/event-explorer.repository.ts";
+import { EventExplorerService } from "../event-explorer.service.ts";
 
 const DEFAULT_DEJA_VIEW: OpsDejaViewProjection[] = [
   {

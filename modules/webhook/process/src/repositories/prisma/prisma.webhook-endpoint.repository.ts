@@ -1,8 +1,10 @@
-import { prismaTables } from "@langwatch/prisma-client/ownership";
+import { randomBytes } from "node:crypto";
 // SPDX-License-Identifier: Apache-2.0
 
-import { randomBytes } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
+import type { Prisma, PrismaClient, WebhookEndpoint } from "@langwatch/prisma-client/generated";
+import { prismaTables } from "@langwatch/prisma-client/ownership";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import {
   WebhookEndpointNotFoundError,
   WebhookEndpointValidationError,
@@ -13,9 +15,8 @@ import {
   type WebhookDestinationKind,
   type WebhookEndpointView,
 } from "@langwatch/webhook-contract";
-import type { Prisma, PrismaClient, WebhookEndpoint } from "@langwatch/prisma-client/generated";
-import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
-import type { WebhookId,WebhookSecret } from "../../app/webhook.app.ts";
+
+import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import {
   WebhookDestinationService,
   type WebhookDestinationConfig,

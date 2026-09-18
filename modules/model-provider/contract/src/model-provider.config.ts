@@ -1,10 +1,4 @@
-import {
-  Config,
-  compileRuntimeConfig,
-  environmentOneOrTrueSchema,
-  RuntimeConfig,
-  type ConfigValue,
-} from "@langwatch/config";
+import { Config, environmentOneOrTrueSchema, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -12,11 +6,10 @@ import { z } from "zod";
  * EMPTY, never a wildcard — a fence that stops fencing on an absent variable is the
  * failure this leaf prevents.
  */
-export const modelProviderServerConfigDefinition = RuntimeConfig.define({
-  blockLocalHttpCalls: Config.value(environmentOneOrTrueSchema, {
-    env: "BLOCK_LOCAL_HTTP_CALLS",
-  }),
-  allowedProxyHosts: Config.value(
+export const modelProviderConfig = Config.define((c) => ({
+  blockLocalHttpCalls: c.env("BLOCK_LOCAL_HTTP_CALLS", environmentOneOrTrueSchema),
+  allowedProxyHosts: c.env(
+    "ALLOWED_PROXY_HOSTS",
     z
       .string()
       .optional()
@@ -26,28 +19,23 @@ export const modelProviderServerConfigDefinition = RuntimeConfig.define({
           .map((host) => host.trim())
           .filter((host) => host.length > 0),
       ),
-    { env: "ALLOWED_PROXY_HOSTS" },
   ),
   /** The engine address, not the proxy path: the composition root joins them. */
-  nlpServiceUrl: Config.value(
+  nlpServiceUrl: c.env(
+    "LANGWATCH_NLP_SERVICE",
     z
       .string()
       .optional()
       .transform((value) => value?.trim() || void 0),
-    { env: "LANGWATCH_NLP_SERVICE" },
   ),
   /** The terminal fallback for a target that names no model; blank is not a model. */
-  defaultModel: Config.value(
+  defaultModel: c.env(
+    "LANGWATCH_DEFAULT_MODEL",
     z
       .string()
       .optional()
       .transform((value) => value?.trim() || void 0),
-    { env: "LANGWATCH_DEFAULT_MODEL" },
   ),
-});
+}));
 
-export type ModelProviderServerConfig = ConfigValue<typeof modelProviderServerConfigDefinition>;
-
-export const modelProviderServerConfigSchema = compileRuntimeConfig(
-  modelProviderServerConfigDefinition,
-);
+export type ModelProviderServerConfig = ConfigOf<typeof modelProviderConfig>;

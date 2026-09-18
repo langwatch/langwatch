@@ -1,5 +1,3 @@
-import { context, SpanStatusCode, trace } from "@opentelemetry/api";
-import { addDays, differenceInCalendarDays, nowInstant } from "@langwatch/time";
 import {
   analyticsEvaluationReadInputSchema,
   analyticsEvaluationRollupAppendBatchInputSchema,
@@ -23,8 +21,11 @@ import {
   type AnalyticsEvaluationRollupAppendInput,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
-import { AnalyticsRepository } from "../repositories/analytics.repository.ts";
+import { addDays, differenceInCalendarDays, nowInstant } from "@langwatch/time";
+import { context, SpanStatusCode, trace } from "@opentelemetry/api";
+
 import { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
+import { AnalyticsRepository } from "../repositories/analytics.repository.ts";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;

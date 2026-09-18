@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { WebhookRetentionRepository } from "../webhook-retention.repository.ts";
 
 /** The client slice the two sweeps use: both are raw statements, by design. */
@@ -18,7 +19,11 @@ export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export class PrismaWebhookRetentionRepository implements WebhookRetentionRepository {
   private constructor(private readonly prisma: WebhookRetentionDatabase) {}
 
-  static create({ prisma }: { prisma: WebhookRetentionDatabase }): PrismaWebhookRetentionRepository {
+  static create({
+    prisma,
+  }: {
+    prisma: WebhookRetentionDatabase;
+  }): PrismaWebhookRetentionRepository {
     return new PrismaWebhookRetentionRepository(prisma);
   }
 

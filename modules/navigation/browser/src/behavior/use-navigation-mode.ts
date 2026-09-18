@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+
 import {
   DEFAULT_NAVIGATION_MODE,
   loadStoredNavigationMode,

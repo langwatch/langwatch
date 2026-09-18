@@ -10,38 +10,39 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Edge } from "@xyflow/react";
-import { useCallback, useState } from "react";
-import { ArrowUp, ArrowUpCircle, ChevronDown, Code, Share2, XCircle } from "react-feather";
-import { FormProvider, useForm } from "react-hook-form";
-import { RenderCode } from "../code/render-code.tsx";
+import { Link } from "@langwatch/browser-host/link";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { Dataset, DatasetRecord } from "@langwatch/dataset-contract";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
+import { Menu } from "@langwatch/design-system/menu";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { Link } from "@langwatch/browser-host/link";
-import { Menu } from "@langwatch/design-system/menu";
-import { toaster } from "@langwatch/browser-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
-import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   getEntryInputs,
   parseStudioWorkflow,
   type Project,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
+import type { Edge } from "@xyflow/react";
+import { useCallback, useState } from "react";
+import { ArrowUp, ArrowUpCircle, ChevronDown, Code, Share2, XCircle } from "react-feather";
+import { FormProvider, useForm } from "react-hook-form";
+
+import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
 } from "../../../model/studio-dataset.utils.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
+import { RenderCode } from "../code/render-code.tsx";
 import { useVersionState } from "./history.tsx";
 import { VersionToBeUsed } from "./version-to-be-used.tsx";
-import { nowInstant } from "@langwatch/time";
 
 // Type with dataset property
 interface NodeDataWithDataset {

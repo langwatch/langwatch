@@ -3,11 +3,10 @@
  */
 
 import { Badge, Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
-
-import { Drawer } from "@langwatch/design-system/drawer";
-import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 
 import type {
   ComparisonEvaluatorConfig,

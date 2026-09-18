@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { AuthzListingRepository } from "../../authz-listing.repository.ts";
 import type { AuthzDatabase } from "../../authz-read.repository.ts";
 import { RoutedAuthzListingRepository } from "../routed.authz-listing.repository.ts";

@@ -14,7 +14,7 @@ import {
   MANAGEMENT_API_VERSION,
   NotFoundError,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,

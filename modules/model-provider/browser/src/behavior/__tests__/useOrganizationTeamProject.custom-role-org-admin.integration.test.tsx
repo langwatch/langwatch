@@ -7,8 +7,8 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery, hostRole } =
-  vi.hoisted(() => ({
+const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery, hostRole } = vi.hoisted(
+  () => ({
     mockOrganizationsQuery: vi.fn(),
     idleQuery: () => ({
       data: undefined,
@@ -29,7 +29,8 @@ const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery, hostRol
       selectedProjectSlug: "",
     } as Record<string, string>,
     hostRole: { current: "MEMBER" },
-  }));
+  }),
+);
 
 vi.mock("../../model/model-provider-host.ts", () => ({
   useModelProviderHost: () => ({
@@ -140,9 +141,7 @@ describe("useOrganizationTeamProject with a custom team role", () => {
   describe("given an org admin holding a custom team role", () => {
     beforeEach(() => {
       hostRole.current = "ADMIN";
-      mockOrganizationsQuery.mockReturnValue(
-        organizationWith({ organizationRole: "ADMIN" }),
-      );
+      mockOrganizationsQuery.mockReturnValue(organizationWith({ organizationRole: "ADMIN" }));
     });
 
     /** @scenario "An org admin holding a custom team role keeps admin access in the browser" */
@@ -163,9 +162,7 @@ describe("useOrganizationTeamProject with a custom team role", () => {
   describe("given an org member holding the same custom team role", () => {
     beforeEach(() => {
       hostRole.current = "MEMBER";
-      mockOrganizationsQuery.mockReturnValue(
-        organizationWith({ organizationRole: "MEMBER" }),
-      );
+      mockOrganizationsQuery.mockReturnValue(organizationWith({ organizationRole: "MEMBER" }));
     });
 
     /** @scenario "An org admin holding a custom team role keeps admin access in the browser" */

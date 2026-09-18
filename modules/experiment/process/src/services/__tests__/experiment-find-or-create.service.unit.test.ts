@@ -3,10 +3,10 @@
  * pre-replacement before slugify, and existing slugs are taken back (not duplicated).
  */
 import type { Experiment } from "@langwatch/experiment-contract";
-import type { ExperimentService } from "../experiment.service.ts";
 import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentFindOrCreateService } from "../experiment-find-or-create.service.ts";
+import type { ExperimentService } from "../experiment.service.ts";
 
 describe("given an SDK naming an experiment by slug", () => {
   describe("when the slug is free", () => {

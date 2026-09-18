@@ -1,5 +1,6 @@
 import { getModelById } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
+
 import { resolveMaxTokensCeiling } from "../model-provider.server.ts";
 
 describe("resolveMaxTokensCeiling", () => {

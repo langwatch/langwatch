@@ -108,6 +108,17 @@ export type ModelProviderExecutionParameters = z.infer<
   typeof modelProviderExecutionParametersSchema
 >;
 
+/** A feature-owned structured prompt executed through the deployment's model proxy. */
+export type ModelProviderStructuredGenerationInput = Readonly<{
+  projectId: string;
+  featureKey: string;
+  system: string;
+  prompt: string;
+  schema: z.ZodType;
+  timeoutMs: number;
+  maxRetries: number;
+}>;
+
 export const modelProviderTenantInputSchema = z
   .object({
     projectId: z.string().min(1).optional(),

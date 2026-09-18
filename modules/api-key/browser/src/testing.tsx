@@ -2,9 +2,10 @@
 // Device flow is programmable (four lookup outcomes, two approve outcomes). Not exported.
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { nowInstant } from "@langwatch/time";
+
 import {
   ApiKeyHostApi,
   ApiKeyHostProvider,

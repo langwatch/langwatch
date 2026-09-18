@@ -4,6 +4,7 @@
  * but the mapped view must not, or a viewer who can't read traces gets one.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   PrismaTriggerFireHistoryRepository,
   type TriggerFireHistoryDatabase,
@@ -19,7 +20,7 @@ const STORED_ROW = {
   resolvedAt: null,
 };
 
-function databaseHolding(rows: typeof STORED_ROW[]) {
+function databaseHolding(rows: (typeof STORED_ROW)[]) {
   const queries: unknown[] = [];
 
   return {

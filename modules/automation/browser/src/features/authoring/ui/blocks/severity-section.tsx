@@ -2,6 +2,7 @@ import { createListCollection } from "@chakra-ui/react";
 import { AlertType } from "@langwatch/automation-contract";
 import type { AlertType as AlertTypeValue } from "@langwatch/automation-contract";
 import { Select } from "@langwatch/design-system/select";
+
 import type { FacetAccordionProps } from "../elements/facet-section.tsx";
 import { FacetSection } from "../elements/facet-section.tsx";
 

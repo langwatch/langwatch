@@ -1,6 +1,6 @@
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useColorMode } from "@langwatch/design-system/color-mode";
 import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
 import type { ChartFrameDashboardContext } from "../model/dashboard-widget/bridge-protocol.ts";
 import { declaredParamDefaults } from "../model/dashboard-widget/params-snapshot.ts";
@@ -49,13 +49,10 @@ export function useWidgetPreview({
   // resets the draft, but the debounced preview would keep showing the just-
   // discarded edit for PREVIEW_DEBOUNCE_MS on the next open — a stale frame the
   // caller flushes past by seeding the reset values synchronously.
-  const resetPreview = useCallback(
-    (nextCode: string, nextQueries: DashboardWidgetQuery[]) => {
-      setPreviewCode(nextCode);
-      setPreviewQueries(nextQueries);
-    },
-    [],
-  );
+  const resetPreview = useCallback((nextCode: string, nextQueries: DashboardWidgetQuery[]) => {
+    setPreviewCode(nextCode);
+    setPreviewQueries(nextQueries);
+  }, []);
 
   const {
     executeQuery,
@@ -68,10 +65,7 @@ export function useWidgetPreview({
     timeWindow ? { timeWindow } : undefined,
   );
 
-  const paramsSnapshot = useMemo(
-    () => declaredParamDefaults(previewQueries),
-    [previewQueries],
-  );
+  const paramsSnapshot = useMemo(() => declaredParamDefaults(previewQueries), [previewQueries]);
 
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 

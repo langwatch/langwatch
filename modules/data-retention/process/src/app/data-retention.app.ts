@@ -1,9 +1,12 @@
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
+  dataRetentionConfig,
   DataRetentionApi,
   INDEFINITE_RETENTION_DAYS,
-  platformDefaultRetentionDaysSchema,
+  resolvePlatformDefaultRetentionDays,
   type DataRetentionApi as DataRetentionApiContract,
+  type DataRetentionServerConfig,
   type KillRetroactiveMutationInput,
   type PinTraceInput,
   type PinnedTrace,
@@ -20,20 +23,13 @@ import {
   type StorageMeterTenantsInput,
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
-import { z } from "zod";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import type { DataRetentionPlanResolver } from "./data-retention.members.ts";
+
 import { ClickHouseRetroactiveRetentionRepository } from "../repositories/clickhouse/clickhouse.retroactive-retention.repository.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
-import {
-  RedisDataRetentionCacheStore,
-  type DataRetentionRedis,
-} from "../stores/data-retention-cache.store.ts";
-import type { StorageMeterRedis } from "../stores/storage-meter-cache.store.ts";
 import {
   DataRetentionPolicyService,
   type RetentionActor,
@@ -43,6 +39,12 @@ import { DataRetentionService } from "../services/data-retention.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
+import {
+  RedisDataRetentionCacheStore,
+  type DataRetentionRedis,
+} from "../stores/data-retention-cache.store.ts";
+import type { StorageMeterRedis } from "../stores/storage-meter-cache.store.ts";
+import type { DataRetentionPlanResolver } from "./data-retention.members.ts";
 
 const DEFAULT_CACHE_TTL_MS = 60_000;
 
@@ -108,8 +110,14 @@ export type DataRetentionInfrastructure = Readonly<{
   cacheTtlMs?: number;
 }>;
 
-export type DataRetentionAppConfig = Readonly<{
-  platformDefaultRetentionDays: number;
+/**
+ * Shapes restated rather than imported from `@langwatch/process-stores`: a
+ * module depends on contracts. `nodeEnvironment` is the process's own fact
+ * (§6) — `dataRetentionConfig` no longer claims `NODE_ENV`.
+ */
+type DataRetentionMembers = Readonly<{
+  clickhouse: ClickHouseQueryClient;
+  nodeEnvironment: string | undefined;
 }>;
 
 /**
@@ -119,8 +127,8 @@ export type DataRetentionAppConfig = Readonly<{
  */
 type DataRetentionSetup = FeatureSetup<
   typeof DataRetentionApp.dependencies,
-  DataRetentionInfrastructure & MembersRead<typeof DataRetentionApp.reads>,
-  DataRetentionAppConfig,
+  DataRetentionInfrastructure & DataRetentionMembers,
+  DataRetentionServerConfig,
   DataRetentionRepositories
 >;
 
@@ -132,10 +140,9 @@ export class DataRetentionApp implements DataRetentionApiContract {
     permissions: AuthzApi,
     users: UserApi,
   };
-  static readonly configSchema = z.object({
-    platformDefaultRetentionDays: platformDefaultRetentionDaysSchema,
-  });
-  static readonly reads = reads("clickhouse");
+  static readonly config = dataRetentionConfig;
+  /** Both names are from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["clickhouse", "nodeEnvironment"] as const;
 
   readonly #retention: DataRetentionService;
   readonly #policy: DataRetentionPolicyService;
@@ -172,7 +179,10 @@ export class DataRetentionApp implements DataRetentionApiContract {
       pins: repositories.pins,
       projects: dependencies.projects,
       organizations: dependencies.organizations,
-      defaultRetentionDays: config.platformDefaultRetentionDays,
+      defaultRetentionDays: resolvePlatformDefaultRetentionDays({
+        LANGWATCH_DEFAULT_RETENTION_DAYS: config.platformDefaultDays,
+        NODE_ENV: members.nodeEnvironment,
+      }),
       retroactive: ClickHouseRetroactiveRetentionRepository.create({
         clickhouse: members.clickhouse,
       }),

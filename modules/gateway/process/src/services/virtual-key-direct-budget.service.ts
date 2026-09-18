@@ -1,14 +1,15 @@
+import type { GatewayBudget } from "@langwatch/gateway-contract";
+import { GatewayWindow } from "@langwatch/gateway-contract";
+import { createLogger } from "@langwatch/observability";
 /**
  * The budget a key carries on itself, with spend in its own current period. That is distinct from
  * calendar-month spend: a daily cap measures against today, so a monthly figure and a daily one
  * are both true and neither substitutes. Spend comes from the rollup every other surface reads.
  */
 import { type Instant, nowInstant } from "@langwatch/time";
-import type { GatewayBudget } from "@langwatch/gateway-contract";
-import { createLogger } from "@langwatch/observability";
+
 import { budgetSpendTargetsFor, type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository.ts";
-import { GatewayWindow } from "@langwatch/gateway-contract";
 
 const logger = createLogger("langwatch:gateway:virtual-key-direct-budget");
 

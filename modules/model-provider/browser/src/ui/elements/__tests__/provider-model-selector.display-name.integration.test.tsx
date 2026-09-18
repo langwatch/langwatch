@@ -6,11 +6,11 @@
  * @see specs/model-providers/custom-model-display-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { resolveLatestAlias } from "@langwatch/model-provider-contract";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveLatestAlias } from "@langwatch/model-provider-contract";
 import { ProviderModelSelector } from "../provider-model-selector.tsx";
 
 afterEach(() => cleanup());

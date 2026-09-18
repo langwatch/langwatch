@@ -1,6 +1,7 @@
 /** Address as activity tables read/write it; re-bound to host with expected shape. */
 
 import { useMemo } from "react";
+
 import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";
 
 export type CodingAgentRouter = {

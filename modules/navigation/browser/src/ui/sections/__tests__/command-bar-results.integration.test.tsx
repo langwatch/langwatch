@@ -7,6 +7,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { NavigationHostProvider } from "../../../model/navigation-host.ts";
 import { StubNavigationHost } from "../../../testing.tsx";
 import { CommandBarResults } from "../command-bar-results.tsx";

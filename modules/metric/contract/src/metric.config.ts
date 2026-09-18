@@ -1,4 +1,4 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -6,10 +6,8 @@ import { z } from "zod";
  * live in different processes and must clamp this identically, or a record
  * lands on a group nothing claims. Carried as written; the clamp owns the bound.
  */
-export const metricServerConfigDefinition = RuntimeConfig.define({
-  processingShards: Config.value(z.string().optional(), { env: "METRIC_PROCESSING_SHARDS" }),
-});
+export const metricConfig = Config.define((c) => ({
+  processingShards: c.env("METRIC_PROCESSING_SHARDS", z.string().optional()),
+}));
 
-export type MetricServerConfig = ConfigValue<typeof metricServerConfigDefinition>;
-
-export const metricServerConfigSchema = compileRuntimeConfig(metricServerConfigDefinition);
+export type MetricServerConfig = ConfigOf<typeof metricConfig>;

@@ -2,6 +2,7 @@
 // within a scope the most recently created config does — both decide silently which model runs.
 
 import { describe, expect, it } from "vitest";
+
 import { ModelProviderDefaultsService } from "../model-provider-defaults.service.ts";
 
 const FEATURES = [

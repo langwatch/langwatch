@@ -1,9 +1,10 @@
-import { z } from "zod";
 import { EventUtils } from "@langwatch/eventing";
 import type { CanonicalLogRecord, CanonicalTraceLogRecord } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
-import { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
 import { nowInstant, Temporal, toDate } from "@langwatch/time";
+import { z } from "zod";
+
+import { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
 import {
   ClickHouseCanonicalLogRecordAppendRepository,
   type LogClickHouseClientResolver,

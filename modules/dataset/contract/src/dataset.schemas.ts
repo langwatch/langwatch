@@ -1,8 +1,9 @@
+import { resolveRequestBound } from "@langwatch/plans";
 /** Dataset tRPC inputs stated once in the contract. Upsert uses two parsers
  * (not intersected) so authorization sweep can read scope ids.
  */
 import { z } from "zod";
-import { resolveRequestBound } from "@langwatch/plans";
+
 import {
   datasetRecordFormSchema,
   datasetRecordInputSchema,

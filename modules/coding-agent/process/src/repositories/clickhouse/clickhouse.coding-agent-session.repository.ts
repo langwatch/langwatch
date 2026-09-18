@@ -1,17 +1,21 @@
 import { performance } from "node:perf_hooks";
+
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
 } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { CodingAgentClock,
-  CodingAgentReadMetrics,
-  CodingAgentSessionListReadOutcome } from "../../app/coding-agent.members.ts";
-import type { CodingAgentSessionRepository as SessionRepository } from "../coding-agent-session.repository.ts";
 import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
+
+import type {
+  CodingAgentClock,
+  CodingAgentReadMetrics,
+  CodingAgentSessionListReadOutcome,
+} from "../../app/coding-agent.members.ts";
+import type { CodingAgentSessionRepository as SessionRepository } from "../coding-agent-session.repository.ts";
 import {
   clickHouseMomentOf,
   asNumber,

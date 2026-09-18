@@ -7,11 +7,7 @@ import {
 
 describe("queryParameterDeclarationSchema (via dashboardWidgetQuerySchema)", () => {
   describe("given a parameter named like a reserved JavaScript property", () => {
-    it.each([
-      "__proto__",
-      "constructor",
-      "prototype",
-    ])("refuses the declaration for %s", (name) => {
+    it.each(["__proto__", "constructor", "prototype"])("refuses the declaration for %s", (name) => {
       const result = dashboardWidgetQuerySchema.safeParse({
         name: "q",
         sql: "select 1",

@@ -1,5 +1,8 @@
-import { type StateProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
-
+import {
+  type StateProjectionStore,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import {
   TOPIC_CLUSTERING_PROJECTION_VERSIONS,
   TOPIC_CLUSTERING_RUN_HISTORY_LIMIT,
@@ -7,6 +10,7 @@ import {
   TOPIC_CLUSTERING_TRIGGER,
 } from "@langwatch/topic-contract";
 import { z } from "zod";
+
 import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,

@@ -9,21 +9,20 @@ import { fromDate, nowInstant, toDate } from "@langwatch/time";
 function toSessionRecord<Row extends { mintedAt: Date }>(row: Row) {
   return { ...row, mintedAt: fromDate(row.mintedAt) };
 }
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
-import type { GatewaySpanIngestion,GatewaySpendConfirmation } from "../app/gateway.members.ts";
+import type { GatewaySpanIngestion, GatewaySpendConfirmation } from "../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
+import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import {
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
 } from "../services/gateway-realtime-session.service.ts";
-import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 

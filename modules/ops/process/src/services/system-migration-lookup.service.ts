@@ -4,6 +4,7 @@
  * `rules/`, because it throws a domain error a rules module may not.
  */
 import { MigrationUnknownError } from "@langwatch/ops-contract";
+
 import type { SystemMigrationsServiceDependencies } from "../rules/system-migration-support.rules.ts";
 
 export class SystemMigrationLookupService {

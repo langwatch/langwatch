@@ -1,8 +1,9 @@
 import { Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { TargetConfig } from "../../../../model/experiments-v3/types.ts";
 import type { ComparisonAggregate } from "@langwatch/experiment-contract";
 import { labelNamesVariant } from "@langwatch/experiment-contract";
+
+import type { TargetConfig } from "../../../../model/experiments-v3/types.ts";
 
 type ComparisonScoreboardProps = {
   aggregate: ComparisonAggregate;

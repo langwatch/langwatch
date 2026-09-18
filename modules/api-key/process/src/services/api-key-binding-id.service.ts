@@ -18,8 +18,7 @@ export class ApiKeyBindingIdAdapter implements ApiKeyBindingId {
     return new ApiKeyBindingIdAdapter();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   generateBindingId(): string {
     return generate(ROLE_BINDING_KSUID_RESOURCE).toString();

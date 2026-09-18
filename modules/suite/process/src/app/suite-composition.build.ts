@@ -2,8 +2,9 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import { SuiteExecutionUnavailableError } from "@langwatch/suite-contract";
+
 import type { ConnectedPresenceReader } from "../services/connected-target.service.ts";
-import type { SuiteAppConfig, SuiteExecution } from "./suite.app.ts";
+import type { SuiteExecution } from "./suite.app.ts";
 
 /** Refuses every run by name, rather than crashing on an absent collaborator. */
 class UnavailableSuiteExecution implements SuiteExecution {
@@ -30,7 +31,7 @@ export interface SuiteAppInfrastructure {
  */
 export function buildSuiteInfrastructure(input: {
   agents: Pick<AgentApi, "getPresence">;
-  config: SuiteAppConfig;
+  publicBaseUrl: string | undefined;
 }): SuiteAppInfrastructure {
   return {
     execution: new UnavailableSuiteExecution(),
@@ -40,6 +41,6 @@ export function buildSuiteInfrastructure(input: {
     // The one platform default every retention-aware feature resolves the
     // same way, off the same process environment (ADR-* data retention).
     defaultRetentionDays: resolvePlatformDefaultRetentionDays(process.env),
-    publicBaseUrl: input.config.publicBaseUrl,
+    publicBaseUrl: input.publicBaseUrl,
   };
 }

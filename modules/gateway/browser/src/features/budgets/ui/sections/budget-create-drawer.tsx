@@ -1,4 +1,3 @@
-import { Temporal, currentTimeZone } from "@langwatch/time";
 import {
   Button,
   Field,
@@ -11,18 +10,18 @@ import {
   VStack,
   Wrap,
 } from "@chakra-ui/react";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { Temporal, currentTimeZone } from "@langwatch/time";
 import { Boxes, Building2, Folder, KeyRound, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { Drawer } from "@langwatch/design-system/drawer";
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { describeError } from "../../../../model/describe-error.ts";
-import { readHandledError } from "../../../../model/handled-error.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
 import { api } from "../../../../behavior/gateway-api.ts";
-
-import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
 import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { describeError } from "../../../../model/describe-error.ts";
+import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
+import { readHandledError } from "../../../../model/handled-error.ts";
 
 /**
  * A budget on an unreachable scope is refused: it would never spend or
@@ -311,7 +310,6 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Engineering monthly $1k cap"
-                
               />
             </Field.Root>
             <Field.Root>

@@ -1,9 +1,9 @@
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 /**
  * Queued suite run model recording via SuiteExecutionService.
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
 
 import type { QueueSimulationRunCommandData } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";

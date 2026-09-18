@@ -1,13 +1,13 @@
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 /**
  * What the agents list reads about presence, including what it shows when the registry
  * cannot answer for one agent.
  * @see specs/agents/connected-agents.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LiveInstance,ConnectedAgentRuntime } from "../connected-agent-runtime.service.ts";
-import { NO_PRESENCE, ConnectedAgentPresenceService } from "../connected-agent-presence.service.ts";
 
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { NO_PRESENCE, ConnectedAgentPresenceService } from "../connected-agent-presence.service.ts";
+import type { LiveInstance, ConnectedAgentRuntime } from "../connected-agent-runtime.service.ts";
 import { ConnectedAgentRuntimeService } from "../connected-agent-runtime.service.ts";
 
 const listLive = vi.fn();

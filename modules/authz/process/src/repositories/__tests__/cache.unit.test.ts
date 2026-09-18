@@ -1,7 +1,8 @@
 import { ALL_PERMISSIONS, type CollectedBinding } from "@langwatch/authz-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthzReadRepository } from "../authz-read.repository.ts";
+
 import { AuthzService, type AuthzServiceOptions } from "../../services/authz.service.ts";
+import type { AuthzReadRepository } from "../authz-read.repository.ts";
 import { StubAuthzBindingRepository } from "./support/authz-binding.stub.ts";
 import { StubAuthzEpoch } from "./support/authz-epoch.stub.ts";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub.ts";

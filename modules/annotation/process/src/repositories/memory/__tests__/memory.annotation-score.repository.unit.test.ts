@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { MemoryAnnotationQueueDatabase } from "../memory.annotation-queue.database.ts";
 import { MemoryAnnotationScoreRepository } from "../memory.annotation-score.repository.ts";
 

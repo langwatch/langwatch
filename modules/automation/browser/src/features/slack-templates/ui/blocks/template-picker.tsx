@@ -2,6 +2,7 @@ import { Badge, Box, Collapsible, HStack, SimpleGrid, Stack, Text } from "@chakr
 import type { SlackDeliveryMethod } from "@langwatch/automation-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
+
 import {
   type DraftCadence,
   pickDefaultSlackBlockKitTemplateId,

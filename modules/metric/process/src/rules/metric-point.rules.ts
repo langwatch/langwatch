@@ -1,10 +1,11 @@
-import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import { MAX_CANONICAL_METRIC_PAYLOAD_BYTES } from "@langwatch/metric-contract";
 import type {
   CanonicalMetricDataPoint,
   MetricKind,
   MetricTraceCorrelation,
 } from "@langwatch/metric-contract";
+import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
+
 import { canonicalAttributes } from "./metric-attributes.rules.ts";
 import { correlations } from "./metric-correlations.rules.ts";
 import { aggregation } from "./metric-kinds.rules.ts";

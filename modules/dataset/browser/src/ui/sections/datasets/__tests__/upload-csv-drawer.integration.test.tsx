@@ -66,7 +66,11 @@ vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { CSVReaderComponent, DatasetUploadProcessing, UploadCSVForm } from "../upload-csv-drawer.tsx";
+import {
+  CSVReaderComponent,
+  DatasetUploadProcessing,
+  UploadCSVForm,
+} from "../upload-csv-drawer.tsx";
 
 /** Error shaped like an aborted fetch. */
 const abortError = () => Object.assign(new Error("aborted"), { name: "AbortError" });

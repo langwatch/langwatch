@@ -4,6 +4,7 @@
  * against the installing graph's own store and app, so each reap prunes and revokes through it.
  */
 import { defineEventingModule, type EventingSetup } from "@langwatch/eventing";
+
 import type { ApiKeyApp } from "../app/api-key.app.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
 import { AgentSandboxKeyReapService } from "../services/agent-sandbox-key-reap.service.ts";
@@ -17,7 +18,13 @@ export const apiKeyEventing = defineEventingModule({
     const loginKeyReap = CliLoginKeyReapService.create({
       repository: repositories.apiKeys,
       revoke: ({ id, organizationId, userId }) =>
-        app.revoke({ id, organizationId, callerUserId: userId, callerIsAdmin: true, cause: "expired" }),
+        app.revoke({
+          id,
+          organizationId,
+          callerUserId: userId,
+          callerIsAdmin: true,
+          cause: "expired",
+        }),
     });
     return EventingAgentSandboxMaintenanceAdapter.create({
       sandboxKeyReap: {

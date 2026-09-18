@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { SlackAlertTask } from "../slack-alert.task.ts";
 
 describe("SlackAlertTask", () => {

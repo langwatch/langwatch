@@ -1,4 +1,5 @@
 import { defineServerModule } from "@langwatch/kernel";
+
 import { AuthApp } from "./app/auth.app.ts";
 import { authRepositories } from "./repositories/auth-repositories.registry.ts";
 import { authRest } from "./transport/auth.rest.ts";

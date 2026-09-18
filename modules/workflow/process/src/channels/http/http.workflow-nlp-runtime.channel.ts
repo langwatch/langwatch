@@ -2,10 +2,13 @@
  * The NLP engine, reached over HTTP.
  */
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
+
 import {
   type WorkflowNlpRuntime,
   type WorkflowNlpDispatchInput,
-  type WorkflowNlpDispatchResponse,type NlpLambdaInvoke,type NlpPayloadStaging
+  type WorkflowNlpDispatchResponse,
+  type NlpLambdaInvoke,
+  type NlpPayloadStaging,
 } from "../../app/workflow.app.ts";
 import {
   NlpInvokeTransportAdapter,
@@ -200,8 +203,7 @@ export class UnconfiguredWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime
     return new UnconfiguredWorkflowNlpRuntimeAdapter();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   dispatch(_input: WorkflowNlpDispatchInput): Promise<WorkflowNlpDispatchResponse> {
     return Promise.reject(

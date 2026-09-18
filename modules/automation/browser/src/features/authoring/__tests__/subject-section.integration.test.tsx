@@ -6,8 +6,9 @@ import { TriggerAction } from "@langwatch/automation-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
+
 import { useAutomationStore } from "../ui/sections/automation-store.ts";
+import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
 import { SubjectSection } from "../ui/sections/subject-section.tsx";
 
 vi.mock("../../../behavior/automation-session.ts", () => ({

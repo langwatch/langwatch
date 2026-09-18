@@ -29,8 +29,7 @@ export function matchesAnyScope(
 ): boolean {
   return scopes.some((scope) =>
     wanted.some(
-      (candidate) =>
-        candidate.scopeType === scope.scopeType && candidate.scopeId === scope.scopeId,
+      (candidate) => candidate.scopeType === scope.scopeType && candidate.scopeId === scope.scopeId,
     ),
   );
 }

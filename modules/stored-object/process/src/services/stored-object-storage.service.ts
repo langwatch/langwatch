@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import {
   mintStoredObjectUri,
@@ -6,6 +7,7 @@ import {
   type StoredObjectStorageDestination,
   type StoredObjectByteStream,
 } from "@langwatch/stored-object-contract";
+
 import {
   StoredObjectStorage,
   type StoredObjectStorageAddress,

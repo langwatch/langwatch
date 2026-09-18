@@ -1,5 +1,4 @@
 import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
-import { createLogger } from "@langwatch/observability";
 import {
   affectedRollupBuckets,
   buildMetricRollups,
@@ -10,6 +9,8 @@ import {
   type CanonicalMetricDataPoint,
   type MetricRollupRow,
 } from "@langwatch/metric-contract";
+import { createLogger } from "@langwatch/observability";
+
 import {
   MetricDataPointAppendRepository,
   type MetricDataPointBulkWrite,

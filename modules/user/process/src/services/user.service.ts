@@ -34,7 +34,8 @@ import {
   type UserSsoStatus,
   type UserTourPreference,
 } from "@langwatch/user-contract";
-import type { UserAvatarStorage } from "../app/user.app.ts";
+
+import type { UserAvatarStorage } from "../app/user.members.ts";
 import type { UserRepository } from "../repositories/user.repository.ts";
 import { UserAvatarCodecService } from "./user-avatar.service.ts";
 

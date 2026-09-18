@@ -1,17 +1,17 @@
 import type {
-  AnalyticsFeedbacksResult,
-  AnalyticsReadInput,
-  AnalyticsTopDocumentsResult,
-  AnalyticsTimeseriesInput,
-  AnalyticsTimeseriesResult,
-} from "./analytics.timeseries.ts";
-import type {
   AnalyticsEvaluationReadInput,
   AnalyticsEvaluationRollupAppendBatchInput,
   AnalyticsEvaluationRollupAppendInput,
   AnalyticsEvaluationRow,
   AnalyticsEvaluationUpsertInput,
 } from "./analytics.evaluation.ts";
+import type {
+  AnalyticsFeedbacksResult,
+  AnalyticsReadInput,
+  AnalyticsTopDocumentsResult,
+  AnalyticsTimeseriesInput,
+  AnalyticsTimeseriesResult,
+} from "./analytics.timeseries.ts";
 
 export interface AnalyticsTimeseriesReadOptions {
   readonly maxResultRows?: number;

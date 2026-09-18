@@ -4,7 +4,6 @@
  * shapes — the requester's address withheld from the organization until membership.
  */
 
-import { Temporal, toDate } from "@langwatch/time";
 import type {
   JoinRequestFiled,
   JoinRequestJoining,
@@ -12,6 +11,7 @@ import type {
   JoinRequestMine,
   JoinRequestPending,
 } from "@langwatch/organization-contract";
+import { Temporal, toDate } from "@langwatch/time";
 
 import type {
   OrganizationDirectory,

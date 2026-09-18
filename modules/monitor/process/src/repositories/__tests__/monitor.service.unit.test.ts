@@ -124,10 +124,12 @@ describe("MonitorService", () => {
       seed: [stored, { ...stored, id: "monitor_2", projectId: "project_2", name: "Other" }],
     });
 
-    await expect(service.listEnabledGuardrailMonitors({
-      projectId: "project_1",
-      evaluatorIds: ["evaluator_1"],
-    })).resolves.toEqual([]);
+    await expect(
+      service.listEnabledGuardrailMonitors({
+        projectId: "project_1",
+        evaluatorIds: ["evaluator_1"],
+      }),
+    ).resolves.toEqual([]);
     await expect(service.getAllForProject({ projectId: "project_2" })).resolves.toMatchObject([
       { id: "monitor_2" },
     ]);

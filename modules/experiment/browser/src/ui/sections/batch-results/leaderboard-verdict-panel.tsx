@@ -5,11 +5,11 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
 import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
+import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline.ts";
 import type {
   CheaperAlternative,
   LeaderboardVerdict,
 } from "../batch-evaluation-results.verdict.ts";
-import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline.ts";
 
 export type LeaderboardVerdictPanelProps = {
   leaderboard: BTLeaderboard;

@@ -1,15 +1,16 @@
 import type { EventStoreReadContext } from "@langwatch/eventing";
 import { processCommandBatch } from "@langwatch/eventing/testing";
 import type { ProcessCommandBatchParams } from "@langwatch/eventing/testing";
-import { describe, expect, it, vi } from "vitest";
-import { RecordCanonicalLogCommand } from "../log.intent.ts";
-import { createLogProcessingPipeline } from "../log.pipeline.ts";
 import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
   LOG_COMMAND_COALESCE_MAX_BATCH,
   RECORD_CANONICAL_LOG_COMMAND_TYPE,
 } from "@langwatch/log-contract";
 import type { CanonicalLogRecord, CanonicalLogRecordReceivedEvent } from "@langwatch/log-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { RecordCanonicalLogCommand } from "../log.intent.ts";
+import { createLogProcessingPipeline } from "../log.pipeline.ts";
 
 const TENANT_ID = "project_log_coalescing";
 

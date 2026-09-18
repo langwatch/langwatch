@@ -1,5 +1,6 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
+
 import type {
   AutomationSettlementEvaluationReader,
   AutomationSettlementTraceReader,

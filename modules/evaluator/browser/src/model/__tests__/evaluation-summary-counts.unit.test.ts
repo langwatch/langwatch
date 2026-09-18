@@ -1,10 +1,11 @@
+import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
 /**
  * Verdict counting for message-list tags and trace-list pills (#6835
  * item 2): skipped isn't a pass and crashed isn't a fail — the three
  * states stay apart, never coerced into pass/fail.
  */
 import { describe, expect, it } from "vitest";
-import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
+
 import {
   evaluationsTagLabel,
   guardrailsTagLabel,

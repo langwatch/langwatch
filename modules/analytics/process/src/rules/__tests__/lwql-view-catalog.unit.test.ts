@@ -3,14 +3,18 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import { describe, expect, it } from "vitest";
-
 import {
   CONTENT_CATEGORIES,
   CONTENT_KEY_CATALOG,
   type ContentCategory,
 } from "@langwatch/data-privacy-contract";
+import { describe, expect, it } from "vitest";
+
 import { GATED_DATASET } from "../../langwatch-ql/__tests__/gatedDatasetFixture.ts";
+import {
+  LangWatchQLCatalogShapesService,
+  LWQL_COLUMN_UNITS,
+} from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   CONTENT_ATTRIBUTE_KEYS,
   contentKeyExclusionSql,
@@ -18,10 +22,6 @@ import {
   isContentAttributeKey,
 } from "../lwql-content-gating.rules.ts";
 import { LWQL_VIEW_CATALOG, lwqlViewByName } from "../lwql-view-catalog.rules.ts";
-import {
-  LangWatchQLCatalogShapesService,
-  LWQL_COLUMN_UNITS,
-} from "../../services/langwatch-ql-catalog-shapes.service.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 

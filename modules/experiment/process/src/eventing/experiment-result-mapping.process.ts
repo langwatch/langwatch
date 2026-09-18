@@ -3,10 +3,6 @@
  * builder's format and transforming them for the frontend.
  */
 
-import { HandledError } from "@langwatch/handled-error";
-import { trace as otelTrace } from "@opentelemetry/api";
-
-import { nodeErrorToDomainError, type StudioServerEvent } from "@langwatch/workflow-contract";
 import { EvaluatorExecutionError } from "@langwatch/evaluation-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
@@ -14,6 +10,9 @@ import {
   type EvaluationV3Event,
   UNNAMED_FAILURE,
 } from "@langwatch/experiment-contract";
+import { HandledError } from "@langwatch/handled-error";
+import { nodeErrorToDomainError, type StudioServerEvent } from "@langwatch/workflow-contract";
+import { trace as otelTrace } from "@opentelemetry/api";
 
 /**
  * Configuration for result mapping.

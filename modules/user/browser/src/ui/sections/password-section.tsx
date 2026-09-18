@@ -7,6 +7,7 @@
 import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { KeyRound } from "lucide-react";
 import { useState } from "react";
+
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { canChangePassword } from "../../model/sign-in-methods.ts";

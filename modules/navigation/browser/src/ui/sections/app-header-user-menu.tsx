@@ -7,6 +7,7 @@
 import { Box, Button, HStack, Portal } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Monitor, PanelsTopLeft } from "lucide-react";
+
 import {
   DEFAULT_NAVIGATION_MODE,
   type NavigationMode,

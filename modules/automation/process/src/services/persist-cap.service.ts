@@ -1,12 +1,12 @@
-import { createLogger } from "@langwatch/observability";
 import type {
   AutomationPersistCapConfig,
   AutomationPersistCapDecision,
   AutomationPlan,
 } from "@langwatch/automation-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { createLogger } from "@langwatch/observability";
 import { ENTERPRISE_PLAN_TYPES, FREE_PLAN_TYPES } from "@langwatch/plans";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automations:persist-cap");

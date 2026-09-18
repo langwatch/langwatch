@@ -1,8 +1,9 @@
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 /**
  * Detection of comparison columns from a stored run.
  */
 import { describe, expect, it } from "vitest";
-import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
+
 import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types.ts";
 
 const createTimestamps = () => ({ createdAt: 1, updatedAt: 1 });

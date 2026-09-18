@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { RenderTimeoutError, renderLiquid } from "../engine.ts";
 
 describe("renderLiquid", () => {

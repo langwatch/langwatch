@@ -3,9 +3,9 @@
  * from features not yet split. Segment names are load-bearing for React Query cache.
  */
 
+import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { automationTrpc, emailSuppressionTrpc } from "@langwatch/automation-contract";
 import type { Monitor } from "@langwatch/monitor-contract";
-import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 
 /** The project every automation procedure is scoped to. */
 type ProjectScope = { projectId: string };

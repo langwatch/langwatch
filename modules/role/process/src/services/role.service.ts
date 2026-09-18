@@ -5,6 +5,7 @@ import {
   ROLE_KIND,
   type Role,
 } from "@langwatch/role-contract";
+
 import type { RoleRepository } from "../repositories/role.repository.ts";
 
 /** Names the API-key mint reserves, so a person cannot define one by hand. */

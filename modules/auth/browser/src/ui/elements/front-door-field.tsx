@@ -2,6 +2,7 @@ import "../../model/ambient.d.ts";
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { type ReactNode, useId } from "react";
 import type { FieldError } from "react-hook-form";
+
 import "./auth-front-door.css";
 import { MONO_FONT } from "../../model/front-door-theme.ts";
 

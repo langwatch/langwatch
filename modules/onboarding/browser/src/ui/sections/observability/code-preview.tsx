@@ -6,12 +6,13 @@ import {
   Icon,
   IconButton,
 } from "@chakra-ui/react";
+import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Copy, Eye, EyeOff, WandSparkles } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { createHighlighter, type HighlighterGeneric } from "shiki";
-import { useColorMode } from "@langwatch/design-system/color-mode";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import { copyToClipboard } from "../../../behavior/shared/copy-to-clipboard.ts";
 import { InlineCopyButton } from "../shared/inline-copy-button.tsx";
 

@@ -7,6 +7,7 @@ import { Button, Field, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PASSWORD_REQUIREMENTS_HINT, passwordProblem } from "@langwatch/identity-contract";
 import { useEffect, useState } from "react";
+
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { authoredMessage, fieldProblems, formProblems } from "../../model/handled-error.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";

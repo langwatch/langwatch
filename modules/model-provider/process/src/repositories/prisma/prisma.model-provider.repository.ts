@@ -1,17 +1,18 @@
 import {
-  type ModelProvider as PrismaModelProvider,
-  type ModelProviderScope,
-  Prisma,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
-import { z } from "zod";
-import {
   modelProviderSchema,
   readStoredSkipList,
   type Model,
   type ModelDefaultScope,
   type ModelProvider,
 } from "@langwatch/model-provider-contract";
+import {
+  type ModelProvider as PrismaModelProvider,
+  type ModelProviderScope,
+  Prisma,
+  PrismaClient,
+} from "@langwatch/prisma-client/generated";
+import { z } from "zod";
+
 import type { ModelProviderCredentialCodec } from "../../app/model-provider.members.ts";
 import type { ModelProviderRepository } from "../model-provider.repository.ts";
 

@@ -1,9 +1,10 @@
 /** @vitest-environment jsdom */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Component, End, Entry } from "@langwatch/workflow-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Component, End, Entry } from "@langwatch/workflow-contract";
+
 import { CodePropertiesPanel } from "../../ui/sections/properties/workflow-code-properties-panel.tsx";
 import { EndPropertiesPanel } from "../../ui/sections/properties/workflow-end-properties-panel.tsx";
 import { EntryPointPropertiesPanel } from "../../ui/sections/properties/workflow-entry-point-properties-panel.tsx";

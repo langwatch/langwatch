@@ -8,12 +8,6 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import {
-  joinRequestApiDecisionInputSchema,
-  joinRequestApiOrganizationScopeSchema,
-  joinRequestApiRequestInputSchema,
-  joinRequestApiWithdrawInputSchema,
-} from "./join-request.trpc-schemas.ts";
-import {
   joinRequestFiledSchema,
   joinRequestJoiningChangedSchema,
   joinRequestJoiningSchema,
@@ -21,6 +15,12 @@ import {
   joinRequestPendingSchema,
   joinRequestWriteAckSchema,
 } from "./join-request.responses.ts";
+import {
+  joinRequestApiDecisionInputSchema,
+  joinRequestApiOrganizationScopeSchema,
+  joinRequestApiRequestInputSchema,
+  joinRequestApiWithdrawInputSchema,
+} from "./join-request.trpc-schemas.ts";
 
 /**
  * How colleagues on a matching domain get in. The three settings are the

@@ -1,3 +1,4 @@
+import { InviteThrottledError } from "@langwatch/organization-contract";
 /**
  * @see modules/organization/specs/invitations.feature
  * Two guarantees `InviteLifecycleService` makes outside the accept path itself: a re-request
@@ -5,7 +6,7 @@
  * hands out the seats the customer actually paid for.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { InviteThrottledError } from "@langwatch/organization-contract";
+
 import { InviteLifecycleService } from "../invite-lifecycle.service.ts";
 import { InviteSendThrottleService } from "../invite-send-throttle.service.ts";
 import {

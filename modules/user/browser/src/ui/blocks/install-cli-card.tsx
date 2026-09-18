@@ -1,9 +1,9 @@
 import { Box, Button, Code, Heading, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { docsUrl } from "@langwatch/config/docs-url";
 import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
 import { useState } from "react";
 
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
-import { docsUrl } from "@langwatch/config/docs-url";
 import { Link } from "../elements/personal-link.tsx";
 
 /**

@@ -13,10 +13,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+
 import { annotationApi } from "../../behavior/annotation-api.ts";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 
 /** What the server said about individual fields, if it named any. */

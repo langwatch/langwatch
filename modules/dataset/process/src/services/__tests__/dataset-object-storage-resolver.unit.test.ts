@@ -3,6 +3,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import type { DatasetS3ClientResolver } from "../../app/dataset.app.ts";
 import {
   DatasetObjectStorageResolverAdapter,
   DatasetStorageDestinationService,
@@ -10,7 +11,6 @@ import {
 } from "../dataset-object-storage-resolver.service.ts";
 import { LocalDatasetStorageAdapter } from "../local.dataset-storage.service.ts";
 import { S3DatasetStorageAdapter } from "../s3.dataset-storage.service.ts";
-import type { DatasetS3ClientResolver } from "../../app/dataset.app.ts";
 
 class FixedDestination extends DatasetStorageDestinationService {
   constructor(private readonly destination: DatasetStorageDestination) {

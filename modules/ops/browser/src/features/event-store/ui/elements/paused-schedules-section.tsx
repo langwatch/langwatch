@@ -1,5 +1,6 @@
 import { Box, HStack, Table, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+
 import type { PausedSchedule } from "../../model/paused-schedule.ts";
 
 export const PAUSED_SCHEDULES_HREF = "/ops/event-sourcing/schedules";

@@ -1,3 +1,5 @@
+import { AuthzApi } from "@langwatch/authz-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 /**
  * The model-provider feature's application: what `modelProvider.*`, `llmModelCost.*` and
  * `translate.*` all call, so caller attribution and Codex-role defaults are written once.
@@ -45,29 +47,37 @@ import {
   type ModelProviderExecution,
   type ModelProviderExecutionParameters,
   type ModelProviderExecutionPrepareInput,
+  type ModelProviderStructuredGenerationInput,
+  type ModelProviderPlaygroundCompletion,
+  type ModelProviderPlaygroundRequest,
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
   type ModelProviderResolution,
   type ModelProviderSummary,
   type TranslateInput,
   type TranslateOutput,
+  modelProviderConfig,
+  type ModelProviderServerConfig,
 } from "@langwatch/model-provider-contract";
-
-import { AuthzApi } from "@langwatch/authz-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { z } from "zod";
 
+import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
-import { buildModelProviderInfrastructure } from "./model-provider-composition.build.ts";
-import { ModelCostRegexSafetyService } from "../services/model-cost-regex-safety.service.ts";
-import { ModelLimitsService } from "../services/model-limits.service.ts";
 import {
   ModelCostPreviewService,
   type ModelCostPreviewSpanReader,
 } from "../services/model-cost-preview.service.ts";
+import { ModelCostRegexSafetyService } from "../services/model-cost-regex-safety.service.ts";
+import { ModelLimitsService } from "../services/model-limits.service.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
+import { ModelProviderPlaygroundService } from "../services/model-provider-playground.service.ts";
+import { ModelProviderStructuredGenerationService } from "../services/model-provider-structured-generation.service.ts";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
+import { ModelProviderService as ModelProviderGateway } from "../services/model-provider.service.ts";
+import { buildModelProviderInfrastructure } from "./model-provider-composition.build.ts";
 import type {
   CodexTokenRefresher,
   ModelProviderCatalog,
@@ -75,11 +85,6 @@ import type {
   ModelProviderCredentialProbe,
   ModelTranslation,
 } from "./model-provider.members.ts";
-import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
-import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
-import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
-import { ModelProviderService as ModelProviderGateway } from "../services/model-provider.service.ts";
-import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 
 export type { ModelProviderCaller } from "@langwatch/model-provider-contract";
 
@@ -141,7 +146,7 @@ export interface ModelProviderCodexDeviceFlow {
 type ModelProviderSetup = FeatureSetup<
   typeof ModelProviderApp.dependencies,
   MembersRead<typeof ModelProviderApp.reads>,
-  ModelProviderAppConfig,
+  ModelProviderServerConfig,
   ModelProviderRepositories
 >;
 
@@ -151,45 +156,23 @@ type ModelProviderSetup = FeatureSetup<
  */
 const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
 
+/** Where nlpgo answers the execution proxy, once an engine address is named. */
+const EXECUTION_PROXY_PATH = "/go/proxy/v1";
+
 /**
- * Mirrors `apps/api`'s `ApiModelProviderConfigResolution` so this module reads config rather
- * than rederiving it; defaults match the deleted composition's absent-config answer.
+ * What {@link buildModelProviderInfrastructure} composes over, derived from
+ * the contract's own config slice at `create()` rather than declared as a
+ * second schema.
  */
-const modelProviderAppConfigSchema = z.object({
-  /**
-   * Whether this is the hosted deployment. System providers — credentials this deployment
-   * supplies rather than the customer — exist only there; explicit rather than inferred from
-   * an environment variable a self-hosted install could also have set.
-   */
-  isSaas: z.boolean().default(false),
-  egress: z
-    .object({
-      /** Refuse private, loopback and link-local destinations, and names resolving to them. */
-      blockLocal: z.boolean().default(true),
-      /** The literal hostname allowlist that relaxes the local block, and only it. */
-      allowedHosts: z.array(z.string()).default([]),
-      /**
-       * Whether an outbound TLS certificate is verified. Defaults true; a deployment that
-       * needs it off (a self-signed on-prem endpoint) needs this field added to `apps/api`'s
-       * own config resolution first — see the handoff.
-       */
-      verifyTls: z.boolean().default(true),
-    })
-    .default({ blockLocal: true, allowedHosts: [], verifyTls: true }),
-  /**
-   * Where a resolved model is executed, fully formed: nlpgo's
-   * `/go/proxy/v1`. The composition root joins its own NLP address with the
-   * workflow feature's own path — this module never learns nlpgo's address.
-   */
-  executionProxyBaseUrl: z.string().default(UNCONFIGURED_EXECUTION_PROXY),
-  /**
-   * The process environment a system provider's fallback credential is read from. A map, not
-   * named leaves, because which variable carries a key is the registry's business, and
-   * `apps/api` hands over its own resolved answer rather than reading `process.env` (ADR-132).
-   */
-  environment: z.record(z.string(), z.string().optional()).default({}),
-});
-export type ModelProviderAppConfig = z.infer<typeof modelProviderAppConfigSchema>;
+export type ModelProviderBuildConfig = Readonly<{
+  egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
+  /** Where a resolved model is executed, fully formed: nlpgo's `/go/proxy/v1`. */
+  executionProxyBaseUrl: string;
+  /** A system provider's fallback-credential env map. Always empty: see the handoff. */
+  environment: Readonly<Record<string, string | undefined>>;
+  /** Hosted-deployment flag. OUT OF SCOPE (config-schema-nuke-batch-c handoff): hardcoded false. */
+  isSaas: boolean;
+}>;
 
 /**
  * The two roles a Codex account is licensed for: Langy's own, and the Fast
@@ -205,7 +188,7 @@ export class ModelProviderApp implements ModelProviderApi {
     organizations: OrganizationApi,
     permissions: AuthzApi,
   };
-  static readonly configSchema = modelProviderAppConfigSchema;
+  static readonly config = modelProviderConfig;
   static readonly reads = reads("redis");
 
   static create({
@@ -214,8 +197,25 @@ export class ModelProviderApp implements ModelProviderApi {
     members,
     config,
   }: ModelProviderSetup): ModelProviderApp {
-    const infrastructure = buildModelProviderInfrastructure({ members, config, dependencies });
-    return new ModelProviderApp(repositories, dependencies, infrastructure);
+    const executionProxyBaseUrl = config.nlpServiceUrl
+      ? `${config.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
+      : UNCONFIGURED_EXECUTION_PROXY;
+    const buildConfig: ModelProviderBuildConfig = {
+      egress: {
+        blockLocal: config.blockLocalHttpCalls,
+        allowedHosts: config.allowedProxyHosts,
+        verifyTls: true,
+      },
+      executionProxyBaseUrl,
+      environment: {},
+      isSaas: false,
+    };
+    const infrastructure = buildModelProviderInfrastructure({
+      members,
+      config: buildConfig,
+      dependencies,
+    });
+    return new ModelProviderApp(repositories, dependencies, infrastructure, executionProxyBaseUrl);
   }
 
   /**
@@ -227,8 +227,14 @@ export class ModelProviderApp implements ModelProviderApi {
     repositories: ModelProviderRepositories;
     dependencies: ModelProviderSetup["dependencies"];
     members: ModelProviderInfrastructure;
+    executionProxyBaseUrl?: string;
   }): ModelProviderApp {
-    return new ModelProviderApp(setup.repositories, setup.dependencies, setup.members);
+    return new ModelProviderApp(
+      setup.repositories,
+      setup.dependencies,
+      setup.members,
+      setup.executionProxyBaseUrl ?? "http://nlp-engine-not-configured.invalid",
+    );
   }
 
   /** The registry's ceilings, read from the catalogue this package ships. */
@@ -255,11 +261,14 @@ export class ModelProviderApp implements ModelProviderApi {
    * re-authorizes a probe: it leaves for the vendor with the caller's keys.
    */
   readonly #providerAuthorization: ModelProviderWriteAuthorizationService;
+  readonly #playground: ModelProviderPlaygroundService;
+  readonly #structuredGeneration: ModelProviderStructuredGenerationService;
 
   private constructor(
     repositories: ModelProviderRepositories,
     dependencies: ModelProviderSetup["dependencies"],
     members: ModelProviderInfrastructure,
+    executionProxyBaseUrl: string,
   ) {
     this.#modelProviders = ModelProviderGateway.create({
       repository: repositories.providers,
@@ -281,6 +290,14 @@ export class ModelProviderApp implements ModelProviderApi {
     this.#credentialProbe = members.credentialProbe;
     this.#codexAccounts = members.codexAccounts;
     this.#spans = members.spans;
+    this.#playground = ModelProviderPlaygroundService.create({
+      modelProviders: this,
+      executionProxyBaseUrl,
+    });
+    this.#structuredGeneration = ModelProviderStructuredGenerationService.create({
+      modelProviders: this.#modelProviders,
+      executionProxyBaseUrl,
+    });
   }
 
   // ── providers ──────────────────────────────────────────────────────────────
@@ -317,6 +334,16 @@ export class ModelProviderApp implements ModelProviderApi {
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters> {
     return this.#modelProviders.prepareExecution(input);
+  }
+
+  generateStructured(input: ModelProviderStructuredGenerationInput): Promise<unknown> {
+    return this.#structuredGeneration.generate(input);
+  }
+
+  runPlaygroundCompletion(
+    input: ModelProviderPlaygroundRequest,
+  ): Promise<ModelProviderPlaygroundCompletion> {
+    return this.#playground.execute(input);
   }
 
   /** Every stored provider row the project can see, keys masked. */
@@ -365,9 +392,7 @@ export class ModelProviderApp implements ModelProviderApi {
     input: ModelProviderCredentialProbeRequest,
     by: ModelProviderCaller,
   ): Promise<ModelProviderCredentialVerdict> {
-    await this.#providerAuthorization.assertCanWrite(by.id, [
-      probedTenantScope(input),
-    ]);
+    await this.#providerAuthorization.assertCanWrite(by.id, [probedTenantScope(input)]);
 
     return this.#credentialProbe.probe({
       provider: input.provider,
@@ -572,9 +597,7 @@ export class ModelProviderApp implements ModelProviderApi {
     // cause, so it stays a plain Error and degrades to unknown plus a trace id.
     if (!feature) throw new Error(`${TRANSLATE_FEATURE_KEY} feature is not registered`);
 
-    return this.#aiCallFailures.wrapAiCall(feature, () =>
-      this.#modelProviders.translate(input),
-    );
+    return this.#aiCallFailures.wrapAiCall(feature, () => this.#modelProviders.translate(input));
   }
 }
 

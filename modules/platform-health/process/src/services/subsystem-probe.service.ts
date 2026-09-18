@@ -5,9 +5,9 @@
  */
 import { randomBytes } from "node:crypto";
 
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
-import { generate } from "@langwatch/ksuid";
 
 const logger = createLogger("langwatch:platform-health:probes");
 
@@ -94,7 +94,11 @@ export class SubsystemProbeService {
 
   async runCollector({ authToken }: { authToken: string }): Promise<SubsystemProbeOutcome> {
     const [restResponse, otelResponse] = await Promise.all([
-      this.#postRestCanary({ authToken, traceId: generate(TRACE_KSUID_RESOURCE).toString(), input: "\u{1F423}" }),
+      this.#postRestCanary({
+        authToken,
+        traceId: generate(TRACE_KSUID_RESOURCE).toString(),
+        input: "\u{1F423}",
+      }),
       this.#postOtelCanary({
         authToken,
         traceId: Buffer.from(randomBytes(16).toString("hex"), "hex").toString("base64"),

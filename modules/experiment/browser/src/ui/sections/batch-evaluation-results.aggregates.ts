@@ -1,3 +1,5 @@
+import { computeMetricStats, type MetricStats } from "@langwatch/experiment-contract";
+
 /**
  * Compute aggregate statistics from batch evaluation data.
  */
@@ -6,10 +8,6 @@ import type {
   BatchResultRow,
   BatchTargetColumn,
 } from "./batch-evaluation-results.types.ts";
-import {
-  computeMetricStats,
-  type MetricStats,
-} from "@langwatch/experiment-contract";
 
 /**
  * Aggregate statistics for a target's evaluator results.

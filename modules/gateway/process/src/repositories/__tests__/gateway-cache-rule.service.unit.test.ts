@@ -8,8 +8,9 @@ import {
 } from "@langwatch/gateway-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository.ts";
+
 import { GatewayCacheRuleService } from "../../services/gateway-cache-rule.service.ts";
+import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository.ts";
 
 const existingRule: GatewayCacheRuleResource = {
   id: "rule_01",

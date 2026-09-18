@@ -6,10 +6,11 @@ import {
   Tabs,
   useTabs,
 } from "@chakra-ui/react";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import type React from "react";
 import { useMemo } from "react";
 import { createHighlighter, type HighlighterGeneric } from "shiki";
-import { useColorMode } from "@langwatch/design-system/color-mode";
+
 import type { InstallMatrix } from "./codegen/registry.tsx";
 
 interface InstallPreviewProps {

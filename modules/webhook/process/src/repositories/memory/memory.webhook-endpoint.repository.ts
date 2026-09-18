@@ -1,3 +1,4 @@
+import { nowInstant, toDate, fromDate, Temporal, type Instant } from "@langwatch/time";
 import {
   WebhookEndpointNotFoundError,
   WebhookEndpointValidationError,
@@ -8,11 +9,12 @@ import {
   type WebhookDestinationKind,
   type WebhookEndpointView,
 } from "@langwatch/webhook-contract";
-import { nowInstant, toDate, fromDate, Temporal, type Instant } from "@langwatch/time";
-import type { WebhookEndpointRuntime,WebhookEndpointServiceOptions } from "../webhook-endpoint.repository.ts";
-import { type WebhookDestinationConfig,
+
+import {
+  type WebhookDestinationConfig,
   WebhookDestinationService,
-  type WebhookUrlProblemCode } from "../../services/webhook-destination.service.ts";
+  type WebhookUrlProblemCode,
+} from "../../services/webhook-destination.service.ts";
 import {
   WebhookEndpointConfiguration,
   WebhookEndpointPolicyService,
@@ -20,10 +22,11 @@ import {
   WEBHOOK_DISABLED_REASON_AUTO,
   WEBHOOK_DISABLED_REASON_MANUAL,
 } from "../../services/webhook-endpoint-policy.service.ts";
-import {
-  MemoryWebhookDatabase,
-  type MemoryWebhookEndpointRow,
-} from "./memory.webhook-database.ts";
+import type {
+  WebhookEndpointRuntime,
+  WebhookEndpointServiceOptions,
+} from "../webhook-endpoint.repository.ts";
+import { MemoryWebhookDatabase, type MemoryWebhookEndpointRow } from "./memory.webhook-database.ts";
 
 const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -174,7 +177,10 @@ function assertValidSqsDestination(
       "sqs.access_key_id and sqs.secret_access_key are set together or not at all",
     );
   }
-  const mode = destinations.sqsCredentialMode({ roleArn: sqs.roleArn, accessKeyId: sqs.accessKeyId });
+  const mode = destinations.sqsCredentialMode({
+    roleArn: sqs.roleArn,
+    accessKeyId: sqs.accessKeyId,
+  });
   if (mode === "ambient" && !configuration.allowAmbientAwsCredentials) {
     throw new WebhookEndpointValidationError(
       "sqs needs credentials of its own: either sqs.role_arn for a role to assume, or sqs.access_key_id with sqs.secret_access_key",
@@ -202,8 +208,10 @@ function assertValidDestination(
   secrets: WebhookEndpointServiceOptions["secrets"],
 ): StoredDestination {
   if (params.destinationKind === "http") {
-    if (!params.url) throw new WebhookEndpointValidationError("url is required for an http endpoint");
-    if (params.sqs) throw new WebhookEndpointValidationError("sqs does not apply to an http endpoint");
+    if (!params.url)
+      throw new WebhookEndpointValidationError("url is required for an http endpoint");
+    if (params.sqs)
+      throw new WebhookEndpointValidationError("sqs does not apply to an http endpoint");
     assertValidUrl(params.url, configuration);
 
     return { ...EMPTY_DESTINATION, url: params.url };
@@ -226,7 +234,11 @@ function assertDestinationUnchanged({
   params,
 }: {
   endpoint: MemoryWebhookEndpointRow;
-  params: { destinationKind?: WebhookDestinationKind; url?: string; sqs?: Partial<SqsDestinationInput> };
+  params: {
+    destinationKind?: WebhookDestinationKind;
+    url?: string;
+    sqs?: Partial<SqsDestinationInput>;
+  };
 }): void {
   if (params.destinationKind !== undefined && params.destinationKind !== endpoint.destinationKind) {
     throw new WebhookEndpointValidationError(
@@ -239,7 +251,9 @@ function assertDestinationUnchanged({
     );
   }
   if (params.sqs !== undefined && endpoint.destinationKind !== "sqs") {
-    throw new WebhookEndpointValidationError("sqs does not apply to this endpoint; it delivers over HTTPS");
+    throw new WebhookEndpointValidationError(
+      "sqs does not apply to this endpoint; it delivers over HTTPS",
+    );
   }
 }
 
@@ -288,7 +302,11 @@ function assertValidSqsUpdate({
   }
   const merged: SqsDestinationInput = {
     queueUrl: sqs.queueUrl ?? endpoint.sqsQueueUrl ?? "",
-    roleArn: mergedCredentialField({ isCleared: selectsStatic, sent: sqs.roleArn, stored: endpoint.sqsRoleArn }),
+    roleArn: mergedCredentialField({
+      isCleared: selectsStatic,
+      sent: sqs.roleArn,
+      stored: endpoint.sqsRoleArn,
+    }),
     externalId: mergedCredentialField({
       isCleared: selectsStatic,
       sent: sqs.externalId,
@@ -397,7 +415,10 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
       .map(toView);
   }
 
-  async getById(params: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView> {
+  async getById(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView> {
     return toView(this.#live(params));
   }
 
@@ -461,7 +482,10 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     return { endpoint: toView(updated), secret };
   }
 
-  async enable(params: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView> {
+  async enable(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView> {
     const endpoint = this.#live(params);
 
     return toView(
@@ -476,7 +500,10 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     );
   }
 
-  async disable(params: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView> {
+  async disable(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView> {
     const endpoint = this.#live(params);
 
     return toView(
@@ -556,7 +583,8 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
       endpoint.previousSecretExpiresAt !== null &&
       endpoint.previousSecretExpiresAt.getTime() > now.getTime();
     const secrets = [this.#options.secrets.decrypt(endpoint.secretEncrypted)];
-    if (previousIsValid) secrets.push(this.#options.secrets.decrypt(endpoint.previousSecretEncrypted as string));
+    if (previousIsValid)
+      secrets.push(this.#options.secrets.decrypt(endpoint.previousSecretEncrypted as string));
 
     return secrets;
   }
@@ -602,7 +630,9 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     };
   }
 
-  async getActiveByOrganization(params: { organizationId: string }): Promise<WebhookEndpointView[]> {
+  async getActiveByOrganization(params: {
+    organizationId: string;
+  }): Promise<WebhookEndpointView[]> {
     return this.#database
       .endpoints()
       .filter(
@@ -657,7 +687,12 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     });
 
     if (params.outcome === "success") {
-      this.#database.putEndpoint({ ...endpoint, lastSuccessAt: now, failingSince: null, updatedAt: now });
+      this.#database.putEndpoint({
+        ...endpoint,
+        lastSuccessAt: now,
+        failingSince: null,
+        updatedAt: now,
+      });
 
       return;
     }
@@ -718,7 +753,10 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     const cursorFiredAtMs = params.cursor ? toDate(params.cursor.firedAt).getTime() : null;
     const rows = this.#database
       .deliveries()
-      .filter((row) => row.organizationId === params.organizationId && row.endpointId === params.endpointId)
+      .filter(
+        (row) =>
+          row.organizationId === params.organizationId && row.endpointId === params.endpointId,
+      )
       .filter((row) => {
         if (cursorFiredAtMs === null) return true;
         if (row.firedAt.getTime() < cursorFiredAtMs) return true;
@@ -726,7 +764,8 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
         return row.firedAt.getTime() === cursorFiredAtMs && row.id < (params.cursor?.id ?? "");
       })
       .toSorted(
-        (left, right) => right.firedAt.getTime() - left.firedAt.getTime() || (right.id < left.id ? -1 : 1),
+        (left, right) =>
+          right.firedAt.getTime() - left.firedAt.getTime() || (right.id < left.id ? -1 : 1),
       );
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
@@ -743,7 +782,8 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
         error: row.error,
         firedAt: fromDate(row.firedAt),
       })),
-      nextCursor: rows.length > limit && last ? { firedAt: fromDate(last.firedAt), id: last.id } : null,
+      nextCursor:
+        rows.length > limit && last ? { firedAt: fromDate(last.firedAt), id: last.id } : null,
     };
   }
 
@@ -761,7 +801,11 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
 
   #live(params: { organizationId: string; endpointId: string }): MemoryWebhookEndpointRow {
     const endpoint = this.#database.findEndpoint(params.endpointId);
-    if (!endpoint || endpoint.organizationId !== params.organizationId || endpoint.archivedAt !== null) {
+    if (
+      !endpoint ||
+      endpoint.organizationId !== params.organizationId ||
+      endpoint.archivedAt !== null
+    ) {
       throw new WebhookEndpointNotFoundError();
     }
 

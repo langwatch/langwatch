@@ -1,5 +1,6 @@
-import { readString } from "./telemetry/coding-agent-span.ts";
 import type { SpanDetail } from "@langwatch/trace-contract";
+
+import { readString } from "./telemetry/coding-agent-span.ts";
 
 export { readString } from "./telemetry/coding-agent-span.ts";
 

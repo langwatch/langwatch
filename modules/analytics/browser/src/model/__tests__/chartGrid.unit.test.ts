@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   CHART_GRID_COLUMNS,
   chartGridBottomRow,
@@ -52,18 +53,10 @@ describe("chartGridPlacementSchema", () => {
   describe("when a placement starts past the last column, spans more than the grid, or is taller than the ceiling", () => {
     it("refuses each", () => {
       const base = { gridColumn: 0, gridRow: 0, colSpan: 1, rowSpan: 1 };
-      expect(
-        chartGridPlacementSchema.safeParse({ ...base, gridColumn: 8 }).success,
-      ).toBe(false);
-      expect(
-        chartGridPlacementSchema.safeParse({ ...base, colSpan: 9 }).success,
-      ).toBe(false);
-      expect(
-        chartGridPlacementSchema.safeParse({ ...base, rowSpan: 21 }).success,
-      ).toBe(false);
-      expect(
-        chartGridPlacementSchema.safeParse({ ...base, colSpan: 1.5 }).success,
-      ).toBe(false);
+      expect(chartGridPlacementSchema.safeParse({ ...base, gridColumn: 8 }).success).toBe(false);
+      expect(chartGridPlacementSchema.safeParse({ ...base, colSpan: 9 }).success).toBe(false);
+      expect(chartGridPlacementSchema.safeParse({ ...base, rowSpan: 21 }).success).toBe(false);
+      expect(chartGridPlacementSchema.safeParse({ ...base, colSpan: 1.5 }).success).toBe(false);
     });
   });
 });

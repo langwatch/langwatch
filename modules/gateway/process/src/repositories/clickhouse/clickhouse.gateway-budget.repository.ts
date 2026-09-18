@@ -2,7 +2,6 @@
  * The gateway budget ledger in ClickHouse.
  */
 
-import { createLogger } from "@langwatch/observability";
 import {
   type GatewayBudgetLedgerStatus,
   type GatewayBudgetResource,
@@ -15,11 +14,15 @@ import {
   nanoUsdToDecimalString,
   parseSummedNanoUsd,
 } from "@langwatch/gateway-contract";
+import { createLogger } from "@langwatch/observability";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
-import { type GatewayClickHouseResolver,
+
+import {
+  type GatewayClickHouseResolver,
   budgetSpendTargetsFor,
   type GatewayBudgetSpend,
-  type GatewayBudgetSpendRecord } from "../../app/gateway.members.ts";
+  type GatewayBudgetSpendRecord,
+} from "../../app/gateway.members.ts";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -216,8 +219,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     return new GatewayBudgetClickHouseRepository(resolveClient);
   }
 
-  constructor(private readonly resolveClient: GatewayClickHouseResolver) {
-  }
+  constructor(private readonly resolveClient: GatewayClickHouseResolver) {}
 
   /**
    * Idempotent at the ledger level (ReplacingMergeTree dedups on merge), but the

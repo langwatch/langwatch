@@ -1,7 +1,6 @@
 import type { EventEmitter } from "node:events";
 
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { Cluster, Redis } from "ioredis";
 import {
   PresenceApi,
   PresenceBroadcastFabric,
@@ -11,12 +10,15 @@ import {
   type PresenceHeartbeatInput,
   type PresenceLeaveInput,
   type PresenceProjectInput,
+  type PresenceProjectEvent,
   type PresenceSession,
   type PresenceTenantEmitter,
   type PresenceUser,
 } from "@langwatch/presence-contract";
+import { reads } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
+import type { Cluster, Redis } from "ioredis";
 
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
 import { RedisBroadcastRepository } from "../repositories/redis/redis.broadcast.repository.ts";
@@ -27,7 +29,7 @@ export interface PresenceBroadcast {
   publish(input: {
     projectId: string;
     event: string;
-    channel: "presence_updated" | "presence_cursor";
+    channel: "presence_updated" | "presence_cursor" | "export_progress";
     rateLimited: boolean;
   }): Promise<void>;
 }
@@ -66,24 +68,27 @@ type PresenceSetup = FeatureSetup<
 export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric {
   static readonly contract = PresenceApi;
   static readonly dependencies = { projects: ProjectApi, users: UserApi };
-  static readonly reads = ["redis", "logger"] as const;
+  static readonly reads = reads("redis", "logger");
 
   readonly #presence: PresenceService;
   readonly #stream: PresenceStreamService;
   readonly #users: UserApi;
   /** The same fabric {@link PresenceBroadcastFabric} exposes to a peer. */
   readonly #emitters: PresenceEmitter;
+  readonly #broadcast: PresenceBroadcast;
 
   private constructor(
     presence: PresenceService,
     stream: PresenceStreamService,
     users: UserApi,
     emitters: PresenceEmitter,
+    broadcast: PresenceBroadcast,
   ) {
     this.#presence = presence;
     this.#stream = stream;
     this.#users = users;
     this.#emitters = emitters;
+    this.#broadcast = broadcast;
   }
 
   static create({ repositories, members, dependencies, resources }: PresenceSetup): PresenceApp {
@@ -98,8 +103,9 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
     }
     const broadcast: PresenceBroadcast = members.broadcast ?? derived!;
     const emitters: PresenceEmitter = members.emitters ?? derived!;
-    const diagnostics: PresenceDiagnostics =
-      members.diagnostics ?? { warn: (message, context) => members.logger.warn(context, message) };
+    const diagnostics: PresenceDiagnostics = members.diagnostics ?? {
+      warn: (message, context) => members.logger.warn(context, message),
+    };
     const presence = PresenceService.create({
       repository: repositories.sessions,
       broadcast,
@@ -112,6 +118,7 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
       PresenceStreamService.create({ presence, emitters }),
       dependencies.users,
       emitters,
+      broadcast,
     );
   }
 
@@ -123,6 +130,10 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
   /** {@link PresenceBroadcastFabric}: releases the tenant emitter a subscription borrowed. */
   cleanupTenantEmitter(tenantId: string): void {
     this.#emitters.cleanupTenantEmitter(tenantId);
+  }
+
+  publishProjectEvent(input: PresenceProjectEvent): Promise<void> {
+    return this.#broadcast.publish({ ...input, rateLimited: false });
   }
 
   isEnabledForProject(input: PresenceProjectInput): Promise<boolean> {

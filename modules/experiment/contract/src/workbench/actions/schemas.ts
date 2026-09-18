@@ -1,7 +1,8 @@
-import { z } from "zod";
+import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 import type { Field } from "@langwatch/workflow-contract";
 import { fieldSchema } from "@langwatch/workflow-contract";
-import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
+import { z } from "zod";
+
 import {
   COMPARISON_COLUMN_REFUSAL,
   COMPARISON_EVALUATOR_TYPE,

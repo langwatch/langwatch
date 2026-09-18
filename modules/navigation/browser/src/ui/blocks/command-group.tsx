@@ -1,4 +1,5 @@
 import { Text, VStack } from "@chakra-ui/react";
+
 import { getItemKey, type ListItem } from "../../model/command-icon-info.ts";
 import { CommandItem } from "../elements/command-item.tsx";
 

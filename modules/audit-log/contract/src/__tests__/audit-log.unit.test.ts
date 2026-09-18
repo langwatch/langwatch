@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { recordAuditLogCommandSchema } from "../index.ts";
 
 describe("recordAuditLogCommandSchema", () => {

@@ -5,6 +5,8 @@
  */
 
 import type { GrantFact, RoleFact } from "@langwatch/authz-contract";
+import { describe, expect, it } from "vitest";
+
 import type {
   ExternalMemberFact,
   GrantHeadRow,
@@ -16,10 +18,10 @@ import type {
   ResourceGrantRow,
   ResourceGrantUsageSeed,
   RoleHeadRow,
-  ShareLinkFactRow,AuthzMigrationRepository
+  ShareLinkFactRow,
+  AuthzMigrationRepository,
 } from "../../repositories/authz-migration.repository.ts";
 import { PRINCIPAL_TO_DB } from "../../repositories/prisma/prisma.authz-grant.mapper.ts";
-import { describe, expect, it } from "vitest";
 import {
   AUTHZ_ENGINE_ACTOR_ID,
   AUTHZ_ENGINE_MIGRATION_NAME,
@@ -498,7 +500,8 @@ describe("given an organization with legacy access rows", () => {
       await first.migration.migrateTenant({ tenantId: ORG_ID });
       await second.migration.migrateTenant({ tenantId: ORG_ID });
 
-      const ids = (sent: Sent[]) => sent.map((entry) => `${entry.kind}:${entry.commandId}`).toSorted();
+      const ids = (sent: Sent[]) =>
+        sent.map((entry) => `${entry.kind}:${entry.commandId}`).toSorted();
       expect(ids(second.sent)).toEqual(ids(first.sent));
     });
 

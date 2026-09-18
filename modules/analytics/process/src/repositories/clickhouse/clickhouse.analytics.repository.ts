@@ -1,5 +1,3 @@
-import { createLogger } from "@langwatch/observability";
-import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
 import {
   analyticsTimeseriesResultSchema,
   type AnalyticsFeedbackEvent,
@@ -7,24 +5,28 @@ import {
   type AnalyticsTopDocumentsResult,
   type AnalyticsTable,
   type AnalyticsTimeseriesInput,
-  type AnalyticsTimeseriesResult,type AnalyticsTimeseriesBuilderInput
+  type AnalyticsTimeseriesResult,
+  type AnalyticsTimeseriesBuilderInput,
 } from "@langwatch/analytics-contract";
-import {
-  buildFeedbacksQuery,
-  buildTimeseriesQuery,
-  buildTopDocumentsQuery,
-} from "./clickhouse.aggregation-builder.mapper.ts";
+import { createLogger } from "@langwatch/observability";
+
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "../../rules/clickhouse-settings.rules.ts";
-import { pickAnalyticsTable } from "./clickhouse.analytics-route-table.mapper.ts";
-import { buildEvalRollupTimeseriesQuery } from "./clickhouse.eval-rollup-timeseries-query.mapper.ts";
-import { buildEvalSlimTimeseriesQuery } from "./clickhouse.eval-slim-timeseries-query.mapper.ts";
-import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query.mapper.ts";
-import { buildSlimTimeseriesQuery } from "./clickhouse.slim-timeseries-query.mapper.ts";
 import {
   AnalyticsRepository,
   type AnalyticsLegacyReadInput,
   type AnalyticsTimeseriesQuery,
 } from "../analytics.repository.ts";
+import {
+  buildFeedbacksQuery,
+  buildTimeseriesQuery,
+  buildTopDocumentsQuery,
+} from "./clickhouse.aggregation-builder.mapper.ts";
+import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
+import { pickAnalyticsTable } from "./clickhouse.analytics-route-table.mapper.ts";
+import { buildEvalRollupTimeseriesQuery } from "./clickhouse.eval-rollup-timeseries-query.mapper.ts";
+import { buildEvalSlimTimeseriesQuery } from "./clickhouse.eval-slim-timeseries-query.mapper.ts";
+import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query.mapper.ts";
+import { buildSlimTimeseriesQuery } from "./clickhouse.slim-timeseries-query.mapper.ts";
 import { parseTimeseriesRows } from "./clickhouse.timeseries-row-parser.mapper.ts";
 
 export class AnalyticsClientUnavailableError extends Error {
@@ -70,7 +72,9 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   private readonly logger = createLogger("langwatch:analytics:timeseries-repository");
 
   private constructor(
-    private readonly resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>,
+    private readonly resolveClient: (
+      tenantId: string,
+    ) => Promise<EvaluationAnalyticsClickHouseClient | null>,
   ) {
     super();
   }

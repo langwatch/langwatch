@@ -3,12 +3,12 @@
  */
 
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCallback, useRef, useState } from "react";
 import { LuCheck, LuCopy } from "react-icons/lu";
 
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEscapeKey } from "./presentation.tsx";
-import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import { COLLAPSED_CELL_HEIGHT_PX, DEFAULT_ROW_HEIGHT, type RowHeight } from "./table-utils.ts";
 
 // Max characters to display for performance

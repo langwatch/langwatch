@@ -1,26 +1,28 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
-import { generate } from "@langwatch/ksuid";
-import { useEffect, useMemo, useState } from "react";
-import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
-import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
-import { EvaluationsV3Table } from "../../../ui/sections/experiments-v3/evaluations-v3-table.tsx";
-import { HistoryButton } from "../../../ui/sections/experiments-v3/history-button.tsx";
-import { PromptTemplateFieldsProvider } from "../../../ui/sections/experiments-v3/prompt-template-fields-provider.tsx";
-import { RunEvaluationButton } from "../../../ui/sections/experiments-v3/run-evaluation-button.tsx";
-import { SavedDatasetLoaders } from "../../../ui/sections/experiments-v3/saved-dataset-loaders.tsx";
-import { TableSettingsMenu } from "../../../ui/sections/experiments-v3/table-settings-menu.tsx";
-import { UndoRedo } from "../../../ui/sections/experiments-v3/undo-redo.tsx";
-import { VersionHistoryButton } from "../../../ui/sections/experiments-v3/version-history-button.tsx";
-import { WorkbenchStaleBanner } from "../../../ui/elements/experiments-v3/workbench-stale-banner.tsx";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   WORKBENCH_ACTION_KINDS,
-  WORKBENCH_ACTIONS,narrateWorkbenchAction,readLiveWorkbench,scopeFromRunPayload
+  WORKBENCH_ACTIONS,
+  narrateWorkbenchAction,
+  readLiveWorkbench,
+  scopeFromRunPayload,
 } from "@langwatch/experiment-contract";
-import { startAndIdentifyRun } from "../../../model/experiments-v3/execution/run-identification.ts";
+import { generate } from "@langwatch/ksuid";
 import {
-  revealTargetColumn,
-  targetColumnLabel,
-} from "../../../model/experiments-v3/reveal-target-column.ts";
+  LangyUiPageOutOfDateError,
+  LangyUiSaveFailedError,
+  type LangyUiActionHandlers,
+  type ProposalHandlers,
+  useRegisterLangyActions,
+  useRegisterLangyHandlers,
+} from "@langwatch/langy-browser/langy-page-registration";
+import { assertCrispChatHidden } from "@langwatch/workflow-browser/crisp-bubble-policy";
+import { HandledErrorAlert } from "@langwatch/workflow-browser/handled-error-views";
+import { useEffect, useMemo, useState } from "react";
+
 import { useAutosaveEvaluationsV3 } from "../../../behavior/experiments-v3/use-autosave-evaluations-v3.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";
@@ -30,20 +32,22 @@ import { useReportPageActivityToLangy } from "../../../behavior/experiments-v3/u
 import { useSavedDatasetLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name.ts";
 import { useWorkbenchUpdateListener } from "../../../behavior/experiments-v3/use-workbench-update-listener.ts";
-import { HandledErrorAlert } from "@langwatch/workflow-browser/handled-error-views";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { assertCrispChatHidden } from "@langwatch/workflow-browser/crisp-bubble-policy";
-import { useDrawer } from "@langwatch/browser-host/drawer";
+import { startAndIdentifyRun } from "../../../model/experiments-v3/execution/run-identification.ts";
 import {
-  LangyUiPageOutOfDateError,
-  LangyUiSaveFailedError,
-  type LangyUiActionHandlers,
-  type ProposalHandlers,
-  useRegisterLangyActions,
-  useRegisterLangyHandlers,
-} from "@langwatch/langy-browser/langy-page-registration";
+  revealTargetColumn,
+  targetColumnLabel,
+} from "../../../model/experiments-v3/reveal-target-column.ts";
+import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
+import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
+import { WorkbenchStaleBanner } from "../../../ui/elements/experiments-v3/workbench-stale-banner.tsx";
+import { EvaluationsV3Table } from "../../../ui/sections/experiments-v3/evaluations-v3-table.tsx";
+import { HistoryButton } from "../../../ui/sections/experiments-v3/history-button.tsx";
+import { PromptTemplateFieldsProvider } from "../../../ui/sections/experiments-v3/prompt-template-fields-provider.tsx";
+import { RunEvaluationButton } from "../../../ui/sections/experiments-v3/run-evaluation-button.tsx";
+import { SavedDatasetLoaders } from "../../../ui/sections/experiments-v3/saved-dataset-loaders.tsx";
+import { TableSettingsMenu } from "../../../ui/sections/experiments-v3/table-settings-menu.tsx";
+import { UndoRedo } from "../../../ui/sections/experiments-v3/undo-redo.tsx";
+import { VersionHistoryButton } from "../../../ui/sections/experiments-v3/version-history-button.tsx";
 
 /** The app's KSUID resource for a workbench evaluator id (`KSUID_RESOURCES.EVALUATOR`). */
 const EVALUATOR_KSUID_RESOURCE = "evaluator";
@@ -314,7 +318,10 @@ export default function ExperimentsWorkbenchPage() {
         await createDatasetRecords.mutateAsync({
           projectId,
           datasetId,
-          entries: rows.map((row) => ({ id: generate(RECORD_KSUID_RESOURCE).toString(), ...row })) as never,
+          entries: rows.map((row) => ({
+            id: generate(RECORD_KSUID_RESOURCE).toString(),
+            ...row,
+          })) as never,
         });
         await utils.dataset.getAll.invalidate({ projectId });
         return projectSlug

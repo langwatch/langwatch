@@ -1,6 +1,7 @@
 import type { GithubRepository } from "@langwatch/github-contract";
 import { GithubRepositoryNotAccessibleError } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
@@ -12,7 +13,6 @@ import type {
   MintInstallationTokenInput,
 } from "../../app/github.app.ts";
 import type { GithubHost } from "../../app/github.members.ts";
-import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 
 /** The installation this App JWT asked GitHub for is gone or was never granted. */
 export class GithubInstallationNotFoundError extends Error {

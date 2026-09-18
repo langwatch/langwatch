@@ -1,8 +1,9 @@
 import type { AgentType } from "@langwatch/agent-contract";
 
-export type AgentEditorDrawerName = "agentCodeEditor" | "agentHttpEditor" | "agentWorkflowEditor";
+import type { AgentEditorDrawer } from "./agent-management-host.ts";
 
-export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawerName {
+/** Every name here is declared in `agent.web.ts`: drawer names are the wire. */
+export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawer {
   switch (type) {
     case "code":
       return "agentCodeEditor";
@@ -10,6 +11,9 @@ export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawerName {
       return "agentHttpEditor";
     case "workflow":
       return "agentWorkflowEditor";
+    case "voice":
+      // No `agentVoiceEditor` drawer is declared, so no name would answer.
+      throw new Error(`Unhandled agent type: ${type} — voice agents have no editor drawer yet`);
     case "signature":
       throw new Error(`Unhandled agent type: ${type} — signature agents have no editor drawer`);
     case "connected":

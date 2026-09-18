@@ -1,8 +1,8 @@
 import { Box, HStack, IconButton, Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Clipboard, ClipboardPlus, Eye, EyeOff } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface CopyableInputWithPrefixProps {
   prefix: string;

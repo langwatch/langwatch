@@ -1,10 +1,11 @@
-import { PrismaRepository, type PrismaModelClient } from "@langwatch/prisma-client";
-import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import {
   CLI_LOGIN_KEY_NAME_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
   type ApiKeyRevocationCause,
 } from "@langwatch/api-key-contract";
+import { PrismaRepository, type PrismaModelClient } from "@langwatch/prisma-client";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+
 import type {
   ApiKeyCreateRecord,
   ApiKeyRepository,
@@ -182,9 +183,9 @@ export class PrismaApiKeyRepository
       select: { id: true },
     });
   }
-  async findLivenessById(
-    input: { id: string },
-  ): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+  async findLivenessById(input: {
+    id: string;
+  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
     const row = await this.database.apiKey.findUnique({
       where: { id: input.id },
       select: { revokedAt: true, expiresAt: true },

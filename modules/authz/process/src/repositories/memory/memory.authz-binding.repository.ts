@@ -1,4 +1,5 @@
 import type { OrganizationRole, RoleBindingScopeType } from "@langwatch/authz-contract";
+
 import {
   type AuthzAssignableRoleRow,
   type AuthzBindingScopeRow,

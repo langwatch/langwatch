@@ -5,17 +5,19 @@
  * (personal-workspace-integrity.feature).
  */
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
 } from "../repositories/prisma/prisma.authz-binding.repository.ts";
 import { PrismaAuthzListingRepository } from "../repositories/prisma/prisma.authz-listing.repository.ts";
 import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
-import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
 const DB_URL = process.env.DATABASE_URL;
@@ -30,7 +32,9 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
   const authz = AuthzService.create({
     repository: PrismaAuthzReadRepository.create(database),
     listing: PrismaAuthzListingRepository.create(database),
-    bindings: PrismaAuthzBindingRepository.create({ database: prisma as unknown as AuthzBindingDatabase }),
+    bindings: PrismaAuthzBindingRepository.create({
+      database: prisma as unknown as AuthzBindingDatabase,
+    }),
     // The legacy RoleBinding head, which is what these rows are. No cache is
     // configured either, so each read below sees the role as it stands.
     isOnEngine: async () => false,

@@ -54,8 +54,8 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
   },
 }));
 
-import { EditProjectDrawer } from "../edit-project-drawer.tsx";
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
+import { EditProjectDrawer } from "../edit-project-drawer.tsx";
 
 const OPEN_FOR_MY_CHATBOT = (
   <EditProjectDrawer projectId="proj-1" projectName="My Chatbot" currentTeamId="team-1" />

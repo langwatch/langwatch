@@ -12,6 +12,7 @@ import {
   type AuthzScopeRef,
   type CollectedGrants,
 } from "@langwatch/authz-contract";
+
 import type { AuthzCollectorService } from "./authz-collector.service.ts";
 import type { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service.ts";
 

@@ -1,8 +1,9 @@
-import { useRef } from "react";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import { useRef } from "react";
+
+import { useDatasetTable } from "../../model/dataset-table-context.tsx";
 import { DatasetCellDisplay } from "./dataset-cell-display.tsx";
 import { FloatingCellEditor } from "./floating-cell-editor.tsx";
-import { useDatasetTable } from "../../model/dataset-table-context.tsx";
 
 export { JSON_LIKE_TYPES } from "../../model/editable-cell-value.ts";
 

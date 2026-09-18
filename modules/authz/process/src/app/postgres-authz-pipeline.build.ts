@@ -1,5 +1,4 @@
 import { EventingAuthzAdapter } from "../eventing/authz-grant.pipeline.ts";
-import type { AuthzPipeline } from "./postgres-authz.build.ts";
 import {
   type AuthzAuditDatabase,
   PrismaAuthzAuditRepository,
@@ -8,6 +7,7 @@ import {
   type AuthzProjectionDatabase,
   PrismaAuthzProjectionRepository,
 } from "../repositories/prisma/prisma.authz-projection.repository.ts";
+import type { AuthzPipeline } from "./postgres-authz.build.ts";
 
 /** Every model the grants ledger's consumer half writes, and no other. */
 export type AuthzGrantPipelineDatabase = AuthzProjectionDatabase & AuthzAuditDatabase;

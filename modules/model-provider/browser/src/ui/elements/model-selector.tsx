@@ -8,30 +8,34 @@ import {
   Skeleton,
   Text,
 } from "@chakra-ui/react";
-import { AlertTriangle, Search } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
-import { LuSettings2 } from "react-icons/lu";
+import { Link } from "@langwatch/browser-host/link";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Select } from "@langwatch/design-system/select";
+import { titleCase } from "@langwatch/design-system/string-casing";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
 } from "@langwatch/model-provider-browser-kit/provider-icons";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { isCodexModel, isModelAllowedForFeature,
+import {
+  isCodexModel,
+  isModelAllowedForFeature,
   buildCustomModelDisplayNames,
   modelDisplayLabel,
   allLitellmModels,
-  type ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { titleCase } from "@langwatch/design-system/string-casing";
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
 import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
 } from "@langwatch/prompt-contract/llm-config-constants";
+import { AlertTriangle, Search } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { LuSettings2 } from "react-icons/lu";
+
 import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
-import { InputGroup } from "@langwatch/design-system/input-group";
-import { Link } from "@langwatch/browser-host/link";
-import { Select } from "@langwatch/design-system/select";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export type ModelOption = {
   label: string;

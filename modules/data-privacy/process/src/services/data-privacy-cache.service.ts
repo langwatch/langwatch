@@ -1,11 +1,12 @@
-import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
-import { nowInstant } from "@langwatch/time";
 import {
   buildDataPrivacyChain,
   resolveDataPrivacy,
   type DataPrivacyScopeFacts,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import { nowInstant } from "@langwatch/time";
+
+import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
 
 type Entry = { value: ResolvedDataPrivacy; expiresAt: number };
 

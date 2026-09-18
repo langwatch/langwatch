@@ -1,19 +1,28 @@
+import {
+  describeError,
+  showErrorToast,
+  isHandledByGlobalHandler,
+} from "@langwatch/browser-host/errors";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { createLogger } from "@langwatch/observability/browser";
+import { nowInstant } from "@langwatch/time";
+import type {
+  BaseComponent,
+  StudioClientEvent,
+  StudioServerEvent,
+} from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { describeError, showErrorToast,isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
-import { fetchSSE } from "../../../model/sse/fetch-sse.ts";
-import { toaster } from "@langwatch/browser-host/toaster";
+
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import type { BaseComponent,StudioClientEvent,StudioServerEvent } from "@langwatch/workflow-contract";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { type WorkflowStore } from "../../../behavior/workflow-store.ts";
+import { fetchSSE } from "../../../model/sse/fetch-sse.ts";
 import {
   type CodedExecutionFailure,
   explainExecutionStateError,
   reportableExecutionFailure,
 } from "./execution-state-error.ts";
-import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import { type WorkflowStore } from "../../../behavior/workflow-store.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;

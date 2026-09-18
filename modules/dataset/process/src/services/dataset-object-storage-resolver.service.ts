@@ -5,9 +5,7 @@
  */
 import { S3Client } from "@aws-sdk/client-s3";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
-import { AzureDatasetStorageAdapter } from "./azure.dataset-storage.service.ts";
-import { LocalDatasetStorageAdapter } from "./local.dataset-storage.service.ts";
-import { S3DatasetStorageAdapter } from "./s3.dataset-storage.service.ts";
+
 import type {
   DatasetAzureConfigResolver,
   DatasetS3ClientResolver,
@@ -15,6 +13,9 @@ import type {
   DatasetS3ClientLease,
   DatasetStorage,
 } from "../app/dataset.app.ts";
+import { AzureDatasetStorageAdapter } from "./azure.dataset-storage.service.ts";
+import { LocalDatasetStorageAdapter } from "./local.dataset-storage.service.ts";
+import { S3DatasetStorageAdapter } from "./s3.dataset-storage.service.ts";
 
 /** One S3-compatible target: a bucket, and how to reach and authenticate to it. */
 export type DatasetS3Target = Readonly<{
@@ -59,8 +60,7 @@ export class DatasetObjectStorageS3ClientResolverAdapter implements DatasetS3Cli
     private readonly aws: AwsClientProcessRuntime,
     private readonly lookupProjectTarget: (projectId: string) => Promise<DatasetS3Target | null>,
     private readonly globalS3: DatasetS3Target | undefined,
-  ) {
-  }
+  ) {}
 
   async acquire(projectId: string): Promise<DatasetS3ClientLease> {
     const target = (await this.lookupProjectTarget(projectId)) ?? this.globalS3;

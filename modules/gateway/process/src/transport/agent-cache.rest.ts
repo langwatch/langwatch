@@ -1,3 +1,8 @@
+import {
+  canonicalBaseResponses,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import {
   DEFAULT_AGENT_CACHE_TTL_SECONDS,
@@ -8,11 +13,6 @@ import {
   gatewayAgentCacheWriteSchema,
   gatewayAgentCacheWrittenSchema,
 } from "@langwatch/gateway-contract/gateway-agent-cache-schemas";
-import {
-  canonicalBaseResponses,
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-} from "@langwatch/api/rest";
 
 export const agentCacheRest = defineRestRouter(GatewayApi)
   .withNamespace("agent-cache")

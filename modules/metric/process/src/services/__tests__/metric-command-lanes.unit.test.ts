@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
 import { metricDataPointReceivedEventSchema } from "@langwatch/metric-contract";
+import { describe, expect, it } from "vitest";
+
 import { point } from "../../app/__tests__/metric.fixture.ts";
 import {
   metricCommandGroupKey,
   metricMapGroupKey,
-  resolveMetricCommandShardCount,createMetricProcessingPipeline
+  resolveMetricCommandShardCount,
+  createMetricProcessingPipeline,
 } from "../metric-processing.service.ts";
 
 describe("metric command lanes", () => {

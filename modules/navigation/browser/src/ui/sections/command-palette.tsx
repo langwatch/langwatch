@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { useAutoFocusInput } from "../../behavior/use-auto-focus-input.ts";
 import { useCommandBarItems } from "../../behavior/use-command-bar-items.ts";
 import { useCommandBarKeyboard } from "../../behavior/use-command-bar-keyboard.ts";
@@ -23,8 +24,8 @@ import {
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { CommandBarLangyMode } from "../blocks/command-bar-langy-mode.tsx";
 import { CommandBarFooter } from "../elements/command-bar-footer.tsx";
-import { CommandBarInput } from "../elements/command-bar-input.tsx";
 import { HintsSection } from "../elements/command-bar-hints.tsx";
+import { CommandBarInput } from "../elements/command-bar-input.tsx";
 import { CommandBarResults } from "./command-bar-results.tsx";
 
 /** Never collapse the results to a sliver, however little room is left. */

@@ -19,13 +19,14 @@ import {
 } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+
 import { secretApi } from "../../behavior/secret-api.ts";
-import { SECRET_MANAGE_PERMISSION, useSecretHost } from "../../model/secret-host.ts";
 import { readableDate } from "../../model/readable-date.ts";
+import { SECRET_MANAGE_PERMISSION, useSecretHost } from "../../model/secret-host.ts";
 import { describeSecretRefusal } from "../../model/secret-refusal-copy.ts";
 
 /**

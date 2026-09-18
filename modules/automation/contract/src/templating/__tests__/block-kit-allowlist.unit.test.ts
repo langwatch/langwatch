@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   filterBlockKit,
   MAX_HEADER_TEXT_CHARS,

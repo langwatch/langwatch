@@ -21,10 +21,11 @@ describe("given the hosted MCP approval declaration", () => {
   });
 
   describe("when the door it answers behind is read", () => {
-    it("resolves no credential and asks no permission of one", () => {
+    it("reads the browser credential while preserving OAuth refusals", () => {
       const route = declaration.routes[0];
 
-      expect(route?.access?.kind).toBe("public");
+      expect(declaration.credential).toBe("browser");
+      expect(route?.access?.kind).toBe("optional");
       expect(route?.permission).toBeUndefined();
       // The body is read, never parsed: a blank field is this route's own
       // refusal, worded in OAuth terms, not a validation envelope.

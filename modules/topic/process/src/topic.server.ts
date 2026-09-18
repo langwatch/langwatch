@@ -1,11 +1,12 @@
-import type { TopicClusteringMetrics } from "./eventing/topic-clustering.intent.ts";
 import { defineServerModule } from "@langwatch/kernel";
+
 import { TopicApp } from "./app/topic.app.ts";
-import { topicRepositories } from "./repositories/topic-repositories.registry.ts";
+import type { TopicClusteringMetrics } from "./eventing/topic-clustering.intent.ts";
 import {
   PrismaTopicServerInstallerRepository,
   type TopicServerInstallerDependencies,
 } from "./repositories/prisma/prisma.topic-server-installer.repository.ts";
+import { topicRepositories } from "./repositories/topic-repositories.registry.ts";
 import { OtelTopicClusteringMetricsService } from "./services/topic-clustering-metrics.service.ts";
 import { topicTrpcTransport } from "./transport/topic.trpc.ts";
 

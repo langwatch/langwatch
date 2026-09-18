@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { SignUpAccountDirectory } from "../../services/signup-verification.service.ts";
 
 /**

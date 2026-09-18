@@ -1,9 +1,10 @@
 import { defineServerModule } from "@langwatch/kernel";
+
 import { AnnotationApp } from "#app/annotation.app";
 import { annotationRepositories } from "#repositories/annotation-repositories.registry";
+import { annotationScoreTrpcTransport } from "#transport/annotation-score.trpc";
 import { annotationRest } from "#transport/annotation.rest";
 import { annotationTrpcTransport } from "#transport/annotation.trpc";
-import { annotationScoreTrpcTransport } from "#transport/annotation-score.trpc";
 
 /**
  * The whole module, declared. Every call answers something already

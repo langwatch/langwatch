@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { suiteTargetSchema } from "../suite.ts";
 
 describe("suiteTargetSchema", () => {

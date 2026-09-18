@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { fireEvent, screen } from "@testing-library/react";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import { AutomationUseCaseStrip } from "../ui/elements/automation-use-case-strip.tsx";
 
 describe("AutomationUseCaseStrip", () => {

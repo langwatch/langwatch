@@ -8,8 +8,9 @@ import type {
   Payload,
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
-import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluation-results.types.ts";
+
 import { readableDate } from "../../../model/display-formatters.ts";
+import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluation-results.types.ts";
 
 export type BatchCellFailure = {
   title: string;

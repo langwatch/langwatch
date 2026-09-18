@@ -1,10 +1,9 @@
 import { Badge, Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
-
 import { ProviderScopeChips } from "@langwatch/authz-browser-kit/scope-picker";
 import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
-import { isModelTier } from "../../model/model-tier-presets.ts";
+import { Plus } from "lucide-react";
 
+import { isModelTier } from "../../model/model-tier-presets.ts";
 import { RoutingPolicyRowActions } from "../elements/routing-policy-row-actions.tsx";
 
 export type RoutingPolicyScopeLevel = "organization" | "team" | "project";

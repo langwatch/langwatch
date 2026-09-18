@@ -28,12 +28,8 @@ import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import { Folder, MoreVertical, Plus, Shield, UserLock } from "lucide-react";
 import { useMemo } from "react";
+
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
-import { useDataPrivacyHost, type DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
-import { SCOPE_ICON } from "../../model/data-privacy-labels.ts";
-import { ruleSummary } from "../../model/data-privacy-rule-config.ts";
-import { EffectiveSummary } from "../blocks/effective-summary.tsx";
-import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 import {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,
@@ -41,6 +37,11 @@ import {
   privacyRuleAddress,
   privacyRuleForAddress,
 } from "../../model/data-privacy-address.ts";
+import { useDataPrivacyHost, type DataPrivacyHostApi } from "../../model/data-privacy-host.ts";
+import { SCOPE_ICON } from "../../model/data-privacy-labels.ts";
+import { ruleSummary } from "../../model/data-privacy-rule-config.ts";
+import { EffectiveSummary } from "../blocks/effective-summary.tsx";
+import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 
 export default function DataPrivacyScreen() {
   const host = useDataPrivacyHost();

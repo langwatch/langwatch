@@ -1,9 +1,10 @@
+import { HandledError } from "@langwatch/handled-error";
 /**
  * Bounded read-your-writes hold; caller can require projection or pass if
  * fold converges.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { HandledError } from "@langwatch/handled-error";
+
 import { ACTOR, binding, harness, ORG_ID } from "./support/eventing.authz-ledger-fork.harness.ts";
 
 beforeEach(() => {

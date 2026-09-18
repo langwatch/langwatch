@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import { EvaluatorCodeService } from "../evaluator-code.service.ts";
-import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
-import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
 import type { Evaluator } from "@langwatch/evaluator-contract";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
+
+import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
+import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
+import { EvaluatorCodeService } from "../evaluator-code.service.ts";
 
 const savedEvaluator: Evaluator = {
   id: "evaluator_code_errors_test",

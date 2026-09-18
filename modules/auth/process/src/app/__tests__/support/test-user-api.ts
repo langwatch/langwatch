@@ -33,10 +33,12 @@ export class TestUserApi implements UserApi {
     this.overrides.recordSignIn?.(input) ?? this.unimplemented("recordSignIn");
 
   getTraceExplorerTourPreference: UserApi["getTraceExplorerTourPreference"] = (input) =>
-    this.overrides.getTraceExplorerTourPreference?.(input) ?? this.unimplemented("getTraceExplorerTourPreference");
+    this.overrides.getTraceExplorerTourPreference?.(input) ??
+    this.unimplemented("getTraceExplorerTourPreference");
 
   dismissTraceExplorerTour: UserApi["dismissTraceExplorerTour"] = (input) =>
-    this.overrides.dismissTraceExplorerTour?.(input) ?? this.unimplemented("dismissTraceExplorerTour");
+    this.overrides.dismissTraceExplorerTour?.(input) ??
+    this.unimplemented("dismissTraceExplorerTour");
 
   isAdmin: UserApi["isAdmin"] = (identity) =>
     this.overrides.isAdmin?.(identity) ?? this.refuse("isAdmin");
@@ -57,7 +59,8 @@ export class TestUserApi implements UserApi {
     this.overrides.createPasskeyUser?.(input) ?? this.unimplemented("createPasskeyUser");
 
   registerCredentialAccount: UserApi["registerCredentialAccount"] = (input) =>
-    this.overrides.registerCredentialAccount?.(input) ?? this.unimplemented("registerCredentialAccount");
+    this.overrides.registerCredentialAccount?.(input) ??
+    this.unimplemented("registerCredentialAccount");
 
   hasPassword: UserApi["hasPassword"] = (input) =>
     this.overrides.hasPassword?.(input) ?? this.unimplemented("hasPassword");
@@ -84,7 +87,8 @@ export class TestUserApi implements UserApi {
     this.overrides.rotatePassword?.(input) ?? this.unimplemented("rotatePassword");
 
   findAuth0DatabaseAccount: UserApi["findAuth0DatabaseAccount"] = (input) =>
-    this.overrides.findAuth0DatabaseAccount?.(input) ?? this.unimplemented("findAuth0DatabaseAccount");
+    this.overrides.findAuth0DatabaseAccount?.(input) ??
+    this.unimplemented("findAuth0DatabaseAccount");
 
   listLinkedAccounts: UserApi["listLinkedAccounts"] = (input) =>
     this.overrides.listLinkedAccounts?.(input) ?? this.unimplemented("listLinkedAccounts");
@@ -96,10 +100,12 @@ export class TestUserApi implements UserApi {
     this.overrides.unlinkOwnAccount?.(input) ?? this.unimplemented("unlinkOwnAccount");
 
   revokeOtherBrowserSessions: UserApi["revokeOtherBrowserSessions"] = (input) =>
-    this.overrides.revokeOtherBrowserSessions?.(input) ?? this.unimplemented("revokeOtherBrowserSessions");
+    this.overrides.revokeOtherBrowserSessions?.(input) ??
+    this.unimplemented("revokeOtherBrowserSessions");
 
   revokeAllBrowserSessions: UserApi["revokeAllBrowserSessions"] = (input) =>
-    this.overrides.revokeAllBrowserSessions?.(input) ?? this.unimplemented("revokeAllBrowserSessions");
+    this.overrides.revokeAllBrowserSessions?.(input) ??
+    this.unimplemented("revokeAllBrowserSessions");
 
   deactivate: UserApi["deactivate"] = (input) =>
     this.overrides.deactivate?.(input) ?? this.unimplemented("deactivate");
@@ -123,7 +129,8 @@ export class TestUserApi implements UserApi {
     this.overrides.removeAvatar?.(input) ?? this.unimplemented("removeAvatar");
 
   ensurePersonalWorkspace: UserApi["ensurePersonalWorkspace"] = (input) =>
-    this.overrides.ensurePersonalWorkspace?.(input) ?? this.unimplemented("ensurePersonalWorkspace");
+    this.overrides.ensurePersonalWorkspace?.(input) ??
+    this.unimplemented("ensurePersonalWorkspace");
 
   findPersonalWorkspace: UserApi["findPersonalWorkspace"] = (input) =>
     this.overrides.findPersonalWorkspace?.(input) ?? this.unimplemented("findPersonalWorkspace");
@@ -147,7 +154,8 @@ export class TestUserApi implements UserApi {
     this.overrides.getHomePagePickerState?.(input) ?? this.unimplemented("getHomePagePickerState");
 
   completeEmailVerification: UserApi["completeEmailVerification"] = (input) =>
-    this.overrides.completeEmailVerification?.(input) ?? this.unimplemented("completeEmailVerification");
+    this.overrides.completeEmailVerification?.(input) ??
+    this.unimplemented("completeEmailVerification");
 
   getPersonalUsage: UserApi["getPersonalUsage"] = (input) =>
     this.overrides.getPersonalUsage?.(input) ?? this.unimplemented("getPersonalUsage");

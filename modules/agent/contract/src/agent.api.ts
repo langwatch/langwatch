@@ -1,23 +1,14 @@
-import type { AgentCallSignal,
-  AgentConnection,
-  AgentConnectCredentials,
-  AgentConnectFramesInput,
-  AgentConnectPollInput,
-  AgentConnectPollAnswer,
-  AgentConnectRegisterAnswer,
-  AgentConnectRegisterInput,
-  AgentConnectRegisterOutput } from "./connected-agent.connection.ts";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
-import type { AgentPresence } from "./connected-agent.view.ts";
-import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connected-agent.call.ts";
-import type { CallOutcome, DispatchAgent, DispatchCall } from "./connected-agent.dispatch.ts";
-import type { RegisterConnectedAgentInput,HttpAgentTestInput,
+
+import type {
+  RegisterConnectedAgentInput,
+  HttpAgentTestInput,
   ArchiveAgentCommand,
   CopyAgentCommand,
   CreateAgentCommand,
-  UpdateAgentCommand } from "./agent.commands.ts";
-import type { Agent, AgentWithFields } from "./agent.ts";
+  UpdateAgentCommand,
+} from "./agent.commands.ts";
 import type {
   HttpProxyResult,
   AgentReferenceState,
@@ -30,6 +21,21 @@ import type {
   AgentTestRunResult,
   AgentTestTurnResult,
 } from "./agent.queries.ts";
+import type { Agent, AgentWithFields } from "./agent.ts";
+import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connected-agent.call.ts";
+import type {
+  AgentCallSignal,
+  AgentConnection,
+  AgentConnectCredentials,
+  AgentConnectFramesInput,
+  AgentConnectPollInput,
+  AgentConnectPollAnswer,
+  AgentConnectRegisterAnswer,
+  AgentConnectRegisterInput,
+  AgentConnectRegisterOutput,
+} from "./connected-agent.connection.ts";
+import type { CallOutcome, DispatchAgent, DispatchCall } from "./connected-agent.dispatch.ts";
+import type { AgentPresence } from "./connected-agent.view.ts";
 
 /** Callable capability exposed by the composed Agent application. */
 export interface AgentApi {

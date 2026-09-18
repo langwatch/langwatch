@@ -4,7 +4,6 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLRunContext,
 } from "@langwatch/analytics-contract";
-import { generate } from "@langwatch/ksuid";
 import {
   projectIdSchema,
   SAVED_WORKBENCH_CHART_KSUID_RESOURCE,
@@ -21,6 +20,8 @@ import {
   type SavedWorkbenchChartDefinitionUpdate,
   type SavedWorkbenchChartPlacement,
 } from "@langwatch/dashboard-contract";
+import { generate } from "@langwatch/ksuid";
+
 import type { DashboardRepository } from "../repositories/dashboard.repository.ts";
 import type { SavedWorkbenchChartPolicyService } from "./saved-workbench-chart-policy.service.ts";
 

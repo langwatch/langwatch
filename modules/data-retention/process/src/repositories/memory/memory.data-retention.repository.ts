@@ -8,6 +8,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
+
 import type { DataRetentionRepository } from "../data-retention.repository.ts";
 
 const RETENTION_POLICY_KSUID_RESOURCE = "retention";

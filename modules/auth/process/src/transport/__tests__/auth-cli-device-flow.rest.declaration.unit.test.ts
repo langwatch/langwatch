@@ -18,7 +18,9 @@ describe("the /api/auth/cli REST family", () => {
     });
 
     it("keeps every path, operation id and method", () => {
-      expect(declaration.routes.map((route) => [route.path, route.operation, route.methods])).toEqual([
+      expect(
+        declaration.routes.map((route) => [route.path, route.operation, route.methods]),
+      ).toEqual([
         ["/api/auth/cli/device-code", "startCliDeviceCode", ["post"]],
         ["/api/auth/cli/exchange", "exchangeCliDeviceCode", ["post"]],
         ["/api/auth/cli/refresh", "refreshCliDeviceSession", ["post"]],
@@ -46,7 +48,10 @@ describe("the /api/auth/cli REST family", () => {
 
     it("writes OAuth's own bodies rather than a schema's", () => {
       for (const route of declaration.routes) {
-        expect([route.operation, route.rawResponse !== undefined]).toEqual([route.operation, true]);
+        expect([route.operation, route.response?.kind === "protocol"]).toEqual([
+          route.operation,
+          true,
+        ]);
       }
     });
 

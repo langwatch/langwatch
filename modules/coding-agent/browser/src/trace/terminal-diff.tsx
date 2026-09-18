@@ -1,5 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo, useMemo } from "react";
+
 import { computeLineDiff, type DiffLine, diffStat } from "./terminal-line-diff.ts";
 import { DIFF_TOKENS, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 

@@ -22,8 +22,8 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/plans": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",

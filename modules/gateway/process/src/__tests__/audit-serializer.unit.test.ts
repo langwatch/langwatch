@@ -1,7 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { Prisma } from "@langwatch/prisma-client/generated";
-
 import { serializeRowForAudit } from "@langwatch/gateway-contract";
+import { Prisma } from "@langwatch/prisma-client/generated";
+import { describe, expect, it } from "vitest";
 
 /**
  * Guards the replacer that lets JSON.stringify handle BigInt columns

@@ -1,13 +1,11 @@
-import type {
-  Topic,
-  TopicClusteringRunHistoryEntry,
-} from "@langwatch/topic-contract";
-import type { TopicClusteringStatusRecord } from "../topic.repository.ts";
+import type { Topic, TopicClusteringRunHistoryEntry } from "@langwatch/topic-contract";
+
 import type {
   TopicClusteringModelRow,
   TopicClusteringSeedTopicRow,
   TopicClusteringTopicIndexRow,
 } from "../topic-clustering.repository.ts";
+import type { TopicClusteringStatusRecord } from "../topic.repository.ts";
 
 /** One project's read rows, as the Prisma repository would read them back. */
 export type MemoryTopicProject = Readonly<{

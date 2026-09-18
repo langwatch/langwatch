@@ -5,20 +5,19 @@
  */
 
 import { Box, Text } from "@chakra-ui/react";
-import { useMemo } from "react";
-
-import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
 import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { dashboardWidgetDefinitionSchema } from "../../model/dashboard-widget-definition.ts";
+import { useMemo } from "react";
 
-import type { ChartFrameDashboardContext } from "../../model/dashboard-widget/bridge-protocol.ts";
-import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
-import { declaredParamDefaults } from "../../model/dashboard-widget/params-snapshot.ts";
-import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
 import { useFrameDiagnostic } from "../../behavior/use-frame-diagnostic.ts";
+import { dashboardWidgetDefinitionSchema } from "../../model/dashboard-widget-definition.ts";
+import type { ChartFrameDashboardContext } from "../../model/dashboard-widget/bridge-protocol.ts";
+import { declaredParamDefaults } from "../../model/dashboard-widget/params-snapshot.ts";
+import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
+import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
+import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
 
 export interface DashboardWidgetFrameProps {
   readonly id: string;

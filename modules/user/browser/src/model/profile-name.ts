@@ -10,13 +10,7 @@ export function sanitizeProfileName(candidate: string): string | null {
 }
 
 /** Whether a typed name is both non-blank and different from what is saved. */
-export function profileNameMaySave({
-  typed,
-  saved,
-}: {
-  typed: string;
-  saved: string;
-}): boolean {
+export function profileNameMaySave({ typed, saved }: { typed: string; saved: string }): boolean {
   const sanitized = sanitizeProfileName(typed);
   return sanitized !== null && sanitized !== saved.trim();
 }

@@ -5,8 +5,9 @@
  */
 import { monitorSchema } from "@langwatch/monitor-contract";
 import { z } from "zod";
-import { automationPersistCapCountSchema } from "./persist-cap.ts";
+
 import { customGraphNameRefSchema } from "./custom-graph.ts";
+import { automationPersistCapCountSchema } from "./persist-cap.ts";
 import { triggerSchema } from "./trigger.ts";
 
 /**

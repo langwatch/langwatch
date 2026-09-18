@@ -1,5 +1,6 @@
-import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import type { MetricKind, MetricTraceCorrelation } from "@langwatch/metric-contract";
+import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
+
 import { finiteNumber, timestampDecimal, timestampMs } from "./metric-numbers.rules.ts";
 import { isRecord } from "./metric-serialization.rules.ts";
 

@@ -1,5 +1,6 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
+
 import {
   MAX_RETENTION_DAYS,
   PLATFORM_DEFAULT_RETENTION_DAYS,
@@ -10,17 +11,11 @@ import {
  * Platform default retention; carried as written and validated at root because
  * the override rule depends on NODE_ENV.
  */
-export const dataRetentionServerConfigDefinition = RuntimeConfig.define({
-  platformDefaultDays: Config.value(z.string().optional(), {
-    env: "LANGWATCH_DEFAULT_RETENTION_DAYS",
-  }),
-});
+export const dataRetentionConfig = Config.define((c) => ({
+  platformDefaultDays: c.env("LANGWATCH_DEFAULT_RETENTION_DAYS", z.string().optional()),
+}));
 
-export type DataRetentionServerConfig = ConfigValue<typeof dataRetentionServerConfigDefinition>;
-
-export const dataRetentionServerConfigSchema = compileRuntimeConfig(
-  dataRetentionServerConfigDefinition,
-);
+export type DataRetentionServerConfig = ConfigOf<typeof dataRetentionConfig>;
 
 /**
  * The only environments allowed to lower the platform retention default.

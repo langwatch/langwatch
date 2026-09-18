@@ -1,3 +1,12 @@
+import type {
+  EvaluatorConfig,
+  EvaluationsV3State,
+  TargetConfig,
+  EvaluationV3Event,
+  ExecutionCell,
+} from "@langwatch/experiment-contract";
+import { createInitialResults, createInitialUIState } from "@langwatch/experiment-contract";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 /**
  * Tests ExperimentRunOrchestratorService.executeConnectedCell: running a
  * connected agent as a workbench column.
@@ -5,9 +14,6 @@
  */
 import type { WorkflowService } from "@langwatch/workflow-process";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { EvaluatorConfig, EvaluationsV3State, TargetConfig, EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
-import { createInitialResults, createInitialUIState } from "@langwatch/experiment-contract";
-import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 const scripted = vi.hoisted(() => ({
   component: [] as StudioServerEvent[],
@@ -15,9 +21,13 @@ const scripted = vi.hoisted(() => ({
 }));
 import type { Agent as TypedAgent, CallOutcome } from "@langwatch/agent-contract";
 import { AgentBusyError, AgentOfflineError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
-import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
+
+import type {
+  ExperimentRunCollaborators,
+  OrchestratorInput,
+} from "../../rules/experiment-run-input.rules.ts";
 import type { ConnectedDispatch } from "../experiment-connected-cell.service.ts";
-import type { ExperimentRunCollaborators, OrchestratorInput } from "../../rules/experiment-run-input.rules.ts";
+import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
 
 /**
  * The studio boundary the grading evaluators reach, scripted rather than

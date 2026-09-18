@@ -2,15 +2,16 @@
 
 import type { ProcessStore } from "@langwatch/eventing";
 import type { WebhookEndpointView } from "@langwatch/webhook-contract";
-import {
-  WebhookBatchPlannerService,
-  type PendingEnvelope,
-} from "./webhook-batch-planner.service.ts";
+
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type EndpointStreamState,
   type SendBatchPayload,
 } from "../rules/webhook-delivery-contract.rules.ts";
+import {
+  WebhookBatchPlannerService,
+  type PendingEnvelope,
+} from "./webhook-batch-planner.service.ts";
 
 /**
  * What the endpoint stream needs, and nothing the delivery process manager

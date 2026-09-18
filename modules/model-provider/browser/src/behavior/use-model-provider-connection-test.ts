@@ -9,6 +9,7 @@ import type {
   ModelProviderUncheckedReason,
 } from "@langwatch/model-provider-contract";
 import { useCallback, useRef, useState } from "react";
+
 import { describeFailure, describeRefusal } from "../model/connection-verdict-copy.ts";
 import { modelProviderApi } from "./model-provider-api.ts";
 

@@ -3,6 +3,7 @@
  * never rejects the starting point.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   starterEncodingType,
   starterVegaLiteSpec,

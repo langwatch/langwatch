@@ -7,26 +7,32 @@ import {
   defaultCliKeyPermissions,
   selectionsFromPermissions,
 } from "@langwatch/api-key-contract";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
+import { nowInstant } from "@langwatch/time";
 import { CheckCircle2, CircleAlert, Clock3, Info, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
-import { CLI_LEAD_SOURCE, useApiKeyHost, type ApiKeyRouteReading, type CliCredentialType } from "../../model/api-key-host.ts";
+import {
+  CLI_LEAD_SOURCE,
+  useApiKeyHost,
+  type ApiKeyRouteReading,
+  type CliCredentialType,
+} from "../../model/api-key-host.ts";
 import {
   clampSelectionsToAvailability,
   getUserPermissionsAcrossScopes,
 } from "../../model/api-key-permissions.ts";
 import { resolveCliAuthProjects } from "../../model/cli-auth-projects.ts";
 import { defaultCliKeyScopes } from "../../model/cli-key-scope-defaults.ts";
-import { StatusCard } from "../blocks/status-card.tsx";
 import {
   PermissionCategoryList,
   PermissionCounter,
   type PermissionSelection,
 } from "../blocks/permission-category-list.tsx";
+import { StatusCard } from "../blocks/status-card.tsx";
+import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
 import { CliAuthContainer } from "./cli-auth-container.tsx";
 import { FirstTraceRedirect } from "./first-trace-redirect.tsx";
-import { nowInstant } from "@langwatch/time";
 
 type LookupState =
   | { kind: "loading" }
@@ -119,7 +125,7 @@ export default function CliAuthScreen() {
   }, [host]);
 
   // Brand-new user (signed up mid-CLI-login, no org yet): approval needs an
-  // organization, so round-trip through onboarding and come straight back  - 
+  // organization, so round-trip through onboarding and come straight back  -
   // return_to preserves the user_code so the CLI's poll can still succeed.
   useEffect(() => {
     if (sessionStatus !== "authenticated" || !organizations) return;

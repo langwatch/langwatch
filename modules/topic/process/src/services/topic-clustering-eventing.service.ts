@@ -5,20 +5,7 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES } from "@langwatch/topic-contract";
-import {
-  RecordClusteringRunCompletedCommand,
-  RecordClusteringRunFailedCommand,
-  RecordClusteringRunStartedCommand,
-  RecordTopicsCommand,
-  RequestTopicClusteringCommand,
-  recordTopicsDedupeId,
-  type TopicClusteringDispatchDeps,
-} from "../eventing/topic-clustering.intent.ts";
-import type { TopicClusteringProcessingEvent } from "./topic-events.service.ts";
-import {
-  TOPIC_CLUSTERING_PROCESS_NAME,
-  TopicClusteringProcess,
-} from "../eventing/topic-clustering.process.ts";
+
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
@@ -28,9 +15,23 @@ import {
   TopicClusteringRunStatusFoldProjection,
 } from "../eventing/topic-clustering-run-status.projection.ts";
 import {
+  RecordClusteringRunCompletedCommand,
+  RecordClusteringRunFailedCommand,
+  RecordClusteringRunStartedCommand,
+  RecordTopicsCommand,
+  RequestTopicClusteringCommand,
+  recordTopicsDedupeId,
+  type TopicClusteringDispatchDeps,
+} from "../eventing/topic-clustering.intent.ts";
+import {
+  TOPIC_CLUSTERING_PROCESS_NAME,
+  TopicClusteringProcess,
+} from "../eventing/topic-clustering.process.ts";
+import {
   type TopicModelData,
   TopicModelFoldProjection,
 } from "../eventing/topic-model.projection.ts";
+import type { TopicClusteringProcessingEvent } from "./topic-events.service.ts";
 
 // Composition needs the projection state types to declare its stores; the
 // projection implementations stay private to the feature server.

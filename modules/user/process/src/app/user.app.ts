@@ -1,5 +1,13 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
+import { ValidationError } from "@langwatch/handled-error";
+import {
+  IdentityApi,
+  passwordProblem,
+  type IdentityApi as IdentityApiContract,
+} from "@langwatch/identity-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
+import { createLogger } from "@langwatch/observability";
 import { OpsApi, type AdminIdentity } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type {
@@ -8,13 +16,9 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
-import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
-import { passwordProblem } from "@langwatch/identity-contract";
-import { createLogger } from "@langwatch/observability";
-import { ValidationError } from "@langwatch/handled-error";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { z } from "zod";
-import { buildUserInfrastructure } from "./user-composition.build.ts";
+import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
+import { nowInstant } from "@langwatch/time";
 import type {
   ChangeOwnPasswordInput,
   CompleteUserVerificationInput,
@@ -40,7 +44,6 @@ import type {
   UserAccountInfo,
   UserApiRequestBudgetIncreaseInput,
   UserAvatarCaller,
-  UserAvatarMediaType,
   UserAvatarObjectRead,
   UserAvatarReadAllowance,
   UserAvatarResult,
@@ -82,12 +85,17 @@ import {
   UserSignupThrottledError,
   UserApi,
 } from "@langwatch/user-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
-import type { FeatureSetup } from "@langwatch/kernel";
+
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
 import { UserService } from "../services/user.service.ts";
+import { buildUserInfrastructure } from "./user-composition.build.ts";
+import type {
+  UserBudgetDecision,
+  UserBudgetScopeDecision,
+  UserInfrastructure,
+} from "./user.members.ts";
 
 const logger = createLogger("langwatch:user-app");
 
@@ -107,305 +115,87 @@ const PASSWORD_BUDGET = { windowSeconds: 60 * 15, max: 5 } as const;
 /** Each upload writes bytes to object storage and updates the row. */
 const AVATAR_UPLOAD_BUDGET = { windowSeconds: 60, max: 10 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Infrastructure: what the process holds and this module only names.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Where an uploaded avatar's bytes go. */
-export interface UserAvatarStorage {
-  store(input: {
-    projectId: string;
-    userId: string;
-    mediaType: UserAvatarMediaType;
-    bytes: Uint8Array;
-  }): Promise<{ id: string }>;
-}
-
 /**
- * The deployment's stored-password format, as the one operation that compares
- * a hash and the one that writes a new one. The cost factor is part of the
- * STORED format, so the process states it once and both halves run through it.
+ * The persisted issuer of a credential account row, restated as a literal
+ * because a module may not value-import another's server package (ADR-134).
  */
-export interface UserPasswordHasher {
-  hash(input: { password: string }): Promise<string>;
-  matches(input: { password: string; hash: string }): Promise<boolean>;
-}
+const CREDENTIAL_ISSUER = "local:credential";
 
-/** What the deployment answers about itself. */
-export interface UserDeployment {
-  /** `"email"`, `"auth0"`, or a federated provider name (ADR-027). */
-  authProvider(): Promise<string>;
-  /** Whether this deployment offers passkeys at all (ADR-120). */
-  offersPasskeys(): boolean;
-  /** The instance's public base URL, for the budget-increase deep link. */
-  findBaseUrl(): string | null;
-}
-
-/** The shared fixed-window counter every account throttle meters through. */
-export type UserRateLimiter = (
-  input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-) => Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
-
-/** The product-analytics trail; never fatal to the request. */
-export interface UserAnalytics {
-  trackServerEvent(
-    input: Readonly<{
-      userId: string;
-      event: string;
-      properties?: Readonly<Record<string, unknown>>;
-    }>,
-  ): void;
-}
-
-/** What the identity provider can answer to a password change. */
-export type UserFederatedPasswordOutcome =
-  | { outcome: "changed" }
-  | { outcome: "wrong_password" }
-  /** The provider's own policy refused the new password; its wording. */
-  | { outcome: "weak_password"; message: string }
-  | { outcome: "insufficient_scope" }
-  | { outcome: "password_grant_not_enabled" }
-  | { outcome: "not_configured" }
-  | { outcome: "failed" };
-
-/** The identity provider this deployment federates through. */
-export interface UserFederatedPasswords {
-  /**
-   * The provider's DATABASE identity, the only linked identity whose password
-   * this deployment can change. Social identities are their upstream IdP's.
-   */
-  findDatabaseAccount(input: {
-    userId: string;
-  }): Promise<Readonly<{ providerAccountId: string }> | null>;
-  changePassword(
-    input: Readonly<{
-      email: string;
-      providerUserId: string;
-      currentPassword: string;
-      newPassword: string;
-    }>,
-  ): Promise<UserFederatedPasswordOutcome>;
-}
-
-/** The credentials a deactivation must end beside the browser sessions. */
-export interface UserCliCredentials {
-  revokeForUser(input: { userId: string }): Promise<void>;
-}
-
-/** The organization rows the /me dashboard reads that this module does not own. */
-export interface UserOrganizationDirectory {
-  isMember(input: { userId: string; organizationId: string }): Promise<boolean>;
-  /** Admin-configured support contact, else the first admin's address. */
-  findSupportContact(input: { organizationId: string }): Promise<string | null>;
-  /** Who a budget-increase request goes to. Refuses when nobody administers. */
-  getBudgetIncreaseRecipient(input: { organizationId: string }): Promise<string>;
-  findName(input: { organizationId: string }): Promise<string | null>;
-  /** The caller's first non-archived project in the organization, by age. */
-  findFirstProjectSlug(input: { organizationId: string; userId: string }): Promise<string | null>;
-}
-
-/** The gateway budget check, at the caller's own personal workspace. */
-export type UserBudgetCheckInput = Readonly<{
-  organizationId: string;
-  teamId: string;
-  projectId: string;
-  virtualKeyId: string;
-  principalUserId: string;
-  projectedCostUsd: number;
-}>;
-
-/** One budget the gateway weighed, as the banner and the chip read it. */
-export type UserBudgetScopeDecision = Readonly<{
-  scope: string;
-  scopeId: string;
-  spentUsd: string;
-  limitUsd: string;
-  window: string;
-}>;
-
-/** The gateway's own pre-check answer, at `projectedCostUsd: 0`. */
-export type UserBudgetDecision = Readonly<{
-  decision: string;
-  scopes: readonly UserBudgetScopeDecision[];
-  blockedBy: readonly UserBudgetScopeDecision[];
-}>;
-
-/** The gateway governance stores behind the /me dashboard. */
-export interface UserGatewayGovernance {
-  /** The routing policy a personal workspace inherits by default, if any. */
-  findDefaultRoutingPolicy(input: {
-    organizationId: string;
-    personalTeamId: string;
-  }): Promise<Readonly<{ id: string; name: string }> | null>;
-  /** The caller's own gateway keys in this organization; only the id is read. */
-  listPersonalVirtualKeys(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<readonly Readonly<{ id: string }>[]>;
-  checkBudget(input: UserBudgetCheckInput): Promise<UserBudgetDecision>;
-}
-
-/** The mail a budget-increase request goes out on. */
-export interface UserBudgetRequestMailer {
-  sendBudgetIncreaseRequest(
-    input: Readonly<{
-      to: string;
-      requesterEmail: string;
-      requesterName?: string;
-      organizationName: string;
-      scope: string;
-      scopeId: string;
-      limitUsd: string;
-      spentUsd: string;
-      period?: string;
-      message?: string;
-    }>,
-  ): Promise<void>;
-}
-
-/**
- * The deployment's email-verification ceremony. It refuses a record that is not
- * pinned to `userId`, which is what makes the ids in the input safe to accept.
- */
-export interface UserVerificationCeremony {
-  completeEmailVerification(
-    input: Readonly<{
-      userId: string;
-      identifierId: string;
-      verificationId: string;
-      token: string;
-      codeVerifier: string;
-    }>,
-  ): Promise<unknown>;
-}
-
-/** The project a calling API key belongs to, as the process resolves one. */
-export type UserKeyProject = Readonly<{
-  id: string;
-  name: string;
-  slug: string;
-  isPersonal: boolean;
-  ownerUserId: string | null;
-  teamId: string;
-}>;
-
-/** The projects `/api/me` reads: the key's own, and the org's ledger tenant. */
-export interface UserProjectDirectory {
-  findById(input: { projectId: string }): Promise<UserKeyProject | null>;
-  /**
-   * The organization's hidden governance project, where ingestion-source ledger
-   * rows land. Absent where the organization never minted an ingestion source.
-   */
-  findGovernanceProject(input: {
-    organizationId: string;
-  }): Promise<Readonly<{ id: string }> | null>;
-}
-
-/**
- * One person's own AI usage, rolled up over a window. The rollup reads a spend
- * ledger this module does not own, so it crosses as a capability.
- */
-export interface UserPersonalUsageReader {
-  personalUsage(input: {
-    personalProjectId: string;
-    userId?: string;
-    ingestionTenantId?: string;
-    window?: { startMs: number; endMs: number };
-  }): Promise<MeUsage>;
-}
-
-/** The avatar bytes, by project and content-addressed id. */
-export interface UserAvatarObjects {
-  findById(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead>;
-}
-
-/** What the process supplies this module, once, at boot. */
-export interface UserInfrastructure {
-  /** The issuer every credential account row this deployment mints is stored under. */
-  credentialIssuer: string;
-  avatarStorage: UserAvatarStorage;
-  passwords: UserPasswordHasher;
-  deployment: UserDeployment;
-  rateLimit: UserRateLimiter;
-  analytics: UserAnalytics;
-  federatedPasswords: UserFederatedPasswords;
-  cliCredentials: UserCliCredentials;
-  organizations: UserOrganizationDirectory;
-  projects: UserProjectDirectory;
-  gateway: UserGatewayGovernance;
-  budgetRequests: UserBudgetRequestMailer;
-  verification: UserVerificationCeremony;
-  personalUsage: UserPersonalUsageReader;
-  avatarObjects: UserAvatarObjects;
-  now?: () => Instant;
-}
-
-/** What the process composes this module's application from. */
+/** The peer capabilities this module calls, resolved by the kernel at boot. */
 interface UserAppDependencies {
   auth: AuthApiContract;
+  identity: IdentityApiContract;
   ops: OpsApi;
   organizations: OrganizationApi;
+  projects: ProjectApi;
 }
 
-/**
- * Config schema: whether this deployment offers passkeys, and the public base URL a
- * budget-increase deep link is built under. Both default to "not configured" rather
- * than refusing at boot, since a process composing neither still composes everything else.
- */
-const userAppConfigSchema = z
-  .object({
-    passkeysEnabled: z.boolean().default(false),
-    baseUrl: z.string().nullable().default(null),
-  })
-  .default({ passkeysEnabled: false, baseUrl: null });
-export type UserAppConfig = z.infer<typeof userAppConfigSchema>;
+/** `passkeysEnabled` collides with `auth`'s landed leaf if redeclared, and
+ * `baseUrl` is the process's own fact; both stay members. See the handoff. */
+type UserMembers = MembersRead<readonly ["prisma", "redis"]> &
+  Readonly<{ passkeysEnabled: boolean; publicBaseUrl: string | undefined }>;
+
+/** The two flagged facts above, resolved once and threaded where `config` used to travel. */
+export type UserFacts = Readonly<{ passkeysEnabled: boolean; baseUrl: string | null }>;
 
 type UserSetup = FeatureSetup<
   typeof UserApp.dependencies,
-  MembersRead<typeof UserApp.reads>,
-  UserAppConfig,
+  UserMembers,
+  undefined,
   UserRepositories
 >;
 
 export class UserApp implements UserApi {
   static readonly contract = UserApi;
-  static readonly configSchema = userAppConfigSchema;
-  static readonly reads = reads("prisma", "redis");
+  /** `passkeysEnabled`/`publicBaseUrl` are named raw so the process can
+   * answer them through `withMember`/`withMembers` (see {@link UserMembers}). */
+  static readonly reads = [
+    ...reads("prisma", "redis"),
+    "passkeysEnabled",
+    "publicBaseUrl",
+  ] as const;
   static readonly dependencies: {
     auth: typeof AuthApi;
+    identity: typeof IdentityApi;
     organizations: typeof OrganizationApi;
     ops: typeof OpsApi;
     projects: typeof ProjectApi;
-  } = { auth: AuthApi, organizations: OrganizationApi, ops: OpsApi, projects: ProjectApi };
+  } = {
+    auth: AuthApi,
+    identity: IdentityApi,
+    organizations: OrganizationApi,
+    ops: OpsApi,
+    projects: ProjectApi,
+  };
 
   static create(setup: UserSetup): UserApp {
     const members = buildUserInfrastructure({
       prisma: setup.members.prisma,
       redis: setup.members.redis,
-      config: setup.config,
-      dependencies: {
-        auth: setup.dependencies.auth,
-        organizations: setup.dependencies.organizations,
-        projects: setup.dependencies.projects,
-      },
+      organizations: setup.dependencies.organizations,
     });
 
     return UserApp.#build({
       members,
       dependencies: setup.dependencies,
       repositories: setup.repositories,
+      facts: {
+        passkeysEnabled: setup.members.passkeysEnabled,
+        baseUrl: setup.members.publicBaseUrl ?? null,
+      },
     });
   }
 
   /**
-   * The application over a hand-supplied infrastructure bag, for a suite exercising
-   * the App directly rather than through a booted process. Nothing here builds
-   * `UserInfrastructure` — the caller supplies the whole shape, unlike `create`.
+   * The application over hand-supplied members, for a suite exercising the App
+   * directly rather than through a booted process. Nothing here builds them —
+   * the caller supplies the whole record, unlike `create`.
    */
   static createForTesting(setup: {
     repositories: UserRepositories;
     dependencies: UserAppDependencies;
     members: UserInfrastructure;
+    facts: UserFacts;
   }): UserApp {
     return UserApp.#build(setup);
   }
@@ -414,10 +204,12 @@ export class UserApp implements UserApi {
     members,
     dependencies,
     repositories,
+    facts,
   }: {
     members: UserInfrastructure;
     dependencies: UserAppDependencies;
     repositories: UserRepositories;
+    facts: UserFacts;
   }): UserApp {
     const now = members.now;
 
@@ -426,37 +218,39 @@ export class UserApp implements UserApi {
         repository: repositories.users,
         organizations: dependencies.organizations,
         avatarStorage: members.avatarStorage,
-        credentialIssuer: members.credentialIssuer,
+        credentialIssuer: CREDENTIAL_ISSUER,
         ...(now ? { now } : {}),
       }),
       UserCredentialService.create({
         repository: repositories.credentials,
         passwords: members.passwords,
       }),
-      {
-        auth: dependencies.auth,
-        ops: dependencies.ops,
-        organizations: dependencies.organizations,
-      },
+      dependencies,
       members,
+      facts,
     );
   }
 
   readonly #users: UserService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
+  readonly #peers: UserAppDependencies;
   readonly #members: UserInfrastructure;
+  readonly #facts: UserFacts;
 
   private constructor(
     users: UserService,
     credentials: UserCredentialService,
     dependencies: UserAppDependencies,
     members: UserInfrastructure,
+    facts: UserFacts,
   ) {
     this.#users = users;
     this.#credentials = credentials;
     this.#account = UserAccountService.create(dependencies);
+    this.#peers = dependencies;
     this.#members = members;
+    this.#facts = facts;
   }
 
   /** Resolves the caller allowed to read a personal workspace. */
@@ -571,7 +365,7 @@ export class UserApp implements UserApi {
     // typed is one sign-in can never find, no matter the password.
     const email = input.email.toLowerCase();
 
-    const emailMode = (await this.#members.deployment.authProvider()) === "email";
+    const emailMode = (await this.#peers.auth.resolveAuthProvider()) === "email";
 
     if (!emailMode) throw new UserRegistrationNotAvailableError();
 
@@ -628,7 +422,7 @@ export class UserApp implements UserApi {
 
     // Email mode only. Under a federated provider the password lives in that
     // tenant and this row is not where it would go.
-    const emailMode = (await this.#members.deployment.authProvider()) === "email";
+    const emailMode = (await this.#peers.auth.resolveAuthProvider()) === "email";
 
     if (!emailMode) throw new UserPasswordAuthUnavailableError();
 
@@ -659,7 +453,7 @@ export class UserApp implements UserApi {
     // to replace, and a replacement outlives the impersonation session.
     if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
 
-    const provider = await this.#members.deployment.authProvider();
+    const provider = await this.#peers.auth.resolveAuthProvider();
 
     // A denied SSO deployment is coerced to email mode (ADR-027), and a person
     // who recovered through the password-reset path owns a credential account
@@ -705,7 +499,7 @@ export class UserApp implements UserApi {
    * without theirs has a good reason, and asking for another is a nag with no upside.
    */
   async getPasskeyOffer(input: UserIdInput): Promise<UserPasskeyOffer> {
-    const offersPasskeys = this.#members.deployment.offersPasskeys();
+    const offersPasskeys = this.#facts.passkeysEnabled;
 
     if (!offersPasskeys) return { offer: false };
 
@@ -1030,7 +824,7 @@ export class UserApp implements UserApi {
   async completeEmailVerification(
     input: CompleteUserVerificationInput,
   ): Promise<UserVerificationCompleted> {
-    await this.#members.verification.completeEmailVerification(input);
+    await this.#peers.identity.completeEmailVerification(input);
 
     return { verified: true };
   }
@@ -1057,7 +851,7 @@ export class UserApp implements UserApi {
       (credential.kind === "apiKey" ? credential.organizationId : null) ??
       (await this.#account.findOrganizationIdByTeamId({ teamId: project.teamId }));
     const tenant = organizationId
-      ? await this.#members.projects.findGovernanceProject({ organizationId })
+      ? await this.#members.governanceProjects.findGovernanceProject({ organizationId })
       : null;
 
     return this.#members.personalUsage.personalUsage({
@@ -1179,15 +973,15 @@ export class UserApp implements UserApi {
    * theirs", which is what keeps a personal rollup inside their own tenant.
    */
   async #assertMember(input: { userId: string; organizationId: string }): Promise<void> {
-    const member = await this.#members.organizations.isMember(input);
+    const member = await this.#peers.organizations.isMember(input);
 
     if (member) return;
 
     throw new UserNotOrganizationMemberError(input.organizationId);
   }
 
-  async #requireProject({ projectId }: { projectId: string }): Promise<UserKeyProject> {
-    const project = await this.#members.projects.findById({ projectId });
+  async #requireProject({ projectId }: { projectId: string }): Promise<ProjectIdentity> {
+    const project = await this.#peers.projects.findIdentity(projectId);
 
     if (!project) throw new Error(`no project row for the credential's project "${projectId}"`);
 
@@ -1200,7 +994,7 @@ export class UserApp implements UserApi {
     limitUsd: string;
     spentUsd: string;
   }): { requestIncreaseUrl?: string } {
-    const baseUrl = this.#members.deployment.findBaseUrl();
+    const baseUrl = this.#facts.baseUrl;
 
     if (!baseUrl) return {};
 

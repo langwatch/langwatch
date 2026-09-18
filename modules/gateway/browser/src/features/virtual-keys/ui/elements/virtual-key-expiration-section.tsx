@@ -1,7 +1,7 @@
 import { Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { useMemo } from "react";
 
-import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
   earliestCustomDate,
   formatExpiry,

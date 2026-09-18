@@ -1,9 +1,10 @@
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 /**
  * @vitest-environment jsdom
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StudioServerEvent } from "@langwatch/workflow-contract";
+
 import type { WorkflowStore } from "../../../../behavior/workflow-store.ts";
 
 // Mock toaster
@@ -22,6 +23,7 @@ vi.mock("@langwatch/observability/browser", () => ({
 }));
 
 import { toaster } from "@langwatch/browser-host/toaster";
+
 import { useHandleServerMessage } from "../use-post-event.tsx";
 
 const toastCreate = vi.mocked(toaster.create);

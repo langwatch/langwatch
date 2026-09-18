@@ -1,20 +1,21 @@
-import type { Anomaly } from "@langwatch/ops-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import type { Anomaly } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+
 import type { AnomalyHardTierAlert } from "../../app/ops.app.ts";
 import {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,
 } from "../../repositories/observe/anomaly.repository.ts";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
+import { percentile } from "../../rules/ops-anomaly-percentile.rules.ts";
 import {
   AnomalyDetectorService,
   HARD_TIER_SUSTAIN_MINUTES,
   INSUFFICIENT_DATA_RECHECK_SECONDS,
   SURFACE_TIER_SUSTAIN_MINUTES,
 } from "../anomaly-detector.service.ts";
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
-import { percentile } from "../../rules/ops-anomaly-percentile.rules.ts";
 
 /** The tenant a kill-switch resolution was asked about, or none. */
 function projectIdOf(target: FeatureFlagTarget): string | undefined {

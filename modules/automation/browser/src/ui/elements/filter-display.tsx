@@ -3,6 +3,7 @@
 
 import { Box, HStack } from "@chakra-ui/react";
 import { Filter } from "react-feather";
+
 import { ClampedText } from "./clamped-text.tsx";
 
 interface FilterDisplayProps {

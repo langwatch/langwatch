@@ -14,7 +14,7 @@ import {
   type LangWatchQLSchema,
 } from "@langwatch/analytics-contract";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 
 /**
  * What the workbench door reaches. The rollout gate and the caller resolution

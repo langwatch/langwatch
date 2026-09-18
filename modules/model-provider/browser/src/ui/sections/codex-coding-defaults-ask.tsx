@@ -1,7 +1,4 @@
 import { Button, Text } from "@chakra-ui/react";
-import { useEffect } from "react";
-import { create } from "zustand";
-
 import {
   DialogBody,
   DialogContent,
@@ -12,9 +9,14 @@ import {
 } from "@langwatch/design-system/dialog";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { isCodexModel, LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
+import { useEffect } from "react";
+import { create } from "zustand";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
-import { useModelProviderHost, type ModelProviderHostApi } from "../../model/model-provider-host.ts";
+import {
+  useModelProviderHost,
+  type ModelProviderHostApi,
+} from "../../model/model-provider-host.ts";
 import type { ScopeAssignment } from "../../model/scope-assignment.ts";
 
 /**

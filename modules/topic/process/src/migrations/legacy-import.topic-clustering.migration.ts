@@ -1,8 +1,9 @@
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { Cluster, Redis } from "ioredis";
+
 import type { TopicClusteringCommands } from "../app/topic.members.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:topic-clustering:seed");
 const scheduleLogger = createLogger("langwatch:topic-clustering:schedule-seed");

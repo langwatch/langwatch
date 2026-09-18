@@ -4,11 +4,11 @@
  */
 
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { Bot, ExternalLink, Laptop, Play, Trash2, User } from "lucide-react";
+import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { AgentCardIcon, AgentCardMenuTrigger, AgentCardShell } from "./agent-card.tsx";
-import { ownerOnlyCopy } from "@langwatch/agent-contract";
+import { Bot, ExternalLink, Laptop, Play, Trash2, User } from "lucide-react";
+
 import type { ConnectedAgentBrowser } from "../../model/agent-client.ts";
 import {
   environmentTone,
@@ -18,6 +18,7 @@ import {
   sdkLabel,
   sortConnectedAgents,
 } from "../../model/connected-agent-rows.ts";
+import { AgentCardIcon, AgentCardMenuTrigger, AgentCardShell } from "./agent-card.tsx";
 
 /**
  * What a connected agent's Test action says on hover while it is offline.
@@ -138,13 +139,7 @@ function ScopeChip({ agent }: { agent: ConnectedAgentBrowser }) {
  * An agent no process is holding cannot answer, so the entry is disabled and
  * the reason reads on hover rather than after a refused run.
  */
-function TestAgentItem({
-  agent,
-  onTest,
-}: {
-  agent: ConnectedAgentBrowser;
-  onTest: () => void;
-}) {
+function TestAgentItem({ agent, onTest }: { agent: ConnectedAgentBrowser; onTest: () => void }) {
   const isOffline = agent.status === "offline";
   return (
     <Tooltip content={OFFLINE_AGENT_TEST_COPY} disabled={!isOffline}>

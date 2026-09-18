@@ -1,9 +1,7 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
-import {
-  type AuthzAuditRow,
-  AuthzAuditTrailStore,
-} from "../authz-audit-trail.repository.ts";
 import { toDate } from "@langwatch/time";
+
+import { type AuthzAuditRow, AuthzAuditTrailStore } from "../authz-audit-trail.repository.ts";
 
 // Narrow structural type: only createMany touched; avoids burdening test doubles.
 export type AuthzAuditDatabase = {

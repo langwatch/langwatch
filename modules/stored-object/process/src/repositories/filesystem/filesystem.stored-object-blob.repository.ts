@@ -7,8 +7,13 @@ import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Readable } from "node:stream";
+
 import { createLogger } from "@langwatch/observability";
-import { getStoredObjectStorageScheme,ObjectNotFoundError } from "@langwatch/stored-object-contract";
+import {
+  getStoredObjectStorageScheme,
+  ObjectNotFoundError,
+} from "@langwatch/stored-object-contract";
+
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 
 const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
@@ -19,9 +24,7 @@ const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
 function parseFileUri(uri: string): string {
   const scheme = getStoredObjectStorageScheme(uri);
   if (scheme !== "file") {
-    throw new Error(
-      `StoredObjectBlobFilesystemRepository only handles file: URIs, got: "${uri}"`,
-    );
+    throw new Error(`StoredObjectBlobFilesystemRepository only handles file: URIs, got: "${uri}"`);
   }
   const parsed = new URL(uri);
   const decoded = decodeURIComponent(parsed.pathname);

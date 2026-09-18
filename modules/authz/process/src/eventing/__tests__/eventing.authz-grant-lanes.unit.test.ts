@@ -3,6 +3,7 @@
  * inertness (ADR-114 amended).
  */
 import { describe, expect, it } from "vitest";
+
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,

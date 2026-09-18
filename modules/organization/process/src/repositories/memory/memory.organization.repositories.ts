@@ -1,7 +1,7 @@
 import type { OrganizationRepositories } from "../organization.repositories.ts";
 import { MemoryGroupRepository } from "./memory.group.repository.ts";
-import { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 import { MemoryOrganizationMembershipRepository } from "./memory.organization-membership.repository.ts";
+import { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "./memory.organization.repository.ts";
 import { MemoryPersonalTeamScopeRepository } from "./memory.personal-team-scope.repository.ts";
 import { MemoryTeamRepository } from "./memory.team.repository.ts";

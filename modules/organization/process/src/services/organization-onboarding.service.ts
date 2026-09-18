@@ -1,17 +1,14 @@
 /** Sign-up ceremony: organization is durable; everything after is non-fatal. */
 
+import { HandledError } from "@langwatch/handled-error";
 import type {
   OnboardingInitializeOrganizationInput,
   OrganizationCaller,
   OrganizationInitialized,
   OrganizationIntent,
 } from "@langwatch/organization-contract";
-import { HandledError } from "@langwatch/handled-error";
 
-import type {
-  OrganizationCeremony,
-  OrganizationSignals,
-} from "../app/organization.members.ts";
+import type { OrganizationCeremony, OrganizationSignals } from "../app/organization.members.ts";
 
 /**
  * The intent that ends on the personal portal rather than in a project.

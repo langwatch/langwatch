@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { mintProjectSlug } from "../../rules/project-slug-service.rules.ts";
 
 const mint = (name: string, projectId = "abcdef0123") => mintProjectSlug(name, projectId);

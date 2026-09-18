@@ -5,6 +5,7 @@
  */
 
 import { Alert, Box, Table, Text, VStack } from "@chakra-ui/react";
+import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import {
   type ColumnDef,
   flexRender,
@@ -15,8 +16,6 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer, type VirtualItem, type Virtualizer } from "@tanstack/react-virtual";
 import { useMemo, useState } from "react";
-
-import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
 import {
   duplicateLangWatchQLColumnNames,

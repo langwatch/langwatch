@@ -2,11 +2,8 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { GraphTriggerEvaluationResult, TriggerSummary } from "@langwatch/automation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
-import {
-  AutomationSlackSecretsService,
-  AutomationSlackBotTokenDecryptorService,
-} from "../../services/automation-slack-secrets.service.ts";
-import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
+
+import type { AutomationGraphActivity } from "../../app/automation.members.ts";
 import {
   BreachingAnalytics,
   createGraphActivityPrismaDouble,
@@ -17,10 +14,6 @@ import {
   SilentLogger,
   TestDispatchErrors,
 } from "../../fixtures/graph-activity.fixture.ts";
-import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
-import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
-import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
-import type { AutomationGraphActivity } from "../../app/automation.members.ts";
 import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
@@ -29,6 +22,14 @@ import {
   type TriggerDatabase,
 } from "../../repositories/prisma/prisma.trigger.repository.ts";
 import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
+import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
+import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
+import {
+  AutomationSlackSecretsService,
+  AutomationSlackBotTokenDecryptorService,
+} from "../../services/automation-slack-secrets.service.ts";
+import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
+import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { createGraphTriggerActivityHandler } from "../graph-trigger-activity.subscriber.ts";
 
 /**
@@ -44,8 +45,7 @@ class ScriptedActivity implements AutomationGraphActivity {
   constructor(
     private readonly triggerIds: string[],
     private readonly failing: string,
-  ) {
-  }
+  ) {}
 
   async getActiveGraphTriggersForProject(): Promise<TriggerSummary[]> {
     return this.triggerIds.map((id) => ({ id }) as TriggerSummary);
@@ -102,7 +102,9 @@ describe("createGraphTriggerActivityHandler", () => {
           analytics: new BreachingAnalytics() as unknown as AnalyticsService,
           delivery,
           webhooks: AutomationWebhookSecretsService.create(crypto),
-          slackTokens: new AutomationSlackBotTokenDecryptorService(AutomationSlackSecretsService.create(crypto)),
+          slackTokens: new AutomationSlackBotTokenDecryptorService(
+            AutomationSlackSecretsService.create(crypto),
+          ),
           emailCaps: AutomationEmailCapService.create({ store: null }),
           logger: new SilentLogger(),
           dispatchErrors: new TestDispatchErrors(),

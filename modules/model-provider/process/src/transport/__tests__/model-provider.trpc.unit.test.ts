@@ -9,8 +9,8 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { modelProviderTrpcTransport } from "../model-provider.trpc.ts";
 import type { CodexAccountService } from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
+import { modelProviderTrpcTransport } from "../model-provider.trpc.ts";
 import {
   mountableModelProviderApp,
   modelProviderTrpcTestMembers,

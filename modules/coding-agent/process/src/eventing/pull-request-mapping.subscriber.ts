@@ -1,9 +1,10 @@
-import { throttledWindow, type SubscriberSpec, type TriggerContext } from "@langwatch/eventing";
-import type { CodingAgentPullRequestMapping } from "../app/coding-agent.members.ts";
-import { createLogger } from "@langwatch/observability";
-import type { CodingAgentSessionState } from "./coding-agent-session.projection.ts";
 import type { CodingAgentProcessingEvent } from "@langwatch/coding-agent-contract";
+import { throttledWindow, type SubscriberSpec, type TriggerContext } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
+
+import type { CodingAgentPullRequestMapping } from "../app/coding-agent.members.ts";
+import type { CodingAgentSessionState } from "./coding-agent-session.projection.ts";
 
 const logger = createLogger("langwatch:coding-agent-processing:pull-request-mapping");
 

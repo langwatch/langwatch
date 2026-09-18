@@ -8,6 +8,7 @@ import { z } from "zod";
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_gateway_menu_enabled",
   "release_ui_beta_annotations_trained_enabled",
+  "release_voice_agents_enabled",
   // Governance: gates personal-keys / admin oversight / RoutingPolicy /
   // IngestionSource UI. On by default (ADR-038 Decision 7); SaaS rollout
   // and per-org kill switches are operator-store rules. Distinct from

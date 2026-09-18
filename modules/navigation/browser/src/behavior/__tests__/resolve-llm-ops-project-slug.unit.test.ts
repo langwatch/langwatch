@@ -1,5 +1,6 @@
 /** Tests resolveLlmOpsProjectSlug; moved from platform/app, now uses host for team access */
 import { describe, expect, it } from "vitest";
+
 import type { NavigationTeam } from "../../model/navigation-host.ts";
 import { resolveLlmOpsProjectSlug } from "../use-llm-ops-project-slug.ts";
 

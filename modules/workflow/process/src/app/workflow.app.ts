@@ -8,10 +8,10 @@ import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/a
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi, type ModelRole } from "@langwatch/model-provider-contract";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { Instant } from "@langwatch/time";
 import {
   clearDsl,
@@ -56,14 +56,12 @@ import {
   type WorkflowVersionHistoryEntry,
   type WorkflowVersionHistoryMode,
   type WorkflowWithVersion,
+  workflowConfig,
+  type WorkflowServerConfig,
 } from "@langwatch/workflow-contract";
 import type { LanguageModel } from "ai";
-import { z } from "zod";
 
-import {
-  HttpWorkflowNlpRuntimeAdapter,
-  UnconfiguredWorkflowNlpRuntimeAdapter,
-} from "../channels/http/http.workflow-nlp-runtime.channel.ts";
+import { UnconfiguredWorkflowNlpRuntimeAdapter } from "../channels/http/http.workflow-nlp-runtime.channel.ts";
 import {
   workflowRepositories,
   type WorkflowRepositories,
@@ -300,20 +298,10 @@ export type WorkflowHostMembers = Omit<
   "evaluators" | "studioDsl" | "agentMappings" | "workflowRows" | "workflows" | "datasets"
 >;
 
-/**
- * `nlpServiceUrl` resolves the module's own NLP runtime, the way
- * `WorkerEvaluationWorkflowCompositionInput.nlpServiceUrl` did for
- * `apps/worker`: absent, a run refuses by name (`UnconfiguredWorkflowNlpRuntimeAdapter`).
- */
-const workflowAppConfigSchema = z.object({
-  nlpServiceUrl: z.string().optional(),
-});
-export type WorkflowAppConfig = z.infer<typeof workflowAppConfigSchema>;
-
 type WorkflowSetup = FeatureSetup<
   typeof WorkflowApp.dependencies,
   WorkflowHostMembers & MembersRead<typeof WorkflowApp.reads>,
-  WorkflowAppConfig,
+  WorkflowServerConfig,
   WorkflowRepositories
 >;
 
@@ -397,7 +385,7 @@ export class WorkflowApp implements WorkflowApi {
     /** The dataset copies a Studio graph carries with it into another project. */
     datasets: DatasetApi,
   };
-  static readonly configSchema = workflowAppConfigSchema;
+  static readonly config = workflowConfig;
   /**
    * `prisma` for `workflowRows`/`workflows`/`projectEnvironment`, via this
    * module's own `workflowRepositories` registry; `encryption` for decrypting
@@ -420,12 +408,9 @@ export class WorkflowApp implements WorkflowApi {
       projectEnvironment,
       llmParameters,
     });
-    const nlpRuntime = setup.config.nlpServiceUrl
-      ? HttpWorkflowNlpRuntimeAdapter.create({
-          serviceUrl: setup.config.nlpServiceUrl,
-          staging: setup.members.nlpPayloadStaging,
-        })
-      : UnconfiguredWorkflowNlpRuntimeAdapter.create();
+    // `LANGWATCH_NLP_SERVICE` is model-provider's own leaf (config-schema-nuke-batch-c
+    // handoff: a cross-module shared-fact collision, unresolved — always Unconfigured here).
+    const nlpRuntime = UnconfiguredWorkflowNlpRuntimeAdapter.create();
     const ids = KsuidWorkflowId.create();
     const workflows = WorkflowService.create({
       repository: setup.repositories.workflows,

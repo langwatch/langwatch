@@ -1,10 +1,11 @@
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 /**
  * Unit tests for formatRunStatusLabel.
  *
  * @see specs/features/suites/suite-list-view-status.feature
  */
 import { describe, expect, it } from "vitest";
-import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
+
 import { formatRunStatusLabel } from "../model/format-run-status-label.ts";
 
 describe("formatRunStatusLabel()", () => {

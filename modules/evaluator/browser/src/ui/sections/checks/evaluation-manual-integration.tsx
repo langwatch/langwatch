@@ -1,15 +1,16 @@
 import { Box, Heading, HStack, Tabs, Tag, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
+import { RenderCode } from "@langwatch/workflow-browser/render-code";
+import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
-import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
-import { RenderCode } from "@langwatch/workflow-browser/render-code";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { Link } from "@langwatch/browser-host/link";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 // Sample values for the fields a Go example can send, in the order the request
@@ -362,10 +363,7 @@ ${
     <VStack align="start" width="full" gap={3}>
       <Text fontSize="14px">
         First, set up your traces and spans capturing as explained in the{" "}
-        <Link
-          href="https://github.com/langwatch/langwatch/tree/main/sdks/go"
-          isExternal
-        >
+        <Link href="https://github.com/langwatch/langwatch/tree/main/sdks/go" isExternal>
           Go SDK documentation
         </Link>
         .
@@ -389,9 +387,7 @@ ${
                   ...evaluatorDefinition.optionalFields,
                 ],
                 isGuardrail,
-                settingsJson: storeSettingsOnCode
-                  ? JSON.stringify(settings ?? {})
-                  : null,
+                settingsJson: storeSettingsOnCode ? JSON.stringify(settings ?? {}) : null,
               })}
               language="go"
             />

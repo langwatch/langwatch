@@ -27,20 +27,21 @@ import {
   type AutomationPersistCapCount,
   type AutomationPersistCapDecision,
 } from "@langwatch/automation-contract";
+import { type Instant } from "@langwatch/time";
+
+import type { AutomationClock } from "../app/automation.members.ts";
+import { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import { EmailSuppressionNameRepository } from "../repositories/email-suppression-name.repository.ts";
 import { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
 import { TriggerRepository } from "../repositories/trigger.repository.ts";
-import { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
-import type { AutomationClock } from "../app/automation.members.ts";
-import { ReportScheduleService } from "./report-schedule.service.ts";
-import { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
-import { AutomationGraphService } from "./trigger-graph.service.ts";
+import { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import { AutomationTemplateService } from "./automation-template.service.ts";
 import type { AutomationPersistCapService } from "./persist-cap.service.ts";
-import { type Instant } from "@langwatch/time";
+import { ReportScheduleService } from "./report-schedule.service.ts";
+import { AutomationGraphService } from "./trigger-graph.service.ts";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
 

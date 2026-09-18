@@ -5,14 +5,15 @@
  */
 
 import {
-  LangWatchQLChartMode as ChartMode,
-  type LangWatchQLChartResult,
-} from "./langwatch-ql-chart-mode.tsx";
-import {
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
 } from "@langwatch/analytics-contract/visualization";
+
 import { useLangwatchVegaTokens } from "../../behavior/use-langwatch-vega-tokens.ts";
+import {
+  LangWatchQLChartMode as ChartMode,
+  type LangWatchQLChartResult,
+} from "./langwatch-ql-chart-mode.tsx";
 
 export type { LangWatchQLChartResult };
 

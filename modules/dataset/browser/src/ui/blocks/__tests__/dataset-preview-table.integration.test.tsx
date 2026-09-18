@@ -4,12 +4,12 @@
  * with evaluations workbench; tests rendering + selection behaviors.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { DatasetPreviewTable } from "../dataset-preview-table.tsx";
 
 const SENTINEL = "SENTINEL_PAST_THE_CAP";

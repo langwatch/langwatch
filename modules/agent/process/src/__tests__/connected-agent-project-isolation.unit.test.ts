@@ -1,16 +1,14 @@
-import { createConnectedAgentFixture,createLongPollFixture } from "./connected-agent.fixture.ts";
 /**
  * The project fence of connected agents: the instance id is chosen by the connecting
  * process, so a session of one project must never read, drain or answer a call of another.
  * @see specs/agents/connected-agents.feature
  */
 import { AgentCallForeignProjectError, CALL_KEY_SLACK_SECONDS } from "@langwatch/agent-contract";
-import { describe, expect, it, vi } from "vitest";
-
 import type { StoredCall } from "@langwatch/agent-contract";
-import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   callAckKey,
   callKey,
@@ -18,11 +16,13 @@ import {
   pendingKey,
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
+import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import {
   AgentSessionService,
   type SessionInfo,
 } from "../services/connected-agent-session.service.ts";
+import { createConnectedAgentFixture, createLongPollFixture } from "./connected-agent.fixture.ts";
 
 const victimProjectId = "project_victim";
 const attackerProjectId = "project_attacker";

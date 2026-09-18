@@ -4,6 +4,7 @@
  * enforcement points; these pin the gate and two server behaviours.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   CODEX_ALLOWED_FEATURE_KEYS,
   CODEX_DEFAULT_MODEL,

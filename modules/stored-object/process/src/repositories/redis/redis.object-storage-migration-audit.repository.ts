@@ -4,6 +4,7 @@ import {
   type RedisLogger,
 } from "@langwatch/redis-client";
 import { Cluster } from "ioredis";
+
 import {
   GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,

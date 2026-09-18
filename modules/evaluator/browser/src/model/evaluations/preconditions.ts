@@ -1,11 +1,11 @@
-import { createLogger } from "@langwatch/observability/browser";
-import safe from "safe-regex2";
-import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import {
   normalizePreconditionTraceData,
   PRECONDITION_FIELD_MATCHERS,
   type PreconditionTraceData,
 } from "@langwatch/analytics-contract";
+import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { createLogger } from "@langwatch/observability/browser";
 import { extractRAGTextualContext } from "@langwatch/trace-contract";
 import type {
   ElasticSearchTrace,
@@ -14,7 +14,8 @@ import type {
   RAGSpan,
   Span,
 } from "@langwatch/trace-contract";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import safe from "safe-regex2";
+
 import type { CheckPreconditionRule, CheckPreconditions } from "./types.ts";
 
 export type { PreconditionTraceData } from "@langwatch/analytics-contract";

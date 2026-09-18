@@ -1,19 +1,20 @@
 /** One turn panel shared by agent drawers. @see specs/agents/agent-test-run.feature */
 
 import { Alert, Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { Play } from "lucide-react";
-import { useState } from "react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
-import { agentApi } from "../../behavior/agent-api.ts";
-import { OFFLINE_AGENT_TEST_COPY } from "../blocks/connected-agents-section.tsx";
-import { ParameterLineField } from "@langwatch/scenario-browser/surfaces/parameter-line-field";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { FieldLabel } from "@langwatch/scenario-browser/surfaces/dialog-fields";
 import { toLineRunParameters } from "@langwatch/scenario-browser/surfaces/parameter-line";
+import { ParameterLineField } from "@langwatch/scenario-browser/surfaces/parameter-line-field";
 import { parameterPlaceholder } from "@langwatch/scenario-browser/surfaces/parameter-suggestions";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import { Play } from "lucide-react";
+import { useState } from "react";
+
+import { agentApi } from "../../behavior/agent-api.ts";
+import { OFFLINE_AGENT_TEST_COPY } from "../blocks/connected-agents-section.tsx";
 
 /** The declared-parameter shape `parameterPlaceholder` and `ParameterLineField` take. */
 type DeclaredParameter = Parameters<typeof parameterPlaceholder>[0][number];

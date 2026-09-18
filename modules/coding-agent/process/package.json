@@ -31,7 +31,6 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@langwatch/kernel": "workspace:*",
     "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -40,6 +39,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",

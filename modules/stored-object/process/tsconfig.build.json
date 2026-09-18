@@ -14,10 +14,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": [
-    "./src/index.ts",
-    "./src/repositories/clickhouse/stored-objects.repository.ts"
-  ],
+  "files": ["./src/index.ts", "./src/repositories/clickhouse/stored-objects.repository.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

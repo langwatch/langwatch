@@ -11,20 +11,23 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AlertTriangle, Plus, Shield } from "react-feather";
-import type { UseFormReturn } from "react-hook-form";
-import NextLink from "@langwatch/workflow-browser/next-link";
-import { useRouter } from "@langwatch/browser-host/use-router";
+import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useFeatureFlag } from "@langwatch/workflow-browser/feature-flag";
-import { evaluatorDisplayName,
-  AVAILABLE_EVALUATORS,
-  type EvaluatorDefinition,
-  type EvaluatorTypes } from "@langwatch/evaluator-contract";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { Link } from "@langwatch/browser-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  evaluatorDisplayName,
+  AVAILABLE_EVALUATORS,
+  type EvaluatorDefinition,
+  type EvaluatorTypes,
+} from "@langwatch/evaluator-contract";
+import { useFeatureFlag } from "@langwatch/workflow-browser/feature-flag";
+import NextLink from "@langwatch/workflow-browser/next-link";
+import { AlertTriangle, Plus, Shield } from "react-feather";
+import type { UseFormReturn } from "react-hook-form";
+
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 type Category = EvaluatorDefinition["category"];
@@ -108,13 +111,13 @@ export function EvaluatorSelection({
   const availableEvaluatorsPerCategory: Record<
     string,
     [
-        string,
-        EvaluatorDefinition & {
-          beta?: boolean;
-          missingEnvVars?: string[];
-          unavailable?: { reason: string; howToEnable: string };
-        },
-      ][]
+      string,
+      EvaluatorDefinition & {
+        beta?: boolean;
+        missingEnvVars?: string[];
+        unavailable?: { reason: string; howToEnable: string };
+      },
+    ][]
   > = {};
 
   for (const category of categories) {

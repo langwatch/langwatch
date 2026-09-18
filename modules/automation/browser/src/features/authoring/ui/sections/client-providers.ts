@@ -1,5 +1,5 @@
 import { TriggerAction } from "@langwatch/automation-contract";
-import { createAutomationDraftModel } from "../../model/draft-reducer.ts";
+
 import {
   createClientProviderRegistry,
   initialSlices as initialProviderSlices,
@@ -8,6 +8,7 @@ import {
   type NotifyPreview as ProviderNotifyPreview,
   type SliceFor as ProviderSliceFor,
 } from "../../../../model/provider-registry.ts";
+import { createAutomationDraftModel } from "../../model/draft-reducer.ts";
 import annotationQueueClient, { type AnnotationQueueSlice } from "./annotation-queue.client.tsx";
 import datasetClient, { type DatasetSlice } from "./dataset.client.tsx";
 import emailClient, { type EmailSlice } from "./email.client.tsx";

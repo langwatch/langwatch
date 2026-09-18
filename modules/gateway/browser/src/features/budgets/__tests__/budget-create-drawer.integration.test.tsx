@@ -4,11 +4,10 @@
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
-
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import { BudgetCreateDrawer } from "../ui/sections/budget-create-drawer.tsx";
 
 const ORG_ID = "org-acme";

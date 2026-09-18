@@ -5,13 +5,13 @@
  * Binds specs/model-providers/role-based-default-models.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { featuresByRole } from "@langwatch/model-provider-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { featuresByRole } from "@langwatch/model-provider-contract";
-import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
-import { FakeModelProviderHost } from "../../../testing.tsx";
 import { ModelProviderHostProvider } from "../../../model/model-provider-host.ts";
+import { FakeModelProviderHost } from "../../../testing.tsx";
+import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
 
 const mockCloseDrawer = vi.fn();
 const mockGetDefaultModels = vi.fn();

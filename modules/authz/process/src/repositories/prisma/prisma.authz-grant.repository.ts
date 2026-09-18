@@ -1,10 +1,10 @@
+import type { AuthzGrantRepository } from "../authz-grant.repository.ts";
 /**
  * ADR-092 — the Prisma implementation of AuthzGrantsRepository's READ half:
  * the tenancy lookups every write path validates with.
  * `EventingAuthzGrantRepository` composes this for reads and owns every write itself.
  */
 import type { AuthzDatabase } from "../authz-read.repository.ts";
-import type { AuthzGrantRepository } from "../authz-grant.repository.ts";
 
 /** The subset of the write port this repository actually implements. */
 export type AuthzGrantsReadRepository = Pick<

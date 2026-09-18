@@ -1,10 +1,10 @@
 import { createListCollection } from "@chakra-ui/react";
-import { Building2, Folder, Users } from "lucide-react";
 import {
   INDEFINITE_RETENTION_DAYS,
   type RetentionCategory,
   type RetentionScopeType,
 } from "@langwatch/data-retention-contract";
+import { Building2, Folder, Users } from "lucide-react";
 
 export const CATEGORY_LABELS: Record<RetentionCategory, string> = {
   traces: "Traces & Spans",

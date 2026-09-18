@@ -4,18 +4,19 @@
  *           specs/model-providers/model-default-config-cascade.feature.
  */
 
+import type { WireOf } from "@langwatch/api/web";
 import type {
   ModelDefaultConfigSnapshot as StoredModelDefaultConfigSnapshot,
   ModelDefaultEffective,
   ModelProviderScopeType,
 } from "@langwatch/model-provider-contract";
-import type { WireOf } from "@langwatch/api/web";
 
 /** A saved default as the browser holds one: its instants are ISO strings. */
 type ModelDefaultConfigSnapshot = WireOf<StoredModelDefaultConfigSnapshot>;
+import { toEpochMs } from "@langwatch/time";
+
 import type { ScopeHierarchy } from "./provider-scope-filter.ts";
 import { scopeBreadthRank } from "./scope-breadth.ts";
-import { toEpochMs } from "@langwatch/time";
 
 /** The four role columns, in the order the table reads them. */
 export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;

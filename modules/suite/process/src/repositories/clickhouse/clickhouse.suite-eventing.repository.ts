@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+
 import type { SuiteEventingCapabilities } from "../suite-eventing.repository.ts";
 import { ClickHouseSuiteRunRepository } from "./clickhouse.suite-run.repository.ts";
 

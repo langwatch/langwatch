@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -130,16 +131,16 @@ vi.mock("@paper-design/shaders-react", () => ({
 }));
 
 import {
+  fakePersonalWorkspaceHost,
+  renderWithPersonalWorkspaceHost,
+  type FakePersonalWorkspaceHost,
+} from "../testing.tsx";
+import {
   EXPLORE_USAGE_AGENT_PROMPT,
   EXPLORE_USAGE_DOCS_PATH,
   EXPLORE_USAGE_LANGY_PROMPT,
 } from "../ui/sections/connect-your-agent-button.tsx";
 import { PersonalOverviewScreen } from "../ui/sections/personal-workspace/personal-overview.screen.tsx";
-import {
-  fakePersonalWorkspaceHost,
-  renderWithPersonalWorkspaceHost,
-  type FakePersonalWorkspaceHost,
-} from "../testing.tsx";
 
 let host: FakePersonalWorkspaceHost;
 

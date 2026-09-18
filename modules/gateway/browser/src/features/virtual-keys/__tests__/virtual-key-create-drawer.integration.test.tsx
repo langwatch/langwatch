@@ -5,11 +5,10 @@
  */
 import type { Instant } from "@langwatch/time";
 import { cleanup, screen, waitFor } from "@testing-library/react";
-
-import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
 import { VirtualKeyCreateDrawer } from "../ui/sections/virtual-key-create-drawer.tsx";
 
 const ORG_ID = "org-acme";

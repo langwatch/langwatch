@@ -1,4 +1,6 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
+import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-record.trpc.ts";
 import type {
   AbortPendingUploadInput,
   CopyDatasetInput,
@@ -30,7 +32,6 @@ import type {
   UploadExistingDatasetInput,
   UpsertDatasetInput,
 } from "./dataset.ts";
-import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-record.trpc.ts";
 
 /** Callable capability exposed by the composed Dataset application. */
 export interface DatasetApi {

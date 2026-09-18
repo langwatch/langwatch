@@ -1,5 +1,3 @@
-import { readableDate } from "../../../model/readable-date.ts";
-import { toEpochMs } from "@langwatch/time";
 import {
   Alert,
   Badge,
@@ -17,21 +15,23 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { toEpochMs } from "@langwatch/time";
 import { Archive, ArrowLeft, FileClock, Pencil, Receipt, TimerReset } from "lucide-react";
 import { useState } from "react";
 
-import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
-import { BudgetEditDrawer } from "../../../features/budgets/ui/sections/budget-edit-drawer.tsx";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Link } from "../../../ui/elements/gateway-link.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { api } from "../../../behavior/gateway-api.ts";
-import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { BudgetEditDrawer } from "../../../features/budgets/ui/sections/budget-edit-drawer.tsx";
+import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
+import { readableDate } from "../../../model/readable-date.ts";
+import { Link } from "../../../ui/elements/gateway-link.tsx";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 
 function BudgetDetailPage() {
   const showErrorToast = useShowErrorToast();

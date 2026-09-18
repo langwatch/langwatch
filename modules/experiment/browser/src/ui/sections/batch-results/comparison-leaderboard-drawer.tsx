@@ -3,17 +3,17 @@
  */
 
 import { Box, Separator, Text, VStack } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { useMemo, useState } from "react";
 
-import { Drawer } from "@langwatch/design-system/drawer";
-import { useDrawer } from "@langwatch/browser-host/drawer";
-
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
+import { computeSampleAdequacy } from "../../../model/batch-evaluation-results.sample-adequacy.ts";
+import { LeaderboardStep } from "../../elements/batch-results/leaderboard-step.tsx";
 import {
   computeJudgeIndependence,
   computeVerbosityProfile,
 } from "../batch-evaluation-results.judge-bias.ts";
-import { computeSampleAdequacy } from "../../../model/batch-evaluation-results.sample-adequacy.ts";
 import type { BatchComparisonColumn, BatchResultRow } from "../batch-evaluation-results.types.ts";
 import {
   computeLeaderboardVerdict,
@@ -21,7 +21,6 @@ import {
 } from "../batch-evaluation-results.verdict.ts";
 import { useBTLeaderboard } from "../use-bt-leaderboard.ts";
 import { useVariantMetrics } from "../use-variant-metrics.ts";
-import { LeaderboardStep } from "../../elements/batch-results/leaderboard-step.tsx";
 import { buildTrustChecks, LeaderboardTrustPanel } from "./leaderboard-trust-panel.tsx";
 import { LeaderboardVerdictPanel } from "./leaderboard-verdict-panel.tsx";
 import { DEFAULT_WARN_THRESHOLD, PairwiseLeaderboard } from "./pairwise-leaderboard.tsx";

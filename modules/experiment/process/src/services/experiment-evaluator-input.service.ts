@@ -4,6 +4,7 @@
  * They exist because an evaluator resolving nothing compares empty to empty and reports a pass.
  */
 
+import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import {
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   toComparisonConfig,
@@ -12,7 +13,7 @@ import {
   type FieldMapping,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
-import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
+
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
 export class ExperimentEvaluatorInputService {

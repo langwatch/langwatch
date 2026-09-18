@@ -1,21 +1,22 @@
-import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { keepPreviousData } from "@tanstack/react-query";
-import { useMemo } from "react";
 import type { SeriesInputType } from "@langwatch/analytics-browser/surfaces/analytics-registry";
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
 // The single canonical encoder for `getTimeseries` bucket keys (ADR-034
 // app-layer module). Reused — not re-implemented — so this reader can never
 // drift from how the app-layer writes the value. Pure helper; safe client-side.
 import { buildSeriesName } from "@langwatch/analytics-contract";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { nowInstant } from "@langwatch/time";
+import { keepPreviousData } from "@tanstack/react-query";
+import { useMemo } from "react";
+
 import type { RecentItem } from "../../../../../behavior/home-api.ts";
 import { homeApi } from "../../../../../behavior/home-api.ts";
 import { formatMilliseconds } from "../../../../../model/format-milliseconds.ts";
 import { formatMoney } from "../../../../../model/format-money.ts";
+import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
 import { buildAttentionInbox, type CountedSignal } from "../attention-inbox.ts";
 import { getBriefingMock, useBriefingMock } from "../mocks/briefing-mocks.ts";
 import type { BriefingData, ScenarioBar, StatusCell } from "../types.ts";
-import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * Derives Langy's home briefing from the project's REAL signals.

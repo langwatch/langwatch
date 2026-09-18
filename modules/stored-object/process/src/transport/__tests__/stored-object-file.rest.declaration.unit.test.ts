@@ -22,12 +22,12 @@ describe("the files REST family", () => {
     });
 
     it("keeps every path, operation id and method", () => {
-      expect(declaration.routes.map((route) => [route.path, route.operation, route.methods])).toEqual(
-        [
-          ["/api/files/:projectId/:id", "readProjectStoredObjectBytes", ["get", "head"]],
-          ["/api/files/:id", "readStoredObjectBytes", ["get", "head"]],
-        ],
-      );
+      expect(
+        declaration.routes.map((route) => [route.path, route.operation, route.methods]),
+      ).toEqual([
+        ["/api/files/:projectId/:id", "readProjectStoredObjectBytes", ["get", "head"]],
+        ["/api/files/:id", "readStoredObjectBytes", ["get", "head"]],
+      ]);
     });
 
     it("resolves the owning scope in the handler rather than at the door", () => {

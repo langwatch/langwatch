@@ -1,6 +1,7 @@
 import { isConnectedAgentStale, type RegisterConnectedAgentInput } from "@langwatch/agent-contract";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import { MemoryAgentRepository } from "../../repositories/memory/memory.agent.repository.ts";
 import { AgentService } from "../agent.service.ts";
 

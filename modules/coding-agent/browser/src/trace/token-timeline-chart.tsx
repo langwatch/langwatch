@@ -1,5 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import { formatCompact } from "./session-signals.ts";
 import type { CacheRebuildEvent, TokenTimelinePoint } from "./token-timeline.ts";
 

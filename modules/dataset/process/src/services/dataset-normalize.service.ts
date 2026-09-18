@@ -4,7 +4,7 @@
 
 import readline from "node:readline";
 import type { Readable } from "node:stream";
-import Papa from "papaparse";
+
 import {
   convertValueToColumnType,
   dedupeHeaders,
@@ -12,12 +12,15 @@ import {
   renameReservedColumns,
   type DatasetColumns,
   type DatasetConfirmColumns,
-  type FileFormat,type DatasetNormalizePayload
+  type FileFormat,
+  type DatasetNormalizePayload,
 } from "@langwatch/dataset-contract";
-import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository.ts";
-import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
+import Papa from "papaparse";
+
 import type { DatasetNormalize, DatasetStorage } from "../app/dataset.app.ts";
+import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository.ts";
 import { UPLOAD_MAX_BYTES } from "../rules/presigned-upload.rules.ts";
+import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 
 /**
  * A single staged `.json` array can't be parsed without buffering the whole

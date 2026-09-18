@@ -9,6 +9,7 @@ import type { IdentityEmailService } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, fromDate, type Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
+
 import type { AuthSessionCacheRepository } from "../repositories/auth-session-cache.repository.ts";
 import type { AuthSessionRepository } from "../repositories/auth-session.repository.ts";
 

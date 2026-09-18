@@ -1,31 +1,37 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { type AnomalyHardTierAlert,
+
+import {
+  type AnomalyHardTierAlert,
   type OpsWorker,
   type OpsWorkerHandle,
-  type UsageStatsWorkerConfig,type UsageStatsErrorReporter,type UsageStatsTelemetryClient,type UsageStatsWorkerDatabase } from "../../app/ops.app.ts";
-import { ClickHouseUsageStatsRepository } from "../clickhouse/clickhouse.usage-stats.repository.ts";
-import { PrismaUsageStatsOrganizationRepository } from "./prisma.usage-stats-organization.repository.ts";
-import { PrismaUsageStatsProjectRepository } from "./prisma.usage-stats-project.repository.ts";
-import { RedisAnomalyStateRepository } from "../redis/redis.anomaly-state.repository.ts";
+  type UsageStatsWorkerConfig,
+  type UsageStatsErrorReporter,
+  type UsageStatsTelemetryClient,
+  type UsageStatsWorkerDatabase,
+} from "../../app/ops.app.ts";
 import { AnomalyDetectorService } from "../../services/anomaly-detector.service.ts";
-import { UsageStatsCollectionService } from "../../services/usage-stats-collection.service.ts";
+import { OpsMetricsCollectorService } from "../../services/ops-metrics-collector.service.ts";
+import { DefaultOpsSnapshotService } from "../../services/ops-snapshot-reader.service.ts";
 import {
   AnomalyWorkerContributionAdapter,
   UsageStatsWorkerContributionAdapter,
 } from "../../services/ops-worker-contribution.service.ts";
-import { RedisAnomalyRateTrackerRepository } from "../redis/redis.anomaly-rate-tracker.repository.ts";
-import { RedisOpsSnapshotRedisRepository } from "../redis/redis.ops-snapshot-redis.repository.ts";
 import { QueueOpsMetricsSourceAdapter } from "../../services/queue.ops-queue-metrics-source.service.ts";
-import { RedisOpsSnapshotRepository } from "../redis/redis.ops-snapshot.repository.ts";
-import { DefaultOpsSnapshotService } from "../../services/ops-snapshot-reader.service.ts";
-import { QueueRedisRepository } from "../redis/queue.repository.ts";
-import { RedisOpsMetricsRepository } from "../redis/redis.ops-metrics.repository.ts";
-import { OpsMetricsCollectorService } from "../../services/ops-metrics-collector.service.ts";
 import { QueueService } from "../../services/queue.service.ts";
+import { UsageStatsCollectionService } from "../../services/usage-stats-collection.service.ts";
+import { ClickHouseUsageStatsRepository } from "../clickhouse/clickhouse.usage-stats.repository.ts";
+import { QueueRedisRepository } from "../redis/queue.repository.ts";
+import { RedisAnomalyRateTrackerRepository } from "../redis/redis.anomaly-rate-tracker.repository.ts";
+import { RedisAnomalyStateRepository } from "../redis/redis.anomaly-state.repository.ts";
+import { RedisOpsMetricsRepository } from "../redis/redis.ops-metrics.repository.ts";
+import { RedisOpsSnapshotRedisRepository } from "../redis/redis.ops-snapshot-redis.repository.ts";
+import { RedisOpsSnapshotRepository } from "../redis/redis.ops-snapshot.repository.ts";
+import { PrismaUsageStatsOrganizationRepository } from "./prisma.usage-stats-organization.repository.ts";
+import { PrismaUsageStatsProjectRepository } from "./prisma.usage-stats-project.repository.ts";
 
 const anomalyLogger = createLogger("langwatch:observability:anomalyWorker");
 const queueMetricsLogger = createLogger("langwatch:ops:queueMetricsWriter");
@@ -54,8 +60,7 @@ export interface OpsWorkerAdapterOptions {
 
 /** Composes the complete Ops worker graph from injected members. */
 export class PrismaOpsWorkerRepository implements OpsWorker {
-  private constructor(private readonly options: OpsWorkerAdapterOptions) {
-  }
+  private constructor(private readonly options: OpsWorkerAdapterOptions) {}
 
   static create(options: OpsWorkerAdapterOptions): PrismaOpsWorkerRepository {
     return new PrismaOpsWorkerRepository(options);

@@ -4,11 +4,11 @@
  * own {@link AuthzManagedOrganizationBinding}, not a browser-inferred router output.
  */
 
+import type { WireOf } from "@langwatch/api/web";
 import type {
   AuthzManagedOrganizationBinding,
   RoleBindingScopeType,
 } from "@langwatch/authz-contract";
-import type { WireOf } from "@langwatch/api/web";
 
 /** A binding as the browser holds one: the wire carries `createdAt` as a string. */
 export type RoleBinding = WireOf<AuthzManagedOrganizationBinding>;

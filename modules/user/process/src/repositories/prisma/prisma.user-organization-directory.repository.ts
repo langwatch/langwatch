@@ -28,7 +28,10 @@ export class PrismaUserOrganizationDirectoryRepository {
     return organization?.name ?? null;
   }
 
-  async findFirstProjectSlug(input: { organizationId: string; userId: string }): Promise<string | null> {
+  async findFirstProjectSlug(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
     const project = await this.database.project.findFirst({
       where: {
         team: { organizationId: input.organizationId, members: { some: { userId: input.userId } } },

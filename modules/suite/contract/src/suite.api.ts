@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import type {
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
@@ -7,6 +7,7 @@ import type {
   SimulationExternalSetSummary,
   SimulationProjectDateRangeInput,
 } from "@langwatch/scenario-contract";
+
 import type {
   CreateSuiteCommand,
   Suite,

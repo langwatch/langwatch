@@ -1,14 +1,15 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+
+import { CodingAgentTraceSessionRepository as TraceSessionRepository } from "../coding-agent-trace-session.repository.ts";
 import {
   clickHouseMomentOf,
   parseClickHouseDateTimeMs,
   type ClickHouseMoment,
 } from "./clickhouse.mapper.ts";
-import { CodingAgentTraceSessionRepository as TraceSessionRepository } from "../coding-agent-trace-session.repository.ts";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
 

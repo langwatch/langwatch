@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
-import type { CustomGraph } from "@langwatch/prisma-client/generated";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
 import { buildSeriesName } from "@langwatch/analytics-contract";
 import type { ReportSource } from "@langwatch/automation-contract";
+import type { CustomGraph } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   ReportChartService,
   REPORT_CHART_QUERY_CONCURRENCY,

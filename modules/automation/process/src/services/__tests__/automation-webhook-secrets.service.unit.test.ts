@@ -1,10 +1,11 @@
 // Webhook secrets are encrypted and redacted with __kept__ marker; this also
 // serves as the write protocol (leave alone). Must refuse __kept__ with changed URL.
 
-import { describe, expect, it } from "vitest";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automation-contract";
-import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
 import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
 
 /** Reversible and obviously not real, so a leak in a failure message is loud. */
 const crypto = {

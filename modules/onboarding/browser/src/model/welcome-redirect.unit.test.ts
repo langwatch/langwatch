@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { resolveWelcomeRedirect } from "./welcome-redirect.ts";
 
 /**

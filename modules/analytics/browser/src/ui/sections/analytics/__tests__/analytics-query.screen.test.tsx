@@ -11,12 +11,11 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CustomQueryMenuLink } from "../../../../ui/sections/custom-query-menu-link.tsx";
-import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "../../../../model/lwql-failure.ts";
-
 import { SCHEMA_RESPONSE } from "../../../../__tests__/lwql-fixtures.ts";
 import { readHandledError } from "../../../../model/handled-error.ts";
+import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "../../../../model/lwql-failure.ts";
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../../testing.tsx";
+import { CustomQueryMenuLink } from "../../../../ui/sections/custom-query-menu-link.tsx";
 
 const harness = vi.hoisted(() => ({
   available: true,

@@ -1,13 +1,17 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 /**
  * @vitest-environment node
  * @see modules/stored-object/specs/stored-objects.feature
  */
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { resolvedSecrets } from "@langwatch/process-stores";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
 import { storedObjectServer } from "../../stored-object.server.ts";
-import { createStoredObjectTestInfrastructure } from "./stored-object.fixture.ts";
 
 function unavailable(name: string): never {
   return new Proxy(
@@ -21,20 +25,33 @@ function unavailable(name: string): never {
 }
 
 function installation(role: "api" | "worker" | "tasks") {
+  const localFilesystemRoot = mkdtempSync(join(tmpdir(), "stored-object-installation-"));
+
   return createApp({ role })
     .withModules([withMemoryRepositories(storedObjectServer)])
     .withConfig({
       "stored-object": {
-        s3: {},
-        azure: { allowInsecureTokenEndpointForTests: false, identity: {} },
+        backend: undefined,
+        localFilesystemRoot,
+        s3: { bucket: undefined, endpoint: undefined, region: undefined },
+        azure: {
+          authMode: undefined,
+          accountName: undefined,
+          container: undefined,
+          endpoint: undefined,
+          authorityHost: undefined,
+          tokenAudience: undefined,
+          allowInsecureTokenEndpointForTests: undefined,
+          identity: { tenantId: undefined, clientId: undefined, federatedTokenFile: undefined },
+        },
         azureSpoolRetentionConfirmed: false,
-        routes: {},
       },
     })
+    .withMember("nodeEnvironment", undefined)
     .withRelational(unavailable("relational store"))
     .withAnalytical(unavailable("analytical store"))
-    .withObservability((observability) => observability.withLogging(unavailable("logger")))
-    .withMember("storedObject", createStoredObjectTestInfrastructure());
+    .withSecrets(resolvedSecrets({}))
+    .withObservability((observability) => observability.withLogging(unavailable("logger")));
 }
 
 const bytes = {

@@ -1,6 +1,7 @@
 /** @vitest-environment node */
 
 import { describe, expect, it } from "vitest";
+
 import { classifyPromptText } from "../injected-notice.ts";
 
 describe("classifyPromptText", () => {

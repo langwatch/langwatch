@@ -54,23 +54,34 @@ export const calculateGridPositions = <T extends GridItem>(items: T[]): GridLayo
   return layouts;
 };
 
-  const cellKey = (col: number, row: number) => `${col},${row}`;
+const cellKey = (col: number, row: number) => `${col},${row}`;
 
-  const isAreaFree = (occupied: Set<string>, col: number, row: number, colSpan: number, rowSpan: number) => {
-    for (let c = col; c < col + colSpan; c++) {
-      for (let r = row; r < row + rowSpan; r++) {
-        const isTaken = c >= 2 || occupied.has(cellKey(c, r));
-        if (isTaken) return false;
-      }
+const isAreaFree = (
+  occupied: Set<string>,
+  col: number,
+  row: number,
+  colSpan: number,
+  rowSpan: number,
+) => {
+  for (let c = col; c < col + colSpan; c++) {
+    for (let r = row; r < row + rowSpan; r++) {
+      const isTaken = c >= 2 || occupied.has(cellKey(c, r));
+      if (isTaken) return false;
     }
-    return true;
-  };
+  }
+  return true;
+};
 
-  const occupyArea = (occupied: Set<string>, col: number, row: number, colSpan: number, rowSpan: number) => {
-    for (let c = col; c < col + colSpan; c++) {
-      for (let r = row; r < row + rowSpan; r++) {
-        occupied.add(cellKey(c, r));
-      }
+const occupyArea = (
+  occupied: Set<string>,
+  col: number,
+  row: number,
+  colSpan: number,
+  rowSpan: number,
+) => {
+  for (let c = col; c < col + colSpan; c++) {
+    for (let r = row; r < row + rowSpan; r++) {
+      occupied.add(cellKey(c, r));
     }
-  };
-
+  }
+};

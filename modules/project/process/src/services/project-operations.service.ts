@@ -5,9 +5,10 @@ import {
   type TopicClusteringRequest,
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
-import type { ProjectService } from "./project.service.ts";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
+
+import type { ProjectService } from "./project.service.ts";
 
 /** The four project operations these use cases orchestrate, and nothing else. */
 export type ProjectOperationsDirectory = Pick<

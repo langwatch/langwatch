@@ -3,6 +3,7 @@ import {
   type ModelDefaultConfig,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
+
 import type {
   ModelDefaultConfigSaveInput,
   ModelDefaultRepository,

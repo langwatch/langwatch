@@ -21,6 +21,7 @@ import {
   type AgentName,
   type AgentPage,
 } from "@langwatch/agent-contract";
+
 import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
 

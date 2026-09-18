@@ -1,12 +1,13 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
+import type { ComponentType, PromptingTechnique } from "@langwatch/workflow-contract";
 import { type Node, type NodeProps, NodeToolbar } from "@xyflow/react";
 import type { Ref } from "react";
 import { forwardRef } from "react";
 import { useDrop } from "react-dnd";
 import { MoreHorizontal, Trash2 } from "react-feather";
-import { Menu } from "@langwatch/design-system/menu";
+
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
-import type { ComponentType, PromptingTechnique } from "@langwatch/workflow-contract";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 import { ComponentNode, selectionColor } from "./workflow-nodes.tsx";
 

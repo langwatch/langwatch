@@ -1,5 +1,3 @@
-import { z } from "zod";
-import { Temporal, toDate, type Instant } from "@langwatch/time";
 import {
   getProviderModelOptions,
   modelProviders,
@@ -7,6 +5,9 @@ import {
   type ModelProviderCredentialVerdict,
   type ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
+import { z } from "zod";
+
 import {
   ModelProviderCatalog,
   ModelProviderManagedGateway,

@@ -1,15 +1,16 @@
+import {
+  applyOverlayToTrace,
+  type Trace,
+  type TraceEditOverlayPatch,
+} from "@langwatch/trace-contract";
 /**
  * What a corrected trace becomes once mapped into a dataset row: the
  * dataset holds the trace as it should have been, so the corrected output
  * is what it gets — from the drawer or a suggestion. The captured trace stays untouched.
  */
 import { describe, expect, it } from "vitest";
+
 import { extractTracesFields, mapTraceToDatasetEntry } from "../trace-mapping.ts";
-import {
-  applyOverlayToTrace,
-  type Trace,
-  type TraceEditOverlayPatch,
-} from "@langwatch/trace-contract";
 
 const capturedTrace = {
   trace_id: "trace-1",

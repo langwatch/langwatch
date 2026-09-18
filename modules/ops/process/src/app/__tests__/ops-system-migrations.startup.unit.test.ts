@@ -1,10 +1,11 @@
-import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { TenantMigrationRecord, SystemMigration } from "@langwatch/system-migrations";
 import { SystemMigrationStartupIncompleteError } from "@langwatch/system-migrations";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
+
 import { PrismaOrganizationTenantSourceRepository } from "../../repositories/prisma/prisma.organization-tenant-source.repository.ts";
+import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
 import {

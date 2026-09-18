@@ -16,20 +16,20 @@ import {
   YAxis,
 } from "recharts";
 
-import { disambiguateNames } from "./presentation.tsx";
+import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
 import {
   axisLabelProps,
   buildAxisLabels,
 } from "../../../model/batch-evaluation-results.chart-axis.ts";
-import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard.ts";
+import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline.ts";
+import type { BatchComparisonColumn, BatchResultRow } from "../batch-evaluation-results.types.ts";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
 } from "../batch-evaluation-results.verdict.ts";
-import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline.ts";
-import type { BatchComparisonColumn, BatchResultRow } from "../batch-evaluation-results.types.ts";
 import { useBTLeaderboard } from "../use-bt-leaderboard.ts";
 import { useVariantMetrics } from "../use-variant-metrics.ts";
+import { disambiguateNames } from "./presentation.tsx";
 import { VARIANT_COLORS } from "./win-rate-chart.tsx";
 
 /** Compact card shows only this many bars before collapsing the rest into "+N more". */

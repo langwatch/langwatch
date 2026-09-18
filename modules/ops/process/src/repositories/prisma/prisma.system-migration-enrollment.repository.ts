@@ -1,8 +1,9 @@
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   MigrationEnrollmentAlreadyExistsError,
   MigrationEnrollmentNotFoundError,
 } from "@langwatch/ops-contract";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { MigrationEnrollmentRecord } from "../../services/system-migrations.service.ts";
 
 /** Cloud rollout enrollment rows: which organizations each migration processes.
@@ -114,11 +115,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
    * or exact id, a short list for a picker. Name and id only - the ops page
    * needs nothing else to act on an organization.
    */
-  async searchOrganizations({
-    query,
-  }: {
-    query: string;
-  }): Promise<{ id: string; name: string }[]> {
+  async searchOrganizations({ query }: { query: string }): Promise<{ id: string; name: string }[]> {
     return this.prisma.organization.findMany({
       where: {
         OR: [{ name: { contains: query, mode: "insensitive" } }, { id: query }],

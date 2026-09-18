@@ -7,14 +7,14 @@ import {
   PRESENCE_TTL_SECONDS,
   RESULT_TTL_SECONDS,
 } from "@langwatch/agent-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { nowInstant } from "@langwatch/time";
 
 import {
   inflightKey,
   instanceMetaKey,
   instanceSetKey,
 } from "../rules/connected-agent-keys.rules.ts";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { nowInstant } from "@langwatch/time";
 import {
   type InstanceMeta,
   type LiveInstance,

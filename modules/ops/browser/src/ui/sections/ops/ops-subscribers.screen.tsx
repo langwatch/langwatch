@@ -1,5 +1,5 @@
-import { EventSourcingLayout } from "../../../ui/sections/event-sourcing-layout.tsx";
 import { SubscribersCard } from "../../../features/event-store/ui/sections/subscribers-panel.tsx";
+import { EventSourcingLayout } from "../../../ui/sections/event-sourcing-layout.tsx";
 
 export default function OpsSubscribersScreen() {
   return (

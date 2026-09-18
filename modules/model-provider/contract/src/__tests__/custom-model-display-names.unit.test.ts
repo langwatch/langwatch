@@ -1,12 +1,13 @@
-// Binds unit scenarios; handles malformed entries (JSON column with unchecked cast
-// can produce invalid data)
-import { describe, expect, it } from "vitest";
 import {
   toLegacyCompatibleCustomModels,
   type CustomModelEntry,
   buildCustomModelDisplayNames,
-  modelDisplayLabel
+  modelDisplayLabel,
 } from "@langwatch/model-provider-contract";
+// Binds unit scenarios; handles malformed entries (JSON column with unchecked cast
+// can produce invalid data)
+import { describe, expect, it } from "vitest";
+
 import { makeProvider } from "./model-provider.test-helpers.ts";
 
 describe("buildCustomModelDisplayNames()", () => {

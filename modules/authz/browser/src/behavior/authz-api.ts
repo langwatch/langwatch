@@ -3,8 +3,8 @@
  * load-bearing for React Query cache key consistency (ADR-004 exception).
  */
 
-import type { AuthzManagedOrganizationBinding, AuthzPermission } from "@langwatch/authz-contract";
 import { createModuleApi } from "@langwatch/api/web";
+import type { AuthzManagedOrganizationBinding, AuthzPermission } from "@langwatch/authz-contract";
 import type { Role } from "@langwatch/role-contract";
 
 /** One organization, the tenant key every procedure on these surfaces takes. */

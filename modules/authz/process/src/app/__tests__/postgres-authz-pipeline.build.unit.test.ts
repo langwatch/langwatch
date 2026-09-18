@@ -5,12 +5,13 @@ import {
 } from "@langwatch/authz-contract";
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
+
+import type { AuthzGrantsEvent } from "../../eventing/authz-grant.events.ts";
+import type { AuthzGrantProjection } from "../../eventing/authz-grant.projection.ts";
 import {
   type AuthzGrantPipelineDatabase,
   PostgresAuthzPipelineAdapter,
 } from "../postgres-authz-pipeline.build.ts";
-import type { AuthzGrantsEvent } from "../../eventing/authz-grant.events.ts";
-import type { AuthzGrantProjection } from "../../eventing/authz-grant.projection.ts";
 
 const ORGANIZATION = "organization_acme";
 const GRANT = "grant_1";

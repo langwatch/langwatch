@@ -1,6 +1,4 @@
-export {
-  RedisSuiteRunProcessingRepository as ClickHouseSuiteRunProcessingAdapter,
-} from "./repositories/redis/redis.suite-run-processing.repository.ts";
+export { RedisSuiteRunProcessingRepository as ClickHouseSuiteRunProcessingAdapter } from "./repositories/redis/redis.suite-run-processing.repository.ts";
 export type { QueueSimulationRunCommandData } from "./app/suite.app.ts";
 export { SuiteExecutionService } from "./services/suite-execution.service.ts";
 export type { SuiteRunProcessingPipeline } from "./services/suite-run-processing.service.ts";

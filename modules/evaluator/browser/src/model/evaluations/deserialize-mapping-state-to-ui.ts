@@ -1,10 +1,10 @@
+import type { MappingState } from "@langwatch/dataset-contract";
 /**
  * Deserializes a persisted MappingState to UI field mappings.
  * `monitorLevel` sets the default sourceId; thread-typed mappings
  * always get sourceId "thread", even for a "trace"-level monitor.
  */
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
-import type { MappingState } from "@langwatch/dataset-contract";
 
 export function deserializeMappingStateToUI(
   existingMappings: MappingState,

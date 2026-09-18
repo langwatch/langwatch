@@ -15,6 +15,8 @@ import {
   type SharedDef,
   type SlackActionParams,
 } from "@langwatch/automation-contract";
+import type { ZodTypeAny } from "zod";
+
 import {
   AutomationSlackSecretsService,
   type AutomationSecretCrypto,
@@ -24,7 +26,6 @@ import {
   type AutomationWebhookProvider,
   type AutomationWebhookStoredParams,
 } from "#services/automation-webhook-secrets.service";
-import type { ZodTypeAny } from "zod";
 
 /** What a channel's persist hook is handed. */
 export interface PersistActionParamsArgs {

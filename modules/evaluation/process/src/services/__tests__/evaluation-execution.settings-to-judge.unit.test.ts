@@ -1,6 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Trace } from "@langwatch/trace-contract";
-import { EvaluationExecutionService, type EvaluationExecutionDeps } from "../evaluation-execution.service.ts";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  EvaluationExecutionService,
+  type EvaluationExecutionDeps,
+} from "../evaluation-execution.service.ts";
 
 // A real, non-native builtin evaluator with no required fields, so the fixed
 // trace's default input/output pass straight through.
@@ -18,10 +22,12 @@ function buildTrace(overrides: Partial<Trace> = {}): Trace {
   } as Trace;
 }
 
-function buildService(overrides: {
-  resolveForEvaluator?: ReturnType<typeof vi.fn>;
-  evaluate?: ReturnType<typeof vi.fn>;
-} = {}) {
+function buildService(
+  overrides: {
+    resolveForEvaluator?: ReturnType<typeof vi.fn>;
+    evaluate?: ReturnType<typeof vi.fn>;
+  } = {},
+) {
   const resolveForEvaluator = overrides.resolveForEvaluator ?? vi.fn().mockResolvedValue({});
   const evaluate =
     overrides.evaluate ??

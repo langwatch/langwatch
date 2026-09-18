@@ -1,4 +1,5 @@
 import type { RedisConnection } from "@langwatch/redis-client";
+
 import type { AuthSessionCacheRepository } from "../auth-session-cache.repository.ts";
 
 /**
@@ -10,11 +11,7 @@ export class RedisAuthSessionCacheRepository implements AuthSessionCacheReposito
   private constructor(private readonly redis: RedisConnection) {}
 
   /** `null` where the deployment composed no connection: the cache is optional. */
-  static create({
-    redis,
-  }: {
-    redis: RedisConnection | null;
-  }): AuthSessionCacheRepository | null {
+  static create({ redis }: { redis: RedisConnection | null }): AuthSessionCacheRepository | null {
     return redis ? new RedisAuthSessionCacheRepository(redis) : null;
   }
 

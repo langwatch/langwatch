@@ -1,3 +1,11 @@
+import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
+import type {
+  EvaluationRunData,
+  EvaluationCompletedEvent,
+  EvaluationProcessingEvent,
+  EvaluationStartedEvent,
+} from "@langwatch/evaluation-contract";
+import { EVALUATION_PROCESSING_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import {
   createTenantId,
   type EventSourcedQueueProcessor,
@@ -6,19 +14,14 @@ import {
   type JobRegistryEntry,
 } from "@langwatch/eventing";
 import { EventStoreMemory, QueueManager } from "@langwatch/eventing/testing";
-import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
-import { EvaluationCommandAdapter } from "../services/evaluation-command.service.ts";
-import type { EvaluationRunData,
-  EvaluationCompletedEvent,
-  EvaluationProcessingEvent,
-  EvaluationStartedEvent } from "@langwatch/evaluation-contract";
-import { createEvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
-import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
+
 import { EvaluationAnalyticsFoldProjection } from "../eventing/evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
+import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
-import { EVALUATION_PROCESSING_EVENT_TYPES } from "@langwatch/evaluation-contract";
+import { EvaluationCommandAdapter } from "../services/evaluation-command.service.ts";
+import { createEvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
 
 const tenantId = createTenantId("project-1");
 

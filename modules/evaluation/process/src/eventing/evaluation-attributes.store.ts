@@ -1,5 +1,7 @@
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+
+import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
@@ -8,7 +10,6 @@ import {
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
 } from "./evaluation-analytics-row.projection.ts";
-import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 
 /**
  * FoldProjectionStore adapter for slim evaluation_analytics fold (ADR-066);

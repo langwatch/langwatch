@@ -1,6 +1,6 @@
+import { llmModels } from "./model-catalog.ts";
 /** "latest" aliases resolve to current registry flagships; code-only, not in llmModels.json. */
 import { compareModelSortKeys, type ModelSortKey, rankOpenAIChatModel } from "./model-tiers.ts";
-import { llmModels } from "./model-catalog.ts";
 
 const REGISTRY = llmModels.models;
 

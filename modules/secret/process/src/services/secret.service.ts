@@ -15,6 +15,7 @@ import {
   type Secret,
   type UpdateSecretInput,
 } from "@langwatch/secret-contract";
+
 import type { SecretEncryption } from "../app/secret.app.ts";
 import type { SecretRepository } from "../repositories/secret.repository.ts";
 

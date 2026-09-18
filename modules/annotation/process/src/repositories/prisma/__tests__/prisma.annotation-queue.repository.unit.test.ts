@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { AnnotationQueueItemDatabase } from "../prisma.annotation-queue-item.repository.ts";
 import { PrismaAnnotationQueueItemRepository } from "../prisma.annotation-queue-item.repository.ts";
 

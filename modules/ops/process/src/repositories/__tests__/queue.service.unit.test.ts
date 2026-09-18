@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import type { GroupInfo, QueueInfo } from "@langwatch/ops-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { QueueService } from "../../services/queue.service.ts";
 import { NullQueueRepository } from "../process/queue.repository.ts";
 import type { DlqGroupInfo, QueueRepository } from "../process/queue.repository.ts";

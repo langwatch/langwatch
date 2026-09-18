@@ -4,11 +4,11 @@
  * @see specs/analytics/lwql-api.feature
  */
 
+import { clickHouseLiteral, postgresLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
 } from "./langwatch-ql-access-model.service.ts";
-import { clickHouseLiteral, postgresLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();

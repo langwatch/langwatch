@@ -17,18 +17,24 @@ import {
   type NotificationCadence,
   sanitizeAutomationFilters,
 } from "@langwatch/automation-contract";
-import { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
+import { nowInstant } from "@langwatch/time";
+import { useEffect, useMemo, useState } from "react";
+
 import { api } from "../../../../behavior/automation-api.ts";
 import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
+import { deriveSeriesOptionsFromGraph } from "../../../../model/graph-series.ts";
 import { formatTimeAgoCompact } from "../../../../model/relative-time.ts";
+import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
 import { queryIsStructurable } from "../../model/condition-query.ts";
 import { type DailyCapAdvice, dailyCapAdvice } from "../../model/daily-cap-advice.ts";
 import { estimateFiringRate, estimateRatePerDay } from "../../model/firing-rate.ts";
-import { deriveSeriesOptionsFromGraph } from "../../../../model/graph-series.ts";
+import { ConditionBuilder } from "../blocks/condition-builder.tsx";
 import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
-import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
+import { QueryFilterInput } from "../elements/query-filter-input.tsx";
+import { useDraft } from "./automation-selectors.ts";
+import { useAutomationStore } from "./automation-store.ts";
 import {
   type AutomationDraft,
   filterQueryIsSet,
@@ -37,11 +43,6 @@ import {
   type ReportSourceKind,
   subjectIsSet,
 } from "./draft-model.ts";
-import { useAutomationStore } from "./automation-store.ts";
-import { useDraft } from "./automation-selectors.ts";
-import { ConditionBuilder } from "../blocks/condition-builder.tsx";
-import { QueryFilterInput } from "../elements/query-filter-input.tsx";
-import { nowInstant } from "@langwatch/time";
 
 /** One-line preview shown when the Subject facet is collapsed. */
 function subjectSummary(draft: AutomationDraft): string {

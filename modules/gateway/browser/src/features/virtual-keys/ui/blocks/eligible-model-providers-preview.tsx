@@ -1,10 +1,10 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { ProviderScopeChips } from "@langwatch/authz-browser-kit/scope-picker";
 import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
-import { modelProviderIcons } from "../../../../ui/elements/model-provider-icons.tsx";
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit/scope-picker";
-import { Link } from "../../../../ui/elements/gateway-link.tsx";
 
+import { Link } from "../../../../ui/elements/gateway-link.tsx";
+import { modelProviderIcons } from "../../../../ui/elements/model-provider-icons.tsx";
 import {
   buildScopeHierarchy,
   type ModelProviderScopeEntry,

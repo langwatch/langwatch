@@ -1,5 +1,6 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { useEffect, useState } from "react";
+
 import type { BriefingData, BriefingReceipt, ScenarioBar, StatusCell } from "../types.ts";
 
 /**

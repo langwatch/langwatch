@@ -1,16 +1,20 @@
 import { Box, HStack, Spacer } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  type Component,
+  type ComponentType,
+  findLowestAvailableName,
+  nameToId,
+  type NodeWithOptionalPosition,
+} from "@langwatch/workflow-contract";
 import { type Node, useReactFlow } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 import { useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import { LuGripVertical } from "react-icons/lu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { updateCodeClassName } from "../../behavior/workflow-store.ts";
+
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
-import { type Component, type ComponentType,
-  findLowestAvailableName,
-  nameToId,
-  type NodeWithOptionalPosition } from "@langwatch/workflow-contract";
+import { updateCodeClassName } from "../../behavior/workflow-store.ts";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 
 export type WorkflowNodeDragItem = {

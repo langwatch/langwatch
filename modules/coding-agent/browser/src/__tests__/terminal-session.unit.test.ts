@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   buildEntryTimeline,
   extractDiffFromToolInput,

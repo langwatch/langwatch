@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { findGraphAlertFromTriggerRow, graphAlertActionParamsSchema } from "../graph-alert.ts";
 
 describe("graph-alert contract", () => {

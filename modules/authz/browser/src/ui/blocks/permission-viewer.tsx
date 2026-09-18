@@ -3,6 +3,7 @@
 import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { Check } from "react-feather";
+
 import {
   actionOf,
   type AuthzAction,

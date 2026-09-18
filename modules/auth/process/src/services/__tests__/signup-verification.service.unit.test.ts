@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Temporal, type Instant } from "@langwatch/time";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   SIGN_UP_VERIFICATION_TTL_MS,

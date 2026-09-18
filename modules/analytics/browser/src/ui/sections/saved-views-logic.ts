@@ -5,6 +5,7 @@
  */
 
 import { differenceInCalendarDays, nowInstant } from "@langwatch/time";
+
 import type { FilterField } from "../../model/filters/types.ts";
 import type { FilterParam } from "./use-filter-params.ts";
 
@@ -80,7 +81,10 @@ export function normalizeFilterValue(value: FilterParam | undefined): FilterPara
         .filter(Boolean) as [string, string[]][];
 
       if (innerEntries.length === 0) return null;
-      return [k, Object.fromEntries(innerEntries.toSorted(([a], [b]) => a.localeCompare(b)))] as const;
+      return [
+        k,
+        Object.fromEntries(innerEntries.toSorted(([a], [b]) => a.localeCompare(b))),
+      ] as const;
     })
     .filter(Boolean) as [string, FilterParam][];
 

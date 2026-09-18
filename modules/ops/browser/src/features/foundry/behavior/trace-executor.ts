@@ -1,8 +1,9 @@
 import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import type { Context, Tracer } from "@opentelemetry/api";
 import { context, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { createFoundryProvider } from "./otel-browser.ts";
+
 import type { SpanConfig, TraceConfig } from "../model/foundry-types.ts";
+import { createFoundryProvider } from "./otel-browser.ts";
 
 interface ExecutorOpts {
   apiKey: string;

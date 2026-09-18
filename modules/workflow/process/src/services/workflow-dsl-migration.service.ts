@@ -4,6 +4,7 @@
  * `runtime/app/features/workflow.ts` — every process now runs it.
  */
 import { migrateDSLVersion, type WorkflowDsl } from "@langwatch/workflow-contract";
+
 import { type WorkflowDslMigration } from "../app/workflow.app.ts";
 
 export class ContractWorkflowDslMigrationService implements WorkflowDslMigration {

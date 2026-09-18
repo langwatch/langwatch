@@ -4,14 +4,16 @@
  * Spec: specs/features/scenarios/externalize-event-byte-content.feature
  */
 import { Readable } from "node:stream";
+
 import { createRestRuntime } from "@langwatch/api/rest";
-import type { ErrorHandler } from "hono";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
+import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { StoredObjectFileStreamRead } from "#app/stored-object.app";
+
 import {
   storedObjectFileRest,
   type FilesProjectPermissionCheck,

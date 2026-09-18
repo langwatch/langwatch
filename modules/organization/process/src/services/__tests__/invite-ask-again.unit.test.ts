@@ -1,12 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InviteNotFoundError, InviteThrottledError } from "@langwatch/organization-contract";
-import { InviteService } from "../invite.service.ts";
-import { InviteSendThrottleService } from "../invite-send-throttle.service.ts";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type {
   OrganizationInviteMail,
   OrganizationInviteRateLimit,
 } from "../../app/organization.members.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
+import { InviteSendThrottleService } from "../invite-send-throttle.service.ts";
+import { InviteService } from "../invite.service.ts";
 
 /**
  * D11 — the wrong account, and asking again

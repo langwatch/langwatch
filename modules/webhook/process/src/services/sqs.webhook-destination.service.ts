@@ -1,6 +1,4 @@
-import { createHash } from "node:crypto";
-import { type MessageAttributeValue, SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
-import type { AwsClientConfig, AwsClientConfigInput } from "@langwatch/aws-client";
+import type { MessageAttributeValue } from "@aws-sdk/client-sqs";
 import {
   assertDispatchBudget,
   signWebhookPayload,
@@ -8,20 +6,22 @@ import {
   WEBHOOK_SIGNATURE_HEADER,
   type WebhookDispatchRateLimiter,
 } from "@langwatch/egress";
+import { nowInstant } from "@langwatch/time";
 
 import {
   type WebhookDestination,
   type WebhookDispatchRequest,
   type WebhookDispatchResult,
 } from "../app/webhook.app.ts";
-import { parseSqsQueueUrl, sqsHostFor } from "../rules/sqs-queue-url.rules.ts";
-import { nowInstant } from "@langwatch/time";
+import {
+  type SqsDestinationConfig,
+  type SqsWebhookSender,
+} from "../channels/sqs/sqs.webhook-destination.channel.ts";
 
-/**
- * How this process builds an AWS transport — the corporate proxy, the TLS agent, the assumed
- * role.
- */
-export type AwsClientConfigResolver = (input: AwsClientConfigInput) => AwsClientConfig;
+export type {
+  AwsClientConfigResolver,
+  SqsDestinationConfig,
+} from "../channels/sqs/sqs.webhook-destination.channel.ts";
 
 /**
  * The Amazon SQS destination: the same batch, the same bytes, the same signature, put on a
@@ -227,15 +227,6 @@ function classifySqsFailure(error: unknown): {
   return { verdict: "retryable", reason: named || "unknown" };
 }
 
-export interface SqsDestinationConfig {
-  queueUrl: string;
-  roleArn?: string | null;
-  externalId?: string | null;
-  accessKeyId?: string | null;
-  /** Decrypted at dispatch, never stored or logged in the clear. */
-  secretAccessKey?: string | null;
-}
-
 /** How much of a failure rides in the delivery log's error column. */
 const ERROR_SNIPPET_CHARS = 500;
 
@@ -283,32 +274,28 @@ function oversizeRefusal({
 
 /** The send itself, and whatever the queue answered, as a verdict. */
 async function putOnQueue({
-  client,
+  channel,
+  config,
   queueUrl,
   body,
   attributes,
   batchId,
 }: {
-  client: SQSClient;
+  channel: SqsWebhookSender;
+  config: SqsDestinationConfig;
   queueUrl: string;
   body: string;
   attributes: Record<string, MessageAttributeValue>;
   batchId: string;
 }): Promise<WebhookDispatchResult> {
   try {
-    const answer = await client.send(
-      new SendMessageCommand({
-        QueueUrl: queueUrl,
-        MessageBody: body,
-        MessageAttributes: attributes,
-      }),
-    );
+    const messageId = await channel.send({ config, body, attributes });
     return {
       verdict: "success",
       // A queue has no status to report, and inventing one (200) would make
       // the delivery log lie about what answered.
       status: null,
-      body: answer.MessageId ?? "",
+      body: messageId,
       dispatchId: batchId,
     };
   } catch (error) {
@@ -317,7 +304,7 @@ async function putOnQueue({
       // The customer fixes this on their side, and we never hear about it, so
       // the next attempt has to ask for credentials again rather than reuse a
       // provider that already resolved against the old permissions.
-      dropSqsClient(queueUrl);
+      channel.invalidate(queueUrl);
     }
     const detail = error instanceof Error ? error.message : String(error ?? "");
     return {
@@ -330,88 +317,9 @@ async function putOnQueue({
   }
 }
 
-/**
- * The client for one endpoint's queue, cached and reused. A client per delivery would be two
- * costs on the hot path.
- */
-const clients = new Map<string, SQSClient>();
-
-/** Cannot appear in a queue URL or in any credential field. */
-const KEY_SEPARATOR = "\u0000";
-
-/** Distinct per queue AND per credential, so a rotation is a different key. */
-function clientCacheKey(config: SqsDestinationConfig): string {
-  return [
-    config.queueUrl,
-    config.roleArn ?? "",
-    config.externalId ?? "",
-    config.accessKeyId ?? "",
-    // The secret decides identity as much as the key id does, and it must not
-    // be readable from a cache key, so it is reduced to a fingerprint.
-    config.secretAccessKey ? createHash("sha256").update(config.secretAccessKey).digest("hex") : "",
-  ].join(KEY_SEPARATOR);
-}
-
-function sqsClientFor(
-  config: SqsDestinationConfig,
-  awsClientConfig: AwsClientConfigResolver,
-): SQSClient {
-  const key = clientCacheKey(config);
-  const cached = clients.get(key);
-  if (cached) return cached;
-
-  const parsed = parseSqsQueueUrl(config.queueUrl);
-  const client = new SQSClient(
-    awsClientConfig({
-      // Region and the dialed host come off the queue URL, so neither can be
-      // configured into disagreeing with it.
-      region: parsed?.region,
-      targetHost: sqsHostFor(config.queueUrl),
-      // Our delivery ladder is already counting attempts; SDK retries
-      // underneath it would make one recorded attempt several real calls.
-      disableSdkRetries: true,
-      ...(config.roleArn
-        ? {
-            assumeRole: {
-              roleArn: config.roleArn,
-              externalId: config.externalId,
-              sessionName: "langwatch-webhooks",
-            },
-          }
-        : {}),
-      staticCredentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
-    }),
-  );
-  clients.set(key, client);
-  return client;
-}
-
-/**
- * Drop every cached client for one queue, whatever credentials they hold. The queue alone is
- * the key here, rather than the full credential key, because the caller is reacting to a
- * rejection and does not know which of the cached identities for that queue is the stale one.
- */
-function dropSqsClient(queueUrl: string): void {
-  for (const [key, client] of clients) {
-    if (key.split(KEY_SEPARATOR)[0] === queueUrl) {
-      client.destroy();
-      clients.delete(key);
-    }
-  }
-}
-
-/** Drop every cached client. For tests, and for a process winding down. */
-function resetSqsClientCache(): void {
-  for (const client of clients.values()) client.destroy();
-  clients.clear();
-}
-
 export interface SqsWebhookDestinationAdapterOptions extends SqsDestinationConfig {
-  /** How this process builds an AWS transport. */
-  awsClientConfig: AwsClientConfigResolver;
+  /** The process-owned SQS transport. */
+  channel: SqsWebhookSender;
   /**
    * Where the hourly dispatch cap is counted. Optional only because the
    * cap is a limit, not a gate: a process without a shared counter delivers
@@ -423,20 +331,14 @@ export interface SqsWebhookDestinationAdapterOptions extends SqsDestinationConfi
 export class SqsWebhookDestinationAdapter implements WebhookDestination {
   readonly kind = "sqs" as const;
 
-  private constructor(
-    private readonly config: SqsWebhookDestinationAdapterOptions,
-    private readonly createClient?: (config: SqsDestinationConfig) => SQSClient,
-  ) {
-  }
+  private constructor(private readonly config: SqsWebhookDestinationAdapterOptions) {}
 
   static create({
     config,
-    createClient,
   }: {
     config: SqsWebhookDestinationAdapterOptions;
-    createClient?: (config: SqsDestinationConfig) => SQSClient;
   }): SqsWebhookDestinationAdapter {
-    return new SqsWebhookDestinationAdapter(config, createClient);
+    return new SqsWebhookDestinationAdapter(config);
   }
 
   /** How large one delivery is, body and attributes together. */
@@ -467,29 +369,8 @@ export class SqsWebhookDestinationAdapter implements WebhookDestination {
     return isStaleCredentialFailure(error);
   }
 
-  /** The client for one endpoint's queue, cached and reused. */
-  static clientFor({
-    config,
-    awsClientConfig,
-  }: {
-    config: SqsDestinationConfig;
-    awsClientConfig: AwsClientConfigResolver;
-  }): SQSClient {
-    return sqsClientFor(config, awsClientConfig);
-  }
-
-  /** Drop every cached client for one queue, whatever credentials they hold. */
-  static dropClient(queueUrl: string): void {
-    dropSqsClient(queueUrl);
-  }
-
-  /** Drop every cached client. For tests, and for a process winding down. */
-  static resetClientCache(): void {
-    resetSqsClientCache();
-  }
-
   async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {
-    const { awsClientConfig, rateLimiter } = this.config;
+    const { channel, rateLimiter } = this.config;
     // The same cap the HTTPS transport answers to, called here directly
     // because a queue send never passes through the HTTP sender that used
     // to own it. Without this line a queue endpoint would be uncapped. A
@@ -510,9 +391,8 @@ export class SqsWebhookDestinationAdapter implements WebhookDestination {
     if (refusal) return refusal;
 
     return putOnQueue({
-      client: this.createClient
-        ? this.createClient(this.config)
-        : sqsClientFor(this.config, awsClientConfig),
+      channel,
+      config: this.config,
       queueUrl: this.config.queueUrl,
       body: request.body,
       attributes,

@@ -1,3 +1,4 @@
+import type { Entry, Field } from "@langwatch/workflow-contract";
 /**
  * @vitest-environment jsdom
  *
@@ -5,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
-import type { Entry, Field } from "@langwatch/workflow-contract";
+
 import { store as storeCreator, type WorkflowStore } from "../behavior/workflow-store.ts";
 
 function makeEntryNode({

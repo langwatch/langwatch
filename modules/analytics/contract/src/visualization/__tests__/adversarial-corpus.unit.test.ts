@@ -4,11 +4,11 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { validateVegaLiteSpec } from "../validate-vega-lite-spec.ts";
 import { ADVERSARIAL_VEGA_FIXTURES } from "./fixtures/adversarial/index.ts";
 import { INVALID_VEGA_FIXTURES } from "./fixtures/invalid/index.ts";
 import { LWQL_FIXTURE_COLUMNS, LWQL_FIXTURE_ROW_COUNTS } from "./fixtures/lwql-dataset-registry.ts";
 import { VALID_VEGA_FIXTURES } from "./fixtures/valid/index.ts";
-import { validateVegaLiteSpec } from "../validate-vega-lite-spec.ts";
 
 const validate = (spec: unknown) =>
   validateVegaLiteSpec({

@@ -5,42 +5,26 @@
  * @see specs/analytics/dashboard-widget-resilience.feature
  */
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-
 import { nowInstant } from "@langwatch/time";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 export const DASHBOARD_AUTO_REFRESH_OPTIONS = ["off", "1m", "5m"] as const;
-export type DashboardAutoRefreshOption =
-  (typeof DASHBOARD_AUTO_REFRESH_OPTIONS)[number];
+export type DashboardAutoRefreshOption = (typeof DASHBOARD_AUTO_REFRESH_OPTIONS)[number];
 
-export const DASHBOARD_AUTO_REFRESH_LABEL: Record<
-  DashboardAutoRefreshOption,
-  string
-> = {
+export const DASHBOARD_AUTO_REFRESH_LABEL: Record<DashboardAutoRefreshOption, string> = {
   off: "Off",
   "1m": "Every minute",
   "5m": "Every 5 minutes",
 };
 
-export const DASHBOARD_AUTO_REFRESH_MS: Record<
-  DashboardAutoRefreshOption,
-  number | null
-> = {
+export const DASHBOARD_AUTO_REFRESH_MS: Record<DashboardAutoRefreshOption, number | null> = {
   off: null,
   "1m": 60_000,
   "5m": 300_000,
 };
 
 export const DASHBOARD_AUTO_REFRESH_DEFAULT: DashboardAutoRefreshOption = "1m";
-export const DASHBOARD_AUTO_REFRESH_STORAGE_KEY =
-  "langwatch.dashboard.autoRefresh";
+export const DASHBOARD_AUTO_REFRESH_STORAGE_KEY = "langwatch.dashboard.autoRefresh";
 
 const isOption = (value: unknown): value is DashboardAutoRefreshOption =>
   DASHBOARD_AUTO_REFRESH_OPTIONS.includes(value as DashboardAutoRefreshOption);
@@ -48,9 +32,7 @@ const isOption = (value: unknown): value is DashboardAutoRefreshOption =>
 export function readStoredAutoRefreshOption(): DashboardAutoRefreshOption {
   if (typeof window === "undefined") return DASHBOARD_AUTO_REFRESH_DEFAULT;
   try {
-    const stored = window.localStorage.getItem(
-      DASHBOARD_AUTO_REFRESH_STORAGE_KEY,
-    );
+    const stored = window.localStorage.getItem(DASHBOARD_AUTO_REFRESH_STORAGE_KEY);
     return isOption(stored) ? stored : DASHBOARD_AUTO_REFRESH_DEFAULT;
   } catch {
     return DASHBOARD_AUTO_REFRESH_DEFAULT;
@@ -61,15 +43,11 @@ export function readStoredAutoRefreshOption(): DashboardAutoRefreshOption {
  * Epoch ms of the dashboard's last scheduled refresh, or undefined before
  * the first. Widgets read it through {@link useDashboardRefreshedAt}.
  */
-export const DashboardRefreshedAtContext = createContext<number | undefined>(
-  undefined,
-);
+export const DashboardRefreshedAtContext = createContext<number | undefined>(undefined);
 
-export const useDashboardRefreshedAt = () =>
-  useContext(DashboardRefreshedAtContext);
+export const useDashboardRefreshedAt = () => useContext(DashboardRefreshedAtContext);
 
-const isHidden = () =>
-  typeof document !== "undefined" && document.visibilityState === "hidden";
+const isHidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
 
 export function useDashboardAutoRefresh({
   onTick,

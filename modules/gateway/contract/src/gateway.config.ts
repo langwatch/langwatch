@@ -1,29 +1,20 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 import type { GatewayCacheRuleResource } from "./gateway-cache-rule.ts";
 import type { GatewayGuardrailBundleEntry } from "./gateway-guardrail.ts";
 
 /**
- * `internalSecret`, `jwtSecret` and `virtualKeyPepper` resolve through the
- * process's `secrets` member (ADR-132), never this schema.
+ * `internalSecret`, `jwtSecret` and `virtualKeyPepper` resolve through
+ * `GatewayApp.secrets` (ADR-132), never this slice.
  * spendSettlementGraceMs carried as-is.
  */
-export const gatewayServerConfigDefinition = RuntimeConfig.define({
+export const gatewayConfig = Config.define((c) => ({
   /** How long after a request an outcome may still arrive. */
-  spendSettlementGraceMs: Config.value(z.string().optional(), {
-    env: "LW_SPEND_SETTLEMENT_GRACE_MS",
-  }),
-});
+  spendSettlementGraceMs: c.env("LW_SPEND_SETTLEMENT_GRACE_MS", z.string().optional()),
+}));
 
-export type GatewayServerConfig = ConfigValue<typeof gatewayServerConfigDefinition>;
-
-export const gatewayServerConfigSchema = compileRuntimeConfig(gatewayServerConfigDefinition);
-
-/**
- * Boot refusal for incomplete gateway config (all three secrets or none);
- * separate refusal for values too short.
- */
+export type GatewayServerConfig = ConfigOf<typeof gatewayConfig>;
 
 /** The three variables that provision the AI Gateway, in the order to report. */
 export const GATEWAY_SECRET_ENVS = [
@@ -62,12 +53,15 @@ export class GatewaySecretsConfigurationError extends Error {
  * naming the two not yet reached would name the wrong fix.
  */
 export function assertGatewaySecretsAllOrNone(source: Readonly<Record<string, unknown>>): void {
-  const present = GATEWAY_SECRET_ENVS.filter((env) => stated(source[env]) !== undefined);
+  // A blank export is not a value: an operator who exported `""` set nothing.
+  const stated = (env: GatewaySecretEnv): string => {
+    const raw = source[env];
+    return typeof raw === "string" ? raw.trim() : "";
+  };
+  const present = GATEWAY_SECRET_ENVS.filter((env) => stated(env) !== "");
   if (present.length === 0) return;
 
-  const short = present.filter(
-    (env) => (stated(source[env]) ?? "").length < GATEWAY_SECRET_MIN_LENGTH,
-  );
+  const short = present.filter((env) => stated(env).length < GATEWAY_SECRET_MIN_LENGTH);
   if (short.length > 0) {
     throw new GatewaySecretsConfigurationError(
       `${short.join(", ")} ${short.length === 1 ? "is" : "are"} shorter than the minimum of ` +
@@ -77,7 +71,7 @@ export function assertGatewaySecretsAllOrNone(source: Readonly<Record<string, un
     );
   }
 
-  const missing = GATEWAY_SECRET_ENVS.filter((env) => stated(source[env]) === undefined);
+  const missing = GATEWAY_SECRET_ENVS.filter((env) => stated(env) === "");
   if (missing.length === 0) return;
 
   throw new GatewaySecretsConfigurationError(
@@ -87,13 +81,6 @@ export function assertGatewaySecretsAllOrNone(source: Readonly<Record<string, un
       `gateway needs none. Generate each value with: ${GATEWAY_SECRET_GENERATE_COMMAND}`,
     missing,
   );
-}
-
-/** A blank export is not a value: an operator who exported `""` set nothing. */
-function stated(raw: unknown): string | undefined {
-  if (typeof raw !== "string") return undefined;
-  const value = raw.trim();
-  return value === "" ? undefined : value;
 }
 
 /** The browser only learns where the gateway answers, never a secret. */

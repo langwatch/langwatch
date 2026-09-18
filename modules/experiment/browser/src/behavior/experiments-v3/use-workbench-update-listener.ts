@@ -1,14 +1,15 @@
-import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
-import { useShallow } from "zustand/react/shallow";
-import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   type ExperimentUpdateSignal,
   experimentUpdateSignalSchema,
 } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { nowInstant } from "@langwatch/time";
+import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
+
 import type { EvaluationsV3Actions } from "../../model/experiments-v3/types.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** Tab switches within this window share one staleness probe. */
 const VISIBILITY_PROBE_MIN_INTERVAL_MS = 5_000;

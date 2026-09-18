@@ -1,6 +1,7 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useRef } from "react";
+
 import { useSectionTrackerStore } from "./section-tracker-store.ts";
 
 export interface PresenceSectionProps extends BoxProps {

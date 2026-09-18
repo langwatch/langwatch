@@ -3,6 +3,7 @@
  */
 
 import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import {
   createColumnHelper,
   flexRender,
@@ -13,23 +14,9 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRight } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { BatchTargetCell } from "./batch-target-cell.tsx";
+
 import { DiffCell, type DiffValue } from "../../elements/batch-results/diff-cell.tsx";
-import { ExpandableDatasetCell } from "./expandable-dataset-cell.tsx";
 import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
-import {
-  calculateMinTableWidth,
-  DEFAULT_ROW_HEIGHT,
-  ESTIMATED_ROW_HEIGHT_PX,
-  getTableStyles,
-  type RowHeight,
-} from "./table-utils.ts";
-import {
-  type DescribeBatchCellFailure,
-  type RenderBatchEvaluatorResult,
-  type RenderTracePeek,
-} from "./presentation.tsx";
 import type {
   BatchDatasetColumn,
   BatchResultRow,
@@ -37,6 +24,20 @@ import type {
   ComparisonRunData,
 } from "../batch-evaluation-results.types.ts";
 import { useResultsGrouping } from "../use-results-grouping.ts";
+import { BatchTargetCell } from "./batch-target-cell.tsx";
+import { ExpandableDatasetCell } from "./expandable-dataset-cell.tsx";
+import {
+  type DescribeBatchCellFailure,
+  type RenderBatchEvaluatorResult,
+  type RenderTracePeek,
+} from "./presentation.tsx";
+import {
+  calculateMinTableWidth,
+  DEFAULT_ROW_HEIGHT,
+  ESTIMATED_ROW_HEIGHT_PX,
+  getTableStyles,
+  type RowHeight,
+} from "./table-utils.ts";
 
 type ComparisonTableProps = {
   /** Comparison data from multiple runs */

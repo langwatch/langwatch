@@ -1,9 +1,6 @@
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import { moduleApi } from "@langwatch/kernel";
-import type {
-  ExecuteEvaluationCommand,
-  UpsertEvaluationRunCommand,
-} from "./evaluation.commands.ts";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type { ReportEvaluationCommandData } from "./evaluation-event.commands.ts";
 import type {
   DatasetEvaluationRow,
@@ -18,11 +15,15 @@ import type {
   SavedEvaluatorResolution,
 } from "./evaluation-rest.schemas.ts";
 import type {
-  EvaluationExecutionResult,
-  EvaluationRunData,
-  EvaluationSummary,
-  TraceEvaluationData,
-} from "./evaluation.ts";
+  CustomEvaluator,
+  EvaluationProjectScope,
+  RunTraceEvaluationInput,
+  WarmupEvaluatorsInput,
+} from "./evaluation-trpc.schemas.ts";
+import type {
+  ExecuteEvaluationCommand,
+  UpsertEvaluationRunCommand,
+} from "./evaluation.commands.ts";
 import type {
   MonitorPerformanceQuery,
   OnlineEvaluationPerformance,
@@ -35,16 +36,16 @@ import type {
   TraceEvaluationsQuery,
 } from "./evaluation.queries.ts";
 import type {
-  CustomEvaluator,
-  EvaluationProjectScope,
-  RunTraceEvaluationInput,
-  WarmupEvaluatorsInput,
-} from "./evaluation-trpc.schemas.ts";
-import type {
   EvaluationRunOutcome,
   EvaluationWarmup,
   EvaluatorCatalogue,
 } from "./evaluation.responses.ts";
+import type {
+  EvaluationExecutionResult,
+  EvaluationRunData,
+  EvaluationSummary,
+  TraceEvaluationData,
+} from "./evaluation.ts";
 
 /** The complete callable Evaluation capability shared by process peers. */
 export interface EvaluationApi {

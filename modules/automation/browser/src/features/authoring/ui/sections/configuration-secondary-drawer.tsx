@@ -1,9 +1,10 @@
 import type { EmailPreview, SlackPreview, WebhookPreview } from "@langwatch/automation-contract";
 import { TriggerAction } from "@langwatch/automation-contract";
-import type { NotifyPreview } from "./client-providers.ts";
+
 import type { ConfigFormCtx } from "../../../../model/provider-types.ts";
-import { CLIENT_PROVIDERS } from "./client-providers.ts";
 import { useAutomationStore } from "./automation-store.ts";
+import type { NotifyPreview } from "./client-providers.ts";
+import { CLIENT_PROVIDERS } from "./client-providers.ts";
 import { SecondaryDrawerShell } from "./secondary-drawer-shell.tsx";
 
 /**

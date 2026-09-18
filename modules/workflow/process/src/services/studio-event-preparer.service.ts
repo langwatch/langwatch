@@ -1,9 +1,7 @@
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import type {
-  WorkflowLlmParameters,
-  WorkflowProjectEnvironment,
-} from "../app/workflow.app.ts";
+
+import type { WorkflowLlmParameters, WorkflowProjectEnvironment } from "../app/workflow.app.ts";
 import { StudioDatasetMaterializerService } from "./studio-dataset-materializer.service.ts";
 import {
   StudioWorkflowEventEnricherService,

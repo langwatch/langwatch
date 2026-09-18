@@ -1,7 +1,7 @@
 import { Box, HStack, RadioCard, Text, VStack } from "@chakra-ui/react";
-import { LuChevronRight } from "react-icons/lu";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { LuChevronRight } from "react-icons/lu";
 
 export function StepButton({
   title,

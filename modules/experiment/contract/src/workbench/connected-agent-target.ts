@@ -2,8 +2,8 @@
 // (ADR-128). A workbench row is one turn; each column maps its own parameter
 // values (dataset or fixed), the rest keep function defaults.
 
-import type { Field } from "@langwatch/workflow-contract";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import type { Field } from "@langwatch/workflow-contract";
 
 /** The input field a connected agent column reads the turn from. */
 export const CONNECTED_INPUT_FIELD = "input";

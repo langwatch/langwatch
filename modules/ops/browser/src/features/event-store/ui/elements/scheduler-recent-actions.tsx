@@ -1,6 +1,7 @@
-import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { SchedulerAuditEntryView } from "@langwatch/ops-contract";
+import { nowInstant, toEpochMs } from "@langwatch/time";
+
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 
 const ACTION_LABELS: Record<string, string> = {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "./schemas/metric-processing/constants.ts";
 import { canonicalMetricDataPointSchema } from "./schemas/metric-processing/metric-data-point.ts";
 

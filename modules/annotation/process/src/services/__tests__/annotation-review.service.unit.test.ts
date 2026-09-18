@@ -1,6 +1,7 @@
 import { traceSchema } from "@langwatch/trace-contract";
 import { userFullProfileSchema } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   createAnnotationTestApp,
   createAnnotationTestAuthz,

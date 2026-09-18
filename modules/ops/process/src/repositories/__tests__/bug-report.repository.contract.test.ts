@@ -5,6 +5,8 @@
  * named. @see specs/support/bug-reports.feature
  */
 import { randomUUID } from "node:crypto";
+
+import { createLogger } from "@langwatch/observability";
 import type { BugReportCreateInput } from "@langwatch/ops-contract";
 import {
   PrismaConfigService,
@@ -13,7 +15,6 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { createLogger } from "@langwatch/observability";
 
 import type { BugReportRepository } from "../admin/bug-report.repository.ts";
 import { MemoryBugReportRepository } from "../memory/memory.bug-report.repository.ts";

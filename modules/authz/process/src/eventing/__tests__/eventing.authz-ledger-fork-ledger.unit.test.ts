@@ -3,6 +3,7 @@
  * revoke resolves ids to fold (ADR-092 decision 4).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ACTOR, harness, ORG_ID } from "./support/eventing.authz-ledger-fork.harness.ts";
 
 beforeEach(() => {

@@ -34,13 +34,17 @@ function process(role: "api" | "worker") {
     .withModules([withMemoryRepositories(opsServer)])
     .withConfig({
       ops: {
-        adminEmails: [OPS_STAFF_ADDRESS],
-        opsApiKey: undefined,
-        opsClickHouseUrl: undefined,
-        isProduction: false,
+        apiKey: undefined,
+        metricsApiKey: undefined,
+        clickhouseOpsUrl: undefined,
+        adminEmails: OPS_STAFF_ADDRESS,
         legacySsoStringWritesRetired: false,
+        usageStats: { disabled: false, installMethod: undefined },
+        collectClickHouseBackupMetrics: true,
+        productAnalytics: { key: undefined, host: undefined },
       },
     })
+    .withMember("nodeEnvironment", undefined)
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
     .withAnalytical(memberWithoutStore<ClickHouseQueryClient>())
     .withKeyvalue(memberWithoutStore<RedisConnection>())

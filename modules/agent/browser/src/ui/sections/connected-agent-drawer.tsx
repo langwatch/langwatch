@@ -15,12 +15,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
-import { AgentTestPanel } from "./agent-test-panel.tsx";
-import type { ReactNode } from "react";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
+import type { ReactNode } from "react";
+
 import type { ConnectedAgentBrowser } from "../../model/agent-client.ts";
 import { presenceLabel, scopeOf, sdkLabel } from "../../model/connected-agent-rows.ts";
+import { AgentTestPanel } from "./agent-test-panel.tsx";
 
 export interface ConnectedAgentDrawerProps {
   agent?: ConnectedAgentBrowser | null;

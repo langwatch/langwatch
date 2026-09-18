@@ -6,17 +6,15 @@ import {
 } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  type GithubAppTokenCache,
-} from "../app/github.app.ts";
-import type {
-  GithubInstallationRow,
-  GithubInstallationsRepository,
-} from "../repositories/github-installations.repository.ts";
+import { type GithubAppTokenCache } from "../app/github.app.ts";
 import {
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
 } from "../channels/http/http.github-api.channel.ts";
+import type {
+  GithubInstallationRow,
+  GithubInstallationsRepository,
+} from "../repositories/github-installations.repository.ts";
 
 const logger = createLogger("langwatch:github:installation-access");
 

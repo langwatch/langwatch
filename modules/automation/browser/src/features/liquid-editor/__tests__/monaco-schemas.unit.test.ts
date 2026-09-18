@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { registerJsonSchema, type AutomationMonaco } from "../model/monaco-schemas.ts";
 
 describe("registerJsonSchema", () => {

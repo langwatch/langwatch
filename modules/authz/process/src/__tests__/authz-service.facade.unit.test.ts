@@ -3,10 +3,11 @@ import {
   PermissionDeniedError,
 } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AuthzService } from "../services/authz.service.ts";
+
 import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import { AuthzService } from "../services/authz.service.ts";
 
 const ORG = "org-1";
 const TEAM = "team-1";
@@ -36,9 +37,7 @@ describe("AuthzService portable facade", () => {
   it("routes declared and imperative checks through the same decision engine", async () => {
     const { service } = makeService({
       reader: makeReader({
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "ADMIN", disabled: false }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "ADMIN", disabled: false }),
       }),
     });
 
@@ -77,9 +76,7 @@ describe("AuthzService portable facade", () => {
   it("preserves a membership-disabled denial through the compatibility decision", async () => {
     const { service } = makeService({
       reader: makeReader({
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabled: true }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: true }),
       }),
     });
 
@@ -103,9 +100,7 @@ describe("AuthzService portable facade", () => {
           teamId: TEAM,
           organizationId: ORG,
         }),
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabled: true }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: true }),
       }),
     });
 

@@ -1,12 +1,13 @@
-import type { WireOf } from "@langwatch/api/web";
 import { Box, Button, Heading, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { WireOf } from "@langwatch/api/web";
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { Evaluator } from "@langwatch/evaluator-contract";
-import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { RenderCode } from "@langwatch/workflow-browser/render-code";
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
 import { EvaluatorSelectionBox } from "./evaluator-selection-box.tsx";
 
 export type GuardrailsDrawerProps = {

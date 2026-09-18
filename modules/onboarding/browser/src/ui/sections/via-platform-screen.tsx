@@ -10,9 +10,10 @@ import {
   Shield,
 } from "lucide-react";
 import type React from "react";
+
+import { accentChipBg } from "../../model/shared/accent-surface.ts";
 import { Link } from "../elements/link.tsx";
 import { useActiveProject } from "./active-project-context.tsx";
-import { accentChipBg } from "../../model/shared/accent-surface.ts";
 
 interface CapabilityProps {
   icon: LucideIcon;

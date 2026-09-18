@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
@@ -7,6 +6,8 @@ import {
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
 } from "@langwatch/evaluation-contract";
+import { describe, expect, it } from "vitest";
+
 import { EvaluationAnalyticsRollupMapProjection } from "../eventing/evaluation-analytics-rollup.projection.ts";
 
 const TENANT = "proj-1";

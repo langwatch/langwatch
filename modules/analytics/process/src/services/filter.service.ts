@@ -5,6 +5,7 @@ import type {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
+
 import type { FilterOption, FilterOptions } from "../repositories/filter-options.repository.ts";
 
 export type GetFilterOptionsInput = {

@@ -13,7 +13,6 @@ export function createLangWatchQLService(
   return LangWatchQLService.create(dependencies);
 }
 
-
 /**
  * The shared LangWatchQL executor fake for every suite that only needs to observe what reached
  * this seam, not what a real database does with it.

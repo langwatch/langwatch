@@ -1,4 +1,5 @@
 import type { AggregateSearchResult } from "@langwatch/ops-contract";
+
 import type {
   AggregateDiscoveryRow,
   EventExplorerRepository,

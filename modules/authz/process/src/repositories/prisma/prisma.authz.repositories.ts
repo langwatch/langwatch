@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { AuthzRepositories } from "../authz.repositories.ts";
 import { PrismaAuthzBindingRepository } from "./prisma.authz-binding.repository.ts";
 import { PrismaAuthzCutoverRepository } from "./prisma.authz-cutover.repository.ts";

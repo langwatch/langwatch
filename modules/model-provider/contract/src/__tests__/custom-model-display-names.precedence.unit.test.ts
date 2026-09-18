@@ -1,6 +1,10 @@
+import {
+  toLegacyCompatibleCustomModels,
+  buildCustomModelDisplayNames,
+} from "@langwatch/model-provider-contract";
 /** Guard row-precedence tiers (enabled > scope > persisted > id lexically) (#5837 AC2/AC3). */
 import { describe, expect, it } from "vitest";
-import { toLegacyCompatibleCustomModels,buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
+
 import { makeProvider } from "./model-provider.test-helpers.ts";
 
 describe("given a real display name and a legacy identity row that collide on the same model id", () => {

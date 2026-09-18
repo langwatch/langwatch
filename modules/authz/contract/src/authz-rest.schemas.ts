@@ -4,6 +4,7 @@
  * legacy-access notice, and only when it switches legacy team access off.
  */
 import { z } from "zod";
+
 import { roleBindingScopeTypeSchema, teamUserRoleSchema } from "./authz.ts";
 
 export const roleBindingPrincipalSchema = z.object({

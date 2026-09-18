@@ -1,6 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
+import type { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 
 /**
@@ -9,12 +9,12 @@ import type { RoleApi } from "@langwatch/role-contract";
  * an invitation neither defines a role nor binds one.
  */
 export type InviteAssignableRoles = Pick<RoleApi, "filterAssignableRoles">;
-import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type {
   OrganizationInviteMail,
   OrganizationInviteSeatCensus,
   OrganizationInviteWorkspaceCensus,
 } from "../app/organization.members.ts";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
 
 /**

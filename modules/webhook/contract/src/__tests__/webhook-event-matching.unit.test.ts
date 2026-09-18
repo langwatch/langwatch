@@ -3,6 +3,7 @@
  * application).
  */
 import { describe, expect, it } from "vitest";
+
 import { eventMatches, isValidEventSelector, WEBHOOK_EVENT_TYPES } from "../webhook.events.ts";
 
 describe("webhook event registry", () => {

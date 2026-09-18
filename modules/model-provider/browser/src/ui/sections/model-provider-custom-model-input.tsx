@@ -1,13 +1,17 @@
 import { Badge, Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
+import type {
+  CustomModelEntry,
+  ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../behavior/use-model-provider-form.ts";
-import type { CustomModelEntry,ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { SmallLabel } from "../elements/small-label.tsx";
-import { Menu } from "@langwatch/design-system/menu";
 import { AddCustomEmbeddingsModelDialog } from "./add-custom-embeddings-model-dialog.tsx";
 import { AddCustomModelDialog } from "./add-custom-model-dialog.tsx";
 import { RegistryModelsModal } from "./registry-models-modal.tsx";

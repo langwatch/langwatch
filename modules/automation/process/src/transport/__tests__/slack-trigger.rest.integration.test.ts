@@ -33,9 +33,9 @@ describe("the /api/trigger/slack declaration", () => {
     const declaration = slackAutomationRest.router();
 
     expect(declaration.addressing).toBe("literal");
-    expect(declaration.routes.map((route) => `${route.method.toUpperCase()} ${route.path}`)).toEqual(
-      ["POST /api/trigger/slack"],
-    );
+    expect(
+      declaration.routes.map((route) => `${route.method.toUpperCase()} ${route.path}`),
+    ).toEqual(["POST /api/trigger/slack"]);
     expect(declaration.routes[0]?.permission).toBe("triggers:manage");
     expect(declaration.routes[0]?.operation).toBe("postApiTriggerSlack");
   });

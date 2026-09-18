@@ -3,7 +3,11 @@
  */
 import { useCallback, useState } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { DEFAULT_ROW_HEIGHT, type RowHeight } from "../model/batch-evaluation-results.row-height.ts";
+
+import {
+  DEFAULT_ROW_HEIGHT,
+  type RowHeight,
+} from "../model/batch-evaluation-results.row-height.ts";
 
 export type ResultField = "outputs" | "scores" | "costAndLatency";
 

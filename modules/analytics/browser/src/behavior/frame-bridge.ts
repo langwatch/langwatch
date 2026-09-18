@@ -15,6 +15,8 @@
  * sides equally, and resumes with a fresh grace period so throttled misses never trigger a kill.
  */
 
+import { nowInstant } from "@langwatch/time";
+
 import type {
   ChartFrameDashboardContext,
   ChartFrameLogSource,
@@ -26,7 +28,6 @@ import type {
   LwLogMessage,
 } from "../model/dashboard-widget/bridge-protocol.ts";
 import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "../model/dashboard-widget/bridge-protocol.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** Upper bound on simultaneously in-flight `lw:query` requests per frame. */
 const MAX_CONCURRENT_QUERIES = 8;
@@ -71,26 +72,15 @@ export interface CreateFrameBridgeOptions {
 
 export interface FrameBridge {
   /** Pushes new dashboard context into the frame (`lw:dashboard-context-change`). */
-  postDashboardContextChange(
-    dashboardContext: ChartFrameDashboardContext,
-  ): void;
+  postDashboardContextChange(dashboardContext: ChartFrameDashboardContext): void;
   /** Detaches everything. Safe to call twice. */
   dispose(): void;
 }
 
 // One factory wiring the iframe's postMessage handlers and lifecycle together;
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: splitting scatters state.
-export function createFrameBridge(
-  options: CreateFrameBridgeOptions,
-): FrameBridge {
-  const {
-    iframe,
-    executeQuery,
-    onLog,
-    onHeightChange,
-    onNavigate,
-    onTeardown,
-  } = options;
+export function createFrameBridge(options: CreateFrameBridgeOptions): FrameBridge {
+  const { iframe, executeQuery, onLog, onHeightChange, onNavigate, onTeardown } = options;
 
   let port: MessagePort | null = null;
   let initialized = false;
@@ -251,10 +241,7 @@ export function createFrameBridge(
     }, CHART_FRAME_HEARTBEAT_TIMEOUT_MS / 5);
   };
 
-  if (
-    iframe.contentDocument?.readyState === "complete" &&
-    iframe.contentWindow
-  ) {
+  if (iframe.contentDocument?.readyState === "complete" && iframe.contentWindow) {
     onFrameLoad();
   } else {
     iframe.addEventListener("load", onFrameLoad);

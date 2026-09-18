@@ -6,6 +6,7 @@
 import type { SlackPayload } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import {
   SlackWebApiDeliveryAdapter,
   type SlackApiTransport,

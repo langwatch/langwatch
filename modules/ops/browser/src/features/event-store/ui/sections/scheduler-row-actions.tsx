@@ -1,12 +1,11 @@
 import { Field, IconButton, Input, Menu, Portal, Text } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { canRunNow, type SchedulerJobStatus } from "../../model/scheduler-presentation.ts";
-
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
+import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
+import { canRunNow, type SchedulerJobStatus } from "../../model/scheduler-presentation.ts";
 type PendingAction = "pause" | "resume" | "clear" | "run" | null;
 
 /** Per-row controls (ADR-091). Confirmations name PROJECT (cross-tenant; risk is

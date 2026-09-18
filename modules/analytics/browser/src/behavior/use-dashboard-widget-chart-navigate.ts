@@ -4,9 +4,10 @@
  * params, so a widget cannot navigate into a different project's traces.
  */
 
-import { useCallback } from "react";
 import { Temporal } from "@langwatch/time";
 import { escapeValue, SEARCH_FIELDS } from "@langwatch/trace-contract";
+import { useCallback } from "react";
+
 import { useAnalyticsHost } from "../model/analytics-host.ts";
 import {
   NAVIGABLE_TARGETS,

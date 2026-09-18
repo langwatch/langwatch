@@ -1,6 +1,11 @@
 import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point.ts";
 import { type BucketEntry, extendExtrema, resetOrGap } from "./rollup-row.ts";
-import { bigint, type MetricRollupSourcePoint, previousPoint, startsNewSequence } from "./sequence.ts";
+import {
+  bigint,
+  type MetricRollupSourcePoint,
+  previousPoint,
+  startsNewSequence,
+} from "./sequence.ts";
 
 function commonExplicitBounds(points: MetricRollupSourcePoint[]): number[] {
   if (points.length === 0) return [];

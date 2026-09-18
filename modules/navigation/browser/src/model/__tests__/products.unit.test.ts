@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { PRODUCTS, productById, productFromPathname } from "../products.ts";
 
 describe("product registry", () => {

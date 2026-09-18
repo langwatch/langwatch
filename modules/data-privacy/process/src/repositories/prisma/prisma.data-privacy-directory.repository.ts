@@ -4,6 +4,7 @@
  */
 import type { DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import {
   type DataPrivacyDirectoryReader,
   type DataPrivacyOrganizationDirectory,
@@ -91,11 +92,7 @@ export class PrismaDataPrivacyDirectoryRepository implements DataPrivacyDirector
     };
   }
 
-  async findScopeOrganizationId({
-    scope,
-  }: {
-    scope: DataPrivacyScope;
-  }): Promise<string | null> {
+  async findScopeOrganizationId({ scope }: { scope: DataPrivacyScope }): Promise<string | null> {
     if (scope.scopeType === "ORGANIZATION") {
       const organization = await this.database.organization.findUnique({
         where: { id: scope.scopeId },

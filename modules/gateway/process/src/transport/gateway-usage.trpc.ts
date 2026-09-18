@@ -4,11 +4,7 @@
  * the membership filter inside it is the check, declared as such.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import {
-  GatewayApi,
-  gatewayUsageTrpc,
-  VirtualKeyNotFoundError,
-} from "@langwatch/gateway-contract";
+import { GatewayApi, gatewayUsageTrpc, VirtualKeyNotFoundError } from "@langwatch/gateway-contract";
 import { type Instant, Temporal, toEpochMs } from "@langwatch/time";
 
 /** The window a caller asked for, as the usage reader takes it. */

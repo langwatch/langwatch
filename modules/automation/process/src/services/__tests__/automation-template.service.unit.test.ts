@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import {
   AlertType,
   TEST_FIRE_EMAIL_SUBJECT_PREFIX,
@@ -8,8 +10,8 @@ import {
   type TestFireProjectIdentity,
   type TestFireTriggerIdentity,
 } from "@langwatch/automation-contract";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+
 import { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
 

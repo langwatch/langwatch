@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type AppendStore, type FoldProjectionStore } from "@langwatch/eventing";
-import { RedisExperimentRunProcessingRepository } from "../redis/redis.experiment-run-processing.repository.ts";
-import type { ExperimentRunProcessingPipeline } from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
+import { describe, expect, it, vi } from "vitest";
+
 import type { ClickHouseExperimentRunResultRecord } from "../../eventing/experiment-run-result-storage.projection.ts";
 import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
+import type { ExperimentRunProcessingPipeline } from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
+import { RedisExperimentRunProcessingRepository } from "../redis/redis.experiment-run-processing.repository.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
@@ -81,16 +82,14 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
   const set = vi.fn(async (..._args: unknown[]) => "OK");
   const redis = { get: vi.fn(async () => null), set };
 
-  const pipeline: ExperimentRunProcessingPipeline = RedisExperimentRunProcessingRepository.create(
-    {
-      resolveClient: resolveClient as never,
-      defaultRetentionDays: 49,
-      redis: redis as never,
-      ...(options.foldCacheTtlSeconds === undefined
-        ? {}
-        : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
-    },
-  ).buildProcessing();
+  const pipeline: ExperimentRunProcessingPipeline = RedisExperimentRunProcessingRepository.create({
+    resolveClient: resolveClient as never,
+    defaultRetentionDays: 49,
+    redis: redis as never,
+    ...(options.foldCacheTtlSeconds === undefined
+      ? {}
+      : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
+  }).buildProcessing();
 
   return { pipeline, insert, resolveClient, redis, set };
 }

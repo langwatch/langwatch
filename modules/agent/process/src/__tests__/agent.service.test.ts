@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { createAgentAppFixture } from "../app/__tests__/agent.fixture.ts";
 
 const projectId = "project_1";

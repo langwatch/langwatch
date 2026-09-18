@@ -4,7 +4,11 @@
 
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-import { PROTOCOL_VERSION, type RefusedCode, type RefusedFrame } from "./connected-agent.protocol.ts";
+import {
+  PROTOCOL_VERSION,
+  type RefusedCode,
+  type RefusedFrame,
+} from "./connected-agent.protocol.ts";
 
 /** HTTP statuses follow the connect protocol's refusal reason table. */
 const REFUSAL_STATUSES = {

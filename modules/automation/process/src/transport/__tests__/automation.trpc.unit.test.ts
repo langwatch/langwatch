@@ -15,7 +15,9 @@ import {
   type AutomationTrpcTestContext,
 } from "./automation.trpc.harness.ts";
 
-function mount(options: { app?: Partial<AutomationApi>; permits?: (name: string) => boolean } = {}) {
+function mount(
+  options: { app?: Partial<AutomationApi>; permits?: (name: string) => boolean } = {},
+) {
   const trpc = initTRPC.context<AutomationTrpcTestContext>().create();
   const router = createTrpcRuntime<AutomationTrpcTestContext>({
     root: trpc,

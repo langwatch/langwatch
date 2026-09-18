@@ -3,6 +3,7 @@ import type { AgentHistoryEntry } from "@langwatch/agent-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowUp, Bot, Copy, Edit, type LucideIcon, RefreshCw, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import type { AgentClient } from "../../model/agent-client.ts";
 
 const ACTION_META = {

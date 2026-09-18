@@ -13,7 +13,9 @@
     "paths": {
       "@langwatch/webhook-contract": ["../contract/src/index.ts"],
       "@langwatch/handled-error": ["../../../packages/handled-error/src/index.ts"],
-      "@langwatch/prisma-client/generated": ["../../../packages/prisma-client/src/generated/client.ts"]
+      "@langwatch/prisma-client/generated": [
+        "../../../packages/prisma-client/src/generated/client.ts"
+      ]
     },
 
     "rewriteRelativeImportExtensions": false

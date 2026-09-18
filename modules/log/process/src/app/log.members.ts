@@ -18,7 +18,6 @@ export interface LogPreparer {
   prepare(input: LogPreparationInput): Promise<LogPreparation>;
 }
 
-
 export interface LogRedaction {
   redactLog(
     log: {

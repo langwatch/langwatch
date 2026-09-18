@@ -6,6 +6,7 @@
 
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ExperimentType } from "../../../../model/prisma-types.ts";
 
 const { replaceMock, routerState, experimentState } = vi.hoisted(() => ({
@@ -48,7 +49,8 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   },
 }));
 
-const { default: EvaluationWizardRedirect } = await import("../evaluation-wizard-redirect.screen.tsx");
+const { default: EvaluationWizardRedirect } =
+  await import("../evaluation-wizard-redirect.screen.tsx");
 
 const renderRepeatedly = () => {
   const { rerender } = render(<EvaluationWizardRedirect />);

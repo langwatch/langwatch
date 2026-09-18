@@ -5,6 +5,7 @@
  */
 
 import type { FilterField } from "@langwatch/analytics-contract";
+
 import { type CHTable, tableAliases } from "./clickhouse.field-mappings.mapper.ts";
 
 /**

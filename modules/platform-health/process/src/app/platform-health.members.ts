@@ -1,5 +1,6 @@
 import type { PlatformHealthCheckName } from "@langwatch/platform-health-contract";
-export interface PlatformHealthInfrastructure {  subsystemProbe: SubsystemProbe;
+export interface PlatformHealthInfrastructure {
+  subsystemProbe: SubsystemProbe;
 }
 
 /**
@@ -15,7 +16,5 @@ export type SubsystemProbeResult = Readonly<
 /** One subsystem, asked whether it is working right now. */
 export interface SubsystemProbe {
   readonly name: PlatformHealthCheckName;
-  run(
-    query: Readonly<{ triggerId?: string; workflowId?: string }>,
-  ): Promise<SubsystemProbeResult>;
+  run(query: Readonly<{ triggerId?: string; workflowId?: string }>): Promise<SubsystemProbeResult>;
 }

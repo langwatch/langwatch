@@ -1,4 +1,3 @@
-import type { z } from "zod";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import {
   type BoardResults,
@@ -16,6 +15,8 @@ import {
   type SeedTargetOutputs,
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
+import type { z } from "zod";
+
 import {
   type ExecutionDataInputs,
   type ExecutionDataServices,

@@ -4,6 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   captureSettingsReturnPath,
   resolveSettingsBackTarget,

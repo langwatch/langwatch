@@ -5,11 +5,8 @@
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
+import type { SimulationExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
 import { SuiteApi, suiteTrpc, extractSuiteId } from "@langwatch/suite-contract";
-import type {
-  SimulationExternalSetSummary,
-  SuiteRunSummary,
-} from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;

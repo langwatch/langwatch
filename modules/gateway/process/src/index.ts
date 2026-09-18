@@ -25,21 +25,18 @@ export {
 export {
   buildGatewayCanonicalString,
   computeGatewaySignature,
-  gatewayInternalRest,
-  gatewayInternalSignature,
+  GatewayInternalIdentity,
   GATEWAY_SIGNATURE_WINDOW_SECONDS,
-} from "./transport/gateway-internal.rest.ts";
+} from "./services/gateway-internal-identity.service.ts";
+export { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 export { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 export { gatewaySessionFact, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
-export {
-  PrismaGatewayAdapter,
-  type GatewayPersistence,
-} from "./adapters/prisma.gateway.adapter.ts";
-export { GatewayEndUserCapsAdapter } from "./adapters/gateway-end-user-caps.adapter.ts";
+export { PrismaGatewayAdapter, type GatewayPersistence } from "./app/prisma.gateway.composition.ts";
+export { GatewayEndUserCapsAdapter } from "./app/gateway-end-user-caps.composition.ts";
 export type {
   GatewayUsageProjects,
   GatewayUsageVirtualKeys,
@@ -90,7 +87,7 @@ export * from "./services/fixed-gateway-settlement-policy.service.ts";
 export { GatewayBudgetClickHouseRepository } from "./repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 export * from "./eventing/gateway-spend.intent.ts";
 export { GatewaySpendEventsRepository } from "./repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
-export * from "./adapters/gateway-spend-cursor.adapter.ts";
+export * from "./rules/gateway-spend-cursor.rules.ts";
 export * from "./services/gateway-budget-dto.service.ts";
 export * from "./services/gateway-virtual-key-dto.service.ts";
 export {
@@ -113,8 +110,8 @@ export {
   VirtualKeyExpiryInPastError,
   VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
-export * from "./adapters/gateway-spend-filters.adapter.ts";
-export * from "./adapters/gateway-spend-grouping.adapter.ts";
+export * from "./rules/gateway-spend-filters.rules.ts";
+export * from "./rules/gateway-spend-grouping.rules.ts";
 export * from "./eventing/gateway-spend-commands.process.ts";
 export * from "./eventing/gateway-spend-settlement.process.ts";
 export * from "./eventing/gateway-spend-settlement.intent.ts";
@@ -122,15 +119,15 @@ export {
   ClickHouseGatewayOpenAdmissionsAdapter,
   type GatewayClickHouseInstance,
   type GatewayClickHouseInstanceResolver,
-} from "./adapters/clickhouse.gateway-open-admissions.adapter.ts";
+} from "./repositories/clickhouse/clickhouse.gateway-open-admissions.adapter.ts";
 export type { OpenAdmission } from "./repositories/gateway-open-admissions.repository.ts";
-export * from "./adapters/eventing.gateway-spend.adapter.ts";
-export { GatewaySpendProducerAdapter } from "./adapters/gateway-spend-producer.adapter.ts";
+export * from "./eventing/gateway-spend.adapter.ts";
+export { GatewaySpendProducerAdapter } from "./eventing/gateway-spend-producer.ts";
 export {
   PostgresGatewayBudgetResolutionAdapter,
   type GatewayBudgetResolutionApi,
   type GatewayBudgetResolutionDatabase,
-} from "./adapters/postgres.gateway-budget-resolution.adapter.ts";
+} from "./repositories/prisma/postgres.gateway-budget-resolution.adapter.ts";
 export type { GatewaySpendState } from "./eventing/gateway-spend.projection.ts";
 export * from "./rules/gateway-wire-pagination.rules.ts";
 export * from "./services/virtual-key-crypto.service.ts";
@@ -209,7 +206,7 @@ export type {
 export type { GatewayModelProviderCredentials } from "./app/gateway.members.ts";
 export type { GatewayScopePermissions, GatewayPermissionScope } from "./app/gateway.members.ts";
 export type { GatewayConfigAssembly } from "./app/gateway.members.ts";
-export { GatewayConfigAssemblyAdapter } from "./adapters/postgres.gateway-config-assembly.adapter.ts";
+export { GatewayConfigAssemblyAdapter } from "./app/gateway-config-assembly.composition.ts";
 export type { GatewayVirtualKeyCrypto } from "./app/gateway.members.ts";
 export type { GatewaySpanIngestion } from "./app/gateway.members.ts";
 export type { GatewaySpendConfirmation } from "./app/gateway.members.ts";

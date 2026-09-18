@@ -5,12 +5,13 @@
  */
 
 import { Button, HStack, Input, Text } from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Check, ChevronDown, User, Users } from "lucide-react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
+
 import { MAX_VIEW_NAME_LENGTH, useSavedViews } from "../use-saved-views.tsx";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { Menu } from "@langwatch/design-system/menu";
 
 export function SaveAsViewButton() {
   const { saveView } = useSavedViews();

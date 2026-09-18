@@ -1,9 +1,7 @@
 import { AUTHZ_GRANTS_EVENT_TYPES } from "@langwatch/authz-contract";
 import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
-import { AuthzGrantProjection } from "./authz-grant.projection.ts";
-import type { GrantProjectionWriteStore } from "./authz-grant.projection.ts";
+
 import { AuthzAuditTrailStore } from "../repositories/authz-audit-trail.repository.ts";
-import { AUTHZ_GRANT_AGGREGATE_TYPE, type AuthzGrantsEvent } from "./authz-grant.events.ts";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
@@ -13,6 +11,9 @@ import {
   GRANT_COALESCE_MAX_BATCH,
   RevokeGrantCommand,
 } from "./authz-grant.commands.ts";
+import { AUTHZ_GRANT_AGGREGATE_TYPE, type AuthzGrantsEvent } from "./authz-grant.events.ts";
+import { AuthzGrantProjection } from "./authz-grant.projection.ts";
+import type { GrantProjectionWriteStore } from "./authz-grant.projection.ts";
 import { EventingAuthzAuditAdapter } from "./authz-grant.subscriber.ts";
 
 export const AUTHZ_GRANT_PIPELINE_NAME = "authz_grant" as const;
@@ -70,9 +71,7 @@ export class EventingAuthzAdapter {
     return new EventingAuthzAdapter(options);
   }
 
-  static build(
-    options: EventingAuthzAdapterOptions,
-  ): ReturnType<typeof buildAuthzGrantPipeline> {
+  static build(options: EventingAuthzAdapterOptions): ReturnType<typeof buildAuthzGrantPipeline> {
     return EventingAuthzAdapter.create(options).build();
   }
 
