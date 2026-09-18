@@ -551,7 +551,9 @@ untagged scenarios enforce nothing. Peer doubles come from `createApiFixture`
 — anything unconfigured throws by name; the same philosophy governs every
 double (`memoryAnalytical` throws on unscripted SQL). Component tests are
 `.integration.test.tsx` with the jsdom docblock. Each package owns its vitest
-config and declares its own datastore needs.
+config and declares its own datastore needs. **Tests live beside what they
+test, in a colocated `__tests__/` folder — never in a root `tests/` directory
+next to `src/`.**
 
 The installation test is the same chain as production:
 
