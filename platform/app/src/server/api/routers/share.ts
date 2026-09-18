@@ -1,3 +1,7 @@
+import {
+  DEFAULT_SHARE_LINK_PERMISSION,
+  SHARE_LINK_PERMISSIONS,
+} from "@langwatch/authz";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -6,6 +10,17 @@ import { getApp } from "~/server/app-layer/app";
 
 const resourceType = z.enum(["TRACE", "THREAD"]);
 const visibility = z.enum(["PUBLIC", "ORGANIZATION", "PROJECT"]);
+
+/**
+ * What the link may confer, from the one allowlist (`@langwatch/authz`) the
+ * service validates against and the collector expands. Built from that object
+ * rather than restated, so a value added there is accepted here with no edit
+ * — and the service still validates, because this router is not the only door
+ * into `createShare`.
+ */
+const permission = z.enum(
+  Object.keys(SHARE_LINK_PERMISSIONS) as [string, ...string[]],
+);
 
 /**
  * Share-link management. Anonymous reads DO NOT live here — they go through the
@@ -48,6 +63,10 @@ export const shareRouter = createTRPCRouter({
         visibility: visibility.default("PUBLIC"),
         expiresAt: z.date().nullish(),
         maxViews: z.number().int().positive().nullish(),
+        // Defaulted, not required: every caller that never mentions it — the
+        // share dialog included — keeps minting exactly the read-only link it
+        // minted before.
+        permission: permission.default(DEFAULT_SHARE_LINK_PERMISSION),
       }),
     )
     .permission("traces:share")
@@ -60,6 +79,7 @@ export const shareRouter = createTRPCRouter({
         expiresAt: input.expiresAt ?? null,
         maxViews: input.maxViews ?? null,
         userId: ctx.session.user.id,
+        permission: input.permission,
       });
     }),
 

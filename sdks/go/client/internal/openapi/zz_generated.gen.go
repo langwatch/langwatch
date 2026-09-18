@@ -22660,6 +22660,7 @@ type ListRoleBindings200JSONResponseBodyBindingsScopeType string
 type CreateRoleBindingJSONBody struct {
 	ApiKeyId     *string                            `json:"apiKeyId,omitempty"`
 	CustomRoleId *string                            `json:"customRoleId,omitempty"`
+	ExpiresAt    *string                            `json:"expiresAt,omitempty"`
 	GroupId      *string                            `json:"groupId,omitempty"`
 	Role         CreateRoleBindingJSONBodyRole      `json:"role"`
 	ScopeId      string                             `json:"scopeId"`
@@ -100242,6 +100243,7 @@ type ListRoleBindingsResponse struct {
 			CreatedAt      string  `json:"createdAt"`
 			CustomRoleId   *string `json:"customRoleId"`
 			CustomRoleName *string `json:"customRoleName"`
+			ExpiresAt      *string `json:"expiresAt"`
 			Id             string  `json:"id"`
 			Principal      struct {
 				Id   string                                                   `json:"id"`
@@ -100288,6 +100290,7 @@ type CreateRoleBindingResponse struct {
 		CreatedAt             string  `json:"createdAt"`
 		CustomRoleId          *string `json:"customRoleId"`
 		CustomRoleName        *string `json:"customRoleName"`
+		ExpiresAt             *string `json:"expiresAt"`
 		HasLegacyAccessNotice *bool   `json:"hasLegacyAccessNotice,omitempty"`
 		Id                    string  `json:"id"`
 		Principal             struct {
@@ -100365,6 +100368,7 @@ type UpdateRoleBindingResponse struct {
 		CreatedAt      string  `json:"createdAt"`
 		CustomRoleId   *string `json:"customRoleId"`
 		CustomRoleName *string `json:"customRoleName"`
+		ExpiresAt      *string `json:"expiresAt"`
 		Id             string  `json:"id"`
 		Principal      struct {
 			Id   string                                            `json:"id"`
@@ -125348,6 +125352,7 @@ func ParseListRoleBindingsResponse(rsp *http.Response) (*ListRoleBindingsRespons
 				CreatedAt      string  `json:"createdAt"`
 				CustomRoleId   *string `json:"customRoleId"`
 				CustomRoleName *string `json:"customRoleName"`
+				ExpiresAt      *string `json:"expiresAt"`
 				Id             string  `json:"id"`
 				Principal      struct {
 					Id   string                                                   `json:"id"`
@@ -125390,6 +125395,7 @@ func ParseCreateRoleBindingResponse(rsp *http.Response) (*CreateRoleBindingRespo
 			CreatedAt             string  `json:"createdAt"`
 			CustomRoleId          *string `json:"customRoleId"`
 			CustomRoleName        *string `json:"customRoleName"`
+			ExpiresAt             *string `json:"expiresAt"`
 			HasLegacyAccessNotice *bool   `json:"hasLegacyAccessNotice,omitempty"`
 			Id                    string  `json:"id"`
 			Principal             struct {
@@ -125459,6 +125465,7 @@ func ParseUpdateRoleBindingResponse(rsp *http.Response) (*UpdateRoleBindingRespo
 			CreatedAt      string  `json:"createdAt"`
 			CustomRoleId   *string `json:"customRoleId"`
 			CustomRoleName *string `json:"customRoleName"`
+			ExpiresAt      *string `json:"expiresAt"`
 			Id             string  `json:"id"`
 			Principal      struct {
 				Id   string                                            `json:"id"`

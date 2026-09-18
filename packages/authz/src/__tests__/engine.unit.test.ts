@@ -635,6 +635,313 @@ describe("authz engine decide()", () => {
     });
   });
 
+  describe("given a grant whose audience names a membership set", () => {
+    const grantFor = (
+      audience: ResourceGrant["audience"],
+    ): ResourceGrant => ({
+      kind: "trace",
+      id: TRACE,
+      projectId: PROJECT,
+      permission: "traces:view",
+      audience,
+    });
+    const opens = (
+      audience: ResourceGrant["audience"],
+      grants: CollectedGrants,
+    ) =>
+      engine.decide({
+        grants,
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants: [grantFor(audience)],
+      });
+
+    describe("when the audience is the trace's own project", () => {
+      /** @scenario "A project audience reaches everyone who reaches the project" */
+      it.each([
+        ["PROJECT" as const, PROJECT],
+        ["TEAM" as const, TEAM],
+        ["ORGANIZATION" as const, ORG],
+      ])("admits a caller bound at %s scope", (scopeType, scopeId) => {
+        const decision = opens(
+          { kind: "project", id: PROJECT },
+          makeGrants({ bindings: [binding({ scopeType, scopeId })] }),
+        );
+        expect(decision.allowed).toBe(true);
+        expect(decision.via).toBe("resource-grant");
+        expect(decision.audience).toBe("member");
+      });
+
+      /** @scenario "A project audience reaches everyone who reaches the project" */
+      it("admits a caller whose team membership predates role bindings", () => {
+        const decision = opens(
+          { kind: "project", id: PROJECT },
+          makeGrants({
+            legacyTeamMemberships: [
+              {
+                teamId: TEAM,
+                role: "VIEWER",
+                customRoleId: null,
+                isPersonal: false,
+              },
+            ],
+          }),
+        );
+        expect(decision.allowed).toBe(true);
+      });
+
+      /** @scenario "A project audience stops at the project's own lineage" */
+      it("refuses a caller bound to a sibling team in the same organization", () => {
+        expect(
+          opens(
+            { kind: "project", id: PROJECT },
+            makeGrants({
+              bindings: [
+                binding({ scopeType: "TEAM", scopeId: "team-other" }),
+                binding({ scopeType: "PROJECT", scopeId: "proj-other" }),
+              ],
+            }),
+          ).allowed,
+        ).toBe(false);
+      });
+
+      /** @scenario "A project audience stops at the project's own lineage" */
+      it("refuses an org member holding no binding on the lineage at all", () => {
+        // The organization floor is an ORGANIZATION-scope rule. A project
+        // audience is not "everyone in the organization", or every link in
+        // acme would open for every employee of acme.
+        expect(
+          opens({ kind: "project", id: PROJECT }, makeGrants()).allowed,
+        ).toBe(false);
+      });
+
+      /** @scenario "A project audience stops at the project's own lineage" */
+      it("refuses a removed member whose binding outlived them", () => {
+        expect(
+          opens(
+            { kind: "project", id: PROJECT },
+            makeGrants({
+              organizationRole: null,
+              isOrgMember: false,
+              bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
+            }),
+          ).allowed,
+        ).toBe(false);
+      });
+
+      /** @scenario "A project audience stops at the project's own lineage" */
+      it("admits nobody from a snapshot collected in another organization", () => {
+        // Belt and braces: a snapshot is always collected for the scope's own
+        // organization, so this shape cannot arise. If it ever did, the ids in
+        // it would be another organization's and matching them would be a
+        // cross-tenant grant. (The caller's OWN binding is a different
+        // question, which the walk answers below the tier and the share seam
+        // does not honour.)
+        const decision = engine.decide({
+          grants: {
+            ...makeGrants({
+              bindings: [binding({ scopeType: "TEAM", scopeId: TEAM })],
+            }),
+            organizationId: "org-other",
+          },
+          permission: "traces:view",
+          scope: traceScope,
+          resourceGrants: [grantFor({ kind: "project", id: PROJECT })],
+        });
+        expect(decision.via).not.toBe("resource-grant");
+      });
+
+      /** @scenario "A project audience stops at the project's own lineage" */
+      it("refuses an audience naming a project the trace does not sit in", () => {
+        expect(
+          opens(
+            { kind: "project", id: "proj-other" },
+            makeGrants({
+              bindings: [
+                binding({ scopeType: "PROJECT", scopeId: "proj-other" }),
+              ],
+            }),
+          ).allowed,
+        ).toBe(false);
+      });
+    });
+
+    describe("when the audience is the trace's organization", () => {
+      /** @scenario "An organization audience is every member and nobody else" */
+      it("admits any member of it, bound or not", () => {
+        const decision = opens({ kind: "organization", id: ORG }, makeGrants());
+        expect(decision.allowed).toBe(true);
+        expect(decision.audience).toBe("member");
+      });
+
+      /** @scenario "An organization audience is every member and nobody else" */
+      it("admits an api key bound at the organization, which holds no membership", () => {
+        expect(
+          opens(
+            { kind: "organization", id: ORG },
+            makeGrants({
+              principal: { type: "apiKey", id: "key-1" },
+              organizationRole: null,
+              isOrgMember: false,
+              bindings: [
+                binding({ scopeType: "ORGANIZATION", scopeId: ORG }),
+              ],
+            }),
+          ).allowed,
+        ).toBe(true);
+      });
+
+      /** @scenario "An organization audience is every member and nobody else" */
+      it("refuses a non-member, and an audience naming another organization", () => {
+        expect(
+          opens(
+            { kind: "organization", id: ORG },
+            makeGrants({ organizationRole: null, isOrgMember: false }),
+          ).allowed,
+        ).toBe(false);
+        expect(
+          opens({ kind: "organization", id: "org-other" }, makeGrants())
+            .allowed,
+        ).toBe(false);
+      });
+    });
+
+    describe("when the audience is the team that owns the trace's project", () => {
+      /** @scenario "A resource grant can name any audience" */
+      it("admits a caller bound at the team, and above it", () => {
+        for (const link of [
+          { scopeType: "TEAM" as const, scopeId: TEAM },
+          { scopeType: "ORGANIZATION" as const, scopeId: ORG },
+        ]) {
+          expect(
+            opens(
+              { kind: "team", id: TEAM },
+              makeGrants({ bindings: [binding(link)] }),
+            ).allowed,
+          ).toBe(true);
+        }
+      });
+
+      /** @scenario "A resource grant can name any audience" */
+      it("refuses a caller bound to another team", () => {
+        expect(
+          opens(
+            { kind: "team", id: TEAM },
+            makeGrants({
+              bindings: [
+                binding({ scopeType: "TEAM", scopeId: "team-other" }),
+              ],
+            }),
+          ).allowed,
+        ).toBe(false);
+      });
+    });
+
+    describe("when the audience is anyone", () => {
+      /** @scenario "A resource grant can name any audience" */
+      it("stays exactly what it was: no membership consulted", () => {
+        for (const grants of [
+          makeGrants(),
+          makeGrants({ organizationRole: null, isOrgMember: false }),
+          makeGrants({ principal: { type: "anonymous" } }),
+        ]) {
+          const decision = opens({ kind: "anyone" }, grants);
+          expect(decision.allowed).toBe(true);
+          expect(decision.audience).toBe("public");
+        }
+      });
+    });
+  });
+
+  /**
+   * The walk ORDER, pinned by behaviour rather than by reading the source.
+   *
+   * `resourceGrantStep` sits above `bindingsStep`, and what makes that safe is
+   * its own first line: `if (scope.type !== "resource" || !resourceGrants)
+   * return;`. A caller who presented no token collects no resource grant at
+   * all (`collectResourceGrants` returns [] when `scope.shareTokens` is
+   * empty), so for every request but a share redemption the step defers and
+   * the order below it is unobservable. Neither step can return a DENIAL —
+   * both answer with an allow or defer — so swapping them cannot change
+   * `allowed` for anybody. It changes only WHICH allow is reported, and only
+   * for a request that presented a token.
+   *
+   * That difference is the whole point. The share seam honours a decision only
+   * when `via` is "resource-grant", because a binding must never redeem a
+   * token. With the tier last, a member holding an ordinary binding on the
+   * trace's lineage was told "granted, via a binding" about a question they
+   * had asked WITH a live link, and the seam refused them for it.
+   */
+  describe("given a caller who presented a share token", () => {
+    const boundMember = makeGrants({
+      bindings: [binding({ scopeType: "TEAM", scopeId: TEAM })],
+    });
+    const anonymous = () => makeGrants({ principal: { type: "anonymous" } });
+    // What the collector hands the engine for a dead link: it filters expiry
+    // and the view budget (`isLiveShareLink`) before the walk sees a row, so
+    // "expired" and "spent" reach the engine as no resource grant at all.
+    const noLiveGrant: ResourceGrant[] = [];
+    const liveGrant = [publicTraceGrant];
+    const present = (
+      grants: CollectedGrants,
+      resourceGrants: readonly ResourceGrant[],
+    ) =>
+      engine.decide({
+        grants,
+        permission: "traces:view",
+        scope: traceScope,
+        resourceGrants,
+      });
+
+    /** @scenario "Presenting a token is answered by the resource tier, not by a binding" */
+    it("answers a bound member's LIVE link through the tier, which is what the seam admits", () => {
+      const decision = present(boundMember, liveGrant);
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("resource-grant");
+    });
+
+    /** @scenario "Presenting a token is answered by the resource tier, not by a binding" */
+    it("answers an unbound viewer's LIVE link through the tier too", () => {
+      const decision = present(anonymous(), liveGrant);
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("resource-grant");
+    });
+
+    /** @scenario "A member's own access never redeems a dead share link" */
+    it("leaves a bound member's DEAD link on the binding path, which the seam refuses", () => {
+      const decision = present(boundMember, noLiveGrant);
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("binding");
+      // The seam's rule, restated where the ordering is pinned: only the tier
+      // redeems a token, so this member gets nothing past a dead link.
+      expect(decision.via).not.toBe("resource-grant");
+    });
+
+    /** @scenario "A member's own access never redeems a dead share link" */
+    it("refuses an unbound viewer's DEAD link outright", () => {
+      expect(present(anonymous(), noLiveGrant).allowed).toBe(false);
+    });
+
+    it("names the same matched binding on a decision no token was presented to", () => {
+      // The reorder must not move which binding an ordinary check reports: at
+      // a non-resource scope the tier returns on its first line, so
+      // bindingsStep still runs first among the steps that can answer, and
+      // still names the first matching binding in collection order.
+      const bindings = [
+        binding({ role: "VIEWER", scopeType: "TEAM", scopeId: TEAM }),
+        binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
+      ];
+      const decision = engine.decide({
+        grants: makeGrants({ bindings }),
+        permission: "traces:view",
+        scope: projectScope,
+        resourceGrants: [publicTraceGrant],
+      });
+      expect(decision.via).toBe("binding");
+      expect(decision.matchedBinding).toBe(bindings[0]);
+    });
+  });
+
   describe("given the demo project", () => {
     /** @scenario "The demo project opens for signed-in callers only" */
     it("grants demo-bag permissions to any signed-in caller, and nothing else", () => {

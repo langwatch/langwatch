@@ -20,10 +20,8 @@
  * organization rolled back to legacy keeps counting from where it got to.
  */
 import type { LedgerActor } from "@langwatch/actor";
-import {
-  SHARE_LINK_PERMISSION,
-  shareVisibilityAudience,
-} from "@langwatch/authz-server";
+import { DEFAULT_SHARE_LINK_PERMISSION } from "@langwatch/authz";
+import { shareVisibilityAudience } from "@langwatch/authz-server";
 import { nanoid } from "nanoid";
 import type {
   Prisma,
@@ -145,7 +143,11 @@ export class LedgerShareRepository implements ShareRepository {
       scopeId: params.resourceId,
       resource: {
         token: params.token,
-        permission: SHARE_LINK_PERMISSION,
+        // The link's own permission, or the default when the minter said
+        // nothing — the fact always names one, because the ledger row is the
+        // authority a rollback reads back through (`grantRowToFact` treats a
+        // permission-less resource row as no resource grant at all).
+        permission: params.permission ?? DEFAULT_SHARE_LINK_PERMISSION,
         kind: params.resourceType === "THREAD" ? "thread" : "trace",
         ...(params.expiresAt
           ? { expiresAtMs: params.expiresAt.getTime() }

@@ -25,6 +25,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "../../db";
 import { demoProjectId } from "./demo-project";
 import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
+import { isEpochCacheEnabled } from "./epoch-cache-flag";
 import { grantsLedgerWriter } from "./ledger";
 import { LedgerAuthzGrantsRepository } from "./repositories/authz-grants.ledger.repository";
 import { CutoverAwareAuthzReadRepository } from "./repositories/authz-read.cutover.repository";
@@ -47,14 +48,14 @@ export const authzCollector = new AuthzCollectorService(
 );
 
 /**
- * The internal rollout knob for the §12 L1 cache, read per check rather than
- * captured at module load so a test (or a restart-free rollout) can flip it.
- * Unset means off, which is always correct and only slower.
+ * The kill switch for the §12 L1 cache, read per check rather than captured
+ * at module load so a test (or a restart-free rollback) can flip it without
+ * a redeploy. On by default now that ADR-110 has put every organization on
+ * the engine; `AUTHZ_EPOCH_CACHE=0` collects fresh every time, which is
+ * always correct and only slower.
  */
-const epochCacheEnabled = (): boolean => {
-  const raw = process.env.AUTHZ_EPOCH_CACHE;
-  return raw === "1" || raw === "true";
-};
+const epochCacheEnabled = (): boolean =>
+  isEpochCacheEnabled(process.env.AUTHZ_EPOCH_CACHE);
 
 /** The checking service - can / check / authorize / effectivePermissions. */
 export const authz = new AuthzService(authzCollector, {

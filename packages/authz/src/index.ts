@@ -36,17 +36,22 @@ export {
   ALL_PERMISSIONS,
   AUTHZ_RESOURCES,
   bindingScopeCanGrantPermission,
+  DEFAULT_SHARE_LINK_PERMISSION,
   isRegistryPermission,
+  isShareLinkPermission,
   permissionIndex,
   permissionResource,
   permissionSatisfiedBy,
+  SHARE_LINK_PERMISSIONS,
   SHAREABLE_RESOURCE_KINDS,
+  shareLinkPermissionsGranted,
 } from "./registry";
 export type {
   AuthzPermission,
   AuthzResource,
   AuthzScopeType,
   ShareableResourceKind,
+  ShareLinkPermission,
 } from "./registry";
 export {
   declaredScopeId,

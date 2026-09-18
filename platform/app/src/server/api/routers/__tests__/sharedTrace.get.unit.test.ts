@@ -224,6 +224,20 @@ describe("sharedTrace.get", () => {
       );
     });
 
+    /**
+     * The engine matches a grant's audience against the PRINCIPAL, so a
+     * request with no session has to arrive as genuinely anonymous — anything
+     * else would hand an `anyone` link a caller it never had.
+     */
+    /** @scenario A share link decides through the engine's resource tier */
+    it("presents the token on behalf of an anonymous principal", async () => {
+      await createAnonymousCaller().get({ token: TOKEN });
+
+      expect(mockResolveForViewer).toHaveBeenCalledWith(
+        expect.objectContaining({ principal: { type: "anonymous" } }),
+      );
+    });
+
     /** @scenario A shared view cannot see beyond the project's data-retention window */
     it("fetches protections as a public-share read", async () => {
       await createAnonymousCaller().get({ token: TOKEN });

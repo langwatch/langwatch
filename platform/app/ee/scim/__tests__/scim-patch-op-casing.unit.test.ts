@@ -16,6 +16,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { ScimService } from "../scim.service";
 import { scimPatchRequestSchema } from "../scim.types";
 import { ScimGroupService } from "../scim-group.service";
@@ -75,11 +76,10 @@ function createMockPrisma() {
       }),
       update: vi.fn().mockResolvedValue({}),
     },
-    groupMembership: {
-      upsert: vi.fn().mockResolvedValue({}),
-      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-      findMany: vi.fn().mockResolvedValue([]),
-    },
+    // Reads only: a membership write is a ledger command now, so a service
+    // reaching for a delegate here fails on a missing method rather than
+    // quietly writing the table.
+    groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi
       .fn()
       .mockImplementation((ops: unknown[]) => Promise.all(ops)),
@@ -89,9 +89,22 @@ function createMockPrisma() {
 
 describe("SCIM PATCH op casing", () => {
   let prisma: ReturnType<typeof createMockPrisma>;
+  let addGroupMembers: ReturnType<typeof vi.fn>;
+  let removeGroupMembersWhere: ReturnType<typeof vi.fn>;
+
+  const service = () =>
+    ScimGroupService.create({
+      prisma,
+      writer: {
+        addGroupMembers,
+        removeGroupMembersWhere,
+      } as unknown as GrantsLedgerWriter,
+    });
 
   beforeEach(() => {
     prisma = createMockPrisma();
+    addGroupMembers = vi.fn().mockResolvedValue({ added: [], duplicates: [] });
+    removeGroupMembersWhere = vi.fn().mockResolvedValue([]);
   });
 
   describe("given an identity provider sends a capitalized op value", () => {
@@ -155,7 +168,7 @@ describe("SCIM PATCH op casing", () => {
 
     describe("when the operation adds a group member", () => {
       it("adds the member to the group", async () => {
-        await ScimGroupService.create({ prisma }).updateGroup({
+        await service().updateGroup({
           scimResourceId: "group-1",
           organizationId: "org-1",
           patchRequest: parsePatch({
@@ -166,9 +179,16 @@ describe("SCIM PATCH op casing", () => {
           }),
         });
 
-        expect(prisma.groupMembership.upsert).toHaveBeenCalledWith(
+        expect(addGroupMembers).toHaveBeenCalledWith(
           expect.objectContaining({
-            create: { userId: "user-1", groupId: "group-1" },
+            organizationId: "org-1",
+            source: "scim",
+            memberships: [
+              expect.objectContaining({
+                groupId: "group-1",
+                userId: "user-1",
+              }),
+            ],
           }),
         );
       });
@@ -176,7 +196,7 @@ describe("SCIM PATCH op casing", () => {
 
     describe("when the operation removes a group member", () => {
       it("removes the member from the group", async () => {
-        await ScimGroupService.create({ prisma }).updateGroup({
+        await service().updateGroup({
           scimResourceId: "group-1",
           organizationId: "org-1",
           patchRequest: parsePatch({
@@ -185,15 +205,18 @@ describe("SCIM PATCH op casing", () => {
           }),
         });
 
-        expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
-          where: { groupId: "group-1", userId: { in: ["user-1"] } },
-        });
+        expect(removeGroupMembersWhere).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org-1",
+            where: { groupId: "group-1", userId: "user-1" },
+          }),
+        );
       });
     });
 
     describe("when the operation renames the group", () => {
       it("renames the group", async () => {
-        await ScimGroupService.create({ prisma }).updateGroup({
+        await service().updateGroup({
           scimResourceId: "group-1",
           organizationId: "org-1",
           patchRequest: parsePatch({

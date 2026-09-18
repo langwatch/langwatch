@@ -49,6 +49,10 @@ const logger = createLogger("langwatch:authz:projection-compat");
 
 type GrantRow = Extract<GrantProjectionWrite, { kind: "grant.upsert" }>["row"];
 type RoleRow = Extract<GrantProjectionWrite, { kind: "role.upsert" }>["row"];
+type GroupMembershipRow = Extract<
+  GrantProjectionWrite,
+  { kind: "groupMembership.upsert" }
+>["row"];
 
 type PrismaLike = Pick<
   PrismaClient,
@@ -57,6 +61,7 @@ type PrismaLike = Pick<
   | "roleBinding"
   | "customRole"
   | "shareLink"
+  | "groupMembership"
   | "$transaction"
   | "$executeRaw"
 >;
@@ -116,10 +121,19 @@ function reportMissedRow(write: GrantProjectionWrite, result: unknown): void {
   // fire the alarm on every revoke and bury the case it exists for. A
   // genuinely absent revoke is a harmless no-op anyway: the attach that would
   // have created the row is itself an upsert, which this already tolerates.
+  //
+  // `groupMembership.remove` is skipped for the revoke's reason exactly:
+  // `enforceGroupMembershipRemoval` marks the row before the event is queued,
+  // so by the time the projection replays the same removal its
+  // `removedAt: null` guard matches 0 rows on every ordinary removal.
+  // `groupMembership.upsert` is an insert that guards on the group and the
+  // user still existing, so a 0 there is the guard doing its job, not a miss.
   if (
     write.kind === "grant.upsert" ||
     write.kind === "role.upsert" ||
-    write.kind === "grant.revoke"
+    write.kind === "grant.revoke" ||
+    write.kind === "groupMembership.upsert" ||
+    write.kind === "groupMembership.remove"
   ) {
     return;
   }
@@ -226,6 +240,13 @@ export class PrismaAuthzGrantsWriteRepository
         await this.prisma.customRole.deleteMany({
           where: { id: write.roleId },
         });
+        return;
+
+      // No compat head. `GroupMembership` is the only head a membership ever
+      // had — the ledger writes the same row the imperative path wrote, so
+      // there is no second table to keep in step and nothing to roll back to.
+      case "groupMembership.upsert":
+      case "groupMembership.remove":
         return;
     }
   }
@@ -443,7 +464,77 @@ export class PrismaAuthzGrantsWriteRepository
           },
           data: { deletedAt: write.occurredAt, occurredAt: write.occurredAt },
         });
+
+      case "groupMembership.upsert":
+        return this.upsertGroupMembership(write.row);
+
+      // `removedAt: null` in the WHERE stops a second removal moving the
+      // first one's timestamp: when a membership ended is a fact, and the
+      // earliest removal is the true one. Same rule as `grant.revoke`.
+      case "groupMembership.remove":
+        return this.prisma.groupMembership.updateMany({
+          where: {
+            id: write.membershipId,
+            removedAt: null,
+            occurredAt: { lte: write.occurredAt },
+          },
+          data: {
+            removedAt: write.occurredAt,
+            removedReason: write.reason,
+            occurredAt: write.occurredAt,
+          },
+        });
     }
+  }
+
+  /**
+   * Insert the membership, or update it only when this event is at least as
+   * new as the row — the same guard the grant upsert carries, for the same
+   * reason.
+   *
+   * Three extra conditions, and each closes a case the grant upsert does not
+   * have:
+   *
+   *   - `EXISTS` on the group and the user. The membership row still carries
+   *     foreign keys to both, and deleting a group hard-deletes its rows. A
+   *     replay after such a deletion would then fail on the constraint and
+   *     park the lane forever; with the guard it writes nothing, which is the
+   *     right answer — a membership of a group that no longer exists grants
+   *     nothing and there is nothing for the row to say.
+   *   - `NOT EXISTS` on a DIFFERENT live membership for the same pair. The
+   *     partial unique index refuses that state at the database, and without
+   *     this the refusal would arrive as a raised error that parks the lane.
+   *     Losing the race is not an error: the pair is already live, which is
+   *     what the event asked for.
+   *
+   * `removedAt` and `removedReason` are absent from the update list, exactly
+   * as `revokedAt` is on the grant side: a redelivered `added` must not
+   * un-remove a membership, and the row's own ending is not this event's to
+   * state.
+   */
+  private upsertGroupMembership(
+    row: GroupMembershipRow,
+  ): Prisma.PrismaPromise<number> {
+    return this.prisma.$executeRaw`
+      INSERT INTO "GroupMembership" (
+        "id", "userId", "groupId", "occurredAt", "createdAt"
+      )
+      SELECT ${row.id}, ${row.userId}, ${row.groupId}, ${row.occurredAt}, NOW()
+      WHERE EXISTS (SELECT 1 FROM "Group" WHERE "id" = ${row.groupId})
+        AND EXISTS (SELECT 1 FROM "User" WHERE "id" = ${row.userId})
+        AND NOT EXISTS (
+          SELECT 1 FROM "GroupMembership" live
+          WHERE live."userId" = ${row.userId}
+            AND live."groupId" = ${row.groupId}
+            AND live."removedAt" IS NULL
+            AND live."id" <> ${row.id}
+        )
+      ON CONFLICT ("id") DO UPDATE SET
+        "userId"     = EXCLUDED."userId",
+        "groupId"    = EXCLUDED."groupId",
+        "occurredAt" = EXCLUDED."occurredAt"
+      WHERE "GroupMembership"."occurredAt" < EXCLUDED."occurredAt"
+    `;
   }
 
   /**

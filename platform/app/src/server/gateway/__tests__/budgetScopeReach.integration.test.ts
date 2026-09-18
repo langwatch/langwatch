@@ -203,6 +203,12 @@ describe("given per-person and group budgets in an organization", () => {
     await prisma.gatewayBudget.deleteMany({
       where: { organizationId: ORG_ID },
     });
+    // Memberships first: `GroupMembership.group` is `onDelete: Restrict`, so
+    // a group cannot be deleted out from under rows that record who was in it.
+    // A teardown IS the deliberate erasure the restrict makes you spell out.
+    await prisma.groupMembership.deleteMany({
+      where: { group: { organizationId: ORG_ID } },
+    });
     await prisma.group.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.virtualKey.deleteMany({
       where: { id: { in: [VK_ID, SHARED_VK_ID] } },

@@ -26,6 +26,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { scimPatchRequestSchema } from "../scim.types";
 import { ScimGroupService } from "../scim-group.service";
 
@@ -87,9 +88,10 @@ function createMockPrisma() {
       findUniqueOrThrow: vi.fn().mockResolvedValue(GROUP),
       update: vi.fn().mockResolvedValue({}),
     },
+    // Reads only. A membership WRITE is a ledger command now, so a service
+    // that reached for a delegate here would fail on a missing method rather
+    // than quietly write the table.
     groupMembership: {
-      upsert: vi.fn().mockResolvedValue({}),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       findMany: vi.fn().mockResolvedValue([
         { userId: "user-1", user: { id: "user-1", email: null, name: null } },
         { userId: "user-2", user: { id: "user-2", email: null, name: null } },
@@ -102,15 +104,35 @@ function createMockPrisma() {
 describe("SCIM group PATCH membership", () => {
   let prisma: ReturnType<typeof createMockPrisma>;
 
+  let addGroupMembers: ReturnType<typeof vi.fn>;
+  let removeGroupMembersWhere: ReturnType<typeof vi.fn>;
+
   const patchGroup = async (operations: unknown[]) =>
-    ScimGroupService.create({ prisma }).updateGroup({
+    ScimGroupService.create({
+      prisma,
+      writer: {
+        addGroupMembers,
+        removeGroupMembersWhere,
+      } as unknown as GrantsLedgerWriter,
+    }).updateGroup({
       scimResourceId: "group-1",
       organizationId: "org-1",
       patchRequest: parsePatch(operations),
     });
 
+  /** The users this patch ended memberships for, in the order the service
+   *  named them. The writer takes one pair per call, so a set removal is a
+   *  call each — the aggregate is the pair, and a shared call could not be
+   *  routed. */
+  const removedUserIds = (): string[] =>
+    removeGroupMembersWhere.mock.calls.map(
+      (call) => (call[0] as { where: { userId: string } }).where.userId,
+    );
+
   beforeEach(() => {
     prisma = createMockPrisma();
+    addGroupMembers = vi.fn().mockResolvedValue({ added: [], duplicates: [] });
+    removeGroupMembersWhere = vi.fn().mockResolvedValue([]);
     warn.mockClear();
   });
 
@@ -125,8 +147,8 @@ describe("SCIM group PATCH membership", () => {
           { op: "replace", path: "externalId", value: "abc-123" },
         ]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
-        expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
+        expect(addGroupMembers).not.toHaveBeenCalled();
       });
 
       it("says in the logs that it understood nothing", async () => {
@@ -151,7 +173,7 @@ describe("SCIM group PATCH membership", () => {
           where: { id: "group-1" },
           data: { name: "Platform" },
         });
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
       });
 
       // A rename that mentions no members is complete and supported. Warning on
@@ -175,7 +197,7 @@ describe("SCIM group PATCH membership", () => {
           where: { id: "group-1" },
           data: { name: "Platform" },
         });
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
       });
     });
 
@@ -189,7 +211,7 @@ describe("SCIM group PATCH membership", () => {
           },
         ]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
       });
     });
 
@@ -200,7 +222,7 @@ describe("SCIM group PATCH membership", () => {
       it("leaves the group's membership untouched", async () => {
         await patchGroup([{ op: "replace", value: [{ value: "user-1" }] }]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
       });
     });
   });
@@ -210,7 +232,7 @@ describe("SCIM group PATCH membership", () => {
       it("leaves the group's membership untouched", async () => {
         await patchGroup([{ op: "replace", path: "members" }]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
       });
     });
 
@@ -218,7 +240,7 @@ describe("SCIM group PATCH membership", () => {
       it("leaves the group's membership untouched", async () => {
         await patchGroup([{ op: "replace", path: "members", value: "user-1" }]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
       });
 
       // Distinct from the unrecognised-attribute warning: this payload did name
@@ -238,7 +260,7 @@ describe("SCIM group PATCH membership", () => {
       it("leaves the group's membership untouched", async () => {
         await patchGroup([{ op: "replace", value: { members: "user-1" } }]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
       });
     });
 
@@ -253,14 +275,14 @@ describe("SCIM group PATCH membership", () => {
           { op: "replace", path: "members", value: [{ display: "Alice" }] },
         ]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
       });
 
       it("leaves it untouched for an entry with no keys at all", async () => {
         await patchGroup([{ op: "replace", path: "members", value: [{}] }]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
-        expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
+        expect(addGroupMembers).not.toHaveBeenCalled();
       });
 
       // A blank id is a string, so it survives every check that asks about
@@ -271,8 +293,8 @@ describe("SCIM group PATCH membership", () => {
           { op: "replace", path: "members", value: [{ value: "  " }] },
         ]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
-        expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
+        expect(addGroupMembers).not.toHaveBeenCalled();
       });
 
       it("leaves it untouched even when only some entries are readable", async () => {
@@ -284,8 +306,8 @@ describe("SCIM group PATCH membership", () => {
           },
         ]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
-        expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
+        expect(addGroupMembers).not.toHaveBeenCalled();
       });
     });
   });
@@ -295,9 +317,7 @@ describe("SCIM group PATCH membership", () => {
       it("clears the group", async () => {
         await patchGroup([{ op: "replace", path: "members", value: null }]);
 
-        expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
-          where: { groupId: "group-1", userId: { in: ["user-1", "user-2"] } },
-        });
+        expect(removedUserIds()).toEqual(["user-1", "user-2"]);
       });
     });
 
@@ -305,9 +325,7 @@ describe("SCIM group PATCH membership", () => {
       it("clears the group", async () => {
         await patchGroup([{ op: "replace", path: "members", value: [] }]);
 
-        expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
-          where: { groupId: "group-1", userId: { in: ["user-1", "user-2"] } },
-        });
+        expect(removedUserIds()).toEqual(["user-1", "user-2"]);
       });
     });
 
@@ -315,9 +333,7 @@ describe("SCIM group PATCH membership", () => {
       it("clears the group", async () => {
         await patchGroup([{ op: "replace", value: { members: [] } }]);
 
-        expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
-          where: { groupId: "group-1", userId: { in: ["user-1", "user-2"] } },
-        });
+        expect(removedUserIds()).toEqual(["user-1", "user-2"]);
       });
     });
   });
@@ -333,14 +349,19 @@ describe("SCIM group PATCH membership", () => {
           },
         ]);
 
-        expect(prisma.groupMembership.upsert).toHaveBeenCalledWith(
+        expect(addGroupMembers).toHaveBeenCalledWith(
           expect.objectContaining({
-            create: { userId: "user-3", groupId: "group-1" },
+            organizationId: "org-1",
+            source: "scim",
+            memberships: [
+              expect.objectContaining({
+                groupId: "group-1",
+                userId: "user-3",
+              }),
+            ],
           }),
         );
-        expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
-          where: { groupId: "group-1", userId: { in: ["user-1"] } },
-        });
+        expect(removedUserIds()).toEqual(["user-1"]);
       });
     });
 
@@ -355,9 +376,7 @@ describe("SCIM group PATCH membership", () => {
           },
         ]);
 
-        expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
-          where: { groupId: "group-1", userId: { in: ["user-1"] } },
-        });
+        expect(removedUserIds()).toEqual(["user-1"]);
       });
     });
 
@@ -374,9 +393,7 @@ describe("SCIM group PATCH membership", () => {
           where: { id: "group-1" },
           data: { name: "Platform" },
         });
-        expect(prisma.groupMembership.deleteMany).toHaveBeenCalledWith({
-          where: { groupId: "group-1", userId: { in: ["user-2"] } },
-        });
+        expect(removedUserIds()).toEqual(["user-2"]);
       });
     });
   });
@@ -386,8 +403,8 @@ describe("SCIM group PATCH membership", () => {
       it("leaves the group's membership untouched", async () => {
         await patchGroup([{ op: "add", path: "externalId", value: "abc-123" }]);
 
-        expect(prisma.groupMembership.deleteMany).not.toHaveBeenCalled();
-        expect(prisma.groupMembership.upsert).not.toHaveBeenCalled();
+        expect(removeGroupMembersWhere).not.toHaveBeenCalled();
+        expect(addGroupMembers).not.toHaveBeenCalled();
       });
     });
   });

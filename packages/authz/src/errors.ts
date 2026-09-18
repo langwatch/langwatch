@@ -11,6 +11,7 @@ export class PermissionDeniedError extends HandledError {
     permission,
     scope,
     denialReason,
+    explanation,
   }: {
     permission: string;
     /**
@@ -24,6 +25,21 @@ export class PermissionDeniedError extends HandledError {
       id: string;
     };
     denialReason: AuthzDenialReason;
+    /**
+     * ADR-092 §6 — the engine's "why", reduced to what the refused person can
+     * act on: which of the roles they already hold were consulted, and which
+     * roles carry the permission. Role LABELS only. The walk itself names
+     * scope ids and filtered-out bindings, which is an operator's artifact
+     * and belongs in a log line, never on the wire.
+     *
+     * Optional because computing it is best effort: a denial is still a
+     * denial when the explanation cannot be produced, and the client copy
+     * stands on its own without it.
+     */
+    explanation?: {
+      heldRoles: readonly string[];
+      wouldGrantRoles: readonly string[];
+    };
   }) {
     super(
       "permission_denied",
@@ -38,6 +54,7 @@ export class PermissionDeniedError extends HandledError {
           permission,
           scopeType: scope.type,
           denialReason,
+          ...(explanation ? { explanation } : {}),
         },
       },
     );

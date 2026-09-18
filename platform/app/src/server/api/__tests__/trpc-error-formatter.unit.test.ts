@@ -1,5 +1,6 @@
 /** @vitest-environment node */
 
+import { PermissionDeniedError } from "@langwatch/authz";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { context as otelContext, trace } from "@opentelemetry/api";
 import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
@@ -8,6 +9,7 @@ import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { z as z4 } from "zod/v4";
+import { readHandledError } from "~/features/errors/logic/readHandledError";
 import { errorFormatter } from "../trpc";
 
 function format(error: TRPCError) {
@@ -164,6 +166,46 @@ describe("tRPC error response boundary", () => {
         const { result, traceId } = withActiveSpan(() => format(error));
 
         expect(result.data.traceId).toBe(traceId);
+      });
+    });
+
+    /**
+     * `meta` is the only channel a denial has for saying anything a client can
+     * act on, and it is written on the server and read on the client with a
+     * whole serialiser in between. Nothing pinned that a field attached at one
+     * end arrives at the other, on the path where a silent drop would look
+     * exactly like "the engine had nothing to say".
+     */
+    describe("when it carries a structured meta field the client reads", () => {
+      /** @scenario "The explanation survives the tRPC boundary as data" */
+      it("delivers it intact to readHandledError, message still collapsed", () => {
+        const cause = new PermissionDeniedError({
+          permission: "traces:share",
+          scope: { type: "project", id: "proj-1" },
+          denialReason: "no-binding",
+          explanation: {
+            heldRoles: ["Viewer"],
+            wouldGrantRoles: ["Admin", "Member"],
+          },
+        });
+        const error = new TRPCError({
+          code: "UNAUTHORIZED",
+          message: cause.message,
+          cause,
+        });
+
+        const formatted = format(error);
+        // Exactly what the client interceptor is handed: the tRPC envelope.
+        const read = readHandledError({ data: formatted.data });
+
+        expect(read?.code).toBe("permission_denied");
+        expect(read?.meta.explanation).toEqual({
+          heldRoles: ["Viewer"],
+          wouldGrantRoles: ["Admin", "Member"],
+        });
+        expect(formatted.message).toBe("permission_denied");
+        // The tier crosses; the id it was refused at does not.
+        expect(JSON.stringify(formatted)).not.toContain("proj-1");
       });
     });
 

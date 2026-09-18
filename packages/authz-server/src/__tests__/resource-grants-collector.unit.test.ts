@@ -248,6 +248,58 @@ describe("collector at the resource tier", () => {
     });
   });
 
+  describe("when the link states what it confers", () => {
+    const collectFrom = async (permission: string | null) => {
+      const reader = makeReader({
+        findShareLinks: vi
+          .fn()
+          .mockResolvedValue([{ ...liveShareLinkRow, permission }]),
+      });
+      return new AuthzCollectorService(reader).collectResourceGrants({
+        scope: traceScope({ shareTokens: ["tok-1"] }),
+      });
+    };
+
+    /** @scenario "A link minted without a permission stays read-only" */
+    it("reads a link that states nothing as traces:view, one grant", async () => {
+      expect(await collectFrom(null)).toEqual([
+        {
+          kind: "trace",
+          id: "trace-1",
+          projectId: PROJECT,
+          permission: "traces:view",
+          audience: { kind: "anyone" },
+        },
+      ]);
+    });
+
+    /** @scenario "An annotate link also lets its holder read the trace" */
+    it("expands an annotate link into the view it implies and the verb itself", async () => {
+      const grants = await collectFrom("annotations:create");
+      expect(grants.map((grant) => grant.permission)).toEqual([
+        "traces:view",
+        "annotations:create",
+      ]);
+      // One link, so every expanded grant names the same resource and the
+      // same audience — the expansion widens what is granted, never where.
+      expect(new Set(grants.map((grant) => grant.id))).toEqual(
+        new Set(["trace-1"]),
+      );
+      expect(grants.every((grant) => grant.audience.kind === "anyone")).toBe(
+        true,
+      );
+    });
+
+    /** @scenario "A stored permission outside the allowlist confers nothing" */
+    it("grants nothing for a stored value outside the allowlist", async () => {
+      // `share.service.ts` refuses to mint a link for `datasets:manage`, so a
+      // row carrying it is one no mint approved. Honouring it would let an
+      // unvalidated row confer what the mint rejected outright.
+      const grants = await collectFrom("datasets:manage");
+      expect(grants).toEqual([]);
+    });
+  });
+
   describe("given an injected clock at the expiry boundary", () => {
     const now = new Date("2026-08-13T12:00:00.000Z");
     const collectAt = async (expiresAt: Date) => {

@@ -9,7 +9,10 @@
  * @see specs/migration/authz-grants-rollout.feature
  */
 
-import { roleKeyForTeamRole } from "@langwatch/authz";
+import {
+  DEFAULT_SHARE_LINK_PERMISSION,
+  roleKeyForTeamRole,
+} from "@langwatch/authz";
 import type {
   ExternalMemberFact,
   GrantFact,
@@ -22,10 +25,7 @@ import type {
   RoleFact,
   ShareLinkFactRow,
 } from "@langwatch/authz-server";
-import {
-  SHARE_LINK_PERMISSION,
-  shareVisibilityAudience,
-} from "@langwatch/authz-server";
+import { shareVisibilityAudience } from "@langwatch/authz-server";
 import { deriveGrantId } from "@langwatch/authz-server/migration";
 
 /**
@@ -454,7 +454,10 @@ function shareLinkToFact({
       kind: row.resourceType === "THREAD" ? "thread" : "trace",
       projectId: row.projectId,
       token: row.token,
-      permission: SHARE_LINK_PERMISSION,
+      // The legacy row's own permission, defaulted the same way every other
+      // reader defaults it — an import must not downgrade a link that was
+      // minted saying something other than "view".
+      permission: row.permission ?? DEFAULT_SHARE_LINK_PERMISSION,
       ...(row.userId === null ? {} : { createdByUserId: row.userId }),
       ...(row.expiresAtMs === null ? {} : { expiresAtMs: row.expiresAtMs }),
       ...(row.maxViews === null ? {} : { maxViews: row.maxViews }),

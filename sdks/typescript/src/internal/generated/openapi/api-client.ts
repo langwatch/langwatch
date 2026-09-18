@@ -3002,10 +3002,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set. */
+        /** @description List the organization's role bindings, each naming its principal (user, group or API key), role, scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts the filtered set. */
         get: operations["listRoleBindings"];
         put?: never;
-        /** @description Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. */
+        /** @description Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. */
         post: operations["createRoleBinding"];
         delete?: never;
         options?: never;
@@ -23566,6 +23566,7 @@ export interface operations {
                             scopeId: string;
                             scopeName: string | null;
                             createdAt: string;
+                            expiresAt: string | null;
                         }[];
                         totalCount: number;
                     };
@@ -23592,6 +23593,7 @@ export interface operations {
                     /** @enum {string} */
                     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                     scopeId: string;
+                    expiresAt?: string;
                 };
             };
         };
@@ -23619,6 +23621,7 @@ export interface operations {
                         scopeId: string;
                         scopeName: string | null;
                         createdAt: string;
+                        expiresAt: string | null;
                         hasLegacyAccessNotice?: boolean;
                     };
                 };
@@ -23692,6 +23695,7 @@ export interface operations {
                         scopeId: string;
                         scopeName: string | null;
                         createdAt: string;
+                        expiresAt: string | null;
                     };
                 };
             };

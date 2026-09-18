@@ -3,6 +3,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import {
+  LIVE_GROUP,
+  liveGroupMemberships,
+} from "~/server/app-layer/authz/repositories/live-rows";
 
 /**
  * Who effectively administers a team.
@@ -66,8 +70,11 @@ async function groupMemberUserIds({
   groupIds: string[];
 }): Promise<string[]> {
   if (groupIds.length === 0) return [];
-  const memberships = await tx.groupMembership.findMany({
-    where: { groupId: { in: groupIds } },
+  const memberships = await liveGroupMemberships(tx).findMany({
+    // A deleted group admins nothing. The ids arrive from bindings that may
+    // still name one, so the fence belongs on the expansion rather than on
+    // whoever collected them.
+    where: { groupId: { in: groupIds }, group: LIVE_GROUP },
     select: { userId: true },
   });
   return memberships.map((m) => m.userId);
@@ -147,8 +154,8 @@ export async function isUserAdminViaGroup({
   });
   if (groupIds.length === 0) return false;
 
-  const count = await tx.groupMembership.count({
-    where: { userId, groupId: { in: groupIds } },
+  const count = await liveGroupMemberships(tx).count({
+    where: { userId, groupId: { in: groupIds }, group: LIVE_GROUP },
   });
   return count > 0;
 }

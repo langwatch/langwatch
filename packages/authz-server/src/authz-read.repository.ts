@@ -50,6 +50,14 @@ export type ShareLinkRow = {
   resourceId: string;
   projectId: string;
   visibility: "PUBLIC" | "ORGANIZATION" | "PROJECT";
+  /**
+   * What the link confers (ADR-092 §8's per-row permission). OPTIONAL on the
+   * port and nullable in storage, and both mean the same thing: the link says
+   * `traces:view`, which is what every link said before the column existed.
+   * The collector expands it through `shareLinkPermissionsGranted`, so a
+   * reader that never sets it produces exactly the grant it produced before.
+   */
+  permission?: string | null;
   expiresAt: Date | null;
   maxViews: number | null;
   viewCount: number;

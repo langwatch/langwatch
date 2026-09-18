@@ -368,13 +368,23 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
 
       await expect(check()).resolves.toBe(true);
 
-      await prisma.groupMembership.delete({
-        where: {
-          userId_groupId: { userId: bob.id, groupId: membership.groupId },
-        },
+      // A removal MARKS the row now (ADR-125): the record of when bob left
+      // the group survives, and the resolver has to stop granting anyway.
+      // Deleting the row here would have tested a state the product can no
+      // longer reach.
+      await prisma.groupMembership.updateMany({
+        where: { userId: bob.id, groupId: membership.groupId },
+        data: { removedAt: new Date(), removedReason: "removed from group" },
       });
 
       await expect(check()).resolves.toBe(false);
+
+      // And the row is still there, which is the half a delete threw away.
+      expect(
+        await prisma.groupMembership.count({
+          where: { userId: bob.id, groupId: membership.groupId },
+        }),
+      ).toBe(1);
     });
 
     it("does not grant through a group after the user leaves the organization", async () => {

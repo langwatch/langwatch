@@ -135,6 +135,54 @@ describe("the grants ledger's wire boundary", () => {
     });
   });
 
+  // ADR-092's expiring bindings ride on the grant itself. A share link has
+  // stated its own expiry inside its terms since ADR-057, and one row holds
+  // one date, so the wire keeps the two from ever arriving together.
+  describe("when a grant states the date its access ends", () => {
+    it("accepts it on a binding-tier grant", () => {
+      expect(parse({}, { expiresAtMs: 1_756_000_000_000 }).success).toBe(true);
+    });
+
+    it("accepts a grant that states no end date at all", () => {
+      expect(parse().success).toBe(true);
+    });
+
+    it("refuses an end date at or before the epoch, which is not a date anybody means", () => {
+      expect(parse({}, { expiresAtMs: 0 }).success).toBe(false);
+      expect(parse({}, { expiresAtMs: -1 }).success).toBe(false);
+    });
+
+    /** @scenario "A shared resource states its end date in its own terms" */
+    it("refuses a resource grant that also states one of its own", () => {
+      expect(
+        parse(
+          {},
+          {
+            principal: { type: "anyone", id: null },
+            roleKey: null,
+            scope: { type: "RESOURCE", id: "trace_t1" },
+            resource: SHARE_TERMS,
+            expiresAtMs: 1_756_000_000_000,
+          },
+        ).success,
+      ).toBe(false);
+    });
+
+    it("still accepts a resource grant that states one inside its terms", () => {
+      expect(
+        parse(
+          {},
+          {
+            principal: { type: "anyone", id: null },
+            roleKey: null,
+            scope: { type: "RESOURCE", id: "trace_t1" },
+            resource: { ...SHARE_TERMS, expiresAtMs: 1_756_000_000_000 },
+          },
+        ).success,
+      ).toBe(true);
+    });
+  });
+
   describe("when resource terms cannot say what they open", () => {
     function resourceGrant(resource: Record<string, unknown>) {
       return parse(

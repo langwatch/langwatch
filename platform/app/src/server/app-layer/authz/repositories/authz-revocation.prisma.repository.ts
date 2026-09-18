@@ -20,7 +20,59 @@ import { getAuthzDirectProjectionWriteCounter } from "~/server/metrics";
 const logger = createLogger("langwatch:authz:revocation");
 
 export class PrismaAuthzRevocationRepository {
-  constructor(private readonly prisma: Pick<PrismaClient, "grant">) {}
+  constructor(
+    private readonly prisma: Pick<PrismaClient, "grant" | "groupMembership">,
+  ) {}
+
+  /**
+   * The membership half of the same bypass. A group membership is not a grant,
+   * but removing one takes away every grant the group holds — so "the answer
+   * has to change before the caller's request returns" applies to it word for
+   * word, and it can only ever deny earlier, never grant.
+   *
+   * `removedAt: null` keeps this from moving an earlier removal's timestamp,
+   * and means re-running it is free.
+   */
+  async enforceGroupMembershipRemoval({
+    organizationId,
+    membershipIds,
+    reason,
+    removedAt = new Date(),
+    removedReason = null,
+  }: {
+    organizationId: string;
+    membershipIds: string[];
+    reason: "revocation" | "offboard";
+    /** The event's authored timestamp. The queue's `group_member_removed`
+     *  write guards on `removedAt: null`, so whatever this mark stamps is what
+     *  the row keeps — it must be the SAME instant the event carries, or the
+     *  audit answer to "when did they leave" is the bypass's clock. */
+    removedAt?: Date;
+    removedReason?: string | null;
+  }): Promise<void> {
+    if (membershipIds.length === 0) return;
+
+    getAuthzDirectProjectionWriteCounter(reason).inc();
+    logger.info(
+      { organizationId, reason, membershipCount: membershipIds.length },
+      "authz read model written directly, bypassing the queue",
+    );
+
+    // The organization bounds the write through the group, which is what
+    // carries the tenancy — a membership row has no organization column of
+    // its own, and a bare id list would be a cross-tenant write. Deliberately
+    // NOT fenced on `Group.deletedAt`: this is a deny, and a deny must never
+    // be refused on the grounds that the group it belongs to is on its way
+    // out. It can only ever deny earlier, never grant.
+    await this.prisma.groupMembership.updateMany({
+      where: {
+        id: { in: membershipIds },
+        removedAt: null,
+        group: { organizationId },
+      },
+      data: { removedAt, removedReason },
+    });
+  }
 
   async enforceGrantRevocation({
     organizationId,

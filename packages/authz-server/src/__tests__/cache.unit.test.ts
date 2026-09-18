@@ -77,6 +77,7 @@ describe("AuthzService epoch cache", () => {
       expect(cached).toContain(true);
     });
 
+    /** @scenario "One member's held answer never answers for another" */
     it("keys entries per principal and per organization", async () => {
       const { reader, collects } = makeMemberReader();
       const authz = makeService({ reader, epoch: () => Promise.resolve(4) });
@@ -160,6 +161,7 @@ describe("AuthzService epoch cache", () => {
       vi.useRealTimers();
     });
 
+    /** @scenario "A held answer is never served indefinitely" */
     it("recollects even though the epoch never moved", async () => {
       const { reader, collects } = makeMemberReader();
       const authz = makeService({
@@ -207,6 +209,7 @@ describe("AuthzService epoch cache", () => {
   });
 
   describe("when the epoch store is unavailable", () => {
+    /** @scenario "Checks stay correct when the change signal cannot be read" */
     it("collects fresh every time — never stale, just slower", async () => {
       const { reader, collects } = makeMemberReader();
       const authz = makeService({ reader, epoch: () => Promise.resolve(null) });
@@ -227,6 +230,7 @@ describe("AuthzService epoch cache", () => {
   });
 
   describe("when the flag is off", () => {
+    /** @scenario "An operator turns the grants cache off" */
     it("bypasses the cache entirely", async () => {
       const { reader, collects } = makeMemberReader();
       const epoch = vi.fn().mockResolvedValue(4);

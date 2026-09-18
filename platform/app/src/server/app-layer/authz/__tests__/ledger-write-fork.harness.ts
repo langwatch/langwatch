@@ -30,6 +30,8 @@ const COMMAND_VERBS = [
   "defineRole",
   "changeRolePermissions",
   "deleteRole",
+  "addGroupMember",
+  "removeGroupMember",
 ] as const;
 
 export function uniqueViolation(): Error {
@@ -89,6 +91,19 @@ export function harness({
       findFirst: vi.fn().mockResolvedValue({ id: "known" }),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    // A membership REMOVAL marks the row, exactly as a revocation does, so
+    // `delete`/`deleteMany` stay stubbed for a test to assert nothing reached
+    // them rather than assert on an absent property.
+    groupMembership: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+      create: vi.fn().mockResolvedValue(undefined),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      delete: vi.fn().mockResolvedValue(undefined),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };
   const writer = new GrantsLedgerWriter(db as unknown as PrismaClient, {
@@ -119,6 +134,21 @@ export const binding = {
   scopeType: RoleBindingScopeType.TEAM,
   scopeId: "team_support",
 };
+
+export const GROUP_ID = "group_sec_eng";
+export const MEMBER_USER_ID = "user_dave";
+
+/** One membership fact, as the writer's own add shape reads it. */
+export const membership = {
+  membershipId: "groupmember_1",
+  groupId: GROUP_ID,
+  userId: MEMBER_USER_ID,
+};
+
+/** A LIVE membership row, as the writer's liveness pre-check reads it back. */
+export function liveMembershipRow({ id }: { id: string }) {
+  return { id, groupId: GROUP_ID, userId: MEMBER_USER_ID };
+}
 
 /** The same binding as the legacy table's own row shape — what the batched
  *  identity pre-check reads back. */

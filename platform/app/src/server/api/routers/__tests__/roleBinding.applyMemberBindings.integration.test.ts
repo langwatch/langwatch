@@ -243,6 +243,10 @@ describe("given an organization admin editing a member's access", () => {
         ).resolves.not.toBeNull();
       } finally {
         await prisma.roleBinding.deleteMany({ where: { id: groupBinding.id } });
+        // Memberships first: `GroupMembership.group` is `onDelete: Restrict`.
+        await prisma.groupMembership.deleteMany({
+          where: { groupId: group.id },
+        });
         await prisma.group.deleteMany({ where: { id: group.id } });
       }
     });

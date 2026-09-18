@@ -15,6 +15,7 @@
  * tool handles one vocabulary across the whole surface.
  */
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { remediation } from "../error-remediation";
 
 export class GroupNotFoundError extends NotFoundError {
   declare readonly code: "group_not_found";
@@ -24,6 +25,28 @@ export class GroupNotFoundError extends NotFoundError {
       ...(groupId ? { meta: { groupId } } : {}),
     });
     this.name = "GroupNotFoundError";
+  }
+}
+
+/**
+ * The group was already deleted, so there is nothing left to take away.
+ *
+ * Not a `GroupNotFoundError`: a deleted group is still a row, kept on purpose
+ * so the memberships it held survive with it, and telling the caller it does
+ * not exist would contradict the record they can read — the same distinction
+ * `MemberNotInGroupError` draws for a membership that already ended. What is
+ * absent is a group that still grants.
+ */
+export class GroupAlreadyDeletedError extends HandledError {
+  declare readonly code: "group_already_deleted";
+
+  constructor(groupId?: string) {
+    super("group_already_deleted", "This group has already been deleted", {
+      httpStatus: 409,
+      ...remediation("group_already_deleted"),
+      ...(groupId ? { meta: { groupId } } : {}),
+    });
+    this.name = "GroupAlreadyDeletedError";
   }
 }
 
@@ -81,6 +104,30 @@ export class DuplicateMemberError extends HandledError {
       { httpStatus: 409, ...(userId ? { meta: { userId } } : {}) },
     );
     this.name = "DuplicateMemberError";
+  }
+}
+
+/**
+ * The user holds no LIVE membership of this group, so there is nothing to end.
+ *
+ * Not a `NotFoundError`: a membership that already ended is still a row, kept
+ * on purpose, and telling the caller it does not exist would contradict the
+ * record they can read. What is absent is a membership that still grants.
+ *
+ * This used to be a raw Prisma `P2025` escaping the repository as an unknown
+ * error - the caller was told "unknown error" for a refusal we could name and
+ * they could act on.
+ */
+export class MemberNotInGroupError extends HandledError {
+  declare readonly code: "group_member_not_in_group";
+
+  constructor(userId?: string) {
+    super("group_member_not_in_group", "That member is not in this group", {
+      httpStatus: 409,
+      ...remediation("group_member_not_in_group"),
+      ...(userId ? { meta: { userId } } : {}),
+    });
+    this.name = "MemberNotInGroupError";
   }
 }
 

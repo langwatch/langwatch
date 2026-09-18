@@ -5,6 +5,8 @@ import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GROUP_MEMBER_ADDED_EVENT_TYPE,
+  GROUP_MEMBER_REMOVED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -122,6 +124,11 @@ export const resourceGrantTermsSchema = z.object({
  * revocable by no principal. It is only meaningful paired with a token, and
  * tokens exist at RESOURCE scope alone.
  *
+ * `expiresAtMs` on the grant itself is the binding tiers' time box, and is
+ * refused at RESOURCE scope: a share link states its expiry inside its terms
+ * and always has, so accepting both would give one row two expiries and no
+ * rule about which wins.
+ *
  * The `project` principal has exactly two legal placements: the resource tier
  * (a share link whose audience is "members who can see this project"), and
  * its OWN project's PROJECT scope — the project-credential self-grant the
@@ -139,9 +146,13 @@ export const grantShapeRefinement = {
     roleKey: string | null;
     scope: { type: string; id: string };
     resource?: unknown;
+    expiresAtMs?: number;
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
     if (grant.principal.type === "anyone" && !isResourceScope) {
+      return false;
+    }
+    if (isResourceScope && grant.expiresAtMs !== undefined) {
       return false;
     }
     const isOwnProjectCredential =
@@ -159,7 +170,7 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
   path: ["resource"] as const,
 };
 
@@ -173,6 +184,14 @@ export const grantAttachedEventSchema = EventSchema.extend({
       scope: ledgerScopeSchema,
       resource: resourceGrantTermsSchema.optional(),
       legacyRole: legacyBindingRoleSchema.optional(),
+      /**
+       * When a binding-tier grant stops granting. ADDITIVE: every event ever
+       * appended lacks it, and an event without it folds to exactly the row
+       * it folded to before - `Grant.expiresAt` null, granting until revoked.
+       * `.positive()` because epoch 0 is not a date anybody means, and a
+       * grant that expired in 1970 would be a fact that never granted.
+       */
+      expiresAtMs: z.number().int().positive().optional(),
       source: grantEventSourceSchema,
       actor: grantsLedgerActorSchema,
     })
@@ -242,6 +261,70 @@ export const roleDeletedEventSchema = EventSchema.extend({
 });
 export type RoleDeletedEvent = z.infer<typeof roleDeletedEventSchema>;
 
+/**
+ * One person joined one group (ADR-125's named prerequisite).
+ *
+ * The membership names no role, no scope and no permission, because a
+ * membership grants nothing by itself — what it does is make every grant the
+ * GROUP holds reach the user, since COLLECT unions `{user} ∪ groups`. That
+ * indirection is exactly why the fact has to be on the ledger: without it a
+ * removal left no trace anywhere, and a past-tense access answer computed
+ * afterwards understated the access that really existed.
+ *
+ * `membershipId` is the membership's identity, minted per fact rather than
+ * derived from the pair: the pair repeats. Somebody removed from a group can
+ * be added back, and that is a new membership with its own beginning and its
+ * own end — a second `group_member_added` on the SAME id would read as a
+ * redelivery of the first and fold to nothing.
+ *
+ * It is NOT the aggregate id. The aggregate is the group-user pair
+ * (`groupMembershipAggregateId`), which is what puts a remove and the re-add
+ * that follows it on one ordered lane instead of two racing ones.
+ *
+ * No `actor.type: "anyone"` question arises here and no principal union is
+ * needed: a membership names one user and one group, both required.
+ */
+export const groupMemberAddedEventSchema = EventSchema.extend({
+  type: z.literal(GROUP_MEMBER_ADDED_EVENT_TYPE),
+  data: z.object({
+    membershipId: z.string().min(1),
+    groupId: z.string().min(1),
+    userId: z.string().min(1),
+    source: grantEventSourceSchema,
+    actor: grantsLedgerActorSchema,
+  }),
+});
+export type GroupMemberAddedEvent = z.infer<typeof groupMemberAddedEventSchema>;
+
+/**
+ * A removal names one membership, and only one: a selector cannot address an
+ * aggregate, so a caller with a set of them sends a command each — the same
+ * rule `grant_revoked` follows.
+ *
+ * It carries `groupId` and `userId` as well as the membership id, and both are
+ * load-bearing rather than decoration. They are what the command derives its
+ * AGGREGATE from (`groupMembershipAggregateId`), which is what puts this event
+ * in the same FIFO lane as the `added` for its pair — including the `added`
+ * for a LATER membership of the same pair, which is the ordering the row id
+ * alone cannot express. They are also what lets the audit row name who left
+ * which group once the membership row itself is gone.
+ */
+export const groupMemberRemovedEventSchema = EventSchema.extend({
+  type: z.literal(GROUP_MEMBER_REMOVED_EVENT_TYPE),
+  data: z.object({
+    membershipId: z.string().min(1),
+    groupId: z.string().min(1),
+    userId: z.string().min(1),
+    /** Carried where the caller stated one, exactly as `grant_revoked` does:
+     *  "when did this access end, and why" is one question, not two. */
+    reason: z.string().min(1).optional(),
+    actor: grantsLedgerActorSchema,
+  }),
+});
+export type GroupMemberRemovedEvent = z.infer<
+  typeof groupMemberRemovedEventSchema
+>;
+
 export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   grantAttachedEventSchema,
   grantRoleChangedEventSchema,
@@ -249,5 +332,7 @@ export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   roleDefinedEventSchema,
   rolePermissionsChangedEventSchema,
   roleDeletedEventSchema,
+  groupMemberAddedEventSchema,
+  groupMemberRemovedEventSchema,
 ]);
 export type AuthzGrantsEvent = z.infer<typeof authzGrantsEventSchema>;
