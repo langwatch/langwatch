@@ -241,6 +241,23 @@ Feature: pi session capture
     Then it reads the project's directory, not the one the global settings name
 
   @unit
+  # Editors on Windows write a byte order mark at the head of a file by default,
+  # and the standard JSON reader rejects it. pi strips it before parsing
+  # (`core/settings-manager.js:199`), so pi honours such a file. A reader that
+  # does not strip it throws, treats the file as naming nothing, and falls
+  # through to a directory pi is not writing to — capture then watches an empty
+  # place and reports no error, which is the failure this whole area exists to
+  # prevent.
+  #
+  # Measured against pi 0.85.1: a project settings file written with a leading
+  # mark and naming a directory was honoured by pi, and thrown out by a parse
+  # that skipped the strip.
+  Scenario: A settings file written with a byte order mark still moves capture
+    Given pi settings whose file begins with a byte order mark
+    When capture works out where to look
+    Then it reads the directory that file names, the way pi reads it
+
+  @unit
   # Reading pi's flags more loosely than pi reads them is the same failure as
   # reading the wrong directory: capture watches a place pi never writes, sends
   # nothing, and says nothing.

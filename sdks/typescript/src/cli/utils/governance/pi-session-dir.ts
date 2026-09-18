@@ -311,13 +311,26 @@ export function piProjectSettingsPath(cwd: string): string {
  * `sessionDir` from one of pi's settings files, or null when the file says
  * nothing usable. Never throws: the whole point of consulting settings is that a
  * user may have moved the directory, not that the file has to be well formed.
+ *
+ * The byte order mark is stripped before parsing because pi strips it
+ * (`core/settings-manager.js:199`, `JSON.parse(stripBom(content))`). Editors on
+ * Windows write one by default, and `JSON.parse` rejects it. Without the strip
+ * the read throws, the catch below turns that into "nothing is named", and
+ * resolution falls through to a directory pi is not writing to — capture then
+ * watches an empty place and reports no error, which is the failure this module
+ * exists to prevent. Measured against pi 0.85.1: a project settings file written
+ * with a leading BOM and naming `/tmp/pi-c2/from-project-bom` was honoured by pi
+ * and thrown out by a bare parse.
  */
 export async function readSettingsSessionDir(
   settingsPath: string,
 ): Promise<string | null> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(await readFile(settingsPath, "utf8"));
+    const contents = await readFile(settingsPath, "utf8");
+    parsed = JSON.parse(
+      contents.charCodeAt(0) === 0xfeff ? contents.slice(1) : contents,
+    );
   } catch {
     // No settings file, no read permission, or not JSON. Nothing is named.
     return null;

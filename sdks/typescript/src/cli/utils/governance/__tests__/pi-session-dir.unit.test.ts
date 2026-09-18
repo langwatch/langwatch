@@ -387,6 +387,50 @@ describe("resolving pi's session directory", () => {
         join("/work/project", ".pi", "settings.json"),
       );
     });
+
+    /**
+     * The mark is written as a real leading character rather than as an escape
+     * in the JSON body, because the defect is in decoding the file's first
+     * bytes: a body-level escape parses fine and would prove nothing.
+     *
+     * @scenario "A settings file written with a byte order mark still moves capture"
+     */
+    it("reads a project settings file that begins with a byte order mark", async () => {
+      const projectCwd = makeProject();
+      writeProjectSettings(
+        projectCwd,
+        `﻿${JSON.stringify({ sessionDir: "/from-project" })}`,
+      );
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-project");
+    });
+
+    /**
+     * The global file goes through the same reader, so the mark must not
+     * disable a relocation written there either.
+     *
+     * @scenario "A settings file written with a byte order mark still moves capture"
+     */
+    it("reads a global settings file that begins with a byte order mark", async () => {
+      const projectCwd = makeProject();
+      writeSettings(`﻿${JSON.stringify({ sessionDir: "/from-global" })}`);
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-global");
+    });
   });
 
   describe("given nothing has moved the directory", () => {
