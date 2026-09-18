@@ -761,6 +761,20 @@ modules register everything — screens, drawers, api bindings, surfaces — via
 their declarations; the app contributes only the shell chrome
 (`src/{main.tsx, shell/, styles/}`).
 
+**The declaration is the module's one browser export that matters** (landed
+2026-09-18): a browser package's `exports` map lists `./declaration` first,
+and the declaration file (`<name>.web.ts`, colocated test beside it)
+declares screens, drawers and api bindings with the same loader shape —
+`{ load }` — for each. The kernel (`@langwatch/ui-kernel`) stays React-free
+and merges what modules declared: `installedModuleScreens` and
+`installedDrawerLoaders` each fold the installed array into one registry
+and **refuse a name two modules claim, naming both owners**. The shell
+turns registries into lazy components and mounts them once — screens under
+the route table, drawers through `CurrentDrawer`. **Drawer names are the
+wire**: they resolve straight from the address bar (`?drawer.open=<name>`),
+ride shared links and REST `platformUrl` fields, so a declared name matches
+the served product exactly or it is a regression.
+
 **`uiBundle()`** is the built browser app as a deployment artefact —
 `apps/ui/dist/client`, resolved by path (env-overridable). `server.serve({
 static: uiBundle() })` serves hashed assets with immutable caching, answers
