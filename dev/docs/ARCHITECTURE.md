@@ -1,0 +1,650 @@
+# LangWatch Architecture
+
+**The one record.** Ruled 2026-09-17/18. Every other architecture document is
+deleted or points here. When this document and a lint rule disagree, the rule
+is the truth and this document is the defect — fix the document, never code to
+it. On conflict between sections, the more specific wins.
+
+---
+
+## 1. The product
+
+Four Node processes and three Go services:
+
+| Process | Package | What it is |
+|---|---|---|
+| `apps/ui` | `@langwatch/ui` | The browser application (Vite SPA) |
+| `apps/api` | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle |
+| `apps/worker` | `@langwatch/worker` | Queues, schedulers, projections, subscribers |
+| `apps/tasks` | `@langwatch/tasks` | One-shot migrations and backfills |
+| `services/aigateway` | Go | Virtual-key data plane (Bifrost fan-out) |
+| `services/nlpgo` | Go | Optimization-studio executions and evaluators |
+| `services/langyagent` | Go | Langy conversation manager (pi harness workers) |
+
+**Applications hold no product code.** The product lives in modules. An
+application is a `main.ts` and a `config.ts`; everything it used to carry —
+transport hosting, static serving, error formatting, lifecycle, signals,
+listeners, per-domain compositions, features trees — belongs to the framework
+packages below.
+
+**The same code runs everywhere.** One `main.ts` per app, byte-identical
+across laptop, CI and production. Only the parsed environment differs. There
+is no dev-only branch anywhere in an app, because an app has nowhere to put
+one.
+
+---
+
+## 2. The package family
+
+Named by one rule: **where the code runs, or what it declares.**
+
+| | declares | runs | reads | wire | shares |
+|---|---|---|---|---|---|
+| **Node** | `@langwatch/module` (`/process`) | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api` | contracts |
+| **Web** | `@langwatch/module` (`/browser`) | `@langwatch/browser` | `@langwatch/browser-host` | `@langwatch/browser-trpc` | `<name>-browser-kit` |
+
+- **`@langwatch/module`** — ALL declaration vocabulary: `defineProcessModule`,
+  `defineBrowserModule`, `definePipeline`, `moduleApi`, supply tokens,
+  `FeatureSetup`, `defineRepositories`, channel registry types, transport
+  declaration types. Zod-only, framework-free, browser-safe. Subpath exports:
+  `@langwatch/module/process`, `@langwatch/module/browser`, shared tokens at
+  the root. Every contract, process and browser package depends on it; it
+  depends on nothing but zod.
+- **`@langwatch/process`** — the Node runtime: `Server` (signals, fatal
+  handlers, ordered teardown, hosted components, `/healthz`, `/metrics`),
+  `GracefulShutdown` (named phases, per-phase timeouts, deadline watchdog,
+  drain semantics), and `createApp` with the whole supply chain, boot and
+  transport hosting. Depends on `module`.
+- **`@langwatch/process-stores`** — materializes storage from config:
+  `storesConfig(modules)`, `openStores`, `memoryStores`. The only package
+  that opens Prisma, ClickHouse or Redis clients for a process.
+- **`@langwatch/api`** — the server transport framework: `defineRestRouter`,
+  `defineTrpcRouter`, doors, auth peers. Never enters a browser graph.
+- **`@langwatch/browser`** — the browser runtime: `createUi`, the browser
+  supply, `render`. Used by `apps/ui` alone.
+- **`@langwatch/browser-host`** — the capabilities a screen reads: session,
+  navigation, storage, feature flags, toasts, slots, **drawers**. The browser
+  analogue of the closed members. Capabilities only — components live in the
+  design system or in kits.
+- **`@langwatch/browser-trpc`** — the browser's wire: the derived tRPC
+  client, batching, the SSE subscription link. All of it is tRPC-derived;
+  the browser calls no REST.
+- **`@langwatch/design-system`** — components (Chakra v3 underneath; nothing
+  imports Chakra directly).
+- Support packages: `handled-error` (the error contract), `secrets`
+  (ADR-132), `config` (generic config machinery), `observability` (logger +
+  OTel), `test-harness` (fixtures and doubles), `installed-modules`
+  (generated lists — never edited by hand), and the raw clients
+  (`prisma-client`, `clickhouse-client`, `redis-client`, `eventing`).
+
+A package earns existence by being framework, not feature. Feature code in
+`packages/` is a defect. The boundary is prefix-checkable: nothing `browser-*`
+in a server graph; no `process*` package in a web graph.
+
+---
+
+## 3. A module
+
+A module is one folder owning up to four workspace packages.
+`modules/catalogue.json` maps every subject to exactly one owning module.
+Enterprise modules mirror the shape exactly under `enterprise/modules/`.
+
+```
+modules/trace/
+├── feature.json · specs/ · adrs/
+├── contract/       @langwatch/trace-contract       shared by everyone
+├── process/        @langwatch/trace-process        the half createApp installs
+├── browser/        @langwatch/trace-browser        PRIVATE — the half createUi installs
+└── browser-kit/    @langwatch/trace-browser-kit    the ONLY thing other browsers may import
+```
+
+**Dependency direction, no exceptions:** apps → `*-process`/`*-browser` →
+`*-contract`. Browser never imports process; process never imports browser;
+contract imports no framework and no other half. Another module imports only
+the owner's **contract** and names the owner's `*Api` token; nobody imports
+another module's service, repository, or browser package.
+
+### 3.1 The contract
+
+Zod schemas with `infer`, portable types, `HandledError` subclasses with
+stable codes, the tRPC declarations (`defineTrpcContract`: every procedure's
+name, kind, input, output, declared once), **the module's config schema**
+(§6), and the callable API:
+
+```ts
+export interface TraceApi { ingestSpan(...): ...; getById(...): ...; }
+export const TraceApi = moduleApi<TraceApi>("trace");
+```
+
+### 3.2 The process half
+
+```ts
+// modules/trace/process/src/trace.module.ts — the installer
+export const traceProcessModule = defineProcessModule("trace")
+  .withRepositories(traceRepositories)   // registry: { live, memory }
+  .withApi(TraceModule)                  // the one class implementing TraceApi
+  .withTransports(traceRest, traceTrpc)  // inert declarations
+  .withEventing(tracePipeline);          // §9
+```
+
+No `.build()`: every `with*` result is installable. `index.ts` exports the
+installer and transport declarations, **nothing else**.
+
+**`TraceModule`** is the implementation of `TraceApi`: `static contract`,
+`static dependencies` (peer tokens), private constructor,
+`static create(setup)`. Services and peers are `#private`; the public surface
+is exactly the API's operations. The word "App" is retired inside modules.
+
+The internal grammar (enforced by the linter — the grammar file, not this
+document, is the authority on filenames):
+
+- `services/` — one class per entity over repository interfaces. A service
+  never opens a channel and never names a peer API.
+- `repositories/` — interfaces at the top; `prisma/` and `memory/` backends
+  below; the registry offers both via `defineRepositories({ live, memory })`.
+  Only `repositories/prisma/**` names Prisma, through
+  `PrismaRepository.for("Model")`; every project-model query carries
+  `projectId`. Every ClickHouse query filters `TenantId` first.
+- `channels/` — messages to or from anything the module does not own (bus,
+  Redis pub/sub, HTTP vendor, queue, email, Slack, SSE): one interface per
+  subject, per-tier implementations, a memory twin each, a registry offering
+  `{ live, memory }`. Repository = owned state; channel = unowned messages;
+  service = behaviour over both.
+- `eventing/` — one folder: the pipeline and everything it names (§9).
+- `transport/` — declarations only (§8).
+- `rules/` — pure functions and constants; no clock, no I/O.
+- No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
+  `domain/`.
+
+**An implementation never sees a raw client.** No prisma, no redis, no
+clickhouse in any `*Module` class. Raw clients cross into a module in exactly
+one place — a registry or channel factory's `create(members)` — and arrive as
+repositories and channels.
+
+### 3.3 What a module may demand — the four-way rule
+
+A module cannot build what needs process information, because it does not
+have it: deployment, availability, credentials and base URLs are the
+process's knowledge. Every dependency a module has resolves into exactly one
+of:
+
+1. **Derivable from supplied stores with no extra info** (a tenant resolver
+   over ClickHouse, an actor lookup over Prisma) → a repository or channel
+   **inside the module**. No demand exists.
+2. **Another module's capability** → a peer: the `*Api` token in
+   `static dependencies`. The process resolves tokens; modules receive each
+   other's implementations. A peer is never a member.
+3. **A deployment fact** (signing key, public base URL, admin list) → the
+   module's **declared config schema**; the process values the slice. Module
+   code never reads `process.env`.
+4. **An availability decision** (a capability this deployment may not have) →
+   a **declared supply token** the process answers with one `.provide({...})`
+   line — or the seam dies with the dead capability. A module never defaults
+   its own availability.
+
+### 3.4 The browser half and the kit
+
+`trace-browser` layers: flat public entries → `model/` (pure) → `behavior/`
+(hooks, api bindings, stores) → `ui/elements|blocks|sections`. Elements and
+blocks cannot fetch. The tRPC client is derived from the contract's
+declarations (`browser-trpc`), never hand-written, never from a router type.
+A screen reads no session or router directly: it declares a `*HostApi` the
+shell implements from `browser-host` capabilities. The half is declared with
+`defineBrowserModule` — screens, drawers, publications, mounts, flags — and
+exported at `./declaration`; the generated `browserModules` list installs it.
+
+**The kit law** — each rule earned by a measured failure:
+
+1. **`trace-browser` is closed.** Nothing else imports it, ever. The moment
+   another module needs a trace hook, store or component, that thing moves to
+   `trace-browser-kit`. Sharing is declared by moving, never observed by
+   reaching in.
+2. **A kit is a leaf.** It may import contracts (any module's),
+   `design-system` and `browser-host`. It may not import its own module's
+   browser package (the rule that broke the nine cyclic web pairs), any other
+   `*-browser`, or another kit.
+3. **A kit fetches nothing.** No project-scoped queries, no `browser-trpc`.
+   Presentational components, pure hooks, shared stores; consumers wire the
+   data (the model-selector ruling: the kit takes `options/value/onChange`,
+   each consumer runs its own query).
+4. **A kit is a package, not a subpath** — a subpath is invisible to the
+   dependency graph, so it cannot break a cycle or be budgeted. A package
+   makes every cross-module browser edge a visible, lintable manifest line.
+5. **A kit exists only where sharing is real** — three or more consumers. One
+   consumer is bilateral coupling, not an API: inline or duplicate it. The
+   published tier is shrink-only.
+
+---
+
+## 4. A process, whole
+
+```
+apps/api/src/
+├── main.ts       # everything below, ~40 lines
+└── config.ts     # module schemas + global config, composed (§6)
+```
+
+```ts
+// apps/api/src/main.ts — the whole process
+import "@langwatch/time/polyfill";
+
+const server  = await Server.start({ name: "langwatch-api", config: apiConfig });
+const stores  = await openStores(server.config.stores, server.resources);
+
+await createApp({ role: "api", server })
+  .withModules(processModules)               // generated from the catalogue
+  .withConfig(server.config.modules)         // one validated slice per module
+  .withStores(stores)                        // the one supply call; tier rides the value
+  .withTransportAuth((a) => a
+    .withStaticTokens({ cron, langyInternal, instanceAdmin })
+    .withBrowserSession(session))
+  .provide({ licenseSource })                // every declared supply token, one line each
+  .boot();                                   // registers everything on the server
+
+await server.serve({ port: server.config.process.port, static: uiBundle() });
+```
+
+**`Server.start` ordering is the point:** fatal handlers first (raw stderr
+until a logger exists) → secrets resolve → config parses **under** telemetry,
+so a parse failure is logged with the service name instead of vanishing →
+signals wired, deadline armed. `/healthz` answers **during** boot, not after.
+
+**The server threads through `boot()`.** `createApp` takes it as a
+dependency; `main.ts` never touches lifecycle:
+
+- The assembled router (every declared REST family, tRPC namespace, SSE lane)
+  registers as a server component with the server's logger and readiness — a
+  draining door refuses new work by name.
+- Each transport host registers its own drain phase on `server.graceful`
+  (stop accepting → finish in-flight → close). No app ever writes a shutdown
+  phase.
+- Eventing consumers (role worker) register drain-first — which makes "the
+  worker drains before the api's graph closes under it" a structural fact.
+- Module services start in dependency order; teardown registers in reverse.
+
+| | knows about |
+|---|---|
+| `main.ts` | the config schema and the chain — no lifecycle, no hosting |
+| `createApp`/`boot` | what modules declared, and how to register it on the server |
+| `Server` | signals, phases, deadline, `/healthz`, `/metrics`, serve |
+
+**The worker** is the same file with `role: "worker"` and `server.run()`
+instead of `serve()`. The role decides what `boot()` hosts: jobs and
+subscriptions instead of HTTP doors. Liveness/metrics is a built-in Server
+component. There is no third thing a worker does — install, and that's it.
+
+**Tasks** takes the Server for telemetry and config, skips the listener;
+graceful degenerates to run-to-completion. Migrations are tasks (§7).
+
+**A test passes no server** — `createApp({ role: "api" })` registers nothing
+anywhere; `boot()` returns the runtime and the test drives `start`/`stop`.
+
+---
+
+## 5. What boot() does — the translation
+
+```
+withModules(processModules)
+  │  collect installers, order by peer dependencies (tokens, never imports)
+  ▼  for each module:
+  1. pick the repository tier from the supplied stores (§7)
+  2. validate the chosen factory's requires against what was supplied
+     — refusal at boot, BY NAME ("webhook needs clickhouse; none supplied")
+  3. build repositories:  live.create({ prisma, clickhouse, encryption })
+  4. resolve peers: each token → the implementation built earlier in the order
+  5. slice config: config.<name>, already validated by the module's own schema
+  6. TraceModule.create({ repositories, dependencies, config, supplies })
+  7. collect what the module declared for THIS role:
+        role api    → REST families + tRPC namespaces + SSE + command senders
+        role worker → jobs + subscriptions + projections + process managers
+  ▼
+register everything on the server; return the runtime
+```
+
+`boot()` takes no arguments beyond what the chain supplied and is **callable
+only when everything the installed modules declared has been supplied**. An
+absent supply is a compile refusal — `MissingSupply<...>` names the whole
+outstanding set at once — never a runtime fallback, never a logged absence,
+never an absence class.
+
+The `processModules` list is generated from `modules/catalogue.json`
+(`pnpm generate:modules` → `@langwatch/installed-modules`). **Installing a
+module edits the catalogue, never a root.** The generated `createServerApp`
+owns the chunked chain TypeScript's instantiation depth forces; no
+hand-written file names a chunk. Uninstalling a module that another module
+peer-depends on fails to compile, naming the dependent.
+
+**The root never grows.** A change that needs it to grow has found a gap in
+the primitives; report the gap, never widen the root.
+
+---
+
+## 6. Config
+
+**Modules declare; apps compose; the parse refuses by name.**
+
+```ts
+// modules/github/contract/src/github.config.ts — the module names its needs
+export const githubConfig = Config.define({
+  appId:      Config.value(z.string().optional(),  { env: "GITHUB_APP_ID" }),
+  privateKey: Config.secret(z.string().optional(), { env: "GITHUB_APP_PRIVATE_KEY" }),
+});
+
+// apps/api/src/config.ts — the whole file
+export const apiConfig = defineAppConfig({
+  process: {                                  // global config, beside the modules
+    port:               Config.value(z.coerce.number().default(6560), { env: ["API_PORT", "PORT"] }),
+    serviceName:        Config.value(z.string().default("langwatch-api")),
+    shutdownDeadlineMs: Config.value(z.coerce.number().default(25_000)),
+  },
+  stores:  storesConfig(processModules),      // derived: demands exactly what's installed
+  modules: moduleConfigs(processModules),     // derived: { github: githubConfig, trace: …, … }
+});
+```
+
+Both maps are **derived from the installed list** — installing a module
+automatically brings its config slice and its store demands. Parse happens
+once in `main.ts`; a missing required value refuses **naming module and key**
+(`github.privateKey ← GITHUB_APP_PRIVATE_KEY`). `.withConfig` hands each
+module exactly its validated slice; a module with a schema and no slice fails
+to compile.
+
+**Defaults are production-shaped; development earns convenience explicitly.**
+`developmentDefault` values (localhost store URLs) apply only under
+`NODE_ENV=development` — so a bare `pnpm dev` boots with zero configuration —
+and are inert in production, where every required value must be explicit or
+the parse refuses. Production infrastructure always sets
+`NODE_ENV=production` (the image sets it; a pod cannot forget it), so no
+development default can ever reach a server.
+
+Secrets resolve before the parse through `@langwatch/secrets` (ADR-132):
+classified keys, ordered chain (env/.env → 1Password opt-in → refusal by
+name), redaction everywhere. Nothing outside the secrets package, config
+composition and boot files reads a secret env var.
+
+---
+
+## 7. Stores, the tier, and migrations
+
+```bash
+# ── local dev (live tier — the default; same shape as production) ──
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/langwatch   # or the development default
+CLICKHOUSE_URL=http://default@localhost:8123/langwatch
+REDIS_URL=redis://localhost:6379
+
+# ── zero-dependency mode: ONE knob, by the word ──
+LANGWATCH_STORES=memory
+
+# ── production: identical shape, managed URLs, the knob unset ──
+```
+
+```ts
+export const storesConfig = (modules) => Config.group({
+  tier:       Config.value(z.enum(["live", "memory"]).default("live"), { env: "LANGWATCH_STORES" }),
+  postgres:   Config.value(z.string().url(), { env: "DATABASE_URL",   developmentDefault: "postgresql://…localhost…" }),
+  clickhouse: Config.value(z.string().url(), { env: "CLICKHOUSE_URL", developmentDefault: "http://…localhost…" }),
+  redis:      Config.value(z.string(),       { env: "REDIS_URL",      developmentDefault: "redis://localhost:6379" }),
+}).refine(/* rule 1: live + a required store unset → refuse naming modules and key
+             rule 2: memory + NODE_ENV=production → refuse by name */);
+```
+
+| You did | What happens |
+|---|---|
+| forgot `DATABASE_URL` in production | refusal: *"live stores: trace, annotation require postgres; DATABASE_URL is unset"* — **never memory** |
+| `LANGWATCH_STORES=memory` locally | whole process on memory twins, stated, one line |
+| `LANGWATCH_STORES=memory` in production | refusal: *"asked to run production on memory storage"* |
+| typo'd the knob | enum refusal — not a fallback to either side |
+
+Memory is reachable only by writing the word, and only outside production.
+Absence always refuses. There is deliberately no per-store tier: one knob,
+whole process, no mixing — half-real storage tests a lie.
+
+**The tier travels inside the value.** `openStores` returns branded live
+clients or the branded `memoryStores()` — same type, one `.withStores(...)`
+call — and `boot()` selects every module's registry (`live` or `memory`) from
+the brand. Config is the only place a human states anything about storage;
+the chain call is plumbing that carries config's answer, and the test seam
+(tests hand `memoryStores()` directly and never touch env).
+
+**Migrations are not the api's job.** They are tasks —
+`pnpm --filter @langwatch/tasks task prisma-migrate clickhouse-migrate` — run
+before serve by the start script and the deploy pipeline. Prisma migrations
+live with the schema; ClickHouse migrations are goose SQL files. A serving
+process holding DDL locks is how deploys die.
+
+**Clients appear in exactly one place: the chain.** From there only registry
+and channel factories touch them. There is no second path.
+
+---
+
+## 8. Transports (REST + tRPC)
+
+- Transport files **declare**; they never implement. A tRPC procedure is
+  declared once, in the contract; the process half binds permission + handler
+  (`defineTrpcRouter`); the browser derives its client from the same
+  declaration. REST is one complete endpoint per route (`defineRestRouter`),
+  `withInput`/`withOutput` mandatory; the framework parses, validates,
+  refuses, serialises.
+- Handlers receive `{ input, app, actor, scope, signal }`, call exactly one
+  API operation, and **return a plain value or throw**. No `c.json`, no
+  `JSON.parse`, no manual status branches, no error envelopes, no
+  `RestErrorHandler` — banned outright.
+- Every wire schema imports from the module's own contract. The one
+  sanctioned exception: the `moduleApi<X>()` app-port interface a door
+  declares for its own implementation.
+- `publicRoute`/raw results only for genuinely non-JSON protocols (SCIM,
+  OAuth device flow, MCP streams, webhook raw bodies) and the documented
+  `*-legacy.rest.ts` family, each carrying a one-line reason.
+- The **process** mounts declarations; `boot()` opens the hosts. A module
+  never mounts anything.
+
+---
+
+## 9. Eventing
+
+The module declares its whole pipeline once:
+
+```ts
+// modules/trace/process/src/eventing/trace.pipeline.ts
+export const tracePipeline = definePipeline("trace")
+  .withEvents(traceEvents)                          // zod-typed, versioned
+  .withCommands({ ingestSpan })                     // validate → append
+  .withProjections({ traceSummary })                // fold → read model      (worker-only)
+  .withSubscribers({ onSpanIngested })              // reactions, idempotent  (worker-only)
+  .withJobs({ retentionSweep: cron("0 3 * * *") }); // schedules              (worker-only)
+```
+
+`boot()` translates the same declaration per role — **api is commands-only,
+structurally**:
+
+| | role `"api"` | role `"worker"` |
+|---|---|---|
+| commands | send (append + return) | send |
+| projections / subscribers / process managers | **never constructed** — nothing to call | hosted, per-aggregate ordered |
+| scheduled jobs | never constructed | hosted |
+| eventing supply the role's chain demands | `EventingProducer` (the type) | `EventingHost` (consume + produce) |
+
+Two enforcement layers: the reaction half is simply not built in an api
+process, and the role types the eventing requirement — an api-role chain
+compiles only against a producer handle, so hand-wiring a consumer into it is
+a type error.
+
+Worker semantics: delivery is at-least-once, so subscribers are idempotent;
+ordering is per aggregate via the group queue, so one poisoned aggregate
+retries with backoff without blocking neighbours; projections fold from the
+same ordered stream; every consumer registers drain-first on the server.
+
+---
+
+## 10. The browser application
+
+```ts
+// apps/ui/src/main.tsx
+const ui = await createUi({ mount: "root" })   // document + meta-tag config read are defaults
+  .withModules(browserModules)
+  .render();
+mountShell(ui);                                 // shell/: providers + router over declarations
+```
+
+`createUi` reads the injected public config from the DOM meta tag by default
+(`withInjectedConfig` is a test-only override) and validates it against every
+installed browser module's declaration **before a component renders**. Browser
+modules register everything — screens, drawers, api bindings, surfaces — via
+their declarations; the app contributes only the shell chrome
+(`src/{main.tsx, shell/, styles/}`).
+
+**`uiBundle()`** is the built browser app as a deployment artefact —
+`apps/ui/dist/client`, resolved by path (env-overridable). `server.serve({
+static: uiBundle() })` serves hashed assets with immutable caching, answers
+`index.html` for unmatched non-API routes **after** every declared route (it
+can never shadow one), and **injects the public-config meta tag at serve
+time** — the api knows the deployment, which is how the browser gets its
+config without a second channel. Absent `dist/` (local dev, Vite owns the
+browser), it serves nothing.
+
+Drawers are URL-routed singletons with a navigation stack, opened through the
+host capability, registered through the declaration. One tRPC client for the
+whole browser.
+
+---
+
+## 11. Enterprise
+
+`enterprise/modules/<name>` mirrors the module shape exactly and **exports
+modules like any other** — the generated lists carry core and enterprise
+tiers, and the same catalogue installs both into the same processes. There is
+no enterprise composition package, no separate wiring, no conditional
+mounting: **enterprise routes are always mounted and refuse per-organization
+on entitlement**. The licence leg is the `licenseSource` supply token,
+provided by the process.
+
+---
+
+## 12. Errors
+
+Throw `HandledError` only when the cause is known **and** the caller can act;
+register the `code` in `packages/handled-error/src/app-codes.ts` and its
+customer copy in the presentation registry. Everything else stays a plain
+`Error` and degrades to "unknown" + trace id at the boundary — deliberately.
+`message` is customer-safe, never internals; the tRPC wire message is the
+code slug, so clients render from the registry and never toast
+`error.message`. A 5xx subclass sets `fault` explicitly. Tests assert on
+`code`, never prose. A knowable failure surfacing as "unknown error" is a bug
+in the feature, not a gap in the error system.
+
+---
+
+## 13. Testing
+
+Specs first (`specs/`, Gherkin); an enforced scenario carries
+`@unit|@integration|@e2e|@regression` and a `/** @scenario */` binding —
+untagged scenarios enforce nothing. Peer doubles come from `createApiFixture`
+— anything unconfigured throws by name; the same philosophy governs every
+double (`memoryAnalytical` throws on unscripted SQL). Component tests are
+`.integration.test.tsx` with the jsdom docblock. Each package owns its vitest
+config and declares its own datastore needs.
+
+The installation test is the same chain as production:
+
+```ts
+const runtime = await createApp({ role: "api" })          // no server: nothing to tear down
+  .withModules([annotationProcessModule, traceProcessModule, presenceProcessModule])
+  .withConfig({ annotation: {}, trace: {}, presence: {} })
+  .withStores(memoryStores())                              // branded → memory tier everywhere
+  .boot();
+
+const traces = runtime.service(TraceApi);
+await traces.ingestSpan({ projectId, span });
+```
+
+Memory bundles require nothing, so no datastore and no Docker — while peers
+resolve each other for real through the same tokens production uses. Zero
+test-only spellings.
+
+---
+
+## 14. Worked examples
+
+**A. Three modules over Prisma, ClickHouse, Redis** — annotation (Prisma),
+trace (Prisma + ClickHouse), presence (Redis). `main.ts` is §4 verbatim with
+those three in the list. Boot validates each live registry's `requires`
+against the supplied stores; removing ClickHouse from the deployment fails
+the config parse naming trace.
+
+**B. GitHub and Slack** — both are things modules don't own → channels.
+`github`'s `channels/http/http.github-app.channel.ts` reads the module's
+config slice (app id, private key from env); `automation`'s Slack channel
+takes per-tenant tokens from a **repository** (tenant data is owned state,
+not config). `main.ts` unchanged; env carries `GITHUB_*`. Unset, the module's
+own optional config decides: operations refuse by name ("GitHub app not
+configured") — configuredness is a config fact, which modules may own.
+
+**C. Slack without GitHub** — remove `github` from the catalogue, regenerate.
+Its routes vanish, its config slice is no longer demanded, `GITHUB_*` env is
+ignored. Any module that peer-depended on `GithubApi` fails to compile,
+naming itself. `main.ts` and `config.ts`: zero edits.
+
+**D. Memory-tier test** — §13.
+
+---
+
+## 15. Deleted spellings
+
+Deleted, not deprecated. Writing one new is a defect; reading one marks
+conversion debt:
+
+`createProcess` · `withProvided` · `withMemoryRepositories` · `membersFrom` ·
+`reads(...)` statics · the `members:` option on `createApp` ·
+`withInfrastructure` · `withPersistence` · process-side `withTransports` ·
+per-store supply calls (`withRelational`/`withAnalytical`/`withKeyvalue` —
+collapsed into `withStores`) · absence classes (`Logged*Absence`, `Absent*`) ·
+`ApplicationBuilder`'s public surface · per-process host files · per-module
+composition files under `apps/*` · hand-projected per-module config · bespoke
+member bags · `*App` classes inside modules · `defineServerModule` /
+`defineWebModule` (renamed) · `RestErrorHandler` · error envelopes in
+transports · re-exports for backwards compatibility · `refusing*` twins ·
+`try*`/`require*` method names · `T | null` returns in new code (`find*` =
+array; `get*` = one or throws).
+
+---
+
+## 16. Renames in flight
+
+This document names the target. The tree is mid-rename; both columns exist
+until each lane lands. New code uses the left column only.
+
+| Target | Today |
+|---|---|
+| `@langwatch/module` | `@langwatch/kernel` (declaration half) |
+| `@langwatch/process` | `@langwatch/process-server` + kernel's boot half |
+| `@langwatch/process-stores` | `@langwatch/infrastructure` |
+| `@langwatch/browser` | `@langwatch/ui-kernel` (boot half) |
+| `@langwatch/browser-host` | `@langwatch/ui-host` (trimmed) + `@langwatch/ui-drawer` (merged) |
+| `@langwatch/browser-trpc` | `@langwatch/api-client-web` |
+| `modules/*/process` · `*-process` | `modules/*/server` · `*-server` |
+| `modules/*/browser` · `*-browser` | `modules/*/web` · `*-web` |
+| `modules/*/browser-kit` | `modules/*/web-kit` |
+| `defineProcessModule` / `defineBrowserModule` | `defineServerModule` / `defineWebModule` |
+| `traceProcessModule` / `processModules` | `traceServer` / `serverModules` |
+| `TraceModule` + `.withApi(...)` | `TraceApp` + `.withApp(...)` |
+| `.withStores(stores)` | per-store `with*` calls |
+| — (dissolved) | `@langwatch/enterprise-plan-gate` → `entitlement-contract` |
+
+Also open, each a worklist: ~14 modules still demand bespoke keys pending
+§3.3; `browserModules` is empty (no module exports `./declaration` yet — the
+browser serves chrome only); worker job declarations designed, not landed;
+the tasks entrypoint rebuild.
+
+---
+
+## 17. Enforcement
+
+The linter is the authority: the file grammar lives in
+`packages/oxlint-rules/grammar/feature-layout-policy.mjs`, the boundaries in
+`packages/architecture-enforcer/`, the banned spellings in
+`banned-legacy-names`. ADR-147 (compiler-checked supply) and ADR-148
+(declared browser supply) are the ruling decision records and are cited by
+this document; all earlier composition ADRs are historical. When someone
+finds this document teaching something the tree refuses, the fix is a change
+to this file in the same commit as the code — an out-of-date architecture
+document is worse than none, because it reads authoritative.
