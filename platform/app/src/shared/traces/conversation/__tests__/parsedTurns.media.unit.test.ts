@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { TraceMediaRef } from "~/shared/traces/media-refs";
-import { turnMediaForSide } from "../utils";
+import { turnMediaForSide } from "../parsedTurns";
 
 const CALLER = "/api/files/project-1/caller";
 const REPLY = "/api/files/project-1/reply";
