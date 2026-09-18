@@ -5,45 +5,12 @@
  */
 import type { SecretsChain } from "./chain.ts";
 import type { SecretHandle } from "./secret.ts";
-
-/** A resolve after boot finished: the capability is gone, on purpose. */
-export class SealedSecretsError extends Error {
-  constructor(id: string) {
-    super(
-      `The secret "${id}" was resolved after boot. Secrets resolve only while modules construct.`,
-    );
-    this.name = "SealedSecretsError";
-  }
-}
-
-/** A create asked for a handle its owner never declared. */
-export class UndeclaredSecretError extends Error {
-  constructor(owner: string, id: string) {
-    super(
-      `"${owner}" resolved the secret "${id}" without declaring it. Declare the handle where the owner is defined.`,
-    );
-    this.name = "UndeclaredSecretError";
-  }
-}
-
-/** A required secret no adapter answered, refused by its one id. */
-export class AbsentSecretError extends Error {
-  constructor(id: string) {
-    super(`The secret "${id}" is not set. Set it, or mark the handle optional at its declaration.`);
-    this.name = "AbsentSecretError";
-  }
-}
-
-/** The preflight's verdict: every unanswerable required handle, at once. */
-export class SecretsPreflightError extends Error {
-  constructor(readonly missing: readonly string[]) {
-    super(
-      `No adapter answers these required secrets:\n  ${missing.join("\n  ")}\n` +
-        `Set each, or mark its handle optional at the declaration.`,
-    );
-    this.name = "SecretsPreflightError";
-  }
-}
+import {
+  AbsentSecretError,
+  SealedSecretsError,
+  SecretsPreflightError,
+  UndeclaredSecretError,
+} from "./secrets.errors.ts";
 
 export class SecretsResolver {
   static over(chain: SecretsChain): SecretsResolver {

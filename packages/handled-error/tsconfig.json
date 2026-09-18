@@ -24,7 +24,6 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   // Tests run via vitest (`pnpm test`), which provides the `vitest` module and
   // its types at runtime; the declaration build must not require them.
-  "exclude": ["src/**/*.test.ts"],
   "references": [
     {
       "path": "tsconfig.build.json"

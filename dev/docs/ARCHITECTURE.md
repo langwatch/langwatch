@@ -227,20 +227,20 @@ exported at `./declaration`; the generated `browserModules` list installs it.
 
 ## 4. A process, whole
 
-```
-apps/api/src/
-├── main.ts           # everything below, ~40 lines
-└── transport/        # HttpMux · BrowserBundle — tiny classes ("transport" for consistency)
-    └── policy/       # SecurityHeaders · ContentSecurityPolicy · ClientAddress · RequestPreamble
+```text
+apps/api/src/main.ts                 # process declaration, at most 50 lines
+apps/worker/src/main.ts              # same graph, consuming pipelines
+packages/api/src/hosting/            # HTTP mux, API hosts and browser bundle
+packages/api/src/policy/             # headers, CSP and client address
+packages/process-server/src/         # boot, lifecycle and peer composition
 ```
 
-**The transport composition lives in the api app, not in `@langwatch/api`**
-(ruled 2026-09-18): the dependency points the other way — these classes USE
-the api package; the api package never contains its own front door. **There
-is no ApiForward** (ruled 2026-09-18, superseding the noun): the /api
-composition rides `composeProcess().expose()` — trpc and rest allowed iff
-declared, then the security middleware, then the bundle route after them —
-so the front door is the expose chain's product, not a class of its own.
+The application declares what it serves through `exposeTransports`.
+Framework classes implement hosting, and process composition resolves their
+peer dependencies. Authentication policy stays in the API runtime; wiring
+installed peer APIs into that runtime belongs to process composition. This
+keeps transport machinery out of `main.ts` without making the API framework
+import the feature implementations which depend on it.
 
 There is no app config file (ruled 2026-09-18): config comes from the
 installed server modules' own declared schemas, composed by the generated
@@ -264,13 +264,12 @@ const server = await Server.create("langwatch-api")
 
 const app = await server.composeProcess("api")
   .withModules(processModules)          // dependencies resolve from config — no store lines (§5)
-  .expose((transports) => transports    // REQUIRED on the api; not on the worker's builder at all
+  .exposeTransports((transports) => transports    // REQUIRED on the api; not on the worker's builder at all
     .trpc()                             //   required iff any module declares namespaces
     .rest()                             //   required iff any module declares families; family
                                         //   credentials bind at their declaring modules, not here
     .browserBundle())                   //   ALWAYS required on the api; .browserBundle(none) opts out loudly
-  .produce((pipelines) => pipelines
-    .commands())                        // the api emits commands onto the queue; never claims it
+  .withPipelines((pipelines) => pipelines.produce()) // emits commands; never claims the queue
   .boot();
 
 await server.serve(app);
@@ -280,114 +279,110 @@ await server.serve(app);
 // apps/worker/src/main.ts — the whole difference
 const app = await server.composeProcess("worker")
   .withModules(processModules)          // SAME module graph: apps install fully, jobs call them in-process
-  .consume((pipelines) => pipelines
-    .commands())                        // claims the queue: consumers, jobs, process managers
+  .withPipelines((pipelines) => pipelines.consume()) // consumers, jobs, process managers
   .boot();
 
 await server.run(app);
 ```
 
-**Surface slots are compiler-driven and role-shaped.** `expose` exists only
-on the api builder, `consume` only on the worker's — a worker exposing REST
-is unwritable, not merely unwise. **Nothing extra rides the expose chain**
-(ruled 2026-09-18): no members, logger or stores threaded through the
-surface, and auth machinery — internal bearers, the admin instance bearer,
-credential binding — is the api package's own business behind a service,
-never something the main or the surface carries along. Inside `expose`, the members are typed
-from the installed tuple: install the first namespace-declaring module and
-`.trpc()` becomes required (boot() refuses to compile, naming
-`surface.trpc`); uninstall the last one and the `.trpc()` line goes red in
-place. **All routing is the framework's.** Every request flows through
-`@langwatch/api` — middleware, family and namespace placement, per-route
-auth binding, all driven by the modules' declarations. No application code
-routes anything. **The hosting dispatch is a pass-through with exactly one
-decision** (ruled 2026-09-18): an unconditional preamble on every request —
-trusted-proxy remap resolved once, base security headers stamped on every
-response, owned by no surface so no surface can forget them — then `/api/**`
-forwards to the API package (the tRPC-vs-REST split is the framework's own
-routing; the dispatch does not know tRPC exists), and everything else is
-the bundle side: an optional session READ on document requests only (never
-hashed assets — the surface is auth-capable, not auth-enforcing, until a
-policy such as a private-instance gate says otherwise), then serving —
-immutable assets, `index.html` with the injected meta tag, CSP overlaid on
-the stamped base. **The hosting layer is one muxer with routes and
-middleware** (ruled 2026-09-18), spoken in the industry's own words:
-`HttpMux.create().use(ClientAddress.fromTrustedProxies(...)).use(
-SecurityHeaders.strict()).route("/api", api).route("/", spa)` — middleware
-runs before routing on every request; `/` is a route, not a fallback,
-because longest prefix wins; `.use`/`.route` are internal (boot() writes
-the composition, prefixes stay library constants, no app code ever holds
-the mux). **The pieces are tiny classes, legible at their constructor
-sites** (ruled 2026-09-18, superseding the SinglePageApp name):
+**Transport selection and pipeline participation are separate fluent APIs.**
+`exposeTransports` exists only on the API builder. Its callback selects
+`.trpc()`, `.rest()` and `.browserBundle()`; it carries no members, logger,
+stores, credentials or paths. Required slots derive from the installed
+module declarations: an omitted declared transport refuses boot by name.
+The bundle is explicit, including an explicit opt-out for deployments
+without one. Both processes use `withPipelines`: the API's callback offers
+`produce()`, the worker's offers `consume()`. Pipelines are never exposed as
+HTTP surfaces. Consumption includes command production for follow-up work.
+Each process entry point and its surface declaration stay within 50 lines;
+framework implementations retain the code needed to preserve behaviour.
+
+**The HTTP boundary is API versus browser bundle.** The host knows two
+paths, `/api` and `/`. The API package owns the fixed tRPC prefix
+`/api/trpc`, REST paths under `/api`, and the existing `/api/sse` subscription
+lane. Apps select transports without repeating or configuring these paths.
+The `api` value below is the framework's assembled transport surface, with
+all installed declarations mounted and API authentication resolved.
 
 ```ts
 const bundle = BrowserBundle.create({
   dist,
   publicConfig,
-  sessionReader,                       // Caller | null, document requests only
+  sessionReader,
   security: SecurityHeaders.strict().withContentSecurityPolicy(csp),
 });
-const handler = RequestPreamble.create({
-  clientAddress: ClientAddress.fromTrustedProxies(trustedProxyConfig),
-  security: SecurityHeaders.strict(),
-  next,
-});
+
+const http = HttpMux.create()
+  .use(ClientAddress.fromTrustedProxies(trustedProxies))
+  .use(SecurityHeaders.strict())
+  .route("/api", api)
+  .route("/", bundle);
 ```
 
-`BrowserBundle` serves the bundle side; `RequestPreamble` is the
-unconditional preamble as a class. The /api front has no noun of its own —
-`expose()` composes it (trpc/rest iff declared, then security, then the
-bundle route last). The fluent mux above and these constructor sites are
-one design — the mux composes them. **The mux is backed by
-Hono internally** (ruled 2026-09-18): the framework's `/api` surface is
-already a Hono app, so the mount is a native sub-app and one router tree
-serves the request end to end, with Hono owning the HTTP edge cases a
-hand-rolled prefix match gets wrong — but Hono never leaks from the
-hosting layer's public surface; it is an implementation detail confined to
-the mux's own file. There is no public Router class, no mount API, no
-scoped router object anywhere. **The mux
-carries the last-resort error boundary, and error presentation follows the
-path prefix** (ruled 2026-09-18): an error anywhere in the chain on an
-`/api` request answers the canonical JSON envelope (generic "unknown" +
-trace id for the unnamed — an API client never receives HTML, even for a
-middleware crash before routing); on any other request it answers the
-standard error page — minimal self-contained HTML with the trace id, never
-a re-attempt of the SPA shell, because the bundle machinery may be what
-failed. Inside `/api` the framework's canonical-error middleware remains
-the handler for everything it reaches; the mux boundary catches only what
-escapes or precedes it, answering in the same envelope shape. **The code's
-physical shape matches**: concept-named directories in the api app —
-`transport/` (HttpMux, BrowserBundle) with `transport/policy/` inside it
-(SecurityHeaders, ContentSecurityPolicy, ClientAddress, RequestPreamble) —
-tiny classes, tens of lines each, composition by constructor, helpers
-inside the class file they serve; a directory growing past a few classes
-means the concept is wrongly cut. **Each expose member sets up only the base**: headers and
-general security, as named CLASSES from `@langwatch/api`, never inline
-data — `SecurityHeaders.strict()` (the floor no surface drops below; `.with`/
-`.merge` overlay, `.without` is the loud exception), `ContentSecurityPolicy
-.app()` (the browser bundle's composed overlay — connect-src rides config),
-`ClientAddress.fromTrustedProxies(...)` (Server-level — client-address truth is
-one answer for every surface). The chaining is pre-done in importable
-defaults — `trpcSurfaceDefaults()`, `restSurfaceDefaults()`,
-`browserBundleDefaults()` — and a bare member call IS its default; a
-deviating deployment imports the default and chains on it, never rebuilds
-from parts.
+These are framework construction sites, not additional application code.
+`HttpMux` owns middleware and routing; separate `ApiForward` and
+`RequestPreamble` wrappers would duplicate those responsibilities.
+`BrowserBundle`, `ClientAddress`, `SecurityHeaders` and
+`ContentSecurityPolicy` are named classes. The canonical implementation
+lives in `@langwatch/api` hosting/policy code, not duplicate app directories.
+Hono remains internal to hosting; the public boundary accepts request
+handlers and named classes, never Hono routers.
 
-**Surface auth is structural, not policy** (ruled 2026-09-18). tRPC IS
-session-authenticated; REST IS API-key-authenticated; neither default is
-settable in the expose block, because it is what the surface means. The
-only written auth is the per-endpoint exception, declared on the route in
-the owning module's transport declaration: `.withAuth(BearerTokenAuth
-.fromConfig("cronBearerToken"))` — the workflow module binds ITS bearer
-from ITS slice; langy likewise — or `.public()`, which stays guarded by
-the no-scope-input check. No internal-family credential appears in a main,
-a surface block, or any process-global bag. Tests construct a surface with
-a fake session or credential — the one override, never a deployment.
+**Longest matching path prefix wins, independent of registration order.**
+Matching respects segment boundaries: `/apiary` belongs to the bundle.
+`/` is an ordinary route. Unknown paths inside `/api` remain API 404s and
+never fall through to the bundle. Hashed assets are immutable; a missing
+asset returns 404 rather than the SPA shell. Other browser document paths
+resolve to the shell with its public config injected.
+
+**Transport mounts consume their prefix once.** Public URLs remain stable;
+inside the tRPC mount, `/api/trpc/getBatch` routes as `/getBatch`. A REST
+version mount can route `/api/v1/roles` as `/roles`; version selection stays
+with the REST host, preserving dated versions and existing aliases. Module
+handlers never strip prefixes themselves. Routing uses a relative path
+while retaining the original request URL for signature checks, auth
+callbacks, redirects, audit and logging. Reading a request body or resolving
+a session twice to achieve this boundary is prohibited. Existing absolute
+route declarations must be adapted with parity coverage before the mount
+starts consuming their prefix.
+
+**Common security policy applies to every response.** Trusted-proxy handling
+resolves the caller IP once from the socket and configured forwarding trust,
+then all transports use that answer. Forwarded headers from untrusted peers
+do not establish identity. The shared security headers cover successful
+responses, 404s, redirects and failures in the preamble itself. Error
+presentation follows the selected prefix: canonical JSON for API failures,
+a self-contained HTML error page for bundle failures. An error page never
+re-enters the failing bundle loader.
+
+**Headers remain explicit, fluent policy values.** The HTTP host supplies
+`SecurityHeaders.strict()` as the common floor; transport and bundle
+construction accepts overlays. `with` and `merge` add or override named
+headers, and `without` explicitly removes one. Bare transport selectors use
+`trpcSurfaceDefaults()`, `restSurfaceDefaults()` and
+`browserBundleDefaults()`; optional policies extend those defaults. Parsed
+config determines production HSTS, document CSP and allowed asset/storage
+origins. These settings do not require threading auth or store bags through
+the process declaration.
+
+**API owns transport authentication and authorization.** tRPC uses verified
+browser sessions; REST uses API credentials. Endpoint exceptions belong to
+the declaring module, including public routes and module-owned internal
+bearers. Neither the main nor a surface declaration receives bearer maps or
+constructs credential services. Tests can supply verifier doubles at the
+owning service boundary.
+
+**The bundle shares the API session reader.** It reads the verified caller
+for document requests only, never for assets. A document access policy can
+use that caller to admit or redirect before rendering, including a private
+instance gate. The default shell remains public so sign-in can be reached;
+reading a session alone is not access enforcement. Public config projection
+receives the caller without exposing credentials to the browser.
 
 **`Server.create` ordering is the point:** fatal handlers first (raw stderr
-until a logger exists) → secrets resolve → config parses **under** telemetry,
-so a parse failure is logged with the service name instead of vanishing →
-signals wired, deadline armed. `/healthz` answers **during** boot, not after.
+until a logger exists) → owner-declared config parses → the secrets reader
+is constructed from that config → telemetry initializes → signals wired,
+deadline armed. Config failures retain the process name in their report. `/healthz` answers **during** boot, not after.
 
 **The server threads through `boot()`.** `createApp` takes it as a
 dependency; `main.ts` never touches lifecycle:
@@ -437,31 +432,11 @@ literal at a call site is banned — if a component has no spoken factory,
 write the factory. Transport/route discovery is likewise built in at the
 layer that owns the route table (`boot()`/the api package), never a module.
 
-**The router is the spine, and it is generic** (ruled 2026-09-18). The
-Server defines ONE router at the very beginning; every surface **plugs in
-on a path hierarchy** — and the hierarchy is **the library's own, not
-configuration**: tRPC is `/api/trpc`, REST is `/api`, the static bundle is
-`/`, hard-wired where the router lives. No application code mounts,
-moves or reorders a surface. Routing is by path prefix, never by an
-ordered list of handlers each inspecting a request and claiming it. The
-router is passed down the stack and appended to; the beginning of a path
-can never be changed by whoever received it. Security headers are a **base
-policy in the library plus per-surface overlays** — every response carries
-the base; the static surface overlays CSP and asset caching, the API
-surface its own set; each surface class composes its overlay and no
-deployment assembles headers. The router itself knows no
-transport vocabulary — tRPC hosting, REST hosting, asset serving, security
-headers, trusted-proxy handling and browser-session composition are each
-their own class in the package that owns that concern, and each arrives
-with what it declared (registry-resolved, §3), never with a hand-assembled
-composition bag. There is no "door": `boot()` registers every installed
-module's declared transports onto the router, and the main never sees a
-namespace, a mount, or any transport internals. Transport auth follows the
-same rule as every dependency: it resolves from config, verifiers built
-with their secrets at construction, and an override stated inside the
-surface's own `expose` member block (§4) takes precedence over config —
-tests and special deployments override in code, scoped to the surface it
-guards; an ordinary deployment states nothing.
+The HTTP host composes the two routes and shared middleware described above.
+Boot resolves transport dependencies and mounts module declarations before
+serving. Auth verifiers are constructed by their owner from declared config
+and secrets; the process entry point supplies neither credentials nor
+transport internals.
 
 **Deployment-choice modules are one line in the main.** The audit sink is
 the worked example: OSS composes `auditLogNullServer` (records nothing),
@@ -471,7 +446,8 @@ line, no conditional wiring.
 **The worker** is the same file with `role: "worker"` and `server.run()`
 instead of `serve()`. The role decides what `boot()` hosts: jobs and
 subscriptions instead of HTTP doors. Liveness/metrics is a built-in Server
-component. There is no third thing a worker does — install, and that's it.
+component. Its pipeline declaration selects consumption, and shutdown drains that work
+before closing the services and stores it uses.
 
 **Tasks** takes the Server for telemetry and config, skips the listener;
 graceful degenerates to run-to-completion. Migrations are tasks (§7).
@@ -653,10 +629,13 @@ resolve through the chain above and are **injected into the thing that uses
 them as early as possible**: the cipher is constructed with its key, the
 database client with its URL, the token verifier with its bearer secret —
 and only the constructed collaborator travels, as a process or module
-dependency. A module's config slice may not declare a key `keys.json`
-classifies as `secret` or `composite`; the schema generator refuses it by
-name. Connection strings are composite secrets, so they belong at the
-dependency-construction seam, never in a config object a module reads.
+dependency. The wall is decentralised (landed 2026-09-18, replacing the
+`keys.json` registry): the one parse cross-checks every config leaf's env
+name against every owner's declared secret handles and refuses a claim of
+both, naming both owners — `ConfigClaimsSecretError`. Connection strings
+are secrets, so they belong at the dependency-construction seam, never in
+a config object a module reads. Every refusal in both packages is a
+`HandledError` with a stable code.
 
 **Three layers, and which one a value belongs to** (ruled 2026-09-18):
 
@@ -800,7 +779,10 @@ export const tracePipeline = definePipeline("trace")
   .withJobs({ retentionSweep: cron("0 3 * * *") }); // schedules              (worker-only)
 ```
 
-`boot()` translates the same declaration per role — **api is commands-only,
+`withPipelines((pipelines) => pipelines.produce())` selects API production;
+`withPipelines((pipelines) => pipelines.consume())` selects worker consumption.
+Neither declaration exposes a transport. `boot()` translates the same module
+pipeline declaration per role — **api is commands-only,
 structurally**:
 
 | | role `"api"` | role `"worker"` |

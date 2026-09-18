@@ -12813,6 +12813,9 @@ importers:
 
   packages/config:
     dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../handled-error
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -13373,12 +13376,54 @@ importers:
 
   packages/process-server:
     dependencies:
+      '@langwatch/actor':
+        specifier: workspace:*
+        version: link:../actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../api
+      '@langwatch/api-key-contract':
+        specifier: workspace:*
+        version: link:../../modules/api-key/contract
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../modules/audit-log/contract
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../modules/auth/contract
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../modules/authz/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../config
+      '@langwatch/enterprise-scim-contract':
+        specifier: workspace:*
+        version: link:../../enterprise/modules/scim/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../modules/langy/contract
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../modules/model-provider/contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../modules/organization/contract
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../process-stores
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../secrets
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -13398,6 +13443,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../clickhouse-client
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../config
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../eventing
@@ -13419,6 +13467,12 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../redis-client
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../secrets
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -13585,6 +13639,10 @@ importers:
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/secrets:
+    dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../handled-error
     devDependencies:
       '@types/node':
         specifier: ^26.0.1

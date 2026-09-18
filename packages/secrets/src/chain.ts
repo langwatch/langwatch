@@ -7,19 +7,13 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+import { OnePasswordInProductionError, OnePasswordUnavailableError } from "./secrets.errors.ts";
+
 /** One place a single id can be read from, one key at a time. */
 type SecretAdapter = Readonly<{
   describe: string;
   read(id: string): Promise<string | undefined>;
 }>;
-
-/** 1Password answered something other than "no such key". */
-export class OnePasswordUnavailableError extends Error {
-  constructor(detail: string) {
-    super(`1Password could not be read: ${detail}. Run \`op signin\` and retry.`);
-    this.name = "OnePasswordUnavailableError";
-  }
-}
 
 export class SecretsChain {
   /** The Server starts the chain at the one boot seam and hands it in. */
@@ -49,12 +43,17 @@ export class SecretsChain {
 
   /**
    * 1Password: one account key plus convention — your private vault, the
-   * LangWatch item, the handle's own id as the field. No account, inert word.
+   * LangWatch item, the handle's own id as the field. No account, inert
+   * word. A development convenience only: production refuses it by name.
    */
   withOnePassword(account: string | undefined): SecretsChain {
     const chosen = account?.trim();
 
     if (chosen === undefined || chosen === "") return this;
+
+    if (this.environment["NODE_ENV"] === "production") {
+      throw new OnePasswordInProductionError();
+    }
 
     return this.with({
       describe: `1password:${chosen}`,

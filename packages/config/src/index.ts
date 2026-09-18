@@ -1,8 +1,11 @@
 export {
-  Config,
+  ConfigClaimsSecretError,
   ConfigCollisionError,
-  ConfigLeaf,
   ConfigParseError,
+} from "./config.errors.ts";
+export {
+  Config,
+  ConfigLeaf,
   parseProcessConfig,
   type ConfigOwner,
   type ConfigSlice,

@@ -1,4 +1,5 @@
 import { trace } from "@opentelemetry/api";
+
 import type {
   HandledErrorFault,
   SerializedHandledError,

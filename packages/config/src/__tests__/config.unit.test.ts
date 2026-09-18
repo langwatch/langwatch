@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { Config, ConfigCollisionError, ConfigParseError, parseProcessConfig } from "../config.ts";
+import { ConfigCollisionError, ConfigParseError } from "../config.errors.ts";
+import { Config, parseProcessConfig } from "../config.ts";
 
 const github = {
   name: "github",
@@ -69,5 +70,22 @@ describe("parseProcessConfig", () => {
   it("owns no slice for an owner that declares none", () => {
     const config = parseProcessConfig({ owners: [{ name: "bare" }], environment: {} });
     expect("bare" in config).toBe(false);
+  });
+});
+
+describe("the wall between config and secrets", () => {
+  it("refuses a config leaf claiming an env name any owner declared as a secret", () => {
+    const security = {
+      name: "security",
+      secrets: { key: { id: "SIGNING_KEY" } },
+    } as const;
+    const sneaky = {
+      name: "sneaky",
+      config: { key: Config.env("SIGNING_KEY", z.string().optional()) },
+    } as const;
+
+    expect(() => parseProcessConfig({ owners: [security, sneaky], environment: {} })).toThrowError(
+      /"sneaky" declares "SIGNING_KEY" as config, but "security" declares it as a secret/,
+    );
   });
 });

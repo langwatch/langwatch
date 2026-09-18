@@ -1,10 +1,11 @@
-export { OnePasswordUnavailableError, SecretsChain } from "./chain.ts";
+export { SecretsChain } from "./chain.ts";
+export { ScopedSecrets, SecretsResolver } from "./resolver.ts";
+export { Secret, SecretHandle, type SecretSchema } from "./secret.ts";
 export {
   AbsentSecretError,
-  ScopedSecrets,
+  OnePasswordInProductionError,
+  OnePasswordUnavailableError,
   SealedSecretsError,
   SecretsPreflightError,
-  SecretsResolver,
   UndeclaredSecretError,
-} from "./resolver.ts";
-export { Secret, SecretHandle, type SecretSchema } from "./secret.ts";
+} from "./secrets.errors.ts";

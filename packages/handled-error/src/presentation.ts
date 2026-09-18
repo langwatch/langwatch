@@ -1,11 +1,5 @@
-import type { GoErrorCode, NodeErrorCode } from "./codes.generated.ts";
-import type {
-  HandledErrorFault,
-  SerializedHandledError,
-  SerializedReason,
-} from "./serialized-handled-error.ts";
-
 import type { AppErrorCode } from "./app-codes.ts";
+import type { GoErrorCode, NodeErrorCode } from "./codes.generated.ts";
 import {
   type HandledErrorShape,
   handledShapeFromSerialized,
@@ -13,6 +7,11 @@ import {
   readHandledError,
   safeProse,
 } from "./read-handled-error.ts";
+import type {
+  HandledErrorFault,
+  SerializedHandledError,
+  SerializedReason,
+} from "./serialized-handled-error.ts";
 
 /**
  * The customer-facing copy for every handled-error code, keyed by code.
@@ -2036,6 +2035,16 @@ const presentations = {
     title: "This can't be run while impersonating",
     describe: () => "Stop impersonating and sign in as yourself to run it.",
   },
+  one_password_in_production: {
+    title: "The service isn't configured correctly",
+    describe: () =>
+      "A development-only secrets source was enabled on a production deployment. An operator needs to remove it before the service can start.",
+  },
+  one_password_unavailable: {
+    title: "Secrets are unavailable",
+    describe: () =>
+      "The development secrets source could not be read. Sign in to it and try again.",
+  },
   ops_confirmation_required: {
     title: "Confirm before running this",
     describe: () => "This action can't be undone, so it has to be confirmed first.",
@@ -2093,6 +2102,21 @@ const presentations = {
   missing_credentials: {
     title: "This request carried no API key",
     describe: () => "Send an organization API key as Authorization: Bearer <api-key>.",
+  },
+  config_claims_secret: {
+    title: "The service isn't configured correctly",
+    describe: () =>
+      "A configuration value was declared where a secret belongs. An operator needs to correct the deployment before the service can start.",
+  },
+  config_collision: {
+    title: "The service isn't configured correctly",
+    describe: () =>
+      "Two parts of the deployment give one setting two different meanings. An operator needs to correct the deployment before the service can start.",
+  },
+  config_refused: {
+    title: "The service isn't configured correctly",
+    describe: () =>
+      "One or more required settings are missing or invalid. An operator needs to correct the deployment before the service can start.",
   },
   contested_credentials: {
     title: "This request carried more than one credential",
@@ -2401,6 +2425,26 @@ const presentations = {
    * The copy says the deployment lacks it rather than that something failed,
    * because "try again" would be an invitation to keep pressing.
    */
+  secret_absent: {
+    title: "The service isn't configured correctly",
+    describe: () =>
+      "A required secret is not set on this deployment. An operator needs to provide it before the service can start.",
+  },
+  secret_sealed: {
+    title: "Something went wrong on our side",
+    describe: () =>
+      "The service asked for a secret at the wrong time. This is a fault on our side.",
+  },
+  secret_undeclared: {
+    title: "Something went wrong on our side",
+    describe: () =>
+      "The service asked for a secret it never declared. This is a fault on our side.",
+  },
+  secrets_preflight_failed: {
+    title: "The service isn't configured correctly",
+    describe: () =>
+      "One or more required secrets are not set on this deployment. An operator needs to provide them before the service can start.",
+  },
   service_unavailable: {
     title: "This deployment doesn't offer that",
     describe: () =>
@@ -2916,14 +2960,12 @@ const presentations = {
     title: "That is no longer in this organization",
     describe: (error) => {
       const target = str(error, "target", "");
-      const subject =
-        target === "user"
-          ? "That person is"
-          : target === "team"
-            ? "That team is"
-            : target === "project"
-              ? "That project is"
-              : "What you picked is";
+      const subjects: Record<string, string> = {
+        user: "That person is",
+        team: "That team is",
+        project: "That project is",
+      };
+      const subject = subjects[target] ?? "What you picked is";
       return `${subject} no longer in this organization, so it cannot be put in a department. Reload and try again.`;
     },
   },

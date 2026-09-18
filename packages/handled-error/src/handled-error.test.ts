@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { HandledError, handledErrorFromHerr, NotFoundError, setTraceUrlProvider } from "./index.ts";
 
 class TestError extends HandledError {

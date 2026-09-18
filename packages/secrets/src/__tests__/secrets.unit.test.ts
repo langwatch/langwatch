@@ -5,14 +5,14 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { SecretsChain } from "../chain.ts";
+import { SecretsResolver } from "../resolver.ts";
+import { Secret } from "../secret.ts";
 import {
   AbsentSecretError,
   SealedSecretsError,
   SecretsPreflightError,
-  SecretsResolver,
   UndeclaredSecretError,
-} from "../resolver.ts";
-import { Secret } from "../secret.ts";
+} from "../secrets.errors.ts";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "secrets-"));
 const dotenv = path.join(dir, ".env");

@@ -19,16 +19,15 @@ export class SecretHandle<Value = string> {
 
 type LoadOptions = Readonly<{ schema?: SecretSchema<string> }>;
 
-export class Secret {
-  static load(id: string, options?: LoadOptions & { optional?: false }): SecretHandle<string>;
-  static load(
-    id: string,
-    options: LoadOptions & { optional: true },
-  ): SecretHandle<string | undefined>;
-  static load(
-    id: string,
-    options: LoadOptions & { optional?: boolean } = {},
-  ): SecretHandle<string | undefined> {
-    return new SecretHandle(id, options.optional === true, options.schema);
-  }
+type Loaded<Options> = Options extends { optional: true } ? string | undefined : string;
+
+function load<const Options extends LoadOptions & { optional?: boolean } = LoadOptions>(
+  id: string,
+  options?: Options,
+): SecretHandle<Loaded<Options>> {
+  return new SecretHandle(id, options?.optional === true, options?.schema) as SecretHandle<
+    Loaded<Options>
+  >;
 }
+
+export const Secret = { load } as const;

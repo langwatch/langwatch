@@ -4,8 +4,8 @@
   "private": true,
   "description": "Config as declared deployment facts: owners attach hand-written Zod leaves with env spellings where they are defined, and the app's one parse meets them, refusing by owner, path and variable name.",
   "keywords": [
-    "langwatch",
-    "config"
+    "config",
+    "langwatch"
   ],
   "license": "MIT",
   "files": [
@@ -25,6 +25,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

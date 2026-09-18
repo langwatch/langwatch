@@ -1,11 +1,16 @@
 /**
- * §6 config: you write the Zod yourself and attach it where you define the
- * owner (a module, or a framework package). The app pulls the slices back off
- * the installed array; this file is the one parse that meets them.
+ * §6 config: hand-written Zod attached where the owner is defined; the app
+ * pulls the slices off the installed array and this is the one parse.
  */
 import { z } from "zod";
 
-/** One deployment fact: an env spelling and the hand-written schema parsing it. */
+import {
+  ConfigClaimsSecretError,
+  ConfigCollisionError,
+  ConfigParseError,
+} from "./config.errors.ts";
+
+/** One deployment fact: an env spelling and the schema parsing it. */
 export class ConfigLeaf<Schema extends z.ZodType = z.ZodType> {
   declare readonly resolvesTo: z.infer<Schema>;
 
@@ -15,12 +20,12 @@ export class ConfigLeaf<Schema extends z.ZodType = z.ZodType> {
   ) {}
 }
 
-export class Config {
-  /** Config always reads the environment — one spelling, one schema. */
-  static env<Schema extends z.ZodType>(env: string, schema: Schema): ConfigLeaf<Schema> {
+/** Config always reads the environment — one spelling, one schema. */
+export const Config = {
+  env<Schema extends z.ZodType>(env: string, schema: Schema): ConfigLeaf<Schema> {
     return new ConfigLeaf(env, schema);
-  }
-}
+  },
+} as const;
 
 /** A slice is leaves, grouped by plain objects when the owner wants structure. */
 export type ConfigSlice = { readonly [key: string]: ConfigLeaf | ConfigSlice };
@@ -30,82 +35,98 @@ type Parsed<Node> =
     ? z.infer<Schema>
     : { readonly [Key in keyof Node]: Parsed<Node[Key]> };
 
-/** Anything that owns a slice: a process module, or a framework package. */
-export type ConfigOwner = Readonly<{ name: string; config?: ConfigSlice }>;
+/** An owner: a module or framework package. Secrets shape is structural (one id per handle). */
+export type ConfigOwner = Readonly<{
+  name: string;
+  config?: ConfigSlice;
+  secrets?: Readonly<Record<string, Readonly<{ id: string }>>>;
+}>;
 
 export type ProcessConfigOf<Owners extends readonly ConfigOwner[]> = {
   readonly [Owner in Owners[number] as Owner["name"]]: Parsed<Owner["config"] & object>;
 };
 
-/** Every refusal at once, each naming owner.path ← ENV_VAR. */
-export class ConfigParseError extends Error {
-  constructor(readonly refusals: readonly string[]) {
-    super(`Configuration refused:\n  ${refusals.join("\n  ")}`);
-    this.name = "ConfigParseError";
-  }
-}
+type Leaf = readonly [path: readonly string[], leaf: ConfigLeaf];
 
-/** Two owners bound one env var through two different leaves — two meanings. */
-export class ConfigCollisionError extends Error {
-  constructor(env: string, owners: readonly string[]) {
-    super(
-      `"${env}" is declared by ${owners.map((o) => `"${o}"`).join(" and ")} as different leaves. ` +
-        `One env var carries one meaning: share the exported leaf, or rename one variable.`,
-    );
-    this.name = "ConfigCollisionError";
-  }
-}
+const leavesOf = (slice: ConfigSlice, path: readonly string[] = []): Leaf[] =>
+  Object.entries(slice).flatMap(([key, node]) =>
+    node instanceof ConfigLeaf ? [[[...path, key], node] as Leaf] : leavesOf(node, [...path, key]),
+  );
 
-/**
- * The merge and the one parse. Loop the owners, walk each slice, read the
- * environment leaf by leaf. A shared exported leaf (same object) may appear
- * under many owners; the same env var behind two different leaves refuses.
- */
+/** One schema, one input, ONE parse; `.readonly()` is the immutability story. */
 export function parseProcessConfig<const Owners extends readonly ConfigOwner[]>(options: {
   owners: Owners;
   environment: Readonly<Record<string, string | undefined>>;
 }): ProcessConfigOf<Owners> {
+  const owned = options.owners.filter((owner) => owner.config !== undefined);
+  const all = owned.flatMap((owner) =>
+    leavesOf(owner.config ?? {}, [owner.name]).map((entry) => ({ owner: owner.name, entry })),
+  );
+
+  refuseCrossClaims(options.owners, all);
+
+  const schema = z
+    .object(Object.fromEntries(owned.map((o) => [o.name, sliceSchema(o.config ?? {})])))
+    .readonly();
+  const input = Object.fromEntries(
+    owned.map((o) => [o.name, sliceInput(o.config ?? {}, options.environment)]),
+  );
+  const result = schema.safeParse(input);
+
+  if (result.success) {
+    return result.data as ProcessConfigOf<Owners>;
+  }
+
+  const envAt = new Map(all.map(({ entry: [path, leaf] }) => [path.join("."), leaf.env]));
+  const refusals = result.error.issues.map((issue) => {
+    const path = issue.path.join(".");
+    return `${path} ← ${envAt.get(path) ?? "?"}: ${issue.message}`;
+  });
+
+  throw new ConfigParseError(refusals);
+}
+
+const sliceSchema = (slice: ConfigSlice): z.ZodType =>
+  z
+    .object(
+      Object.fromEntries(
+        Object.entries(slice).map(([key, node]) => [
+          key,
+          node instanceof ConfigLeaf ? node.schema : sliceSchema(node),
+        ]),
+      ),
+    )
+    .readonly();
+
+const sliceInput = (
+  slice: ConfigSlice,
+  environment: Readonly<Record<string, string | undefined>>,
+): unknown =>
+  Object.fromEntries(
+    Object.entries(slice).map(([key, node]) => [
+      key,
+      node instanceof ConfigLeaf ? environment[node.env] : sliceInput(node, environment),
+    ]),
+  );
+
+function refuseCrossClaims(
+  owners: readonly ConfigOwner[],
+  all: readonly { owner: string; entry: Leaf }[],
+): void {
+  const secretIds = new Map(
+    owners.flatMap((o) => Object.values(o.secrets ?? {}).map((h) => [h.id, o.name] as const)),
+  );
   const claimed = new Map<string, { leaf: ConfigLeaf; owner: string }>();
-  const refusals: string[] = [];
-  const parsed: Record<string, unknown> = {};
 
-  for (const owner of options.owners) {
-    if (owner.config === undefined) continue;
+  for (const {
+    owner,
+    entry: [, leaf],
+  } of all) {
+    const secretOwner = secretIds.get(leaf.env);
+    if (secretOwner !== undefined) throw new ConfigClaimsSecretError(leaf.env, owner, secretOwner);
 
-    parsed[owner.name] = parseSlice(owner.config, owner.name, [owner.name]);
-  }
-
-  if (refusals.length > 0) throw new ConfigParseError(refusals);
-
-  return Object.freeze(parsed) as ProcessConfigOf<Owners>;
-
-  function parseSlice(slice: ConfigSlice, owner: string, path: string[]): unknown {
-    const out: Record<string, unknown> = {};
-
-    for (const [key, node] of Object.entries(slice)) {
-      out[key] =
-        node instanceof ConfigLeaf
-          ? parseLeaf(node, owner, [...path, key])
-          : parseSlice(node, owner, [...path, key]);
-    }
-
-    return Object.freeze(out);
-  }
-
-  function parseLeaf(leaf: ConfigLeaf, owner: string, path: string[]): unknown {
     const held = claimed.get(leaf.env);
-
     if (held && held.leaf !== leaf) throw new ConfigCollisionError(leaf.env, [held.owner, owner]);
-
     claimed.set(leaf.env, { leaf, owner });
-    const result = leaf.schema.safeParse(options.environment[leaf.env]);
-
-    if (result.success) return result.data;
-
-    refusals.push(
-      `${path.join(".")} ← ${leaf.env}: ${result.error.issues[0]?.message ?? "invalid"}`,
-    );
-
-    return undefined;
   }
 }
