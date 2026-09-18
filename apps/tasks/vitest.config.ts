@@ -1,11 +1,17 @@
 import { defineModuleVitestConfig } from "../../packages/test-harness/src/vitest-config.ts";
 
-export default defineModuleVitestConfig({
+const config = defineModuleVitestConfig({
   kind: "node",
-  isolate: false,
+  isolate: true,
   test: {
     fsModuleCache: true,
     watch: false,
     testTimeout: 10000,
   },
 });
+
+export default {
+  ...config,
+  // Typechecking owns project references; test transforms only strip this package's types.
+  oxc: { tsconfig: { compilerOptions: { verbatimModuleSyntax: true } } },
+};

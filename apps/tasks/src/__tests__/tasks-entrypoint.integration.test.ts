@@ -1,44 +1,51 @@
 import { execFile } from "node:child_process";
 import process from "node:process";
 import { promisify } from "node:util";
+
 import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
 
-/**
- * Runs the built entrypoint two ways: a bare `pnpm -s task <name>` (the
- * container CMD's invocation) and the filtered laptop form. Both must
- * resolve the same catalogue entry - one command line, not one per environment.
- */
+const environment = {
+  ...process.env,
+  NODE_ENV: "test",
+  DATABASE_URL: "",
+  SKIP_PRISMA_MIGRATE: "true",
+  LANGWATCH_SECRETS_VAULT: "",
+  VITEST: "",
+};
+
 describe("apps/tasks entrypoint", () => {
-  describe("given the webhook-signature-vectors task, which needs no infrastructure", () => {
+  describe("given a skipped Prisma migration, which needs no infrastructure", () => {
     /** @scenario "The same command line works from a laptop and from the container CMD" */
     it("runs identically from a laptop-style and a container-style invocation", async () => {
       const laptop = await execFileAsync(
         "pnpm",
-        ["--filter", "@langwatch/tasks", "task", "webhook-signature-vectors"],
-        { cwd: new URL("../../../..", import.meta.url).pathname },
+        ["--filter", "@langwatch/tasks", "task", "prisma-migrate"],
+        { cwd: new URL("../../../..", import.meta.url).pathname, env: environment },
       );
-      const container = await execFileAsync("pnpm", ["-s", "task", "webhook-signature-vectors"], {
+      const container = await execFileAsync("pnpm", ["-s", "task", "prisma-migrate"], {
         cwd: new URL("../..", import.meta.url).pathname,
+        env: environment,
       });
 
-      expect(laptop.stdout).toContain("wrote");
-      expect(container.stdout).toContain("wrote");
+      expect(laptop.stdout).toContain("skipping Prisma migrations");
+      expect(container.stdout).toContain("skipping Prisma migrations");
     }, 60_000);
   });
 
-  describe("given an environment carrying a stored-object backend nothing implements", () => {
+  describe("given an invalid process environment", () => {
     /** @scenario "The task process validates its configuration before a migration runs" */
     it("refuses before it builds the catalogue or runs a task", async () => {
-      const failure = await execFileAsync("pnpm", ["-s", "task", "webhook-signature-vectors"], {
+      const failure = execFileAsync("pnpm", ["-s", "task", "prisma-migrate"], {
         cwd: new URL("../..", import.meta.url).pathname,
-        env: { ...process.env, STORED_OBJECTS_BACKEND: "gcs" },
-      }).catch((error: unknown) => error as { stdout: string; stderr: string; code: number });
-
-      const output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
-      expect(output).toContain("Invalid tasks configuration");
-      expect(output).not.toContain("wrote");
+        env: { ...environment, NODE_ENV: "invalid" },
+      });
+      await expect(failure).rejects.toMatchObject({
+        code: 1,
+        stderr: expect.stringContaining("Invalid tasks configuration"),
+        stdout: expect.not.stringContaining("skipping Prisma migrations"),
+      });
     }, 60_000);
   });
 });
