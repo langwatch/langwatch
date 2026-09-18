@@ -10,6 +10,7 @@ import { useUiAddress } from "@langwatch/browser-host/address";
 import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
+import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { LangyMark, LangyMarkGradientDefs, useLangyStore } from "@langwatch/langy-browser-kit";
 import {
   NavigationHostProvider,
@@ -36,7 +37,7 @@ import {
 } from "@langwatch/organization-browser/surfaces/scope-capability";
 import { useLegacySimulationsPreference } from "@langwatch/scenario-browser/surfaces/simulations-preference";
 import { PresenceMenuItem } from "@langwatch/trace-browser/surfaces/presence-menu-item";
-import { UiPageFailure, UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
+import { UiPageFailure, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
 
@@ -89,7 +90,7 @@ export function UiNavigationHost({
 }) {
   const { host, failure } = useNavigationHostReading(commandBar);
 
-  if (failure.departing) return <UiPageLoading />;
+  if (failure.departing) return <LoadingScreen />;
   if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return (
@@ -265,7 +266,7 @@ function useNavigationHostReading(commandBar: boolean) {
           commandBar: commandBarAnswer,
           langy,
           accountMenu,
-          waiting: <UiPageLoading />,
+          waiting: <LoadingScreen />,
           notFound: <UiPageNotFound />,
           hasPermission: (permission) => session.hasPermission(permission),
           featureFlag: (flag) => session.featureFlag(flag),

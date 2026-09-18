@@ -7,6 +7,7 @@ import {
   Alert,
   Box,
   Button,
+  Container,
   HStack,
   Spacer,
   type StackProps,
@@ -14,12 +15,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { KeyRound } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { type NavigationTeam, useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
+import { isSettingsShellRoute } from "../../model/products.ts";
 import { isResolverAddress } from "../../model/resolve-shell-route.ts";
 import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
@@ -77,6 +79,26 @@ function readerMayOpenThePage({
   // The same predicate the host's own ambient team resolution prefers on, so
   // the team the application picks and the one the chrome draws cannot diverge.
   return !!team && !!userId && (team.members ?? []).some((member) => member.userId === userId);
+}
+
+/**
+ * The settings detour is read at a measure, centred in the width left beside
+ * the menu — a settings form flush against the sidebar is what this stops.
+ */
+function PageMeasure({ pathname, children }: { pathname: string; children: ReactNode }) {
+  if (!isSettingsShellRoute(pathname)) return <>{children}</>;
+  return (
+    <Container
+      maxWidth="1280px"
+      padding={4}
+      paddingBottom={16}
+      height="full"
+      overflowY="auto"
+      flex={1}
+    >
+      {children}
+    </Container>
+  );
 }
 
 export const ShellPageBody = ({
@@ -284,7 +306,7 @@ export const ShellPageBody = ({
         // showing one pushed the bottom of the page off the viewport.
         <Box flex="1" minHeight={0} width="full" display="flex" flexDirection="column">
           <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[pathname]}>
-            {children}
+            <PageMeasure pathname={pathname}>{children}</PageMeasure>
           </ErrorBoundary>
         </Box>
       ) : (
