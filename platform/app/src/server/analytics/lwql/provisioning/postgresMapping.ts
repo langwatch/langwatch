@@ -25,7 +25,7 @@
  *
  * @see ./accessModel.ts — the ClickHouse access model applied over these tables
  * @see ../sqlText.ts — the escaping and identifier rules these statements obey
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import {

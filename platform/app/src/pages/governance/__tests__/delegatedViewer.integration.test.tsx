@@ -35,6 +35,12 @@ const harness = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
 }));
 
+// The guided-onboarding offer is covered by its own suite, and this one
+// covers the page, not the offer.
+vi.mock("~/features/guided-onboarding/home/GuidedOnboardingOffer", () => ({
+  GuidedOnboardingOffer: () => null,
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   const rbac =
     await vi.importActual<typeof import("~/server/api/rbac")>(

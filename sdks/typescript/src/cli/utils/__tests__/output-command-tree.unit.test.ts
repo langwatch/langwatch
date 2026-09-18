@@ -53,6 +53,12 @@ describe("the real command tree", () => {
       ["gateway-budgets", "archive"],
       ["virtual-keys", "rotate"],
       ["analytics", "query"],
+      ["query", "run"],
+      ["query", "schema"],
+      ["query", "reference"],
+      ["query", "examples"],
+      ["trace", "facets"],
+      ["trace", "fields"],
       ["trigger", "delete"],
       ["secret", "update"],
       ["run-plan", "run"],
@@ -172,7 +178,6 @@ describe("the real command tree", () => {
       // Interactive / credential flows: prompts, not documents.
       ["login", "interactive credential flow"],
       ["logout", "interactive credential flow"],
-      ["whoami", "interactive credential flow"],
       // The output contract covers commands that return a platform document.
       // This one reports what it wrote to the local machine, so there is no
       // document for `--json` to carry.

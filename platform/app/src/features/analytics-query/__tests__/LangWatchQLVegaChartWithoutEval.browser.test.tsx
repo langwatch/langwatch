@@ -19,7 +19,7 @@
  * test harness itself evaluates modules from source text, and hardening before
  * that would fail the harness rather than the chart.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: specs/lwql/workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

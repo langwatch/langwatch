@@ -64,6 +64,7 @@ help:
 	@echo "  Dogfood applications (the customer application Langy works on):"
 	@echo "    make dogfood-langy-local lang=python      boot the ACME support demo (FastAPI)"
 	@echo "    make dogfood-langy-local lang=typescript  boot the ACME support demo (Hono)"
+	@echo "    make dogfood-langy-local lang=langgraph   boot the ACME checkout demo (LangGraph)"
 	@echo ""
 	@echo "  Per-worktree isolated stacks (for AI agents / parallel work):"
 	@echo "    make dev-up [PROFILE=full]            start isolated containers"
@@ -72,9 +73,14 @@ help:
 	@echo ""
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
 
-# The demo applications keep their own Makefile; this only forwards `lang`.
+# The demo applications keep their own Makefile; this only picks the folder
+# and forwards `lang`.
 dogfood-langy-local:
+ifeq ($(lang),langgraph)
+	@$(MAKE) -C dev/dogfood/acme-checkout dogfood-langy-local
+else
 	@$(MAKE) -C dev/dogfood/acme-support dogfood-langy-local $(if $(lang),lang=$(lang))
+endif
 
 include dev/boxd.mk
 # dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`

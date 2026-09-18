@@ -255,5 +255,5 @@ doubles aggregates, which is the failure mode nobody notices.
 - `platform/app/src/server/analytics/lwql/provisioning/catalogStatements.ts` — the generators, and
   the measurement on `SHIPPED_LWQL_DEDUP`
 - `platform/app/src/server/analytics/lwql/provisioning/__tests__/catalogStatements.integration.test.ts`
-- `specs/analytics/lwql-api.feature`
+- `specs/lwql/api.feature`
 - ADR-081 — the table-function and SSRF policy over the same identity

@@ -227,11 +227,16 @@ function ButtonReferences() {
       <Button size="sm" colorPalette="orange">
         reference solid small
       </Button>
-      {/* Add tool is not a bare button: it is this menu's trigger, and the
+      {/* Add source is not a bare button: it is this menu's trigger, and the
           trigger composition adds a class and its own emitted style. Comparing
-          it against a bare solid button fails on the wrapper rather than on
-          the variant, which would be a false alarm. So the reference wears the
+          it against a bare button fails on the wrapper rather than on the
+          variant, which would be a false alarm. So the references wear the
           same wrapper, and the comparison stays about the button. */}
+      <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
+        <Button size="sm" variant="outline">
+          reference outline small trigger
+        </Button>
+      </AddIngestionSourceMenu>
       <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
         <Button size="sm" colorPalette="orange">
           reference solid small trigger
@@ -266,6 +271,14 @@ export async function openTab(name: RegExp) {
   const tab = screen.getByRole("tab", { name });
   await userEvent.click(tab);
   await waitFor(() => expect(tab).toHaveAttribute("aria-selected", "true"));
+  // A selected tab is not a filled panel. The panel's content lands in a later
+  // commit than the selection, so a caller that queries on the click's own tick
+  // can read an empty panel and fail on a row that is about to render. Waiting
+  // for the panel to hold something is what makes every caller's first query
+  // safe, rather than each one remembering to use an async query.
+  await waitFor(() => {
+    expect(screen.getByRole("tabpanel").textContent ?? "").not.toBe("");
+  });
 }
 
 beforeEach(() => {

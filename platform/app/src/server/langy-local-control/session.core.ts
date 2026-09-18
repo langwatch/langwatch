@@ -206,7 +206,7 @@ export class LocalControlSessionCore {
     this.now = options.now ?? (() => Date.now());
     this.tokenResolver =
       options.tokenResolver ?? TokenResolver.create(options.prisma);
-    this.turns = options.turns ?? defaultTurnStarter(options.prisma);
+    this.turns = options.turns ?? localConnectTurnStarter(options.prisma);
     this.skipGate = options.skipGate ?? canModelSkipPermissions;
     // The App is composed after this process core is built, so every port it
     // reads off the App is read at call time rather than at construction.
@@ -399,7 +399,11 @@ export class LocalControlSessionCore {
    *
    * A turn already in flight is not a failure: the developer connected while
    * Langy was working, and the running turn picks the folder up on its next
-   * call. The event still lands, so the card reads connected either way.
+   * call. That reading is folded from events, though, so a turn that ended
+   * seconds ago can still read as in flight with no turn left to pick the
+   * folder up. The connect turn is then owed, and the turn's end starts it
+   * unless the turn reached the folder (`createLocalConnectTurnSubscriber`).
+   * The event still lands, so the card reads connected either way.
    */
   async afterRegister(session: ControlSession): Promise<void> {
     const workspace = await this.presence.read(session.conversationId);
@@ -421,13 +425,19 @@ export class LocalControlSessionCore {
         conversationId: session.conversationId,
         userId: session.userId,
         text: connectMessage(),
-        idempotencyKey: `local-connect:${session.requestId}`,
+        idempotencyKey: connectTurnIdempotencyKey(session.requestId),
       });
     } catch (error) {
       if (LangyTurnInProgressError.is(error)) {
+        await this.presence.oweConnectTurn({
+          conversationId: session.conversationId,
+          projectId: session.projectId,
+          userId: session.userId,
+          requestId: session.requestId,
+        });
         logger.info(
           { conversationId: session.conversationId },
-          "folder connected while a turn was running, no second turn started",
+          "folder connected while a turn read as in flight; the connect turn is owed when that turn ends",
         );
         return;
       }
@@ -810,6 +820,15 @@ export function grantedPatterns(frame: PermissionRequiredFrame): string[] {
 }
 
 /**
+ * The idempotency key of the turn one connection starts, whether the
+ * connection started it directly or the turn before it ended first: the
+ * same key, so the two paths can never both start one.
+ */
+export function connectTurnIdempotencyKey(requestId: string): string {
+  return `local-connect:${requestId}`;
+}
+
+/**
  * The message the connected folder starts the next turn with.
  *
  * Four words, and no facts. The model reads the path, the machine and the
@@ -895,8 +914,10 @@ export function conversationUrl(
   }
 }
 
-/** Starts the turn through the app layer, as the acting user. */
-function defaultTurnStarter(prisma: PrismaClient): ControlTurnStarter {
+/** Starts the turn through the app layer, as the acting user who approved the share. */
+export function localConnectTurnStarter(
+  prisma: PrismaClient,
+): ControlTurnStarter {
   return {
     async start({ projectId, conversationId, userId, text, idempotencyKey }) {
       const actor = await resolveLangyActorSession({

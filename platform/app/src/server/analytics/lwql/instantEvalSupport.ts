@@ -46,8 +46,15 @@ const DEFAULT_MAX_CONCURRENCY = 128;
 const DEFAULT_QUERY_TOKEN_BUDGET = 4_000_000;
 
 export interface LangWatchQLInstantEvalSupport {
-  /** Whether this project may call an eval function at all. */
-  isEnabled(args: { projectId: string }): Promise<boolean>;
+  /**
+   * Whether this caller may call an eval function at all.
+   *
+   * Takes the whole scope rather than one project because a key can read
+   * several, and a judgement is charged to a project: a query spanning more
+   * than one has no single owner for the spend, so it is refused. Within a
+   * single-project scope this is the project's own flag.
+   */
+  isEnabled(args: { projectIds: readonly string[] }): Promise<boolean>;
   /** The judge, built on first use. */
   classifier(): InstantEvalClassifier;
   readonly maxConcurrency: number;
@@ -66,12 +73,27 @@ export interface LangWatchQLInstantEvalSupport {
  */
 export function createLangWatchQLInstantEvalSupport({
   recorder,
+  isProjectEnabled = (projectId: string) =>
+    instantEvalsEnabled({ prisma, projectId }),
 }: {
   recorder?: InstantEvalSpendRecorder;
+  /**
+   * Whether one project may judge, injectable so the scope rule below can be
+   * stated in a test without a datastore behind it — the same reason
+   * `instantEvalsEnabled` takes `isClassifierConfigured`.
+   */
+  isProjectEnabled?: (projectId: string) => Promise<boolean>;
 } = {}): LangWatchQLInstantEvalSupport {
   const fallback = new LoggingInstantEvalSpendRecorder();
   return {
-    isEnabled: ({ projectId }) => instantEvalsEnabled({ prisma, projectId }),
+    isEnabled: async ({ projectIds }) => {
+      // A judgement is charged to a project, so a scope that names anything
+      // other than exactly one has no owner for the spend and is refused before
+      // the flag is read at all.
+      const only = projectIds.length === 1 ? projectIds[0] : undefined;
+      if (only === undefined) return false;
+      return await isProjectEnabled(only);
+    },
     classifier: getInstantEvalClassifier,
     maxConcurrency: DEFAULT_MAX_CONCURRENCY,
     queryTokenBudget:

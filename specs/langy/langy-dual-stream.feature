@@ -293,3 +293,16 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     When a moment passes with tokens still pending
     Then the pending text is flushed without waiting for the batch to fill
     And a fast stream still batches, so the stream write volume stays bounded
+
+  # The proof that a turn is alive is the heartbeat, and the buffer's TTL
+  # moves with it, not with appends alone. A tool call the agent waits on, a
+  # suite run, a build, produces no appends for as long as it takes, and a
+  # TTL that only appends refresh would let a turn quiet for longer than the
+  # TTL lose its whole buffer under a worker beating the entire time.
+  @unit
+  Scenario: A turn that goes quiet inside one tool call keeps its live edge
+    Given a turn whose tool call runs longer than the buffer's TTL
+    And the worker keeps beating for the whole wait
+    When the agent writes to the live edge again on the far side of the wait
+    Then a tab attaching then replays the whole turn, that entry included
+    And a turn that stops beating still lets its buffer lapse

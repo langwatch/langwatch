@@ -12,6 +12,7 @@
  */
 
 import chalk from "chalk";
+import { ProjectsApiService } from "../../../client-sdk/services/projects/projects-api.service";
 import { loginCommand } from "../login";
 import {
   chooseRequest,
@@ -139,6 +140,17 @@ async function shareControl(root: string): Promise<void> {
       url: choice.request.conversationUrl,
     },
     withoutGit: !isGitRepository(root),
+    project: {
+      id: choice.request.projectId,
+      name: choice.request.projectName,
+    },
+    // The developer's own login, never the session key: the platform gates
+    // the key on this person's permission on the project.
+    readProjectApiKey: (projectId) =>
+      new ProjectsApiService({
+        endpoint: credentials.endpoint,
+        apiKey: credentials.apiKey,
+      }).getApiKey(projectId),
   });
 
   const onSignal = () => session.requestShutdown();

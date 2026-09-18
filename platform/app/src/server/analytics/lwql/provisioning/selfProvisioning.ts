@@ -26,7 +26,7 @@
  * distribution, so a self-hosted operator reading the docs and a cloud
  * operator reading terraform see the same objects.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { createLogger } from "@langwatch/observability";

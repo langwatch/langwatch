@@ -28,6 +28,7 @@ import type {
   RangeFacetDef,
 } from "./facet-registry";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
+import { withHiddenOrigins } from "./hidden-origins";
 import type {
   BatchedFacetResult,
   CategoricalFacetResult,
@@ -132,6 +133,8 @@ interface ListParams {
   pageSize: number;
   cursor?: TraceListCursor;
   filterWhere?: { sql: string; params: Record<string, unknown> };
+  /** Origins left out on top of the filter, see `explorerHiddenOrigins`. */
+  hiddenOrigins?: readonly string[];
   /**
    * Visibility gate: list items older than this cutoff get their
    * input/output previews teaser-redacted. Omitted/null = ungated.
@@ -143,6 +146,11 @@ interface FacetParams {
   tenantId: string;
   timeRange: { from: number; to: number };
   filterWhere?: { sql: string; params: Record<string, unknown> };
+  /**
+   * Origins left out of every count but the origin facet's own, which keeps
+   * them so they stay there to pick.
+   */
+  hiddenOrigins?: readonly string[];
 }
 
 interface NewCountParams {
@@ -150,6 +158,7 @@ interface NewCountParams {
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
+  hiddenOrigins?: readonly string[];
 }
 
 interface SuggestParams {
@@ -538,7 +547,7 @@ export class TraceListService {
       limit: params.pageSize + 1,
       cursor: params.cursor,
       offset,
-      filterWhere: params.filterWhere,
+      filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
     });
 
     const hasMore = result.rows.length > params.pageSize;
@@ -586,13 +595,17 @@ export class TraceListService {
   }
 
   async getFacets(params: FacetParams): Promise<FacetCounts> {
+    const filterWhere = withHiddenOrigins(
+      params.filterWhere,
+      params.hiddenOrigins,
+    );
     const facetPromises = Object.entries(FACET_EXPRESSIONS).map(
       async ([name, expression]) => {
         const result = await this.repository.findFacetCounts({
           tenantId: params.tenantId,
           timeRange: params.timeRange,
           facetExpression: expression,
-          filterWhere: params.filterWhere,
+          filterWhere: name === "origin" ? params.filterWhere : filterWhere,
         });
         return [name, result.values] as const;
       },
@@ -602,7 +615,7 @@ export class TraceListService {
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       facetExpression: MODEL_FACET_QUERY,
-      filterWhere: params.filterWhere,
+      filterWhere,
     });
 
     const rangePromises = {
@@ -610,19 +623,19 @@ export class TraceListService {
         tenantId: params.tenantId,
         timeRange: params.timeRange,
         column: "TotalPromptTokenCount + TotalCompletionTokenCount",
-        filterWhere: params.filterWhere,
+        filterWhere,
       }),
       cost: this.repository.findRangeStats({
         tenantId: params.tenantId,
         timeRange: params.timeRange,
         column: "TotalCost",
-        filterWhere: params.filterWhere,
+        filterWhere,
       }),
       latency: this.repository.findRangeStats({
         tenantId: params.tenantId,
         timeRange: params.timeRange,
         column: "TotalDurationMs",
-        filterWhere: params.filterWhere,
+        filterWhere,
       }),
     };
 
@@ -658,7 +671,7 @@ export class TraceListService {
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       since: params.since,
-      filterWhere: params.filterWhere,
+      filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
     });
   }
 

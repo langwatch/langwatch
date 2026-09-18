@@ -181,6 +181,15 @@ Feature: Langy asks how to reach the customer's code, once
       And it says the remote list reaches the network, so it goes with the fetch
 
     @unit
+    Scenario: A dirty tree gets a branch with no start point and a commit by file name
+      Given the code changes skill
+      When its branching step is read
+      Then it says a dirty tree branches with no start point, so the uncommitted files come along
+      And it says a nested worktree is not the answer, because every command runs from the shared folder and a cd asks
+      And it says a dirty file the change needs is asked about before it is edited
+      And its commit step says to stage the changed files by name and never the whole tree
+
+    @unit
     Scenario: A pull request body of more than one line goes in a file
       Given the code changes skill
       When its pull request step is read
@@ -249,6 +258,13 @@ Feature: Langy asks how to reach the customer's code, once
       Then no preference is stored, because a folder must be shared again each time
 
   Rule: A shared folder belongs to one conversation
+
+    @unit
+    Scenario: A folder connected to this conversation answers with its facts, not a card
+      Given my local folder is connected to this conversation
+      When Langy calls the code access tool
+      Then the tool answers with the folder's facts and says to work with the local tools
+      And no control request is recorded, so no card is drawn
 
     @integration
     Scenario: A folder connected in another conversation does not count

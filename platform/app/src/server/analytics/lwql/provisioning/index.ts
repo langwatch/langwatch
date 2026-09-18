@@ -15,7 +15,7 @@
  * (the view catalog, the statement builders) onto every query boot, the exact
  * coupling this module keeps out.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./accessModel";

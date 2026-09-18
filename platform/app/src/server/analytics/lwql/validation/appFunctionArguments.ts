@@ -17,7 +17,7 @@
  *
  * @see ./validate.ts
  * @see ../appFunctions/catalog.ts
- * @see ../../../../../specs/analytics/lwql-eval-functions.feature
+ * @see ../../../../../specs/lwql/eval-functions.feature
  */
 
 import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals/classifier/token-budget";

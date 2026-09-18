@@ -32,7 +32,7 @@
  * module.
  *
  * @see ./catalog.ts — what each function is
- * @see ../../../../../specs/analytics/lwql-app-functions.feature
+ * @see ../../../../../specs/lwql/app-functions.feature
  */
 
 import { InstantEvalClassifierUnavailableError } from "~/server/app-layer/instant-evals/errors";
@@ -153,6 +153,25 @@ export async function judgeLangWatchQLHydration({
 const EMPTY_TRACES: FetchedTraces = { byId: new Map(), byThread: new Map() };
 
 /**
+ * The project a judgement is rated and billed against.
+ *
+ * A judgement has one owner, so the validator admits an eval call only for a
+ * scope naming exactly one project. Reaching here with any other scope is a
+ * programming error rather than anything a caller wrote, so it is a plain
+ * `Error`: it degrades to an unknown failure with a trace id rather than
+ * telling a customer to fix something they did not do (ADR-045).
+ */
+function judgingProjectOf(input: LangWatchQLHydrationInput): string {
+  const only = input.projectIds.length === 1 ? input.projectIds[0] : undefined;
+  if (only === undefined) {
+    throw new Error(
+      `an eval function reached hydration with ${input.projectIds.length} projects in scope; the validator admits one`,
+    );
+  }
+  return only;
+}
+
+/**
  * Step 5: judge what the extraction produced.
  *
  * Skipped entirely when the statement called no eval function, and skipped
@@ -176,7 +195,7 @@ async function judgeCalls({
 
   try {
     const outcome = await evaluateCalls({
-      projectId: input.projectId,
+      projectId: judgingProjectOf(input),
       resolved,
       traces,
       support,

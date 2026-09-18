@@ -17,7 +17,7 @@
  * it for another.
  *
  * @see ../../analytics/lwql/access.ts
- * @see ../../../../specs/analytics/lwql-eval-functions.feature
+ * @see ../../../../specs/lwql/eval-functions.feature
  */
 
 import type { PrismaClient } from "~/generated/prisma/client";

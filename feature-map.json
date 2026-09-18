@@ -26,14 +26,18 @@
                 "trace get",
                 "trace export",
                 "trace transcript",
-                "session events"
+                "session events",
+                "trace facets",
+                "trace fields"
               ],
               "hints": {
                 "trace search": "langwatch trace search -q \"timeout\" --limit 10 -o json",
                 "trace get": "langwatch trace get <traceId> -o json",
                 "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl",
                 "trace transcript": "langwatch trace transcript <traceId> -o json",
-                "session events": "langwatch session events <sessionId> --kinds model_call,compaction -o json"
+                "session events": "langwatch session events <sessionId> --kinds model_call,compaction -o json",
+                "trace facets": "langwatch trace facets model --prefix gpt -o json",
+                "trace fields": "langwatch trace fields -o json"
               },
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
@@ -93,6 +97,48 @@
           "produces": [
             "metrics"
           ],
+          "consumes": [
+            "traces"
+          ]
+        },
+        {
+          "id": "observability.custom-query",
+          "name": "Custom Query",
+          "description": "Query traces two ways: LangWatchQL analytics SQL for counts, rates and joins, and the trace filter language for finding traces",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "typescript": "langwatch.query"
+              },
+              "cli": [
+                "query run",
+                "query schema",
+                "query reference",
+                "query examples"
+              ],
+              "hints": {
+                "query run": "langwatch query \"SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day ORDER BY day\" -f json",
+                "query schema": "langwatch query schema -f json",
+                "query reference": "langwatch query reference -f json",
+                "query examples": "langwatch query examples --tag cost"
+              },
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/experiments/workbench",
+              "mcp": [
+                "run_query",
+                "discover_schema"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/v1/query",
+            "docs": null
+          },
+          "sync": "code-to-platform",
+          "produces": [],
           "consumes": [
             "traces"
           ]

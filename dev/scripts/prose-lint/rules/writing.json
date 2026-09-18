@@ -1,0 +1,456 @@
+{
+  "set": "writing",
+  "source": "writing-rules (marketing prose: blog, HN, LinkedIn)",
+  "rules": [
+    {
+      "id": "em-dash",
+      "name": "No em dashes",
+      "kind": "regex",
+      "pattern": "[\\u2014\\u2015]",
+      "flags": "g",
+      "note": "Use a comma or a colon instead. En dashes and hyphens are fine."
+    },
+    {
+      "id": "banned-words-2026-08-02",
+      "name": "Banned words and phrases (founder review 2026-08-02)",
+      "kind": "regex",
+      "pattern": "\\bhonest(?:ly)?\\b|\\bhinges? on\\b|\\b(?:nobody|no one) can\\b|\\bshows up nowhere\\b",
+      "flags": "gi",
+      "note": "honest/honestly as rhetorical framing, hinges on, nobody can / no one can as mystery-framing, shows up nowhere."
+    },
+    {
+      "id": "load-bearing",
+      "name": "Load-bearing and borrowed structural metaphors (literal)",
+      "kind": "regex",
+      "pattern": "\\bload[- ]bearing\\b|\\bimpedance mismatch\\b",
+      "flags": "gi",
+      "note": "Write the plain thing: the part that does the work, the assumption the argument rests on."
+    },
+    {
+      "id": "founder-banned-words",
+      "name": "Founder banned words (standing instruction, not on the rule page)",
+      "kind": "regex",
+      "pattern": "\\bseams?\\b|\\bharvest(?:s|ed|ing)?\\b|\\bloud(?:ly)?\\b|\\bnobody\\b",
+      "flags": "gi",
+      "note": "seam, harvest, loud, nobody. From the founder's standing instruction list; honest and load-bearing are covered by their own rules."
+    },
+    {
+      "id": "most-vague-quantifier",
+      "name": "\"most\" as a vague-majority quantifier (founder review 2026-08-12)",
+      "kind": "regex",
+      "pattern": "(?<!\\b(?:the|at)\\s)\\bmost\\b(?!\\s+(?:likely|recent|recently|important|common|commonly|often)\\b)",
+      "flags": "gi",
+      "note": "State the direct claim or give a real quantity. Superlatives (the most) and bounds (at most) are not this."
+    },
+    {
+      "id": "interesting-literal",
+      "name": "\"is the interesting one\" / \"the interesting part is\" (literal strings)",
+      "kind": "regex",
+      "pattern": "\\bis the interesting one\\b|\\bthe interesting part is\\b",
+      "flags": "gi",
+      "note": "Narrator sentences by shape: they say the thing is interesting instead of saying the thing."
+    },
+    {
+      "id": "vibe-phrases-literal",
+      "name": "Vibe phrases (literal list from the rule)",
+      "kind": "regex",
+      "pattern": "\\bfelt like the future\\b|\\bwild when it works\\b|\\bthe real unlock\\b|\\bthe forcing function\\b|\\bzero friction\\b",
+      "flags": "gi"
+    },
+    {
+      "id": "magic-reframe",
+      "name": "Magic/not-magic reframe",
+      "kind": "regex",
+      "pattern": "\\bnot magic\\b|\\bless about magic\\b|\\bisn'?t magic\\b",
+      "flags": "gi",
+      "note": "\"It's not magic, it's just X.\" Template; delete."
+    },
+    {
+      "id": "arrow-cta",
+      "name": "Arrow CTAs",
+      "kind": "regex",
+      "pattern": "\\u2192|-->",
+      "flags": "g",
+      "note": "\"→ github.com/...\" reads as LinkedIn-influencer template."
+    },
+    {
+      "id": "ellipsis-shrug",
+      "name": "Ellipsis-as-shrug",
+      "kind": "regex",
+      "pattern": "\\.\\.\\.|\\u2026",
+      "flags": "g",
+      "note": "\"It was just... a bit stupid.\" Manufactured casualness."
+    },
+    {
+      "id": "generic-provider-brand",
+      "name": "Name the companies, not the model brands, for generic providers",
+      "kind": "regex",
+      "pattern": "\\b(?:GPT|Claude)(?: or (?:GPT|Claude))? APIs?\\b|\\bthe (?:GPT|Claude) API\\b",
+      "flags": "g",
+      "note": "Write \"the OpenAI or Anthropic APIs\". Saying Claude is fine when the subject is Claude Code or a specific model."
+    },
+    {
+      "id": "internal-strategy-vocab",
+      "name": "Internal strategy vocabulary stays internal",
+      "kind": "regex",
+      "pattern": "\\breceipts\\b|\\bwedge\\b|\\bthe pond\\b",
+      "flags": "gi",
+      "note": "Coinages from the strategy pages (receipts, wedge, pond) read weird in public copy."
+    },
+    {
+      "id": "interface-internals-vocab",
+      "name": "Interface-internals vocabulary is not reader vocabulary",
+      "kind": "regex",
+      "pattern": "\\bunfolds?\\b|\\bunfolded\\b|\\bunfolding\\b|\\bfolds? (?:back|into|up)\\b",
+      "flags": "gi",
+      "note": "Say what the reader does or sees: expand, open, click into."
+    },
+    {
+      "id": "vague-attribution",
+      "name": "Vague attribution",
+      "kind": "regex",
+      "pattern": "\\bsome experts\\b|\\bmany (?:companies|teams|people|users|engineers)\\b|\\ba lot of people\\b|\\bsome people\\b",
+      "flags": "gi",
+      "note": "Name who or cut."
+    },
+    {
+      "id": "exclamation-marks",
+      "name": "One exclamation mark per post is plenty",
+      "kind": "regex",
+      "pattern": "!(?!=)",
+      "flags": "g",
+      "documentMax": 1,
+      "note": "Fires only when the whole document carries more than one."
+    },
+    {
+      "id": "one-line-paragraph-barrage",
+      "name": "Single-sentence paragraph barrage",
+      "kind": "local",
+      "check": "one-sentence-paragraph-run",
+      "max": 3,
+      "note": "One such paragraph is fine. Four in a row is a tic."
+    },
+    {
+      "id": "open-flat",
+      "name": "Open flat",
+      "kind": "judge",
+      "scope": "first-section",
+      "instruction": "Does `text` open with a windup instead of naming its subject? A windup is a reframe, a rhetorical question, a quoted saying set up to be dismantled, a one-line hook followed by a colon, or an anonymous scene that withholds what the post is about. An opener that names the real subject in the first sentence (\"We shipped a support bot, and within a week it told a customer they'd get a refund we don't give\", \"Langy is the automated AI engineer inside LangWatch\") is flat and passes.",
+      "yes": "the first sentence is a rhetorical question, a quoted saying, a hook ending in a colon, or a scene whose subject the reader cannot tell yet",
+      "no": "the first sentence says what the text is about or what happened, with the real subject named"
+    },
+    {
+      "id": "quoted-cliche-opener",
+      "name": "Opening with a quoted cliché to dismantle",
+      "kind": "judge",
+      "scope": "first-section",
+      "instruction": "Does `text` open by quoting a common saying or cliché in order to knock it down? Example: \"Context switching is the enemy of deep work.\" Everyone says this. It is wrong.",
+      "yes": "the text opens on a quoted saying that the following sentences dismantle",
+      "no": "the text opens on its own subject, not on a quoted saying"
+    },
+    {
+      "id": "mechanism-before-meaning",
+      "name": "Describe mechanism before meaning",
+      "kind": "judge",
+      "instruction": "Does `text` claim that a tool, change or approach mattered (changed a workflow, saved time, made something better) without saying, before or right after the claim, what the thing literally does? If the mechanism is missing entirely, the meaning is probably fake.",
+      "yes": "an impact claim stands with no concrete how-it-works sentence anywhere near it",
+      "no": "the concrete mechanism is stated, or the text makes no impact claim"
+    },
+    {
+      "id": "vague-specifics",
+      "name": "Prefer specifics over summaries",
+      "kind": "judge",
+      "instruction": "Does `text` use a vague stand-in where a specific was available: \"a bug\", \"the logs\", \"a customer\", \"a tricky issue\", \"a tool that does X\", instead of naming the error, the file, the person or the tool? \"The 500 error from the billing webhook\" beats \"a tricky bug\".",
+      "yes": "a vague stand-in such as \"a bug\", \"the logs\", \"a customer\" or \"a tool\" appears and the specific thing is never named",
+      "no": "the things involved are named concretely, or the text is not describing an incident or a tool"
+    },
+    {
+      "id": "clinical-hedge",
+      "name": "Hedge colloquially, not clinically",
+      "kind": "judge",
+      "instruction": "Does `text` hedge in a clinical, emotionally flat register (\"results weren't worth the setup\", \"results may vary depending on configuration\", \"outcomes were mixed\") instead of colloquially (\"it worked, kind of\", \"not terrible, just dumb\") or with a concrete bound (\"wrong maybe one time in twenty\")?",
+      "yes": "a hedge is written in flat clinical wording with no colloquial register and no concrete bound",
+      "no": "hedges are colloquial or carry a number or condition, or the text does not hedge"
+    },
+    {
+      "id": "negated-restart",
+      "name": "Let the sentence turn instead of stopping",
+      "kind": "judge",
+      "instruction": "Does a sentence in `text` open by negating a word from the sentence right before it, so the payoff is split from its setup by a full stop? Example of the tic: \"Their briefing told them to execute one directive and stop. Neither stopped: one lived 10.7 hours.\" The fix carries the turn inside one sentence with a conjunction: \"...and stop, but they never did!\"",
+      "yes": "a sentence opens with \"Neither stopped\", \"It did not\", \"That never happened\" or a similar negation of the previous sentence's word",
+      "no": "turns are carried inside the sentence by a conjunction, or there is no setup-and-break pair"
+    },
+    {
+      "id": "keynote-closer",
+      "name": "Keynote closers, end modestly, match length to content",
+      "kind": "judge",
+      "instruction": "Does `text` end on a summary paragraph, a thesis restatement, a call to action, a product plug, a callback question, or a \"this is why we win\" beat, instead of on a concrete observation, action or partial result? The last sentence should sound like the end of a conversation at a bar, not the last slide of a keynote.",
+      "yes": "the closing sentences restate the thesis, plug the product, call the reader to act, or land a grand reflection",
+      "no": "the text ends on a concrete fact, action, result or modest observation"
+    },
+    {
+      "id": "teach-list-as-list",
+      "name": "Teach a list as a list",
+      "kind": "judge",
+      "instruction": "Does `text` describe a set or taxonomy of three or more named kinds (\"there are four kinds of agents in a company\") as prose paragraphs, when it should be the numbered list it is, with short capitalized names and one-line definitions?",
+      "yes": "a taxonomy or set of three or more kinds is hidden in prose paragraphs",
+      "no": "sets are written as lists, or the text teaches no taxonomy"
+    },
+    {
+      "id": "passive-voice",
+      "name": "Active voice",
+      "kind": "judge",
+      "instruction": "Does `text` use passive voice where the actor is known and could be the subject with a plain verb (\"the parameter is declared by the scenario\" instead of \"the scenario declares the parameter\")? Passives whose actor is unknown or irrelevant do not count.",
+      "yes": "at least one passive construction hides an actor the text knows",
+      "no": "sentences make the actor the subject, or the only passives have no meaningful actor"
+    },
+    {
+      "id": "negation-reframe",
+      "name": "Negation-reframe punchlines",
+      "kind": "judge",
+      "instruction": "Does `text` contain a negation-reframe punchline of the shape \"It wasn't X. It was Y.\" or \"This isn't about X, it's about Y\", often closing a paragraph? The reframe claims the thing is one category rather than another and adds no information beyond Y; the writer could have just said Y.",
+      "yes": "a sentence or sentence pair of the shape \"not X, (it was) Y\" is used as a punchline or paragraph closer",
+      "no": "no such reframe; a plain factual correction that adds new information is not this"
+    },
+    {
+      "id": "x-not-y-closer",
+      "name": "\"X, not Y\" fragment closers",
+      "kind": "judge",
+      "instruction": "Does a sentence in `text` end with a tagline fragment of the shape \"..., not Y\" (\"doing engineering, not prompting\"; \"a workflow, not a demo\") that claims the thing is one category rather than another? Deleting the \"not Y\" half would usually improve the sentence.",
+      "yes": "a sentence closes on a \", not Y\" fragment used as a tagline",
+      "no": "no tagline-style \", not Y\" closer"
+    },
+    {
+      "id": "didnt-just-escalation",
+      "name": "\"Didn't just X, it Y\" escalation",
+      "kind": "judge",
+      "instruction": "Does `text` contain an escalation of the shape \"It didn't just X, it Y\" (\"It didn't just change how we work, it changed who we are\")? An intensifier that costs nothing to write and means nothing.",
+      "yes": "a \"didn't just X, it Y\" or \"not just X but Y\" escalation is present",
+      "no": "no such escalation"
+    },
+    {
+      "id": "conspiratorial-hook",
+      "name": "\"Here's what nobody tells you\" and conspiratorial hooks",
+      "kind": "judge",
+      "instruction": "Does `text` pretend to let the reader in on a secret with a hook like \"here's what nobody tells you\", \"the thing nobody talks about\", \"here's the honest answer\", \"here's what actually happened\", \"the metric nobody writes down\", or a softened paraphrase of one (\"here's how it looked for us\")?",
+      "yes": "a sentence frames what follows as a secret, a hidden truth, or the honest version",
+      "no": "no conspiratorial or secret-revealing hook"
+    },
+    {
+      "id": "fake-epiphany",
+      "name": "Fake-epiphany markers",
+      "kind": "judge",
+      "instruction": "Does `text` label a moment as a revelation with a marker like \"That's when we realized\", \"That shift is the real unlock\", \"And that's the real lesson\", \"What became clear was\"? Showing the detail that flipped things (\"The retrieval span above it: contexts: []\") without a label is fine.",
+      "yes": "a sentence announces a realization, lesson or unlock instead of showing the detail",
+      "no": "no epiphany marker; turns are shown through concrete detail or not present"
+    },
+    {
+      "id": "pseudo-precision",
+      "name": "Pseudo-precision emphasis",
+      "kind": "judge",
+      "instruction": "Does `text` try to manufacture authenticity by insisting on it: \"Not metaphorically, literally\", \"Yes, this actually happened\", \"that is deliberate\", \"I mean that literally\"?",
+      "yes": "a sentence insists on its own literalness or authenticity",
+      "no": "no such insistence"
+    },
+    {
+      "id": "rule-of-three-anaphora",
+      "name": "Rule-of-three anaphora as punchline",
+      "kind": "judge",
+      "instruction": "Does `text` use three parallel fragments with the same opening word as a punchline (\"Too much overhead, too many handoffs, too much silent failure\") where the three items collapse into one idea?",
+      "yes": "three parallel same-opening fragments are stacked for rhythm and restate one idea",
+      "no": "no such triplet, or each item in a parallel list carries genuinely different information"
+    },
+    {
+      "id": "staccato",
+      "name": "Staccato rhythm within a paragraph",
+      "kind": "judge",
+      "instruction": "Does a paragraph in `text` contain three or more consecutive short sentences (under about eight words each) that sit on the same moment and restate or intensify it, the way \"Andrew gave up on it first. Overhead was high. Handoffs failed silently.\" does? Stacked like that they read as someone performing seriousness instead of telling a story. Do not count short sentences that each land a new event with time advancing between them (\"Bumped the embedding model. Deploy went green. Wednesday morning, support pinged me.\"). The run may sit inside a longer paragraph.",
+      "yes": "three or more consecutive short sentences pile onto one moment for weight, like \"Overhead was high. Handoffs failed silently.\"",
+      "no": "no run of three short sentences, or the short sentences advance through time as narrative"
+    },
+    {
+      "id": "unintroduced-first-name",
+      "name": "Unintroduced first names",
+      "kind": "judge",
+      "instruction": "Does `text` introduce a person by bare first name (\"Andrew gave up on it first\") without a short appositive saying who they are (\"Andrew, one of our engineers\")?",
+      "yes": "a person's first name appears for the first time with no appositive or role",
+      "no": "every named person gets a role or appositive on first mention, or no people are named"
+    },
+    {
+      "id": "brand-closer",
+      "name": "Declarative brand closers",
+      "kind": "judge",
+      "instruction": "Does a paragraph in `text` end by naming what was just described as if the reader needed a label: \"That's the workflow.\", \"That's LangWatch.\", \"This is observability.\"?",
+      "yes": "a paragraph closes on a sentence that labels what was just described",
+      "no": "no labelling closer"
+    },
+    {
+      "id": "imperative-signoff",
+      "name": "Imperative signoffs",
+      "kind": "judge",
+      "instruction": "Does `text` end with an imperative signoff or template call to action (\"Stop waiting. Start building.\", \"Go build something.\", \"Try it today.\")?",
+      "yes": "the text closes on an imperative call to action",
+      "no": "no imperative signoff"
+    },
+    {
+      "id": "vibe-phrases",
+      "name": "Vibe phrases",
+      "kind": "judge",
+      "instruction": "Does `text` use a vibe phrase seen in many other posts: \"it felt like the future\", \"wild when it works\", \"the real unlock\", \"the forcing function\", \"zero friction\", \"game changer\", \"this changes everything\", \"the future of X\", \"10x\"?",
+      "yes": "at least one vibe phrase of that kind appears",
+      "no": "no vibe phrases"
+    },
+    {
+      "id": "round-number-flex",
+      "name": "Round-number flexes",
+      "kind": "judge",
+      "instruction": "Does `text` state a number (\"700k lines of code\", \"4,000 tests a month\", \"70% cheaper\") without explaining why it matters or comparing it to something real? A number with its consequence (\"137 questions, which took the support lead most of a day to answer by hand\") is information and passes.",
+      "yes": "a number stands alone as a status signal with no consequence or comparison attached",
+      "no": "every number travels with its meaning, or there are no numbers"
+    },
+    {
+      "id": "grand-reframe",
+      "name": "Grand reframe claims",
+      "kind": "judge",
+      "instruction": "Does `text` make a sweeping redefinition of a role or industry (\"Every engineer is now a manager\", \"The job of writing code is over\")?",
+      "yes": "a sentence redefines a whole role or industry in one sweep",
+      "no": "no sweeping redefinition"
+    },
+    {
+      "id": "second-order-abstraction",
+      "name": "Second-order abstractions",
+      "kind": "judge",
+      "instruction": "Does `text` reach for a second-order abstraction instead of the concrete thing: \"the shape of the workflow\", \"the nature of the problem\", \"the reality of X\", \"the dynamics of Y\", \"the texture of\"?",
+      "yes": "a phrase of the shape \"the shape/nature/reality/dynamics of X\" stands in for the concrete thing",
+      "no": "the concrete thing is described directly"
+    },
+    {
+      "id": "voiceover-summary",
+      "name": "Voiceover summaries",
+      "kind": "judge",
+      "instruction": "Does `text` summarize a person's day or work from above like documentary narration, with a generic subject such as \"the day\", \"the work\", \"most interactions\" (\"The day is mostly dispatching work and reviewing it\"), instead of a person describing it from the inside (\"When a ticket lands I hand it to an agent and go back to what I was doing\")?",
+      "yes": "a generic subject narrates someone's day or work from above",
+      "no": "work is described from the inside with \"I\" or a named person, or no work is described"
+    },
+    {
+      "id": "borrowed-structural-metaphor",
+      "name": "Borrowed structural metaphors",
+      "kind": "judge",
+      "instruction": "Does `text` import an engineering-domain metaphor to dress up an ordinary claim: \"load-bearing\", \"surface area\", \"impedance mismatch\", \"first-order\", used for tone rather than as the precise technical term for what is meant?",
+      "yes": "an engineering metaphor is used for tone where a plain phrase exists",
+      "no": "no such metaphor, or the term is the precise technical one"
+    },
+    {
+      "id": "narrator-sentence",
+      "name": "Narrator sentences",
+      "kind": "judge",
+      "instruction": "Does `text` contain a sentence about the essay instead of about the thing: it announces that a point is coming or frames how interesting it will be, and only a later sentence says the point? Examples: \"The extra half power above quadratic has a cause worth knowing.\", \"Two things people reach for at this point do not save you.\", \"The mechanism stops being mysterious once you measure it.\", \"This is the interesting one.\" A sentence with no number, no actor and no event in it is suspect.",
+      "yes": "at least one sentence announces or frames a coming point instead of stating it",
+      "no": "sentences state facts, numbers, actors or events directly"
+    },
+    {
+      "id": "stating-priors",
+      "name": "Stating your priors",
+      "kind": "judge",
+      "instruction": "Does `text` narrate the writer's expectations before the finding (\"I went in expecting to write X and the data says otherwise\", \"I assumed Y, but it turned out\") as a one-line aside rather than as a story with stakes?",
+      "yes": "the writer's prior expectation is stated as an aside before the finding",
+      "no": "the finding is stated directly, or the prior is told as a real story with stakes"
+    },
+    {
+      "id": "unnamed-concept",
+      "name": "Unnamed named concepts",
+      "kind": "judge",
+      "instruction": "Does `text` describe a concept that has an established name (survivorship bias, confirmation bias, Goodhart's law, base rate neglect, regression to the mean) in roundabout sentences instead of using the name and saying what it means here in one clause?",
+      "yes": "a known named concept is described in riddles without its name",
+      "no": "known concepts are named, or none are involved"
+    },
+    {
+      "id": "two-beat-aphorism",
+      "name": "Two-beat aphorism pairs",
+      "kind": "judge",
+      "instruction": "Does `text` contain two clipped parallel sentences with mirrored verbs that dress one idea as two (\"Policies attest. Evidence proves.\", \"Dashboards show. Traces prove.\")?",
+      "yes": "a pair of clipped mirrored sentences performs one idea as two",
+      "no": "no such pair"
+    },
+    {
+      "id": "personified-abstraction",
+      "name": "Personified abstractions",
+      "kind": "judge",
+      "instruction": "Does `text` make an abstract noun do a human verb as cleverness (\"Who does your AI spend answer to?\", \"the spend answers to no one\", \"the metric wants attention\")? Ordinary idiom (\"the bill arrives\") does not count.",
+      "yes": "an abstraction is personified as the punchline",
+      "no": "no personification beyond ordinary idiom"
+    },
+    {
+      "id": "marveling-at-ai",
+      "name": "Do not marvel at ordinary AI behavior",
+      "kind": "judge",
+      "instruction": "Does `text` narrate ordinary AI coding-agent behavior as if it were remarkable (\"the agent reread the file and corrected itself, nobody scripted that\", \"it figured out the fix on its own\")? The reader uses these tools daily.",
+      "yes": "a sentence marvels at normal agent behavior",
+      "no": "agent behavior is stated plainly, or not described"
+    },
+    {
+      "id": "gravitas-closer",
+      "name": "Short gravitas closer",
+      "kind": "judge",
+      "instruction": "Does a paragraph in `text` end with a two or three word sentence dropped to land a point (\"Ours stays.\", \"That is the unlock.\", \"And it worked.\", \"It held.\"), especially after a contrast (\"most setups do X; we do Y. [tiny punch]\")?",
+      "yes": "a paragraph closes on a tiny punch sentence for gravitas",
+      "no": "paragraphs end on the concrete consequence"
+    },
+    {
+      "id": "punchline-section-opener",
+      "name": "A punchy line never as a section opener",
+      "kind": "judge",
+      "instruction": "Does `text` open its section with a punchline or clever line (\"Two reasons, and neither is that the model is clever.\", \"Cost questions usually get a shrug and a bigger budget.\") instead of starting plainly and getting straight into the substance?",
+      "yes": "the section's first sentence is a clever or punchy line",
+      "no": "the section starts plainly on its substance"
+    },
+    {
+      "id": "pronoun-chain",
+      "name": "Anonymized people need role nouns, not pronoun chains",
+      "kind": "judge",
+      "instruction": "Does `text` tell a story about unnamed people through pronoun chains (him, her, he, she, they) with no name or role noun (the PM, the CTO), so the reader cannot tell who is who?",
+      "yes": "people are referred to only by pronouns and the reader cannot tell who is who",
+      "no": "people are named or given a role noun, or no people appear"
+    },
+    {
+      "id": "defensive-moat",
+      "name": "Embrace the \"I could do this myself\" objection",
+      "kind": "judge",
+      "instruction": "Does `text` answer the objection \"this has no value, I could just do it myself\" defensively (\"but ours is better\", \"the difference is that\") instead of agreeing fully and offering the product as the same thing already assembled?",
+      "yes": "the text defends the product against a do-it-yourself objection",
+      "no": "no defensive framing, or the objection is embraced"
+    },
+    {
+      "id": "empty-summary-sentence",
+      "name": "Empty summary sentences",
+      "kind": "judge",
+      "instruction": "Does `text` contain a sentence that restates the paragraph without adding anything (\"By following these steps, we achieve better performance\", \"This is what makes the approach work\")?",
+      "yes": "a sentence restates the paragraph and adds nothing",
+      "no": "every sentence adds something"
+    },
+    {
+      "id": "low-information-density",
+      "name": "Low information density",
+      "kind": "judge",
+      "instruction": "Does `text` contain sentences that carry only tone and no fact, name, number, mechanism or judgment? A sentence that survives only because it broke no rule is still a bad sentence.",
+      "yes": "at least one sentence carries only tone",
+      "no": "every sentence carries a fact, name, number, mechanism or judgment"
+    },
+    {
+      "id": "dangling-demonstrative",
+      "name": "Demonstrative pronouns without referents",
+      "kind": "judge",
+      "instruction": "Does `text` use \"this\", \"that\", \"these\" or \"it\" as a sentence subject where the reader has to guess what it points to?",
+      "yes": "a demonstrative or pronoun subject has no clear referent",
+      "no": "every demonstrative points to something obvious"
+    },
+    {
+      "id": "invented-jargon",
+      "name": "Invented jargon",
+      "kind": "judge",
+      "instruction": "Does `text` use a made-up term that sounds technical but is not established (\"retrieval grounding\" as if it were a method) without calling it out as coined and defining it in the same breath?",
+      "yes": "a coined-sounding term is used as if established, with no definition",
+      "no": "terms are established, or coined ones are defined on the spot"
+    }
+  ]
+}

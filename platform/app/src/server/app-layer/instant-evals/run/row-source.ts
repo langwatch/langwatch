@@ -41,6 +41,7 @@ import type { InstantEvalClassifier } from "../classifier/classifier";
 import { INSTANT_EVAL_OPTIONAL_KEY_COLUMNS } from "./composition";
 import {
   countPass,
+  type InstantEvalPassExecution,
   type InstantEvalPasses,
   judgePass,
   judgePreparedPass,
@@ -305,14 +306,17 @@ export function createInstantEvalRowSource(
     parameters?: Readonly<Record<string, unknown>>;
     maxRows: number;
   }) =>
-    await executorOrRefuse().execute({
-      sql,
-      ...(parameters && Object.keys(parameters).length > 0
-        ? { parameters }
-        : {}),
-      tenantCapability: lwqlTenantCapability({ secret: caller.lwqlKey }),
-      limits: { ...DEFAULT_LWQL_RESULT_LIMITS, maxRows },
-      usesAppFunctions: true,
+    await runBounded({
+      execute: () =>
+        executorOrRefuse().execute({
+          sql,
+          ...(parameters && Object.keys(parameters).length > 0
+            ? { parameters }
+            : {}),
+          tenantCapability: lwqlTenantCapability({ secret: caller.lwqlKey }),
+          usesAppFunctions: true,
+        }),
+      maxRows,
     });
 
   const prepare = async ({
@@ -333,7 +337,9 @@ export function createInstantEvalRowSource(
     };
   }) =>
     await prepareLangWatchQLHydration({
-      projectId: caller.id,
+      // A run belongs to one project, which is the scope every judgement in it
+      // is rated and billed against.
+      projectIds: [caller.id],
       protections,
       calls,
       columns: execution.columns,
@@ -366,4 +372,25 @@ export function createInstantEvalRowSource(
     judge: (input) => judgePass(passes, input),
     texts: (input) => textPass(passes, input),
   };
+}
+
+/**
+ * Runs one pass's statement and says whether the result outgrew its bound.
+ *
+ * The executor hands back every row the database returned — bounding a result
+ * is the caller's business, and for a run it is per pass: the probe, the count
+ * and the key pass bound themselves in SQL, while the page pass is bounded by
+ * how far its traces expand. A row count above the bound is what the passes
+ * refuse on, because a page read as whole when it was cut is the one failure a
+ * run cannot notice later.
+ */
+async function runBounded({
+  execute,
+  maxRows,
+}: {
+  execute: () => Promise<Awaited<ReturnType<LangWatchQLExecutor["execute"]>>>;
+  maxRows: number;
+}): Promise<InstantEvalPassExecution> {
+  const execution = await execute();
+  return { ...execution, truncated: execution.rows.length > maxRows };
 }

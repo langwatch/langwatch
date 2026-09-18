@@ -56,6 +56,15 @@ const TIMEOUT_EXCEEDED: ServerError = {
 const TOO_MANY_ROWS: ServerError = { code: "158", name: "TOO_MANY_ROWS" };
 const TOO_MANY_BYTES: ServerError = { code: "307", name: "TOO_MANY_BYTES" };
 
+// `max_result_rows` / `max_result_bytes` under `result_overflow_mode =
+// 'throw'` — the *output* ceiling, distinct from TOO_MANY_ROWS/TOO_MANY_BYTES
+// above (which bound how much the query may *read*). Both settings raise the
+// same code.
+const TOO_MANY_ROWS_OR_BYTES: ServerError = {
+  code: "396",
+  name: "TOO_MANY_ROWS_OR_BYTES",
+};
+
 // The three shapes of "the object this query names is not there for you":
 // missing table, missing database, and an RBAC refusal. None of the three is
 // ever echoed back to the caller — the LangWatchQL validator only lets
@@ -232,6 +241,23 @@ export function unknownIdentifierFromError(error: unknown): string | undefined {
 export function isClickHouseObjectAccessDeniedError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return raisedServerError({ error, variants: [ACCESS_DENIED] });
+}
+
+/**
+ * True when the server refused because the finished result exceeded
+ * `max_result_rows` / `max_result_bytes` — TOO_MANY_ROWS_OR_BYTES (396).
+ *
+ * Not mapped inside {@link translateClickHouseQueryError}: on the
+ * application's own connection nothing pins those settings, so this can only
+ * fire on a connection that does — the LangWatchQL executor, which pins them
+ * as the server-side backstop for its row cap (a `LIMIT` written as a bound
+ * parameter evades the TypeScript-side check, this does not). Exported so
+ * that caller can map it to its own `lwql_result_too_large`, never relaying
+ * the raw driver error.
+ */
+export function isClickHouseResultTooLargeError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [TOO_MANY_ROWS_OR_BYTES] });
 }
 
 /**

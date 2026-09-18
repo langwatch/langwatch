@@ -7,7 +7,7 @@
  * artifact to inspect rather than a call sequence to verify.
  *
  * @see ../lwql.service.ts
- * @see specs/analytics/lwql-eval-functions.feature
+ * @see specs/lwql/eval-functions.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -22,7 +22,7 @@ import type { InstantEvalSpendRecord } from "~/server/app-layer/instant-evals/in
 import type { Protections } from "../../../traces/protections";
 import { recordingExecutor } from "../executor.testFakes";
 import { LangWatchQLService } from "../lwql.service";
-import { describeLangWatchQLFunctions } from "../schema";
+import { describeLangWatchQLAppFunctions } from "../schema";
 
 const DATABASE = "analytics";
 
@@ -92,7 +92,7 @@ async function codeOf(run: () => Promise<unknown>): Promise<unknown> {
 
 const run = (service: LangWatchQLService) =>
   service.execute({
-    project: PROJECT,
+    projects: [PROJECT],
     protections: FULLY_PERMITTED,
     sql: JUDGED_SQL,
   });
@@ -220,7 +220,7 @@ describe("given a project the feature is not open to", () => {
   describe("when the schema is described", () => {
     /** @scenario "The schema publishes eval functions as unavailable while they are gated" */
     it("lists every eval function as unavailable, leaving the rest alone", () => {
-      const functions = describeLangWatchQLFunctions({
+      const functions = describeLangWatchQLAppFunctions({
         database: DATABASE,
         protections: FULLY_PERMITTED,
         instantEvalsEnabled: false,
@@ -237,7 +237,7 @@ describe("given a project the feature is not open to", () => {
     });
 
     it("lists them as available once the feature is open", () => {
-      const functions = describeLangWatchQLFunctions({
+      const functions = describeLangWatchQLAppFunctions({
         database: DATABASE,
         protections: FULLY_PERMITTED,
         instantEvalsEnabled: true,
@@ -282,7 +282,7 @@ describe("given a statement that calls no eval function", () => {
       });
 
       await service.execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql:
           "SELECT count() AS value FROM analytics.traces " +

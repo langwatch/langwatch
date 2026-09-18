@@ -16,6 +16,27 @@
  */
 
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy";
+import {
+  GUIDED_KICKOFF_CONVERSATION_TITLE,
+  guidedKickoffPartOf,
+} from "~/features/guided-onboarding/kickoff";
+import { extractTextFromParts } from "./langy-message.service";
+
+/**
+ * The title a new conversation takes from its first user message. The guided
+ * onboarding kickoff names its conversation "Getting started" (a title set at
+ * creation sticks, so no generated title replaces it); any other first message
+ * derives the placeholder from its text, which the generated title later
+ * replaces. Null when the message has no usable text.
+ *
+ * @see specs/langy/langy-guided-onboarding.feature
+ */
+export function titleFromFirstUserMessage(
+  parts: readonly unknown[] | undefined,
+): string | null {
+  if (guidedKickoffPartOf(parts)) return GUIDED_KICKOFF_CONVERSATION_TITLE;
+  return normalizeLangyConversationTitle(extractTextFromParts(parts)) || null;
+}
 
 /**
  * Words that keep their capital in the middle of a sentence. Sentence case

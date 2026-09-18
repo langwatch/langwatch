@@ -76,6 +76,19 @@ function toRowKey(row: Record<string, unknown>): InstantEvalRowKey {
 export const INSTANT_EVAL_PAGE_ROW_CEILING = 5_000;
 
 /**
+ * What one pass read, with the fact every pass has to check before trusting it.
+ *
+ * `truncated` is decided here rather than by the executor, which returns every
+ * row the database gave it: a pass asks for a bounded number of rows and a
+ * result above that bound means the selection outgrew what the pass can own.
+ * Reading a cut page as if it were whole is the one failure a run cannot
+ * detect afterwards, so each pass refuses instead.
+ */
+export type InstantEvalPassExecution = Awaited<
+  ReturnType<LangWatchQLExecutor["execute"]>
+> & { readonly truncated: boolean };
+
+/**
  * The three operations every pass is built from, closed over one caller's
  * executor: the statement, the read half of hydration, and the judge half.
  */
@@ -85,7 +98,7 @@ export interface InstantEvalPasses {
     sql: string;
     parameters?: Readonly<Record<string, unknown>>;
     maxRows: number;
-  }): Promise<Awaited<ReturnType<LangWatchQLExecutor["execute"]>>>;
+  }): Promise<InstantEvalPassExecution>;
   prepare(input: {
     caller: InstantEvalRunCaller;
     protections: Protections;

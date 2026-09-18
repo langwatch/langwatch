@@ -193,6 +193,30 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And it bounds the retries and says how long to leave between them
     And it says not to report the change as verified when the wait runs out
 
+  # A filmed run put langwatch.setup() at the top of the entry file, above the
+  # import that loaded the .env it had just written, and the agent died at
+  # import with "LangWatch API key is required but not provided".
+  @unit
+  Scenario: LangWatch initialises after the project's environment is loaded
+    Given the tracing skill
+    When its instrumentation step is read
+    Then setup runs below the import that loads the environment, in Python and in TypeScript
+    And the env loader is added to the entry file when the project has it and the entry file does not load it
+    And the key is checked visible to the process the way the project reads it, without printing it
+    And the given command is the first and only check, copied as written for the project's runner, with no probe before it
+
+  # A filmed run put the LangChain callback on the model call inside one graph
+  # node. The trace then held llm spans only: the tool nodes and the plain
+  # function nodes never appeared, and a scenario judge looking for the payment
+  # step found no span to read.
+  @unit
+  Scenario: A LangGraph callback is attached at the graph, not inside a node
+    Given the tracing skill
+    When its instrumentation step is read
+    Then the LangChain callback goes in the config of the graph invocation
+    And it says every node the run touches becomes a span under the trace
+    And it says a callback on one model call leaves the nodes out of the trace
+
   @unit
   Scenario: A run cleans up the demo folders the runs before it left
     Given several finished runs left their demo folder on disk

@@ -13,16 +13,13 @@
  * `translate-query-error.unit.test.ts` and by the harness suites.
  *
  * @see ../executor.ts
- * @see specs/analytics/lwql-app-functions.feature
+ * @see specs/lwql/app-functions.feature
  */
 
 import { describe, expect, it, vi } from "vitest";
 
 import type { LangWatchQLConnection } from "../connection";
-import {
-  createLangWatchQLExecutor,
-  DEFAULT_LWQL_RESULT_LIMITS,
-} from "../executor";
+import { createLangWatchQLExecutor } from "../executor";
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
@@ -47,7 +44,6 @@ const run = ({ usesAppFunctions }: { usesAppFunctions: boolean }) =>
       ? "SELECT TraceId, conversation(ConversationId) AS transcript FROM analytics.traces"
       : "SELECT toBool(1) AS flag FROM analytics.traces",
     tenantCapability: "tenant-a",
-    limits: DEFAULT_LWQL_RESULT_LIMITS,
     usesAppFunctions,
   });
 
