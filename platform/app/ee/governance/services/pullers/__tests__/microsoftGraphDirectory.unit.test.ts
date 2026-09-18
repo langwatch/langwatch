@@ -29,7 +29,6 @@ const graphUser = (over: Record<string, unknown> = {}) => ({
 });
 
 describe("reading a directory page", () => {
-  /** @scenario "A directory page hands back its rows and the link to the next one" */
   it("reads the rows and hands back the next link beside them", () => {
     const read = readDirectoryUserRows({
       response: {
@@ -44,7 +43,6 @@ describe("reading a directory page", () => {
     expect(read.nextLink).toContain("$skiptoken");
   });
 
-  /** @scenario "A directory row that cannot be read costs the row, not the page" */
   it("counts an unreadable row rather than dropping the page", () => {
     const read = readDirectoryUserRows({
       response: { value: [graphUser(), { id: "not-a-guid" }] },
@@ -54,7 +52,6 @@ describe("reading a directory page", () => {
     expect(read.unreadableRows).toBe(1);
   });
 
-  /** @scenario "A directory row carrying nothing but an id is still a person" */
   it("keeps a row that carries nothing but its id — Graph omits absent fields", () => {
     const read = readDirectoryUserRows({
       response: { value: [{ id: USER_ID }] },
@@ -64,7 +61,6 @@ describe("reading a directory page", () => {
     expect(read.unreadableRows).toBe(0);
   });
 
-  /** @scenario "A directory answer that is not a page is malformed, not an empty tenant" */
   it("calls a body that is not a page malformed, not an empty tenant", () => {
     const read = readDirectoryUserRows({ response: { error: "oops" } });
 
@@ -74,7 +70,6 @@ describe("reading a directory page", () => {
 });
 
 describe("shaping directory events", () => {
-  /** @scenario "A directory row is recorded against the person and the day" */
   it("keys the event on the person and the day, with the directory id as actor", () => {
     const [event] = microsoftDirectoryEvents({
       users: [graphUser()],
@@ -98,7 +93,6 @@ describe("shaping directory events", () => {
     });
   });
 
-  /** @scenario "A directory field the tenant left empty is recorded empty" */
   it("shapes absent fields as empty strings, never as the word undefined", () => {
     const [event] = microsoftDirectoryEvents({
       users: [
@@ -123,7 +117,6 @@ describe("shaping directory events", () => {
 });
 
 describe("the next-page host gate", () => {
-  /** @scenario "A next-page link is followed only when it is Microsoft Graph over https" */
   it("accepts only https Microsoft Graph with a clean authority", () => {
     expect(
       isMicrosoftGraphUrl(

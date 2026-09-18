@@ -47,19 +47,6 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And a viewer without ingestionSources:manage sees no row actions at all
 
   @integration
-  Scenario: Archiving from the row asks the same question the detail page asks
-    Given a source in the table
-    When the admin picks Archive from its row actions
-    Then they are asked to confirm, and the question names the source and
-      says historical events stay readable
-    And declining leaves the source as it was
-    And confirming archives it
-    # The detail page has asked this since it was built. The table's menu
-    # item archived on the first click, so the same action cost one click
-    # on one screen and two on the other, and the cheaper one was the one
-    # with no way back.
-
-  @integration
   Scenario: Add source menu lists every type by vendor, grouped in plain language
     When the admin clicks "Add source"
     Then a menu opens listing every supported source type with its vendor logo
@@ -79,31 +66,6 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     Then every source type beyond Generic OpenTelemetry is visible but locked
     And each locked entry says it needs an Enterprise plan
     And picking a locked entry does not open the composer
-
-  # --- Types that are defined but must not be offered ---
-
-  @unit
-  Scenario: A source type nothing reads can no longer be chosen
-    Given a source type whose data path was never finished
-    When the admin opens the "Add source" menu on any plan
-    Then that type is not offered
-    And its blurb says the source is not available rather than describing
-      a fetch it cannot perform
-    # Not locked, offered-but-locked is a sales message about what an
-    # Enterprise plan unlocks, and a source that cannot deliver data is not
-    # something to sell. The OpenAI Enterprise Compliance type is hidden this
-    # way: an admin who picked it got a source that stayed silent. The Claude
-    # one was hidden for the same reason and is no longer in this case — its
-    # workspace key reaches the adapter now — so it stays out of the picker
-    # on a different footing, described below.
-
-  @unit
-  Scenario: Sources already configured on an unread type still display
-    Given an ingestion source already configured on one of those types
-    When an admin opens the inventory
-    Then that source still shows its name and vendor mark rather than a blank
-    # Which is why the entry is hidden rather than deleted: the label map is
-    # built from the same list and read without a fallback.
 
   @unit
   Scenario: The composer and the menu share one plan gate
@@ -495,27 +457,6 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       | openai_compliance  | display name, S3 bucket / prefix, AWS role ARN, polling cadence              |
       | claude_compliance  | display name, workspace API key, polling cadence                              |
       | s3_custom          | display name, bucket / prefix, role ARN, parser DSL                           |
-
-  @unit
-  Scenario: The Claude compliance workspace key reaches its adapter as the token it reads
-    Given the admin enters a workspace API key on a Claude compliance source
-    When the source's pull config is assembled for saving
-    Then the key is stored under the encrypted credentials as the token
-    And the adapter's frozen request header resolves to that key
-    # The form collected the key under a name nothing routed into the
-    # credentials, so it was dropped on the way through and every run sent
-    # the unresolved template as its header. Every other secret-collecting
-    # source type already names its key so the form knows where it goes.
-
-  @unit
-  Scenario: Every source type that collects a secret can put it back where its adapter reads it
-    Given the source types that collect a secret in their setup form
-    Then each of them has a way to reassemble that secret into its pull config
-    And none is left out of that check by being hidden from the picker
-    # Hiding a type from the picker was how a missing builder was worked
-    # around. The check now covers hidden types too, so a builder cannot go
-    # missing behind that door again. Whether the type comes back to the
-    # picker is a separate call and is not made here: it stays hidden.
 
   Scenario: Generic OTel passthrough is the simplest setup
     Given the admin picks "Generic OTel" as the source type

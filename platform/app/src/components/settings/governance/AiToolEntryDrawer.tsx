@@ -346,7 +346,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     void utils.aiTools.adminList.invalidate({ organizationId });
     void utils.aiTools.list.invalidate({ organizationId });
     toaster.create({
-      title: isEdit ? "Tool updated" : "Tool published",
+      title: isEdit ? "Tile updated" : "Tile published",
       type: "success",
     });
     onClose();
@@ -355,7 +355,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   const onError = (err: unknown) => {
     showErrorToast({
       error: err,
-      fallbackTitle: isEdit ? "Couldn't update tool" : "Couldn't publish tool",
+      fallbackTitle: isEdit ? "Couldn't update tile" : "Couldn't publish tile",
     });
   };
 
@@ -420,11 +420,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     >
       <Drawer.Content>
         <Drawer.Header>
-          {/* "Tool", not "tile". A tile is how this row is drawn on the
-              personal portal; what the reader is adding is a tool the
-              organization runs, and the Inventory catalog that now opens this
-              same drawer calls it that. */}
-          <Heading size="md">{isEdit ? "Edit tool" : "Add tool"}</Heading>
+          <Heading size="md">{isEdit ? "Edit tile" : "Add tile"}</Heading>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -457,7 +453,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
               label="Visible to"
               hint={
                 departmentIds.length === 0
-                  ? "Whole organization - every member sees this tool."
+                  ? "Whole organization - every member sees this tile."
                   : `${departmentIds.length} department${departmentIds.length === 1 ? "" : "s"} - only members of these departments see it.`
               }
             >
@@ -473,12 +469,12 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
               />
               {departments.length === 0 && (
                 <Text fontSize="xs" color="fg.muted">
-                  No departments yet. The tool stays visible to every member.
+                  No departments yet. The tile stays visible to every member.
                   Create departments under{" "}
                   <Link href="/governance/people" color="blue.600">
                     Governance → People
                   </Link>{" "}
-                  to scope tools to a group of people.
+                  to scope tiles to a group of people.
                 </Text>
               )}
             </FormSection>
@@ -531,7 +527,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
                 onClick={onSave}
                 disabled={!canSave || isPending}
               >
-                {isPending ? "Saving…" : isEdit ? "Save changes" : "Save tool"}
+                {isPending ? "Saving…" : isEdit ? "Save changes" : "Save tile"}
               </Button>
             </HStack>
           </VStack>
@@ -1069,7 +1065,7 @@ function ExternalToolFields({
       </FormSection>
       <FormSection
         label="Description (markdown)"
-        hint="Rendered on the tool's card when end users expand it. Markdown is sanitized."
+        hint="Rendered in the tile body when end users expand it. Markdown is sanitized."
       >
         <Textarea
           size="sm"

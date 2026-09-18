@@ -30,10 +30,6 @@ import {
   OTTL_ENABLED_SOURCE_TYPES,
 } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 import { hasPollerCursor } from "@ee/governance/services/pullers/pollerCursor";
-import {
-  type PullRunSummary,
-  sourcePullStatus,
-} from "@ee/governance/services/pullers/sourcePullStatus";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -62,7 +58,6 @@ const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
 export function toIngestionSourceDto({
   row,
   liveTraceProjectIds,
-  pullRun,
 }: {
   row: {
     id: string;
@@ -102,7 +97,6 @@ export function toIngestionSourceDto({
    * is the one thing the drawer must say and cannot work out for itself.
    */
   liveTraceProjectIds: ReadonlySet<string>;
-  pullRun?: PullRunSummary | null;
 }) {
   const parser = (row.parserConfig as Record<string, unknown>) ?? {};
   const safeParser = Object.fromEntries(
@@ -156,11 +150,6 @@ export function toIngestionSourceDto({
      */
     errorCount: row.errorCount,
     lastSuccessAt: row.lastSuccessAt,
-    pullStatus: sourcePullStatus({
-      sourceType: row.sourceType,
-      cursor: row.pollerCursor,
-      pullRun,
-    }),
     traceProjectId: row.traceProjectId,
     traceProjectArchived: row.traceProjectId
       ? !liveTraceProjectIds.has(row.traceProjectId)
@@ -215,17 +204,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         // client has to sniff out of the tRPC envelope.
         throw new IngestionSourceNotFoundError(input.id);
       }
-      const pullRun = row.pullSchedule
-        ? await service.lastPullRun({
-            sourceId: row.id,
-            organizationId: input.organizationId,
-          })
-        : null;
-      const liveTraceProjectIds = await service.liveTraceProjectIds(
-        [row],
-        input.organizationId,
-      );
-      return toIngestionSourceDto({ row, liveTraceProjectIds, pullRun });
+      return dtoForRow(service, row, input.organizationId);
     }),
 
   /**

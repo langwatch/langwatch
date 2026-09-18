@@ -80,12 +80,8 @@ export const legacyRedirectRoutes: RouteObject[] = [
     ),
   },
   {
-    // Anomaly rules have no page of their own and no inventory tab any
-    // more, so the old address lands on the inventory. The pinned tab is
-    // kept rather than dropped: it names no tab the inventory renders, so
-    // the inventory falls back to Catalog either way, and leaving it in
-    // place keeps the redirect's shape for whenever rules get a home
-    // again. Nothing in the product offers rule authoring today.
+    // Anomaly rules became a tab inside the inventory. Pinned, because the
+    // inventory default tab is Catalog and the old address meant rules.
     path: "/governance/anomaly-rules",
     element: (
       <LegacyPrefixRedirect
