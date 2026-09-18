@@ -77,12 +77,20 @@ export async function sendCanary({
   transport,
   url,
   authToken,
+  projectId,
   body,
 }: {
   probe: string;
   transport: CanaryTransport;
   url: string;
   authToken: string;
+  /**
+   * The project `authenticateProject` already resolved from the credential.
+   * Forwarded as `X-Project-Id` so an API key accepted via its single-project
+   * self-scope stays scoped downstream — without it, the boundary behind
+   * `url` re-resolves the bare token and cannot repeat the same resolution.
+   */
+  projectId: string;
   body: unknown;
 }): Promise<Response> {
   let response: Response;
@@ -91,6 +99,7 @@ export async function sendCanary({
       method: "POST",
       headers: {
         "X-Auth-Token": authToken,
+        "X-Project-Id": projectId,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),

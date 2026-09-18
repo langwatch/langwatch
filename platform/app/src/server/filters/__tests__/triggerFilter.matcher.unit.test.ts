@@ -185,6 +185,123 @@ describe("matchesTriggerFilters", () => {
     });
   });
 
+  describe("when filtering by metadata.value on a bare OTEL resource attribute", () => {
+    // ClickHouse resolves a metadata.value key against three candidates —
+    // metadata.{key}, langwatch.metadata.{key}, and the bare {key} —
+    // see clickhouse/filter-conditions.ts. The in-memory matcher has to
+    // resolve the same three, or a filter the UI offers and the preview
+    // counts silently never fires at trigger time.
+    function makeFoldStateWithAttributes(
+      attributes: Record<string, string>,
+    ): TraceSummaryData {
+      return {
+        traceId: "trace-1",
+        traceName: "",
+        spanCount: 1,
+        totalDurationMs: 100,
+        computedIOSchemaVersion: "1",
+        computedInput: null,
+        computedOutput: null,
+        timeToFirstTokenMs: null,
+        timeToLastTokenMs: null,
+        tokensPerSecond: null,
+        containsErrorStatus: false,
+        containsOKStatus: true,
+        errorMessage: null,
+        models: [],
+        totalCost: null,
+        nonBilledCost: null,
+        tokensEstimated: false,
+        totalPromptTokenCount: null,
+        totalCompletionTokenCount: null,
+        outputFromRootSpan: false,
+        outputSpanEndTimeMs: 0,
+        blockedByGuardrail: false,
+        rootSpanType: null,
+        containsAi: false,
+        topicId: null,
+        subTopicId: null,
+        annotationIds: [],
+        containsPrompt: false,
+        selectedPromptId: null,
+        selectedPromptSpanId: null,
+        selectedPromptStartTimeMs: null,
+        lastUsedPromptId: null,
+        lastUsedPromptVersionNumber: null,
+        lastUsedPromptVersionId: null,
+        lastUsedPromptSpanId: null,
+        lastUsedPromptStartTimeMs: null,
+        attributes,
+        occurredAt: Date.now(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        LastEventOccurredAt: Date.now(),
+      } as TraceSummaryData;
+    }
+
+    it("matches a service.name attribute hoisted onto the trace summary", () => {
+      const data = buildPreconditionTraceDataFromFoldState(
+        makeFoldStateWithAttributes({
+          "langwatch.origin": "application",
+          "service.name": "coaching-api",
+        }),
+      );
+      const filters: TriggerFilters = {
+        "metadata.value": { service·name: ["coaching-api"] },
+      };
+
+      expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
+
+    it("does not match when the attribute value differs", () => {
+      const data = buildPreconditionTraceDataFromFoldState(
+        makeFoldStateWithAttributes({
+          "langwatch.origin": "application",
+          "service.name": "billing-api",
+        }),
+      );
+      const filters: TriggerFilters = {
+        "metadata.value": { service·name: ["coaching-api"] },
+      };
+
+      expect(matchesTriggerFilters(data, filters)).toBe(false);
+    });
+
+    it("matches the bare attribute even when a canonical key also exists", () => {
+      // ClickHouse ORs the three candidates rather than taking the first,
+      // so a filter on the bare value matches there and has to match here.
+      const data = buildPreconditionTraceDataFromFoldState(
+        makeFoldStateWithAttributes({
+          "langwatch.origin": "application",
+          "metadata.env": "canonical-value",
+          env: "bare-value",
+        }),
+      );
+      const filters: TriggerFilters = {
+        "metadata.value": { env: ["bare-value"] },
+      };
+
+      expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
+
+    it("matches the bare attribute when the canonical key is blank", () => {
+      // A blank canonical value is still a candidate, not a missing one, so
+      // this goes through the same any-candidate match rather than a fallback.
+      const data = buildPreconditionTraceDataFromFoldState(
+        makeFoldStateWithAttributes({
+          "langwatch.origin": "application",
+          "metadata.env": "",
+          env: "bare-value",
+        }),
+      );
+      const filters: TriggerFilters = {
+        "metadata.value": { env: ["bare-value"] },
+      };
+
+      expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
+  });
+
   describe("when filtering by topics.topics", () => {
     it("matches when topicId is in filter values", () => {
       const data = makeTraceData({ topicId: "topic-1" });

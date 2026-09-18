@@ -5,10 +5,10 @@
  * the provisioning statements and the executor are the service's business, not
  * a route handler's.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
-export { lwqlTenantCapability } from "./capability";
+export { lwqlTenantCapability, lwqlTenantCapabilitySet } from "./capability";
 export type { LangWatchQLColumnUnit } from "./catalog/types";
 export { LWQL_COLUMN_UNITS } from "./catalog/types";
 export type { LangWatchQLConnection } from "./connection";
@@ -25,6 +25,7 @@ export {
   LangWatchQLParameterMissingError,
   LangWatchQLReservedParameterSuppliedError,
   LangWatchQLReservedParameterTypeError,
+  LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
 } from "./errors";
 export type {
@@ -34,17 +35,22 @@ export type {
   LangWatchQLStatistics,
 } from "./executor";
 export {
-  applyLangWatchQLResultLimits,
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
   lwqlConnectionFromEnv,
 } from "./executor";
-export { MAX_LWQL_LENGTH } from "./limits";
+export {
+  LWQL_MAX_RESULT_BYTES,
+  LWQL_MAX_RESULT_ROWS,
+  MAX_LWQL_LENGTH,
+} from "./limits";
 export type {
+  LangWatchQLCaller,
   LangWatchQLQueryResult,
   ValidatedLangWatchQL,
 } from "./lwql.service";
 export {
+  appendDefaultRowLimit,
   closeLangWatchQLService,
   createLangWatchQLService,
   DEFAULT_LWQL_DATABASE,
@@ -63,7 +69,7 @@ export {
 export type {
   LangWatchQLSchema,
   LangWatchQLSchemaColumn,
-  LangWatchQLSchemaDataset,
+  LangWatchQLSchemaView,
 } from "./schema";
 export { describeLangWatchQLSchema, lwqlExampleSql } from "./schema";
 export type { LangWatchQLTimeWindow } from "./timeWindow";

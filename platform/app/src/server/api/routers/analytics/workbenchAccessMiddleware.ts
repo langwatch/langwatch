@@ -13,8 +13,8 @@
  * switched on for it.
  *
  * @see ~/server/analytics/lwql/access — the decision this adapts
- * @see specs/analytics/lwql-workbench.feature
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/workbench.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { lwqlEnabled } from "~/server/analytics/lwql/access";

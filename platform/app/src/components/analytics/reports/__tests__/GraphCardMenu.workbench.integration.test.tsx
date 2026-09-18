@@ -14,7 +14,7 @@
  * member can reach it" is the claim, and a prop that never renders satisfies a
  * prop assertion.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

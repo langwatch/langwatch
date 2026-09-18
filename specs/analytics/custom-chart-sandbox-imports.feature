@@ -25,6 +25,13 @@ Feature: Custom chart widgets import any module and run under their own CSP
     And the response is never cached
 
   @unit
+  Scenario: The frame's own inline scripts survive a nonce added upstream
+    Given the frame route issues a fresh nonce on every response
+    When the frame document and its policy are built
+    Then the policy's script-src carries that nonce and no 'unsafe-inline'
+    And every inline script in the document, including the import map, carries the same nonce
+
+  @unit
   Scenario: The frame document is sandboxed even when opened directly
     Given the app serves the chart frame document at "/sandbox/chart-frame"
     When the frame document's response headers are built
@@ -71,6 +78,13 @@ Feature: Custom chart widgets import any module and run under their own CSP
     When the frame resolves it
     Then it resolves to the frame's own React instance through the import map
     And it is not rewritten to esm.sh
+
+  @unit
+  Scenario: The JSX runtime shim preserves array children exactly
+    Given a third-party package compiled with the automatic JSX runtime renders a component with children
+    When it passes an empty array, a single-element array or a multi-element array as children
+    Then the component receives the same array shape React would give it
+    And a key passed as the third argument becomes the element key, not a prop
 
   @unit
   Scenario: URL, data, blob and relative imports are left alone
