@@ -363,6 +363,13 @@ export function createInstantEvalRowSource(
 
   const passes: InstantEvalPasses = { run, prepare, judge };
 
+  return instantEvalRowSourceOver(passes);
+}
+
+/** The row source's seven reads, each one pass composed over the three above. */
+function instantEvalRowSourceOver(
+  passes: InstantEvalPasses,
+): InstantEvalRowSource {
   return {
     probe: (input) => probePass(passes, input),
     count: (input) => countPass(passes, input),

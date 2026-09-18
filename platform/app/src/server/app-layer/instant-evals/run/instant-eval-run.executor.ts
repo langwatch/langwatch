@@ -67,6 +67,7 @@ import type {
   InstantEvalJudgedPage,
   InstantEvalKeyPage,
   InstantEvalPreparedPage,
+  InstantEvalRowKey,
   InstantEvalRowSource,
 } from "./row-source";
 
@@ -305,6 +306,149 @@ async function judgeRunPage(
   }
 }
 
+/** Where a key pass resumes from, and how many keys it asks for. */
+interface PageCursor {
+  afterTraceId: string | null;
+  afterSpanId: string | null;
+  limit: number;
+}
+
+/**
+ * One page's keys, and the rows behind them, read and extracted but unjudged.
+ *
+ * Its own function because both the page being judged now and the page being
+ * read ahead go through it, and the read-ahead has to be the same read or the
+ * page it hands over would not be the page the next intent asked for.
+ */
+async function readPage({
+  deps,
+  projectId,
+  row,
+  caller,
+  parameters,
+  keyColumns,
+  after,
+}: {
+  deps: InstantEvalRunExecutorDependencies;
+  projectId: string;
+  row: Awaited<ReturnType<typeof loadRun>>["row"];
+  caller: Awaited<ReturnType<typeof loadRun>>["caller"];
+  parameters: Awaited<ReturnType<typeof loadRun>>["parameters"];
+  keyColumns: Parameters<InstantEvalRunPort["judgePage"]>[0]["keyColumns"];
+  after: PageCursor;
+}): Promise<PrefetchedPage> {
+  const keyPage = await deps.rowSource.keys({
+    caller,
+    sql: row.sql,
+    parameters,
+    keyColumns,
+    limit: after.limit,
+    ...(after.afterTraceId === null
+      ? {}
+      : {
+          after: {
+            traceId: after.afterTraceId,
+            spanId: after.afterSpanId,
+          },
+        }),
+  });
+  if (keyPage.keys.length === 0) return { keyPage, prepared: null };
+  const prepared = await deps.rowSource.read({
+    caller,
+    protections: await deps.protections(projectId),
+    sql: row.sql,
+    parameters,
+    calls: instantEvalHydrationPlan(row.plan),
+    keys: keyPage.keys,
+    classifier: deps.classifier(),
+    maxConcurrency: deps.maxConcurrency,
+  });
+  return { keyPage, prepared };
+}
+
+/**
+ * Starts the next page's read while this one judges.
+ *
+ * Its limit is what the next intent will ask for when every key of this page
+ * becomes a judged row, which is the common case; an intent that arrives
+ * asking for anything else misses and reads for itself.
+ */
+function startNextPageRead({
+  prefetches,
+  runId,
+  read,
+  last,
+  hasMore,
+  remaining,
+  pageSize,
+}: {
+  prefetches: InstantEvalPrefetches;
+  runId: string;
+  read: (after: PageCursor) => Promise<PrefetchedPage>;
+  last: InstantEvalRowKey | undefined;
+  hasMore: boolean;
+  remaining: number;
+  pageSize: number;
+}): void {
+  if (!hasMore || remaining <= 0 || !last) return;
+  const after: PageCursor = {
+    afterTraceId: last.traceId,
+    afterSpanId: last.spanId ? last.spanId : null,
+    limit: Math.max(1, Math.min(pageSize, remaining)),
+  };
+  prefetches.start({ runId, ...after }, () => read(after));
+}
+
+/**
+ * Maps a judged page onto judgement rows and writes them.
+ *
+ * A page that mostly failed is thrown instead, so the outbox delivers it again
+ * rather than baking a bad minute of the provider's day into the answer. The
+ * throw comes BEFORE the write, so the retry is the only thing that records
+ * it; the write comes before the page is recorded, so a crash between the two
+ * costs a redelivery rather than a lost page.
+ */
+async function writeJudgedPage({
+  deps,
+  projectId,
+  runId,
+  page,
+  questions,
+  judged,
+  keys,
+}: {
+  deps: InstantEvalRunExecutorDependencies;
+  projectId: string;
+  runId: string;
+  page: number;
+  questions: Awaited<ReturnType<typeof loadRun>>["questions"];
+  judged: Awaited<ReturnType<typeof judgeUnderCancellation>>;
+  keys: readonly InstantEvalRowKey[];
+}): Promise<ReturnType<typeof mapInstantEvalPage>> {
+  const mapping = mapInstantEvalPage({
+    tenantId: projectId,
+    runId,
+    questions,
+    rows: judged.rows,
+    keys,
+    skipReason: instantEvalSkipReason(judged.usage.skipped),
+    now: deps.now?.() ?? Date.now(),
+  });
+
+  const failureRate = instantEvalPageFailureRate({
+    counters: mapping.counters,
+    questions: questions.length,
+  });
+  if (failureRate > INSTANT_EVAL_PAGE_FAILURE_CEILING) {
+    throw new Error(
+      `instant eval page ${page} of run ${runId} lost ${Math.round(failureRate * 100)}% of its judgements`,
+    );
+  }
+
+  await deps.judgments.insert(mapping.records);
+  return mapping;
+}
+
 async function judgeRunPageOrThrow(
   deps: InstantEvalRunExecutorDependencies,
   prefetches: InstantEvalPrefetches,
@@ -334,39 +478,16 @@ async function judgeRunPageOrThrow(
   }
 
   const limit = Math.max(1, Math.min(pageSize, remaining));
-  const read = async (after: {
-    afterTraceId: string | null;
-    afterSpanId: string | null;
-    limit: number;
-  }): Promise<PrefetchedPage> => {
-    const keyPage = await deps.rowSource.keys({
+  const read = (after: PageCursor) =>
+    readPage({
+      deps,
+      projectId,
+      row,
       caller,
-      sql: row.sql,
       parameters,
       keyColumns: input.keyColumns,
-      limit: after.limit,
-      ...(after.afterTraceId === null
-        ? {}
-        : {
-            after: {
-              traceId: after.afterTraceId,
-              spanId: after.afterSpanId,
-            },
-          }),
+      after,
     });
-    if (keyPage.keys.length === 0) return { keyPage, prepared: null };
-    const prepared = await deps.rowSource.read({
-      caller,
-      protections: await deps.protections(projectId),
-      sql: row.sql,
-      parameters,
-      calls: instantEvalHydrationPlan(row.plan),
-      keys: keyPage.keys,
-      classifier: deps.classifier(),
-      maxConcurrency: deps.maxConcurrency,
-    });
-    return { keyPage, prepared };
-  };
 
   const current =
     (await prefetches.take({ runId, afterTraceId, afterSpanId, limit })) ??
@@ -374,34 +495,16 @@ async function judgeRunPageOrThrow(
   const { keyPage, prepared } = current;
   if (keyPage.keys.length === 0 || prepared === null) return emptyPage();
 
-  // The next page is read while this one judges. Its limit is what the next
-  // intent will ask for when every key of this page becomes a judged row,
-  // which is the common case; the intent that arrives asking for anything
-  // else misses and reads for itself.
   const last = keyPage.keys.at(-1);
-  const nextRemaining = remaining - keyPage.keys.length;
-  if (keyPage.hasMore && nextRemaining > 0 && last) {
-    const nextKey = {
-      runId,
-      afterTraceId: last.traceId,
-      cursorSpanId: last.spanId ? last.spanId : null,
-      limit: Math.max(1, Math.min(pageSize, nextRemaining)),
-    };
-    prefetches.start(
-      {
-        runId,
-        afterTraceId: nextKey.afterTraceId,
-        afterSpanId: nextKey.cursorSpanId,
-        limit: nextKey.limit,
-      },
-      () =>
-        read({
-          afterTraceId: nextKey.afterTraceId,
-          afterSpanId: nextKey.cursorSpanId,
-          limit: nextKey.limit,
-        }),
-    );
-  }
+  startNextPageRead({
+    prefetches,
+    runId,
+    read,
+    last,
+    hasMore: keyPage.hasMore,
+    remaining: remaining - keyPage.keys.length,
+    pageSize,
+  });
 
   const judged = await judgeUnderCancellation({
     deps,
@@ -410,33 +513,15 @@ async function judgeRunPageOrThrow(
     prepared,
   });
 
-  const at = deps.now?.() ?? Date.now();
-  const mapping = mapInstantEvalPage({
-    tenantId: projectId,
+  const mapping = await writeJudgedPage({
+    deps,
+    projectId,
     runId,
+    page,
     questions,
-    rows: judged.rows,
+    judged,
     keys: keyPage.keys,
-    skipReason: instantEvalSkipReason(judged.usage.skipped),
-    now: at,
   });
-
-  // A page that mostly failed is thrown so the outbox delivers it again,
-  // rather than baking a bad minute of the provider's day into the answer.
-  // Thrown BEFORE the write, so the retry is the only thing that records it.
-  const failureRate = instantEvalPageFailureRate({
-    counters: mapping.counters,
-    questions: questions.length,
-  });
-  if (failureRate > INSTANT_EVAL_PAGE_FAILURE_CEILING) {
-    throw new Error(
-      `instant eval page ${page} of run ${runId} lost ${Math.round(failureRate * 100)}% of its judgements`,
-    );
-  }
-
-  // Written before the page is recorded, so a crash between the two costs
-  // a redelivery rather than a lost page.
-  await deps.judgments.insert(mapping.records);
 
   return {
     ...mapping.counters,
