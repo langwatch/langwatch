@@ -99,29 +99,32 @@ describe("createNlpFetchDispatcher", () => {
     );
   });
 
-  it("memoizes: the same timeoutMs returns the same dispatcher instance", () => {
-    const first = createNlpFetchDispatcher({ timeoutMs: 42_000 });
-    const second = createNlpFetchDispatcher({ timeoutMs: 42_000 });
+  describe("when the same timeoutMs is requested twice", () => {
+    it("memoizes: the same timeoutMs returns the same dispatcher instance", () => {
+      const first = createNlpFetchDispatcher({ timeoutMs: 42_000 });
+      const second = createNlpFetchDispatcher({ timeoutMs: 42_000 });
 
-    expect(second).toBe(first);
-    // Only the first call should have constructed a new Agent.
-    expect(agentOptions).toHaveLength(1);
+      expect(second).toBe(first);
+      expect(agentOptions).toHaveLength(1);
+    });
+
+    it("a memoized dispatcher still carries headersTimeout/bodyTimeout equal to timeoutMs", () => {
+      createNlpFetchDispatcher({ timeoutMs: 77_000 });
+      createNlpFetchDispatcher({ timeoutMs: 77_000 });
+
+      expect(agentOptions.at(-1)?.headersTimeout).toBe(77_000);
+      expect(agentOptions.at(-1)?.bodyTimeout).toBe(77_000);
+    });
   });
 
-  it("does not memoize across different timeoutMs values", () => {
-    const first = createNlpFetchDispatcher({ timeoutMs: 10_000 });
-    const second = createNlpFetchDispatcher({ timeoutMs: 20_000 });
+  describe("when different timeoutMs values are requested", () => {
+    it("does not memoize across different timeoutMs values", () => {
+      const first = createNlpFetchDispatcher({ timeoutMs: 10_000 });
+      const second = createNlpFetchDispatcher({ timeoutMs: 20_000 });
 
-    expect(second).not.toBe(first);
-    expect(agentOptions).toHaveLength(2);
-  });
-
-  it("a memoized dispatcher still carries headersTimeout/bodyTimeout equal to timeoutMs", () => {
-    createNlpFetchDispatcher({ timeoutMs: 77_000 });
-    createNlpFetchDispatcher({ timeoutMs: 77_000 }); // served from cache
-
-    expect(agentOptions.at(-1)?.headersTimeout).toBe(77_000);
-    expect(agentOptions.at(-1)?.bodyTimeout).toBe(77_000);
+      expect(second).not.toBe(first);
+      expect(agentOptions).toHaveLength(2);
+    });
   });
 });
 
@@ -131,13 +134,15 @@ describe("closeNlpFetchDispatchers", () => {
     await closeNlpFetchDispatchers();
   });
 
-  it("empties the cache so a later call constructs a fresh instance", async () => {
-    const first = createNlpFetchDispatcher({ timeoutMs: 99_000 });
+  describe("given a dispatcher is already cached for a timeoutMs", () => {
+    it("empties the cache so a later call constructs a fresh instance", async () => {
+      const first = createNlpFetchDispatcher({ timeoutMs: 99_000 });
 
-    await closeNlpFetchDispatchers();
-    const second = createNlpFetchDispatcher({ timeoutMs: 99_000 });
+      await closeNlpFetchDispatchers();
+      const second = createNlpFetchDispatcher({ timeoutMs: 99_000 });
 
-    expect(second).not.toBe(first);
-    expect(agentOptions).toHaveLength(2);
+      expect(second).not.toBe(first);
+      expect(agentOptions).toHaveLength(2);
+    });
   });
 });
