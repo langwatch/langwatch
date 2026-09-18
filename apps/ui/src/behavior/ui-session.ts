@@ -4,9 +4,16 @@
  * permission that flickers open while loading is a permission that leaked.
  */
 
+import {
+  readUiActor,
+  uiAuthClient,
+  UI_SESSION_QUERY_KEY,
+  type UiAuthClient,
+  type UiSessionReading as UiSessionResponse,
+} from "@langwatch/auth-browser/session";
 import { permissionSatisfiedBy } from "@langwatch/authz-contract";
 import type { UiActiveScope, UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
-import { UiSession } from "@langwatch/browser-host/capabilities";
+import { UiScope, UiSession } from "@langwatch/browser-host/capabilities";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import {
   createUiScopeHost,
@@ -24,19 +31,18 @@ import { resolveUiScope, uiScopeSelectionWrites } from "./ui-scope-resolution";
 import { useUiRouteReading } from "./ui-scope-route";
 import { rememberUiScopeSelection, useUiScopeMemory } from "./ui-scope-storage";
 import {
-  readUiActor,
-  uiAuthClient,
-  UI_SESSION_QUERY_KEY,
-  type UiAuthClient,
-  type UiSessionReading as UiSessionResponse,
-} from "./ui-session-client";
-import {
   useUiEffectivePermissions,
   useUiFeatureFlags,
   useUiOrganizations,
   useUiSharedProject,
   type UiEffectivePermissionsRead,
 } from "./ui-session-queries";
+
+/**
+ * Both capabilities one session read fills. Scope is a capability of its own,
+ * and it is resolved here because the reads that answer it are these reads.
+ */
+export type UiSessionCapabilities = { session: UiSession; scope: UiScope };
 
 /**
  * A composition's live session, built where the transport is — declared
@@ -47,7 +53,7 @@ export type UiSessionSource = (input: {
   transport: UiFeatureApiTransport;
   /** Where a refused session read is told, since nobody else sees it. */
   feedback: UiFeedback;
-}) => UiSession;
+}) => UiSessionCapabilities;
 
 /** The screen a visitor with no session is sent to. */
 export const UI_SIGN_IN_PATH = "/auth/signin";
@@ -124,16 +130,44 @@ export class UiFeatureFlagRequests {
 export type BrowserUiSessionState = {
   readonly flags: ReadonlyMap<string, boolean>;
   readonly askFlag: (flag: string) => void;
-  readonly scopeHost: UiScopeHost | undefined;
 } & (
   | { readonly snapshot: UiSessionSnapshot }
   | {
       readonly actor: UiActor | null;
-      readonly scope: UiActiveScope;
       readonly permissions: ReadonlySet<string> | undefined;
       readonly settled: boolean;
     }
 );
+
+export type BrowserUiScopeState = {
+  readonly scopeHost: UiScopeHost | undefined;
+} & ({ readonly snapshot: UiSessionSnapshot } | { readonly scope: UiActiveScope });
+
+/** The scope port over the same render's worth of answers. */
+export class BrowserUiScope extends UiScope {
+  static create(state: BrowserUiScopeState): BrowserUiScope {
+    return new BrowserUiScope(state);
+  }
+
+  private constructor(private readonly state: BrowserUiScopeState) {
+    super();
+  }
+
+  activeScope(): UiActiveScope {
+    if ("snapshot" in this.state) {
+      const { scope } = this.state.snapshot;
+      return {
+        organizationId: scope.organization?.id ?? null,
+        projectId: scope.project?.id ?? null,
+      };
+    }
+    return this.state.scope;
+  }
+
+  override scopeHost(): UiScopeHost | undefined {
+    return this.state.scopeHost;
+  }
+}
 
 /** The port over one render's worth of answers. */
 export class BrowserUiSession extends UiSession {
@@ -148,17 +182,6 @@ export class BrowserUiSession extends UiSession {
   currentUser(): UiActor | null {
     if ("snapshot" in this.state) return this.state.snapshot.session.user;
     return this.state.actor;
-  }
-
-  activeScope(): UiActiveScope {
-    if ("snapshot" in this.state) {
-      const { scope } = this.state.snapshot;
-      return {
-        organizationId: scope.organization?.id ?? null,
-        projectId: scope.project?.id ?? null,
-      };
-    }
-    return this.state.scope;
   }
 
   /**
@@ -186,10 +209,6 @@ export class BrowserUiSession extends UiSession {
     return this.state.snapshot;
   }
 
-  override scopeHost(): UiScopeHost | undefined {
-    return this.state.scopeHost;
-  }
-
   featureFlag(flag: string): boolean | undefined {
     const answer = this.state.flags.get(flag);
     if (answer === void 0) {
@@ -214,7 +233,7 @@ export function useBrowserUiSession({
   feedback: UiFeedback;
   /** The deployment's own client unless a test answers with a recorded session. */
   authClient?: UiAuthClient;
-}): UiSession {
+}): UiSessionCapabilities {
   const route = useUiRouteReading();
   const address = useUiAddress();
   const memory = useUiScopeMemory();
@@ -347,12 +366,13 @@ export function useBrowserUiSession({
     permissions: readPermissions(scope.status, permissions, organizationPermissions),
   };
 
-  return BrowserUiSession.create({
-    snapshot,
-    flags,
-    askFlag,
-    scopeHost: legacyScopeHost(snapshot, resolved.organizationRole, isDemo),
-  });
+  return {
+    session: BrowserUiSession.create({ snapshot, flags, askFlag }),
+    scope: BrowserUiScope.create({
+      snapshot,
+      scopeHost: legacyScopeHost(snapshot, resolved.organizationRole, isDemo),
+    }),
+  };
 }
 
 function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionSnapshot["session"] {
