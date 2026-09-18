@@ -31,6 +31,7 @@ import {
   type AutomationSuccessNotice,
   type AutomationTeam,
 } from "../model/automation-host.ts";
+import { automationApi } from "./automation-api.ts";
 
 /** Writes a registered drawer's address, clearing every stale `drawer.*` key. */
 function openDrawerAddress({
@@ -51,6 +52,17 @@ function openDrawerAddress({
   route.setQuery(next);
 }
 
+/** The graph as the read answers it, richer than the port's own shapes. */
+type AutomationOrganizationGraph = {
+  id: string;
+  name: string;
+  slug: string;
+  teams: { id: string; name: string; slug: string }[];
+};
+
+/** A stable reference, so a query still loading never re-triggers a memo below it. */
+const NO_ORGANIZATIONS: readonly AutomationOrganizationGraph[] = [];
+
 class CapabilityAutomationHost extends AutomationHost {
   constructor(
     private readonly hostScope: AutomationScope,
@@ -61,6 +73,7 @@ class CapabilityAutomationHost extends AutomationHost {
     private readonly feedback: UiFeedback,
     private readonly openRegisteredDrawer: ReturnType<typeof useDrawer>["openDrawer"],
     private readonly goBackDrawer: ReturnType<typeof useDrawer>["goBack"],
+    private readonly organizations: readonly AutomationOrganizationGraph[],
   ) {
     super();
   }
@@ -69,13 +82,18 @@ class CapabilityAutomationHost extends AutomationHost {
     return this.hostScope;
   }
 
-  /** No org-graph capability exists yet; recorded gap, see the handoff. */
   organization(): AutomationOrganization | undefined {
-    return void 0;
+    const found = this.organizations.find((one) => one.id === this.hostScope.organizationId);
+    return found === void 0 ? void 0 : { id: found.id, name: found.name, slug: found.slug };
   }
 
-  /** Same recorded gap: a compliant `slug` cannot be built from the current scope alone. */
   team(): AutomationTeam | undefined {
+    const teamId = this.hostScope.teamId;
+    if (teamId === null) return void 0;
+    for (const one of this.organizations) {
+      const found = one.teams.find((candidate) => candidate.id === teamId);
+      if (found) return { id: found.id, name: found.name, slug: found.slug };
+    }
     return void 0;
   }
 
@@ -172,6 +190,11 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
 
   const project = useMemo<AutomationProject | undefined>(() => scopeHost?.project(), [scopeHost]);
 
+  // Shares the tRPC cache entry with every other reader of this procedure, so
+  // the graph is fetched once per page however many hosts want it.
+  const graph = automationApi.organization.getAll.useQuery({ isDemo: false });
+  const organizations = graph.data ?? NO_ORGANIZATIONS;
+
   const host = useMemo(
     () =>
       new CapabilityAutomationHost(
@@ -183,8 +206,19 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
         feedback,
         openRegisteredDrawer,
         goBack,
+        organizations,
       ),
-    [hostScope, project, session, navigation, route, feedback, openRegisteredDrawer, goBack],
+    [
+      hostScope,
+      project,
+      session,
+      navigation,
+      route,
+      feedback,
+      openRegisteredDrawer,
+      goBack,
+      organizations,
+    ],
   );
 
   return <AutomationHostProvider value={host}>{children}</AutomationHostProvider>;
