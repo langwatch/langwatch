@@ -66,7 +66,14 @@ async function getSharedContext(): Promise<BrowserContext> {
         timeout: 30_000,
       });
       await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
-      await page.locator('input[type="password"]').fill(ADMIN_PASSWORD);
+      // The page asks for the address first and shows the password box once
+      // it knows the account signs in with one.
+      const password = page.locator('input[type="password"]');
+      if ((await password.count()) === 0) {
+        await page.locator('button[type="submit"]').click();
+        await password.waitFor({ timeout: 20_000 });
+      }
+      await password.fill(ADMIN_PASSWORD);
       await page.locator('button[type="submit"]').click();
       await page.waitForURL((url) => !url.pathname.startsWith("/auth/signin"), {
         timeout: 20_000,
