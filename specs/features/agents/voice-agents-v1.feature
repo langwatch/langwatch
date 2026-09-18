@@ -179,6 +179,19 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then the reloaded editor shows the saved values
     And the caller voice only takes effect when the scenario is later run against a voice target
 
+  # AC17
+  @integration
+  Scenario: The caller voice is also offered in the Agent Testing scenario editor
+    Given the Agent Testing scenario editor for any scenario
+    When "Customize scenario" is expanded
+    Then a "Caller voice" chip is offered alongside parameters, turns and models
+    When the "Caller voice" chip is clicked
+    Then the block offers Voice, Interrupts and Effects
+    When a stored scenario carries a caller voice
+    Then the editor opens with the Caller voice block already showing its values
+    When the caller voice block is removed
+    Then the draft's caller voice clears back to the project default
+
   # AC18
   @integration
   Scenario: The Voice picker lists only audio and realtime models the project has credentials for
