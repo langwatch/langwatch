@@ -2,7 +2,7 @@
 
 **Date:** 2026-01-29 (initial), 2026-05-17 (scope split + registry)
 
-**Status:** Accepted — amended 2026-08-20 and 2026-08-31, see below
+**Status:** Accepted, amended 2026-08-20, 2026-08-31, 2026-09-07 and 2026-09-13, see below
 
 ## Amendment (2026-08-20): PostHog removed from the resolver
 
@@ -19,6 +19,35 @@ Three consequences the rest of this document predates:
 - **A SYSTEM-scoped flag exposed to the frontend is a legitimate shape.** `FeatureFlagKey` is the union of all registered keys regardless of scope, so the `featureFlag.isEnabled` router's cast is safe either way. The Langy family relies on this: internal levers that gate a product surface. A guard added in #7357 asserted the opposite — that every frontend-exposed flag must be PRODUCT — and went red on `main` when #7424 landed a SYSTEM flag in `FRONTEND_FEATURE_FLAGS` (issue #7511); it was removed rather than extended, because the premise was inherited from this ADR after the code beneath it had changed.
 
 Sections below describing a PostHog path (Resolution order, Architecture Flow, Targeting via personProperties, PostHog local evaluation) are retained as history of the 2026-05 design and are **not** the current behaviour. `POSTHOG_FEATURE_FLAGS_KEY` no longer affects flag resolution; PostHog remains in the product for analytics and error capture only.
+
+## Amendment (2026-09-13): PostHog experiments without PostHog feature flags
+
+An A/B test on this platform is analysed in PostHog as an experiment without
+a PostHog feature flag (https://posthog.com/docs/experiments/running-experiments-without-feature-flags).
+PostHog is never consulted for the assignment: the flag in the registry
+decides it, through its targeting rules, and the assignment is recorded on
+the subject at the moment it is made. For the onboarding experiment the flag
+is `experiment_onboarding_langy_guided` and the assignment is
+`Organization.signupData.onboardingVariant`, written when the organization is
+created.
+
+PostHog needs two things from us. An exposure event, tracked once per subject
+when the assignment is made (`onboarding_variant_assigned`), and the variant
+on every metric event, as the event property `$feature/<flag key>`, here
+`$feature/experiment_onboarding_langy_guided`. The baseline variant is named
+`control`, the PostHog convention: the classic onboarding maps to `control`
+and the guided one to `guided`. The mapping and the property name live in
+`src/server/onboarding/guided-onboarding.experiment.ts`, which both the server
+events and the browser import.
+
+Server events read the variant next to the user they are tracked against
+(`resolveOrgAdmin` for a project-scoped milestone, the organization for an
+onboarding event). The browser registers the property with posthog-js once
+the organization's variant is known, so client events carry it too.
+
+SaaS only. An organization without a recorded variant, self-hosted or older
+than the experiment, gets no exposure and no property, and its events are
+unchanged.
 
 ## Amendment (2026-08-31): targeting by organization age ("New users")
 
@@ -49,6 +78,30 @@ Two properties are load-bearing:
   for ten minutes. A creation date never changes, and a flag with no age rule
   — every kill switch on the per-event hot path — reads exactly what it read
   before, with no extra query.
+
+## Amendment (2026-09-07): targeting by email domain
+
+A flag under QA in production has to reach the team's own accounts and no one
+else. A rule may name an email domain, or a list of them:
+
+```json
+{ "match": { "emailDomain": "acme.com" }, "enabled": true }
+{ "match": { "emailDomain": ["acme.com", "acme.io"] }, "enabled": true }
+```
+
+It matches every signed-in user whose email is at one of those domains. The
+comparison is on the part after the last `@`, case-insensitive and exact, so a
+subdomain only matches when it is listed. Domains are stored lowercase without
+the `@`; the write schema rejects anything else. `/ops/feature-flags` writes it
+as the **Email domain** scope, one comma-separated field.
+
+The email comes from the session. `FeatureFlagEvaluateOptions.userEmail` is
+optional, and every caller that resolves a flag on behalf of a session passes
+`session.user.email`: the frontend flag procedures, the automations webhook
+gates, the device-login governance gate, the Langy access gate and the member
+budget overview. A read without a session, from a job, an API key or a
+sign-up, passes nothing, and no domain rule matches it, for the same reason
+the age and percentage rules fail closed.
 
 ## Context
 
@@ -134,9 +187,10 @@ FeatureFlagService                                 env override
 
 ## Targeting
 
-Rules on a flag row name a project, an organization, or an organization
-creation date (see the 2026-08-31 amendment). The read states both ids, so a
-rule written for either one can match:
+Rules on a flag row name a project, an organization, an organization
+creation date (see the 2026-08-31 amendment) or an email domain (see the
+2026-09-07 amendment). The read states both ids, so a rule written for either
+one can match:
 
 ```typescript
 await featureFlagService.isEnabled("release_ui_simulations_menu_enabled", {

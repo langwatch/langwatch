@@ -139,6 +139,7 @@ function ProjectMenu({
         <Button
           variant="ghost"
           aria-label="Switch project"
+          data-tour="project-switcher"
           fontSize="13px"
           fontWeight="normal"
           paddingX={2}

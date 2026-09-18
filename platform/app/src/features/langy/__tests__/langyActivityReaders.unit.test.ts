@@ -167,6 +167,45 @@ describe("langy activity readers", () => {
     });
   });
 
+  describe("given a gh with no login on a call that ran in the shared folder", () => {
+    const ghOutput =
+      "To get started with GitHub CLI, please run: gh auth login";
+    const failedGh = (extra: Record<string, unknown>) => ({
+      type: "tool-bash",
+      toolCallId: "call-1",
+      state: "output-error",
+      input: { command: "gh pr list" },
+      errorText: ghOutput,
+      ...extra,
+    });
+
+    /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
+    it("reads the marker off the durable part", () => {
+      const parts = [failedGh({ local: true })];
+      expect(
+        toFailedToolCalls({ parts })[0]?.presentation.code,
+      ).toBeUndefined();
+    });
+
+    /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
+    it("reads the marker off the live edge's settled-chunk metadata", () => {
+      const parts = [
+        failedGh({ resultProviderMetadata: { langwatch: { local: true } } }),
+      ];
+      expect(
+        toFailedToolCalls({ parts })[0]?.presentation.code,
+      ).toBeUndefined();
+    });
+
+    /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
+    it("still names the missing GitHub App when neither carrier marked it", () => {
+      const parts = [failedGh({})];
+      expect(toFailedToolCalls({ parts })[0]?.presentation.code).toBe(
+        "langy_github_not_connected",
+      );
+    });
+  });
+
   describe("given the CLI announced its own failure", () => {
     describe("when the marker heads a line of the output", () => {
       it("still reads the call as failed", () => {

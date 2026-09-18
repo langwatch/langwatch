@@ -16,6 +16,7 @@ describe("getOnboardingFlowConfig", () => {
         isSaaS: true,
         intent: undefined,
         intentForkEnabled: true,
+        guided: false,
       });
       expect(flow.visibleScreens).toEqual([
         OnboardingScreenIndex.ORGANIZATION,
@@ -33,6 +34,7 @@ describe("getOnboardingFlowConfig", () => {
         isSaaS: true,
         intent: undefined,
         intentForkEnabled: true,
+        guided: false,
       });
       expect(flow.visibleScreens[1]).toBe(OnboardingScreenIndex.INTENT);
     });
@@ -45,6 +47,7 @@ describe("getOnboardingFlowConfig", () => {
         isSaaS: true,
         intent: "LLM_OPS",
         intentForkEnabled: true,
+        guided: false,
       });
       expect(flow.visibleScreens).toEqual([
         OnboardingScreenIndex.ORGANIZATION,
@@ -65,6 +68,7 @@ describe("getOnboardingFlowConfig", () => {
         isSaaS: true,
         intent: "AGENT_GOVERNANCE",
         intentForkEnabled: true,
+        guided: false,
       });
       expect(flow.visibleScreens).toEqual([
         OnboardingScreenIndex.ORGANIZATION,
@@ -82,6 +86,7 @@ describe("getOnboardingFlowConfig", () => {
         isSaaS: true,
         intent: undefined,
         intentForkEnabled: false,
+        guided: false,
       });
       expect(flow.visibleScreens).toEqual([
         OnboardingScreenIndex.ORGANIZATION,
@@ -97,6 +102,7 @@ describe("getOnboardingFlowConfig", () => {
         isSaaS: false,
         intent: undefined,
         intentForkEnabled: false,
+        guided: false,
       });
       expect(flow.visibleScreens).toEqual([OnboardingScreenIndex.ORGANIZATION]);
       expect(flow.total).toBe(1);
@@ -108,6 +114,7 @@ describe("getOnboardingFlowConfig", () => {
           isSaaS: true,
           intent: "AGENT_GOVERNANCE",
           intentForkEnabled: false,
+          guided: false,
         }).visibleScreens,
       ).not.toContain(OnboardingScreenIndex.INTENT);
     });
@@ -120,6 +127,7 @@ describe("getOnboardingFlowConfig", () => {
         isSaaS: false,
         intent: undefined,
         intentForkEnabled: true,
+        guided: false,
       });
       expect(flow.visibleScreens).toEqual([
         OnboardingScreenIndex.ORGANIZATION,
@@ -134,6 +142,7 @@ describe("getOnboardingFlowConfig", () => {
           isSaaS: false,
           intent: "AGENT_GOVERNANCE",
           intentForkEnabled: true,
+          guided: false,
         }).visibleScreens,
       ).toEqual([
         OnboardingScreenIndex.ORGANIZATION,
@@ -144,11 +153,83 @@ describe("getOnboardingFlowConfig", () => {
           isSaaS: false,
           intent: "LLM_OPS",
           intentForkEnabled: true,
+          guided: false,
         }).visibleScreens,
       ).toEqual([
         OnboardingScreenIndex.ORGANIZATION,
         OnboardingScreenIndex.INTENT,
       ]);
+    });
+  });
+});
+
+/**
+ * The guided variant: Langy takes over after the tailor step.
+ * Spec: specs/features/onboarding/guided-welcome-takeover.feature
+ */
+describe("getOnboardingFlowConfig in the guided variant", () => {
+  const classicScreens = [
+    OnboardingScreenIndex.ORGANIZATION,
+    OnboardingScreenIndex.INTENT,
+    OnboardingScreenIndex.BASIC_INFO,
+    OnboardingScreenIndex.DESIRES,
+    OnboardingScreenIndex.ROLE,
+  ];
+
+  describe("when the guided flag is on for the user on SaaS", () => {
+    /** @scenario "The guided flow shows the organization, tailor, hello, value and provider screens in that order" */
+    it("shows organization, tailor, hello, value and provider, and none of intent, desires or role", () => {
+      const flow = getOnboardingFlowConfig({
+        isSaaS: true,
+        intent: undefined,
+        intentForkEnabled: true,
+        guided: true,
+      });
+      expect(flow.visibleScreens).toEqual([
+        OnboardingScreenIndex.ORGANIZATION,
+        OnboardingScreenIndex.BASIC_INFO,
+        OnboardingScreenIndex.HELLO,
+        OnboardingScreenIndex.VALUE,
+        OnboardingScreenIndex.PROVIDER,
+      ]);
+      expect(flow.visibleScreens).not.toContain(OnboardingScreenIndex.INTENT);
+      expect(flow.visibleScreens).not.toContain(OnboardingScreenIndex.DESIRES);
+      expect(flow.visibleScreens).not.toContain(OnboardingScreenIndex.ROLE);
+      expect(flow.variant).toBe("guided");
+      expect(flow.last).toBe(OnboardingScreenIndex.PROVIDER);
+    });
+  });
+
+  describe("when the guided flag is on for the user on a self-hosted install", () => {
+    /** @scenario "A self-hosted install gets the same guided screens" */
+    it("shows the same five screens", () => {
+      const flow = getOnboardingFlowConfig({
+        isSaaS: false,
+        intent: undefined,
+        intentForkEnabled: true,
+        guided: true,
+      });
+      expect(flow.visibleScreens).toEqual([
+        OnboardingScreenIndex.ORGANIZATION,
+        OnboardingScreenIndex.BASIC_INFO,
+        OnboardingScreenIndex.HELLO,
+        OnboardingScreenIndex.VALUE,
+        OnboardingScreenIndex.PROVIDER,
+      ]);
+    });
+  });
+
+  describe("when the guided flag is off", () => {
+    /** @scenario "The classic flow is untouched when the flag is off" */
+    it("returns exactly the classic wizard", () => {
+      const flow = getOnboardingFlowConfig({
+        isSaaS: true,
+        intent: "LLM_OPS",
+        intentForkEnabled: true,
+        guided: false,
+      });
+      expect(flow.visibleScreens).toEqual(classicScreens);
+      expect(flow.variant).toBe("full");
     });
   });
 });

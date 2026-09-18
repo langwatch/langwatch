@@ -14,6 +14,13 @@ import type { FeatureFlagTargetId } from "./targeting";
 export interface FeatureFlagEvaluateOptions {
   distinctId: string;
   /**
+   * The signed-in user's email, for an email domain targeting rule. Only a
+   * read made on behalf of a session passes it; a job, an API key or a
+   * sign-up leaves it out, and no domain rule can match that read. Typed to
+   * take the session's own field as is.
+   */
+  userEmail?: string | null;
+  /**
    * Overrides the registry default for unregistered keys (registered
    * flags always use their `defaultValue` from `registry.ts`).
    */

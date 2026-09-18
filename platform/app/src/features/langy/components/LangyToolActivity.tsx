@@ -62,6 +62,8 @@ import {
   isQuestionToolPart,
   questionToolCardParts,
 } from "../logic/langyQuestionTool";
+import { isSayToolPart } from "../logic/langySayTool";
+import { isSecretSnippetToolPart } from "../logic/langySecretSnippetTool";
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
@@ -120,7 +122,32 @@ type ToolPartLike = {
   /** The recorded result digest, on durable parts of CLI calls (additive). */
   digest?: unknown;
   result?: unknown;
+  /**
+   * The call ran in the folder the developer shared from their own machine
+   * (ADR-129) rather than in the sandbox. Carried on the durable part.
+   */
+  local?: boolean;
+  /** The live edge's carrier for the same fact. See {@link ranInSharedFolder}. */
+  resultProviderMetadata?: unknown;
 };
+
+/**
+ * Whether a settled call ran in the developer's shared folder.
+ *
+ * The durable part carries a plain `local`. The live edge has no such field to
+ * write to: the AI SDK rebuilds a tool part from its own chunks, and
+ * `resultProviderMetadata` is the one slot a settled chunk carries through, so
+ * the transport writes the marker there. Both shapes mean the same thing.
+ */
+function ranInSharedFolder(part: ToolPartLike): boolean | undefined {
+  if (typeof part.local === "boolean") return part.local;
+  const metadata = part.resultProviderMetadata;
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const namespace = (metadata as Record<string, unknown>).langwatch;
+  if (!namespace || typeof namespace !== "object") return undefined;
+  const local = (namespace as Record<string, unknown>).local;
+  return typeof local === "boolean" ? local : undefined;
+}
 
 /**
  * The minimal view every reader here needs — just the ordered parts. Loosened
@@ -551,6 +578,7 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
         title: described.title,
         errorText: part.errorText ?? part.output,
         toolName: name,
+        local: ranInSharedFolder(part),
       }),
       order: index,
     });
@@ -583,10 +611,18 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     if (isQuestionToolPart(part) && questionToolCardParts(part).length > 0) {
       return;
     }
+    // The `say` tool is a line of Langy's own words, drawn as reply prose
+    // where the call happened (MessageContent); an activity row for it would
+    // only say a line was said.
+    if (isSayToolPart(part)) return;
     // The `code_access` tool is the code access card (ADR-129), for the same
     // reason: it speaks to the person, not to the model, and the card carries
     // its whole life.
     if (isCodeAccessToolPart(part)) return;
+    // The `secret_snippet` tool is the secret snippet card, rendered by
+    // MessageContent: the card is where the value shows, once, and an
+    // activity row would only say a card was drawn.
+    if (isSecretSnippetToolPart(part)) return;
     const name = partToolName(part);
     if (!name) return;
 
@@ -1476,11 +1512,13 @@ function FailedToolCallRow({
 }
 
 /**
- * A step that failed and that the turn then recovered from, as one line.
+ * A step that failed and that the turn then answered after, as one line.
  *
  * Quiet, not gone. The same card is one click away, and the failure keeps its
  * place in the transcript — it just stops competing with the answer the turn
- * went on to give.
+ * went on to give. The line says the reply follows and nothing more: the reply
+ * may be the turn stopping on that failure, so the line never claims Langy
+ * carried on.
  */
 function RecoveredToolFailureRow({
   presentation,
@@ -1503,7 +1541,7 @@ function RecoveredToolFailureRow({
             <AlertCircle size={11} aria-hidden="true" />
           </Box>
           <Text textStyle="xs" color="fg.subtle" flex={1} truncate>
-            {presentation.title}, and Langy carried on
+            {presentation.title}, and Langy answered below
           </Text>
           <Box
             color="fg.subtle"

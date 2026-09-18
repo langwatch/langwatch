@@ -192,6 +192,7 @@ export class FinishRunCommand
         scenarioSetId: ecst.scenarioSetId,
       }),
       ...(ecst.traceIds !== undefined && { traceIds: ecst.traceIds }),
+      ...(ecst.target !== undefined && { target: ecst.target }),
       ...(ecst.evaluators !== undefined && { evaluators: ecst.evaluators }),
     };
 
@@ -217,8 +218,8 @@ export class FinishRunCommand
   /**
    * Fills ECST gaps from the run's prior events. Caller-supplied fields
    * always win; only missing ones are backfilled (identity from RunQueued,
-   * traceIds from MessageSnapshot/TextMessageEnd, the evaluators the run was
-   * queued with from RunQueued).
+   * traceIds from MessageSnapshot/TextMessageEnd, the target and the
+   * evaluators the run was queued with from RunQueued).
    *
    * The prior events are always read now: `evaluators` is a gap on every
    * command, since no caller supplies it.
@@ -229,13 +230,23 @@ export class FinishRunCommand
   ): Promise<
     Pick<
       SimulationRunFinishedEventData,
-      "scenarioId" | "batchRunId" | "scenarioSetId" | "traceIds" | "evaluators"
+      | "scenarioId"
+      | "batchRunId"
+      | "scenarioSetId"
+      | "traceIds"
+      | "target"
+      | "evaluators"
     >
   > {
     const { scenarioRunId } = data;
     const result: Pick<
       SimulationRunFinishedEventData,
-      "scenarioId" | "batchRunId" | "scenarioSetId" | "traceIds" | "evaluators"
+      | "scenarioId"
+      | "batchRunId"
+      | "scenarioSetId"
+      | "traceIds"
+      | "target"
+      | "evaluators"
     > = {
       scenarioId: data.scenarioId,
       batchRunId: data.batchRunId,
@@ -258,6 +269,7 @@ export class FinishRunCommand
 
     const queuedEvent = priorEvents.find(isSimulationRunQueuedEvent);
     result.evaluators = queuedEvent?.data.evaluators;
+    result.target = queuedEvent?.data.target;
 
     if (!result.scenarioId || !result.batchRunId || !result.scenarioSetId) {
       const queued = queuedEvent;

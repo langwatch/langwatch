@@ -363,6 +363,112 @@ describe("LangyDeclarativeCard", () => {
     });
   });
 
+  describe("given a connected agent read", () => {
+    const agent = {
+      id: "agent_1",
+      name: "acme-checkout",
+      type: "connected",
+      config: { timeoutMs: 120000 },
+      environment: "development",
+      status: "online",
+      hostLabel: "riley-laptop",
+      ownerUserId: null,
+      lastSeenAt: "2026-09-06T18:42:34.162Z",
+      createdAt: "2026-09-06T17:41:57.478Z",
+      updatedAt: "2026-09-06T18:42:34.164Z",
+    };
+
+    describe("when the detail card renders", () => {
+      /** @scenario "An agent card reads in customer copy" */
+      it("shows the status as a word, the environment and the host, and no id, type or timestamp", () => {
+        renderCard({
+          name: "langwatch.agent.get",
+          input: { command: "langwatch agent get agent_1 --format json" },
+          output: JSON.stringify(agent),
+        });
+
+        expect(screen.getByText("Online")).toBeTruthy();
+        expect(screen.getByText("environment")).toBeTruthy();
+        expect(screen.getByText("development")).toBeTruthy();
+        expect(screen.getByText("host")).toBeTruthy();
+        expect(screen.getByText("riley-laptop")).toBeTruthy();
+        expect(screen.queryByText("id")).toBeNull();
+        expect(screen.queryByText("agent_1")).toBeNull();
+        expect(screen.queryByText("type")).toBeNull();
+        expect(screen.queryByText("created at")).toBeNull();
+        expect(screen.queryByText("updated at")).toBeNull();
+        expect(screen.queryByText("host label")).toBeNull();
+      });
+    });
+
+    describe("when the list card renders", () => {
+      /** @scenario "An agent card reads in customer copy" */
+      it("words each row's status", () => {
+        renderCard({
+          name: "langwatch.agent.list",
+          input: { command: "langwatch agent list --format json" },
+          output: JSON.stringify({
+            data: [
+              agent,
+              {
+                ...agent,
+                id: "agent_2",
+                name: "acme-support",
+                status: "offline",
+              },
+            ],
+            pagination: { total: 2, page: 1, totalPages: 1, limit: 100 },
+          }),
+        });
+
+        expect(screen.getByText("acme-checkout")).toBeTruthy();
+        expect(screen.getByText("Online")).toBeTruthy();
+        expect(screen.getByText("Offline")).toBeTruthy();
+        expect(screen.queryByText("online")).toBeNull();
+      });
+    });
+  });
+
+  describe("given the onboarding commands Langy runs at the end of a guided path", () => {
+    describe("when the complete-path card renders", () => {
+      /** @scenario "The done marker is one line" */
+      it("draws the one line the result carries, and no label and value rows", () => {
+        renderCard({
+          name: "langwatch.onboarding.complete-path",
+          input: {
+            command: "langwatch onboarding complete-path coding --format json",
+          },
+          output: { text: "Coding Agent Tracking set up" },
+        });
+
+        expect(screen.getByText("Coding Agent Tracking set up")).toBeTruthy();
+        expect(screen.queryByText("text")).toBeNull();
+        expect(screen.queryByText(/Couldn.t read this result/)).toBeNull();
+      });
+    });
+
+    describe("when the state card renders", () => {
+      /** @scenario "The onboarding state card reads in customer copy" */
+      it("draws the picks, the provider and the tour as label and value rows", () => {
+        renderCard({
+          name: "langwatch.onboarding.state",
+          input: { command: "langwatch onboarding state --format json" },
+          output: {
+            paths: "Evals & LLM Ops, Gateway",
+            currentPath: "Evals & LLM Ops",
+            provider: "OpenAI · gpt-5.2",
+            tour: "Completed",
+          },
+        });
+
+        expect(screen.getByText("current path")).toBeTruthy();
+        expect(screen.getByText("Evals & LLM Ops, Gateway")).toBeTruthy();
+        expect(screen.getByText("OpenAI · gpt-5.2")).toBeTruthy();
+        expect(screen.getByText("Completed")).toBeTruthy();
+      });
+    });
+  });
+
   describe("given a collection read whose references hydrate fresh data", () => {
     const digest: CliResultDigest = {
       resource: "prompt",

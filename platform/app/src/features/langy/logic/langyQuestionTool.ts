@@ -55,6 +55,7 @@ export function isQuestionToolPart(part: unknown): boolean {
 interface RawQuestionOption {
   label?: unknown;
   description?: unknown;
+  quiet?: unknown;
 }
 
 interface RawQuestion {
@@ -63,6 +64,7 @@ interface RawQuestion {
   options?: unknown;
   multiple?: unknown;
   custom?: unknown;
+  bare?: unknown;
 }
 
 /**
@@ -103,7 +105,9 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
       : [];
     const options = rawOptions
       .filter(
-        (option): option is { label: string; description?: string } =>
+        (
+          option,
+        ): option is { label: string; description?: string; quiet?: unknown } =>
           typeof option?.label === "string" && option.label.trim() !== "",
       )
       .map((option, optionIndex) => ({
@@ -113,6 +117,9 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
         option.description.trim() !== ""
           ? { description: option.description }
           : {}),
+        // The quiet mark rides through untouched: the tool said which answer
+        // is the way out, and the card draws it as a link.
+        ...(option.quiet === true ? { quiet: true } : {}),
       }));
     if (options.length === 0) return;
 
@@ -125,9 +132,17 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
       question,
       options,
       ...(raw.multiple === true ? { multiSelect: true } : {}),
-      // The tool's TUI always accepts a typed answer; only an explicit
-      // `custom: false` closes that door here.
-      ...(raw.custom !== false ? { allowOther: true } : {}),
+      // The tool's TUI always accepts a typed answer; an explicit
+      // `custom: false` closes that door here, and so does a bare question:
+      // its free-text route is the quiet option the ask itself provides, so
+      // an "Other…" row under it would be a third way out the ask never
+      // offered.
+      ...(raw.custom !== false && raw.bare !== true
+        ? { allowOther: true }
+        : {}),
+      // The words before the call carry the question: the card draws only
+      // the options.
+      ...(raw.bare === true ? { bare: true } : {}),
     };
     const parsed = parseLangyCardPart({
       type: "langy-card",

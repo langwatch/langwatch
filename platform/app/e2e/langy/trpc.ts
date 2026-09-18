@@ -30,6 +30,39 @@ export interface TrpcCallError extends Error {
 
 let cachedCookie: Promise<string> | null = null;
 
+/** Forget the cached session, so the next call signs in again. */
+export function resetSessionCookie(): void {
+  cachedCookie = null;
+}
+
+/**
+ * Create an account through the same endpoint the sign-up form posts to.
+ * The response also signs the account in, but the session helper does its
+ * own sign-in once `useAccount` points at the new credentials, so nothing
+ * here keeps a cookie.
+ */
+export async function signUpAccount({
+  name,
+  email,
+  password,
+}: {
+  name: string;
+  email: string;
+  password: string;
+}): Promise<void> {
+  const res = await fetch(`${APP_BASE}/api/auth/sign-up/email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: APP_BASE },
+    body: JSON.stringify({ name, email, password }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Langy test sign-up failed for ${email}: ${res.status} ${await res.text()}`,
+    );
+  }
+}
+
 /**
  * Sign in once (per test process) and cache the better-auth session cookie.
  * Clears the cache on rejection: otherwise a single transient sign-in
@@ -42,15 +75,32 @@ export function getSessionCookie(): Promise<string> {
     try {
       let res: Response;
       for (let attempt = 1; ; attempt++) {
-        res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Origin: APP_BASE },
-          body: JSON.stringify({
-            email: ADMIN_EMAIL,
-            password: ADMIN_PASSWORD,
-          }),
-          signal: AbortSignal.timeout(15_000),
-        });
+        try {
+          res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Origin: APP_BASE },
+            body: JSON.stringify({
+              email: ADMIN_EMAIL,
+              password: ADMIN_PASSWORD,
+            }),
+            // A loaded stack answers the sign-in in tens of seconds, and the
+            // whole run is lost if this one call gives up: allow it a minute
+            // and try again twice before failing the seed.
+            signal: AbortSignal.timeout(60_000),
+          });
+        } catch (error) {
+          if (
+            attempt < 3 &&
+            error instanceof Error &&
+            (error.name === "TimeoutError" || error.name === "AbortError")
+          ) {
+            console.log(
+              `[scenario] sign-in timed out, retrying (attempt ${attempt})`,
+            );
+            continue;
+          }
+          throw error;
+        }
         // Every vitest run signs in once, so a burst of runs (a suite driven
         // in chunks) can land on the auth rate limiter. That is the runner
         // being throttled, not a scenario failing: wait out the window.

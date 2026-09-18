@@ -129,6 +129,21 @@ describe("LangyCliEnvelopeService", () => {
         expect(frame.name).toBe("langwatch.monitor.list");
       }
     });
+
+    it("re-types a call run in the shared folder and keeps its local marker", () => {
+      const local = bashFrame({
+        name: "local_bash",
+        local: true,
+        input: { command: "langwatch scenario create Checkout --format json" },
+      });
+
+      expect(service.shellCommandOf(local)).toBe(
+        "langwatch scenario create Checkout --format json",
+      );
+      const frame = service.normalizeToolFrame({ frame: local });
+      expect(frame.name).toBe("langwatch.scenario.create");
+      expect(frame.local).toBe(true);
+    });
   });
 
   describe("given a CLI frame whose output holds no JSON document", () => {

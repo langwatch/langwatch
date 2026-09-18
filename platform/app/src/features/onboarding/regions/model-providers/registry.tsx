@@ -8,7 +8,6 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "open_ai",
     backendModelProviderKey: "openai",
     label: "OpenAI",
-    defaultModel: "gpt-5.2",
     defaultBaseUrl: "https://api.openai.com/v1",
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
@@ -32,7 +31,6 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "anthropic",
     backendModelProviderKey: "anthropic",
     label: "Anthropic",
-    defaultModel: "claude-sonnet-4-5",
     defaultBaseUrl: "https://api.anthropic.com/v1",
     icon: themedIcon(
       "/images/external-icons/anthropic-lighttheme.svg",
@@ -56,7 +54,6 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "gemini",
     backendModelProviderKey: "gemini",
     label: "Google Gemini",
-    defaultModel: "gemini-2.5-flash",
     defaultBaseUrl: "https://generativelanguage.googleapis.com/v1",
     // Google answers the same key on /v1, /v1beta and the OpenAI-compatible
     // surface, and which one a key was minted for is not knowable up front.
@@ -90,7 +87,6 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "open_ai_azure",
     backendModelProviderKey: "azure",
     label: "Azure OpenAI",
-    defaultModel: "gpt-5",
     icon: singleIcon("/images/external-icons/ms-azure.svg", "Azure OpenAI"),
     externalDocsUrl: "https://learn.microsoft.com/azure/ai-services/openai/",
     fieldMetadata: {
@@ -150,7 +146,6 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "deepseek",
     backendModelProviderKey: "deepseek",
     label: "DeepSeek",
-    defaultModel: "deepseek-r1",
     defaultBaseUrl: "https://api.deepseek.com/v1",
     icon: singleIcon("/images/external-icons/deepseek.svg", "DeepSeek"),
     externalDocsUrl: "https://www.deepseek.com/",
@@ -179,7 +174,6 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "grok_xai",
     backendModelProviderKey: "xai",
     label: "Grok (xAI)",
-    defaultModel: "grok-4",
     defaultBaseUrl: "https://api.x.ai/v1",
     icon: themedIcon(
       "/images/external-icons/grok-lighttheme.svg",
@@ -264,7 +258,6 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "codex",
     backendModelProviderKey: "openai_codex",
     label: "Codex (OpenAI account)",
-    defaultModel: "gpt-5.6-terra",
     // A distinct terminal-prompt glyph, NOT OpenAI's logo: it must not read as
     // the plain OpenAI card sitting right next to it, and it mirrors the
     // settings icon (src/components/icons/Codex.tsx).

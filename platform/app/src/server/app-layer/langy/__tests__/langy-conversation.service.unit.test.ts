@@ -37,6 +37,7 @@ function makeRepo(
     findActiveOwnedIds: vi.fn(async () => []),
     findPendingHandoff: vi.fn(async () => null),
     findRunToken: vi.fn(async () => null),
+    hasAdmittedTurn: vi.fn(async () => false),
     turnExists: vi.fn(async () => false),
   };
   return { ...defaults, ...overrides };
@@ -89,10 +90,11 @@ const row = (o: Partial<Row> = {}): Row => ({
 
 describe("LangyConversationService", () => {
   describe("given a conversation whose create was just dispatched (projection lagging)", () => {
-    // The dispatch window: the create command is accepted (a pending handoff
-    // exists, written synchronously) before the projection row lands. A read
-    // in that window must wait it out, not report "not found" — the panel
-    // used to render the lie moments before the turn was accepted.
+    // The dispatch window: the send is admitted (a turn receipt exists,
+    // written in the admission transaction) before the projection row lands.
+    // A read in that window waits it out instead of reporting "not found",
+    // the answer the panel would render moments before the turn is accepted.
+    /** @scenario "A read in the dispatch window waits for the projection row" */
     it("getById waits out the projection lag and returns the row", async () => {
       vi.useFakeTimers();
       try {
@@ -103,9 +105,7 @@ describe("LangyConversationService", () => {
           .mockResolvedValue(row());
         const repo = makeRepo({
           findVisibleById,
-          findPendingHandoff: vi
-            .fn()
-            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+          hasAdmittedTurn: vi.fn().mockResolvedValue(true),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -122,13 +122,14 @@ describe("LangyConversationService", () => {
       }
     });
 
+    /** @scenario "An unknown conversation id is answered quickly" */
     it("an unknown id still gives up quickly, without waiting out the window", async () => {
       vi.useFakeTimers();
       try {
         const findVisibleById = vi.fn().mockResolvedValue(null);
         const repo = makeRepo({
           findVisibleById,
-          findPendingHandoff: vi.fn().mockResolvedValue(null),
+          hasAdmittedTurn: vi.fn().mockResolvedValue(false),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -149,11 +150,11 @@ describe("LangyConversationService", () => {
       }
     });
 
-    // The other half of the same race, and the one that kept reaching people:
-    // the handoff row is written by the very dispatch being waited on, so a
-    // read that arrived before IT landed found no evidence, took the fast
-    // path, and reported "not found" without ever retrying.
-    it("waits when the handoff itself has not landed yet either", async () => {
+    // The other half of the same race: the receipt is written by the very
+    // send being waited on, so a read that arrived before IT landed found no
+    // evidence, took the fast path, and reported "not found" without ever
+    // retrying.
+    it("waits when the receipt itself has not landed yet either", async () => {
       vi.useFakeTimers();
       try {
         const findVisibleById = vi
@@ -163,12 +164,12 @@ describe("LangyConversationService", () => {
           .mockResolvedValue(row());
         const repo = makeRepo({
           findVisibleById,
-          // Nothing to see on the first probe — the create is younger than
+          // Nothing to see on the first probe: the send is younger than
           // this read by a few milliseconds.
-          findPendingHandoff: vi
+          hasAdmittedTurn: vi
             .fn()
-            .mockResolvedValueOnce(null)
-            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+            .mockResolvedValueOnce(false)
+            .mockResolvedValue(true),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -184,14 +185,12 @@ describe("LangyConversationService", () => {
       }
     });
 
-    it("gives up honestly when the projection never lands inside the window", async () => {
+    it("gives up when the projection never lands inside the window", async () => {
       vi.useFakeTimers();
       try {
         const repo = makeRepo({
           findVisibleById: vi.fn().mockResolvedValue(null),
-          findPendingHandoff: vi
-            .fn()
-            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+          hasAdmittedTurn: vi.fn().mockResolvedValue(true),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -256,6 +255,7 @@ describe("LangyConversationService", () => {
     });
 
     describe("when the conversation is shared", () => {
+      /** @scenario "A shared conversation is visible to other project members" */
       it("returns the conversation to non-owners in the same project", async () => {
         const repo = makeRepo({
           findVisibleById: vi
@@ -278,6 +278,7 @@ describe("LangyConversationService", () => {
   });
 
   describe("given a delete is requested by a non-owner", () => {
+    /** @scenario "A non-owner cannot archive someone else's conversation" */
     it("does not archive and returns false", async () => {
       const archiveConversation = vi.fn(async () => {});
       const repo = makeRepo({
@@ -300,6 +301,7 @@ describe("LangyConversationService", () => {
   });
 
   describe("given a delete is requested by the owner", () => {
+    /** @scenario "Deleting a conversation archives it rather than hard-deleting" */
     it("dispatches an archive command and returns true", async () => {
       const archiveConversation = vi.fn(async () => {});
       const repo = makeRepo({
@@ -318,6 +320,50 @@ describe("LangyConversationService", () => {
       expect(archiveConversation).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "p1", conversationId: "c1" }),
       );
+    });
+  });
+
+  describe("given the owner renames a conversation and shares it", () => {
+    /** @scenario "Renaming or sharing updates metadata via one event" */
+    it("dispatches a single metadata command carrying both the title and the sharing state", async () => {
+      const updateConversationMetadata = vi.fn(async () => {});
+      const archiveConversation = vi.fn(async () => {});
+      const recordMessage = vi.fn(async () => {});
+      const repo = makeRepo({
+        findVisibleById: vi.fn().mockResolvedValue(row({ userId: "alice" })),
+      });
+      const svc = new LangyConversationService(
+        repo,
+        makeCommands({
+          updateConversationMetadata,
+          archiveConversation,
+          recordMessage,
+        }),
+      );
+
+      const result = await svc.updateById({
+        id: "c1",
+        projectId: "p1",
+        userId: "alice",
+        title: "trace triage",
+        isShared: true,
+      });
+
+      expect(updateConversationMetadata).toHaveBeenCalledOnce();
+      expect(updateConversationMetadata).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: "p1",
+          conversationId: "c1",
+          title: "trace triage",
+          isShared: true,
+          sharedById: "alice",
+        }),
+      );
+      // Metadata travels as its own event, never as a second write on some
+      // other command.
+      expect(archiveConversation).not.toHaveBeenCalled();
+      expect(recordMessage).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ title: "trace triage", isShared: true });
     });
   });
 
@@ -477,6 +523,7 @@ describe("LangyConversationService", () => {
   });
 
   describe("when getAll maps rows for the conversation list", () => {
+    /** @scenario "Listing conversations reads the operational projection, newest activity first" */
     it("exposes lastActivityAt and messageCount and marks ownership", async () => {
       const lastActivityAtMs = Date.parse("2026-05-01T10:00:00.000Z");
       const repo = makeRepo({
@@ -491,6 +538,7 @@ describe("LangyConversationService", () => {
       expect(result[0]).toMatchObject({
         id: "c1",
         isOwn: true,
+        title: "t",
         lastActivityAt: new Date(lastActivityAtMs),
         messageCount: 3,
       });
@@ -580,6 +628,7 @@ describe("LangyConversationService", () => {
   });
 
   describe("when clearAllForUser is called", () => {
+    /** @scenario "Clearing memory archives all of my conversations" */
     it("archives each active owned conversation and returns the count", async () => {
       const archiveConversation = vi.fn(async () => {});
       const repo = makeRepo({
@@ -701,6 +750,7 @@ describe("LangyConversationService", () => {
 
   describe("ingestAgentTurnResult (the durable HTTP-final path)", () => {
     describe("when the agent posts a completed turn", () => {
+      /** @scenario "The finalized response carries the whole answer as the source of truth" */
       it("dispatches recordAgentResponse carrying the turnId and assembled parts", async () => {
         const recordAgentResponse = vi.fn<
           LangyConversationCommands["recordAgentResponse"]
