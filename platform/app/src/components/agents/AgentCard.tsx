@@ -178,6 +178,8 @@ export type AgentCardProps = {
   onViewHistory?: () => void;
   /** Runs one scripted scenario against the agent and opens the run. */
   onTest?: () => void;
+  /** Opens the browser call panel — the voice agent equivalent of Test. */
+  onTalkToIt?: () => void;
 };
 
 export function AgentCard({
@@ -191,6 +193,7 @@ export function AgentCard({
   onSyncFromSource,
   onViewHistory,
   onTest,
+  onTalkToIt,
 }: AgentCardProps) {
   const typeLabel = agentTypeLabels[agent.type];
 
@@ -205,7 +208,7 @@ export function AgentCard({
       testId={`agent-card-${agent.id}`}
       leading={<AgentTypeIcon type={agent.type} />}
       menu={
-        (onEdit || onDelete || onTest) && (
+        (onEdit || onDelete || onTest || onTalkToIt) && (
           <Menu.Root>
             <AgentCardMenuTrigger agentName={agent.name} />
             <Menu.Content className={CARD_MENU_CLASS}>
@@ -232,6 +235,19 @@ export function AgentCard({
                 >
                   <Play size={14} />
                   Test agent
+                </Menu.Item>
+              )}
+              {onTalkToIt && (
+                <Menu.Item
+                  value="talk-to-it"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTalkToIt();
+                  }}
+                  data-testid={`agent-talk-${agent.id}`}
+                >
+                  <Mic size={14} />
+                  Talk to it
                 </Menu.Item>
               )}
               {agent.type === "workflow" && onOpenWorkflow && (

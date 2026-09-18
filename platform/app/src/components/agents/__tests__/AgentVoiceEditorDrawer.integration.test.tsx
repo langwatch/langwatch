@@ -12,6 +12,12 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// The panel statically pulls the vendor client; the drawer test never opens it,
+// so stub it to keep that SDK out of the drawer's import graph.
+vi.mock("../voice/TalkToItPanel", () => ({
+  TalkToItPanel: () => null,
+}));
+
 import { AgentVoiceEditorDrawer } from "../AgentVoiceEditorDrawer";
 
 // -- Transitive-dependency mocks (mirrors AgentHttpEditorDrawer.integration) --
@@ -235,12 +241,18 @@ describe("AgentVoiceEditorDrawer", () => {
       ).toBe("agent_draft");
     });
 
-    /** @scenario "Talk to it is disabled before the agent is saved" */
-    it("disables Talk to it with the tooltip 'Save the agent first'", async () => {
+    /** @scenario "Talk to it is disabled until the agent id is filled" */
+    it("disables Talk to it until the agent id is filled, then enables it without saving", async () => {
+      const user = userEvent.setup();
+      mockProviders = [ELEVENLABS_KEYED_PROVIDER];
       renderVoiceDrawer();
+
       const talk = await screen.findByTestId("voice-agent-talk");
       expect(talk).toBeDisabled();
-      expect(talk).toHaveAttribute("title", "Save the agent first");
+      expect(talk).toHaveAttribute("title", "Enter the agent id first");
+
+      await user.type(screen.getByTestId("voice-agent-id-input"), "agent_1");
+      expect(talk).toBeEnabled();
     });
   });
 

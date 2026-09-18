@@ -7,15 +7,51 @@
 
 import type { AgentAdapter } from "@langwatch/scenario";
 import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
+import type { CallRecord } from "./call-record";
 import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport";
+
+/** The provider key and host a runner reads a conversation back with. Never
+ *  reaches the browser — a runner keeps it and returns only the signed URL. */
+export interface VoiceTransportCredential {
+  apiKey: string;
+  baseUrl: string;
+}
+
+/** What a minted browser session needs to open the call, minus the id and
+ *  limit the service adds. The signed URL is short-lived and safe to hand out;
+ *  the key is not, and never appears here. */
+export interface VoiceSessionConnect {
+  signedUrl: string;
+}
 
 export interface VoiceTransportRunner {
   /** Build the SDK agent adapter the pool child drives for this transport. */
   createAgentAdapter(input: {
     agentId: string;
-    credential: { apiKey: string; baseUrl: string };
+    credential: VoiceTransportCredential;
     maxCallSeconds: number;
   }): AgentAdapter;
+  /**
+   * Ask the provider for a short-lived signed URL the browser opens the call
+   * with. The key stays here; only the signed URL travels back.
+   */
+  mintSession(input: {
+    agentId: string;
+    credential: VoiceTransportCredential;
+  }): Promise<VoiceSessionConnect>;
+  /**
+   * Read the finished conversation back as a normalised {@link CallRecord}.
+   * Returns `null` when the provider has no record yet (the caller falls back
+   * to the browser transcript); throws when the fetch itself fails, so the
+   * caller can tell "not ready" from "could not be fetched" (AC15). When the
+   * conversation has audio, the record's `audioUrl` is set to `audioProxyUrl`
+   * — the provider bytes are streamed through the app, never with the key.
+   */
+  fetchCallRecord(input: {
+    conversationId: string;
+    credential: VoiceTransportCredential;
+    audioProxyUrl: string;
+  }): Promise<CallRecord | null>;
   /** Customer-facing failure when the project has no key for this transport. */
   readonly missingKeyMessage: string;
 }

@@ -39,3 +39,8 @@ export const VOICE_TRANSPORT_PROVIDER: Record<VoiceTransport, "elevenlabs"> = {
 
 export const parseVoiceAgentConfig = (config: unknown): VoiceAgentConfig =>
   voiceAgentConfigSchema.parse(config);
+
+/** The scenario set every drawer "Talk to it" call is written into, so those
+ *  runs group apart from scenario runs. Client-safe (the panel builds the run
+ *  link from it; the run writer writes into it). */
+export const VOICE_CALL_SCENARIO_SET_ID = "voice-calls";

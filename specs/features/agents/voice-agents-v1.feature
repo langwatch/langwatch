@@ -85,10 +85,12 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
 
   # AC7
   @integration
-  Scenario: Talk to it is disabled before the agent is saved
-    Given an unsaved voice agent drawer
+  Scenario: Talk to it is disabled until the agent id is filled
+    Given an unsaved voice agent drawer with a key but no agent id yet
     When the drawer is drawn
-    Then "Talk to it" is disabled with the tooltip "Save the agent first"
+    Then "Talk to it" is disabled with the tooltip "Enter the agent id first"
+    When the agent id is filled in
+    Then "Talk to it" is enabled without saving the agent first
 
   # AC7
   @integration
@@ -98,7 +100,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then "Talk to it" is disabled with the tooltip "Add an ElevenLabs key first"
 
   # AC8
-  @integration @unimplemented
+  @integration
   Scenario: Session mint returns only the signed URL, the conversation id and the max duration
     Given the AI Gateway mints an ElevenLabs signed URL for "Support line"
     When "Talk to it" is pressed
@@ -106,7 +108,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the response body carries no ElevenLabs API key
 
   # AC9
-  @integration @unimplemented
+  @integration
   Scenario: A mint failure shows a retry panel and starts no run
     Given the AI Gateway returns an error when minting the session for "Support line"
     When "Talk to it" is pressed
@@ -114,14 +116,14 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And no run is created
 
   # AC11
-  @integration @unimplemented
+  @integration
   Scenario: The panel shows the consent and guardrails notice before the call connects
     Given "Talk to it" was just pressed and the call has not connected
     When the panel is drawn
     Then it shows "This call is recorded and sent to ElevenLabs. LangWatch gateway guardrails do not apply to this session."
 
   # AC12
-  @integration @unimplemented
+  @integration
   Scenario: The timer turns red in the final 60 seconds and the call ends at the limit
     Given the project's maximum voice call duration is 90 seconds
     And a live call panel connected to "Support line"
@@ -131,14 +133,14 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then the panel reaches the post-call view with no Hang up click
 
   # AC15
-  @integration @unimplemented
+  @integration
   Scenario: Recording unavailable leaves the transcript without a Play control or an error
     Given ElevenLabs returns no audio for the finished conversation
     When the post-call fetch runs
     Then the panel and the run show the transcript with no Play control and no error notice
 
   # AC15
-  @integration @unimplemented
+  @integration
   Scenario: A recording fetch failure keeps the live transcript and shows a fetch-failed notice
     Given the ElevenLabs post-call fetch fails after hang-up
     When the fetch failure is handled
@@ -146,14 +148,14 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the panel shows "Recording could not be fetched from ElevenLabs" instead of a generic error
 
   # AC14
-  @integration @unimplemented
+  @integration
   Scenario: Hanging up twice, a mid-call reload and a late webhook each produce exactly one run
     Given a live call against "Support line" with a known conversation id
     When Hang up is pressed twice, the page is reloaded during the call, and the ElevenLabs post-call webhook arrives after the poller already wrote the run
     Then exactly one run exists for that conversation id after each action
 
   # AC27
-  @integration @unimplemented
+  @integration
   Scenario: Microphone access denied shows a retry notice and starts no run
     Given "Talk to it" was pressed
     When the browser denies microphone access
@@ -259,7 +261,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then only the audio-tagged and realtime-tagged models pass
 
   # AC14
-  @unit @unimplemented
+  @unit
   Scenario: The idempotency key is derived from the conversation id
     Given two ingestion attempts carrying the same conversation id and one attempt carrying a different conversation id
     When the idempotency key is derived for each
@@ -267,7 +269,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the different conversation produces a different key
 
   # AC12
-  @unit @unimplemented
+  @unit
   Scenario: The countdown math flags the final 60 seconds of the call
     Given a call duration limit and an elapsed time 60 seconds or fewer before the limit
     When the remaining time is computed

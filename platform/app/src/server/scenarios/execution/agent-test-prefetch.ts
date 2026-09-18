@@ -79,7 +79,7 @@ export async function prefetchAgentTestData({
   if (target.type === "voice") {
     return {
       success: false,
-      error: "Voice agents run as scenarios, not as single test turns",
+      error: "Voice agents are tested by talking to them or by running a scenario",
     };
   }
 
