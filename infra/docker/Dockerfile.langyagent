@@ -111,7 +111,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # is still a `workspace:*` dependency of the CLI; it is source-only (its `main`
 # points at src/index.ts) and is bundled into the binary.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
-COPY patches ./patches
 COPY packages/langy ./packages/langy
 COPY sdks/typescript ./sdks/typescript
 # Full source for the langy-worker wrapper: its Bun compile below bundles
