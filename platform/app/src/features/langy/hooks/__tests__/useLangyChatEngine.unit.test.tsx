@@ -75,6 +75,29 @@ describe("useLangyChatEngine", () => {
     });
   });
 
+  describe("when a turn transitions from streaming to error", () => {
+    /** @scenario "A failed turn still refetches the dashboard when it settles" */
+    it("invalidates both dashboard widgets and graphs queries", () => {
+      chatStatus = "streaming";
+
+      const { rerender } = renderHook(() =>
+        useLangyChatEngine({
+          transport: {} as never,
+        }),
+      );
+
+      expect(dashboardWidgetsListInvalidate).not.toHaveBeenCalled();
+      expect(graphsGetAllInvalidate).not.toHaveBeenCalled();
+
+      chatStatus = "error";
+
+      rerender();
+
+      expect(dashboardWidgetsListInvalidate).toHaveBeenCalledTimes(1);
+      expect(graphsGetAllInvalidate).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when status remains ready after a rerender", () => {
     /** @scenario "A settled turn does not refetch again on later renders" */
     it("does not re-invalidate", () => {
