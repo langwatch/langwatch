@@ -186,6 +186,8 @@ Both also need, in the target project (not gated — prerequisites): the
 simulated user and judge can run. Pin a fresh project with `E2E_PROJECT_SLUG` so
 the voice agent can be created through the drawer's "Setup agent" box.
 
+They also need `release_trace_media_extraction` force-enabled (or on for the target project): the trace drawer's Conversation view only renders the playable audio the final `thenTheTracesCarryTheAudio` assertion checks once span media has been externalized to `/api/files/` references — with the flag off, oversized inline audio is replaced by a `[truncated: N bytes]` placeholder and no `media-part-audio` element renders.
+
 ## Running Tests
 
 ```bash
