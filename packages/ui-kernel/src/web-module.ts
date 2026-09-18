@@ -58,12 +58,29 @@ export type WebSurfacePublications = Readonly<Record<string, WebSurfacePublicati
 /** What a module's capability implementation is, as the composition receives it. */
 export type WebCapabilities = Readonly<Record<string, unknown>>;
 
+/**
+ * One host mount: a provider component that renders its `*HostProvider` around
+ * `UiRouteOutlet`, as a screen's `load` resolves a page. ARCHITECTURE.md §10.1.
+ */
+export type WebHostMount = Readonly<{
+  load: () => Promise<unknown>;
+}>;
+
+/**
+ * A screen's `*HostApi` dependency (`requires`), and this module's own or a
+ * peer's mount that answers it, keyed by host name. ARCHITECTURE.md §10.1.
+ */
+export type WebHostDeclaration = Readonly<{
+  requires: readonly string[];
+  mounts: Readonly<Record<string, WebHostMount>>;
+}>;
+
 type WebModuleDeclaration = Readonly<{
   screens: WebScreens;
   drawers: WebDrawers;
   publications: WebSurfacePublications;
   mounts: readonly string[];
-  flags: readonly string[];
+  hosts: WebHostDeclaration;
   capabilities: WebCapabilities;
 }>;
 
@@ -72,7 +89,7 @@ type EmptyDeclaration = Readonly<{
   drawers: Empty;
   publications: Empty;
   mounts: readonly [];
-  flags: readonly [];
+  hosts: Readonly<{ requires: readonly []; mounts: Empty }>;
   capabilities: Empty;
 }>;
 
@@ -89,10 +106,9 @@ export type WebModuleInstallation = Readonly<{
   drawers: WebDrawers;
   publications: WebSurfacePublications;
   mounts: readonly string[];
-  flags: readonly string[];
+  hosts: WebHostDeclaration;
   capabilities: WebCapabilities;
   api?: unknown;
-  commands?: unknown;
   slots: readonly string[];
   seatTypeCopy: boolean;
   failureInterceptors: readonly unknown[];
@@ -106,10 +122,6 @@ type RecordKeys<Value extends object> = keyof Value & string;
 type ScreenRequirements<Screens extends WebScreens> = IfPresent<
   RecordKeys<Screens>,
   RequirementFields<"transport">
->;
-type FlagRequirements<Flags extends readonly string[]> = IfPresent<
-  Flags[number],
-  RequirementFields<"session">
 >;
 type CheckedLiteralTuple<Values extends readonly string[]> = number extends Values["length"]
   ? never
@@ -154,7 +166,7 @@ export class WebModule<
       drawers: {},
       publications: {},
       mounts: [],
-      flags: [],
+      hosts: { requires: [], mounts: {} },
       capabilities: {},
       slots: [],
       seatTypeCopy: false,
@@ -246,27 +258,23 @@ export class WebModule<
     });
   }
 
-  withCommands<Commands>(
-    commands: Commands,
-  ): WebModule<Name, Requirements, Config, Declaration, Precise> {
-    return this.#next({ ...this.#installation, commands });
-  }
-
-  withFlags<const Flags extends readonly string[]>(
-    flags: Flags,
-    ..._checked: [CheckedLiteralTuple<Flags>] extends [never] ? [never] : []
+  /**
+   * The `*HostApi` names this module reads (`requires`) and mounts, for
+   * itself or a peer (`mounts`). `createUi` refuses an unmet `requires`.
+   */
+  withHosts(
+    hosts: Partial<WebHostDeclaration>,
   ): WebModule<
     Name,
-    Merge<Requirements, FlagRequirements<Flags>>,
+    Requirements,
     Config,
-    Merge<Declaration, { readonly flags: Flags }>,
+    Merge<Declaration, { readonly hosts: WebHostDeclaration }>,
     Precise
   > {
-    const requirements: readonly UiSupplyName[] =
-      flags.length === 0
-        ? this.#installation.requirements
-        : mergeNames(this.#installation.requirements, ["session"]);
-    return this.#next({ ...this.#installation, requirements, flags });
+    return this.#next({
+      ...this.#installation,
+      hosts: { requires: hosts.requires ?? [], mounts: hosts.mounts ?? {} },
+    });
   }
 
   withConfig<Schema extends ZodType>(

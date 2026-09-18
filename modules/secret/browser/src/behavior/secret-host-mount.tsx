@@ -10,7 +10,7 @@ import {
   type UiFeedback,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
-import { useMemo, type ComponentType, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import {
   SecretHostApi,
@@ -51,19 +51,17 @@ class CapabilitySecretHost extends SecretHostApi {
   }
 }
 
-/** Wraps one screen in this module's host, so no route renders without it. */
-export function withSecretHost(Screen: ComponentType): ComponentType {
-  return function SecretHostMount() {
-    const { session, feedback } = useUiCapabilities();
-    const { projectId } = useUiScope().activeScope();
-    const host = useMemo(
-      () => new CapabilitySecretHost(projectId ?? void 0, session, feedback),
-      [projectId, session, feedback],
-    );
-    return (
-      <SecretHostProvider value={host}>
-        <Screen />
-      </SecretHostProvider>
-    );
-  };
+/**
+ * The mount the declaration names: one provider above the routed tree, so a
+ * peer's screen reading this port finds it too. Default-exported because that
+ * is what `mounts.load` resolves.
+ */
+export default function SecretHostMount({ children }: { children?: ReactNode }) {
+  const { session, feedback } = useUiCapabilities();
+  const { projectId } = useUiScope().activeScope();
+  const host = useMemo(
+    () => new CapabilitySecretHost(projectId ?? void 0, session, feedback),
+    [projectId, session, feedback],
+  );
+  return <SecretHostProvider value={host}>{children}</SecretHostProvider>;
 }

@@ -1041,18 +1041,18 @@ invented:
   not one — it is an invitation to declare something that will never be read.
   Counted across `defineWebModule`'s ten module-facing slots:
 
-  | slot | declarers | consumer |
-  | --- | --- | --- |
-  | `withScreens` | 33 | `installedModuleScreens` |
-  | `withDrawers` | 11 | `installedDrawerLoaders` |
-  | `withConfig` | 1 | yes |
-  | `withApi` | 1 of 33 | `installedModuleApis` |
-  | `withCapabilities` | 0 | being built |
-  | `withSlots` | **0** | built (`browser-host/src/slots.tsx`) |
-  | `withFailureInterceptors` | **0** | built (`ui-feature-shell.tsx:162`) |
-  | `withSeatTypeCopy` | **0** | built (`slots.tsx:143`) |
-  | `withFlags` · `withCommands` | **0** | **none** |
-  | `publishSurfaces` | 13 | **none — superseded, below** |
+  | slot                         | declarers | consumer                             |
+  | ---------------------------- | --------- | ------------------------------------ |
+  | `withScreens`                | 33        | `installedModuleScreens`             |
+  | `withDrawers`                | 11        | `installedDrawerLoaders`             |
+  | `withConfig`                 | 1         | yes                                  |
+  | `withApi`                    | 1 of 33   | `installedModuleApis`                |
+  | `withCapabilities`           | 0         | being built                          |
+  | `withSlots`                  | **0**     | built (`browser-host/src/slots.tsx`) |
+  | `withFailureInterceptors`    | **0**     | built (`ui-feature-shell.tsx:162`)   |
+  | `withSeatTypeCopy`           | **0**     | built (`slots.tsx:143`)              |
+  | `withFlags` · `withCommands` | **0**     | **none**                             |
+  | `publishSurfaces`            | 13        | **none — superseded, below**         |
 
   Only the last row is builder surface that does nothing, and only it is
   deleted. The three above it are the opposite case and stay: their consumers
@@ -1138,6 +1138,44 @@ invented:
   `apps/ui/src/behavior/*` from inside the application, which is the shape
   `01d92f9c74` existed to delete. The mount is new-shape or it does not happen.
 
+  **A mount carries a loader, and the shell composes them at the router root**
+  (ruled 2026-09-18, evening). `mounts` stops being a bare string and becomes
+  what `withScreens` and `withDrawers` already are:
+
+  ```ts
+  // modules/secret/browser/src/secret.web.ts — the worked half
+  .withHosts({
+    requires: ["SecretHostApi"],
+    mounts: { SecretHostApi: { load: () => import("./behavior/secret-host-mount.tsx") } },
+  })
+  ```
+
+  The loader resolves a default-exported provider rendering
+  `<SecretHostProvider value={host}>{children}</SecretHostProvider>`;
+  `installedModuleHostMounts` collects every declared one in install order and
+  `createUiModuleHostStack` composes them into the root layout, below the
+  feature shell and below the router.
+
+  Two constraints decided the position, and both rule out the alternative of
+  wrapping the declaring module's own screen loaders:
+
+  - A host is regularly read by a **peer's** screens — `requires` is per
+    module, and scenario reading workflow's port is the ordinary case. A mount
+    around one module's own loaders cannot answer it.
+  - A host that reads the **address bar** (auth and authorize both do) has to
+    be inside the router. Api providers mount above it; hosts do not.
+
+  The module writes the projection, so the application learns nothing about the
+  module: every method of a host is `session.x()`, `feedback.x()` or
+  `scope.x()` over `@langwatch/browser-host` capabilities the module can
+  already reach.
+
+  **A mount nobody requires is refused too**, by `findUnrequiredHostMounts`.
+  Both halves of the seam are free strings, so `requires: ["WorkflowHostApi"]`
+  against `mounts: { WorkflowHost }` satisfies the unmounted check and still
+  crashes at render — the same shape of silent pass this whole section is
+  about. Reading the seam from the mount side names the typo, and it is why a
+  module declares both halves in one change rather than mounting first.
 
 - **A capability travels by declaration** (ruled 2026-09-18). `defineWebModule`
   carries a capability slot, and the composition root reaches a module's
@@ -1146,7 +1184,7 @@ invented:
   ```ts
   // modules/organization/browser/src/organization.web.ts
   export const organizationWeb = defineWebModule("organization")
-    .withScreens({ /* … */ })
+    .withScreens({/* … */})
     // "Where they are standing" is organization's to answer. It RUNS
     // organization.getAll, so it is not kit-legal (rule 3) — it is declared.
     .withCapabilities({
@@ -1219,6 +1257,7 @@ invented:
   no session is mounted, so changing who answers `hasPermission` changes
   authorization behaviour on those pages. That is a change with its own spec
   and its own scenarios, not a side effect of a file move.
+
 - **State defaults to server state**: react-query over the derived tRPC
   client is the normal answer, so cross-module client state is rare and ruled
   case by case. The unit of browser sharing is the **published hook** — the

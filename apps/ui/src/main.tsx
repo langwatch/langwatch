@@ -35,6 +35,10 @@ import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
 import { GraphicsQualityProvider } from "@langwatch/ui-kernel/graphics-quality-provider";
 import { installedModuleApis } from "@langwatch/ui-kernel/module-apis";
 import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
+import {
+  installedModuleHostMounts,
+  type UiModuleHostMount,
+} from "@langwatch/ui-kernel/module-hosts";
 import { installedModuleScreens, type UiModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { UiPageFailure } from "@langwatch/ui-kernel/page-fallbacks";
 import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
@@ -122,6 +126,7 @@ class BrowserUiShell extends UiShell {
     apis: readonly UiFeatureApiBinding[],
     drawers: UiDrawerRegistry,
     transport: UiFeatureApiTransport,
+    hosts: readonly UiModuleHostMount[],
   ): BrowserUiShell {
     return new BrowserUiShell(
       createUiApplication({
@@ -131,6 +136,7 @@ class BrowserUiShell extends UiShell {
           loaders: screens.loaders,
           routes: screens.routes,
           apis,
+          hosts,
           transport,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
@@ -165,7 +171,10 @@ class BrowserUiShell extends UiShell {
         pages: {
           loaders: uiUnservedPageLoaders,
           table: uiRouteTable,
-          shellLayouts: { chrome: () => import("./shell/ui-app-chrome") },
+          shellLayouts: {
+            auth: () => import("./shell/ui-auth-host"),
+            chrome: () => import("./shell/ui-app-chrome"),
+          },
           errorFallback: UiPageError,
           rootErrorBoundary: UiBootPageError,
         },
@@ -218,6 +227,7 @@ export async function startUi(): Promise<void> {
       installedModuleApis(installed.modules),
       installedModuleDrawers(installed.modules),
       transport,
+      installedModuleHostMounts(installed.modules),
     ),
   }).start();
 }

@@ -19,6 +19,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { ComponentType, ReactNode } from "react";
 import type { RouteObject } from "react-router";
 
+import type { UiModuleHostMount } from "./ui-host-mounts.ts";
 import type { UiPageLoaderRegistry } from "./ui-page-loaders.ts";
 import type { UiWebRouteParent } from "./ui-web-installation.ts";
 
@@ -61,6 +62,8 @@ export type UiFeatureInstall = {
    */
   session?: UiSessionSource;
   routes?: Readonly<Record<UiWebRouteParent, readonly RouteObject[]>>;
+  /** Every installed module's declared host mounts, in install order. */
+  hosts?: readonly UiModuleHostMount[];
 };
 
 /** One feature package's whole contribution to the browser application. */

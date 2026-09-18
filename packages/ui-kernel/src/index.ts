@@ -11,6 +11,17 @@ export {
   type UiRenderResult,
 } from "./ui-supply.ts";
 export { installedDrawerLoaders, type InstalledDrawerLoaders } from "./installed-drawers.ts";
+export {
+  BrowserHostUnmountedError,
+  BrowserHostUnrequiredError,
+  checkHostMounts,
+  findUnmountedHostOwners,
+  findUnrequiredHostMounts,
+  installedModuleHostMounts,
+  type UiModuleHostMount,
+  type UnrequiredHostMount,
+  type UnmountedHostOwner,
+} from "./ui-host-mounts.ts";
 export { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 export type {
   MissingUiSupplyFields,
@@ -28,6 +39,7 @@ export {
   type UiSupplyRequirements,
   type WebDrawer,
   type WebDrawers,
+  type WebHostDeclaration,
   type WebModuleConfig,
   type WebModuleInstallation,
   type WebScreen,

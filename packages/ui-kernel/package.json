@@ -126,6 +126,10 @@
     "./module-apis": {
       "types": "./dist/ui-module-apis.d.ts",
       "default": "./src/ui-module-apis.ts"
+    },
+    "./module-hosts": {
+      "types": "./dist/ui-host-mounts.d.ts",
+      "default": "./src/ui-host-mounts.ts"
     }
   },
   "scripts": {

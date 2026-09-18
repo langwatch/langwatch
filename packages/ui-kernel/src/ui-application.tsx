@@ -15,6 +15,7 @@ import {
 } from "./ui-feature-install.ts";
 import { createUiFeatureShell } from "./ui-feature-shell.tsx";
 import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers.tsx";
+import { createUiModuleHostStack } from "./ui-module-hosts.tsx";
 import {
   createUiOuterProvider,
   type UiOuterProviderInstall,
@@ -76,6 +77,7 @@ export function createUiApplication({
         shellLayouts: pages.shellLayouts,
       }),
       rootComponent: createUiRootLayout({
+        moduleHosts: createUiModuleHostStack(features.hosts ?? []),
         innerProvider: createUiInnerProvider(providers),
         featureShell: createUiFeatureShell({
           apis: features.apis ?? [],
