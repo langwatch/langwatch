@@ -289,11 +289,17 @@ layer that owns the route table (`boot()`/the api package), never a module.
 
 **The router is the spine, and it is generic** (ruled 2026-09-18). The
 Server defines ONE router at the very beginning; every surface **plugs in
-on a path hierarchy** — `/api/trpc` is the tRPC surface, `/api` the REST
-surface, `/` the static bundle. Routing is by path prefix, never by an
+on a path hierarchy** — and the hierarchy is **the library's own, not
+configuration**: tRPC is `/api/trpc`, REST is `/api`, the static bundle is
+`/`, hard-wired where the router lives. No application code mounts,
+moves or reorders a surface. Routing is by path prefix, never by an
 ordered list of handlers each inspecting a request and claiming it. The
 router is passed down the stack and appended to; the beginning of a path
-can never be changed by whoever received it. The router itself knows no
+can never be changed by whoever received it. Security headers are a **base
+policy in the library plus per-surface overlays** — every response carries
+the base; the static surface overlays CSP and asset caching, the API
+surface its own set; each surface class composes its overlay and no
+deployment assembles headers. The router itself knows no
 transport vocabulary — tRPC hosting, REST hosting, asset serving, security
 headers, trusted-proxy handling and browser-session composition are each
 their own class in the package that owns that concern, and each arrives
@@ -424,10 +430,14 @@ name), redaction everywhere. Nothing outside the secrets package, config
 composition and boot files reads a secret env var.
 
 **One generated Zod parse per process** (ruled 2026-09-18). The process's
-schema is generated from its installed module list: each module's own Zod
-schema merges in, so no value is declared twice. Every key is a **root
-object** — `process` for the global values, or the module's name for its
-slice — and Zod reads the environment directly at the one boot seam.
+schema is generated from its installed module list **plus the app's own
+process schema** — `apiConfig()` infers every module slice from
+`installedModules`, and the app authors only its `process` object, so
+installing a module brings its config demand and uninstalling removes it
+without touching the app. No value is declared twice. Every key is a
+**root object** — `process` for the global values, or the module's name
+for its slice — and Zod reads the environment directly at the one boot
+seam.
 `.readonly()` on the schema is the immutability story; there is no
 `Object.freeze`, no hand-built projection type mirroring the schema, and no
 re-plumbing from an env read into a second structure. What the parse returns
