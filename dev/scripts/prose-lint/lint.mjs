@@ -30,6 +30,7 @@ function parseArgs(argv) {
     concurrency: 4,
     only: null,
     skip: null,
+    context: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -41,6 +42,7 @@ function parseArgs(argv) {
     else if (a === "--min") opts.min = Number(next());
     else if (a === "--locate") opts.locate = Number(next());
     else if (a === "--no-locate") opts.noLocate = true;
+    else if (a === "--context") opts.context = true;
     else if (a === "--concurrency") opts.concurrency = Number(next());
     else if (a === "--only") opts.only = new Set(next().split(","));
     else if (a === "--skip") opts.skip = new Set(next().split(","));
@@ -62,13 +64,14 @@ function parseArgs(argv) {
 
 function usage() {
   console.error(`usage: node lint.mjs <file.md|mdx> [more files] [options]
-  --rules docs|writing|both   rule set (default docs)
+  --rules docs|writing|both|landing   rule set (default docs; landing loads landing-page-writing plus writing)
   --section-level N           split the file at headings of this level and above (default 2)
   --json                      machine output
   --threshold P               exit 1 when any rule fires at or above P (default 0.7)
   --min P                     report rules at or above P (default 0.5)
   --locate P                  ask which sentence for rules at or above P (default 0.6)
   --no-locate                 skip the sentence-locating request
+  --context                   give the judge every section above the one it reads, for rules marked "context" (landing rule 2)
   --concurrency N             sections judged in parallel (default 4)
   --only a,b,c                run only these rule ids
   --skip a,b,c                skip these rule ids`);
@@ -111,7 +114,7 @@ function readDotenv(file, name) {
 // ---------- rules ----------
 
 function loadRules(which, only, skip) {
-  const sets = which === "both" ? ["docs", "writing"] : [which];
+  const sets = which === "both" ? ["docs", "writing"] : which === "landing" ? ["landing", "writing"] : [which];
   const out = [];
   const seen = new Set();
   for (const set of sets) {
@@ -420,6 +423,12 @@ const hasContent = (section) => section.paragraphs.some((p) => p.kind === "code"
 
 function sectionState(section, doc) {
   const state = { heading: section.heading || "(no heading)", text: section.text };
+  if (doc.context) {
+    // Everything the reader has seen before this block, so a rule can ask
+    // whether the block is understandable from the page above it alone.
+    const above = doc.sections.slice(0, section.index).map((s) => s.text).join("\n\n");
+    state.above = above || "(nothing: this is the first block on the page)";
+  }
   if (section.index === doc.firstContentIndex) {
     if (doc.frontmatter.title) state.title = doc.frontmatter.title;
     if (doc.frontmatter.description) state.description = doc.frontmatter.description;
@@ -429,7 +438,9 @@ function sectionState(section, doc) {
 
 async function judgeSection(key, rules, section, doc, opts, usage) {
   if (!hasContent(section)) return []; // a bare heading has nothing to judge
-  const judge = rules.filter((r) => r.kind === "judge" && (r.scope !== "first-section" || section.index === doc.firstContentIndex));
+  const judge = rules.filter(
+    (r) => r.kind === "judge" && (r.scope !== "first-section" || section.index === doc.firstContentIndex) && (!r.context || doc.context),
+  );
   if (judge.length === 0) return [];
   const state = sectionState(section, doc);
   const questions = Object.fromEntries(judge.map((r) => [r.key, noul(r)]));
@@ -489,7 +500,9 @@ async function lintFile(file, rules, opts, key) {
   const sections = splitSections(body, opts.sectionLevel);
   const firstHeading = sections.find((s) => s.heading)?.heading;
   const firstContentIndex = Math.max(0, sections.findIndex(hasContent));
-  const doc = { file, frontmatter, firstHeading, firstContentIndex };
+  const doc = { file, frontmatter, firstHeading, firstContentIndex, context: opts.context, sections };
+  const skipped = rules.filter((r) => r.context && !opts.context);
+  if (skipped.length) console.error(`note: ${skipped.map((r) => r.key).join(", ")} need --context and were skipped`);
   const usage = { requests: 0, inputTokens: 0 };
   const docCounts = {};
   const results = new Array(sections.length);
