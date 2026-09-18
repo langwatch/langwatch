@@ -2,7 +2,7 @@
  * The instant-eval-processing pipeline (ADR-137).
  *
  * One projection, five commands and one process manager. The projection keeps
- * the run's counters on its Postgres row, which is what a caller polls; the
+ * the run's counters on its ClickHouse row, which is what a caller polls; the
  * process manager owns the loop, which is plan, then a page at a time, then
  * finish.
  *
@@ -68,7 +68,7 @@ import type { InstantEvalProcessingEvent } from "./schemas/events";
  * itself is declared inline below, per ADR-052.
  */
 export interface InstantEvalProcessingPipelineDeps {
-  /** The run's counters, on its own Postgres row. */
+  /** The run's counters, on its own ClickHouse row. */
   instantEvalRunStore: StateProjectionStore<InstantEvalRunProjectionState>;
   dispatch: InstantEvalDispatchDeps;
 }

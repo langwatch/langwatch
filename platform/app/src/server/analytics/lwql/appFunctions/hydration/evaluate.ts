@@ -59,11 +59,13 @@ export interface EvaluationOutcome {
 }
 
 export async function evaluateCalls({
+  projectId,
   resolved,
   traces,
   support,
   signal,
 }: {
+  projectId: string;
   resolved: readonly ResolvedCall[];
   traces: FetchedTraces;
   support: InstantEvalHydrationSupport;
@@ -100,6 +102,7 @@ export async function evaluateCalls({
     ...(signal ? { signal } : {}),
     run: async (unit) => {
       const judgement = await judge({
+        projectId,
         unit,
         support,
         ...(signal ? { signal } : {}),
@@ -287,17 +290,19 @@ function assertQueryBudget({
  * result full of nulls and would let the remaining units keep spending.
  */
 async function judge({
+  projectId,
   unit,
   support,
   signal,
 }: {
+  projectId: string;
   unit: JudgementUnit;
   support: InstantEvalHydrationSupport;
   signal?: AbortSignal;
 }): Promise<InstantEvalJudgement | null> {
   try {
     return await support.classifier.classify(
-      { text: unit.text, questions: unit.questions },
+      { projectId, text: unit.text, questions: unit.questions },
       signal,
     );
   } catch (error) {

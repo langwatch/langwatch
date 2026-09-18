@@ -1,6 +1,6 @@
 /**
  * Shared fakes for the Instant Eval run executor suites: a fake row source, the
- * shipped null classifier, a recording cost recorder, and the run row the
+ * shipped null classifier, a recording spend recorder, and the run row the
  * executor reads its statement from.
  *
  * Not a suite itself, so vitest does not collect it.
@@ -12,7 +12,7 @@ import { vi } from "vitest";
 
 import type { LangWatchQLAppFunctionCall } from "~/server/analytics/lwql";
 import { NullInstantEvalClassifier } from "../../classifier/null.client";
-import type { InstantEvalCostRecord } from "../../instant-eval-cost.recorder";
+import type { InstantEvalSpendRecord } from "../../instant-eval-spend.recorder";
 import { createInstantEvalRunExecutor } from "../instant-eval-run.executor";
 import type { InstantEvalJudgmentRecord } from "../judgments";
 import { instantEvalRunQuestions } from "../questions";
@@ -54,7 +54,7 @@ export function fakes(options?: {
   total?: number;
 }) {
   const inserted: InstantEvalJudgmentRecord[][] = [];
-  const costs: InstantEvalCostRecord[] = [];
+  const spends: InstantEvalSpendRecord[] = [];
   let keyCall = 0;
 
   const rowSource: InstantEvalRowSource = {
@@ -109,10 +109,9 @@ export function fakes(options?: {
     },
     rowSource,
     classifier: () => new NullInstantEvalClassifier(),
-    costRecorder: {
-      recordCost: vi.fn(async (record: InstantEvalCostRecord) => {
-        costs.push(record);
-        return "cost_1";
+    spendRecorder: {
+      recordSpend: vi.fn(async (record: InstantEvalSpendRecord) => {
+        spends.push(record);
       }),
     },
     projectKey: async () => "lwql-secret",
@@ -122,5 +121,5 @@ export function fakes(options?: {
     now: () => NOW,
   });
 
-  return { executor, rowSource, inserted, costs };
+  return { executor, rowSource, inserted, spends };
 }

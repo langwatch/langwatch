@@ -118,6 +118,7 @@ async function judgeCalls({
 
   try {
     const outcome = await evaluateCalls({
+      projectId: input.projectId,
       resolved,
       traces,
       support,

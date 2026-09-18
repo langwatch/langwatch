@@ -403,7 +403,7 @@ export interface PipelineRepositories {
    * domain's dispatcher scopes its leases via `processNames`).
    */
   processStore: ProcessStore;
-  /** An Instant Eval run's counters, on its own Postgres row (ADR-137). */
+  /** An Instant Eval run's counters, on its own ClickHouse row (ADR-137). */
   instantEvalRun: StateProjectionStore<InstantEvalRunProjectionState>;
   /** Per-project topic clustering run status (ADR-051, Postgres). */
   topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;

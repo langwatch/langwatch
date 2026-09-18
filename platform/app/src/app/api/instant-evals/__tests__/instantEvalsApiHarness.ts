@@ -13,7 +13,6 @@ import { afterEach, beforeEach, vi } from "vitest";
 
 import { projectFactory } from "~/factories/project.factory";
 import type {
-  InstantEvalRun,
   Organization,
   Project,
   Team,
@@ -26,6 +25,7 @@ import type {
   InstantEvalRunService,
 } from "~/server/app-layer/instant-evals/run";
 import { setInstantEvalRunService } from "~/server/app-layer/instant-evals/run";
+import type { InstantEvalRunRow } from "~/server/app-layer/instant-evals/run/instant-eval-run.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -98,7 +98,9 @@ export function setupInstantEvalsApiHarness({
   };
 
   /** One stored run row, in the shape the repository answers with. */
-  function runRow(overrides: Partial<InstantEvalRun> = {}): InstantEvalRun {
+  function runRow(
+    overrides: Partial<InstantEvalRunRow> = {},
+  ): InstantEvalRunRow {
     return {
       id: `instant_eval_${nanoid(8)}`,
       projectId: testProjectId,
@@ -128,7 +130,7 @@ export function setupInstantEvalsApiHarness({
       lastEventId: null,
       projectionVersion: null,
       ...overrides,
-    } as InstantEvalRun;
+    };
   }
 
   /** One judgement, in the shape the judgements repository answers with. */

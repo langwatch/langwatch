@@ -265,9 +265,13 @@ import {
   PrismaSsoConnectionStrandingRepository,
 } from "./identity/repositories/sso-connection-reads.prisma.repository";
 import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
+import { LoggingInstantEvalSpendRecorder } from "./instant-evals/instant-eval-spend.recorder";
 import { createInstantEvalRunPortFromEnv } from "./instant-evals/run";
 import { ClickHouseInstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
-import { PrismaInstantEvalRunProjectionStore } from "./instant-evals/run/instant-eval-run.repository";
+import {
+  ClickHouseInstantEvalRunProjectionStore,
+  ClickHouseInstantEvalRunRepository,
+} from "./instant-evals/run/instant-eval-run.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -460,11 +464,17 @@ export function initializeDefaultApp(options?: {
     return client;
   };
 
-  // ADR-137: one judgements store, handed to the pipeline's run port and to
-  // the App, so the run surface never resolves a client of its own.
+  // ADR-137: one runs store and one judgements store, handed to the
+  // pipeline's run port and to the App, so the run surface never resolves a
+  // client of its own. The spend recorder is the logging default until the
+  // gateway spend pipeline binds its own.
+  const instantEvalRuns = new ClickHouseInstantEvalRunRepository({
+    resolveClient: resolveClickHouseClient,
+  });
   const instantEvalJudgments = new ClickHouseInstantEvalJudgmentsRepository(
     resolveClickHouseClient,
   );
+  const instantEvalSpend = new LoggingInstantEvalSpendRecorder();
 
   // Clustering reads ClickHouse directly (its query has no repository yet), so
   // it takes the resolver as a parameter. Bound once here, then handed to both
@@ -1004,7 +1014,9 @@ export function initializeDefaultApp(options?: {
       prisma,
       new EmailJoinRequestNotifier(prisma),
     ),
-    instantEvalRun: new PrismaInstantEvalRunProjectionStore(prisma),
+    instantEvalRun: new ClickHouseInstantEvalRunProjectionStore(
+      instantEvalRuns,
+    ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -1442,7 +1454,9 @@ export function initializeDefaultApp(options?: {
     },
     instantEvals: {
       runPort: createInstantEvalRunPortFromEnv({
+        runs: instantEvalRuns,
         judgments: instantEvalJudgments,
+        spend: instantEvalSpend,
       }),
     },
     enterprisePipelines: {
@@ -1986,7 +2000,11 @@ export function initializeDefaultApp(options?: {
       topics,
       runPage: runClusteringPage,
     },
-    instantEvals: { judgments: instantEvalJudgments },
+    instantEvals: {
+      runs: instantEvalRuns,
+      judgments: instantEvalJudgments,
+      spend: instantEvalSpend,
+    },
     gateway: {
       budgets: gatewayBudgetRepository,
       virtualKeySpend: gatewayVirtualKeySpendRepository,
@@ -2370,9 +2388,15 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     },
     filters: { options: new FilterService(null) },
     instantEvals: {
+      runs: new ClickHouseInstantEvalRunRepository({
+        resolveClient: async () => {
+          throw new Error("ClickHouse is not available in the test app");
+        },
+      }),
       judgments: new ClickHouseInstantEvalJudgmentsRepository(async () => {
         throw new Error("ClickHouse is not available in the test app");
       }),
+      spend: new LoggingInstantEvalSpendRecorder(),
     },
     clickhouse: {
       enabled: false,

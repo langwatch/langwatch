@@ -993,7 +993,6 @@ model Project {
   pinnedTraces        PinnedTrace[]
   traceEditOverlays   TraceEditOverlay[]
   emailSuppressions   EmailSuppression[]
-  instantEvalRuns     InstantEvalRun[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -1221,100 +1220,6 @@ model Cost {
   @@index([costType])
   @@index([projectId])
   @@index([projectId, createdAt])
-}
-
-/// The state of one Instant Eval run: a LangWatchQL statement executed as a
-/// job, judging up to a hundred thousand rows with progress.
-///
-/// PROJECTION of the `lw.obs.instant_eval.*` event stream, written only by
-/// the run fold projection and rebuildable by replay. The judgements
-/// themselves are not here: they are one ClickHouse row per trace and
-/// question in `instant_eval_judgments`, because a hundred thousand rows
-/// times three questions is not a shape Postgres should hold. This row is
-/// the run's counters, which is what a caller polls.
-model InstantEvalRun {
-  id        String  @id
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id])
-
-  /// What the caller called the run. Theirs to choose.
-  name String?
-
-  /// The statement, exactly as submitted. Never rewritten: the run composes a
-  /// wrapper around it to bound each page, and hands this back so an agent can
-  /// copy it, edit it and resubmit.
-  sql String
-
-  /// Values for the parameters the statement declares.
-  parameters Json @default("{}")
-
-  /// One entry per eval function the statement projects, derived from it at
-  /// creation: the output column it lands in, what kind of question it is, and
-  /// how its answer is read. Stored rather than re-derived so a run reads back
-  /// the same way after the catalog moves under it.
-  questions Json @default("[]")
-
-  /// The hydration plan the query validator recorded for the statement: one
-  /// entry per app-function call in its projection. Stored because a page is
-  /// executed as a wrapper around the statement and hydrated against this
-  /// plan, and re-parsing the statement per page would be a second answer to
-  /// what its columns mean.
-  plan Json @default("[]")
-
-  /// Rows this run may judge. Ten thousand by default, up to a hundred
-  /// thousand on a plan that lifts the cap.
-  rowLimit Int
-
-  status InstantEvalRunStatus @default(QUEUED)
-
-  /// Rows the key pass found, bounded by rowLimit. Null until it has run.
-  total Int?
-
-  /// Rows judged so far, across every page.
-  progress Int @default(0)
-
-  /// Judgements that matched. `matched` counts the run's BOOLEAN questions
-  /// only, and is null for a run that asked none: a score and a category have
-  /// no yes to count, so adding their judged rows would make the headline
-  /// number read as matches while being mostly rows we looked at. Per question
-  /// the number is matches for a boolean one and judged rows for the others,
-  /// which is unambiguous because the kind is listed beside it. A boolean matches
-  /// when it passed; a score and a category are counted as judged.
-  matched           Int?
-  matchedByQuestion Json @default("{}")
-
-  /// Rows the judge could not answer, and rows it declined to answer.
-  failed  Int @default(0)
-  skipped Int @default(0)
-
-  /// Input tokens the judge billed for, and what that cost us and the customer.
-  tokens   Int   @default(0)
-  costUsd  Float @default(0)
-  priceUsd Float @default(0)
-
-  /// The code of the failure that ended the run, when one did. A code, never
-  /// prose: the words a customer reads come from the client presentation
-  /// registry.
-  error String?
-
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
-  startedAt  DateTime?
-  finishedAt DateTime?
-
-  /// The projection's checkpoint over the run's own event stream: the
-  /// business time of the latest applied event, the event log's acceptance
-  /// time, the event id that breaks a tie inside one millisecond, and the
-  /// projection version that wrote the counters. Null until the first event
-  /// is folded, because the row is created by the service that accepted the
-  /// run rather than by the projection.
-  occurredAt        Float?
-  acceptedAt        Float?
-  lastEventId       String?
-  projectionVersion String?
-
-  @@index([projectId, createdAt])
-  @@index([projectId, status])
 }
 
 /// PROJECTION of the topic-clustering event stream (ADR-051): topics are
@@ -5558,13 +5463,4 @@ model IdentityMatchSuggestion {
   @@unique([organizationId, discoveredPersonId, userId])
   // The review surface reads one organization's candidates, strongest first.
   @@index([organizationId, score])
-}
-
-enum InstantEvalRunStatus {
-  QUEUED
-  PLANNING
-  RUNNING
-  FINISHED
-  FAILED
-  CANCELLED
 }

@@ -365,6 +365,10 @@ export const INDEFINITE_DEFAULT_RETENTION_TABLES = [
   // there is nothing to bill as storage. Migration 00097 creates the table with
   // this clause already in place.
   "instant_eval_judgments",
+  // The run's own row: its counters and the caller's statement. Deleting it on
+  // a timer would orphan the judgements it explains, so it keeps the same
+  // indefinite default. Migration 00098.
+  "instant_eval_runs",
 ] as const;
 
 export type IndefiniteDefaultRetentionTable =

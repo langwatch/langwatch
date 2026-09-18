@@ -365,8 +365,9 @@ describe("ttlReconciler", () => {
         "governance_cost_rollup_restatement_index",
         // Instant Eval judgements, also outside the cascade: a verdict holds no
         // customer content, so there is no trace-shaped category to map it to
-        // and nothing to meter as storage.
+        // and nothing to meter as storage. The run's row follows them.
         "instant_eval_judgments",
+        "instant_eval_runs",
       ]);
     });
 
