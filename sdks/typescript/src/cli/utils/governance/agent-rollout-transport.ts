@@ -28,14 +28,26 @@ import { drainSessionContextSpool } from "./session-context-spool";
  * sort. A caller that stops on a match (`onFile` returning true) therefore
  * finds a recent session in the first directory it opens, rather than after
  * walking a long-lived account's older ones.
+ *
+ * `followSymlinks` is off by default and opted into per caller. A directory
+ * entry reports what the entry itself is, so a symlink is neither a directory
+ * nor a file and is skipped — a linked project folder, or a linked session
+ * file, is invisible. That is the right default for an agent whose own reader
+ * refuses links, and the wrong one for an agent whose reader follows them:
+ * reading fewer files than the agent writes is the silent miss, since nothing
+ * fails and no session arrives. Turning it on resolves the link to decide what
+ * it points at; a link that points nowhere is skipped, and `maxDepth` bounds a
+ * cycle the same way it bounds real directories.
  */
 export async function walkSessionFiles({
   root,
   maxDepth,
+  followSymlinks = false,
   onFile,
 }: {
   root: string;
   maxDepth: number;
+  followSymlinks?: boolean;
   onFile: (path: string, name: string) => Promise<boolean | void> | boolean;
 }): Promise<void> {
   async function walk(dir: string, depth: number): Promise<boolean> {
@@ -48,9 +60,21 @@ export async function walkSessionFiles({
     entries.sort((a, b) => b.name.localeCompare(a.name));
     for (const e of entries) {
       const full = join(dir, e.name);
-      if (e.isDirectory()) {
+      let isDirectory = e.isDirectory();
+      let isFile = e.isFile();
+      if (followSymlinks && e.isSymbolicLink()) {
+        try {
+          // `stat` follows the link; `readdir` reported the link itself.
+          const target = await stat(full);
+          isDirectory = target.isDirectory();
+          isFile = target.isFile();
+        } catch {
+          continue; // Points nowhere.
+        }
+      }
+      if (isDirectory) {
         if (depth < maxDepth && (await walk(full, depth + 1))) return true;
-      } else if (e.isFile() && (await onFile(full, e.name))) {
+      } else if (isFile && (await onFile(full, e.name))) {
         return true;
       }
     }
@@ -83,11 +107,13 @@ export async function walkSessionFiles({
 export async function findFilesModifiedSince({
   root,
   maxDepth,
+  followSymlinks = false,
   sinceMs,
   matchesName,
 }: {
   root: string;
   maxDepth: number;
+  followSymlinks?: boolean;
   sinceMs: number;
   matchesName: (name: string) => boolean;
 }): Promise<string[]> {
@@ -95,6 +121,7 @@ export async function findFilesModifiedSince({
   await walkSessionFiles({
     root,
     maxDepth,
+    followSymlinks,
     onFile: async (full, name) => {
       if (!matchesName(name)) return false;
       try {

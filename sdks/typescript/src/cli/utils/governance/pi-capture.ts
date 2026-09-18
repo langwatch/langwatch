@@ -199,6 +199,15 @@ async function sessionFilesTouchedSince({
     // at all. Widening the walk instead would have reached into every
     // project's sessions, which is not ours to capture.
     maxDepth: 0,
+    // pi's own readers follow links, so ours have to. pi lists a session
+    // folder with a plain `readdir` and filters on the name alone
+    // (`core/session-manager.js:550-572`), which accepts a linked file without
+    // ever asking what it is, and its cross-project listing accepts an entry
+    // that `isDirectory() || isSymbolicLink()`. A walk that skips links reads
+    // fewer sessions than pi writes, and reads them silently. Measured against
+    // the shared walker before this option existed: a linked project folder and
+    // a linked session file were both invisible to it.
+    followSymlinks: true,
     // Widened against the filesystem clock, never narrowed: see
     // FS_CLOCK_SKEW_GRACE_MS. The run's real boundary is the row window in
     // `readTurnsSince`, which this cannot loosen.
@@ -230,6 +239,11 @@ async function sessionFilesTouchedSince({
     for (const path of await findFilesModifiedSince({
       root: crossProjectRoot,
       maxDepth: 1,
+      // Same reason as above, and it bites harder here: the entries one level
+      // down are whole project folders, so one link hides every session a
+      // project has. pi's picker offers them, having accepted the entry as
+      // `isDirectory() || isSymbolicLink()`.
+      followSymlinks: true,
       sinceMs: sinceMs - FS_CLOCK_SKEW_GRACE_MS,
       matchesName: (name) => name.endsWith(SESSION_FILE_SUFFIX),
     })) {

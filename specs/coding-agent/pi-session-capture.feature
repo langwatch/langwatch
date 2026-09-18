@@ -241,6 +241,18 @@ Feature: pi session capture
     Then it reads the project's directory, not the one the global settings name
 
   @unit
+  # A directory entry says what the entry itself is, so a link is neither a file
+  # nor a directory and a walk that asks that question skips it. pi never asks:
+  # it lists a session folder by name alone, and accepts a project folder that is
+  # a directory or a link. Keeping sessions on another disk and linking them in
+  # is an ordinary thing to do, and a linked project folder hides every session
+  # that project has — with nothing failing and no session arriving.
+  Scenario: A session reached through a link is captured like any other
+    Given a session folder or session file that is a link to somewhere else
+    When capture reads what pi has written
+    Then it captures those turns, because pi reads through links too
+
+  @unit
   # Editors on Windows write a byte order mark at the head of a file by default,
   # and the standard JSON reader rejects it. pi strips it before parsing
   # (`core/settings-manager.js:199`), so pi honours such a file. A reader that

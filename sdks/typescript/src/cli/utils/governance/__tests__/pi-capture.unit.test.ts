@@ -21,6 +21,7 @@ import {
   mkdir,
   mkdtemp,
   rm,
+  symlink,
   utimes,
   writeFile,
 } from "node:fs/promises";
@@ -1277,5 +1278,111 @@ describe("given a resume that reopened another project's session", () => {
 
       expect(await fresh.harvest()).toBe(1);
     });
+  });
+});
+
+/**
+ * Keeping sessions on another disk and linking them into place is an ordinary
+ * thing to do, and pi does not notice: it lists a session folder by name alone
+ * (`core/session-manager.js:550-572`) and accepts a project folder that is a
+ * directory OR a link. A walk that asks a directory entry what it is gets
+ * "link" and skips it, so the sessions pi is writing never arrive and nothing
+ * fails to say so.
+ *
+ * Both levels are covered because they fail differently: a linked session file
+ * loses one conversation, a linked project folder loses every conversation that
+ * project has.
+ */
+describe("given a session reached through a link", () => {
+  let elsewhere: string;
+
+  beforeEach(async () => {
+    elsewhere = await mkdtemp(join(tmpdir(), "pi-link-target-"));
+  });
+
+  afterEach(async () => {
+    await rm(elsewhere, { recursive: true, force: true });
+  });
+
+  /** @scenario "A session reached through a link is captured like any other" */
+  it("captures a session file that is a link into another disk", async () => {
+    const real = join(elsewhere, "real.jsonl");
+    await writeFile(real, sessionLines("aaaaaaaa", "bbbbbbbb"), "utf8");
+    await symlink(real, join(dir, "linked.jsonl"));
+
+    const bodies: string[] = [];
+    const fetchImpl = vi.fn(async (_url: unknown, init?: { body?: string }) => {
+      if (init?.body) bodies.push(init.body);
+      return { ok: true, status: 200 } as Response;
+    }) as unknown as typeof fetch;
+
+    const capture = createPiCapture({
+      sinceMs: 0,
+      sessionsDir: dir,
+      logsEndpoint: LOGS_ENDPOINT,
+      token: "sk-lw-test",
+      fetchImpl,
+    });
+
+    expect(await capture.harvest()).toBe(2);
+    expect(bodies.join("")).toContain(SESSION_ID);
+  });
+
+  /** @scenario "A session reached through a link is captured like any other" */
+  it("captures a resumed session under a project folder that is a link", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi-link-root-"));
+    const ours = join(root, "--work-ours--");
+    await mkdir(ours, { recursive: true });
+    const realTheirs = join(elsewhere, "their-project");
+    await mkdir(realTheirs, { recursive: true });
+    await writeFile(
+      join(realTheirs, "resumed.jsonl"),
+      sessionLines("aaaaaaaa"),
+      "utf8",
+    );
+    await symlink(realTheirs, join(root, "--work-theirs--"));
+
+    const fetchImpl = vi.fn(
+      async () => ({ ok: true, status: 200 }) as Response,
+    ) as unknown as typeof fetch;
+
+    const capture = createPiCapture({
+      sinceMs: 0,
+      sessionsDir: ours,
+      crossProjectSessionsRoot: root,
+      logsEndpoint: LOGS_ENDPOINT,
+      token: "sk-lw-test",
+      fetchImpl,
+    });
+
+    expect(await capture.harvest()).toBe(1);
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  /**
+   * A link whose target has been deleted is the normal end state of a disk that
+   * was unplugged. Resolving it throws, and a sweep that lets that escape takes
+   * the whole run's capture with it.
+   *
+   * @scenario "A session reached through a link is captured like any other"
+   */
+  it("steps over a link that points nowhere and keeps reading", async () => {
+    await symlink(join(elsewhere, "gone.jsonl"), join(dir, "dangling.jsonl"));
+    await writeFile(join(dir, "real.jsonl"), sessionLines("aaaaaaaa"), "utf8");
+
+    const fetchImpl = vi.fn(
+      async () => ({ ok: true, status: 200 }) as Response,
+    ) as unknown as typeof fetch;
+
+    const capture = createPiCapture({
+      sinceMs: 0,
+      sessionsDir: dir,
+      logsEndpoint: LOGS_ENDPOINT,
+      token: "sk-lw-test",
+      fetchImpl,
+    });
+
+    expect(await capture.harvest()).toBe(1);
   });
 });
