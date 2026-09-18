@@ -23,21 +23,32 @@ export default function Accept() {
     return typeof inviteCode === "string" && inviteCode.length > 0 ? (
       <InviteLanding inviteCode={inviteCode} />
     ) : (
-      <SetupLayout>
-        <Text>This invitation link is incomplete. Ask for a new one.</Text>
-      </SetupLayout>
+      <IncompleteInviteLink />
     );
   }
 
   return <LegacyAccept />;
 }
 
+/**
+ * Email clients cut long links in half, so a code-less arrival is ordinary
+ * rather than exceptional — and it has no acceptance to wait on.
+ */
+function IncompleteInviteLink() {
+  return (
+    <SetupLayout>
+      <Text>This invitation link is incomplete. Ask for a new one.</Text>
+    </SetupLayout>
+  );
+}
+
 function LegacyAccept() {
   const router = useRouter();
   const { inviteCode } = router.query;
+  const code = typeof inviteCode === "string" && inviteCode.length > 0 ? inviteCode : void 0;
   const { data: session } = useRequiredSession();
   const { status, error } = useAcceptInviteOnce({
-    inviteCode: typeof inviteCode === "string" ? inviteCode : undefined,
+    inviteCode: code,
     enabled: !!session,
   });
 
@@ -49,6 +60,10 @@ function LegacyAccept() {
     status === "loading" ||
     status === "success" ||
     status === "already-accepted";
+
+  // Without a code there is nothing to accept, so `idle` is where the hook
+  // stays — and the reader waited on a spinner that could never resolve.
+  if (code === void 0) return <IncompleteInviteLink />;
 
   if (isAwaitingOrRedirecting) {
     return <LoadingScreen />;

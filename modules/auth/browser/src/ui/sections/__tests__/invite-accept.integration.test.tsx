@@ -10,17 +10,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AcceptInviteStatus } from "../../../behavior/use-accept-invite-once.ts";
 
-const { hardRedirectSpy, signOutSpy, mockAcceptState } = vi.hoisted(() => ({
+const { hardRedirectSpy, signOutSpy, mockAcceptState, mockQuery } = vi.hoisted(() => ({
   hardRedirectSpy: vi.fn(),
   signOutSpy: vi.fn(),
   mockAcceptState: {
     status: "error" as AcceptInviteStatus,
     error: null as unknown,
   },
+  mockQuery: { inviteCode: "invite-abc" as string | undefined },
 }));
 
 vi.mock("../../../behavior/use-route.ts", () => ({
-  useRouter: () => ({ query: { inviteCode: "invite-abc" } }),
+  useRouter: () => ({ query: mockQuery }),
 }));
 
 vi.mock("../../../behavior/use-required-session.ts", () => ({
@@ -61,6 +62,7 @@ describe("Accept invite page", () => {
   beforeEach(() => {
     hardRedirectSpy.mockReset();
     signOutSpy.mockReset();
+    mockQuery.inviteCode = "invite-abc";
   });
 
   afterEach(() => {
@@ -137,6 +139,22 @@ describe("Accept invite page", () => {
       expect(
         screen.queryByText("An error occurred while accepting the invite"),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the link arrived without its code", () => {
+    beforeEach(() => {
+      mockQuery.inviteCode = void 0;
+      // There is nothing to accept, so the hook never leaves `idle` — which
+      // used to render the loading screen for the life of the page.
+      mockAcceptState.status = "idle";
+      mockAcceptState.error = null;
+    });
+
+    it("says the link is incomplete instead of waiting forever", () => {
+      renderAccept();
+
+      expect(screen.getByText(/invitation link is incomplete/i)).toBeInTheDocument();
     });
   });
 });
