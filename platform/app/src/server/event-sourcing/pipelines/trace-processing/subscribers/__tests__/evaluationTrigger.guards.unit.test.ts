@@ -307,7 +307,7 @@ describe("evaluationTrigger subscriber", () => {
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
 
-    /** @scenario "a late origin resolution on a recent trace whose span has no valid timing still re-runs evaluations" */
+    /** @scenario "a late origin resolution on a trace of unknown age whose span has no valid timing still re-runs evaluations" */
     it("still dispatches for one recorded span whose start time is unknown", async () => {
       const deps = createDeps();
       vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([

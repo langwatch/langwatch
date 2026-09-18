@@ -134,10 +134,17 @@ describe("trace alert trigger match subscriber", () => {
      * evaluation trigger, not in the shared origin guards this subscriber
      * also runs.
      *
-     * Alerting is a different question: a trigger matches on trace IDENTITY
-     * and its own filters, so an alert that is due stays due whether or not
-     * this replica folded the spans. Pinned so the evaluation rule cannot
-     * migrate back into the shared guards and silently stop alerts.
+     * Alerting is a different question, and this test pins only that the
+     * shared guards do not answer it — so the evaluation rule cannot migrate
+     * back into them and silently change alerting as a side effect.
+     *
+     * It does NOT assert that the resulting alert is correct. It is not. The
+     * match recorded here is confirmed later against this same empty fold
+     * state (confirmSettledMatch.ts -> buildPreconditionTraceDataFromFoldState),
+     * so a trigger with filters fails its confirm and is discarded, while a
+     * trigger without filters delivers a notification whose input and output
+     * are read off the empty fold and render blank. Both are tracked on the
+     * alert-path issue; neither is fixed from inside a shared guard chain.
      *
      * The event is origin_resolved, not span_received, because span_received
      * cannot be observed here with spanCount 0: subscribers fire on fold
@@ -146,7 +153,7 @@ describe("trace alert trigger match subscriber", () => {
      * (foldProjection.ts:289). A late origin resolution on a rehydrated-empty
      * fold is the reachable case, and the one the incident produced.
      */
-    /** @scenario "a trace alert still fires for a trace with no recorded spans" */
+    /** @scenario "a trace alert still records a match for a trace with no recorded spans" */
     it("still records a match, since alerting does not need folded spans", async () => {
       const triggers = {
         getActiveTraceTriggersForProject: vi

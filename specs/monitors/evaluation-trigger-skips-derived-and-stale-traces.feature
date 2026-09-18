@@ -41,11 +41,14 @@ Feature: ON_MESSAGE evaluations only re-run on real, recent messages
     # "no start time": a recent span without valid timing also leaves the
     # start time unknown, and that trace must still be evaluated.
     #
-    # This rule is scoped to evaluations on purpose. Trace alerts run off the
-    # same shared trace guards, but an alert matches on the trace's identity
-    # and its own filters, so one that is due stays due whether or not this
-    # replica folded the spans. Silencing alerts is a separate product
-    # decision and is not made here.
+    # This rule is scoped to evaluations on purpose: trace alerts run off the
+    # same shared trace guards, and a shared chain should not decide the
+    # alerting question for both consumers. Scoping is ALL that is claimed
+    # here. The alert path on an empty fold is separately broken — trigger
+    # filters are matched against that same empty fold state, so a filtered
+    # alert fails its confirm and an unfiltered one renders empty content —
+    # and the scenario below records that behaviour as it is today, not as
+    # what it should be. Tracked on its own issue.
 
     @unit
     Scenario: a late origin resolution on a trace with no recorded spans does not re-run evaluations
@@ -53,14 +56,21 @@ Feature: ON_MESSAGE evaluations only re-run on real, recent messages
       When the trace's origin is resolved
       Then no evaluation is dispatched
 
+    # "Age unknown", not "recent": with no valid first-span time the age cap
+    # has nothing to compare and short-circuits, so this trace is dispatched
+    # without its age ever being established. That is the accepted trade for
+    # keying the rule on spanCount — one real span is the signal — but the
+    # scenario must not call the trace recent when nothing here proves it is.
     @unit
-    Scenario: a late origin resolution on a recent trace whose span has no valid timing still re-runs evaluations
-      Given a recent trace with one recorded span whose first-span time is unknown
+    Scenario: a late origin resolution on a trace of unknown age whose span has no valid timing still re-runs evaluations
+      Given a trace with one recorded span whose first-span time is unknown
       When the trace's origin is resolved
       Then an evaluation is dispatched
 
+    # Recorded behaviour, not endorsed behaviour: the match is recorded, and
+    # what happens after it is the broken part described above.
     @unit
-    Scenario: a trace alert still fires for a trace with no recorded spans
+    Scenario: a trace alert still records a match for a trace with no recorded spans
       Given a project with an active trace alert
       And a trace whose fold state holds no spans
       When the trace's origin is resolved

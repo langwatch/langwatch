@@ -61,9 +61,10 @@ function isDispatchableEvaluationEvent(
   //
   // No folded span means nothing to evaluate, whatever the origin says. The
   // rule sits here rather than in `passesTraceOriginGuards` because it is an
-  // evaluation rule: the EE trace-alert subscriber shares that chain, and its
-  // triggers match on trace identity, so an alert that is due stays due
-  // whether or not this replica folded the spans.
+  // evaluation rule, and the EE trace-alert subscriber shares that chain.
+  // That is a scope decision only — the alert path is separately broken on an
+  // empty fold (its filters match against the same empty state) and is
+  // tracked on its own issue, not silently fixed from inside a shared guard.
   //
   // Keyed on spanCount, not occurredAt: a recent span whose end time is
   // missing also leaves occurredAt at 0 and must still be evaluated.

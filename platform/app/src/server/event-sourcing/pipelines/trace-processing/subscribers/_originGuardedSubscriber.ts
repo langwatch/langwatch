@@ -70,9 +70,16 @@ export function passesTraceOriginGuards(
   // occurredAt 0), so a late origin_resolved on it looks brand new. The rule
   // that covers this is deliberately NOT here: "no folded span means nothing
   // to evaluate" is an evaluation rule, and this chain is also run by the EE
-  // trace-alert subscriber (ADR-052), whose triggers match on trace identity
-  // and stay due whether or not this replica folded the spans. It lives on
-  // the evaluation trigger instead, in `isDispatchableEvaluationEvent`.
+  // trace-alert subscriber (ADR-052). It lives on the evaluation trigger
+  // instead, in `isDispatchableEvaluationEvent`.
+  //
+  // This is a SCOPE decision, not a claim that the alert path is fine on an
+  // empty fold. It is not: trigger filters are matched against this same fold
+  // state (buildPreconditionTraceDataFromFoldState, triggerFilter.matcher.ts),
+  // so a filtered trigger silently fails its confirm, and an unfiltered one
+  // renders input/output straight off the empty fold. Blocking alerts here
+  // would mean deciding that for both consumers from inside a shared chain.
+  // See the alert-path issue linked from the guard's tests.
 
   if (foldState.blockedByGuardrail && !foldState.computedOutput) return false;
 

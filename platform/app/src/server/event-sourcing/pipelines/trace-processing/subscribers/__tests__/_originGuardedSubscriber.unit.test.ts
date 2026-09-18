@@ -113,6 +113,11 @@ describe("passesTraceOriginGuards", () => {
     // shared chain, which the EE trace-alert subscriber also runs. Alerting
     // on a trace whose fold rehydrated empty is a separate product question
     // from evaluating it, and this guard must not decide it for both.
+    //
+    // Admitting it here is NOT a statement that the alert is then correct.
+    // Downstream the trigger's filters are matched against this same empty
+    // fold, so a filtered alert is discarded at confirm and an unfiltered one
+    // notifies with blank content. Tracked on the alert-path issue.
     it("admits a late origin resolution, leaving the rule to each subscriber", () => {
       expect(
         passesTraceOriginGuards(
@@ -122,7 +127,10 @@ describe("passesTraceOriginGuards", () => {
       ).toBe(true);
     });
 
-    it("still admits a recent trace whose only span left the start time unknown", () => {
+    // "Age unknown", not "recent": with no valid start time the age cap has
+    // nothing to compare, so this admits the trace without establishing its
+    // age at all. spanCount is the signal being tested, not recency.
+    it("still admits a trace of unknown age whose only span left the start time unknown", () => {
       expect(
         passesTraceOriginGuards(
           event({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
