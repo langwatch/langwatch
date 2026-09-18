@@ -28,10 +28,11 @@ import {
 import { createUi } from "@langwatch/ui-kernel";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
+import type { FallbackProps } from "react-error-boundary";
 import { useLocation } from "react-router";
 
 import { readPublicAppConfig } from "./behavior/public-config";
-import { BrowserUiFeedback } from "./behavior/ui-feedback";
+import { BrowserUiFeedback, resolveUiFailureCopy } from "./behavior/ui-feedback";
 import { UiShell } from "./behavior/ui-shell";
 import { UiRuntime } from "./behavior/ui.runtime";
 import { GraphicsQualityProvider } from "./shell/graphics-quality-provider";
@@ -40,6 +41,7 @@ import { UiApplicationShell } from "./shell/ui-application-shell";
 import { UiErrorToaster } from "./shell/ui-error-toaster";
 import { installedModuleDrawers } from "./shell/ui-module-drawers";
 import { installedModuleScreens, type UiModuleScreens } from "./shell/ui-module-screens";
+import { UiPageFailure } from "./shell/ui-page-fallbacks";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 
 import "nprogress/nprogress.css";
@@ -59,10 +61,18 @@ function UiNoFooter() {
 function useNoNavigationTracking() {}
 
 /**
- * Deliberately plain, like `shell/ui-page-fallbacks` — the words a
- * customer reads for a named failure come from the client error
- * presentation registry, not yet harvested here. This says the true thing.
+ * A page that threw, said properly: this renders inside the providers, so the
+ * words come from the code-keyed registry rather than `error.message`.
  */
+function UiPageError({ error }: FallbackProps) {
+  return (
+    <UiPageFailure
+      copy={resolveUiFailureCopy({ error, fallbackTitle: "This page did not load" })}
+    />
+  );
+}
+
+/** The last resort: plain, because it must render when nothing else loaded. */
 function UiBootPageError() {
   return (
     <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>
@@ -73,10 +83,8 @@ function UiBootPageError() {
 }
 
 /**
- * Where the two capabilities meet, and the only place they do. Four calls in
- * the order ruling (a) fixes: who is here, where they are standing, the
- * session port over both, then the scope port over the grants the session
- * answered. `auth` and `organization` never import each other.
+ * Where the two capabilities meet, and the only place they do — in the order
+ * record 10.1 rules. `auth` and `organization` never import each other.
  */
 function useBrowserUiCapabilities({
   transport,
@@ -147,7 +155,7 @@ class BrowserUiShell extends UiShell {
         },
         pages: {
           loaders: uiUnservedPageLoaders,
-          errorFallback: UiBootPageError,
+          errorFallback: UiPageError,
           rootErrorBoundary: UiBootPageError,
         },
       }),
