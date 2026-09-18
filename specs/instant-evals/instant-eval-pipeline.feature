@@ -70,6 +70,15 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     When the page size is chosen
     Then it is a hundred rows rather than five hundred
 
+  @unit
+  Scenario: The next page is read while the current one is judged
+    Given a run whose classifier is busy with a page
+    When that page is being judged
+    Then the next page's keys, rows and texts are read before the judging resolves
+    And the intent that asks for the next page is handed what was read, so it is read once
+    And one page is judged at a time
+    And an intent asking for a different page, a cancellation or a failed page drops what was read ahead
+
   # ---------------------------------------------------------------------------
   # Progress
   # ---------------------------------------------------------------------------

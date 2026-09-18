@@ -211,6 +211,16 @@ const SPAN_READ_FLOOR_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_EVENTS_PER_TRACE = 1_000;
 
 /**
+ * Traces a thread read returns when the caller names no ceiling.
+ *
+ * Enough for the thread views, which ask for one conversation at a time. A
+ * caller reading many threads in one call passes its own, sized by the
+ * threads, because a ceiling below the traces they hold drops the rest
+ * without a word.
+ */
+const DEFAULT_THREAD_TRACES_LIMIT = 1_000;
+
+/**
  * How many spans the traces-with-spans OOM fallback will hold in memory before
  * it gives up on the read.
  *
@@ -841,6 +851,10 @@ export class ClickHouseTraceService {
    * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the eval
    *   path can read full thread IO (#4888). Customer thread views construct
    *   without a blob resolver, so this is a no-op for them.
+   * @param opts.maxTraces - Traces the read may return across every thread
+   *   asked for, a thousand unless the caller says otherwise. A caller asking
+   *   for many threads at once sizes it by the threads, because a ceiling
+   *   below the traces they hold drops the rest without a word.
    * @returns Array of Trace objects with spans
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
@@ -848,7 +862,7 @@ export class ClickHouseTraceService {
     projectId: string,
     threadIds: string[],
     protections: Protections,
-    opts?: { resolveBlobs?: boolean },
+    opts?: { resolveBlobs?: boolean; maxTraces?: number },
   ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpansByThreadIds",
@@ -880,11 +894,12 @@ export class ClickHouseTraceService {
               WHERE TenantId = {tenantId:String}
                 AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
               ORDER BY CreatedAt ASC
-              LIMIT 1000
+              LIMIT {maxTraces:UInt32}
             `,
             query_params: {
               tenantId: projectId,
               threadIds,
+              maxTraces: opts?.maxTraces ?? DEFAULT_THREAD_TRACES_LIMIT,
             },
             format: "JSONEachRow",
           });

@@ -24,15 +24,17 @@ import {
   createLangWatchQLAppFunctionTraceSource,
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
-  hydrateLangWatchQLAppFunctions,
+  judgeLangWatchQLHydration,
   type LangWatchQLAppFunctionCall,
   type LangWatchQLAppFunctionTraceSource,
   type LangWatchQLColumn,
   type LangWatchQLEvalUsage,
   type LangWatchQLExecutor,
+  type LangWatchQLPreparedHydration,
   lwqlAppFunction,
   lwqlConnectionFromEnv,
   lwqlTenantCapability,
+  prepareLangWatchQLHydration,
 } from "~/server/analytics/lwql";
 import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
@@ -41,8 +43,10 @@ import {
   countPass,
   type InstantEvalPasses,
   judgePass,
+  judgePreparedPass,
   keyPass,
   probePass,
+  readPass,
   textPass,
 } from "./row-source.passes";
 
@@ -103,6 +107,20 @@ export interface InstantEvalJudgedPage {
   readonly usage: LangWatchQLEvalUsage;
 }
 
+/**
+ * One page read and extracted, with nothing judged yet.
+ *
+ * What {@link InstantEvalRowSource.read} answers and
+ * {@link InstantEvalRowSource.judgePrepared} takes. Opaque to the run on
+ * purpose: it holds the traces and the rendered texts of up to a page of rows,
+ * and the run only ever hands it back.
+ */
+export interface InstantEvalPreparedPage {
+  /** Rows the page owns, which is what will be judged. */
+  readonly rows: number;
+  readonly hydration: LangWatchQLPreparedHydration;
+}
+
 export interface InstantEvalRowSource {
   /** What the statement projects, without reading a row or judging anything. */
   probe(input: {
@@ -137,8 +155,13 @@ export interface InstantEvalRowSource {
     after?: InstantEvalCursor;
   }): Promise<InstantEvalKeyPage>;
 
-  /** One page of rows, judged. */
-  judge(input: {
+  /**
+   * One page of rows, read and extracted but not judged.
+   *
+   * The half of {@link judge} that costs nothing, separated so a run can read
+   * its next page while the classifier is busy with this one.
+   */
+  read(input: {
     caller: InstantEvalRunCaller;
     protections: Protections;
     sql: string;
@@ -146,6 +169,24 @@ export interface InstantEvalRowSource {
     /** The hydration plan the validator recorded for the inner statement. */
     calls: readonly LangWatchQLAppFunctionCall[];
     /** The page's own keys, which are also what its rows are matched against. */
+    keys: readonly InstantEvalRowKey[];
+    classifier: InstantEvalClassifier;
+    maxConcurrency: number;
+  }): Promise<InstantEvalPreparedPage>;
+
+  /** The other half: judges a page {@link read} prepared. */
+  judgePrepared(input: {
+    page: InstantEvalPreparedPage;
+    signal?: AbortSignal;
+  }): Promise<InstantEvalJudgedPage>;
+
+  /** One page of rows, judged: {@link read} then {@link judgePrepared}. */
+  judge(input: {
+    caller: InstantEvalRunCaller;
+    protections: Protections;
+    sql: string;
+    parameters?: Readonly<Record<string, unknown>>;
+    calls: readonly LangWatchQLAppFunctionCall[];
     keys: readonly InstantEvalRowKey[];
     classifier: InstantEvalClassifier;
     maxConcurrency: number;
@@ -274,13 +315,12 @@ export function createInstantEvalRowSource(
       usesAppFunctions: true,
     });
 
-  const hydrate = async ({
+  const prepare = async ({
     caller,
     protections,
     calls,
     execution,
     instantEvals,
-    signal,
   }: {
     caller: InstantEvalRunCaller;
     protections: Protections;
@@ -291,9 +331,8 @@ export function createInstantEvalRowSource(
       maxConcurrency: number;
       queryTokenBudget: number;
     };
-    signal?: AbortSignal;
   }) =>
-    await hydrateLangWatchQLAppFunctions({
+    await prepareLangWatchQLHydration({
       projectId: caller.id,
       protections,
       calls,
@@ -302,15 +341,28 @@ export function createInstantEvalRowSource(
       limits: DEFAULT_LWQL_RESULT_LIMITS,
       traceSource: traceSource(),
       ...(instantEvals ? { instantEvals } : {}),
+    });
+
+  const judge = async ({
+    prepared,
+    signal,
+  }: {
+    prepared: LangWatchQLPreparedHydration;
+    signal?: AbortSignal;
+  }) =>
+    await judgeLangWatchQLHydration({
+      prepared,
       ...(signal ? { signal } : {}),
     });
 
-  const passes: InstantEvalPasses = { run, hydrate };
+  const passes: InstantEvalPasses = { run, prepare, judge };
 
   return {
     probe: (input) => probePass(passes, input),
     count: (input) => countPass(passes, input),
     keys: (input) => keyPass(passes, input),
+    read: (input) => readPass(passes, input),
+    judgePrepared: (input) => judgePreparedPass(passes, input),
     judge: (input) => judgePass(passes, input),
     texts: (input) => textPass(passes, input),
   };

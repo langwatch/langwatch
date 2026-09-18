@@ -38,7 +38,8 @@ describe("given a run about to be planned", () => {
 
       await executor.plan({ runId: RUN_ID, projectId: PROJECT_ID });
 
-      expect(rowSource.judge).not.toHaveBeenCalled();
+      expect(rowSource.read).not.toHaveBeenCalled();
+      expect(rowSource.judgePrepared).not.toHaveBeenCalled();
     });
 
     it("reports the total it found", async () => {

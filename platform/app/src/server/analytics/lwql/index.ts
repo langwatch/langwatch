@@ -28,7 +28,12 @@ export type {
   LangWatchQLJudgementReading,
 } from "./appFunctions/evalCatalog";
 export { instantEvalQuestionFor } from "./appFunctions/evalQuestions";
-export { hydrateLangWatchQLAppFunctions } from "./appFunctions/hydrate";
+export {
+  hydrateLangWatchQLAppFunctions,
+  judgeLangWatchQLHydration,
+  type LangWatchQLPreparedHydration,
+  prepareLangWatchQLHydration,
+} from "./appFunctions/hydrate";
 export type {
   LangWatchQLEvalUsage,
   LangWatchQLHydrationResult,

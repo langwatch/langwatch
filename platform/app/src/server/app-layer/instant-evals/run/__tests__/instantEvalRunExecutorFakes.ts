@@ -16,7 +16,12 @@ import type { InstantEvalSpendRecord } from "../../instant-eval-spend.recorder";
 import { createInstantEvalRunExecutor } from "../instant-eval-run.executor";
 import type { InstantEvalJudgmentRecord } from "../judgments";
 import { instantEvalRunQuestions } from "../questions";
-import type { InstantEvalRowKey, InstantEvalRowSource } from "../row-source";
+import type {
+  InstantEvalJudgedPage,
+  InstantEvalPreparedPage,
+  InstantEvalRowKey,
+  InstantEvalRowSource,
+} from "../row-source";
 
 export const PROJECT_ID = "project-1";
 export const RUN_ID = "instanteval_1";
@@ -71,7 +76,18 @@ export function fakes(options?: {
         hasMore: options?.hasMore?.[index] ?? false,
       };
     }),
-    judge: vi.fn(async () => ({
+    read: vi.fn(
+      async ({ keys }): Promise<InstantEvalPreparedPage> => ({
+        rows: keys.length,
+        hydration: { keys } as unknown as InstantEvalPreparedPage["hydration"],
+      }),
+    ),
+    judgePrepared: vi.fn(async (): Promise<InstantEvalJudgedPage> => judged()),
+    judge: vi.fn(async () => judged()),
+    texts: vi.fn(async () => options?.texts ?? []),
+  };
+  function judged(): InstantEvalJudgedPage {
+    return {
       columns: [],
       rows: (options?.judgedCells ?? [0.9, 0.1]).map((cell, index) => ({
         TraceId: `t${index + 1}`,
@@ -82,9 +98,8 @@ export function fakes(options?: {
         inputTokens: 1_200,
         skipped: options?.skipped ?? {},
       },
-    })),
-    texts: vi.fn(async () => options?.texts ?? []),
-  };
+    };
+  }
 
   const executor = createInstantEvalRunExecutor({
     runs: {

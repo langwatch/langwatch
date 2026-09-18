@@ -66,6 +66,8 @@ function harness(options?: {
         ],
     ),
     keys: vi.fn(),
+    read: vi.fn(),
+    judgePrepared: vi.fn(),
     judge: vi.fn(),
     texts: vi.fn(),
   } as unknown as InstantEvalRowSource;
@@ -122,6 +124,7 @@ describe("given a statement a run could execute", () => {
       await accept({ query, rowSource });
 
       expect(rowSource.judge).not.toHaveBeenCalled();
+      expect(rowSource.read).not.toHaveBeenCalled();
       expect(rowSource.keys).not.toHaveBeenCalled();
     });
   });
