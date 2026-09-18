@@ -19,8 +19,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
+  organizationTenantPath,
   type PostgresReaderRole,
+  parentTenantPath,
+  postgresApprovedViewStatement,
   postgresReaderRoleStatements,
+  projectTenantPath,
+  teamTenantPath,
 } from "../postgresMapping";
 
 /** A role that is valid in every respect, so a case varies exactly one thing. */
@@ -164,6 +169,172 @@ describe("given the PostgreSQL reader role statements", () => {
           statement.includes('ALTER ROLE "lwql_ro" WITH LOGIN PASSWORD'),
         ),
       ).toBe(true);
+    });
+  });
+});
+
+describe("given postgresApprovedViewStatement", () => {
+  const SCHEMA = "public";
+
+  describe("when the mapping carries no tenant path", () => {
+    it("reads the tenant column off the base relation, aliased m", () => {
+      const statement = postgresApprovedViewStatement({
+        schema: SCHEMA,
+        view: "lwql_topics",
+        baseRelation: "Topic",
+        columns: [
+          { exposed: "TenantId", source: "projectId" },
+          { exposed: "TopicId", source: "id" },
+        ],
+        joins: projectTenantPath(),
+      });
+
+      expect(statement).toBe(
+        `CREATE OR REPLACE VIEW "public"."lwql_topics" AS\n` +
+          `SELECT\n` +
+          `  "m"."projectId" AS "TenantId",\n` +
+          `  "m"."id" AS "TopicId"\n` +
+          `FROM "public"."Topic" AS "m"`,
+      );
+    });
+  });
+
+  describe("when the base relation is team-scoped", () => {
+    it("joins the base's teamId to Project and reads TenantId off p", () => {
+      const statement = postgresApprovedViewStatement({
+        schema: SCHEMA,
+        view: "lwql_group_things",
+        baseRelation: "GroupThing",
+        columns: [
+          { exposed: "TenantId", source: "id", alias: "p" },
+          { exposed: "GroupThingId", source: "id" },
+        ],
+        joins: teamTenantPath(),
+      });
+
+      expect(statement).toBe(
+        `CREATE OR REPLACE VIEW "public"."lwql_group_things" AS\n` +
+          `SELECT\n` +
+          `  "p"."id" AS "TenantId",\n` +
+          `  "m"."id" AS "GroupThingId"\n` +
+          `FROM "public"."GroupThing" AS "m"\n` +
+          `JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId"`,
+      );
+    });
+  });
+
+  describe("when the base relation is organization-scoped", () => {
+    it("chains Organization -> Team -> Project and reads TenantId off p", () => {
+      const statement = postgresApprovedViewStatement({
+        schema: SCHEMA,
+        view: "lwql_virtual_keys",
+        baseRelation: "VirtualKey",
+        columns: [
+          { exposed: "TenantId", source: "id", alias: "p" },
+          { exposed: "VirtualKeyId", source: "id" },
+        ],
+        joins: organizationTenantPath(),
+      });
+
+      expect(statement).toBe(
+        `CREATE OR REPLACE VIEW "public"."lwql_virtual_keys" AS\n` +
+          `SELECT\n` +
+          `  "p"."id" AS "TenantId",\n` +
+          `  "m"."id" AS "VirtualKeyId"\n` +
+          `FROM "public"."VirtualKey" AS "m"\n` +
+          `JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"\n` +
+          `JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"`,
+      );
+    });
+  });
+
+  describe("when the base relation reaches its scope through a parent", () => {
+    it("hops to the parent first, then appends the parent's org chain", () => {
+      const statement = postgresApprovedViewStatement({
+        schema: SCHEMA,
+        view: "lwql_ledger_entries",
+        baseRelation: "GatewayBudgetLedger",
+        columns: [
+          { exposed: "TenantId", source: "id", alias: "p" },
+          { exposed: "LedgerEntryId", source: "id" },
+        ],
+        joins: parentTenantPath({
+          parent: "GatewayBudget",
+          foreignKey: "budgetId",
+          alias: "gb",
+          tail: organizationTenantPath(),
+        }),
+      });
+
+      expect(statement).toBe(
+        `CREATE OR REPLACE VIEW "public"."lwql_ledger_entries" AS\n` +
+          `SELECT\n` +
+          `  "p"."id" AS "TenantId",\n` +
+          `  "m"."id" AS "LedgerEntryId"\n` +
+          `FROM "public"."GatewayBudgetLedger" AS "m"\n` +
+          `JOIN "public"."GatewayBudget" AS "gb" ON "m"."budgetId" = "gb"."id"\n` +
+          `JOIN "public"."Team" AS "t" ON "gb"."organizationId" = "t"."organizationId"\n` +
+          `JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"`,
+      );
+    });
+  });
+
+  describe("when a hop is malformed", () => {
+    const columns = [{ exposed: "TenantId", source: "id", alias: "p" }];
+
+    it("refuses a hop whose alias equals the base alias m", () => {
+      expect(() =>
+        postgresApprovedViewStatement({
+          schema: SCHEMA,
+          view: "lwql_x",
+          baseRelation: "X",
+          columns,
+          joins: [
+            {
+              relation: "Project",
+              alias: "m",
+              on: { from: "teamId", to: "teamId" },
+            },
+          ],
+        }),
+      ).toThrow(/lwql provisioning: .*base alias "m"/);
+    });
+
+    it("refuses two hops sharing an alias", () => {
+      expect(() =>
+        postgresApprovedViewStatement({
+          schema: SCHEMA,
+          view: "lwql_x",
+          baseRelation: "X",
+          columns,
+          joins: [
+            {
+              relation: "Team",
+              alias: "t",
+              on: { from: "organizationId", to: "organizationId" },
+            },
+            {
+              relation: "Project",
+              alias: "t",
+              on: { from: "id", to: "teamId" },
+            },
+          ],
+        }),
+      ).toThrow(/lwql provisioning: .*reuses alias "t"/);
+    });
+
+    it("refuses a hop with an empty relation", () => {
+      expect(() =>
+        postgresApprovedViewStatement({
+          schema: SCHEMA,
+          view: "lwql_x",
+          baseRelation: "X",
+          columns,
+          joins: [
+            { relation: "", alias: "p", on: { from: "teamId", to: "teamId" } },
+          ],
+        }),
+      ).toThrow(/lwql provisioning: .*empty relation/);
     });
   });
 });

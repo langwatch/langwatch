@@ -480,10 +480,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/notification-coverage-gaps.feature",
   "specs/licensing/resource-limit-notifications.feature",
   "specs/licensing/usage-page-navigation.feature",
-  // #8207's design contract, every scenario @unimplemented on purpose: the
-  // spec ships ahead of the Postgres catalog derivation, and the PR that lands
-  // derivePostgresCatalog binds these. Remove this entry with the first binding.
-  "specs/lwql/postgres-catalog.feature",
   "specs/mcp-server/analytics-tool.feature",
   "specs/mcp-server/api-key-tools.feature",
   "specs/mcp-server/experiment-results-tool.feature",

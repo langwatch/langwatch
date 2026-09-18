@@ -93,6 +93,7 @@ describe("given the Go LWQL manifest and the application catalog", () => {
   const { sourceTables, viewNames, tenantColumns } = manifest();
 
   describe("when comparing view names", () => {
+    /** @scenario "The catalog ground truth lists every derived view" */
     it("the manifest's view names equal the catalog's in the same order", () => {
       const catalogNames = catalogViewNames();
       expect(viewNames).toEqual(catalogNames);
@@ -100,6 +101,7 @@ describe("given the Go LWQL manifest and the application catalog", () => {
   });
 
   describe("when comparing source tables", () => {
+    /** @scenario "The catalog ground truth lists every derived view" */
     it("the manifest's source tables equal the catalog's in the same order", () => {
       const catalogTables = catalogSourceTables();
       expect(sourceTables).toEqual(catalogTables);

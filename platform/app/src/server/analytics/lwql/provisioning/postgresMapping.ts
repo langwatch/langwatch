@@ -188,14 +188,27 @@ export function postgresApprovedViewStatement({
   view,
   baseRelation,
   columns,
+  joins = [],
 }: {
   schema: string;
   /** Name of the view to create. */
   view: string;
-  /** Table in the application's schema it reads. */
+  /** Table in the application's schema it reads, aliased {@link POSTGRES_BASE_ALIAS}. */
   baseRelation: string;
-  /** Exposed name and the base relation's column behind it, in catalog order. */
-  columns: readonly { exposed: string; source: string }[];
+  /**
+   * Exposed name, the column behind it, and the alias that column is read on,
+   * in catalog order. `alias` defaults to {@link POSTGRES_BASE_ALIAS}; the
+   * tenant column names the last {@link joins} hop's alias, which is where the
+   * project column actually lives.
+   */
+  columns: readonly { exposed: string; source: string; alias?: string }[];
+  /**
+   * The join chain from the base relation to the relation carrying the owning
+   * project — {@link LangWatchQLPostgresMapping.tenantPath}. Empty (the default)
+   * renders a single-table body, so every path-less view is unchanged bar the
+   * new base-alias qualifier.
+   */
+  joins?: readonly PostgresApprovedViewJoin[];
 }): string {
   const quotedSchema = postgresQuoted(schema);
   const quotedView = postgresQuoted(view);
@@ -204,16 +217,124 @@ export function postgresApprovedViewStatement({
       `lwql provisioning: approved view "${view}" needs at least one column`,
     );
   }
+  // The base alias is fixed, so a hop reusing it would make `<m>.<from>`
+  // ambiguous between the base relation and that hop; two hops sharing an alias
+  // are the same ambiguity between themselves. Caught here rather than left to
+  // PostgreSQL so the message names the mapping, not a generated relation.
+  const seen = new Set<string>([POSTGRES_BASE_ALIAS]);
+  for (const hop of joins) {
+    if (hop.relation.length === 0) {
+      throw new Error(
+        `lwql provisioning: approved view "${view}" has a tenant-path hop with an empty relation`,
+      );
+    }
+    if (seen.has(hop.alias)) {
+      throw new Error(
+        hop.alias === POSTGRES_BASE_ALIAS
+          ? `lwql provisioning: approved view "${view}" tenant-path hop reuses the base alias "${POSTGRES_BASE_ALIAS}"`
+          : `lwql provisioning: approved view "${view}" tenant-path reuses alias "${hop.alias}"`,
+      );
+    }
+    seen.add(hop.alias);
+  }
   const projection = columns
     .map(
       (column) =>
-        `  ${postgresQuoted(column.source)} AS ${postgresQuoted(column.exposed)}`,
+        `  ${postgresQuoted(column.alias ?? POSTGRES_BASE_ALIAS)}.${postgresQuoted(column.source)} AS ${postgresQuoted(column.exposed)}`,
     )
     .join(",\n");
+  let previousAlias = POSTGRES_BASE_ALIAS;
+  const joinClause = joins
+    .map((hop) => {
+      const clause =
+        `\nJOIN ${quotedSchema}.${postgresQuoted(hop.relation)} AS ${postgresQuoted(hop.alias)} ` +
+        `ON ${postgresQuoted(previousAlias)}.${postgresQuoted(hop.on.from)} = ` +
+        `${postgresQuoted(hop.alias)}.${postgresQuoted(hop.on.to)}`;
+      previousAlias = hop.alias;
+      return clause;
+    })
+    .join("");
   return (
     `CREATE OR REPLACE VIEW ${quotedSchema}.${quotedView} AS\nSELECT\n${projection}\n` +
-    `FROM ${quotedSchema}.${postgresQuoted(baseRelation)}`
+    `FROM ${quotedSchema}.${postgresQuoted(baseRelation)} AS ${postgresQuoted(POSTGRES_BASE_ALIAS)}` +
+    joinClause
   );
+}
+
+/**
+ * Alias the approved view's body gives the base relation.
+ *
+ * Fixed rather than derived: the base relation is the same table in every
+ * mapping, so one constant lets the tenant-path hops and the column projection
+ * agree on how to name it without threading a value through. A hop may not
+ * reuse it — see {@link postgresApprovedViewStatement}.
+ */
+export const POSTGRES_BASE_ALIAS = "m";
+
+/** One hop of an approved view's tenant join chain, rendered by the view body. */
+export interface PostgresApprovedViewJoin {
+  /** Relation joined (application table name). */
+  readonly relation: string;
+  /** Alias this hop's relation gets in the view body. */
+  readonly alias: string;
+  /** `<previous alias>.<from> = <alias>.<to>`. */
+  readonly on: { readonly from: string; readonly to: string };
+}
+
+/**
+ * The three tenant scopes as reusable join chains, plus a parent prefixer.
+ *
+ * Pure data: they decide *which* relation carries the project, never any SQL.
+ * `projectTenantPath` is empty because a project-scoped table carries the
+ * project column itself. `teamTenantPath` joins the base's `teamId` to
+ * `Project.teamId`, whose `id` is the project. `organizationTenantPath` cannot
+ * hop straight to a project — `Project` has no `organizationId` — so it goes
+ * Organization -> Team -> Project through the organization's teams' projects.
+ * `parentTenantPath` prefixes the hop to a parent table (foreign key -> its
+ * `id`) onto whichever tail the parent's own scope needs.
+ *
+ * @see LangWatchQLPostgresMapping.tenantPath — the field these fill
+ */
+export function projectTenantPath(): readonly PostgresApprovedViewJoin[] {
+  return [];
+}
+
+export function teamTenantPath(): readonly PostgresApprovedViewJoin[] {
+  return [
+    { relation: "Project", alias: "p", on: { from: "teamId", to: "teamId" } },
+  ];
+}
+
+export function organizationTenantPath(): readonly PostgresApprovedViewJoin[] {
+  return [
+    {
+      relation: "Team",
+      alias: "t",
+      on: { from: "organizationId", to: "organizationId" },
+    },
+    { relation: "Project", alias: "p", on: { from: "id", to: "teamId" } },
+  ];
+}
+
+export function parentTenantPath({
+  parent,
+  foreignKey,
+  alias,
+  tail,
+}: {
+  /** The parent relation the base table's foreign key points at. */
+  parent: string;
+  /** The base table's column holding the parent's `id`. */
+  foreignKey: string;
+  /** Alias the parent relation gets — distinct from the tail's aliases. */
+  alias: string;
+  /** The parent's own scope hops, appended after the parent hop. */
+  tail: readonly PostgresApprovedViewJoin[];
+}): readonly PostgresApprovedViewJoin[] {
+  return [
+    { relation: parent, alias, on: { from: foreignKey, to: "id" } },
+    ...tail,
+  ];
 }
 
 /** How the dedicated PostgreSQL role is constrained. */

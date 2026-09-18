@@ -535,6 +535,94 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
     });
   });
 
+  describe("when a caller joins a fact table to a derived PostgreSQL view", () => {
+    /**
+     * `trace_summaries` rows built with an explicit `TopicId`, mirroring
+     * `traceSummaryRow`'s shape (the private builder `seedRealFactRows` uses)
+     * with that one field added — the builder itself takes no `TopicId`
+     * parameter, so this inserts directly rather than widening the harness for
+     * one case.
+     */
+    /** @scenario "Traffic by topic name" */
+    it("returns one row per topic name with its trace count, scoped to the caller's tenant", async () => {
+      const topicTraceRow = ({
+        tenantId,
+        traceId,
+        topicId,
+      }: {
+        tenantId: string;
+        traceId: string;
+        topicId: string;
+      }) => ({
+        ProjectionId: `${tenantId}/${traceId}`,
+        TenantId: tenantId,
+        TraceId: traceId,
+        Version: "1",
+        Attributes: {},
+        OccurredAt: SEED_RECENT_WEEK.from,
+        UpdatedAt: SEED_RECENT_WEEK.from,
+        ComputedIOSchemaVersion: "1",
+        ComputedInput: "",
+        ComputedOutput: "",
+        TotalDurationMs: 1200,
+        SpanCount: 1,
+        ContainsErrorStatus: false,
+        ContainsOKStatus: true,
+        Models: [],
+        TotalCost: 0.001,
+        TokensEstimated: false,
+        TraceName: `trace ${traceId}`,
+        TopicId: topicId,
+        SubTopicId: null,
+      });
+
+      const tenantATopic1 = `${harness.tenantA.tenantId}-topic-1`;
+      const tenantATopic2 = `${harness.tenantA.tenantId}-topic-2`;
+      const tenantBTopic1 = `${harness.tenantB.tenantId}-topic-1`;
+
+      await harness.admin.insert({
+        table: `${facts}.trace_summaries`,
+        format: "JSONEachRow",
+        values: [
+          ...[0, 1, 2].map((index) =>
+            topicTraceRow({
+              tenantId: harness.tenantA.tenantId,
+              traceId: `${harness.tenantA.tenantId}-topic-trace-1-${index}`,
+              topicId: tenantATopic1,
+            }),
+          ),
+          topicTraceRow({
+            tenantId: harness.tenantA.tenantId,
+            traceId: `${harness.tenantA.tenantId}-topic-trace-2-0`,
+            topicId: tenantATopic2,
+          }),
+          topicTraceRow({
+            tenantId: harness.tenantB.tenantId,
+            traceId: `${harness.tenantB.tenantId}-topic-trace-1-0`,
+            topicId: tenantBTopic1,
+          }),
+        ],
+      });
+
+      const rows = await selectRows<{ TopicName: string; n: string }>(
+        tenantA,
+        `SELECT t.TopicName, count() AS n FROM ${database}.traces ` +
+          `JOIN ${database}.topics AS t ON traces.TopicId = t.TopicId ` +
+          `GROUP BY t.TopicName ORDER BY t.TopicName LIMIT 50`,
+      );
+
+      expect(rows.map((row) => row.TopicName)).toEqual([
+        `Topic ${harness.tenantA.tenantId} 1`,
+        `Topic ${harness.tenantA.tenantId} 2`,
+      ]);
+      expect(rows.map((row) => Number(row.n))).toEqual([3, 1]);
+      expect(
+        rows.some((row) => row.TopicName.includes(harness.tenantB.tenantId)),
+        "tenant B's topic name leaked through the join",
+      ).toBe(false);
+    });
+  });
+
   describe("when a source table holds two versions of one row", () => {
     /** @scenario "A LangWatchQL view returns one row per logical record, the latest version" */
     it("returns one row through the view, carrying the newer version's values", async () => {
