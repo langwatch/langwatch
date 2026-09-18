@@ -600,6 +600,35 @@ Rule: The hook probes the target the agent itself exports with
     When the wired target is read
     Then it reports no wiring, so no bearer the agent never sends is probed
 
+  # The settings file proves nothing about who wrote what is in it: a person
+  # can wire it to any collector by hand. Ownership of a wired key is read
+  # from the key itself — a personal ingest key the platform recognises as
+  # this account's — and nothing short of that mints or rewrites anything.
+  @unit
+  Scenario: A wiring to another collector is not probed
+    Given an agent whose settings file a person wired to another collector with its own bearer
+    When the wired target is read
+    Then it reports no wiring
+
+  @unit
+  Scenario: A drifted wired key the platform recognises is re-minted
+    Given a wired personal key that differs from the cached one
+    And a platform that says the key was retired by its own doing
+    When the healer is asked about the wired credential
+    Then it re-mints and rewires the tool
+
+  @unit
+  Scenario: A wired key the platform does not know is not re-minted
+    Given a wired personal key the platform has no record of for this account
+    When the healer is asked about the wired credential
+    Then it declines, minting nothing and writing nothing
+
+  @unit
+  Scenario: A wired bearer that is not a personal ingest key is not re-minted
+    Given a wired bearer that is not a personal ingest key
+    When the healer is asked about the wired credential
+    Then it declines without asking the platform anything
+
   @unit
   Scenario: An offline probe does not spend the session's one ask
     Given an agent whose wired endpoint the network never answers

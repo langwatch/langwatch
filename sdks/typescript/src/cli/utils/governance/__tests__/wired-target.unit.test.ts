@@ -63,6 +63,18 @@ describe("readWiredExporterTarget", () => {
     });
   });
 
+  describe("given a Claude settings file a person wired to another collector", () => {
+    /** @scenario "A wiring to another collector is not probed" */
+    it("reports no wiring: a bearer this CLI never wrote is not its to probe or heal", () => {
+      writeClaudeEnv({
+        OTEL_EXPORTER_OTLP_ENDPOINT: "https://otel.other-vendor.example/v1",
+        OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ov_9f8e7d6c5b4a",
+      });
+
+      expect(readWiredExporterTarget({ agent: "claude_code" })).toBeNull();
+    });
+  });
+
   describe("given a machine with no wiring", () => {
     it("answers null for every agent", () => {
       expect(readWiredExporterTarget({ agent: "claude_code" })).toBeNull();

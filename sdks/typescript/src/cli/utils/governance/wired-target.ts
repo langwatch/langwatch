@@ -17,6 +17,7 @@ import {
   appSettingsTargetFor,
 } from "./app-settings";
 import { parseOtlpHeaders } from "./session-context";
+import { otelWiringLooksLangwatchAuthored } from "./telemetry-refresh";
 import {
   codexOtelBlockAuthToken,
   codexOtelBlockLogsEndpoint,
@@ -37,8 +38,13 @@ export interface WiredExporterTarget {
  * - `claude_code`: the `env` block of `~/.claude/settings.json` — the same
  *   block `installTelemetryWiring` writes. The persisted endpoint is the
  *   `/api/otel` base; Claude's exporter appends `/v1/logs`, so this does too.
+ *   That block carries no authorship marker, so it is read only when it
+ *   looks like wiring this CLI could have written (a langwatch bearer or a
+ *   `/api/otel` endpoint — the same test the login refresh applies before it
+ *   touches the block). A person's own OTLP wiring to some other collector
+ *   is not this CLI's to probe, and a 401 from it is not this CLI's to heal.
  * - `codex`: the langwatch marker block of `~/.codex/config.toml`, which
- *   persists the logs endpoint in full.
+ *   persists the logs endpoint in full — the markers are the authorship.
  * - `opencode` (and anything else): null. Its wiring is a shell-rc function
  *   that exports plain env vars, and those already reach the hook as the
  *   `environment` target — there is no second file to drift.
@@ -63,6 +69,7 @@ function claudeWiredTarget(): WiredExporterTarget | null {
   const target = appSettingsTargetFor("claude");
   if (!target) return null;
   const env = appEnvValues(target);
+  if (!otelWiringLooksLangwatchAuthored(env)) return null;
   const token = bearerFrom(env.OTEL_EXPORTER_OTLP_HEADERS);
   const endpoint = logsEndpointFrom(env);
   if (!token || !endpoint) return null;
