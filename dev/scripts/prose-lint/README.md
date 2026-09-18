@@ -31,6 +31,8 @@ node dev/scripts/prose-lint/lint.mjs page.mdx --rules both --section-level 3 --t
 | Flag | Default | What it does |
 |---|---|---|
 | `--rules docs\|writing\|both` | `docs` | Which rule file(s) to load. `both` runs the docs rules and the writing rules on every section |
+| `--rules landing` | | `rules/landing.json`, the landing-page-writing rules, plus the writing rules, since every writing rule binds on a landing page |
+| `--context` | | Give the judge every section above the one it reads as `above`. Rules marked `"context": true` (landing rule 2, understandable from the page above; rule 9, product name defined) only run with it, and are skipped with a note without it. Write the page copy as one file, one `##` per block, in page order |
 | `--section-level N` | `2` | Split the file at headings of level N and above. Frontmatter is stripped, MDX components stay in the text |
 | `--threshold P` | `0.7` | Exit code 1 when any rule fires at or above P |
 | `--min P` | `0.5` | Only report rules at or above P |
@@ -83,6 +85,16 @@ Both files were derived on 2026-09-18 from the two Nexus wiki pages:
 - `rules/writing.json` from https://nexus.langwatch.ai/wiki/writing-rules
 
 The JSON is a hand-written translation of those pages, not a generated artifact, and nothing keeps the two in sync. When either page changes, read the diff and regenerate the affected entries: a new rule becomes a new `id`, a reworded rule needs its `instruction` and its `yes` / `no` criteria rewritten from the new text, and a removed rule goes out of the file. Re-run `node calibrate.mjs` afterwards and update `CALIBRATION.md` with the new table and the date.
+
+## Landing pages
+
+`rules/landing.json` holds the twelve checkable rules from landing-page-writing (rule 13 is the process itself). Write the page as markdown, one `##` per block in the order a visitor reads them (hero, each section with its subtitle, each card, the FAQ, the closing band), with buttons as markdown links, and run:
+
+```bash
+node lint.mjs page-copy.md --rules landing --context --threshold 0.6
+```
+
+`--context` is what makes rule 2 mean anything: each block is judged together with everything above it, the way a first-time visitor meets it.
 
 ## Cost
 
