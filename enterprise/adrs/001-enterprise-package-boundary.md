@@ -1,8 +1,11 @@
 # ADR-001: Enterprise packages have one legal and catalogue root
 
-**Status:** Accepted
-
-**Behavioural contract:** [Enterprise package catalogue](../specs/enterprise-catalogue.feature)
+**Status:** Superseded by [dev/docs/ARCHITECTURE.md §11](../../dev/docs/ARCHITECTURE.md)
+— enterprise holds no packages of its own, only modules mirroring the module
+shape under `enterprise/modules/<name>`. The portable `@langwatch/enterprise`
+catalogue package this ADR described has been dissolved:
+`modules/catalogue.json` and the generated module lists now carry the same
+facts.
 
 **Related:** [ADR-111: physical application workspaces](../../../dev/docs/adr/111-physical-application-workspaces.md)
 and [ADR-112: singular feature ownership](../../../dev/docs/adr/112-singular-feature-ownership.md)

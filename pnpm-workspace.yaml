@@ -19,7 +19,6 @@ packages:
   # than three loose files so the lists resolve the module packages they name
   # and a renamed export fails to compile.
   - "modules"
-  - "enterprise"
   - "enterprise/packages/composition/*"
   - "enterprise/modules/*/*"
   - "mcp/typescript"

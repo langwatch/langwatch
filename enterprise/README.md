@@ -4,22 +4,26 @@ Everything under `enterprise/` is the Enterprise Edition of LangWatch.
 It is **not** covered by the repository's Apache 2.0 license — it is governed by
 the [LangWatch Enterprise License](./LICENSE.md).
 
-This directory is the legal and package ownership root:
+This directory is the legal ownership root. It holds no packages of its own —
+only modules, each mirroring the same shape a core module uses:
 
-- `@langwatch/enterprise` is the portable feature catalogue.
-- `composition/api`, `composition/worker`, and `composition/web` are the only
-  Enterprise runtime composition roots.
-- `features/<feature>/{contract,server,web}` contains each strict feature
-  vertical. Licensing currently provides portable contracts and a server
-  implementation; it has no separate web implementation.
+- `modules/<feature>/{contract,server,web}` — billing, licensing,
+  managed-provider, saas, scim, sso, and governance. Each module's contract is
+  shared, its server half is installed by `createApp` like any other module,
+  and its browser half (where one exists) is installed by `createUi`.
+  `modules/catalogue.json` maps every one of these subjects to its owning
+  module and its `enterprise` classification; the generated module lists
+  install both classifications into the same processes.
+
+There is no separate Enterprise composition root and no conditional mounting:
+Enterprise routes are always mounted and refuse per-organization on
+entitlement. The licence leg is the `licenseSource` supply token, provided by
+the process. See [dev/docs/ARCHITECTURE.md §11](../dev/docs/ARCHITECTURE.md)
+for the shape ruling.
 
 Billing's Stripe subscription lifecycle, usage-limit notifications, and
-license-purchase workflow live in `features/billing/server`; the application
+license-purchase workflow live in `modules/billing/server`; the application
 keeps only injected provider/mail/notification adapters and route mounting.
-
-Enterprise implementations belong in this package tree. Process-specific
-composition may mount them from the applications, but application directories
-do not own Enterprise feature implementations.
 
 These modules ship in every LangWatch distribution and you may run them in
 production without a license: the enterprise capabilities verify a license at
