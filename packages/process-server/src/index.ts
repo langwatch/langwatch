@@ -6,6 +6,7 @@ export {
   ShutdownPhaseTimeoutError,
   type ShutdownSignalHost,
 } from "./graceful-shutdown.ts";
+export { hostedRuntime } from "./hosted-runtime.ts";
 export {
   Server,
   type HealthRoute,

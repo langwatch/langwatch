@@ -7,7 +7,7 @@ import { createServerApp } from "@langwatch/installed-modules/server";
 import { configureLogger, createLogger } from "@langwatch/observability";
 import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
 import { startOtlpMetricsExport } from "@langwatch/observability/node";
-import { Server } from "@langwatch/process-server";
+import { hostedRuntime, Server } from "@langwatch/process-server";
 import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
 
 import { apiLoggerConfiguration, resolveApiConfig } from "./config.ts";
@@ -34,7 +34,7 @@ export async function startApi(): Promise<Server> {
 
   const runtime = await createServerApp("api").boot();
 
-  server.with({ name: "api runtime", start: () => runtime.start(), stop: () => runtime.stop() });
+  server.with(hostedRuntime({ name: "api runtime", runtime }));
   await server.listen();
   return server;
 }
