@@ -8,6 +8,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -83,13 +84,11 @@ function gatewayAppStub(): GatewayApp {
         gatewayBudget: { findMany: gatewayBudgetFindMany },
       }),
       clickhouse: fakeClickHouse({ query: vi.fn(), insert: vi.fn() }),
+      secrets: resolvedSecrets({}),
       elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
     },
     config: {
-      internalSecret: void 0,
-      jwtSecret: void 0,
-      virtualKeyPepper: void 0,
       spendSettlementGraceMs: void 0,
     },
     resources: new ResourceScope(),

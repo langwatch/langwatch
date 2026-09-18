@@ -26,13 +26,15 @@ describe("auth server configuration", () => {
     /** @scenario "A cross-field rule refuses a half-configured feature at boot" */
     it("refuses the configuration and names both variables", () => {
       expect(() =>
-        assertAuthServerConfig({
-          sessionSecret: "secret",
-          sessionUrl: undefined,
-          mfaEnrollmentOpen: false,
-          passkeysEnabled: false,
-          passkeyHandleSecret: undefined,
-        }),
+        assertAuthServerConfig(
+          {
+            sessionUrl: undefined,
+            mfaEnrollmentOpen: false,
+            passkeysEnabled: false,
+            passkeyHandleSecret: undefined,
+          },
+          "secret",
+        ),
       ).toThrow(/NEXTAUTH_SECRET and NEXTAUTH_URL/);
     });
   });

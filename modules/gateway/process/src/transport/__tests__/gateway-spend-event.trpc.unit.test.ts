@@ -8,6 +8,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -130,13 +131,11 @@ function gatewayAppStub(): GatewayApp {
     members: {
       prisma: fakePrisma(),
       clickhouse: fakeClickHouse(),
+      secrets: resolvedSecrets({}),
       elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
     },
     config: {
-      internalSecret: void 0,
-      jwtSecret: void 0,
-      virtualKeyPepper: void 0,
       spendSettlementGraceMs: void 0,
     },
     resources: new ResourceScope(),

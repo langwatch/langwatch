@@ -7,15 +7,10 @@ const read = (source: Record<string, unknown>) =>
     .value;
 
 describe("gateway server configuration", () => {
-  describe("given a deployment runs no gateway", () => {
+  describe("given a deployment sets nothing", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
-    it("reads every secret absent", () => {
-      expect(read({})).toEqual({
-        internalSecret: undefined,
-        jwtSecret: undefined,
-        virtualKeyPepper: undefined,
-        spendSettlementGraceMs: undefined,
-      });
+    it("reads its one deployment fact absent, and declares no credential", () => {
+      expect(read({})).toEqual({ spendSettlementGraceMs: undefined });
     });
   });
 

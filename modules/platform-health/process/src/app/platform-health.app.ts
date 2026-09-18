@@ -10,6 +10,7 @@ import {
 } from "@langwatch/platform-health-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -23,7 +24,7 @@ export type PlatformHealthInfrastructure = SubsystemProbeCollaborators;
 
 type PlatformHealthSetup = FeatureSetup<
   typeof PlatformHealthApp.dependencies,
-  never,
+  MembersRead<typeof PlatformHealthApp.reads>,
   PlatformHealthServerConfig
 >;
 
@@ -35,6 +36,7 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     workflow: WorkflowApi,
     projects: ProjectApi,
   };
+  static readonly reads = reads("secrets");
   static readonly configSchema = platformHealthServerConfigSchema;
 
   readonly #health: PlatformHealthService;
@@ -45,8 +47,8 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     this.#key = key;
   }
 
-  static create({ dependencies, config }: PlatformHealthSetup): PlatformHealthApp {
-    const probeApiKey = config.probeApiKey ?? "";
+  static create({ dependencies, config, members }: PlatformHealthSetup): PlatformHealthApp {
+    const probeApiKey = members.secrets.find("PLATFORM_HEALTH_PROBE_API_KEY") ?? "";
     const collaborators: SubsystemProbeCollaborators = {
       publicBaseUrl: config.publicBaseUrl ?? "",
       automation: () => ({
@@ -72,7 +74,9 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
           SubsystemProbeAdapter.create({ name, probes, credential }),
         ),
       }),
-      PlatformHealthKeyService.create({ apiKey: config.apiKey ?? "" }),
+      PlatformHealthKeyService.create({
+        apiKey: members.secrets.find("PLATFORM_HEALTH_API_KEY") ?? "",
+      }),
     );
   }
 

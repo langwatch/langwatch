@@ -2,6 +2,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { resolvedSecrets } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import { gatewayServer } from "../../gateway.server.ts";
@@ -63,14 +64,12 @@ function process() {
     .withModules([gatewayServer])
     .withConfig({
       gateway: {
-        internalSecret: undefined,
-        jwtSecret: undefined,
-        virtualKeyPepper: undefined,
         spendSettlementGraceMs: undefined,
       },
     })
     .withRelational(relationalWithoutStore())
     .withAnalytical(analyticalWithoutStore())
+    .withSecrets(resolvedSecrets({}))
     .withMember("elevenLabsWebhook", undefined)
     .withMember("gatewayInternalProtocol", {})
     .provide({

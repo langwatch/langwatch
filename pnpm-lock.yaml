@@ -3211,6 +3211,9 @@ importers:
       '@langwatch/evaluation-process':
         specifier: workspace:*
         version: link:evaluation/process
+      '@langwatch/evaluator-browser':
+        specifier: workspace:*
+        version: link:evaluator/browser
       '@langwatch/evaluator-process':
         specifier: workspace:*
         version: link:evaluator/process
@@ -3422,6 +3425,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -3635,6 +3641,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@monaco-editor/react':
         specifier: 'catalog:'
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -6422,6 +6431,9 @@ importers:
       '@langwatch/trace-browser-kit':
         specifier: workspace:*
         version: link:../../trace/browser-kit
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@langwatch/workflow-browser':
         specifier: workspace:*
         version: link:../../workflow/browser
@@ -6911,6 +6923,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -8701,6 +8716,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@monaco-editor/react':
         specifier: 'catalog:'
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -9203,6 +9221,9 @@ importers:
       '@langwatch/platform-health-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract

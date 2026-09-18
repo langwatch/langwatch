@@ -16,6 +16,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { resolvedSecrets } from "@langwatch/process-stores";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -117,14 +118,12 @@ async function mountWebhook(): Promise<MountableRestApp> {
     .withModules([gatewayServer])
     .withConfig({
       gateway: {
-        internalSecret: undefined,
-        jwtSecret: undefined,
-        virtualKeyPepper: undefined,
         spendSettlementGraceMs: undefined,
       },
     })
     .withRelational(database())
     .withAnalytical(peer("analytical store"))
+    .withSecrets(resolvedSecrets({}))
     .withMember("elevenLabsWebhook", {
       credentials: {
         providers: PrismaGatewayElevenLabsCredentialRepository.create({

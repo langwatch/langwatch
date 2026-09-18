@@ -493,7 +493,7 @@ const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayApp.dependencies,
-  Pick<ProcessMembers, "prisma" | "clickhouse"> &
+  Pick<ProcessMembers, "prisma" | "clickhouse" | "secrets"> &
     Readonly<{
       elevenLabsWebhook: ElevenLabsWebhookCollaborators | undefined;
       gatewayInternalProtocol: GatewayInternalProtocolCollaborators;
@@ -552,6 +552,7 @@ export class GatewayApp implements GatewayApi {
   static readonly reads = [
     "prisma",
     "clickhouse",
+    "secrets",
     "elevenLabsWebhook",
     "gatewayInternalProtocol",
   ] as const;
@@ -566,7 +567,7 @@ export class GatewayApp implements GatewayApi {
         evaluators: setup.dependencies.evaluators,
         monitors: setup.dependencies.monitors,
       },
-      virtualKeyPepper: setup.config?.virtualKeyPepper,
+      virtualKeyPepper: setup.members.secrets.find("LW_VIRTUAL_KEY_PEPPER"),
     });
     const internalCollaborators = setup.members.gatewayInternalProtocol;
     const config =
@@ -591,8 +592,8 @@ export class GatewayApp implements GatewayApi {
     const internalProtocol = GatewayInternalProtocolService.create({
       virtualKeys: controlPlane.internalVirtualKeys,
       projects: setup.dependencies.projects,
-      jwt: setup.config?.jwtSecret
-        ? GatewayJwtService.create({ secret: setup.config.jwtSecret })
+      jwt: setup.members.secrets.find("LW_GATEWAY_JWT_SECRET")
+        ? GatewayJwtService.create({ secret: setup.members.secrets.read("LW_GATEWAY_JWT_SECRET") })
         : void 0,
       store: PrismaGatewayInternalStoreRepository.create({ database: setup.members.prisma }),
       changes: controlPlane.internalChanges,

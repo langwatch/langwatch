@@ -11,7 +11,6 @@ const onSwitch = z
   .transform((value) => value === "on");
 
 export const authServerConfigDefinition = RuntimeConfig.define({
-  sessionSecret: Config.value(z.string().optional(), { env: "NEXTAUTH_SECRET" }),
   sessionUrl: Config.value(z.string().optional(), { env: "NEXTAUTH_URL" }),
   mfaEnrollmentOpen: Config.value(onSwitch, { env: "MFA_ENROLLMENT_OPEN" }),
   passkeysEnabled: Config.value(onSwitch, { env: "PASSKEYS_ENABLED" }),
@@ -24,12 +23,15 @@ export type AuthServerConfig = ConfigValue<typeof authServerConfigDefinition>;
 export const authServerConfigSchema = compileRuntimeConfig(authServerConfigDefinition);
 
 /**
- * Refuses a browser session that is half configured. Applied to the RESOLVED
- * value, not a schema refinement: the leaves transform as they parse, so a
- * second parse of the output would refuse a value it just produced.
+ * Refuses a browser session that is half configured. `sessionSecret` now
+ * arrives resolved through the secrets member (ADR-132), never this config
+ * object, so the caller passes it in alongside the resolved value.
  */
-export function assertAuthServerConfig(config: AuthServerConfig): void {
-  const secret = config.sessionSecret?.trim();
+export function assertAuthServerConfig(
+  config: AuthServerConfig,
+  sessionSecret: string | undefined,
+): void {
+  const secret = sessionSecret?.trim();
   const url = config.sessionUrl?.trim();
   if (Boolean(secret) === Boolean(url)) return;
 

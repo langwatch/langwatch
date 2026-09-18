@@ -5,16 +5,11 @@ import type { GatewayCacheRuleResource } from "./gateway-cache-rule.ts";
 import type { GatewayGuardrailBundleEntry } from "./gateway-guardrail.ts";
 
 /**
- * Secrets for virtual-key traffic and spend settlement, all-or-none at boot.
+ * `internalSecret`, `jwtSecret` and `virtualKeyPepper` resolve through the
+ * process's `secrets` member (ADR-132), never this schema.
  * spendSettlementGraceMs carried as-is.
  */
 export const gatewayServerConfigDefinition = RuntimeConfig.define({
-  /** Verified before any handler runs; blank answers 500, never falls open. */
-  internalSecret: Config.value(z.string().optional(), { env: "LW_GATEWAY_INTERNAL_SECRET" }),
-  /** Signs short-lived JWTs handed OUT to the data plane; rotates separately. */
-  jwtSecret: Config.value(z.string().optional(), { env: "LW_GATEWAY_JWT_SECRET" }),
-  /** Separate from the API-key pepper: virtual keys rotate independently. */
-  virtualKeyPepper: Config.value(z.string().optional(), { env: "LW_VIRTUAL_KEY_PEPPER" }),
   /** How long after a request an outcome may still arrive. */
   spendSettlementGraceMs: Config.value(z.string().optional(), {
     env: "LW_SPEND_SETTLEMENT_GRACE_MS",
