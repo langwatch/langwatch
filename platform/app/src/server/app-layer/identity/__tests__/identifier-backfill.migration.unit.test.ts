@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { IdentityIdentifierBackfillMigration } from "../identifier-backfill.migration";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../migration-name";
 
@@ -36,10 +37,8 @@ describe("the identifier backfill migration", () => {
       // migration it runs at all, so this is what gives a self-hosted user an
       // identity history — and the front door now needs one to find them.
       expect(migration.runsAutomaticallyOnSelfHosted).toBe(true);
-      // Still paced by enrollment on cloud: the identity rollout has not
-      // finished, so deploying it must keep changing nothing until an
-      // operator enrolls an organization.
-      expect(migration.enrolledAutomatically).toBe(false);
+      // Cloud includes every user too; deployment requires no enrollment.
+      expect(migration.enrolledAutomatically).toBe(true);
     });
   });
 });

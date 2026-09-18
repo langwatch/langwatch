@@ -421,7 +421,8 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # The interstitial's CONTRACT ships with D13 and is bound below (verified
   # email in, decision out, nothing rendered when there is nothing to offer).
   # Which organizations will take an address, and the words that go with them,
-  # are D12's - so this stays parked until D12 fills the seam.
+  # are D12's, and D12 has filled the seam - so this is bound rather than
+  # parked, against the page at /auth/join.
   @integration
   Scenario: Sign-up offers my team before offering a new workspace
     Given my verified domain matches an organization that allows joining
@@ -879,3 +880,26 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   Scenario: No unauthenticated journey touches an Auth0-hosted page
     When every unauthenticated journey is walked
     Then no page, asset, or redirect resolves to an Auth0-hosted surface
+
+  @integration @regression
+  Scenario: Signing out does not start another provider sign-in
+    Given an identity provider still has an active session
+    When I reach the signed-out confirmation page
+    Then no sign-in routing or provider handoff starts
+    And I can explicitly choose to log in again
+
+  @integration @regression
+  Scenario: A sole SSO provider waits for a sign-in gesture
+    Given the self-hosted installation has one active SSO connection
+    When I open the sign-in page without submitting an address
+    Then I see a button for that provider without an automatic redirect
+    When I choose to continue with that provider
+    Then the provider sign-in starts
+
+  @unit @regression
+  Scenario: Logout reports a revocation failure instead of confirming success
+    Given a signed-in session is stored in the database and session cache
+    When either store cannot complete revocation
+    Then logout reports the failure
+    And it still attempts to revoke the session from the other store
+    And it does not confirm that the person is signed out

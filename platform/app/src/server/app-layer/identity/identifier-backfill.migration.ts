@@ -1,8 +1,6 @@
 import type { IdentityBackfillService } from "@langwatch/identity-server";
-import type {
-  SystemMigration,
-  TenantMigrationOutcome,
-} from "@langwatch/system-migrations";
+import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "./migration-name";
 
 /**
@@ -39,21 +37,12 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
   // the legacy screens deleted, a user with no history is told there is no
   // account for their address.
   readonly runsAutomaticallyOnSelfHosted = true;
-  // Still soaking on cloud: the identity rollout is paced by enrollment, so
-  // deploying this changes nothing until an operator enrolls an
-  // organization. Flip it only once the rollout is finished and the
-  // remaining question is reaching tenants created since.
-  readonly enrolledAutomatically = false;
+  // Cloud startup includes every user without operator enrollment.
+  readonly enrolledAutomatically = true;
 
-  constructor(
-    private readonly backfill: Pick<IdentityBackfillService, "migrateUser">,
-  ) {}
+  constructor(private readonly backfill: Pick<IdentityBackfillService, "migrateUser">) {}
 
-  async migrateTenant({
-    tenantId,
-  }: {
-    tenantId: string;
-  }): Promise<TenantMigrationOutcome> {
+  async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
     // Nothing here consults `previous`: the pass re-reads the legacy rows
     // and states only what the heads do not carry, so there is no partial
     // state a failed pass could leave behind that a full pass does not redo.

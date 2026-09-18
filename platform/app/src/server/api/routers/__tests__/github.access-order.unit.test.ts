@@ -39,13 +39,18 @@ const { appConfig } = vi.hoisted(() => ({
     configured: true,
   },
 }));
-// The declared permission seam resolves its service from the App.
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return appPermissionsMock();
-});
+// The declared permission seam resolves its canonical service from the App.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    permissions: {
+      getDecision: async ({ permission }: { permission: string }) => {
+        permissionsAsked.push(permission);
+        return { permitted: hasOrgPermission(), organizationRole: null };
+      },
+    },
+  }),
+  tryGetApp: () => null,
+}));
 
 vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
   getGithubAppConfig: () => appConfig,
@@ -59,19 +64,6 @@ const { githubHost } = vi.hoisted(() => ({
 vi.mock("~/server/app-layer/github/githubHost", () => ({
   getGithubWebBase: () => githubHost.webBase,
 }));
-
-vi.mock("~/server/api/rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/api/rbac")>();
-  return {
-    ...actual,
-    hasOrganizationPermission: vi.fn(
-      async (_ctx: unknown, _organizationId: string, permission: string) => {
-        permissionsAsked.push(permission);
-        return hasOrgPermission();
-      },
-    ),
-  };
-});
 
 vi.mock("~/server/app-layer", () => ({
   getApp: () => ({

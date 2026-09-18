@@ -59,7 +59,7 @@ describe("InviteService resilience", () => {
         findUnique: vi.fn(),
       },
       organization: { findFirst: vi.fn() },
-      customRole: { findMany: vi.fn() },
+      role: { findMany: vi.fn() },
     };
 
     service = new InviteService(
@@ -255,6 +255,119 @@ describe("InviteService resilience", () => {
         expect(
           resolveInviteDisplayStatus({ status: "REVOKED", expiration: past }),
         ).toBe("REVOKED");
+      });
+    });
+  });
+
+  /**
+   * The shared `makePendingInvite` accepts overrides and ignores them, so
+   * these cases build their own row rather than appearing to vary one.
+   */
+  const invitation = (overrides: Record<string, unknown> = {}) => ({
+    ...makePendingInvite(),
+    ...overrides,
+  });
+
+  /**
+   * EXTEND IS NOT RESEND. Both keep an invitation usable and only one of them
+   * kills the link already out there. The distinction is load-bearing
+   * precisely because it is invisible from the members list, where both show
+   * as "pending, expires on ...".
+   *
+   * Spec: specs/identity/resilient-invitations.feature,
+   *       "Buying time without minting a link".
+   */
+  describe("given a pending invitation whose deadline is near", () => {
+    describe("when an administrator extends it", () => {
+      /** @scenario "Extending an invitation moves the deadline and leaves the link alone" */
+      it("moves the deadline the full fourteen days and mints no new code", async () => {
+        const existing = invitation({
+          expiration: new Date(Date.now() + 60_000),
+        });
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue(existing);
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
+
+        const { invite } = await service.extendInvite({
+          organizationId: "org-1",
+          inviteId: existing.id,
+        });
+
+        const written =
+          mockPrisma.organizationInvite.updateMany.mock.calls[0]?.[0]?.data;
+        // The whole point: the code is untouched, so the link in somebody's
+        // inbox goes on working and nothing has to be sent again.
+        expect(written).not.toHaveProperty("inviteCode");
+        expect(invite.inviteCode).toBe(existing.inviteCode);
+        expect(written.expiration.getTime()).toBeGreaterThan(
+          existing.expiration.getTime(),
+        );
+      });
+
+      /** @scenario "Extending is not how a leaked link is dealt with" */
+      it("writes no code at all, so whatever leaked goes on working", async () => {
+        const existing = invitation();
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue(existing);
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
+
+        const { invite } = await service.extendInvite({
+          organizationId: "org-1",
+          inviteId: existing.id,
+        });
+
+        // Rotating the code is what kills a leaked link, and extending does
+        // not do it — the contrast is covered by "A leaked stale link dies on
+        // resend", which owns the resend half.
+        const written =
+          mockPrisma.organizationInvite.updateMany.mock.calls[0]?.[0]?.data;
+        expect(Object.keys(written)).toEqual(["expiration"]);
+        expect(invite.inviteCode).toBe(existing.inviteCode);
+      });
+    });
+
+    describe("when the invitation is no longer waiting", () => {
+      /** @scenario "Only an invitation still waiting can be extended" */
+      it("answers as though there were no such invitation, whichever ending it had", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
+        for (const status of ["ACCEPTED", "REVOKED", "EXPIRED"]) {
+          mockPrisma.organizationInvite.findFirst.mockResolvedValue(
+            invitation({ status }),
+          );
+
+          await expect(
+            service.extendInvite({
+              organizationId: "org-1",
+              inviteId: "inv-race-1",
+            }),
+          ).rejects.toBeInstanceOf(InviteNotFoundError);
+        }
+        // Nothing was written for any of the three, and none of them is
+        // distinguishable from an id that never existed.
+        expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when two administrators extend it at the same moment", () => {
+      /** @scenario "Two administrators extending at once extend it once" */
+      it("refuses the second rather than letting it overwrite the first", async () => {
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue(invitation());
+        // The row moved between the read and the write, so the conditional
+        // claim matches nothing.
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          service.extendInvite({
+            organizationId: "org-1",
+            inviteId: "inv-race-1",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
       });
     });
   });

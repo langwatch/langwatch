@@ -56,7 +56,9 @@ export type AuthzScopeRef =
  * alone carries no id.
  */
 export type AuthzPrincipalRef = {
-  [K in CallerKind]: K extends "anonymous" ? { type: K } : { type: K; id: string };
+  [K in CallerKind]: K extends "anonymous"
+    ? { type: K }
+    : { type: K; id: string };
 }[CallerKind];
 
 /**
@@ -65,7 +67,9 @@ export type AuthzPrincipalRef = {
  * grants) and `anyone`, which is the public share expressed as a row.
  */
 export type GrantAudience = {
-  [K in PrincipalKind]: K extends "anyone" ? { kind: K } : { kind: K; id: string };
+  [K in PrincipalKind]: K extends "anyone"
+    ? { kind: K }
+    : { kind: K; id: string };
 }[PrincipalKind];
 
 /** A grant at the resource tier. Matched on (kind, id, projectId) — the
@@ -78,20 +82,15 @@ export type ResourceGrant = {
   audience: GrantAudience;
 };
 
+/** Role keys currently enforced by organization, team, and project grants. */
+export type BindingRoleKey = "admin" | "member" | "viewer" | `custom:${string}`;
+
 export type CollectedBinding = {
-  role: TeamUserRole;
-  customRoleId: string | null;
+  roleKey: BindingRoleKey;
   scopeType: RoleBindingScopeType;
   scopeId: string;
   /** Present when the binding arrived via a group membership. */
   viaGroupId?: string | null;
-};
-
-export type LegacyTeamMembership = {
-  teamId: string;
-  role: TeamUserRole;
-  customRoleId: string | null;
-  isPersonal: boolean;
 };
 
 /**
@@ -117,11 +116,6 @@ export type CollectedGrants = {
    */
   membershipDisabled: boolean;
   bindings: CollectedBinding[];
-  /**
-   * LEGACY-QUIRK(B): TeamUser rows, consulted only when `bindings` is empty
-   * (users migrated before role bindings existed). Deleted in stage B.
-   */
-  legacyTeamMemberships: LegacyTeamMembership[];
   /** Custom-role permission lists, prefetched for every referenced id. */
   customRolePermissions: ReadonlyMap<string, readonly string[]>;
 };
@@ -137,7 +131,6 @@ export type AuthzGrantVia =
   | "binding"
   | "org-role-floor"
   | "demo-project"
-  | "legacy-team-fallback"
   | "resource-grant";
 
 export type AuthzDecision = {

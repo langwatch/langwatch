@@ -2,11 +2,7 @@ import { Button, createListCollection, Field, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useRequiredSession } from "../../hooks/useRequiredSession";
-import {
-  hasPermissionWithHierarchy,
-  teamRoleHasPermission,
-} from "../../server/api/rbac";
+import { useProjectsForCopy } from "../../hooks/useProjectsForCopy";
 import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
@@ -23,52 +19,13 @@ export const CopyDatasetDialog = ({
   datasetId: string;
   datasetName: string;
 }) => {
-  const { organizations, project } = useOrganizationTeamProject();
-  const session = useRequiredSession();
+  const { project } = useOrganizationTeamProject();
   const copyDataset = api.dataset.copy.useMutation();
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
 
-  const currentUserId = session.data?.user?.id;
-
-  const projects =
-    organizations?.flatMap((org) =>
-      org.teams.flatMap((team) => {
-        // Find the current user's membership in this team
-        const teamMember = team.members.find(
-          (member) => member.userId === currentUserId,
-        );
-        if (!teamMember) return [];
-
-        let hasCreatePermission = false;
-        if (teamMember.assignedRole) {
-          const permissions =
-            (teamMember.assignedRole.permissions as string[]) ?? [];
-          if (permissions.length > 0) {
-            hasCreatePermission = hasPermissionWithHierarchy(
-              permissions,
-              "datasets:create",
-            );
-          } else {
-            hasCreatePermission = teamRoleHasPermission(
-              teamMember.role,
-              "datasets:create",
-            );
-          }
-        } else {
-          hasCreatePermission = teamRoleHasPermission(
-            teamMember.role,
-            "datasets:create",
-          );
-        }
-
-        if (!hasCreatePermission) return [];
-
-        return team.projects.map((project) => ({
-          label: `${org.name} / ${team.name} / ${project.name}`,
-          value: project.id,
-        }));
-      }),
-    ) ?? [];
+  const projects = useProjectsForCopy("datasets:create")
+    .filter((target) => target.hasCreatePermission)
+    .map(({ label, value }) => ({ label, value }));
 
   const projectCollection = createListCollection({
     items: projects,

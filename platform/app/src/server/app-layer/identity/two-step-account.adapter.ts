@@ -40,7 +40,7 @@ export class PrismaTwoStepAccount implements TwoStepAccountPort {
   }): Promise<readonly RequiringOrganization[]> {
     // Asked of ORGANIZATION rather than of the membership rows, which is the
     // repo's established shape for "the organizations this person belongs to"
-    // (see `authz-read.prisma.repository.ts`). A `findMany` over
+    // (see `authz-read.grants.repository.ts`). A `findMany` over
     // `OrganizationUser` keyed only by `userId` spans every organization at
     // once, so the org-tenancy guard refuses it — and that refusal is a plain
     // Error, which reached this page as an unknown failure and took the whole

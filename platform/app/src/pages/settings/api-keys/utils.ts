@@ -2,8 +2,8 @@ import { createListCollection } from "@chakra-ui/react";
 import {
   bindingScopeCanGrantPermission,
   builtinRolePermissions,
+  permissionSatisfiedBy,
 } from "@langwatch/authz";
-import { hasPermissionWithHierarchy } from "../../../server/api/rbac";
 import {
   type AccessLevel,
   categorizablePermissions,
@@ -32,7 +32,10 @@ export function categoryAccessAvailability({
   const holdsAll = (permissions: readonly string[]) =>
     permissions.length > 0 &&
     permissions.every((permission) =>
-      hasPermissionWithHierarchy(userPermissions, permission),
+      permissionSatisfiedBy({
+        granted: new Set(userPermissions),
+        requested: permission,
+      }),
     );
   return {
     canRead:

@@ -54,6 +54,16 @@ vi.mock("~/utils/api", () => ({
     governance: {
       resolveHome: { useQuery: () => mockResolveHome },
     },
+    // Asked only of somebody who belongs to no organization, to tell a
+    // just-tested SSO arrival apart from a genuine first-time sign-up — the
+    // difference between an explanatory screen and "create your
+    // organization". Every case in this file has an organization, so the
+    // query is disabled and answers nothing; it still has to exist.
+    identity: {
+      myTestArrival: {
+        useQuery: () => ({ data: null, isLoading: false, isError: false }),
+      },
+    },
   },
 }));
 

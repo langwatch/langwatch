@@ -1,5 +1,7 @@
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
+
 import type { PrismaClient, User } from "~/generated/prisma/client";
+
 import { sessionRevocation } from "../app-layer/identity/runtime";
 import type { SessionRevocationService } from "../app-layer/identity/session-revocation.service";
 
@@ -32,11 +34,15 @@ export class UserService {
   async create({
     name,
     email,
+    active = true,
   }: {
     name: string;
     email: string;
+    active?: boolean;
   }): Promise<User> {
-    return this.prisma.user.create({ data: { name, email } });
+    return this.prisma.user.create({
+      data: { name, email, ...(!active && { deactivatedAt: new Date() }) },
+    });
   }
 
   /**
@@ -46,10 +52,8 @@ export class UserService {
    * remain stale until the cache TTL expires (up to 30 days). Stale
    * email matters for the invite-accept flow which compares
    * `session.user.email` to `invite.email`, and for any UI that relies
-   * on the displayed identity matching what's in the DB. SCIM-driven
-   * email changes (the only path that calls this method today) are
-   * always treated as a hard "re-authenticate as the new identity"
-   * event by the IdP, so revoking sessions is the right behavior.
+   * on the displayed identity matching what's in the DB. SCIM profiles are
+   * organization-local and do not use this global account mutation.
    *
    * Name-only changes do NOT trigger revocation — those are cosmetic
    * and don't warrant kicking the user out.
@@ -66,7 +70,7 @@ export class UserService {
     // Normalize the incoming email the same way BetterAuth does for
     // signup/signin (`findUserByEmail` in
     // node_modules/better-auth/dist/db/internal-adapter.mjs:
-    // `email.toLowerCase()`). Otherwise a SCIM-provisioned update from
+    // `email.toLowerCase()`). Otherwise an update from
     // "alice@acme.com" → "Alice@Acme.com" would (a) trigger an unneeded
     // session revocation and (b) desync the stored email from what
     // BetterAuth's signin lookup would find.

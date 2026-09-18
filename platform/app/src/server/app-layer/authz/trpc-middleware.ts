@@ -4,17 +4,8 @@
  * down to the middleware built here.
  *
  * ONE seam, decision-neutral, properly layered: this middleware is the tRPC
- * boundary, it resolves `getApp().permissions` — the App-composed
- * `PermissionsService`, which takes the
- * `ForkAwarePermissionDecisionRepository`, which owns the client and
- * delegates to the same fork-aware resolvers the legacy
- * `checkXxxPermission` middlewares ran (`rbac.ts`) — so a not-yet-migrated
- * organization is decided by the legacy walk and a migrated one by the engine,
- * chosen by the organization's migration status alone. There is no shadow or
- * reverse-shadow comparison at request time (that path was removed with
- * `shadow.ts`); the fork is a plain if/else on the gate. Deploying the codemod
- * changes no decision anywhere; the contract PR later rewires only the
- * repository — one file, not four hundred call sites.
+ * boundary and resolves the App-composed `PermissionsService`, whose
+ * decision repository reads the grants projection.
  *
  * What IS deliberately new here is the ordinary denial shape: every tier's
  * refusal carries the engine's one handled code (`permission_denied`, with

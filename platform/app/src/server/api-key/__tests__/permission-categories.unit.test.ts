@@ -1,7 +1,6 @@
-import { ALL_PERMISSIONS } from "@langwatch/authz";
+import { ALL_PERMISSIONS, permissionSatisfiedBy } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
-import { hasPermissionWithHierarchy } from "../../api/rbac";
-import { CustomRolePermissionsSchema } from "../../rbac/custom-role-permissions";
+import { CustomRolePermissionsSchema } from "~/server/app-layer/authz/custom-role-permissions";
 import {
   CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS,
   defaultCliKeyPermissions,
@@ -13,6 +12,9 @@ import {
   PERMISSION_CATEGORIES,
   selectionsFromPermissions,
 } from "../permission-categories";
+
+const hasPermissionWithHierarchy = (permissions: string[], requested: string) =>
+  permissionSatisfiedBy({ granted: new Set(permissions), requested });
 
 describe("PERMISSION_CATEGORIES", () => {
   /** @scenario Every registry permission belongs to a category */
@@ -109,6 +111,10 @@ describe("PERMISSION_CATEGORIES", () => {
       { category: "Team", accessLevels: "read, write" },
       { category: "Project", accessLevels: "read, write" },
       { category: "Organization", accessLevels: "read, write" },
+      {
+        category: "Single sign-on and directory sync",
+        accessLevels: "read, write",
+      },
       { category: "Gateway", accessLevels: "read, write" },
       { category: "Governance", accessLevels: "read, write" },
     ]);

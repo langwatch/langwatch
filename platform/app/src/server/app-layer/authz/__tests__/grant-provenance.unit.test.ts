@@ -18,6 +18,7 @@ import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   type AuthzCollectorService,
   GrantsService,
+  grantFactToRow,
 } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -33,7 +34,8 @@ const ADMIN = { userId: "user_admin" };
 const BINDING_ID = "rb_provenance";
 
 function service() {
-  const { writer, db, sent } = harness({ onLedger: true });
+  const { writer, db, sent } = harness({});
+  db.grant.count.mockResolvedValue(1);
   const repository = new LedgerAuthzGrantsRepository(
     db as unknown as PrismaClient,
     writer,
@@ -77,6 +79,7 @@ beforeEach(() => {
 describe("given a grant attached through the grants service", () => {
   describe("when the caller states which surface authored it", () => {
     /** @scenario "A grant states which surface authored it" */
+    /** @scenario "An authorization write emits a grant command" */
     it("carries that source on the emitted fact", async () => {
       const { grants, sent } = service();
 
@@ -156,11 +159,23 @@ describe("given a grant revoked through the grants service", () => {
      *  @scenario "A revocation names the surface that made it without a source of its own" */
     it("carries the surface as the emitted revocation's actor", async () => {
       const { grants, db, sent } = service();
-      db.roleBinding.findUnique.mockResolvedValue({
-        id: BINDING_ID,
-        organizationId: ORG_ID,
-      });
-      db.roleBinding.findFirst.mockResolvedValue({ id: BINDING_ID });
+      const row = {
+        ...grantFactToRow({
+          organizationId: ORG_ID,
+          grant: {
+            grantId: BINDING_ID,
+            principal: { type: "user", id: "user_alice" },
+            roleKey: "member",
+            legacyRole: "MEMBER",
+            source: "grants-service",
+            scope: { type: "ORGANIZATION", id: ORG_ID },
+            occurredAtMs: Date.parse("2026-01-01T00:00:00.000Z"),
+          },
+        }),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      };
+      db.grant.findFirst.mockResolvedValue(row);
+      db.grant.findMany.mockResolvedValue([row]);
 
       await grants.revoke({
         actor: { type: "system", name: "scim" },

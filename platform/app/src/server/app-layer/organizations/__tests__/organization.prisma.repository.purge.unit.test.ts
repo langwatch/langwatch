@@ -37,6 +37,8 @@ function purgingPrisma() {
     "systemMigrationEnrollment",
     "apiKey",
     "promptTag",
+    "teamUser",
+    "organizationUser",
     "team",
     "organization",
   ];
@@ -76,6 +78,8 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
         "systemMigrationEnrollment",
         "apiKey",
         "promptTag",
+        "teamUser",
+        "organizationUser",
         "team",
         "organization",
       ]);
@@ -99,7 +103,9 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
             ? { id: ORGANIZATION_ID }
             : deletion.model === "systemMigrationTenantState"
               ? { tenantId: ORGANIZATION_ID }
-              : { organizationId: ORGANIZATION_ID },
+              : deletion.model === "teamUser"
+                ? { team: { organizationId: ORGANIZATION_ID } }
+                : { organizationId: ORGANIZATION_ID },
         );
       }
     });

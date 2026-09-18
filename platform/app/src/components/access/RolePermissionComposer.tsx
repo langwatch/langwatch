@@ -9,10 +9,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { AuthzPermission } from "@langwatch/authz";
+import type {
+  AuthzPermission,
+  AuthzResource as Resource,
+} from "@langwatch/authz";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Resource } from "~/utils/rbacVocabulary";
 import { Checkbox } from "../ui/checkbox";
 import { Tooltip } from "../ui/tooltip";
 import { PermissionToken } from "./PermissionToken";

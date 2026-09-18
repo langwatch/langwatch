@@ -295,6 +295,27 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
+  /** @scenario "A sole SSO provider waits for a sign-in gesture" */
+  it("waits for an explicit click before using the sole provider", async () => {
+    routeMock.mockResolvedValue({
+      outcome: "redirect_to_connection",
+      connectionId: "org:acme",
+      methodSet: [oktaMethod],
+      reasonCode: "sole_connection",
+    });
+    renderScreen();
+    const continueButton = await screen.findByRole("button", {
+      name: /continue with okta/i,
+    });
+    expect(signInMock).not.toHaveBeenCalled();
+    await userEvent.click(continueButton);
+    expect(signInMock).toHaveBeenCalledTimes(1);
+    expect(signInMock).toHaveBeenCalledWith(
+      "okta",
+      expect.objectContaining({ callbackUrl: undefined }),
+    );
+  });
+
   describe("when an address routes to an identity provider", () => {
     /** @scenario The email step renders the routed outcome */
     /** @scenario "The address typed on our screen rides along to the identity provider" */

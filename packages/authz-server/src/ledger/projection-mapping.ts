@@ -3,10 +3,13 @@ import {
   STORED_PRINCIPAL_KIND,
 } from "@langwatch/authz";
 import type {
+  BindingRoleKey,
   StoredPrincipalKind,
   StoredScopeTier,
   TeamUserRole,
 } from "@langwatch/authz";
+
+import { BindingMissingError } from "../authz-grants.repository";
 import type {
   GrantEventSource,
   GrantFact,
@@ -153,7 +156,10 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
   const resourceKind = resourceKindFromDb(row.resourceKind);
   return {
     grantId: row.id,
-    principal: { type: PRINCIPAL_FROM_DB[row.principalType], id: row.principalId },
+    principal: {
+      type: PRINCIPAL_FROM_DB[row.principalType],
+      id: row.principalId,
+    },
     roleKey: row.roleKey,
     scope: { type: row.scopeType as LedgerScopeType, id: row.scopeId },
     ...(row.legacyRole != null
@@ -241,27 +247,40 @@ export interface CompatBindingRowShape {
   scopeId: string;
 }
 
+type BindingGrant = GrantFact & {
+  principal: { type: "user" | "group" | "apiKey"; id: string };
+  scope: { type: "ORGANIZATION" | "TEAM" | "PROJECT"; id: string };
+  roleKey: BindingRoleKey;
+};
+
+/** Select binding facts from streams that also contain resource and platform grants. */
+export function isBindingGrant(grant: GrantFact): grant is BindingGrant {
+  const { scope, principal, roleKey } = grant;
+  const bindingScope =
+    scope.type === "ORGANIZATION" ||
+    scope.type === "TEAM" ||
+    scope.type === "PROJECT";
+  const bindingPrincipal =
+    principal.type === "user" ||
+    principal.type === "group" ||
+    principal.type === "apiKey";
+  const bindingRole =
+    roleKey === "admin" ||
+    roleKey === "member" ||
+    roleKey === "viewer" ||
+    (roleKey !== null &&
+      roleKey.startsWith("custom:") &&
+      roleKey.length > "custom:".length);
+  return (
+    bindingScope && bindingPrincipal && principal.id !== null && bindingRole
+  );
+}
+
 /**
- * The compat head projects only what the legacy tables can express:
- * scope ∈ ORGANIZATION|TEAM|PROJECT, principal ∈ user|group|api_key, and a
- * roleKey the `TeamUserRole` enum can carry. RESOURCE and PLATFORM rows,
- * collective principals (team/organization/project/anyone), and
- * `lite-member` (an org-level concept `RoleBinding` never represented) are
- * future-head-only; the legacy resolver never answered for them, so their
- * absence from the compat view changes nothing it reads.
- *
- * roleKey → (role, customRoleId), the inverse of
- * `roleKeyForTeamRole` in @langwatch/authz (roles.ts): admin→ADMIN,
- * member→MEMBER, viewer→VIEWER, custom:<id>→(`legacyRole` ?? CUSTOM, id).
- *
- * That last arm is not cosmetic. `roleKey` alone cannot say which built-in
- * role a custom binding ALSO carried, and the legacy resolver reads it: a
- * custom role with an empty permission list falls through to the row's own
- * `role`, so writing CUSTOM where the legacy row said ADMIN silently
- * downgrades the principal to viewer (matchers.ts, `roleKeyForTeamRole`).
- * Imported facts therefore carry `legacyRole` and the compat row reproduces
- * it; ledger-born custom grants have no legacy row to preserve and stay
- * CUSTOM.
+ * Map a binding fact to the existing API shape. Imported custom grants retain
+ * their original built-in role for API compatibility. Runtime authorization
+ * uses the canonical custom role key.
+ * @throws BindingMissingError when the fact does not represent a role binding.
  */
 export function grantFactToCompatBinding({
   grant,
@@ -269,35 +288,18 @@ export function grantFactToCompatBinding({
 }: {
   grant: GrantFact;
   organizationId: string;
-}): CompatBindingRowShape | null {
+}): CompatBindingRowShape {
+  if (!isBindingGrant(grant)) throw new BindingMissingError();
   const { scope, principal, roleKey } = grant;
-  if (
-    scope.type !== "ORGANIZATION" &&
-    scope.type !== "TEAM" &&
-    scope.type !== "PROJECT"
-  ) {
-    return null;
-  }
-  if (
-    principal.type !== "user" &&
-    principal.type !== "group" &&
-    principal.type !== "apiKey"
-  ) {
-    return null;
-  }
-  if (roleKey == null || principal.id == null) return null;
 
   let role: TeamUserRole;
   let customRoleId: string | null = null;
   if (roleKey === "admin") role = "ADMIN";
   else if (roleKey === "member") role = "MEMBER";
   else if (roleKey === "viewer") role = "VIEWER";
-  else if (roleKey.startsWith("custom:")) {
+  else {
     role = grant.legacyRole ?? "CUSTOM";
     customRoleId = roleKey.slice("custom:".length);
-  } else {
-    // lite-member (and any future key the enum cannot carry).
-    return null;
   }
 
   return {
@@ -369,9 +371,11 @@ export const SHARE_VISIBILITY_BY_PRINCIPAL_DB: Record<
   string,
   CompatShareLinkRowShape["visibility"] | undefined
 > = Object.fromEntries(
-  (Object.entries(SHARE_VISIBILITY_BY_PRINCIPAL) as Array<
-    [LedgerPrincipalType, CompatShareLinkRowShape["visibility"]]
-  >).map(([principalType, visibility]) => [
+  (
+    Object.entries(SHARE_VISIBILITY_BY_PRINCIPAL) as Array<
+      [LedgerPrincipalType, CompatShareLinkRowShape["visibility"]]
+    >
+  ).map(([principalType, visibility]) => [
     PRINCIPAL_TO_DB[principalType],
     visibility,
   ]),

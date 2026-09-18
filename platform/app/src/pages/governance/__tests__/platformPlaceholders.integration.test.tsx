@@ -11,6 +11,10 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  builtinRolePermissions,
+  permissionSatisfiedBy,
+} from "@langwatch/authz";
+import {
   cleanup,
   fireEvent,
   render,
@@ -25,11 +29,6 @@ import { join } from "node:path";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  getOrganizationRolePermissions,
-  hasPermissionWithHierarchy,
-} from "~/server/api/rbac";
-
 const harness = vi.hoisted(() => ({
   permissions: [] as string[],
   flagEnabled: true,
@@ -37,7 +36,10 @@ const harness = vi.hoisted(() => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => {
   const holds = (permission: string) =>
-    hasPermissionWithHierarchy(harness.permissions, permission);
+    permissionSatisfiedBy({
+      granted: new Set(harness.permissions),
+      requested: permission,
+    });
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,
@@ -152,7 +154,7 @@ const pickOption = async (label: string, value: string, shown: string) => {
 };
 
 beforeEach(() => {
-  harness.permissions = getOrganizationRolePermissions("ADMIN");
+  harness.permissions = [...builtinRolePermissions("org-admin")];
   harness.flagEnabled = true;
   modelQueries.getResolvedDefault.mockReturnValue({
     data: { model: LANGY_CONFIGURED_MODEL },
@@ -193,7 +195,10 @@ describe("given the billed-cost flag is off for a permitted viewer", () => {
   /** @scenario "The Platform screens are unreachable with the billed-cost flag off" */
   it("shows the not-found scene on every Platform screen", () => {
     expect(
-      hasPermissionWithHierarchy(harness.permissions, "governance:view"),
+      permissionSatisfiedBy({
+        granted: new Set(harness.permissions),
+        requested: "governance:view",
+      }),
     ).toBe(true);
     harness.flagEnabled = false;
 

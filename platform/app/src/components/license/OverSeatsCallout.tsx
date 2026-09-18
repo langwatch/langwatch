@@ -54,7 +54,13 @@ export function OverSeatsCallout({
             longer need access, or talk to us about more seats.
           </Text>
           <HStack gap={3} paddingTop={1}>
-            <Button asChild size="sm" colorPalette="orange">
+            <Button
+              asChild
+              size="sm"
+              colorPalette="orange"
+              color="white"
+              _hover={{ color: "white" }}
+            >
               <a href="/settings/members">Choose who to disable</a>
             </Button>
             <Button asChild size="sm" variant="outline">

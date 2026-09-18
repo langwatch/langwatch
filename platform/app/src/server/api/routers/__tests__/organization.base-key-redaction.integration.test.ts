@@ -7,6 +7,7 @@
  * so gating the endpoints that return it is only half the job — what the
  * session already holds has to be gated too.
  */
+
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -15,8 +16,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { globalForApp, resetApp } from "../../../app-layer/app";
@@ -98,15 +99,13 @@ describe("Feature: base key in the organizations payload", () => {
     await prisma.teamUser.create({
       data: { userId: user.id, teamId, role: teamRole },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId,
-        userId: user.id,
-        role: teamRole,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: teamId,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId,
+      userId: user.id,
+      role: teamRole,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
     });
     return user.id;
   };
@@ -189,6 +188,7 @@ describe("Feature: base key in the organizations payload", () => {
   afterAll(async () => {
     await resetApp();
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { team: { organizationId } }],
       ["project", { team: { organizationId } }],

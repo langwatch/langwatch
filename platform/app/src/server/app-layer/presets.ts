@@ -24,6 +24,20 @@ import { IdentityErasureService } from "@ee/governance/services/identityErasure.
 import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
 import { IdentityMatchSuggestionService } from "@ee/governance/services/identityMatchSuggestion.service";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
+import { PrismaScimSyncProjectionRepository } from "@ee/scim/scim-sync-projection.prisma.repository";
+import {
+  LocalDoorBreakGlassBinding,
+  RequiresLocalDoorAndBinding,
+} from "@ee/sso/break-glass-binding";
+import { AdminEmailPlatformOperators } from "@ee/sso/platform-operators";
+import { PrismaSsoConnectionProjectionRepository } from "@ee/sso/sso-connection-projection.prisma.repository";
+import {
+  PrismaSsoConnectionReadRepository,
+  PrismaSsoConnectionStrandingRepository,
+} from "@ee/sso/sso-connection-reads.prisma.repository";
+import { PrismaSsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.prisma.repository";
+import { SsoConnectionTeardownDispatcher } from "@ee/sso/sso-connection-teardown";
+import { LicenseDomainClaimAuthority } from "@ee/sso/sso-self-serve-adapters";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -246,12 +260,10 @@ import { PrismaGithubInstallationsRepository } from "./github/repositories/githu
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
-import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
 import {
   EmailJoinRequestNotifier,
   JoinRequestLifecycleDispatcher,
 } from "./identity/join-request-adapters";
-import { AdminEmailPlatformOperators } from "./identity/platform-operators";
 import { EventLogIdentityRepository } from "./identity/repositories/identity-event-log.repository";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
@@ -261,13 +273,11 @@ import { PrismaJoinRequestReadRepository } from "./identity/repositories/join-re
 import { PrismaJoinRequestProjectionRepository } from "./identity/repositories/join-request-projection.prisma.repository";
 import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrollment.prisma.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
-import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
-import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
 import {
-  PrismaSsoConnectionReadRepository,
-  PrismaSsoConnectionStrandingRepository,
-} from "./identity/repositories/sso-connection-reads.prisma.repository";
-import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
+  joinMembership,
+  ssoBreakGlass,
+  ssoEngineProviderDerivation,
+} from "./identity/runtime";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -858,6 +868,7 @@ export function initializeDefaultApp(options?: {
     prisma,
   );
   const langyTurnAdmission = new PrismaLangyTurnAdmissionRepository(prisma);
+  const processStore = new PrismaProcessStore(prisma);
   const scimSyncProjectionRepository = new PrismaScimSyncProjectionRepository(
     prisma,
   );
@@ -962,7 +973,7 @@ export function initializeDefaultApp(options?: {
         ? new ClickHouseLangyAnalyticsEventRepository(resolveClickHouseClient)
         : new NullLangyAnalyticsEventRepository(),
     ),
-    processStore: new PrismaProcessStore(prisma),
+    processStore,
     authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     identityProjection: new PrismaIdentityProjectionRepository(
@@ -978,13 +989,29 @@ export function initializeDefaultApp(options?: {
     identityLinkProposals: new EventLogIdentityRepository(),
     mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
     mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
+    // The engine's provider table is folded from the same events in the same
+    // apply (D09), so the STAGED command re-run projects exactly what the
+    // calling path projects — a fold that maintained it on one route and not
+    // the other would be two answers to "what is registered".
     ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
       prisma,
+      ssoEngineProviderDerivation,
     ),
     ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
+    ssoConnectionRegistrationSlots:
+      new PrismaSsoConnectionRegistrationRepository(prisma),
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
-    ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
+    // Activation's way-back-in precondition, as of D05: a named person who
+    // holds a live binding AND a local door for it to be a way in through.
+    // Composed here so the STAGED command re-run asks exactly what the
+    // calling path asks — a guard that answered differently on the queue
+    // would let a re-run activate what the live command refused.
+    ssoBreakGlassBindings: new RequiresLocalDoorAndBinding({
+      localDoor: new LocalDoorBreakGlassBinding(),
+      bindings: ssoBreakGlass(),
+    }),
     ssoPlatformOperators: new AdminEmailPlatformOperators(identityUsers),
+    ssoLicenseAuthority: new LicenseDomainClaimAuthority(),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     // One repository, two roles (D08): the fold's store and the guards' read
     // are the same `ScimSyncState` rows, so composing them separately would
@@ -995,8 +1022,8 @@ export function initializeDefaultApp(options?: {
     joinRequestProjection: new PrismaJoinRequestProjectionRepository(prisma),
     joinRequestReads: new PrismaJoinRequestReadRepository(prisma),
     joinRequestLifecycle: new JoinRequestLifecycleDispatcher(
-      prisma,
-      new EmailJoinRequestNotifier(prisma),
+      new EmailJoinRequestNotifier(prisma, processStore),
+      joinMembership(),
     ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,

@@ -1,17 +1,10 @@
 /**
- * ADR-092 delivery-plan PR 3 — the read repository a CUT-OVER organization
- * collects through: the same port as `authz-read.prisma.repository.ts`, over
- * the grants ledger's own projection (`Grant` / `Role`, plus `GrantUsage` for
- * share-link view accounting) instead of the compat `RoleBinding` /
- * `CustomRole` / `ShareLink` heads.
+ * Runtime authorization reader backed by the grants projection (`Grant` /
+ * `Role`, plus `GrantUsage` for share-link view accounting). Membership and
+ * lineage remain direct reads because they are not grant facts.
  *
- * The two implementations are deliberately independent rather than sharing a
- * base class: they answer the same questions of different tables, and each has
- * to be readable on its own for the cutover migration's decision-parity proof
- * to mean anything (it collects through both, explicitly, and compares every
- * decision). Where the query is genuinely the same one - membership and
- * lineage are not grants and were never projected - the duplication is a few
- * lines and the alternative is an inheritance seam nobody wants.
+ * The migration keeps its legacy repository separately for parity. Shared
+ * membership and lineage queries remain small direct reads.
  *
  * Policy stays where it always was: this class returns stored facts, the
  * collector in @langwatch/authz-server decides what they mean.
@@ -19,7 +12,6 @@
 import type {
   AuthzPrincipalRef,
   CollectedBinding,
-  LegacyTeamMembership,
   RoleBindingScopeType,
   ShareableResourceKind,
 } from "@langwatch/authz";
@@ -30,10 +22,14 @@ import type {
   ShareLinkRow,
 } from "@langwatch/authz-server";
 import {
+  grantRowToFact,
+  isBindingGrant,
   RESOURCE_KIND_TO_DB,
   SHARE_VISIBILITY_BY_PRINCIPAL_DB,
 } from "@langwatch/authz-server";
+
 import type { Prisma } from "~/generated/prisma/client";
+
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
 import { liveGrants, liveRoles } from "./live-rows";
 
@@ -45,6 +41,30 @@ const BINDING_SCOPE_TYPES: readonly RoleBindingScopeType[] = [
   "TEAM",
   "PROJECT",
 ];
+
+const GRANT_ROW_SELECT = {
+  id: true,
+  organizationId: true,
+  principalType: true,
+  principalId: true,
+  roleKey: true,
+  legacyRole: true,
+  source: true,
+  scopeType: true,
+  scopeId: true,
+  token: true,
+  permission: true,
+  resourceKind: true,
+  projectId: true,
+  createdByUserId: true,
+  expiresAt: true,
+  maxViews: true,
+  occurredAt: true,
+} as const satisfies Prisma.GrantSelect;
+
+type BindingGrantRow = Prisma.GrantGetPayload<{
+  select: typeof GRANT_ROW_SELECT;
+}>;
 
 export class GrantsAuthzReadRepository implements AuthzReadRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
@@ -87,7 +107,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: userId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: GRANT_ROW_SELECT,
     });
     return collectBindings({ rows, viaGroupId: () => null });
   }
@@ -118,12 +138,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: { in: memberships.map((row) => row.groupId) },
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: {
-        roleKey: true,
-        scopeType: true,
-        scopeId: true,
-        principalId: true,
-      },
+      select: GRANT_ROW_SELECT,
     });
     return collectBindings({ rows, viaGroupId: (row) => row.principalId });
   }
@@ -145,54 +160,9 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: apiKeyId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: GRANT_ROW_SELECT,
     });
     return collectBindings({ rows, viaGroupId: () => null });
-  }
-
-  /**
-   * The same `TeamUser` read the legacy repository performs, on purpose. The
-   * rows live until contract deletes them, and the engine's org-level union
-   * quirk keeps inferring organization-scope answers from them — the
-   * dormant-fact principle (delivery plan decision 13): the genesis-minted
-   * org-member floor grant that will replace the union is stored but not yet
-   * load-bearing, so the inference must keep running IDENTICALLY over both
-   * heads. Returning nothing here made the two readers disagree at
-   * organization scope for every ordinary member, which no parity proof
-   * could ever clear. The quirk, the rows and this read all retire together
-   * at contract.
-   */
-  async findLegacyTeamMemberships({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<LegacyTeamMembership[]> {
-    const rows = await this.prisma.teamUser.findMany({
-      // A stale cross-org TeamUser row must not confer access any more than a
-      // stale grant: the team belongs to the organization AND the user is a
-      // current member of it (legacy parity, rbac.ts's TeamUser fallback).
-      where: {
-        userId,
-        team: {
-          organizationId,
-          organization: { members: { some: { userId, disabledAt: null } } },
-        },
-      },
-      select: {
-        teamId: true,
-        role: true,
-        assignedRoleId: true,
-        team: { select: { isPersonal: true } },
-      },
-    });
-    return rows.map((row) => ({
-      teamId: row.teamId,
-      role: row.role,
-      customRoleId: row.assignedRoleId ?? null,
-      isPersonal: row.team.isPersonal,
-    }));
   }
 
   /**
@@ -279,11 +249,9 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
    * ordinary way.
    *
    * `organizationId` is OPTIONAL and exists only so a caller who has already
-   * resolved the project's lineage (`CutoverAwareAuthzReadRepository`, which
-   * reads it to decide which head to ask) can hand it straight over instead
-   * of this method resolving it again - the same row, read twice per
-   * share-link check otherwise. A caller with no lineage of its own still
-   * gets the fallback resolve.
+   * resolved the project's lineage can hand it straight over instead of this
+   * method resolving it again - the same row, read twice per share-link check
+   * otherwise. A caller with no lineage of its own still gets the resolve.
    */
   async findShareLinks({
     projectId,
@@ -440,25 +408,27 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         organizationId,
         roleKey: { in: roleIds.map((roleId) => `custom:${roleId}`) },
       },
-      select: { roleKey: true, principalType: true, principalId: true },
+      select: GRANT_ROW_SELECT,
     });
     const held = new Map<string, { isMine: boolean; isForeign: boolean }>();
     for (const holder of holders) {
-      const role = bindingRole(holder.roleKey);
-      if (role?.customRoleId == null) continue;
-      const entry = held.get(role.customRoleId) ?? {
+      const grant = grantRowToFact(holder);
+      if (!isBindingGrant(grant)) continue;
+      if (!grant.roleKey.startsWith("custom:")) continue;
+      const roleId = grant.roleKey.slice("custom:".length);
+      const entry = held.get(roleId) ?? {
         isMine: false,
         isForeign: false,
       };
       if (
-        holder.principalType === "API_KEY" &&
-        holder.principalId === apiKeyId
+        grant.principal.type === "apiKey" &&
+        grant.principal.id === apiKeyId
       ) {
         entry.isMine = true;
       } else {
         entry.isForeign = true;
       }
-      held.set(role.customRoleId, entry);
+      held.set(roleId, entry);
     }
     return new Set(
       [...held.entries()]
@@ -469,22 +439,11 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
 }
 
 /**
- * `roleKey` → `CollectedBinding`, the inverse of `roleKeyForTeamRole` in
- * @langwatch/authz and the same translation the ledger's projection mapping
- * performs onto the compat head: admin→ADMIN, member→MEMBER, viewer→VIEWER,
- * custom:<id>→(CUSTOM, id).
- *
- * A row this cannot translate - `lite-member`, `legacy-admin`, a null key
- * (RESOURCE and PLATFORM rows), anything else - is SKIPPED, not defaulted. Those are the
- * dormant head-only facts the cutover imports (dev/docs/adr/110-grant-aggregates-are-grants.md,
- * decision 13, the dormant-fact principle): they are stored so contract can make them load-bearing, and
- * until then their decisions are still inferred from membership by the engine's
- * org-role floor, exactly as they were before the cutover. Translating one into
- * a binding here would change a decision the cutover promised not to change.
+ * Translate grant roles the current decision API can represent. Facts such as
+ * lite-member and legacy-admin remain migration data or membership-derived
+ * policy and are not invented as binding rows.
  */
-function collectBindings<
-  TRow extends { roleKey: string | null; scopeType: string; scopeId: string },
->({
+function collectBindings<TRow extends BindingGrantRow>({
   rows,
   viaGroupId,
 }: {
@@ -493,34 +452,16 @@ function collectBindings<
 }): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   for (const row of rows) {
-    if (!isBindingScope(row.scopeType)) continue;
-    const role = bindingRole(row.roleKey);
-    if (!role) continue;
+    const grant = grantRowToFact(row);
+    if (!isBindingGrant(grant)) continue;
     bindings.push({
-      role: role.role,
-      customRoleId: role.customRoleId,
-      scopeType: row.scopeType,
-      scopeId: row.scopeId,
+      roleKey: grant.roleKey,
+      scopeType: grant.scope.type,
+      scopeId: grant.scope.id,
       viaGroupId: viaGroupId(row),
     });
   }
   return bindings;
-}
-
-function bindingRole(
-  roleKey: string | null,
-): { role: CollectedBinding["role"]; customRoleId: string | null } | null {
-  if (roleKey === "admin") return { role: "ADMIN", customRoleId: null };
-  if (roleKey === "member") return { role: "MEMBER", customRoleId: null };
-  if (roleKey === "viewer") return { role: "VIEWER", customRoleId: null };
-  if (roleKey?.startsWith("custom:")) {
-    return { role: "CUSTOM", customRoleId: roleKey.slice("custom:".length) };
-  }
-  return null;
-}
-
-function isBindingScope(scopeType: string): scopeType is RoleBindingScopeType {
-  return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
 }
 
 /** The columns `findResourceGrantCandidates` selects off `Grant`. */

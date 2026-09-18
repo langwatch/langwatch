@@ -6,6 +6,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { belongsToNoOrganization } from "./logic/belongsToNoOrganization";
 import { readLastVisitedProduct } from "./logic/productMemory";
 import { resolveLandingDestination } from "./logic/resolveLandingDestination";
+import { resolveOrglessDestination } from "./logic/resolveOrglessDestination";
 import type { ProductId } from "./products";
 import { useLlmOpsProjectSlug } from "./useLlmOpsProjectSlug";
 import { useReachableProducts } from "./useReachableProducts";
@@ -75,6 +76,13 @@ interface LandingInput {
    */
   projectHomeSlug: string | null;
   isOrgless: boolean;
+  /**
+   * Whether this session was opened by a test sign-in through a connection
+   * that is not live yet — answered by the server, never by the query string.
+   * `isPending` holds the redirect while the question is still out, rather
+   * than racing it to the bootstrap screen.
+   */
+  testArrival: { isPending: boolean; isTestArrival: boolean };
 }
 
 /**
@@ -120,10 +128,11 @@ function fallbackDestination({
   resolved,
   projectSlug,
   isOrgless,
+  testArrival,
 }: LandingInput): string | null {
   if (resolved.hasError && projectSlug) return `/${projectSlug}`;
-  if (isOrgless) return "/onboarding/welcome";
-  return null;
+  if (!isOrgless) return null;
+  return resolveOrglessDestination(testArrival);
 }
 
 /**
@@ -171,6 +180,22 @@ export function useLandingRedirect(): LandingRedirect {
     useReachableProducts({ enabled: true });
   const llmOpsProjectSlug = useLlmOpsProjectSlug();
   const replaceOnce = useReplaceOnce();
+  // One reading of "belongs to nobody", shared by the redirect and by the
+  // question below it. An unanswered organization graph is not an empty one:
+  // reading the first as the second is what briefly put a member with
+  // organizations on the bootstrap screen, and it would also have asked the
+  // test-arrival question of people it cannot be true of.
+  const isOrgless = belongsToNoOrganization({
+    isWorkspaceResolving: isLoading,
+    organization,
+    organizations,
+  });
+  // Asked only of the people it can be true of, which is the dead end itself:
+  // everybody with an organization is already past this branch.
+  const testArrival = api.identity.myTestArrival.useQuery(
+    {},
+    { enabled: isOrgless, staleTime: 60_000, retry: false },
+  );
 
   useEffect(() => {
     replaceOnce(
@@ -188,11 +213,14 @@ export function useLandingRedirect(): LandingRedirect {
             : null,
           projectSlug: project?.slug ?? null,
           projectHomeSlug: llmOpsProjectSlug,
-          isOrgless: belongsToNoOrganization({
-            isWorkspaceResolving: isLoading,
-            organization,
-            organizations,
-          }),
+          isOrgless,
+          testArrival: {
+            // A failed read must not hold the redirect forever; it falls
+            // through to the bootstrap screen, which is what this branch did
+            // before the question existed.
+            isPending: isOrgless && testArrival.isLoading,
+            isTestArrival: testArrival.data != null,
+          },
         }),
         search: window.location.search,
       }),
@@ -204,6 +232,9 @@ export function useLandingRedirect(): LandingRedirect {
     organization,
     organizations,
     isLoading,
+    isOrgless,
+    testArrival.data,
+    testArrival.isLoading,
     replaceOnce,
     isReachableLoading,
     reachableProducts,

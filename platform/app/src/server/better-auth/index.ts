@@ -1,14 +1,15 @@
-import { fireActivityTrackingNurturing } from "@ee/billing/nurturing/hooks/activityTracking";
-import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
 import { buildSocialProviders } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { betterAuth } from "better-auth";
+
 import { env } from "~/env.mjs";
 import {
   addressRoutesToConnection,
   BACKUP_CODE_COUNT,
   betterAuthInstance,
+  databaseHooks as composeDatabaseHooks,
   secondaryStorage as composeSecondaryStorage,
+  credentialSessions,
   deploymentIsFederationCapable,
   identityBridgeCeremonies,
   identityCeremonies,
@@ -22,11 +23,14 @@ import {
   sessionCallbackEvidence,
   sessionClaims,
   sessionRevocation,
-  signInLinkEvidence,
+  signInLockout,
   signUpConfirmationEndpoint,
+  ssoAssertion,
+  ssoProvisionedUsers,
+  ssoRegisteredIssuers,
   twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
-import { prisma } from "~/server/db";
+
 import { databaseHooks } from "./config/database-hooks";
 import { emailAndPassword } from "./config/email-and-password";
 import { models } from "./config/models";
@@ -34,15 +38,7 @@ import { plugins } from "./config/plugins";
 import { rateLimit } from "./config/rate-limit";
 import { requestHooks } from "./config/request-hooks";
 import { secondaryStorage } from "./config/secondary-storage";
-import {
-  afterAccountCreate,
-  afterAccountUpdate,
-  afterSessionCreate,
-  afterUserCreate,
-  beforeAccountCreate,
-  beforeSessionCreate,
-  beforeUserCreate,
-} from "./hooks";
+import { resolveTrustedOrigins } from "./trustedOrigins";
 
 /**
  * better-auth, assembled (ADR-129).
@@ -50,9 +46,8 @@ import {
  * Nothing here decides anything. Every option is a slice produced by a module
  * under `config/`, every collaborator those slices need comes from the one
  * composition root, and what is left in this file is which slice goes where.
- * The files a reviewer opens to answer "what runs when an account is created"
- * are `config/database-hooks.ts` and the legacy callbacks in `hooks.ts`; this
- * one answers "what is wired at all".
+ * The file a reviewer opens to answer "what runs when an account is created"
+ * is `BetterAuthDatabaseHooks`; this one answers "what is wired at all".
  */
 
 const logger = createLogger("langwatch:better-auth");
@@ -66,58 +61,46 @@ const isBuildTime = !!process.env.BUILD_TIME;
  */
 const store = secondaryStorage(composeSecondaryStorage());
 
-interface AccountHookRow {
-  userId: string;
-  providerId: string;
-  accountId: string;
-  idToken?: string;
-}
-
-const legacyDatabaseHooks = () => ({
-  beforeUserCreate: ({
-    user,
-  }: {
-    user: { email: string; deactivatedAt?: Date | null } & Record<
-      string,
-      unknown
-    >;
-  }) => beforeUserCreate({ prisma, user }),
-  afterUserCreate: ({
-    user,
-  }: {
-    user: { id: string; email: string; name: string };
-  }) => afterUserCreate({ prisma, user }),
-  beforeAccountCreate: ({ account }: { account: AccountHookRow }) =>
-    beforeAccountCreate({
-      prisma,
-      account,
-      linkEvidence: signInLinkEvidence(),
-    }),
-  afterAccountCreate: ({ account }: { account: AccountHookRow }) =>
-    afterAccountCreate({ prisma, account }),
-  afterAccountUpdate: ({ account }: { account: AccountHookRow }) =>
-    afterAccountUpdate({ prisma, account }),
-  beforeSessionCreate: ({ session }: { session: { userId: string } }) =>
-    beforeSessionCreate({ prisma, session }),
-  afterSessionCreate: ({ userId }: { userId: string }) =>
-    afterSessionCreate({
-      prisma,
-      userId,
-      fireActivityTrackingNurturing,
-      ensureUserSyncedToCio,
-    }),
-});
+/**
+ * Where a failed sign-in is sent.
+ *
+ * Named once and exported because two places have to agree about it: this is
+ * what better-auth appends its code and its prose to, and it is what the
+ * boundary in `signin-error-redirect.ts` recognises on the way back out. A
+ * second copy of the string would let a redirect start slipping past the
+ * boundary the moment either moved.
+ */
+export const SIGN_IN_ERROR_PAGE_URL = `${env.NEXTAUTH_URL}/auth/error`;
 
 export const auth = betterAuth({
   baseURL: isBuildTime ? "http://localhost" : env.NEXTAUTH_URL,
+  /**
+   * Our own address, plus the identity providers our customers registered —
+   * the list the SSO plugin checks a discovery URL against before it will
+   * fetch one.
+   *
+   * A FUNCTION, because the answer is not fixed at boot. Every customer
+   * brings their own issuer, so no list we could ship contains the next
+   * one; what makes an issuer trusted is an administrator of that
+   * organization having registered it. Resolved per request, and only
+   * single sign-on requests pay for the read. See `trustedOrigins.ts`.
+   */
   trustedOrigins: isBuildTime
     ? []
-    : [
-        env.NEXTAUTH_URL,
-        ...(env.BASE_HOST && env.BASE_HOST !== env.NEXTAUTH_URL
-          ? [env.BASE_HOST]
-          : []),
-      ],
+    : async (request) =>
+        resolveTrustedOrigins({
+          nextAuthUrl: env.NEXTAUTH_URL,
+          baseHost: env.BASE_HOST,
+          trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
+          idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
+          // Scoped to the connection this request names, not every issuer we
+          // hold: the same list gates the Origin header and `callbackURL`, so
+          // the whole set made one tenant's registered origin a redirect
+          // target on the single sign-on endpoints for every other tenant.
+          registeredIssuers:
+            await ssoRegisteredIssuers().issuersForRequest(request),
+          isProduction: env.NODE_ENV === "production",
+        }),
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
   /**
    * The identity storage adapter (ADR-116 §1) — one `database:` entry,
@@ -182,7 +165,7 @@ export const auth = betterAuth({
    * intentional — `c.redirect` honors it at the response level.
    */
   onAPIError: {
-    errorURL: `${env.NEXTAUTH_URL}/auth/error`,
+    errorURL: SIGN_IN_ERROR_PAGE_URL,
   },
 
   ...models(),
@@ -205,14 +188,18 @@ export const auth = betterAuth({
     passkeySignUp,
     confirmSignUpAddress: (ctx) =>
       signUpConfirmationEndpoint().confirmSignUpAddress(ctx),
+    ssoAssertion,
+    ssoProvisionedUsers,
+    ssoCallbackEvidence: sessionCallbackEvidence,
   }),
 
   databaseHooks: databaseHooks({
-    hooks: legacyDatabaseHooks,
+    hooks: composeDatabaseHooks,
     userErasure: identityCeremonies,
     accountCeremonies: identityBridgeCeremonies,
     sessionClaims,
     providerAssertions: sessionCallbackEvidence,
+    credentialSessions,
   }),
 
   // BetterAuth logger wiring
@@ -234,6 +221,7 @@ export const auth = betterAuth({
     signInAfterPasswordReset: (ctx) =>
       passwordResetSessionBridge().signInAfterPasswordReset(ctx),
     addressRoutesToConnection,
+    signInLockout,
   }),
 });
 

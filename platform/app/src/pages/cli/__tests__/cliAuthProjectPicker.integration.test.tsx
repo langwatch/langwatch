@@ -73,6 +73,17 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
+    authz: {
+      effectivePermissions: {
+        useQuery: () => ({
+          data: {
+            permissions: ["organization:manage", "project:manage"],
+          },
+          isLoading: false,
+          isFetched: true,
+        }),
+      },
+    },
   },
 }));
 

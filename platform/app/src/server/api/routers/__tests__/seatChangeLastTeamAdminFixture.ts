@@ -22,6 +22,8 @@ import {
 } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { seedRoleBinding } from "../../../../test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "../../../../test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
@@ -104,15 +106,13 @@ async function createOrganization({
     });
   }
 
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      userId: members.adminId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organizationId,
-    },
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId,
+    userId: members.adminId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organizationId,
   });
 
   return organizationId;
@@ -255,7 +255,9 @@ async function seedOrganization({
  */
 async function installTestApp({ prisma }: { prisma: PrismaClient }) {
   await resetApp();
+  const eventSourcing = createAuthzTestEventSourcing(prisma);
   globalForApp.__langwatch_app = createTestApp({
+    _eventSourcing: eventSourcing,
     // FREE_PLAN gives away no Lite Member seats, so without this a seat change
     // is refused for the allowance rather than for anything these suites are
     // about.
@@ -291,15 +293,13 @@ function bindTeamRole({
   teamId: string;
   role: TeamUserRole;
 }) {
-  return prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      userId,
-      role,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: teamId,
-    },
+  return seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId,
+    userId,
+    role,
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: teamId,
   });
 }
 
@@ -333,6 +333,14 @@ async function resetMemberships({
         },
       },
     ],
+    [
+      "grant",
+      {
+        organizationId,
+        principalType: "USER",
+        principalId: { in: [soloUserId, companionUserId] },
+      },
+    ],
   ]);
   await prisma.organizationUser.update({
     where: { userId_organizationId: { userId: soloUserId, organizationId } },
@@ -360,15 +368,13 @@ async function resetMemberships({
     teamId: seed.sharedWithAnotherAdminTeamId,
     role: TeamUserRole.ADMIN,
   });
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      userId: soloUserId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.PROJECT,
-      scopeId: seed.sharedProjectId,
-    },
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId,
+    userId: soloUserId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.PROJECT,
+    scopeId: seed.sharedProjectId,
   });
 }
 
@@ -382,6 +388,7 @@ async function removeSeed({
   await resetApp();
   await cleanupTestRows(prisma, [
     ["roleBinding", { organizationId: seed.organizationId }],
+    ["grant", { organizationId: seed.organizationId }],
     ["organizationUser", { organizationId: seed.organizationId }],
     ["project", { id: { in: [seed.sharedProjectId, seed.personalProjectId] } }],
     ["team", { organizationId: seed.organizationId }],
@@ -431,19 +438,18 @@ async function withAdminGroupOn({
       data: { userId: memberUserId, groupId: group.id },
     });
   }
-  const binding = await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      groupId: group.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: teamId,
-    },
+  const binding = await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId,
+    groupId: group.id,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: teamId,
   });
   try {
     await run();
   } finally {
+    await prisma.grant.deleteMany({ where: { id: binding.id } });
     await prisma.roleBinding.deleteMany({ where: { id: binding.id } });
     await prisma.groupMembership.deleteMany({ where: { groupId: group.id } });
     await prisma.group.deleteMany({ where: { id: group.id } });

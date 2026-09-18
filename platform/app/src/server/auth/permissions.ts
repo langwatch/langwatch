@@ -1,4 +1,4 @@
-import type { Permission } from "~/server/api/rbac";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { getApp } from "~/server/app-layer/app";
 
 /**

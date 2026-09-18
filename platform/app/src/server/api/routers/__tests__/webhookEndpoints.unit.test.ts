@@ -34,39 +34,27 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (value: string) => value.replace(/^encrypted:/, ""),
 }));
 
-// Every checkOrganizationPermission call records its permission string and
-// denies the ones a test put into `denied`, so each procedure's scope
-// mapping is asserted against the real wiring, not a copy of it.
+// Every declared check records its canonical permission and denies the ones a
+// test put into `denied`, so scope mapping is asserted at the App seam.
 const seenPermissions: string[] = [];
 const denied = new Set<string>();
-
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasOrganizationPermission: vi.fn(
-      async (_ctx: unknown, _organizationId: string, permission: string) => {
-        seenPermissions.push(permission);
-        return !denied.has(permission);
-      },
-    ),
-  };
-});
+const permissions = vi.hoisted(() => ({
+  getDecision: vi.fn(),
+}));
 
 const getActivePlan = vi.fn();
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return {
-    // Consumers that degrade without Redis read through this one.
-    tryGetApp: () => null,
-    getApp: () => ({
-      permissions: appPermissionsService(),
-      planProvider: { getActivePlan },
-    }),
-  };
-});
+vi.mock("~/server/app-layer", () => ({
+  getApp: () => ({
+    permissions,
+    planProvider: { getActivePlan },
+  }),
+  tryGetApp: () => null,
+}));
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ permissions, planProvider: { getActivePlan } }),
+  tryGetApp: () => null,
+}));
 
 const ENDPOINT_ROW = {
   id: "whep_1",
@@ -118,6 +106,12 @@ describe("webhookEndpointsRouter", () => {
     vi.clearAllMocks();
     seenPermissions.length = 0;
     denied.clear();
+    permissions.getDecision.mockImplementation(
+      async ({ permission }: { permission: string }) => {
+        seenPermissions.push(permission);
+        return { permitted: !denied.has(permission), organizationRole: null };
+      },
+    );
     getActivePlan.mockResolvedValue({ webhookEndpointsEnabled: true });
   });
 

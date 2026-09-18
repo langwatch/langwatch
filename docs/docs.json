@@ -275,11 +275,13 @@
           {
             "group": "Platform",
             "pages": [
+              "platform/command-bar",
               {
                 "group": "Administration",
                 "pages": [
                   "platform/members-and-teams",
                   "platform/rbac",
+                  "platform/sso",
                   "platform/api-keys",
                   "platform/audit-log",
                   "platform/data-privacy",
@@ -287,8 +289,7 @@
                   "platform/secrets",
                   "platform/scim",
                   "platform/scim-groups",
-                  "platform/model-providers",
-                  "platform/command-bar"
+                  "platform/model-providers"
                 ]
               }
             ]

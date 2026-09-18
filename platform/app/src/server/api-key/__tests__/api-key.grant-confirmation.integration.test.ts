@@ -14,6 +14,7 @@
  * @see specs/api-keys/unified-api-keys.feature
  */
 
+import { type GrantFact, grantFactToRow } from "@langwatch/authz-server";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
@@ -58,22 +59,9 @@ function sendersThatLand({
   return {
     ...sendersThatNeverLand(),
     attachGrant: {
-      send: async (data: {
-        grant: {
-          grantId: string;
-          principal: { type: string; id: string };
-          scope: { type: string; id: string };
-        };
-      }) => {
-        await prisma.roleBinding.create({
-          data: {
-            id: data.grant.grantId,
-            organizationId,
-            apiKeyId: data.grant.principal.id,
-            role: TeamUserRole.ADMIN,
-            scopeType: data.grant.scope.type as RoleBindingScopeType,
-            scopeId: data.grant.scope.id,
-          },
+      send: async (data: { grant: GrantFact }) => {
+        await prisma.grant.create({
+          data: grantFactToRow({ organizationId, grant: data.grant }),
         });
       },
     },
@@ -90,7 +78,6 @@ describe("Feature: a key is activated only once its grants are readable", () => 
   /** The service over a writer whose projection either lands or does not. */
   const serviceWith = (commands: AuthzGrantsCommandSenders) => {
     const writer = new GrantsLedgerWriter(prisma as unknown as PrismaClient, {
-      onLedgerWrites: async () => true,
       // Short on purpose: the point is the window closing, not how long a
       // real one is.
       poll: { intervalMs: 10, timeoutMs: 150 },
@@ -150,6 +137,7 @@ describe("Feature: a key is activated only once its grants are readable", () => 
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["apiKey", { organizationId }],
       ["organizationUser", { organizationId }],

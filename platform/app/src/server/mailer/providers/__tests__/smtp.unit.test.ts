@@ -158,6 +158,31 @@ describe("smtpProvider.send", () => {
     });
   });
 
+  describe("given an outbox delivery identity", () => {
+    /** @scenario "SMTP retries preserve the notification message identity" */
+    it("preserves the MIME identity on retry without exposing the delivery key", async () => {
+      const content = {
+        to: "a@example.com",
+        subject: "Joined",
+        html: "<p>Joined</p>",
+      };
+      for (const idempotencyKey of ["org:join:a", "org:join:a", "org:join:b"]) {
+        await smtpProvider.send({
+          content: { ...content, idempotencyKey },
+          defaultFrom: "noreply@langwatch.ai",
+        });
+      }
+      const messages = sendMailMock.mock.calls.map(([message]) => message);
+      expect(messages).toHaveLength(3);
+      expect(messages[0].messageId).toMatch(
+        /^<[a-f0-9]{64}@notifications\.langwatch\.ai>$/,
+      );
+      expect(messages[1].messageId).toBe(messages[0].messageId);
+      expect(messages[2].messageId).not.toBe(messages[0].messageId);
+      expect(messages[0]).not.toHaveProperty("idempotencyKey");
+    });
+  });
+
   describe("given the full message surface", () => {
     /** @scenario "The full message surface survives every gateway" */
     it("maps blind copies, reply-to, custom headers and attachments", async () => {

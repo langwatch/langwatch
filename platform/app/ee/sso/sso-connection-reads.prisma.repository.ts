@@ -1,0 +1,400 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import {
+  disputedDomainClaimQueue,
+  IDENTIFIER_PROVIDERS,
+  LIVE_IDENTIFIER_STATES,
+  routingStateOf,
+  SsoConnectionNotFoundError,
+  type SsoConnectionState,
+  type SsoDomainClaimQueueEntry,
+  ssoConnectionStateSchema,
+  waitingDomainClaims,
+} from "@langwatch/identity";
+import type { PrismaClient } from "~/generated/prisma/client";
+import type { SignInConnection } from "./sso-assertion.service";
+import type {
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+  SsoDomainClaimQueueRepository,
+} from "./sso-connection.repository";
+import { isSsoConnectionId } from "./sso-connection-id";
+import { rowToConnection } from "./sso-connection-projection.prisma.repository";
+import { identifierBelongsToMigrationConnection } from "./sso-migration.rules";
+
+/**
+ * The reads the connection guards run (D04, ADR-117 §5), over the
+ * `SsoConnection` projection. Policy — what a state allows, who owns a domain
+ * — lives in `@langwatch/identity-server`; this class returns stored facts.
+ */
+export class PrismaSsoConnectionReadRepository
+  implements SsoConnectionReadRepository
+{
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async findConnection({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<SsoConnectionState | null> {
+    const row = await this.prisma.ssoConnection.findUnique({
+      where: { id: connectionId },
+    });
+    return row === null ? null : rowToConnection(row);
+  }
+
+  /**
+   * First verifier owns, and this is where the scope of "owns" is decided.
+   *
+   * The query is deliberately unscoped by organization: on cloud that IS the
+   * global rule, and on a self-hosted installation this table only ever holds
+   * that installation's own connections, so the same statement means
+   * "per-instance" there without a branch. Scoping it by deployment mode
+   * would be a branch that is a no-op on one side and a hole on the other.
+   */
+  async findDomainOwner({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ connectionId: string; organizationId: string } | null> {
+    const ownership = await this.prisma.ssoVerifiedDomain.findUnique({
+      where: { domain },
+      select: {
+        organizationId: true,
+        holders: { select: { connectionId: true } },
+      },
+    });
+    if (ownership === null || ownership.holders.length === 0) return null;
+    const holderIds = ownership.holders.map((holder) => holder.connectionId);
+    const holders = await this.prisma.ssoConnection.findMany({
+      where: {
+        id: { in: holderIds },
+        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
+      },
+      select: { id: true, replacesConnectionId: true },
+    });
+    if (holders.length === 0) return null;
+    const predecessor = holders.find(
+      (candidate) => candidate.replacesConnectionId === null,
+    );
+    const connectionId = predecessor?.id ?? holders[0]!.id;
+    return { connectionId, organizationId: ownership.organizationId };
+  }
+
+  /**
+   * The one connection an organization is setting up or running.
+   *
+   * Terminal states are excluded rather than ordered around: a discarded or
+   * torn-down connection is a tombstone, and an organization whose
+   * connection was removed is setting up from nothing again. Most recently
+   * touched first, so an organization that somehow holds two — a back-office
+   * registration alongside a self-served one — sees the live one.
+   */
+  async findConnectionForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SsoConnectionState | null> {
+    const row = await this.prisma.ssoConnection.findFirst({
+      where: {
+        organizationId,
+        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    return row === null ? null : rowToConnection(row);
+  }
+
+  async findConnectionsForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<readonly SsoConnectionState[]> {
+    const rows = await this.prisma.ssoConnection.findMany({
+      where: {
+        organizationId,
+        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(rowToConnection);
+  }
+
+  /**
+   * The connection an assertion names, as the two sign-in decisions read it
+   * (ADR-129): may this connection assert this address, and what happens to
+   * somebody arriving through it.
+   *
+   * A narrow projection rather than `findConnection` above, and `lapsedDomains`
+   * from the COLUMN rather than re-derived from the proofs: the column is what
+   * the reproof sweep writes, so a domain whose grace expires mid-request is
+   * still routing until that sweep says otherwise (ADR-123). Deriving it here
+   * would move the moment a domain stops provisioning off the sweep and onto
+   * whoever happens to sign in.
+   */
+  async findConnectionForSignIn({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<SignInConnection | null> {
+    const row = await this.prisma.ssoConnection.findUnique({
+      where: { id: connectionId },
+    });
+    if (row === null) return null;
+    const state = rowToConnection(row);
+    return {
+      connectionId: state.connectionId,
+      organizationId: state.organizationId,
+      replacesConnectionId: state.replacesConnectionId,
+      state: state.state,
+      verifiedDomains: state.verifiedDomains,
+      domainVerifications: state.domainVerifications,
+      lapsedDomains: row.lapsedDomains,
+      arrivalPolicy: state.arrivalPolicy,
+      // Read for the go-live readiness the assertion gate asks about: a
+      // connection that has done everything but the sign-in is trusted for
+      // the sign-in that would complete it.
+      arrivalPolicyDecidedAtMs: state.arrivalPolicyDecidedAtMs,
+      createdBy: state.createdBy,
+      source: state.source,
+      providerId: state.idpMetadata.providerId,
+    };
+  }
+
+  /**
+   * How many ACTIVE connections this organization has right now.
+   *
+   * The break-glass revoke guard's one outside fact: revoking the last way
+   * back in matters only while a connection is actually deciding this
+   * organization's sign-in. A count rather than the rows, because the guard
+   * asks whether there is any and reads nothing about them.
+   */
+  async countActiveConnections({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number> {
+    return await this.prisma.ssoConnection.count({
+      where: { organizationId, state: "ACTIVE" },
+    });
+  }
+}
+
+/**
+ * The operator queue (D05), which is disputes only: a claim on a domain some
+ * OTHER organization has already proved, longest wait first.
+ *
+ * Everything else left this queue when the published record became the
+ * decision. An uncontested claim is finished by the customer publishing DNS,
+ * with no operator command anywhere in its history, so listing it would be
+ * listing work nobody has to do — and burying the one entry that IS work
+ * under a hundred that are not is how a queue stops being read.
+ *
+ * Two reads rather than one: the claims that are waiting, then who already
+ * holds those domains. The second is unscoped by organization for the same
+ * reason `findDomainOwner` is — a dispute is by definition about somebody
+ * else's connection — and the model is exempt from the org guard on exactly
+ * that ground.
+ *
+ * The waiting claims live in the `domainClaims` column rather than in rows of
+ * their own, so the scan is over connections that are CLAIMED and the sort is
+ * in memory. That is honest at this size — a queue with more entries than one
+ * page is a staffing incident, which is the thing Open Q2 is about — and it
+ * keeps one aggregate as the only writer of what a claim's state is.
+ */
+export class PrismaSsoDomainClaimQueueRepository
+  implements SsoDomainClaimQueueRepository
+{
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async findAllDisputed({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<SsoDomainClaimQueueEntry[]> {
+    const rows = await this.prisma.ssoConnection.findMany({
+      where: { state: "CLAIMED" },
+      orderBy: { updatedAt: "asc" },
+    });
+    const connections = rows.map(rowToConnection);
+    const waitingDomains = [
+      ...new Set(
+        connections.flatMap((connection) =>
+          waitingDomainClaims(connection).map((claim) => claim.domain),
+        ),
+      ),
+    ];
+    if (waitingDomains.length === 0) return [];
+    // THE SAME STATES `findDomainOwner` COUNTS, and it has to be the same
+    // set. That read is what decides a claim is disputed — it refuses the
+    // customer with "we are reviewing this" for a holder in any non-terminal
+    // state — while this one builds the queue an operator reviews it FROM.
+    // Filtering to ACTIVE here meant a claim held up by a VERIFIED or
+    // SUSPENDED holder was refused and then never listed: the customer could
+    // neither prove the domain nor get the claim decided, and no operator
+    // ever saw it. One question, one answer.
+    const holders = await this.prisma.ssoVerifiedDomain.findMany({
+      where: {
+        domain: { in: waitingDomains },
+      },
+      select: { organizationId: true, domain: true },
+    });
+    const verifiedElsewhere = new Map<string, string>();
+    for (const holder of holders) {
+      if (!verifiedElsewhere.has(holder.domain)) {
+        verifiedElsewhere.set(holder.domain, holder.organizationId);
+      }
+    }
+    // The ordering, the wait and the dispute rule are the package's, so the
+    // number the operator surface sorts on is the one a test enumerates.
+    return disputedDomainClaimQueue({
+      connections,
+      nowMs: Date.now(),
+      verifiedElsewhere,
+    }).slice(0, limit);
+  }
+}
+
+/**
+ * Who a teardown would strand (ADR-117 §5). Read over the identity heads —
+ * D01's `Identifier` projection — because that is where "how can this person
+ * get in" is answered, and teardown must not invent a second answer.
+ *
+ * A fallback must be a verified authentication method outside this connection.
+ * An address alone is not authentication, and adopted provider bindings can
+ * belong to the connection even when their connectionId is null.
+ */
+export class PrismaSsoConnectionStrandingRepository
+  implements SsoConnectionStrandingRepository
+{
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async findStrandedUserIds({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<string[]> {
+    const row = await this.prisma.ssoConnection.findUnique({
+      where: { id: connectionId },
+    });
+    if (row === null) {
+      throw new SsoConnectionNotFoundError(
+        `connection ${connectionId}: cannot assess teardown without its projection`,
+      );
+    }
+    const connection = rowToConnection(row);
+    const legacyMembers =
+      connection.source === "legacy-grandfathered"
+        ? await this.prisma.organizationUser.findMany({
+            where: { organizationId: connection.organizationId },
+            select: { userId: true },
+          })
+        : [];
+    const candidates = await this.prisma.identifier.findMany({
+      where: {
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        OR: [
+          { connectionId },
+          { connectionId: null, providerId: connectionId },
+          ...(legacyMembers.length > 0
+            ? [
+                {
+                  connectionId: null,
+                  userId: { in: legacyMembers.map(({ userId }) => userId) },
+                  providerId: {
+                    in: ["auth0", connection.idpMetadata.providerId],
+                  },
+                },
+              ]
+            : []),
+        ],
+      },
+      select: {
+        userId: true,
+        connectionId: true,
+        providerId: true,
+        providerAccountId: true,
+      },
+    });
+    const userIds = [
+      ...new Set(
+        candidates
+          .filter((identifier) =>
+            identifierBelongsToMigrationConnection({ identifier, connection }),
+          )
+          .map(({ userId }) => userId),
+      ),
+    ];
+    if (userIds.length === 0) return [];
+
+    const covered = await this.#findUsersWithFallback(connection, userIds);
+    return userIds.filter((userId) => !covered.has(userId));
+  }
+
+  async #findUsersWithFallback(
+    connection: SsoConnectionState,
+    userIds: string[],
+  ): Promise<Set<string>> {
+    const alternatives = await this.prisma.identifier.findMany({
+      where: {
+        userId: { in: userIds },
+        state: { in: ["VERIFIED", "PRIMARY"] },
+        provider: {
+          in: IDENTIFIER_PROVIDERS.filter((provider) => provider !== "email"),
+        },
+      },
+      select: {
+        userId: true,
+        connectionId: true,
+        providerId: true,
+        providerAccountId: true,
+      },
+    });
+    const independent = alternatives.filter(
+      (identifier) =>
+        !identifierBelongsToMigrationConnection({ identifier, connection }),
+    );
+    if (independent.length === 0) return new Set<string>();
+    const referencedIds = [
+      ...new Set(
+        independent.flatMap(({ connectionId, providerId }) =>
+          [connectionId, providerId].filter((id): id is string => id !== null),
+        ),
+      ),
+    ];
+    const referencedConnections = await this.prisma.ssoConnection.findMany({
+      where: { id: { in: referencedIds } },
+      select: { id: true, state: true },
+    });
+    const routingStates = new Map(
+      referencedConnections.map(({ id, state }) => [
+        id,
+        routingStateOf(ssoConnectionStateSchema.parse(state)),
+      ]),
+    );
+    return new Set(
+      independent
+        .filter(({ connectionId, providerId }) => {
+          if (
+            connectionId !== null &&
+            routingStates.get(connectionId) !== "ACTIVE"
+          ) {
+            return false;
+          }
+          if (
+            providerId !== null &&
+            isSsoConnectionId(providerId) &&
+            !routingStates.has(providerId)
+          ) {
+            return false;
+          }
+          return (
+            providerId !== connection.connectionId &&
+            (providerId === null ||
+              !routingStates.has(providerId) ||
+              routingStates.get(providerId) === "ACTIVE")
+          );
+        })
+        .map(({ userId }) => userId),
+    );
+  }
+}

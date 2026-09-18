@@ -8,10 +8,11 @@
  * - src/pages/api/trace/search.ts
  * - src/pages/api/thread/[id].ts
  */
+
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import type { Context } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import type { Permission } from "~/server/api/rbac";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";

@@ -75,6 +75,15 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
+    authz: {
+      effectivePermissions: {
+        useQuery: () => ({
+          data: { permissions: [] },
+          isLoading: false,
+          isFetched: true,
+        }),
+      },
+    },
     apiKey: {
       myBindings: {
         useQuery: () => ({ data: bindingsRef.current, isLoading: false }),

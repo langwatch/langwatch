@@ -1,5 +1,5 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import { ForkAwareCredentialDecisionRepository } from "~/server/app-layer/permissions/credential-decision.repository";
+import { EngineCredentialDecisionRepository } from "~/server/app-layer/permissions/credential-decision.repository";
 import { PermissionsService } from "~/server/app-layer/permissions/permissions.service";
 
 const unstubbed = () => {
@@ -12,7 +12,7 @@ const unstubbed = () => {
  * Factory body for `vi.mock("~/server/app-layer/app", ...)` in tests that
  * exercise the CREDENTIAL (API-key) check path: the real service + credential
  * repository over the `role-binding-resolver` module, so a test's
- * `vi.mock("~/server/rbac/role-binding-resolver")` stub keeps deciding.
+ * `vi.mock("~/server/app-layer/authz/credential-permissions")` stub keeps deciding.
  * Separate from `appPermissionsMock` because this half's module graph pulls
  * the resolver's own imports, which user-grant tests deliberately avoid.
  *
@@ -27,7 +27,7 @@ export function appCredentialPermissionsMock(prisma?: unknown) {
       findTeamDecision: unstubbed,
       findOrganizationDecision: unstubbed,
     },
-    credentials: new ForkAwareCredentialDecisionRepository(
+    credentials: new EngineCredentialDecisionRepository(
       (prisma ?? {}) as PrismaClient,
     ),
   });

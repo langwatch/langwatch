@@ -1,6 +1,6 @@
 import { z } from "zod";
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import { authz, authzCollector } from "~/server/app-layer/authz/runtime";
-import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**

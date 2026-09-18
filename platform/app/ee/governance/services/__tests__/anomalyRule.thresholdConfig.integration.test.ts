@@ -39,9 +39,12 @@ import {
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { safeParseSpendSpikeThresholdConfig } from "../activity-monitor/thresholdConfig.schema";
 
@@ -53,7 +56,9 @@ let adminUserId: string;
 
 beforeAll(async () => {
   await resetApp();
+  resetAuthzGrantsCommandsForTests();
   globalForApp.__langwatch_app = createTestApp({
+    _eventSourcing: createAuthzTestEventSourcing(prisma),
     planProvider: PlanProviderService.create({
       getActivePlan: async () => enterprisePlan,
     }),
@@ -86,20 +91,19 @@ beforeAll(async () => {
   await prisma.teamUser.create({
     data: { userId: admin.id, teamId: team.id, role: TeamUserRole.ADMIN },
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId,
-      userId: admin.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organizationId,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId,
+    userId: admin.id,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organizationId,
   });
 });
 
 afterAll(async () => {
   await cleanupTestRows(prisma, [
     ["anomalyRule", { organizationId }],
+    ["grant", { organizationId }],
     ["roleBinding", { organizationId }],
     ["teamUser", { team: { organizationId } }],
     ["organizationUser", { organizationId }],

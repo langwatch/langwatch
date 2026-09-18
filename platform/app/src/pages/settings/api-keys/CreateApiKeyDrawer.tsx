@@ -9,6 +9,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { builtinRolePermissions, roleKeyForTeamRole } from "@langwatch/authz";
 import { useEffect, useMemo, useState } from "react";
 import type { TeamUserRole } from "~/generated/prisma/client";
 import { useSession } from "~/utils/auth-client";
@@ -18,7 +19,6 @@ import {
 } from "../../../components/settings/ScopeChipPicker";
 import { Drawer } from "../../../components/ui/drawer";
 import { Select } from "../../../components/ui/select";
-import { getTeamRolePermissions } from "../../../server/api/rbac";
 import { computePermissionsFromSelections } from "../../../server/api-key/permission-categories";
 import type { RouterOutputs } from "../../../utils/api";
 import { api } from "../../../utils/api";
@@ -142,8 +142,9 @@ export function CreateApiKeyDrawer({
         organizationId,
         orgProjects,
         isServiceKey: keyType === "service",
-        getTeamRolePermissions: (role) =>
-          getTeamRolePermissions(role as TeamUserRole),
+        getTeamRolePermissions: (role) => [
+          ...builtinRolePermissions(roleKeyForTeamRole(role as TeamUserRole)),
+        ],
       }),
     [
       myBindings.data,

@@ -15,6 +15,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import type { EventSourcing } from "~/server/event-sourcing";
 
 type ClickHouseClientLike = ClickHouseClient;
 
@@ -47,6 +48,7 @@ export function installClickHouseTestApp({
   resolveClient,
   resolveOrganizationClient,
   redis,
+  eventSourcing,
 }: {
   /**
    * Per-tenant resolver, usually a closure over the test's container client.
@@ -70,6 +72,9 @@ export function installClickHouseTestApp({
    * test whose route needs Redis passes the one it already opened.
    */
   redis?: RedisConnection | null;
+  /** Optional real authz event-sourcing composition for route tests that
+   * mint or mutate authorization grants. */
+  eventSourcing?: EventSourcing;
 }): void {
   const required: ClickHouseClientResolver = async (tenantId) => {
     const client = await resolveClient(tenantId);
@@ -127,6 +132,7 @@ export function installClickHouseTestApp({
       required,
       requiredOrg,
     ),
+    _eventSourcing: eventSourcing,
   });
 }
 

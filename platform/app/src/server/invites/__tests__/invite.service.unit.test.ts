@@ -43,7 +43,9 @@ vi.mock("../../../env.mjs", async (importOriginal) => {
     ...original,
     env: {
       ...original.env,
-      SENDGRID_API_KEY: "test-sendgrid-key",
+      EMAIL_PROVIDER: "smtp",
+      SMTP_URL: "smtp://127.0.0.1:1025",
+      SENDGRID_API_KEY: void 0,
     },
   };
 });
@@ -172,7 +174,7 @@ describe("InviteService", () => {
         findFirst: vi.fn(),
         findUnique: vi.fn(),
       },
-      customRole: {
+      role: {
         findMany: vi.fn(),
       },
     };
@@ -448,7 +450,7 @@ describe("InviteService", () => {
 
   describe("checkLicenseLimits()", () => {
     beforeEach(() => {
-      mockPrisma.customRole.findMany.mockResolvedValue([]);
+      mockPrisma.role.findMany.mockResolvedValue([]);
     });
 
     describe("when member limit is exceeded", () => {
@@ -781,7 +783,8 @@ describe("InviteService", () => {
         expect(firstCall.data.expiration).toBeInstanceOf(Date);
       });
 
-      it("sends invite emails for each invite", async () => {
+      /** @scenario Invitations use the configured email provider */
+      it("sends each invite through SMTP without a SendGrid key", async () => {
         await service.approvePaymentPendingInvites({
           subscriptionId: "sub-1",
           organizationId: "org-1",
@@ -1012,6 +1015,7 @@ describe("InviteService", () => {
           expect(order).toContain("emitted");
         });
 
+        /** @scenario "Accepted invitation grants name the original sender" */
         it("names the inviter as the actor, not the person receiving the access", async () => {
           await service.applyInvite({ userId: "user-flow-2", invite });
 
@@ -1045,6 +1049,7 @@ describe("InviteService", () => {
       });
 
       describe("when the invite records no sender", () => {
+        /** @scenario "Accepted invitation grants name the original sender" */
         it("attributes the grants to the service rather than to the invitee", async () => {
           await service.applyInvite({
             userId: "user-flow-2",

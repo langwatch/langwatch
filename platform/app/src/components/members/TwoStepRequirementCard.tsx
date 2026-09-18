@@ -1,12 +1,11 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
 import { Lock } from "lucide-react";
+import { useEnterpriseLock } from "~/components/access/useEnterpriseLock";
 import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
 import { SettingsCard } from "~/components/settings/kit/SettingsCard";
 import { QuietNotice } from "~/components/settings/QuietNotice";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useActivePlan } from "~/hooks/useActivePlan";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 /** What this organization's identity provider is asserting, if it has one. */
 export interface ConnectionSecondFactorView {
@@ -14,83 +13,8 @@ export interface ConnectionSecondFactorView {
   assertsSecondFactor: boolean;
 }
 
-/**
- * Whether this organization's plan carries the requirement, and the words to
- * say when it does not.
- *
- * Two states rather than one, because an organization can hold the
- * requirement without holding the plan — it turned it on and then moved off
- * Enterprise. Its members are still being asked, and the administrator has
- * to be able to turn it OFF, or a lapsed plan would be a lockout they
- * cannot undo. So the plan gates turning it ON and nothing else.
- *
- * The way out differs by deployment: a Cloud customer buys a plan, an
- * operator activates a license, and a "See plans" link on a self-hosted
- * installation leads to a page they cannot buy from.
- */
-function useEnterpriseLock({ mfaRequired }: { mfaRequired: boolean }): {
-  /** Whether turning the requirement on is available on this plan. */
-  canTurnOn: boolean;
-  /** The plan is not carrying it, and we know that for certain. */
-  locked: boolean;
-  /** The switch is inert AND there is a reason worth saying on it. */
-  explained: boolean;
-  explanation: string;
-  linkLabel: string;
-  linkHref: string;
-} {
-  const { isEnterprise, isLoading } = useActivePlan();
-  const publicEnv = usePublicEnv();
-  const isSaaS = publicEnv.data?.IS_SAAS ?? false;
-  // Until the plan is known nothing is marked as locked: a badge that
-  // appears and then vanishes for an Enterprise organization tells them
-  // something untrue about what they bought.
-  const locked = !isEnterprise && !isLoading;
-
-  return {
-    canTurnOn: isEnterprise,
-    locked,
-    explained: locked && !mfaRequired,
-    explanation: mfaRequired
-      ? "Your plan no longer includes this requirement. Your members are still being asked for a second factor, and you can turn that off — turning it back on needs the Enterprise plan."
-      : "Requiring two-step verification of every member is part of the Enterprise plan. Members can still set it up on their own accounts.",
-    linkLabel: isSaaS ? "See plans" : "Activate a license",
-    linkHref: isSaaS ? "/settings/subscription" : "/settings/license",
-  };
-}
-
-/**
- * The organization's security setting: every member can prove a second
- * factor (D06).
- *
- * Three sentences do the work here, and each is load-bearing:
- *
- *   - what turning it ON does — asks the members who cannot yet prove one to
- *     set one up, and ends nobody's session. An administrator who thinks this
- *     signs their team out will not turn it on;
- *   - how many members it would hold, said BEFORE the switch. A requirement
- *     turned on blind is how an organization locks out its own staff;
- *   - what the identity provider is doing, when there is one. Members signing
- *     in through a connection that asserts no second factor are held here for
- *     a reason that looks like our fault and is the provider's configuration,
- *     and the administrator has to be told which it is.
- *
- * The card is on screen on every plan and never hidden. An organization
- * whose plan does not carry the requirement gets the switch greyed with the
- * reason on it and a way to the plans, and keeps the count below it — how
- * many members cannot prove a second factor is the honest reason to want
- * this, and hiding it would leave an administrator with an unexplained blank
- * where a security control used to be. The plan is read here, in the card,
- * so the lock travels with it wherever the screen is rebuilt.
- *
- * The greying is a courtesy, not the boundary: `setRequirement` in
- * `organization-mfa.service.ts` refuses the flip on its own.
- *
- * The chrome is the settings kit's — `SettingsCard`, the same shape every
- * card in the cluster wears — and the warning is the one notice these screens
- * speak, in its warning tone. What is this card's own is the content: the
- * switch, the count, and what the provider is asserting.
- */
+/** The server enforces this requirement; the card keeps disabling it available
+ * after an Enterprise plan lapses. */
 export function TwoStepRequirementCard({
   mfaRequired,
   heldCount,
@@ -106,7 +30,13 @@ export function TwoStepRequirementCard({
   saving: boolean;
   onChange: (mfaRequired: boolean) => void;
 }) {
-  const lock = useEnterpriseLock({ mfaRequired });
+  const lock = useEnterpriseLock({
+    held: mfaRequired,
+    offExplanation:
+      "Requiring two-step verification of every member is part of the Enterprise plan. Members can still set it up on their own accounts.",
+    heldExplanation:
+      "Your plan no longer includes this requirement. Your members are still being asked for a second factor, and you can turn that off — turning it back on needs the Enterprise plan.",
+  });
   const locked = lock.locked;
 
   return (
@@ -130,7 +60,10 @@ export function TwoStepRequirementCard({
               rather than the switch: a disabled control takes no pointer
               events, so an explanation pinned to it is one nobody can ever
               read. */}
-          <Tooltip content={lock.explanation} disabled={!lock.explained}>
+          <Tooltip
+            content={lock.explanation}
+            disabled={!lock.locked || mfaRequired}
+          >
             <Box>
               <Switch
                 checked={mfaRequired}

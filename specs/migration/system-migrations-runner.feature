@@ -86,11 +86,12 @@ Feature: Running system migrations across organizations
     And being re-proved into the same state does not count as progress
 
   @unit
-  Scenario: A finite held migration prevents startup
-    Given a finite migration remains held after its pass, with nothing advancing
+  Scenario: A held migration stays on the legacy path without preventing startup
+    Given a migration remains held after its pass, with nothing advancing
     When the app starts
-    Then the preflight fails
-    And runtime processes do not start
+    Then it is re-proved once and the run ends
+    And being re-proved into the same state does not count as progress
+    And its migration gate stays closed on the legacy path
 
   @unit
   Scenario: One tenant's parked migration does not stop the fleet starting
@@ -135,17 +136,23 @@ Feature: Running system migrations across organizations
     And runtime processes do not start
     And the next start retries the pass
 
-  # PR1 keeps the staff-configured Auth0 route as the compatibility path. Its
-  # stored domain is not proof that the customer controls that domain, so D04
-  # stays outside the shared registry until PR2 can register the proof-aware
-  # migration. The registry is shared by prestart, ordinary, targeted and
-  # enrollment paths, which keeps the unproved migration out of all four.
+  # D04 records the configured legacy route WITHOUT treating the old domain
+  # string as ownership evidence, which is what let it join the shared
+  # registry: existing sign-in stays compatible, while activation, linking and
+  # new-person trust still demand qualified proof. The registry is shared by
+  # the prestart, ordinary, targeted and enrollment paths, so declaring it here
+  # declares it for all four.
+  #
+  # This scenario used to say the opposite — that D04 stayed out of the
+  # registry until a later change — and it went on saying it after the
+  # registration landed. The test bound to it had been updated to assert the
+  # registration, so the pair read green while the words asserted the reverse.
   @unit
-  Scenario: PR1 does not run the unproved SSO grandfather migration
+  Scenario: The D04 connection grandfather migration is declared in the shared registry
     Given an organization has a staff-configured legacy SSO domain
-    When any system migration entry point reads the PR1 registry
-    Then the D04 connection grandfather migration is not declared or run
-    And the legacy SSO route remains unchanged
+    When any system migration entry point reads the registry
+    Then the D04 connection grandfather migration is declared alongside the authorization engine migration
+    And the legacy SSO route is recorded without being treated as proof of ownership
 
   # ═══ Automatic enrollment ═════════════════════════════════════════════
   # Enrollment paces a rollout while it is happening. A finished rollout has

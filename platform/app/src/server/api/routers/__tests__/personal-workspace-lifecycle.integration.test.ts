@@ -28,6 +28,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import { hasProjectPermission } from "~/server/app-layer/authz/permission-adapters";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
@@ -36,7 +40,6 @@ import { PrismaOrganizationRepository } from "../../../app-layer/organizations/r
 import { createTestApp } from "../../../app-layer/presets";
 import { prisma } from "../../../db";
 import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
-import { hasProjectPermission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -54,6 +57,7 @@ let leaverUserId: string;
 let workspaceService: PersonalWorkspaceService;
 let personalTeamId: string;
 let personalProjectId: string;
+let groupId: string;
 
 const callerAsAdmin = () =>
   appRouter.createCaller(
@@ -112,14 +116,12 @@ describe("given a member with a personal workspace in an organization", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        userId: adminUserId,
-        organizationId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      userId: adminUserId,
+      organizationId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     workspaceService = new PersonalWorkspaceService(prisma);
@@ -127,11 +129,30 @@ describe("given a member with a personal workspace in an organization", () => {
     personalTeamId = workspace.team.id;
     personalProjectId = workspace.project.id;
 
+    const group = await prisma.group.create({
+      data: {
+        organizationId,
+        name: `Removal group ${ns}`,
+        slug: `removal-group-${ns}`,
+        members: { create: [{ userId: leaverUserId }] },
+      },
+    });
+    groupId = group.id;
+    await seedRoleBinding(prisma, {
+      groupId,
+      organizationId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
+    });
+
     // A real organization service against the test database: `createTestApp`
     // defaults to a NullOrganizationRepository that resolves without writing,
     // and every assertion below is about what the removal left behind.
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       organizations: new OrganizationService(
         new PrismaOrganizationRepository(prisma),
         new PromptTagRepository(prisma),
@@ -144,7 +165,10 @@ describe("given a member with a personal workspace in an organization", () => {
     await cleanupTestRows(prisma, [
       ["project", { teamId: personalTeamId }],
       ["teamUser", { teamId: personalTeamId }],
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
+      ["groupMembership", { groupId }],
+      ["group", { id: groupId }],
       ["organizationUser", { organizationId }],
       ["team", { organizationId }],
       ["organization", { id: organizationId }],
@@ -179,6 +203,28 @@ describe("given a member with a personal workspace in an organization", () => {
     });
 
     /** @scenario Removing a member takes their personal workspace with them */
+    it("removes the member from every organization group during offboarding", async () => {
+      await expect(
+        prisma.groupMembership.findUnique({
+          where: { userId_groupId: { userId: leaverUserId, groupId } },
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it("keeps the shared group binding for the group's remaining members", async () => {
+      await expect(
+        prisma.grant.findFirst({
+          where: {
+            organizationId,
+            principalType: "GROUP",
+            principalId: groupId,
+            revokedAt: null,
+          },
+          select: { id: true },
+        }),
+      ).resolves.toMatchObject({ id: expect.any(String) });
+    });
+
     it("leaves nothing an admin still has to clean up", async () => {
       // The whole point of archiving here: no live personal workspace remains in
       // the organization for a user who is no longer in it.

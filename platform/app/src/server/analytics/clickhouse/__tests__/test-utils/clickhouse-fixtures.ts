@@ -177,9 +177,14 @@ export async function seedSpans(
     }
   }
 
-  // Insert spans in batches
-  for (let i = 0; i < spanRows.length; i += BATCH_SIZE) {
-    const batch = spanRows.slice(i, i + BATCH_SIZE);
+  // Keep wide fixtures below 10 MB per insert without reducing the dataset.
+  const attributesBytes = Buffer.byteLength(JSON.stringify(spanAttributes));
+  const spanBatchSize = Math.max(
+    1,
+    Math.min(BATCH_SIZE, Math.floor(10_000_000 / (attributesBytes + 2_000))),
+  );
+  for (let i = 0; i < spanRows.length; i += spanBatchSize) {
+    const batch = spanRows.slice(i, i + spanBatchSize);
     await ch.insert({
       table: "stored_spans",
       values: batch,

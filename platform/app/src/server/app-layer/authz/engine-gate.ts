@@ -1,28 +1,6 @@
 /**
- * The one question the whole authorization surface forks on: has this
- * organization finished its migration onto the engine?
- *
- * ADR-110 — finishing the migration IS the switch. There is no separate
- * cutover record and no flip afterwards, so one gate serves every fork: the
- * permission seams in `rbac.ts` and `role-binding-resolver.ts`, the
- * collector's read repository, and the grant write path. "On" means on
- * everywhere at once, and the read and write halves can never answer for
- * different heads mid-request.
- *
- * This replaces two gates that asked the same question through different
- * tables (`AuthzCutoverProjection` and `SystemMigrationTenantState`), with
- * two caches, two TTLs and two failure directions between them.
- *
- * BROWSER SAFETY. This module must not import anything Node-only, and that
- * is a hard constraint rather than a preference: `rbac.ts` imports the gate,
- * and the browser imports `rbac.ts` for the permission-matching functions the
- * UI gates on (`useOrganizationTeamProject`, the settings permission picker).
- * A module-scope logger or metric here therefore does not merely leak — pino
- * reaches `process.stdout` and prom-client runs `register.removeSingleMetric`
- * at import time, so the client bundle dies on `process is not defined`
- * before the app mounts. No Prisma, no Redis, no logger, no metrics: the
- * caller hands in its client, and the failure reporter is INSTALLED by the
- * server composition below.
+ * Migration completion for compatibility writes and legacy API-key adoption.
+ * Permission checks use the authz engine independently of migration status.
  */
 import type { MigrationTenantStatus } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";

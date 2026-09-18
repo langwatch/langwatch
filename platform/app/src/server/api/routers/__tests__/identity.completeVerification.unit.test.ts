@@ -57,6 +57,7 @@ vi.mock(
       beforeUserDelete: async () => undefined,
     }),
     identityEmail: () => ({ resolveEmail: async () => null }),
+    ssoTestArrival: () => ({ standingFor: async () => null }),
     identityService: () => ({}),
     signInLinkEvidence: () => ({
       refusalForLink: async () => null,
@@ -73,12 +74,15 @@ vi.mock(
     identityAddressLockReaper: () => ({}),
     identitySecretCarry: () => ({}),
     identitySecretHealMigration: () => ({}),
+    databaseHooks: () => ({}),
+    credentialSessions: () => ({}),
     isLatched: async () => false,
     isAnyoneLatched: async () => false,
     // No organization routes this suite's addresses, which is what lets the
     // credential boundary answer at all — a true here would refuse every
     // address as provider-managed.
     addressRoutesToConnection: async () => false,
+    connectionGoverningAddress: async () => null,
     // A value, not a factory: the runtime exports the birth-aware gate itself
     // so the adapter and the databaseHooks bridge fork on one closure.
     routesToIdentityBranch: async () => false,
@@ -95,20 +99,35 @@ vi.mock(
     // stay inert rather than being modelled.
     connectionGrandfatherMigration: () => ({}),
     joinRequests: () => ({}),
+    joinMembership: () => ({}),
     joinRequestsService: () => ({}),
+    looksLikeSsoConnectionId: () => false,
+    memberProvenance: () => ({}),
     // These two are re-exported from ./signin-method-policy rather than built
     // here, so they are the functions themselves, not factories returning one.
     deploymentIsFederationCapable: () => false,
     deploymentOffersPasskeys: () => true,
     resolveSignInMethodPolicy: async () => ({}),
     priorSession: () => ({}),
-    signInDomainRoutingPort: () => ({}),
     signInRouter: () => ({}),
     decideLocalSignUp: async () => ({}),
     localSignUpDecision: async () => ({}),
     signUpIdentifier: () => ({}),
     signUpVerification: () => ({}),
+    scimOversight: () => ({}),
+    scimReconciliation: () => ({}),
+    ssoArrival: () => ({}),
+    ssoAssertion: () => ({}),
+    ssoProvisionedUsers: () => ({}),
+    ssoBreakGlass: () => ({}),
+    ssoConnectionBackoffice: () => ({}),
+    ssoConnectionHistory: () => ({}),
     ssoConnections: () => ({}),
+    ssoDomainClaimQueue: () => ({}),
+    ssoDomainReproof: () => ({}),
+    ssoEngineProviderDerivation: () => undefined,
+    ssoRegisteredIssuers: () => ({}),
+    ssoSelfServe: () => ({}),
     // Core identity additions. Stubbed rather than omitted because the annotation
     // above is exhaustive on purpose: a new runtime export has to be looked
     // at here, and this suite reaches none of them.
@@ -138,6 +157,15 @@ vi.mock(
     lastWayInGuard: () => ({}),
     credentialAccounts: () => ({}),
     sessionMinter: () => ({}),
+    // Org sign-in security surface (account lockout, session binding). Not
+    // reached by this suite, stubbed inert for the same reason as the rest.
+    forgetSignInSecurityPolicies: () => undefined,
+    sessionBound: () => ({}),
+    signInLockout: () => ({}),
+    signInSecurityMembership: () => ({}),
+    signInSecurityReleaseEvidence: () => ({}),
+    signInSecuritySessions: () => ({}),
+    signInSecuritySettings: () => ({}),
   }),
 );
 

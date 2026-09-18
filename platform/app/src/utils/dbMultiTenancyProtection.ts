@@ -55,6 +55,14 @@ const GLOBAL_MODELS = [
   // and claimed BEFORE any user is known to hold it, which is the whole
   // point - it is what decides who gets to.
   "IdentifierReservation",
+  // The sign-in lock-out counter (GAC-09): keyed on an HMAC of the address
+  // that was TYPED, and deliberately not on a user. An address with no
+  // account behind it is counted, locked and refused exactly like one that
+  // resolves — which is the whole point, because answering the two
+  // differently would make the door an oracle for who has an account here.
+  // There is therefore no tenant in hand when the row is read: it is read
+  // before the address has been resolved to anybody at all.
+  "SignInAttemptLock",
   // Credential tables, per-user in exactly the sense `Account` is. A passkey
   // and a TOTP enrollment belong to a person, not to a project — and the
   // ceremonies that read them are keyed by credential id BEFORE any user is
@@ -69,12 +77,6 @@ const GLOBAL_MODELS = [
   // The MFA aggregate's projection is keyed `tenantId = userId` (D06), so it
   // is per-user by construction like the identity projections above.
   "MfaEnrollment",
-  // The directory's `(connectionId, externalId) -> userId` map (D08). Not
-  // project-scoped and carries no organizationId; a SCIM push resolves a
-  // person through it before anything org-shaped is in hand. Cross-org safety
-  // comes from the token's connection scope, which is checked at the endpoint
-  // rather than here.
-  "ScimExternalId",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",
@@ -277,6 +279,34 @@ const parentEntryScoped = (): ScopedModelConfig => ({
 const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   AiToolEntryTeam: parentEntryScoped(),
   AiToolEntryDepartment: parentEntryScoped(),
+  // Operational scheduling state owned by one SSO connection. The sweep
+  // writes the table directly, so every read or write must name the parent
+  // connection rather than receiving a blanket parent-table exemption.
+  SsoConnectionReproofCursor: {
+    validateWhere: (where) => {
+      const reason = "requires a connectionId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.connectionId === "string" ||
+          (c.connectionId &&
+            Array.isArray(c.connectionId.in) &&
+            c.connectionId.in.length > 0),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.connectionId !== "string") {
+          return "create requires a connectionId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
   // Idempotency receipts carry their tenancy on `scopeId` alone: the project
   // on the gateway platform's creates, the organization on the webhook
   // platform's. Every query names either the row id just claimed or the

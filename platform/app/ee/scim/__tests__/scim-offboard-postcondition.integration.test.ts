@@ -33,12 +33,21 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { bumpAuthzEpoch } from "~/server/app-layer/authz/epoch";
-import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import {
+  grantsLedgerWriter,
+  resetAuthzGrantsCommandsForTests,
+} from "~/server/app-layer/authz/ledger";
 import { LedgerAuthzGrantsRepository } from "~/server/app-layer/authz/repositories/authz-grants.ledger.repository";
 import { authzCollector } from "~/server/app-layer/authz/runtime";
+import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { KSUID_RESOURCES } from "~/utils/constants";
+
 import { ScimDeprovisionService } from "../scim-deprovision.service";
 
 const namespace = `scimoff-${nanoid(8)}`;
@@ -89,30 +98,31 @@ async function seedMemberWithAccessEverywhere() {
     data: { userId: USER, groupId: GROUP },
   });
   // A grant the group carries, and one the person holds directly. Both are
-  // sources the proof has to sweep.
-  await prisma.roleBinding.createMany({
-    data: [
-      {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: ORGANIZATION,
-        groupId: GROUP,
-        scopeType: "ORGANIZATION",
-        scopeId: ORGANIZATION,
-        role: "MEMBER",
-      },
-      {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: ORGANIZATION,
-        userId: USER,
-        scopeType: "ORGANIZATION",
-        scopeId: ORGANIZATION,
-        role: "ADMIN",
-      },
-    ],
+  // sources the proof has to sweep. Seed the canonical Grant head and its
+  // compatibility row together, so the real collector sees the same facts a
+  // production writer leaves behind.
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId: ORGANIZATION,
+    groupId: GROUP,
+    scopeType: "ORGANIZATION",
+    scopeId: ORGANIZATION,
+    role: "MEMBER",
+  });
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId: ORGANIZATION,
+    userId: USER,
+    scopeType: "ORGANIZATION",
+    scopeId: ORGANIZATION,
+    role: "ADMIN",
   });
 }
 
 async function tearDown() {
+  await prisma.grant.deleteMany({
+    where: { organizationId: ORGANIZATION },
+  });
   await prisma.roleBinding.deleteMany({
     where: { organizationId: ORGANIZATION },
   });
@@ -121,7 +131,9 @@ async function tearDown() {
   await prisma.organizationUser.deleteMany({
     where: { organizationId: ORGANIZATION },
   });
-  await prisma.scimExternalId.deleteMany({ where: { userId: USER } });
+  await prisma.scimExternalId.deleteMany({
+    where: { organizationId: ORGANIZATION, userId: USER },
+  });
   await prisma.user.deleteMany({ where: { id: USER } });
   await prisma.organization.deleteMany({ where: { id: ORGANIZATION } });
 }
@@ -136,11 +148,20 @@ async function collectAccess() {
 
 describe("a directory deprovision, against real storage", () => {
   beforeEach(async () => {
+    await resetApp();
+    resetAuthzGrantsCommandsForTests();
     await tearDown();
     await seedMemberWithAccessEverywhere();
+    globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
   });
 
-  afterEach(tearDown);
+  afterEach(async () => {
+    await resetApp();
+    resetAuthzGrantsCommandsForTests();
+    await tearDown();
+  });
 
   describe("given a person holding access through every source at once", () => {
     /** @scenario Deprovisioning leaves no effective permission anywhere */
@@ -163,7 +184,6 @@ describe("a directory deprovision, against real storage", () => {
       const after = await collectAccess();
       expect(after.isOrgMember).toBe(false);
       expect(after.bindings).toEqual([]);
-      expect(after.legacyTeamMemberships).toEqual([]);
     });
 
     /** @scenario The proof runs on every path a directory can remove somebody by */

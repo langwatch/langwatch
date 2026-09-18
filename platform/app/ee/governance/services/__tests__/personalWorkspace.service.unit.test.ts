@@ -58,7 +58,7 @@ const makePrisma = () => {
     },
     project: { create: vi.fn(), updateMany: vi.fn() },
     teamUser: { create: vi.fn() },
-    roleBinding: { findFirst: vi.fn().mockResolvedValue(null) },
+    grant: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   };
   // Callback form: the service's transaction runs against this same mock so
@@ -88,6 +88,27 @@ const ownerAdminGrantOn = (teamId: string) =>
     ],
   });
 
+const ownerAdminGrant = (teamId: string) => ({
+  id: `grant-${teamId}`,
+  organizationId: ORG_ID,
+  principalType: "USER",
+  principalId: USER_ID,
+  roleKey: "admin",
+  legacyRole: "ADMIN",
+  source: "grants-service",
+  scopeType: "TEAM",
+  scopeId: teamId,
+  token: null,
+  permission: null,
+  resourceKind: null,
+  projectId: null,
+  createdByUserId: null,
+  expiresAt: null,
+  maxViews: null,
+  occurredAt: new Date("2026-01-01T00:00:00Z"),
+  updatedAt: new Date("2026-01-01T00:00:00Z"),
+});
+
 describe("PersonalWorkspaceService.ensure", () => {
   let prisma: ReturnType<typeof makePrisma>;
   let writer: GrantsLedgerWriter;
@@ -105,7 +126,7 @@ describe("PersonalWorkspaceService.ensure", () => {
     describe("when the owner still holds a grant on the personal team", () => {
       it("returns the workspace without emitting a grant", async () => {
         prisma.team.findFirst.mockResolvedValueOnce(teamRow);
-        prisma.roleBinding.findFirst.mockResolvedValueOnce({ id: "rb_1" });
+        prisma.grant.findMany.mockResolvedValueOnce([ownerAdminGrant(TEAM_ID)]);
 
         const result = await service.ensure({
           userId: USER_ID,
@@ -121,7 +142,6 @@ describe("PersonalWorkspaceService.ensure", () => {
     describe("when an earlier ensure() died before the grant append", () => {
       it("re-asserts the owner's ADMIN grant on the personal team", async () => {
         prisma.team.findFirst.mockResolvedValueOnce(teamRow);
-        prisma.roleBinding.findFirst.mockResolvedValueOnce(null);
 
         const result = await service.ensure({
           userId: USER_ID,
@@ -137,7 +157,6 @@ describe("PersonalWorkspaceService.ensure", () => {
       describe("when the grants ledger is unavailable", () => {
         it("still returns the workspace instead of failing sign-in", async () => {
           prisma.team.findFirst.mockResolvedValueOnce(teamRow);
-          prisma.roleBinding.findFirst.mockResolvedValueOnce(null);
           (
             writer.attachBindings as ReturnType<typeof vi.fn>
           ).mockRejectedValueOnce(new AuthzLedgerUnavailableError());
@@ -153,7 +172,6 @@ describe("PersonalWorkspaceService.ensure", () => {
 
         it("does not await the projection, since nothing on this request reads it back", async () => {
           prisma.team.findFirst.mockResolvedValueOnce(teamRow);
-          prisma.roleBinding.findFirst.mockResolvedValueOnce(null);
 
           await service.ensure({ userId: USER_ID, organizationId: ORG_ID });
 
@@ -164,7 +182,6 @@ describe("PersonalWorkspaceService.ensure", () => {
 
         it("propagates every other failure", async () => {
           prisma.team.findFirst.mockResolvedValueOnce(teamRow);
-          prisma.roleBinding.findFirst.mockResolvedValueOnce(null);
           (
             writer.attachBindings as ReturnType<typeof vi.fn>
           ).mockRejectedValueOnce(new Error("boom"));
@@ -196,8 +213,6 @@ describe("PersonalWorkspaceService.ensure", () => {
 
     describe("when the winner died before its own grant append", () => {
       it("repairs the owner grant on the race-loser return path", async () => {
-        prisma.roleBinding.findFirst.mockResolvedValueOnce(null);
-
         const result = await service.ensure({
           userId: USER_ID,
           organizationId: ORG_ID,
@@ -213,7 +228,7 @@ describe("PersonalWorkspaceService.ensure", () => {
 
     describe("when the winner finished its grant append", () => {
       it("returns the winner's workspace without emitting a grant", async () => {
-        prisma.roleBinding.findFirst.mockResolvedValueOnce({ id: "rb_1" });
+        prisma.grant.findMany.mockResolvedValueOnce([ownerAdminGrant(TEAM_ID)]);
 
         const result = await service.ensure({
           userId: USER_ID,

@@ -5,14 +5,19 @@ import type {
   Prisma,
   PrismaClient,
   RoleBinding,
+  RoleBindingScopeType,
+  TeamUserRole,
 } from "~/generated/prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import {
+  liveGrants,
+  liveRoles,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 import type { ApiKeyRevocationCause } from "./revocation-cause";
@@ -46,13 +51,48 @@ export class ApiKeyRepository {
      * rather than `prisma` above, which may be one.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+    private readonly accessListing: AccessListingRepository = new GrantsAccessListingRepository(
       prisma,
     ),
   ) {}
 
   static create(prisma: ApiKeyPrismaDelegate): ApiKeyRepository {
     return new ApiKeyRepository(prisma);
+  }
+
+  private async withBindings(
+    organizationId: string,
+    keys: ApiKey[],
+    includeRoleNames = false,
+  ): Promise<ApiKeyWithBindings[]> {
+    if (keys.length === 0) return [];
+    const bindingsByKey = await this.accessListing.findApiKeyBindings({
+      organizationId,
+      apiKeyIds: keys.map((key) => key.id),
+    });
+    return keys.map((key) => ({
+      ...key,
+      roleBindings: (bindingsByKey.get(key.id) ?? []).map((row) => ({
+        id: row.id,
+        organizationId: row.organizationId,
+        userId: row.userId,
+        groupId: row.groupId,
+        apiKeyId: row.apiKeyId,
+        role: row.role,
+        customRoleId: row.customRoleId,
+        scopeType: row.scopeType,
+        scopeId: row.scopeId,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        ...(includeRoleNames
+          ? {
+              customRole: row.customRole
+                ? { id: row.customRole.id, name: row.customRole.name }
+                : null,
+            }
+          : {}),
+      })),
+    }));
   }
 
   async create({
@@ -137,18 +177,28 @@ export class ApiKeyRepository {
     organizationId: string;
     projectId: string;
   }): Promise<ApiKeyWithBindings[]> {
-    return this.prisma.apiKey.findMany({
+    const grants = await liveGrants(this.prisma).findMany({
+      where: {
+        organizationId,
+        principalType: "API_KEY",
+        scopeType: "PROJECT",
+        scopeId: projectId,
+      },
+      select: { principalId: true },
+    });
+    const keyIds = grants.flatMap((grant) =>
+      grant.principalId ? [grant.principalId] : [],
+    );
+    const keys = await this.prisma.apiKey.findMany({
       where: {
         organizationId,
         ingestSourceType: { not: null },
         revokedAt: null,
-        roleBindings: {
-          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
-        },
+        id: { in: keyIds },
       },
-      include: { roleBindings: true },
       orderBy: { createdAt: "desc" },
     });
+    return this.withBindings(organizationId, keys);
   }
 
   /**
@@ -165,16 +215,16 @@ export class ApiKeyRepository {
     organizationId: string;
     userId: string;
   }): Promise<ApiKeyWithBindings[]> {
-    return this.prisma.apiKey.findMany({
+    const keys = await this.prisma.apiKey.findMany({
       where: {
         organizationId,
         userId,
         ingestSourceType: { not: null },
         revokedAt: null,
       },
-      include: { roleBindings: true },
       orderBy: { createdAt: "desc" },
     });
+    return this.withBindings(organizationId, keys);
   }
 
   async findByLookupId({
@@ -187,13 +237,14 @@ export class ApiKeyRepository {
     // We use findFirst rather than findUnique because Prisma's findUnique
     // does not accept related filters; lookupId is @unique so the result
     // is still unique.
-    return this.prisma.apiKey.findFirst({
+    const key = await this.prisma.apiKey.findFirst({
       where: {
         lookupId,
         OR: [{ userId: null }, { user: { deactivatedAt: null } }],
       },
-      include: { roleBindings: true },
     });
+    if (!key) return null;
+    return (await this.withBindings(key.organizationId, [key]))[0] ?? null;
   }
 
   /**
@@ -235,10 +286,11 @@ export class ApiKeyRepository {
   }
 
   async findById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
-    return this.prisma.apiKey.findUnique({
+    const key = await this.prisma.apiKey.findUnique({
       where: { id },
-      include: { roleBindings: true },
     });
+    if (!key) return null;
+    return (await this.withBindings(key.organizationId, [key]))[0] ?? null;
   }
 
   /**
@@ -255,10 +307,11 @@ export class ApiKeyRepository {
     id: string;
     organizationId: string;
   }): Promise<ApiKeyWithBindings | null> {
-    return this.prisma.apiKey.findFirst({
+    const key = await this.prisma.apiKey.findFirst({
       where: { id, organizationId },
-      include: { roleBindings: true },
     });
+    if (!key) return null;
+    return (await this.withBindings(key.organizationId, [key]))[0] ?? null;
   }
 
   /**
@@ -276,7 +329,7 @@ export class ApiKeyRepository {
     organizationId: string;
   }): Promise<Array<{ id: string; permissions: Prisma.JsonValue }>> {
     if (ids.length === 0) return [];
-    return this.prisma.customRole.findMany({
+    return liveRoles(this.prisma).findMany({
       where: { id: { in: ids }, organizationId },
       select: { id: true, permissions: true },
     });
@@ -318,20 +371,16 @@ export class ApiKeyRepository {
     //
     // Hidden system keys (ephemeral per-Langy-session keys) are excluded so a
     // user's own key list isn't flooded with one row per chat session.
-    return this.prisma.apiKey.findMany({
+    const keys = await this.prisma.apiKey.findMany({
       where: {
         organizationId,
         revokedAt: null,
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
         OR: [{ userId }, { userId: null, ingestSourceType: null }],
       },
-      include: {
-        roleBindings: {
-          include: { customRole: { select: { id: true, name: true } } },
-        },
-      },
       orderBy: { createdAt: "desc" },
     });
+    return this.withBindings(organizationId, keys, true);
   }
 
   async findAllByOrganization({
@@ -343,19 +392,15 @@ export class ApiKeyRepository {
     // per-Langy-session keys — there is one per chat session per user, which
     // would swamp the admin list. They remain auth-functional (verify/revoke go
     // by id, not this query).
-    return this.prisma.apiKey.findMany({
+    const keys = await this.prisma.apiKey.findMany({
       where: {
         organizationId,
         revokedAt: null,
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
       },
-      include: {
-        roleBindings: {
-          include: { customRole: { select: { id: true, name: true } } },
-        },
-      },
       orderBy: { createdAt: "desc" },
     });
+    return this.withBindings(organizationId, keys, true);
   }
 
   async update({
@@ -483,7 +528,7 @@ export class ApiKeyRepository {
     organizationId: string;
   }): Promise<{ userId: string } | null> {
     return this.prisma.organizationUser.findFirst({
-      where: { userId, organizationId },
+      where: { userId, organizationId, disabledAt: null },
       select: { userId: true },
     });
   }
@@ -518,15 +563,23 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }): Promise<{ userId: string | null } | null> {
-    return this.prisma.roleBinding.findFirst({
-      where: {
-        userId,
-        organizationId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        role: TeamUserRole.ADMIN,
-      },
-      select: { userId: true },
+    const member = await this.prisma.organizationUser.findFirst({
+      where: { userId, organizationId, disabledAt: null },
+      select: { userId: true, role: true },
     });
+    if (!member || member.role === "EXTERNAL") return null;
+    const binding = await liveGrants(this.prisma).findFirst({
+      where: {
+        principalType: "USER",
+        principalId: userId,
+        organizationId,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        roleKey: "admin",
+      },
+      select: { principalId: true },
+    });
+    return binding ? { userId: binding.principalId } : null;
   }
 
   async findOrgAdminApiKeyBinding({
@@ -536,15 +589,18 @@ export class ApiKeyRepository {
     apiKeyId: string;
     organizationId: string;
   }): Promise<{ apiKeyId: string | null } | null> {
-    return this.prisma.roleBinding.findFirst({
+    const binding = await liveGrants(this.prisma).findFirst({
       where: {
-        apiKeyId,
+        principalType: "API_KEY",
+        principalId: apiKeyId,
         organizationId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        role: TeamUserRole.ADMIN,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        roleKey: "admin",
       },
-      select: { apiKeyId: true },
+      select: { principalId: true },
     });
+    return binding ? { apiKeyId: binding.principalId } : null;
   }
 
   async findUserBindings({
@@ -554,9 +610,6 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }) {
-    // Through the per-organization fork (ADR-092, delivery-plan PR 3
-    // follow-up): a cut-over organization's key drawer is served from the
-    // ledger's own head.
     const rows = await this.accessListing.findUserBindings({
       organizationId,
       userId,
@@ -594,10 +647,16 @@ export class ApiKeyRepository {
     });
   }
 
-  async findCustomRolesByIds(ids: string[]) {
+  async findCustomRolesByIds({
+    ids,
+    organizationId,
+  }: {
+    ids: string[];
+    organizationId: string;
+  }) {
     if (ids.length === 0) return [];
-    return this.prisma.customRole.findMany({
-      where: { id: { in: ids } },
+    return liveRoles(this.prisma).findMany({
+      where: { organizationId, id: { in: ids } },
       select: { id: true, name: true, permissions: true },
     });
   }

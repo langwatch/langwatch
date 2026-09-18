@@ -61,6 +61,15 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
     },
+    authz: {
+      effectivePermissions: {
+        useQuery: () => ({
+          data: { permissions: ["project:manage"] },
+          isLoading: false,
+          isFetched: true,
+        }),
+      },
+    },
     useUtils: () => ({
       organization: { getAll: { invalidate: vi.fn() } },
       modelProvider: {

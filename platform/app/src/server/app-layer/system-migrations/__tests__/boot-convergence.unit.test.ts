@@ -71,48 +71,18 @@ describe("runSystemMigrationsToQuiescence", () => {
     expect(stubs.runPass).toHaveBeenCalledTimes(3);
   });
 
-  /** @scenario A recurring reconciliation does not loop forever */
+  /** @scenario A held migration stays on the legacy path without preventing startup */
   it("treats a held but unchanged tenant as quiescent", async () => {
     stubs.runPass.mockResolvedValue({
       ...summaryOf({ advanced: 0 }),
       held: 1,
-      finiteHeld: 0,
+      finiteHeld: 1,
     });
 
     await expect(runSystemMigrationsToQuiescence()).resolves.toMatchObject({
       held: 1,
     });
     expect(stubs.runPass).toHaveBeenCalledTimes(1);
-  });
-
-  /** @scenario A finite held migration prevents startup */
-  it("rejects finite held work that cannot converge", async () => {
-    stubs.runPass.mockResolvedValue({
-      ...summaryOf({ advanced: 0 }),
-      held: 1,
-      finiteHeld: 1,
-    });
-    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow(
-      "finite migrations held",
-    );
-    expect(stubs.runPass).toHaveBeenCalledTimes(2);
-  });
-
-  it("runs a proof pass after draining effects before rejecting a finite hold", async () => {
-    const settle = vi.fn().mockResolvedValue(void 0);
-    stubs.runPass
-      .mockResolvedValueOnce({
-        ...summaryOf({ advanced: 0 }),
-        held: 1,
-        finiteHeld: 1,
-      })
-      .mockResolvedValueOnce(summaryOf({ advanced: 0 }));
-
-    await expect(
-      runSystemMigrationsToQuiescence({ awaitPassEffects: settle }),
-    ).resolves.toMatchObject({ advanced: 0, held: 0 });
-    expect(settle).toHaveBeenCalledTimes(2);
-    expect(stubs.runPass).toHaveBeenCalledTimes(2);
   });
 
   /** @scenario A pass shut out by another process is not convergence */
@@ -165,22 +135,6 @@ describe("runSystemMigrationsToQuiescence", () => {
     await expect(runSystemMigrationsToQuiescence()).resolves.toMatchObject({
       parked: 1,
     });
-  });
-
-  /** @scenario One tenant's parked migration does not stop the fleet starting */
-  it("still refuses when a finite migration stalls beside the park", async () => {
-    // The park is tolerated; the stalled finite hold beside it is not, so
-    // dropping the park refusal must not have dropped that one with it.
-    stubs.runPass.mockResolvedValue({
-      ...summaryOf({ advanced: 0 }),
-      parked: 1,
-      held: 1,
-      finiteHeld: 1,
-    });
-
-    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow(
-      "finite migrations held",
-    );
   });
 
   it("waits for queue effects and propagates barrier failures", async () => {

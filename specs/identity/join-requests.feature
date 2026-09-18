@@ -43,7 +43,8 @@ Feature: Join requests - asking to join the organization your colleagues already
   # hand over more answers with a formal invitation instead, which is the flow
   # that owns roles and teams. Least privilege by construction.
   #
-  # Ships behind JOIN_REQUESTS. Flag off, none of this exists.
+  # On for everybody. The JOIN_REQUESTS flag is retired — see "The flag is
+  # retired" at the foot of this file for what replaced it.
 
   Background:
     Given an organization "acme" whose members hold verified addresses on "acme.com"
@@ -169,7 +170,7 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the attempt is refused with code join_request_throttled and status 429
     And asking after the cool-down opens a fresh PENDING request
 
-  @unit @unimplemented
+  @unit
   Scenario: Every refusal reaches the person as words
     When any of these refusals is shown to a person
     Then the screen shows the customer copy registered for that code
@@ -204,6 +205,98 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the invitation is created
     And the duplicate-request limit had nothing to say about it
 
+  # ── A request nobody clicked ───────────────────────────────────────────
+
+  # Everywhere above, a request exists because a person pressed a button.
+  # There is a second door: somebody signs in through a connection whose
+  # answer is that arrivals WAIT, and a request appears because an account
+  # row did. The difference matters in four places, and each is a scenario
+  # here — most of all the cool-down, because a request nobody chose to make
+  # is one an administrator could otherwise watch reappear for ever.
+
+  @unit
+  Scenario: Somebody an identity provider admits but does not let straight in waits in the queue
+    Given "acme"'s connection proved "acme.com" and answers that arrivals wait for approval
+    When "sam" signs in through it for the first time
+    Then a PENDING request for "sam" is waiting for an administrator
+    And the administrators are told somebody is waiting
+
+  @unit
+  Scenario: The request a sign-in made is attributed to the system, not to the person
+    Given "acme"'s connection answers that arrivals wait for approval
+    When "sam" signs in through it for the first time
+    Then the request records the system as what made it
+    And nobody is recorded as having asked, because "sam" pressed nothing
+
+  # REGRESSION-SHAPED. A request through this door is made because an account
+  # row appeared, which happens on a provider rotation, on an unlink, and on
+  # the account reconcile beside it — none of which "sam" chose. Without the
+  # cool-down an administrator who explicitly said no would watch the same
+  # person climb back into the queue, repeatedly, for reasons neither of them
+  # caused.
+  @unit
+  Scenario: Somebody already rejected does not climb back into the queue when their account is touched
+    Given "ana" rejected "sam" and the cool-down has not run out
+    When "sam"'s account row is touched again by a sign-in through the connection
+    Then no new request is made
+    And the administrators are not told anything
+
+  @unit
+  Scenario: A sign-in never fails because the queue would not take the request behind it
+    Given "sam" already has a PENDING request to join "acme"
+    When "sam" signs in through the connection again
+    Then the sign-in succeeds and the account is exactly as it was
+    And the duplicate was declined quietly rather than raised at the person signing in
+
+  # The two doors ask different questions of different populations. An
+  # organization that is closed to strangers off the internet has said
+  # nothing about its own staff, and re-asking its join policy here would be
+  # asking the wrong door about the wrong people.
+  @unit
+  Scenario: An arrival is not re-asked the question the organization answered about strangers
+    Given "acme" is closed to people asking to join off the internet
+    And its connection proved "acme.com" and answers that arrivals wait
+    When "sam" signs in through that connection
+    Then a request is still made, because the connection already decided they may come in
+    And the organization's join policy was never consulted
+
+  @unit
+  Scenario: Somebody who is already a member is nothing to admit and nothing to ask about
+    Given "ana" is already a member of "acme"
+    When she signs in through the connection to test it
+    Then no request is made and nothing is sent to anybody
+    And her membership is exactly as it was
+
+  # The failure that has to stay findable. An administrator whose queue is
+  # empty is told to look for the line saying an arrival was not admitted —
+  # so the routine outcomes must not be filed as that same kind of problem,
+  # or the one line worth reading is buried under thousands that are not.
+  @unit
+  Scenario: An arrival already in the queue is recorded as routine, not as a failure
+    Given "sam" already has a PENDING request to join "acme"
+    When "sam" signs in through the connection again
+    Then it is recorded as an ordinary outcome rather than as something that went wrong
+    But an arrival that failed for a reason nobody expected is still recorded as a failure
+
+  # ── An offer that is over ──────────────────────────────────────────────
+
+  @unit
+  Scenario: Saying no thanks is remembered for that domain and no other
+    Given "sam" was offered "acme" on their "acme.com" address and dismissed it
+    When "sam" is offered somewhere on a different verified address
+    Then that other offer still stands
+    And only "acme.com" is remembered as dismissed
+
+  # A dismissed offer must answer with the same nothing every other closed
+  # door answers with. Anything distinguishable would tell somebody which
+  # domains have an organization behind them.
+  @unit
+  Scenario: A dismissed offer reads exactly like no offer at all
+    Given "sam" dismissed the offer to join on their "acme.com" address
+    When the offer is looked for again
+    Then there is nothing to show
+    And it is the same nothing a domain with no organization behind it answers with
+
   # ── Where an admin answers ─────────────────────────────────────────────
 
   @integration
@@ -213,6 +306,16 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the pending requests and the pending invitations are in one panel
     And each request shows who is asking and when they asked
 
+  # An empty panel is not the same as a panel that failed to load, and from
+  # the browser they look identical. A tab somebody opened on purpose owes
+  # them a sentence either way.
+  @integration
+  Scenario: An empty request list says it is empty
+    Given "acme" has nobody waiting to join
+    When "ana" opens the members area
+    Then the panel says nobody is waiting rather than rendering blank
+    And there is nothing to approve or reject
+
   @unit
   Scenario: Answering a request needs the authority that already gates inviting
     Given a member of "acme" who cannot invite colleagues
@@ -220,11 +323,12 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the attempt is refused for lack of permission
     And no new permission had to be granted to anybody for approvals to work
 
-  # ── The flag ───────────────────────────────────────────────────────────
-
-  @unit
-  Scenario: With the flag off nothing here exists
-    Given the join-requests flag is off
-    When "sam" signs up with a work email
-    Then no request can be made and no panel appears
-    And sign-up proceeds exactly as it did before
+  # ── The flag is retired ────────────────────────────────────────────────
+  #
+  # `JOIN_REQUESTS` gated the whole deliverable through its bake and is gone.
+  # What it actually turned off was an offer that had already passed every
+  # other gate — a verified address, a company domain, an organization that
+  # opted in and that the caller is not already in — so keeping it meant a
+  # second, blunter answer to a question the matching rules answer precisely.
+  # The rollback lever customers have is the setting on their own Access page,
+  # which is where it belongs.

@@ -22,6 +22,8 @@ import { TokenResolver } from "~/server/api-key/token-resolver";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import {
   startTestContainers,
   stopTestContainers,
@@ -154,7 +156,10 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
     await resetApp();
-    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
+    globalForApp.__langwatch_app = createTestApp({
+      redis: redisConnection,
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
 
     await prisma.organization.create({
       data: { id: ORG_ID, name: `IKPP ${suffix}`, slug: `ikpp-${suffix}` },
@@ -169,14 +174,12 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
       await prisma.organizationUser.create({
         data: { organizationId: ORG_ID, userId: id, role: "ADMIN" },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: ORG_ID,
-          userId: id,
-          role: "ADMIN",
-          scopeType: "ORGANIZATION",
-          scopeId: ORG_ID,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: ORG_ID,
+        userId: id,
+        role: "ADMIN",
+        scopeType: "ORGANIZATION",
+        scopeId: ORG_ID,
       });
     }
     const workspace = await new PersonalWorkspaceService(prisma).ensure({
@@ -200,6 +203,9 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
       }
     }
     await prisma.roleBinding
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.grant
       .deleteMany({ where: { organizationId: ORG_ID } })
       .catch(() => undefined);
     await prisma.apiKey

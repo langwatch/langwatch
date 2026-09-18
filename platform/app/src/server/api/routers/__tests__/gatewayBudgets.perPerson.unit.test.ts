@@ -22,13 +22,19 @@ const ORG_ID = "org_1";
 const ANCHOR_VK_ID = "vk_anchor";
 const ANCHOR_PROJECT_ID = "project_anchor";
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    };
+  },
+);
 
 const breakdown = vi.hoisted(() => vi.fn());
 

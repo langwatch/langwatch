@@ -21,13 +21,13 @@ import {
   within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import type React from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  getOrganizationRolePermissions,
-  hasPermissionWithHierarchy,
-} from "~/server/api/rbac";
+  builtinRolePermissions,
+  permissionSatisfiedBy,
+} from "@langwatch/authz";
+import type React from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
   /** The grants the viewer under test holds. */
@@ -48,7 +48,10 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => {
   // The real permission check, not a stand-in: a `governanceCost:view`
   // missing from the built-in role bag has to fail these tests.
   const holds = (permission: string) =>
-    hasPermissionWithHierarchy(harness.permissions, permission);
+    permissionSatisfiedBy({
+      granted: new Set(harness.permissions),
+      requested: permission,
+    });
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,
@@ -153,7 +156,7 @@ const renderScreen = () =>
   );
 
 /** The real org-admin bag, not a hand-written list that could drift from it. */
-const ORG_ADMIN_PERMISSIONS = getOrganizationRolePermissions("ADMIN").slice();
+const ORG_ADMIN_PERMISSIONS = [...builtinRolePermissions("org-admin")];
 
 function summaryFixture(overrides: Record<string, unknown> = {}) {
   return {
@@ -388,7 +391,10 @@ describe("the governance cost screen", () => {
       // neither the permission guard nor the unresolved-org branch can be what
       // hides the page.
       expect(
-        hasPermissionWithHierarchy(harness.permissions, "governanceCost:view"),
+        permissionSatisfiedBy({
+          granted: new Set(harness.permissions),
+          requested: "governanceCost:view",
+        }),
       ).toBe(true);
       expect(harness.organizationResolved).toBe(true);
 

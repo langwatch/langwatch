@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import {
+  type GrantFixtureQuery,
+  grantRowsForKeyResult,
+} from "~/server/api-key/__tests__/api-key-grant-fixture";
 import { createInnerTRPCContext } from "../../trpc";
 import { apiKeyRouter } from "../apiKey";
 
@@ -11,42 +15,48 @@ vi.mock("nanoid", () => ({
   ),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck:
+        () =>
+        async ({ ctx, next }: any) => {
+          ctx.permissionChecked = true;
+          return next();
+        },
+    };
+  },
+);
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  checkRoleBindingPermission: vi.fn().mockResolvedValue(true),
-  // These cases are about the binding path; the legacy fallback grants
-  // nothing so the binding decision is the only one under test.
-  resolveLegacyCeiling: vi.fn().mockResolvedValue({ grants: () => false }),
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
+  checkPrincipalPermission: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/server/rbac/custom-role-permissions")
-    >();
-  return {
-    ...actual,
-    parseCustomRolePermissions: vi
-      .fn()
-      .mockImplementation(actual.parseCustomRolePermissions),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/custom-role-permissions",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/custom-role-permissions")
+      >();
+    return {
+      ...actual,
+      parseCustomRolePermissions: vi
+        .fn()
+        .mockImplementation(actual.parseCustomRolePermissions),
+    };
+  },
+);
 
 // A key's grants and its private role are ledger commands (ADR-092
 // delivery-plan PR 2), so the writer is the seam these cases observe.
@@ -95,6 +105,7 @@ function buildMockPrisma() {
         updatedAt: new Date(),
       }),
       findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       // Activation reads back the row it flips live, the way Prisma's update
       // answers with the updated record.
       update: vi.fn().mockImplementation(({ data }: { data: object }) =>
@@ -115,6 +126,30 @@ function buildMockPrisma() {
           ...data,
         }),
       ),
+    },
+    grant: {
+      findFirst: vi.fn().mockResolvedValue({ id: "grant-admin" }),
+      findMany: vi.fn(),
+    },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi
+        .fn()
+        .mockImplementation(
+          ({ where }: { where: { name?: string; id?: string } }) =>
+            where.name
+              ? null
+              : {
+                  id: where.id ?? CUSTOM_ROLE_ID,
+                  organizationId: ORG_ID,
+                  name: "API Key: Old Key",
+                  description: null,
+                  permissions: ["traces:view", "annotations:manage"],
+                  kind: "system_api_key",
+                  occurredAt: new Date(),
+                  updatedAt: new Date(),
+                },
+        ),
     },
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue({
@@ -163,6 +198,13 @@ function buildMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
     },
   };
+
+  client.grant.findMany.mockImplementation(
+    async (args: GrantFixtureQuery = {}) => {
+      const key = client.apiKey.findUnique.mock.results.at(-1)?.value;
+      return grantRowsForKeyResult(key, args);
+    },
+  );
 
   return client as unknown as PrismaClient;
 }
@@ -249,12 +291,6 @@ describe("apiKey router — restricted permissions", () => {
     describe("when creating a restricted key with camelCase permissions", () => {
       /** @scenario Restricted key with camelCase permissions saves without error */
       it("accepts auditLog:view without malformed error", async () => {
-        (prisma.customRole.findFirst as unknown as Mock).mockResolvedValue({
-          id: CUSTOM_ROLE_ID,
-          name: "API Key: Audit Key",
-          permissions: ["auditLog:view"],
-        });
-
         const result = await caller.create({
           organizationId: ORG_ID,
           name: "Audit Key",
@@ -376,11 +412,6 @@ describe("apiKey router — restricted permissions", () => {
         (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(
           existingKey,
         );
-        (prisma.customRole.findFirst as unknown as Mock).mockResolvedValue({
-          id: CUSTOM_ROLE_ID,
-          name: "API Key: Old Key",
-          permissions: ["auditLog:view"],
-        });
 
         const result = await caller.update({
           organizationId: ORG_ID,

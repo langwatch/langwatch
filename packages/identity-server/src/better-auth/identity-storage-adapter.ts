@@ -1,5 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
-import { normalizeIdentifierValue } from "@langwatch/identity";
+import {
+  looksLikeSsoConnectionId,
+  normalizeIdentifierValue,
+} from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -10,6 +13,7 @@ import type {
   CleanedWhere,
   CustomAdapter,
   DBAdapter,
+  DBTransactionAdapter,
 } from "better-auth/adapters";
 import { createAdapterFactory } from "better-auth/adapters";
 import type { IdentityUserGate } from "../identity-user-gate";
@@ -27,8 +31,13 @@ import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
   IdentityResolutionPort,
 } from "./storage-ports";
+
+interface ProviderConfigReader {
+  open(stored: string): string;
+}
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
@@ -122,9 +131,35 @@ export interface IdentityStorageAdapterDeps {
    * byte-for-byte what the stock adapter did.
    */
   legacyEngine: (options: BetterAuthOptions) => DBAdapter;
+  /**
+   * ONE real Postgres transaction, with the legacy engine rebound to it.
+   *
+   * Required rather than optional, and for the reason every other dependency
+   * here is: better-auth's single sign-on plugin decides whether to run
+   * `resolveUser` at all by asking whether `transaction` is a function, and a
+   * dependency nobody wired would answer that question "no" while looking
+   * wired. The callback runs INSIDE the transaction and everything that
+   * reaches the engine it is handed runs there too; the transaction commits
+   * when the callback returns and rolls back when it throws, with the throw
+   * passed through rather than swallowed.
+   *
+   * Postgres only, and deliberately so — see `## Transaction` on
+   * `createIdentityStorageAdapter` for what that does and does not span.
+   */
+  postgresTransaction: <R>(
+    work: (
+      legacyEngine: (options: BetterAuthOptions) => DBAdapter,
+    ) => Promise<R>,
+  ) => Promise<R>;
   passkeyRemoval: PasskeyRemovalPort;
   accounts: IdentityAccountsPort;
   resolution: IdentityResolutionPort;
+  /**
+   * The issuer each connection registered, both ways. Required rather than
+   * optional: without it the legacy branch silently cannot serve a single
+   * connection, which is the shape of failure this port exists to end.
+   */
+  connectionIssuers: IdentityConnectionIssuersPort;
   ceremonies: IdentityAccountCeremonies;
   /** ADR-116 §2: `finalized` and nothing else, cached, fail-closed. */
   isUserOnIdentityWrites: IdentityUserGate;
@@ -140,6 +175,15 @@ export interface IdentityStorageAdapterDeps {
    * does.
    */
   isAnyoneOnIdentityWrites: () => Promise<boolean>;
+  /**
+   * Opens the engine row's dialing configuration on its way out (D09).
+   *
+   * Required rather than optional, and for the reason the credential vault
+   * is: a cipher nobody passed would leave the document readable by anybody
+   * holding a database copy, and an optional dependency nobody wires is a
+   * protection that only looks present.
+   */
+  providerConfig: ProviderConfigReader;
 }
 
 export type PasskeyRemovalOutcome =
@@ -190,23 +234,66 @@ export interface PasskeyRemovalPort {
  *
  * ## Transaction
  *
- * `transaction` is left unset, which makes the factory hand better-auth the
- * as-is passthrough — no real transaction, the same thing the application
- * ran with the stock `prismaAdapter`. The identity branch invents no
- * cross-branch transactional promise, and preserving the existing behavior
- * exactly is the point.
+ * `transaction` is a REAL Postgres transaction, and it spans the Postgres
+ * side ONLY. What it covers is everything better-auth issues through this
+ * adapter while the callback runs and that lands on the legacy engine: the
+ * `SsoProvider` row, `User`, `Session`, `Account`. What it does not cover is
+ * the identity branch — its facts are appended to the event store, a
+ * different database, and the Postgres rows its own ports hold
+ * (`Identifier`, `AccountCredential`) are written on the base connection
+ * rather than on this transaction's. No transaction can span the two stores,
+ * and the branch keeps the guarantee event sourcing offers instead: a
+ * command is atomic at its append and replaying it is idempotent.
+ *
+ * The narrower promise is the one better-auth's single sign-on plugin
+ * actually needs, and it is why this is no longer left unset. The plugin
+ * refuses `resolveUser` outright unless `adapterConfig.transaction` is a
+ * function, because it locks the `SsoProvider` row for the length of a link
+ * by issuing a no-op update against it and then checks the provider's
+ * identity boundary has not moved underneath the ceremony. A row lock only
+ * holds inside a transaction, so the factory's as-is passthrough would not
+ * merely forgo atomicity: it would leave that check reading a provider
+ * somebody could re-point mid-link. `SsoProvider` is a Postgres table, so a
+ * Postgres transaction gives the lock exactly the meaning it asks for.
+ *
+ * The shape is better-auth's own Prisma adapter's, verbatim: open the
+ * transaction, build a SECOND adapter around the engine bound to it, and
+ * hand that to the callback. The inner adapter declares no `transaction` of
+ * its own, so a nested `runWithTransaction` joins the open one rather than
+ * asking Prisma for an interactive transaction inside an interactive
+ * transaction, which its client cannot give.
  */
 export function createIdentityStorageAdapter(
   deps: IdentityStorageAdapterDeps,
 ): AdapterFactory<BetterAuthOptions> {
-  return (options) =>
-    createAdapterFactory({
-      config: identityAdapterConfig,
-      adapter: identityCustomAdapter({
-        ...deps,
-        legacy: deps.legacyEngine(options),
-      }),
-    })(options);
+  return (options) => {
+    /**
+     * One adapter over one engine. Called again per transaction, with the
+     * engine rebound, which is what puts the work inside the callback on the
+     * transaction instead of on the base connection.
+     */
+    const over = (
+      legacyEngine: (options: BetterAuthOptions) => DBAdapter,
+      config: AdapterFactoryConfig,
+    ): DBAdapter =>
+      createAdapterFactory({
+        config,
+        adapter: identityCustomAdapter({
+          ...deps,
+          legacy: legacyEngine(options),
+        }),
+      })(options);
+
+    return over(deps.legacyEngine, {
+      ...identityAdapterConfig,
+      transaction: <R>(
+        callback: (trx: DBTransactionAdapter<BetterAuthOptions>) => Promise<R>,
+      ): Promise<R> =>
+        deps.postgresTransaction((legacyEngine) =>
+          callback(over(legacyEngine, identityAdapterConfig)),
+        ),
+    });
+  };
 }
 
 /**
@@ -234,9 +321,11 @@ function identityCustomAdapter({
   passkeyRemoval,
   accounts,
   resolution,
+  connectionIssuers,
   ceremonies,
   isUserOnIdentityWrites,
   isAnyoneOnIdentityWrites,
+  providerConfig,
 }: Omit<IdentityStorageAdapterDeps, "legacyEngine"> & {
   legacy: DBAdapter;
 }): AdapterFactoryCustomizeAdapterCreator {
@@ -783,6 +872,8 @@ function identityCustomAdapter({
         // stays exactly as specific as it was. A built-in provider beside a
         // foreign issuer stays unanswerable, which is the case that would
         // resolve one provider's subject onto another's.
+        if (derived === null && looksLikeSsoConnectionId(providerId))
+          return rest;
         return null;
       }
 
@@ -791,7 +882,10 @@ function identityCustomAdapter({
       // issuer and the subject and NO provider id at all. A synthetic issuer
       // decodes; a connection's real one has to be looked up, because the
       // connection wrote it down when it registered.
-      const registered = derived;
+      const registered =
+        derived === null
+          ? await connectionIssuers.providerIdForIssuer({ issuer })
+          : derived;
       // An issuer no connection registered and no provider id encodes — a
       // built-in provider's REAL issuer, of which Google's is the one that
       // matters. Answered by matching the column directly.
@@ -833,6 +927,29 @@ function identityCustomAdapter({
      * returned unchanged, so this needs no backfill to be correct and no
      * branch at the call sites.
      */
+    const withOpenedProviderConfig = (model: string, row: Row): Row => {
+      if (modelOf(model) !== "ssoProvider") return row;
+      const opened = { ...row };
+      for (const field of ["oidcConfig", "samlConfig"] as const) {
+        const stored = opened[field];
+        if (typeof stored === "string" && stored.length > 0) {
+          opened[field] = providerConfig.open(stored);
+        }
+      }
+      return opened;
+    };
+
+    /**
+     * Everything a row needs on its way OUT of the store, in one place.
+     *
+     * Both halves are per-model no-ops for the model the other one serves, so
+     * every generic read path can call this without asking what it is holding
+     * — which is what keeps a new outbound rule from having to be remembered
+     * at four call sites.
+     */
+    const outbound = async (model: string, row: Row): Promise<Row> =>
+      withOpenedProviderConfig(model, await withLegacyIssuer(model, row));
+
     const withLegacyIssuer = async (model: string, row: Row): Promise<Row> => {
       if (modelOf(model) !== "account") return row;
       if (row.issuer != null) return row;
@@ -844,9 +961,12 @@ function identityCustomAdapter({
       // again under `requireExactAccountBinding`). Minting `local:oauth:<id>`
       // for a connection fails that comparison every time, so finding the row
       // at all would not have been enough on its own.
+      const registered = await connectionIssuers.registeredIssuerFor({
+        providerId,
+      });
       return {
         ...row,
-        issuer: issuerForProviderId(providerId),
+        issuer: registered ?? issuerForProviderId(providerId),
       };
     };
 
@@ -874,7 +994,7 @@ function identityCustomAdapter({
           // ceremony pinned would stop being the row's.
           forceAllowId: true,
         });
-        return toStorageKeys(model, await withLegacyIssuer(model, row)) as never;
+        return toStorageKeys(model, await outbound(model, row)) as never;
       },
 
       findOne: async ({ model, where, select, join }) => {
@@ -904,7 +1024,7 @@ function identityCustomAdapter({
         });
         return found === null
           ? null
-          : (toStorageKeys(model, await withLegacyIssuer(model, found)) as never);
+          : (toStorageKeys(model, await outbound(model, found)) as never);
       },
 
       findMany: async ({
@@ -966,7 +1086,7 @@ function identityCustomAdapter({
         });
         return (await Promise.all(
           found.map(async (row) =>
-            toStorageKeys(model, await withLegacyIssuer(model, row)),
+            toStorageKeys(model, await outbound(model, row)),
           ),
         )) as never;
       },
@@ -1047,7 +1167,7 @@ function identityCustomAdapter({
         });
         return row === null
           ? null
-          : (toStorageKeys(model, await withLegacyIssuer(model, row)) as never);
+          : (toStorageKeys(model, await outbound(model, row)) as never);
       },
 
       updateMany: async ({ model, where, update }) => {
@@ -1100,8 +1220,9 @@ function identityCustomAdapter({
               ),
             );
           }
-          const outcome =
-            await passkeyRemoval.deleteIfAnotherWayInRemains({ passkeyId });
+          const outcome = await passkeyRemoval.deleteIfAnotherWayInRemains({
+            passkeyId,
+          });
           if (outcome === "would_strand_user") {
             throw APIError.from("BAD_REQUEST", {
               code: "LAST_WAY_IN",
@@ -1166,7 +1287,10 @@ function identityCustomAdapter({
         const row = await legacy.incrementOne<Row>({
           model,
           where,
-          increment: toCanonicalKeys(model, increment) as Record<string, number>,
+          increment: toCanonicalKeys(model, increment) as Record<
+            string,
+            number
+          >,
           set: set === undefined ? undefined : toCanonicalKeys(model, set),
         });
         return row === null ? null : (toStorageKeys(model, row) as never);
@@ -1240,7 +1364,19 @@ async function surfaceHandledRefusals<T>(run: () => Promise<T>): Promise<T> {
 
 /** better-auth's status vocabulary, from ours. Anything unmapped is a 500,
  *  which is the honest answer for a status the library cannot name. */
-function httpStatusFor(httpStatus: number): "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "GONE" | "UNPROCESSABLE_ENTITY" | "TOO_MANY_REQUESTS" | "SERVICE_UNAVAILABLE" | "INTERNAL_SERVER_ERROR" {
+function httpStatusFor(
+  httpStatus: number,
+):
+  | "BAD_REQUEST"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "CONFLICT"
+  | "GONE"
+  | "UNPROCESSABLE_ENTITY"
+  | "TOO_MANY_REQUESTS"
+  | "SERVICE_UNAVAILABLE"
+  | "INTERNAL_SERVER_ERROR" {
   switch (httpStatus) {
     case 400:
       return "BAD_REQUEST";

@@ -7,6 +7,7 @@
  * - src/pages/api/annotations/trace/[trace].ts
  */
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
@@ -17,7 +18,6 @@ import {
   annotationAnchorScopeSchema,
   annotationAnchorScopeWhere,
 } from "~/server/annotations/annotationAnchor";
-import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
   apiKeyCeilingDenialResponse,

@@ -31,8 +31,11 @@ import {
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   AiToolEntryService,
@@ -54,7 +57,10 @@ describe("aiToolsRouter integration", () => {
 
   beforeAll(async () => {
     await resetApp();
-    globalForApp.__langwatch_app = createTestApp();
+    resetAuthzGrantsCommandsForTests();
+    globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
 
     const organization = await prisma.organization.create({
       data: { name: `AiTools Org ${ns}`, slug: `--ait-${ns}` },
@@ -110,14 +116,12 @@ describe("aiToolsRouter integration", () => {
         role: TeamUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId: admin.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: admin.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     const memberPlatform = await prisma.user.create({
@@ -141,14 +145,12 @@ describe("aiToolsRouter integration", () => {
         role: TeamUserRole.MEMBER,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId: memberPlatform.id,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: memberPlatform.id,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     const memberOrphan = await prisma.user.create({
@@ -162,14 +164,12 @@ describe("aiToolsRouter integration", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId: memberOrphan.id,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: memberOrphan.id,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // EXTERNAL (lite) member: a bare org membership, no department, no
@@ -192,6 +192,7 @@ describe("aiToolsRouter integration", () => {
   afterAll(async () => {
     await cleanupTestRows(prisma, [
       ["aiToolEntry", { organizationId }],
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { team: { organizationId } }],
       ["organizationUser", { organizationId }],
@@ -538,14 +539,12 @@ describe("aiToolsRouter integration", () => {
           role: OrganizationUserRole.MEMBER,
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: org.id,
-          userId: member.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: org.id,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: org.id,
+        userId: member.id,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: org.id,
       });
 
       try {
@@ -703,14 +702,12 @@ describe("aiToolsRouter integration", () => {
           role: OrganizationUserRole.ADMIN,
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: freshOrgId,
-          userId: adminUserId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: freshOrgId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: freshOrgId,
+        userId: adminUserId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: freshOrgId,
       });
 
       try {
@@ -785,14 +782,12 @@ describe("aiToolsRouter integration", () => {
           role: OrganizationUserRole.ADMIN,
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: freshOrgId,
-          userId: adminUserId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: freshOrgId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: freshOrgId,
+        userId: adminUserId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: freshOrgId,
       });
 
       try {
@@ -892,14 +887,12 @@ describe("aiToolsRouter integration", () => {
           role: OrganizationUserRole.ADMIN,
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: freshOrgId,
-          userId: adminUserId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: freshOrgId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: freshOrgId,
+        userId: adminUserId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: freshOrgId,
       });
 
       try {

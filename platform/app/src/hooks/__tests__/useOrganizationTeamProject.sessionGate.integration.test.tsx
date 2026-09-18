@@ -38,6 +38,7 @@ const { mockOrganizationsQuery, mockRouter, idleQuery, session } = vi.hoisted(
 vi.mock("~/utils/api", () => ({
   api: {
     organization: { getAll: { useQuery: mockOrganizationsQuery } },
+    authz: { effectivePermissions: { useQuery: idleQuery } },
     sharedTrace: { get: { useQuery: idleQuery } },
     publicEnv: { useQuery: idleQuery },
     modelProvider: { getAllForProject: { useQuery: idleQuery } },

@@ -15,6 +15,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 
 // License limits need the app layer, which is not initialized under
 // vitest — same workaround as the other router integration tests.
@@ -125,6 +126,14 @@ describe("workflow.create node LLM materialization", () => {
       data: { userId, teamId, role: TeamUserRole.ADMIN },
     });
 
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: "ORGANIZATION",
+      scopeId: organizationId,
+    });
+
     caller = appRouter.createCaller(
       createInnerTRPCContext({
         session: { user: { id: userId }, expires: "1" },
@@ -147,6 +156,8 @@ describe("workflow.create node LLM materialization", () => {
       ["workflow", { projectId }],
       ["modelDefaultConfig", { organizationId }],
       ["teamUser", { teamId }],
+      ["grant", { organizationId }],
+      ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["project", { id: projectId }],
       ["team", { id: teamId }],

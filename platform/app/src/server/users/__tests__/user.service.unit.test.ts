@@ -33,6 +33,36 @@ describe("UserService", () => {
     service = UserService.create(prisma);
   });
 
+  describe("create()", () => {
+    it("persists an explicitly inactive account inactive from the first write", async () => {
+      await service.create({
+        name: "Inactive person",
+        email: "inactive@example.com",
+        active: false,
+      });
+
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: {
+          name: "Inactive person",
+          email: "inactive@example.com",
+          deactivatedAt: expect.any(Date),
+        },
+      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("preserves active creation when no status is supplied", async () => {
+      await service.create({
+        name: "Active person",
+        email: "active@example.com",
+      });
+
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: { name: "Active person", email: "active@example.com" },
+      });
+    });
+  });
+
   describe("deactivate()", () => {
     describe("when called with a valid user id", () => {
       it("sets deactivatedAt to the current timestamp", async () => {

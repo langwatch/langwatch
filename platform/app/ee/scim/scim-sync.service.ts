@@ -33,6 +33,7 @@ import {
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
   RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE,
   RECORD_SCIM_USER_PUSH_COMMAND_TYPE,
+  REDRIVE_SCIM_APPLY_COMMAND_TYPE,
   REVOKE_SCIM_SYNC_COMMAND_TYPE,
   type ScimApplyOp,
   type ScimRevokeCause,
@@ -41,11 +42,9 @@ import {
   type ScimUserOp,
   scimSyncIdFor,
 } from "@langwatch/identity";
-import {
-  newScimSyncCommandId,
-  type ScimSyncGuards,
-  type ScimSyncLedger,
-} from "@langwatch/identity-server";
+import type { ScimSyncGuards } from "./scim-sync-guards";
+import { newScimSyncCommandId } from "./scim-sync-id";
+import type { ScimSyncLedger } from "./scim-sync-ledger.port";
 
 /**
  * The durable record's actor. One principal for every connection an
@@ -176,6 +175,36 @@ export class ScimSyncLifecycle {
     await this.commit(
       { type: RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE, data },
       await this.guards.recordScimApplyFailure(data),
+    );
+  }
+
+  /**
+   * A platform operator sent a retired apply through again (ADR-122).
+   *
+   * The one verb here whose actor is NOT the directory. It is stamped with
+   * the operator because a re-drive is authority exercised across a tenant
+   * boundary, and the tenant's own history is where that has to be readable —
+   * an audit row only support can see would not be.
+   */
+  async applyRedriven({
+    organizationId,
+    connectionId,
+    retiredAtMs,
+    operator,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    retiredAtMs: number;
+    operator: { userId: string };
+  }): Promise<void> {
+    const data = {
+      ...this.identity({ organizationId, connectionId }),
+      actor: { type: "user", id: operator.userId } as const,
+      retiredAtMs,
+    };
+    await this.commit(
+      { type: REDRIVE_SCIM_APPLY_COMMAND_TYPE, data },
+      await this.guards.redriveScimApply(data),
     );
   }
 

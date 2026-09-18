@@ -29,9 +29,12 @@ import {
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { createUpgradeRouter } from "~/server/websockets/upgrade-router";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -264,7 +267,11 @@ beforeAll(async () => {
   })!;
   if (!connection) throw new Error("These tests need a real Redis");
   await resetApp();
-  globalForApp.__langwatch_app = createTestApp({ redis: connection });
+  resetAuthzGrantsCommandsForTests();
+  globalForApp.__langwatch_app = createTestApp({
+    _eventSourcing: createAuthzTestEventSourcing(prisma),
+    redis: connection,
+  });
 
   organization = await prisma.organization.create({
     data: { name: "Connected Org", slug: `--test-org-${ns}` },
@@ -290,15 +297,13 @@ beforeAll(async () => {
   await prisma.teamUser.create({
     data: { userId, teamId: team.id, role: TeamUserRole.ADMIN },
   });
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId: organization.id,
-      userId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId: organization.id,
+    userId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organization.id,
   });
   projectApiKey = `sk-lw-${nanoid(48)}`;
   const project = await prisma.project.create({
@@ -396,6 +401,7 @@ afterAll(async () => {
   await stopPod(podB);
   await cleanupTestRows(prisma, [
     ["agent", { projectId }],
+    ["grant", { organizationId: organization.id }],
     ["roleBinding", { organizationId: organization.id }],
     ["apiKey", { organizationId: organization.id }],
     ["project", { teamId: team.id }],
@@ -406,6 +412,7 @@ afterAll(async () => {
     ["user", { id: userId }],
   ]);
   await resetApp();
+  resetAuthzGrantsCommandsForTests();
   connection.disconnect();
 });
 

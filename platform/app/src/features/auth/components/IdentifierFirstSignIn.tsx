@@ -2,8 +2,9 @@ import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
+import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
-import { normalizeErrorCode, SignInError } from "~/pages/auth/error";
+import { SignInError } from "~/pages/auth/error";
 import { api } from "~/utils/api";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { replaceLocation } from "~/utils/browserNavigation";
@@ -327,6 +328,7 @@ export function IdentifierFirstSignIn() {
         onContinue={dialFederated}
         callbackUrl={callbackUrl}
         loginHint={submittedIdentifier?.trim() || undefined}
+        autoStart={submittedIdentifier !== null}
       />
     );
   }
@@ -636,8 +638,11 @@ export function RoutedToConnection({
   loginHint,
   title = "Log in to LangWatch",
   footer,
+  autoStart = true,
 }: {
   decision: RoutingDecision;
+  /** A typed address is a sign-in gesture; opening the page alone is not. */
+  autoStart?: boolean;
   onContinue: (method: SignInMethod) => void;
   callbackUrl?: string;
   /** The address that routed here, handed to the provider as the OIDC
@@ -654,10 +659,10 @@ export function RoutedToConnection({
   const [waitIsVisible, setWaitIsVisible] = useState(false);
 
   useEffect(() => {
-    if (!method || dialed.current) return;
+    if (!autoStart || !method || dialed.current) return;
     dialed.current = true;
     void signIn(method.id, { callbackUrl, loginHint });
-  }, [method, callbackUrl, loginHint]);
+  }, [autoStart, method, callbackUrl, loginHint]);
 
   useEffect(() => {
     const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);
@@ -665,15 +670,16 @@ export function RoutedToConnection({
   }, []);
 
   if (!method) return null;
-  if (!waitIsVisible) return null;
+  if (autoStart && !waitIsVisible) return null;
 
   return (
     <AuthCard title={title}>
       <HStack gap={3}>
-        <Spinner size="sm" color="orange.500" />
+        {autoStart && <Spinner size="sm" color="orange.500" />}
         <Text data-testid="routed-to-connection">
-          Taking you to your organization's sign-in with{" "}
-          {signInMethodLabel(method)}.
+          {autoStart
+            ? `Taking you to your organization's sign-in with ${signInMethodLabel(method)}.`
+            : `Log in with ${signInMethodLabel(method)} to continue.`}
         </Text>
       </HStack>
       <AuthPrimaryButton onClick={() => onContinue(method)}>

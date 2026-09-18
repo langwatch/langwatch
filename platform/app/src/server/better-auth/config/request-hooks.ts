@@ -36,11 +36,39 @@ export interface RequestHooksDeps {
   twoStepCeremonies: () => TwoStepCeremoniesPort;
   /** Opening the session a completed reset earned (D13). */
   signInAfterPasswordReset: (ctx: ResetEndpointContext) => Promise<void>;
-  /** Whether an organization's own connection governs this address (D04).
-   *  Asked at the credential boundary so a deployment that issues its own
-   *  passwords still cannot hand one to somebody their company signs in. */
+  /** Whether an organization connection forbids resetting this address. */
   addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
+  /** Locking an address after repeated failures (GAC-09). */
+  signInLockout: () => SignInAttemptCounter;
 }
+
+/**
+ * The part of the lock-out service these hooks use.
+ *
+ * Narrower than the service on purpose: a request hook may refuse an attempt
+ * and record how it went, and must not be able to release a hold - that is an
+ * administrator's act, and it belongs on a surface with a permission on it.
+ */
+export interface SignInAttemptCounter {
+  refuseIfLockedOut(args: { identifier: string }): Promise<void>;
+  recordFailure(args: { identifier: string }): Promise<void>;
+  recordSuccess(args: { identifier: string }): Promise<void>;
+}
+
+/**
+ * The paths where a sign-in is ATTEMPTED with an address in hand (GAC-09).
+ * Spec: specs/identity/org-account-lockout.feature.
+ *
+ * Only the password path, and the spec says why at length: this counter is
+ * keyed on the address, and the second-step endpoints carry no address - a
+ * wrong one-time code arrives with a pending ceremony and nothing naming
+ * whose it is. Those keep the two-step plugin's own per-account lock, which
+ * has been there since D06.
+ */
+const LOCKOUT_COUNTED_SUFFIXES = ["/sign-in/email"] as const;
+
+const isLockoutCountedPath = (pathname: string): boolean =>
+  LOCKOUT_COUNTED_SUFFIXES.some((suffix) => pathname.endsWith(suffix));
 
 /**
  * Whether a licensed deployment should refuse this credential route, the
@@ -79,7 +107,7 @@ function refusesCredentialRoute({
   //
   // This answers for the DEPLOYMENT only. An address governed by an
   // organization's own connection is refused separately, by
-  // `refuseConnectionGovernedCredential` — a policy that offers a password
+  // the session guard — a policy that offers a password
   // says nothing about whether THIS address may use one.
   if (policy.defaultMethods.some((method) => method.kind === "password")) {
     return false;
@@ -95,60 +123,19 @@ function submittedAddress(body: unknown): string | null {
   return typeof email === "string" && email.length > 0 ? email : null;
 }
 
-/**
- * Refuses a credential route for an address an ORGANIZATION routes through
- * its own identity provider.
- *
- * The deployment-wide policy cannot answer this. It knows a password is
- * offered *somewhere* on this deployment; it does not know that this
- * particular address belongs to a company whose connection is the only way
- * its people are supposed to get in. Before a deployment could issue its own
- * passwords the distinction never arose — `refusesCredentialRoute` turned
- * every credential route away on any federating deployment, so no address
- * reached one — and opening that door for the deployment would have opened it
- * for those addresses too.
- *
- * That is an authorization bypass rather than an untidiness: an organization
- * mandating SSO gets session lifetime, conditional access and revocation from
- * its own provider, and a local password beside that connection silently
- * answers none of them. Sign-up already refuses on the same ground — it asks
- * the router, which ranks a live domain connection above everything — so this
- * is the same rule stated at the boundary the router does not sit on.
- *
- * Asked ONLY for a request that names an address and only once the policy has
- * already allowed the route, so no deployment that refused these paths before
- * now pays a lookup for them. Email mode never arrives at all — the hook has
- * already returned at `deploymentIsFederationCapable` — and a deployment that
- * offers no password of its own was refused a line earlier.
- *
- * `/reset-password` carries a token rather than an address, so it is allowed
- * through: a token can only be obtained from `/request-password-reset`, which
- * this refuses, leaving one narrow residue — a token issued in the hour before
- * an organization's connection went live is still redeemable. Resolving the
- * token to its user here would close it, and is not worth putting a second
- * lookup on the path for a window that opens only as a connection is created.
- */
-async function refuseConnectionGovernedCredential({
+/** Reset requests cannot use a recovery grant before proving whose it is. */
+async function refuseConnectionGovernedReset({
   pathname,
-  isResetPath,
-  policy,
   body,
   addressRoutesToConnection,
 }: {
   pathname: string;
-  isResetPath: boolean;
-  policy: SignInMethodPolicy;
   body: unknown;
   addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
 }): Promise<void> {
-  if (!isResetPath && !isEmailAuthPath(pathname)) return;
-  // Only the deployments this PR opened these routes for can reach a
-  // connection-governed address here; everywhere else the refusal above
-  // already answered.
-  if (!policy.defaultMethods.some((method) => method.kind === "password")) {
-    return;
-  }
+  if (!isPasswordResetPath(pathname)) return;
 
+  // Token redemption has no address; preserve already-issued reset tokens.
   const email = submittedAddress(body);
   if (email === null) return;
   if (!(await addressRoutesToConnection({ email }))) return;
@@ -254,21 +241,18 @@ async function enforceFederationRoutes({
   resolveSignInMethodPolicy: () => Promise<SignInMethodPolicy>;
   addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
 }): Promise<void> {
-  // Deployments that name no federated method never register an IdP, so
-  // there is no policy to enforce. The answer stays synchronous in email mode.
-  if (!deploymentIsFederationCapable()) return;
+  if (deploymentIsFederationCapable()) {
+    refuseCredentialMutation(pathname);
+    if (!isGateDependentPath(url)) return;
 
-  refuseCredentialMutation(pathname);
-  if (!isGateDependentPath(url)) return;
+    const policy = await resolveSignInMethodPolicy();
+    enforceGate({ url, pathname, policy });
+  }
 
-  const policy = await resolveSignInMethodPolicy();
-  enforceGate({ url, pathname, policy });
-  // After the deployment-wide answer, never instead of it: the organization's
-  // connection is a second refusal over an address the policy has allowed.
-  await refuseConnectionGovernedCredential({
+  // Organization connections also exist in email-mode deployments. Password
+  // sign-in checks the verified user and recovery grant at session creation.
+  await refuseConnectionGovernedReset({
     pathname,
-    isResetPath: isPasswordResetPath(pathname),
-    policy,
     body,
     addressRoutesToConnection,
   });
@@ -305,6 +289,46 @@ async function enforceFederationRoutes({
  *     OAuth-born with no password, so reset is the inbox-proof
  *     self-recovery door (Decision 4 exception).
  */
+/**
+ * Records how a sign-in attempt went (GAC-09).
+ *
+ * Its own failure is swallowed, and that is the right trade in both
+ * directions. A counter that could not be written must not turn somebody's
+ * correct password into an error, and it must not turn a wrong one into a
+ * success either - the endpoint has already answered by the time this runs,
+ * so neither outcome is changed by anything here. What is lost is a count,
+ * and the log line is what makes that findable.
+ */
+async function countSignInAttempt({
+  ctx,
+  signInLockout,
+}: {
+  ctx: {
+    request?: { url?: string };
+    body?: unknown;
+    context?: { returned?: unknown };
+  };
+  signInLockout: () => SignInAttemptCounter;
+}): Promise<void> {
+  const pathname = normalizedRequestPathname(ctx.request?.url ?? "");
+  if (!isLockoutCountedPath(pathname)) return;
+
+  const identifier = submittedAddress(ctx.body);
+  if (identifier === null) return;
+
+  const refused = ctx.context?.returned instanceof APIError;
+  try {
+    await (refused
+      ? signInLockout().recordFailure({ identifier })
+      : signInLockout().recordSuccess({ identifier }));
+  } catch (error) {
+    logger.warn(
+      { error, refused },
+      "could not record how a sign-in attempt went; the attempt itself already answered",
+    );
+  }
+}
+
 export function requestHooks({
   refuseIfItClosesTheLastDoor,
   requiringOrganizations,
@@ -313,12 +337,27 @@ export function requestHooks({
   twoStepCeremonies,
   signInAfterPasswordReset,
   addressRoutesToConnection,
+  signInLockout,
 }: RequestHooksDeps): BetterAuthOptions["hooks"] {
   return {
     before: createAuthMiddleware(async (ctx) => {
       const url = ctx.request?.url ?? "";
       const pathname = normalizedRequestPathname(url);
       const endpointPath = ctx.path ?? pathname;
+
+      // GAC-09, and FIRST of the checks here, because a locked address must
+      // not get a free credential comparison out of every attempt: running
+      // the password check before the lock would let somebody keep testing
+      // passwords for as long as they liked and simply not be told the
+      // answer, with the timing of the response telling them anyway.
+      const attemptedAddress = isLockoutCountedPath(pathname)
+        ? submittedAddress(ctx.body)
+        : null;
+      if (attemptedAddress !== null) {
+        await signInLockout().refuseIfLockedOut({
+          identifier: attemptedAddress,
+        });
+      }
 
       // Local account creation belongs to `user.register`, which writes the
       // pending-confirmation latch and sends its continuation email. Leaving
@@ -389,6 +428,12 @@ export function requestHooks({
       // `password-reset-session.ts` for why the callback and the hook split
       // the job between them.
       await signInAfterPasswordReset(ctx as never);
+      // GAC-09: how the attempt went. Counted HERE rather than optimistically
+      // in the before hook because after-hooks run for refusals too —
+      // better-auth puts the `APIError` in `returned` rather than throwing
+      // past them — so the outcome is known exactly, and a correct password
+      // is never counted as a failure.
+      await countSignInAttempt({ ctx, signInLockout });
     }),
   };
 }

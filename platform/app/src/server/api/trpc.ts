@@ -57,6 +57,10 @@ import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import superjson from "superjson";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import { type App, getApp } from "~/server/app-layer/app";
+import type {
+  OpsScope,
+  PermissionMiddleware,
+} from "~/server/app-layer/authz/permission-adapters";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -75,7 +79,6 @@ import {
 } from "../app-layer/authz/trpc-middleware";
 import { rateLimit } from "../rateLimit";
 import { isAuditLogExempt } from "./auditLogExemptions";
-import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
 

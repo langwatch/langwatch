@@ -1,3 +1,5 @@
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 /**
  * @vitest-environment node
  *
@@ -31,6 +33,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -69,8 +72,10 @@ describe("Feature: Governance REST API", () => {
 
   beforeEach(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -123,14 +128,12 @@ describe("Feature: Governance REST API", () => {
 
     // ApiKeyService.create reads the creator's own RoleBindings to enforce
     // the ceiling; an org-scoped ADMIN grant lets the PAT request the same.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: testOrganization.id,
-        userId: testUser.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId: testUser.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
 
     const apiKeyResult = await ApiKeyService.create(prisma).create({
@@ -193,6 +196,9 @@ describe("Feature: Governance REST API", () => {
     });
     // RoleBindings carry the required relation to the PAT's ApiKey, so they
     // must be removed before the keys they belong to.
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: orgIds } },
+    });
     await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: orgIds } },
     });

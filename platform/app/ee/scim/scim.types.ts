@@ -50,6 +50,13 @@ export interface ScimError {
   schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"];
   status: string;
   detail: string;
+  /**
+   * The protocol's own name for WHY a 400 was refused (RFC 7644 §3.12) —
+   * `invalidFilter` for a filter we will not answer. Providers branch on
+   * this rather than on the prose, so a refusal without it reads to them as
+   * an unexplained failure.
+   */
+  scimType?: string;
 }
 
 /**
@@ -97,13 +104,32 @@ const scimEnterpriseUserSchema = z
   })
   .passthrough();
 
+/**
+ * The identity provider's own id for a resource, as it actually arrives.
+ *
+ * ABSENT AND BLANK ARE THE SAME THING, and only one of them was accepted.
+ * `externalId` is optional in RFC 7644, and a provisioning client that has no
+ * external id for somebody sends the key with an empty string about as often
+ * as it omits it - the simulator did, and so do real ones. Refusing on
+ * `.min(1)` turned that into a 400 for the WHOLE user, over a field nothing
+ * required, with a Zod sentence for a detail.
+ *
+ * So an empty string is read as "none" here rather than argued with, and
+ * `.min(1)` still stands for anything that is actually present: what must
+ * never reach the store is a blank id pretending to be one.
+ */
+const scimExternalId = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(1).optional(),
+);
+
 export const scimCreateUserRequestSchema = z
   .object({
     schemas: z.array(z.string()),
     /** Declared, not cast. It used to be read off the parsed body through a
      *  `as { externalId?: string }` the schema knew nothing about, so nothing
      *  validated it and nothing said it existed. */
-    externalId: z.string().min(1).optional(),
+    externalId: scimExternalId,
     userName: z.string().email(),
     name: z
       .object({
@@ -155,7 +181,7 @@ export const scimGroupMemberSchema = z.object({
 export const scimCreateGroupRequestSchema = z.object({
   schemas: z.array(z.string()),
   /** Declared, not cast — see the note on the user schema above. */
-  externalId: z.string().min(1).optional(),
+  externalId: scimExternalId,
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });
@@ -169,7 +195,7 @@ export const scimReplaceGroupRequestSchema = z.object({
   /** A PUT restates the whole resource, so it restates this too. It used to
    *  be accepted on create only, which meant a directory that started sending
    *  it later could never attach it. */
-  externalId: z.string().min(1).optional(),
+  externalId: scimExternalId,
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });
