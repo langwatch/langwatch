@@ -4,20 +4,13 @@
  * routing, NProgress) lives in `@langwatch/ui`'s `ui/sections`.
  */
 import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
+
 import { colorSystem } from "../color-mode/index.tsx";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
 
 // Inter and JetBrains Mono are loaded by the CSS @import in the application's
-// globals.scss; Sentient is self-hosted and declared with @font-face there.
-// This file names the families, it does not fetch them.
+// globals.scss. This file names the families, it does not fetch them.
 const interFontFamily = "'Inter', sans-serif";
-
-/**
- * The display voice. Sentient is the LangWatch site's own heading face, and the
- * fallback is a real serif stack in the same register rather than the sans —
- * a missing file should read as the same decision, not as a missing one.
- */
-const sentientFontFamily = '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
 
 /** The face the product's small technical lines are set in. */
 const monoFontFamily =
@@ -81,7 +74,7 @@ export const designSystemConfig = defineConfig({
     tokens: {
       fonts: {
         heading: {
-          value: sentientFontFamily,
+          value: interFontFamily,
         },
         body: {
           value: interFontFamily,
@@ -536,11 +529,7 @@ export const designSystemConfig = defineConfig({
       }),
       heading: defineRecipe({
         base: {
-          // The site sets its display face light and tight. The weight stays at
-          // 500 (Sentient Medium, vendored) rather than the hero's 400: a
-          // 14px section heading at 400 stops reading as a heading.
           fontWeight: "500",
-          letterSpacing: "-0.03em",
           color: "fg",
         },
         variants: {

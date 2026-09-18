@@ -25,7 +25,8 @@ describe("the application-composed design system", () => {
     });
 
     it("keeps the shared foundations it composes over", () => {
-      expect(uiDesignSystem.token("fonts.heading")).toContain("Sentient");
+      // Headings are set in the body face, as the product has always set them.
+      expect(uiDesignSystem.token("fonts.heading")).toContain("Inter");
       expect(uiDesignSystem.token("fonts.mono")).toContain("JetBrains Mono");
     });
   });
