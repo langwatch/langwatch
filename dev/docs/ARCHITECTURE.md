@@ -779,6 +779,30 @@ Drawers are URL-routed singletons with a navigation stack, opened through the
 host capability, registered through the declaration. One tRPC client for the
 whole browser.
 
+### 10.1 Shared browser machinery (ruled 2026-09-18)
+
+The browser mirrors the process grammar, adapted rather than copied — when a
+browser shape has no obvious process twin, the shape is asked for, not
+invented:
+
+- **Capability classes on the shell.** Everything shared (analytics, session,
+  navigation, environment) is a small class composed by the shell and received
+  by modules only through their declared `*HostApi`. Ambient React context is
+  never a cross-module transport; modules never import a vendor (posthog,
+  router, theme) directly.
+- **One Analytics capability** wraps every instrumentation destination
+  (posthog, gtag, browser tracing). Modules emit named events through it —
+  the browser twin of a channel.
+- **State defaults to server state**: react-query over the derived tRPC
+  client is the normal answer, so cross-module client state is rare and ruled
+  case by case. The unit of browser sharing is the **published hook** — the
+  owner publishes hooks through its kit; shared mutable-state packages are
+  not a tier.
+- **apps/ui holds no product code**: `main.tsx` + `shell/` (+ `styles/`)
+  only. The former `behavior/` layer dissolves — shared machinery becomes
+  shell capability classes, module-specific parts move into their owning
+  module's browser half.
+
 ---
 
 ## 11. Enterprise
