@@ -1,97 +1,102 @@
-# Publish a web surface
+# Publish a browser kit
 
-Read `.claude/skills/architecture-guide/references/web.md` first.
+Read `dev/docs/ARCHITECTURE.md` §3.4 (the kit law) first.
 
-A **screen** is a whole page, and only the module of the same id may consume it
-(`ui-screen-owner`). A **surface** is any other public piece (a picker, a panel, a
-store, a chart, a host provider) that a _different_ module may mount. Everything else
-in a web package is private.
+A module's `*-browser` package is **closed**: nothing else ever imports it,
+ever. The moment a *different* module needs a hook, store or component this
+module owns, that thing moves to a new package, `<name>-browser-kit` —
+sharing is declared by moving code, never observed by reaching in. This
+replaces the older per-application "surfaces" catalogue: a consumer no longer
+declares `uses.surfaces` on itself and reaches into another module's `web`
+package; it imports the owner's **kit** package directly, like any other
+workspace dependency.
 
-## 1. Decide the id and where the code lives
+## 1. Decide whether a kit is warranted
 
-The id is lower-kebab and names what the consumer mounts, not where the file sits:
-`annotation-card`, `annotation-chips`, `annotation-form`, `annotation-scores`. The export path
-is the contract; the module behind it is a flat entry file `src/<id>.ts` that names what
-the consumer may reach (the older `surfaces/<id>/index.ts` barrel is still accepted).
+The kit law, in order:
 
-`modules/annotation/web/src/annotation-card.ts` is the entry idiom:
+1. **A kit exists only where sharing is real — three or more consumers.**
+   One consumer is bilateral coupling, not an API: inline or duplicate the
+   piece instead of creating a kit for it.
+2. **A kit is a leaf.** It may import contracts (any module's),
+   `@langwatch/design-system` and `@langwatch/browser-host`. It may not
+   import its own module's `*-browser`, any other module's `*-browser`, or
+   another kit.
+3. **A kit fetches nothing.** No project-scoped queries, no
+   `@langwatch/browser-trpc`. Presentational components and pure hooks and
+   stores only; each consumer wires its own data (the model-selector ruling:
+   the kit takes `options/value/onChange`, each consumer runs its own
+   query).
+4. **A kit is a package, not a subpath.** A subpath inside `*-browser` is
+   invisible to the dependency graph — it cannot break a cycle or be
+   budgeted. A separate package makes every cross-module browser edge a
+   visible, lintable manifest line.
+5. **The published tier is shrink-only.** Once something is in a kit, moving
+   it back to being private is the exception, not the norm — don't publish
+   speculatively hoping for a second consumer.
+
+If you are not sure three consumers are real, say so in the report and
+default to leaving the piece private; a kit created for one consumer is a
+finding the next audit will raise.
+
+## 2. Create or extend the kit package
+
+`modules/<owner>/browser-kit/` (`@langwatch/<owner>-browser-kit`), a normal
+workspace package with its own `package.json`, `tsconfig.json`,
+`vitest.config.ts`. Move the component, hook or store in — do not copy it and
+leave the original behind in `*-browser`; the original's importers inside the
+owner's own browser package now import from the kit too, so there is exactly
+one copy.
 
 ```ts
-export * from "./ui/blocks/annotation-card.tsx";
+// modules/annotation/browser-kit/src/annotation-form.ts
+export * from "./ui/annotation-form.tsx";
 ```
 
-and `annotations.ts` in the same package shows an entry that publishes a screen loader,
-the api binding, the host port and a few hooks together.
+Keep the layer order inside the kit: a pure hook or a presentational
+component only — no `behavior/` that fetches, no api binding. A piece that
+needs data takes it as props (`options/value/onChange`), never as a query
+result it runs itself.
 
-## 2. Export it
+## 3. Export it
 
-`modules/<owner>/web/package.json`:
-
-```json
-"./annotation-card": {
-  "langwatch-declaration-source": "./src/annotation-card.ts",
-  "types": "./dist/annotation-card.d.ts",
-  "default": "./src/annotation-card.ts"
-}
-```
-
-`ui-web-public-entry` allows a flat `./<id>` only when the catalogue declares it (step 3),
-plus the older `./screens/<id>` and `./surfaces/<id>`; the id must match
-`[a-z][a-z0-9]*(-[a-z0-9]+)*`. `ui-screen-closure` then walks the whole import
-graph behind each export and rejects direct browser capabilities, non-literal module
-specifiers, forbidden presentation imports and anything reaching outside the package.
-`@langwatch/design-system` and any `*-contract` package are always allowed.
-
-Keep the layer order behind the surface: an element or block may not import behavior; a
-section may. A surface that needs data composes a section.
-
-## 3. Declare the use
-
-`apps/ui/src/features/catalogue.json`, on the **consuming** module:
+`modules/<owner>/browser-kit/package.json`:
 
 ```json
-{
-  "id": "trace",
-  "root": "trace",
-  "uses": {
-    "screens": ["@langwatch/trace-web/screens/traces"],
-    "surfaces": ["@langwatch/annotation-web/annotation-form"]
+"exports": {
+  "./annotation-form": {
+    "types": "./dist/annotation-form.d.ts",
+    "default": "./src/annotation-form.ts"
   }
 }
 ```
 
-- The specifier must be exact and must be an exported entry, or
-  `ui-web-capability-declaration` fires on the catalogue file.
-- Importing a surface a module has not declared fires the same rule on the importing
-  file. Every consumer declares its own use.
-- A web package new to the application also goes in `governedWebPackages`, or
-  `ui-web-package-governance` refuses the import.
-- Only a named frontend module may import a screen or surface
-  (`ui-web-capability-owner`); a global layer under `apps/ui/src/ui` or
-  `apps/ui/src/behavior` may not.
+## 4. Consume it
 
-## 4. Mount it
-
-The consuming module imports the surface inside its own
-`apps/ui/src/features/<consumer>/ui/sections/*`, or a section of its own web package if
-the composition belongs to the package rather than the application. A surface that needs
-session, project or navigation takes them as props or through the consumer's host port;
-it never reads them itself.
+The consuming module's `browser` package adds
+`"@langwatch/annotation-browser-kit": "workspace:*"` and imports the flat
+entry directly in its own `ui/sections/*` — a normal workspace import, no
+catalogue registration step. A consumer that needs session, project or
+navigation passes them as props or through its own `*HostApi`; the kit never
+reads them itself.
 
 ## 5. Tests and gates
 
-A surface is rendered by its own `.integration.test.tsx` (jsdom docblock) in the owning
-package, with the scenario bound. Then:
+A kit component is rendered by its own `.integration.test.tsx` (jsdom
+docblock) in the kit package, with the scenario bound. Then:
 
 ```bash
-pnpm --filter @langwatch/<owner>-web test && pnpm --filter @langwatch/<owner>-web typecheck
-pnpm --filter @langwatch/ui typecheck
+pnpm --filter @langwatch/<owner>-browser-kit test && pnpm --filter @langwatch/<owner>-browser-kit typecheck
+pnpm --filter @langwatch/<consumer>-browser typecheck
 pnpm --filter @langwatch/architecture-enforcer lint
 ```
 
-and the rest of `.claude/skills/architecture-guide/references/gates.md`.
+`architecture-enforcer` is what checks the kit law itself (closed
+`*-browser`, leaf-only imports, no fetching) — a violation there is the
+finding, not a judgement call.
 
 ## Report
 
-The export path added, the consumers that declared it, the closure the export pulled in,
-and any module that had to move layer to keep the closure clean.
+The kit package created or extended, the piece moved into it, the consumers
+that now import it directly, and why three consumers made this real sharing
+rather than a two-way coupling that should have stayed inline.

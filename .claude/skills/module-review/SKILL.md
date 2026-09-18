@@ -7,11 +7,14 @@ argument-hint: "<module name, package path, diff target, or directory>"
 
 # Audit a module
 
-Read `.claude/skills/architecture-guide/SKILL.md` and
-`.claude/skills/architecture-guide/references/testing.md`. The audit is evidence first:
-every finding names a file and line and the rule or scenario it breaks. No finding without
-a path. Never edit code, never run `pnpm lint --fix`, never run the root `pnpm typecheck`.
-The reference the module is measured against is `modules/annotation`.
+Read `dev/docs/ARCHITECTURE.md` in full, especially §3 (a module), §13
+(testing) and §15-16 (deleted spellings, renames in flight). The audit is
+evidence first: every finding names a file and line and the rule or scenario
+it breaks. No finding without a path. Never edit code, never run `pnpm lint
+--fix`, never run the root `pnpm typecheck`. The reference the module is
+measured against is `modules/annotation` — but the tree is mid-rename (§16):
+a module still spelled `server`/`web` is not itself a finding, only a module
+that writes the "Today" spelling in *new* code after this ruling is.
 
 Auditing a change rather than a whole package? Diff against `origin/main`, or the PR base
 if on a PR branch, and apply the mechanical and reading passes to the touched files only.
@@ -26,8 +29,8 @@ prefixes and database tables do not define module ownership.
 
 1. The mechanical pass: the detectors, then the shape survey no rule covers
    (`references/review-checklist.md`, section 1).
-2. Read what the detectors cannot see: server shape, grammar, naming and data scoping,
-   then the contract, then the web package (`references/review-checklist.md`, sections 2 to 4).
+2. Read what the detectors cannot see: process shape, grammar, naming and data scoping,
+   then the contract, then the browser package (`references/review-checklist.md`, sections 2 to 4).
 3. Composition and wiring, then specs and tests (`references/parity.md`, sections 5 and 6).
 4. Over-abstraction: the questions that each need a `path:line` answer, then the Keep list
    (`references/over-abstraction.md`, section 7).
@@ -41,10 +44,10 @@ same three, applied to the touched files only.
 | You are... | Read |
 | --- | --- |
 | Running the detectors (architecture-enforcer, oxlint, feature-parity, typecheck, tests, the frontend boundary, ast-grep), then the layer inventory, comment-heavy files and single-consumer modules | `references/review-checklist.md` section 1 |
-| Walking `server/src`: installer, app, services, repositories, channels, `projectId` and `TenantId` scoping, transports, legacy pieces, folder grammar, filenames, identifiers, migrations, method names, the reject-on-sight list | `references/review-checklist.md` section 2 |
-| Reading the contract package: the api interface and token, what may not live there, schemas, error classes | `references/review-checklist.md` section 3 |
-| Reading the web package: folders, layer direction, entries and the catalogue, the api-map, host ports, hooks, drawers, copy, test naming, single responsibility | `references/review-checklist.md` section 4 |
-| Checking how the installer is booted, what the composition root actually passes, config, the API's producer-only rule, the UI installation | `references/parity.md` section 5 |
+| Walking `process/src`: installer, `<Name>Module`, services, repositories, channels, `projectId` and `TenantId` scoping, transports, legacy pieces, folder grammar, filenames, identifiers, migrations, method names, the reject-on-sight list | `references/review-checklist.md` section 2 |
+| Reading the contract package: the api interface and token, what may not live there, schemas, config schema, error classes | `references/review-checklist.md` section 3 |
+| Reading the browser package: folders, layer direction, entries and the declaration, the api-map, host ports, hooks, drawers, copy, test naming, single responsibility, plus whether a browser-kit is warranted or over-published | `references/review-checklist.md` section 4 |
+| Checking how the installer is booted, what the process actually supplies (config, stores, peers, provided tokens), the API's producer-only eventing rule, the UI installation | `references/parity.md` section 5 |
 | Checking scenario binding, test quality, skill and MCP tool scenarios, re-exports, and field-by-field behaviour parity of a diff that converts or migrates a module | `references/parity.md` section 6 |
 | Asked "this is overengineered", "too many tiny files" or "simplify this", or judging where a database client or a conduit stops, ports with one implementation, optional dependencies and error status | `references/over-abstraction.md` |
 
@@ -63,6 +66,15 @@ same three, applied to the touched files only.
 - **The audit names gaps; it does not convert.** Every `feature-shape` entry is named with
   its replacement; closing it is `.claude/skills/module/references/convert.md`'s job.
 - **Never propose collapsing a port with real polymorphism.**
+- **Flag exactly what the record bans, nothing invented beyond it**: a
+  spelling from record §15's deleted list written new; a raw Prisma,
+  ClickHouse or Redis client reached from `<Name>Module` or a service instead
+  of arriving through a registry/channel factory's `create(members)`; an
+  application-shaped composition file inside a module (a mount file, a
+  hand-built router, a per-app credential chain — record §8, §15); a
+  `browser-kit` package that runs a project-scoped query or imports
+  `browser-trpc` (§3.4.3); a module defaulting its own availability instead
+  of a declared supply token the process answers (§3.3 case 4).
 
 ## 8. Classify and report
 

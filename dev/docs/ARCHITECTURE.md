@@ -135,7 +135,9 @@ export const traceProcessModule = defineProcessModule("trace")
 ```
 
 No `.build()`: every `with*` result is installable. `index.ts` exports the
-installer and transport declarations, **nothing else**.
+installer and transport declarations, **nothing else**. The installer and the
+`<Name>Module` class share `<f>.module.ts` — the class is thin forwarding
+(services carry the weight), and one file is the module's identity.
 
 **`TraceModule`** is the implementation of `TraceApi`: `static contract`,
 `static dependencies` (peer tokens), private constructor,
@@ -626,8 +628,8 @@ until each lane lands. New code uses the left column only.
 | `@langwatch/process` | `@langwatch/process-server` + kernel's boot AND declaration halves |
 | `@langwatch/process-stores` | `@langwatch/infrastructure` |
 | `@langwatch/browser` | `@langwatch/ui-kernel` (boot half) |
-| `@langwatch/browser-host` | `@langwatch/ui-host` (trimmed) + `@langwatch/ui-drawer` (merged) |
-| `@langwatch/browser-trpc` | `@langwatch/api-client-web` |
+| `@langwatch/browser-host` | `@langwatch/browser-host` (trimmed) + `@langwatch/browser-host/drawer` (merged) |
+| `@langwatch/browser-trpc` | `@langwatch/browser-trpc` |
 | `modules/*/process` · `*-process` | `modules/*/server` · `*-server` |
 | `modules/*/browser` · `*-browser` | `modules/*/web` · `*-web` |
 | `modules/*/browser-kit` | `modules/*/web-kit` |

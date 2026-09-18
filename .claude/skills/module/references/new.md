@@ -1,25 +1,29 @@
 # Create a module
 
-Read `.claude/skills/architecture-guide/SKILL.md` first, then the references for
-contract, server, web and install as you reach each step. Everything below is the order
-that keeps the linter green from the first commit. **Copy `modules/annotation`**;
-it is the reference and the only module with no entry in
-`packages/architecture-enforcer/src/feature-shape-baseline.json`. Do not copy a module that
-still has one.
+Read `dev/docs/ARCHITECTURE.md` §3 first, then this file end to end before
+writing anything. Everything below is the order that keeps the linter green
+from the first commit. **Copy `modules/annotation`**; it is the shape
+reference and the only module with no entry in
+`packages/architecture-enforcer/src/feature-shape-baseline.json`. Translate
+every file you copy through record §16 as you go: `server`→`process`,
+`web`→`browser`, `defineServerModule`→`defineProcessModule`, `<Name>App` +
+`.withApp(...)`→`<Name>Module` + `.withApi(...)`.
 
 ## 0. Decide the subject and check ownership
 
-- The module's name is a lower-kebab noun (`annotation`, `model-provider`, `coding-agent`).
+- The module's name is a lower-kebab noun (`annotation`, `model-provider`,
+  `coding-agent`).
 - Open `modules/catalogue.json`. If the subject already belongs to a module,
   stop: this is `references/extend.md` on the owner, not a new package.
-- Ask only if two readings lead to materially different packages (project-scoped versus
-  organization-scoped, say). Otherwise decide and state it.
+- Ask only if two readings lead to materially different packages
+  (project-scoped versus organization-scoped, say). Otherwise decide and
+  state it.
 
 ## 1. Spec first
 
 Create `modules/<name>/specs/<name>.feature`. Write the golden path and the
-named failures as scenarios, each tagged `@unit` or `@integration`, each with the error
-code it will carry (see the `spec-bind` skill):
+named failures as scenarios, each tagged `@unit` or `@integration`, each with
+the error code it will carry (see the `spec-bind` skill):
 
 ```gherkin
 Feature: Annotation scores
@@ -35,26 +39,21 @@ Feature: Annotation scores
     Then the request fails with annotation_score_invalid
 ```
 
-(`modules/annotation/specs/annotation-service.feature` is the full reference.)
-
 Also create `modules/<name>/feature.json` with `{ "layoutVersion": 0 }`,
-`adrs/README.md` with a `001-<name>-boundary.md` modelled on
-`modules/annotation/adrs/001-annotation-service-boundary.md`, and add the
-module to `modules/catalogue.json`:
+`adrs/README.md` with a `001-<name>-boundary.md`, and add the module to
+`modules/catalogue.json`:
 
 ```json
 { "id": "<name>", "root": "modules/<name>", "classification": "core", "subjects": ["<name>"] }
 ```
 
-then regenerate the `ModuleName` union:
-`node packages/runtime-composition/scripts/check-feature-names.mjs --write`.
+then regenerate the module-name union per the project's own generator script.
 
 ## 2. Contract package
 
-`modules/<name>/contract/` with `package.json` (`@langwatch/<name>-contract`,
-copy `modules/annotation/contract/package.json`), `tsconfig.json` and
-`tsconfig.build.json` (incremental, own `tsBuildInfoFile` under
-`node_modules/.cache/tsbuildinfo/`), `vitest.config.ts`, and `src/`:
+`modules/<name>/contract/` with `package.json` (`@langwatch/<name>-contract`),
+`tsconfig.json`/`tsconfig.build.json` (incremental, own `tsBuildInfoFile`),
+`vitest.config.ts`, and `src/`:
 
 ```
 index.ts
@@ -64,38 +63,31 @@ index.ts
 <name>-trpc.schemas.ts   input schemas for the tRPC door
 <name>.trpc.ts           export const <name>Trpc = defineTrpcContract("<name>").query(…).withInput(…).withOutput(…).mutation(…)….build()
 <name>.errors.ts         HandledError subclasses with `declare readonly code`, httpStatus, fault
+<name>.config.ts         Config.define({ … }) if the module needs any deployment fact (record §6, §3.3 case 3) — omit entirely if it needs none
 ```
 
 Leave both `references` arrays empty and run `pnpm sync:references` once the
-`dependencies` are written: every project reference is derived from the
-manifests, and lint reports a hand-typed one as drift.
+`dependencies` are written. Every new manifest's dependency versions come
+from the pnpm catalog (`pnpm-workspace.yaml`'s `catalog:` block) — write
+`"dep": "catalog:"` for anything already listed there.
 
-Every new manifest's dependency versions come from the pnpm catalog: check
-`pnpm-workspace.yaml`'s `catalog:` block first and write `"dep": "catalog:"`
-for anything already listed there, rather than typing a range. Only add an
-explicit range for a dependency the catalog doesn't carry yet — and if two or
-more packages will end up sharing that exact range, that's a sign it belongs
-in the catalog instead (`dev/docs/best_practices/typescript.md`, "pnpm
-catalogs"; `packages/architecture-enforcer/tests/catalog-enforcement.test.ts`
-enforces it).
+Operations use RPC verbs (`get`, `getMany`, `list`, `create`, `update`,
+`delete`, `<verb><Entity>`); absence is `find*` returning `undefined`. Add
+each new error code to `packages/handled-error/src/app-codes.ts` (sorted) and
+its customer copy to `packages/handled-error/src/presentation.ts` in the same
+change. Write the contract unit tests (`src/__tests__/<name>.unit.test.ts`)
+binding the `@unit` scenarios. No abstract service class in the contract —
+that is a `feature-shape: contract-service` finding, not a pattern.
 
-Operations use RPC verbs (`get`, `getMany`, `list`, `create`, `update`, `delete`,
-`<verb><Entity>`); absence is `find*` returning `undefined`. Add each new error code to
-`packages/handled-error/src/app-codes.ts` (sorted) and its customer copy to
-`packages/handled-error/src/presentation.ts` in the same change. Write the contract unit
-tests (`src/__tests__/<name>.unit.test.ts`) binding the `@unit` scenarios. No abstract
-service: `feature-shape` inventories a `<name>.service.ts` in a contract.
+## 3. Process package
 
-## 3. Server package
-
-`modules/<name>/server/` (`@langwatch/<name>-server`,
+`modules/<name>/process/` (`@langwatch/<name>-process`,
 `"imports": { "#*": { "types": "./dist/*.d.ts", "default": "./src/*.ts" } }`):
 
 ```
-src/index.ts                                          export { <name>Server } and the transport declarations, nothing else
-src/<name>.server.ts                                  defineModule("<name>").withRepositories(<name>Repositories).withApp(<Name>App).withTransports(…).build()
-src/app/<name>.app.ts                                 class <Name>App implements <Name>Api: static contract/dependencies, private ctor, static create(setup: FeatureSetup<…>)
-src/app/__tests__/<name>.fixture.ts                   create<Name>TestApp over Memory<Name>Repositories and createApiFixture peers
+src/index.ts                                          export { <name>ProcessModule } and the transport declarations, nothing else
+src/<name>.module.ts                                  defineProcessModule("<name>").withRepositories(<name>Repositories).withApi(<Name>Module).withTransports(…) — same file also defines class <Name>Module implements <Name>Api: static contract/dependencies, private ctor, static create(setup)
+src/__tests__/<name>.fixture.ts                       create<Name>TestModule over Memory<Name>Repositories and createApiFixture peers
 src/services/<name>.service.ts                        one class per entity; static create({ repository }); parses input with contract schemas
 src/rules/<name>.rules.ts                             pure helpers, if any
 src/repositories/<name>.repository.ts                 the interface: findAll / findById / create / update / delete …
@@ -109,42 +101,48 @@ src/channels/<subject>.channel.ts                     an interface per subject t
 src/channels/<name>-channels.registry.ts              { live: Http<Name>Channels, memory: Memory<Name>Channels }, each a class with static create
 src/channels/<tier>/<tier>.<subject>.channel.ts       one live implementation per tier: eventing, redis, http, sqs, ses, slack
 src/channels/memory/memory.<subject>.channel.ts       the twin every test asserts against
-src/transport/<name>.rest.ts                          defineRestRouter(<Name>Api).withNamespace("<name>s").withVersion(MANAGEMENT_API_VERSION)….build()   (public REST, optional)
+src/transport/<name>.rest.ts                          defineRestRouter(<Name>Api).withNamespace("<name>s")….build()   (public REST, optional)
 src/transport/<name>.trpc.ts                          defineTrpcRouter(<Name>Api, <name>Trpc).procedure(name).withPermission(…).handle(…)….build()      (browser)
+src/eventing/<name>.pipeline.ts                        definePipeline("<name>") — only if the module owns events, commands, projections, subscribers or jobs (record §9)
 src/tasks/<name>.task.ts                              a one-shot program, if any
 ```
 
-Peers the app needs are `*Api` tokens in `static dependencies`, never ports or imported
-services; a technical dependency (encryption, object storage) is an abstract `*Port` in
-`ports/` that arrives through `FeatureSetup`'s infrastructure parameter. Prisma models go
-in `packages/prisma-client/prisma/schema.prisma` with a migration under
-`packages/prisma-client/prisma/migrations/<timestamp>_<name>/migration.sql`; run
-`pnpm start:prepare:files` after. Identifiers come from `@langwatch/ksuid`. Never
-`as PrismaClient`; never `try*`/`require*`; no `adapters/postgres.*`, `fixtures/` or
-`testing.ts` (`feature-shape`).
+Peers `<Name>Module` needs are `*Api` tokens in `static dependencies`, never
+imported services (four-way rule case 2). A deployment fact is the module's
+own config schema, sliced in by `.withConfig` (case 3). An availability
+decision is a declared supply token the process answers with `.provide({...})`
+(case 4). Prisma models go in `packages/prisma-client/prisma/schema.prisma`
+with a migration under
+`packages/prisma-client/prisma/migrations/<timestamp>_<name>/migration.sql`;
+run `pnpm start:prepare:files` after. Identifiers come from `@langwatch/ksuid`.
+Never `as PrismaClient`; never `try*`/`require*`; no `ports/`, `adapters/`,
+`composition/`, `utils/`, `lib/`, `helpers/`, `domain/` folder.
 
-Messages to or from something the module does not own - the event bus, Redis pub/sub, a
-vendor over HTTP, a queue, email, Slack, a browser over SSE - are a channel, not a
-service member: declare the interface in `channels/`, put the conduit in
-`channels/<tier>/` beside its memory twin, and register both as `{ live, memory }` in the
-registry. A service that imports the bus, pub/sub or an HTTP client is refused by
-`service-does-not-open-a-channel`.
+Messages to or from something the module does not own — the event bus, Redis
+pub/sub, a vendor over HTTP, a queue, email, Slack, a browser over SSE — are a
+channel, not a service member: declare the interface in `channels/`, put the
+conduit in `channels/<tier>/` beside its memory twin, and register both as
+`{ live, memory }` in the registry. A service that imports the bus, pub/sub or
+an HTTP client is refused by `service-does-not-open-a-channel`.
 
-Tests: `app/__tests__/<name>-installation.unit.test.ts` boots the installer through
-the ruled chain - `createApp({ role }).withModules([<name>Server])` with memory
-storage supplied through the closed vocabulary; the deleted `withProvided` /
-`withPersistence` spellings must not be copied (see `architecture-guide`); `services/__tests__/*.unit.test.ts` over memory repositories;
-`repositories/memory/__tests__` and `repositories/prisma/__tests__` (the latter with an
-integration test if the package declares a datastore in `vitest.integration.config.ts`);
-`transport/__tests__` through the harness host.
+Tests: `__tests__/<name>-installation.unit.test.ts` boots the installer
+through `createApp({ role }).withModules([<name>ProcessModule])` with memory
+storage supplied through `.withStores(memoryStores())` — never a per-store
+`with*` call, never `withProvided`/`withPersistence` (record §15);
+`services/__tests__/*.unit.test.ts` over memory repositories;
+`repositories/memory/__tests__` and `repositories/prisma/__tests__` (the
+latter with an integration test if the package declares a datastore in
+`vitest.integration.config.ts`); `transport/__tests__` through the harness
+host.
 
-## 4. Web package (skip with `--no-web`)
+## 4. Browser package (skip with `--no-browser`)
 
-`modules/<name>/web/` (`@langwatch/<name>-web`; `exports` lists one flat
-entry per public piece plus `./testing`):
+`modules/<name>/browser/` (`@langwatch/<name>-browser`; `exports` lists one
+flat entry per public piece plus `./testing` and `./declaration`):
 
 ```
 src/<name>s.ts                      the entry: export const <name>Screens = { <name>s: () => import("./ui/sections/<name>s-screen.tsx") }; export { <name>Api }; export { <Name>HostApi, <Name>HostProvider, use<Name>Host }
+src/declaration.ts                  export default defineBrowserModule("<name>") … — screens, drawers, publications, mounts, flags
 src/model/<name>-host.ts            abstract <Name>HostApi + React context (project, user, permissions, route, navigate, notify)
 src/behavior/<name>-api.ts          export type <Name>ApiMap; export const <name>Api = createModuleApi<<Name>ApiMap>()
 src/behavior/use-<name>s.ts         hooks over <name>Api
@@ -152,16 +150,17 @@ src/ui/elements/ … ui/blocks/ … ui/sections/<name>s-screen.tsx (default expo
 src/testing.tsx                     Stub<Name>Host extends <Name>HostApi + render harness
 ```
 
-Read the `design-system` skill and the pattern doc for the surface you build. Component
-tests are `.integration.test.tsx` with the jsdom docblock. Add the package to
-`apps/ui/src/features/catalogue.json` → `governedWebPackages`.
+Read the `design-system` skill and the pattern doc for the surface you build.
+Component tests are `.integration.test.tsx` with the jsdom docblock. A
+`browser-kit` package is created only when a *different* module needs a piece
+of this one — see `references/web-surface.md` — never speculatively.
 
 ## 5. Wire it
 
-Follow `references/wire.md` for the details. In short: add the module to
+Follow `references/wire.md`. In short: add the module to
 `modules/catalogue.json`, run `pnpm generate:modules`, and every process that
-boots `serverModules` installs it. No process file changes; requirements the
-chain cannot satisfy fail `boot()` at compile time by name.
+boots `processModules` installs it — no process file changes, and a
+requirement `boot()` cannot satisfy fails to compile, naming the module.
 
 ## 6. Gates
 
@@ -169,14 +168,14 @@ chain cannot satisfy fail `boot()` at compile time by name.
 pnpm install    # new workspace packages
 ```
 
-then `.claude/skills/architecture-guide/references/gates.md` for the three new packages,
-`@langwatch/runtime-composition` (typecheck fails if `feature-names.generated.ts` lags),
-`@langwatch/platform-api`, `@langwatch/ui`, architecture-enforcer and parity. Your new
-`.feature` file must report all bound, and `feature-shape` must report nothing for the new
-module: a new module never gets a baseline entry.
+Then, for the new packages plus every process that installs the module:
+`pnpm --filter <pkg> typecheck && pnpm --filter <pkg> test`,
+`pnpm --filter @langwatch/architecture-enforcer lint` and `check:feature-parity`.
+Your new `.feature` file must report all bound, and `feature-shape` must
+report nothing for the new module: a new module never gets a baseline entry.
 
 ## Report
 
-List the packages created, the scenarios and which tests bind them, the composition
-root and registrations touched, the error codes added, and the gate numbers. Name
+List the packages created, the scenarios and which tests bind them, the
+catalogue registration, the error codes added, and the gate results. Name
 anything deliberately left absent and why.

@@ -1,34 +1,43 @@
 # Wire a module into the processes
 
-Rewritten 2026-09-17; the earlier per-process composition recipe
-(`installApi<F>`, `apps/api/src/features/<f>/<f>.composition.ts`) is deleted
-along with those directories. Wiring is now catalogue-driven and the
-composition root does not grow.
+Read `dev/docs/ARCHITECTURE.md` §4 and §5. Wiring is catalogue-driven and the
+process root does not grow — a change that needs `main.ts` to grow has found a
+gap in the primitives; report the gap, never widen the root.
 
-## Server halves (api, worker, tasks)
+## Process halves (api, worker, tasks)
 
 1. The module's `index.ts` exports its installer
-   (`defineServerModule("<f>")...`) - see `architecture-guide`.
+   (`defineProcessModule("<f>")...` — record §3.2).
 2. Add or confirm the module's entry in `modules/catalogue.json`.
-3. `pnpm generate:modules` regenerates `@langwatch/installed-modules/server`;
-   every process that boots `serverModules` now installs it. No process file
-   changes; a root that needs editing means a gap in the primitives - report
-   it, never widen the root.
-4. What the module needs arrives through the ruled chain: config as a slice
-   keyed by module name (declare a config schema in the contract), storage
-   through the closed vocabulary (`relational`, `analytical`, `keyvalue`, ...),
-   peers by `*Api` token in `static dependencies`. If a requirement is not
-   supplied, `boot()` does not compile and `MissingSupply<...>` names it.
+3. `pnpm generate:modules` regenerates `@langwatch/installed-modules`; every
+   process that boots `processModules` now installs it (record §5). No
+   process file changes; a root that needs editing means a gap in the
+   primitives — report it, never widen the root.
+4. What the module needs arrives through the ruled chain (record §3.3): a
+   peer by `*Api` token in `static dependencies`; a deployment fact through
+   the module's declared config schema, sliced by `.withConfig` (record §6);
+   storage through the one `.withStores(stores)` call — never a per-store
+   `with*` call (record §15); an availability decision through a declared
+   supply token the process answers with `.provide({...})`. If a requirement
+   is not supplied, `boot()` does not compile and `MissingSupply<...>` names
+   it.
 
-## Web halves
+## Browser halves
 
-The browser boot target is `@langwatch/ui-kernel` (`createUi`,
-`defineWebModule`); web modules are generated into
-`@langwatch/installed-modules` the same way. Do not deepen the older
-`uiFeature`/`WebInstallation` generations.
+The browser boot target is `@langwatch/browser` (`createUi`,
+`defineBrowserModule` — record §10). A browser module declares its screens,
+drawers, publications, mounts and flags in one file exported at
+`./declaration`; browser modules are generated into
+`@langwatch/installed-modules` the same way `processModules` are, and
+`createUi({ mount }).withModules(browserModules).render()` installs the
+whole set before any component renders. Do not deepen an older per-module
+"uses" registration in `apps/ui`'s own catalogue — that mechanism is
+superseded by the kit law (`references/web-surface.md`) for cross-module
+sharing, and by the module's own `./declaration` for everything the module
+owns.
 
 ## Verify
 
-- `pnpm --filter <the-module-server> typecheck` and its tests.
-- `pnpm --filter @langwatch/platform-api typecheck` - a missing supply
+- `pnpm --filter <the-module-process> typecheck` and its tests.
+- `pnpm --filter @langwatch/platform-api typecheck` — a missing supply
   surfaces HERE, as a compile refusal naming the module and requirement.

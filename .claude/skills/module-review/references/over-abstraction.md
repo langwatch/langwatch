@@ -33,7 +33,7 @@ Do not invent work. A rule firing is a question, not a verdict: check each hit a
 the source and drop the idioms (`(x) => x` as a no-op default, `.filter((x) => x)` as a
 truthiness filter, a routed repository delegating by verb). List what stays and why in a
 Keep list: a port with two or more implementations, an open set with one file per member
-where a new member touches nothing else, `app/<f>.app.ts` (the one facade both transports
+where a new member touches nothing else, `<Name>Module` (the one facade both transports
 call, which the layout requires), a hot path already inside its quality ceiling where the
 only complaint is method length, and anything the mechanical half already accepts
 (`packages/architecture-enforcer/src/overengineering-policy.mjs`,

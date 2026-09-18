@@ -1,11 +1,13 @@
 # Remap: rename, repoint, or derive, then prove it with the tools
 
 A remap changes names or import sources and nothing else: a `try*` member becomes
-`find*`, a hand-written web procedure map becomes `ContractApiMap<typeof xTrpc>`, a
+`find*`, a hand-written browser procedure map becomes `ContractApiMap<typeof xTrpc>`, a
 deleted export is repointed at its new home, a test double follows an interface it
-stands in for. The work is mechanical; the proof is not optional. Every step below
-runs, in this order, and the report pastes each output verbatim. A lane that skips a
-step has not finished.
+stands in for. A rename that record §16 already names (`server`→`process`,
+`defineServerModule`→`defineProcessModule`, `<Name>App`+`.withApp`→`<Name>Module`+
+`.withApi`, and the rest of the table) is this same procedure. The work is mechanical;
+the proof is not optional. Every step below runs, in this order, and the report pastes
+each output verbatim. A lane that skips a step has not finished.
 
 ## 1. Find every occurrence before touching one
 
@@ -31,8 +33,8 @@ broken.
 ## 3. Tests: the package's own suite, every package you touched
 
 ```bash
-grep -o '"test[a-z:]*"' modules/<f>/server/package.json   # find the script name first
-pnpm --filter @langwatch/<f>-server test                        # or `test` when there is no test
+grep -o '"test[a-z:]*"' modules/<f>/process/package.json   # find the script name first
+pnpm --filter @langwatch/<f>-process test                        # or `test` when there is no test
 pnpm --filter @langwatch/<f>-contract test
 ```
 
@@ -42,7 +44,7 @@ red already.
 ## 4. Types: the package, then every package that imports it
 
 ```bash
-pnpm --filter @langwatch/<f>-server typecheck
+pnpm --filter @langwatch/<f>-process typecheck
 pnpm --filter @langwatch/<f>-contract typecheck
 pnpm --filter "...@langwatch/<f>-contract" --filter "!@langwatch/platform-api" --filter "!@langwatch/worker" --filter "!@langwatch/ui" typecheck
 ```
@@ -57,13 +59,13 @@ error in a file you touched is yours.
 ## 5. Lint: the rule you are serving, counted
 
 ```bash
-npx oxlint -c .oxlintrc.jsonc modules/<f>/contract/src modules/<f>/server/src | grep -c <rule-name>
+npx oxlint -c .oxlintrc.jsonc modules/<f>/contract/src modules/<f>/process/src | grep -c <rule-name>
 ```
 
 Before and after. The count for the rule goes to zero for `try*`; a remaining hit is
 listed with its line and why it is not this remap's (a different rule, a pre-existing
 finding on a line you did not touch). The naming rule reads every source file of a
-module's contract and server, transports and adapters included.
+module's contract and process, transports included.
 
 ## 6. The old name is gone
 
