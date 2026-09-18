@@ -10,6 +10,8 @@ import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -58,6 +60,7 @@ function bootTraceApp(options: {
   } as unknown as AuthzApi;
 
   const app = TraceApp.create({
+    storedObjects: createApiFixture<StoredObjectApi>(),
     traces: {
       existence: { findExistingTraceIds: async ({ traceIds }) => [...traceIds] },
       read: { findById } as unknown as TraceLegacyRead,

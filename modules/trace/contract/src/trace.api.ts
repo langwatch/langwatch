@@ -65,6 +65,13 @@ export type TraceAnnotationCommands = Readonly<{
 
 /** Public Trace operations shared by process peers after boot composition. */
 export interface TraceApi extends TraceOtlpIngestApi {
+  extractInlineMediaFromEvent(input: {
+    event: unknown;
+    projectId: string;
+    ownerKind: "scenario_run";
+    ownerId: string;
+    purpose: "scenario_event";
+  }): Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }>;
   downloadTraceExport(input: TraceExportDownloadInput): Promise<TraceExportDownload>;
   formatSpansDigest(input: { spans: Span[] }): Promise<string>;
   recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void>;

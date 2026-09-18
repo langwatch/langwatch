@@ -13,6 +13,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 
@@ -40,6 +41,7 @@ export const traceDependencies = {
   presence: PresenceApi,
   projects: ProjectApi,
   share: ShareApi,
+  storedObjects: StoredObjectApi,
   topics: TopicApi,
 };
 

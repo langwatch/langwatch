@@ -18,6 +18,8 @@ import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -160,6 +162,7 @@ function deployment(access: CollectorAccess = {}) {
   const app = TraceApp.create(
     composeTraceAppDependencies({
       repositories: MemoryTraceRepositories.create(),
+      storedObjects: createApiFixture<StoredObjectApi>(),
       canonicalisation,
       blobStore: TraceBlobStoreService.create({
         resolveS3Client: () => Promise.reject(new Error("no object store in this test")),

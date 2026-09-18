@@ -103,6 +103,7 @@ export type TraceReaderCompositionOptions = {
     | undefined;
   evaluations: TraceAppDependencies["evaluations"];
   codingAgents: TraceAppDependencies["codingAgents"];
+  storedObjects: TraceAppDependencies["storedObjects"];
   presence?: TraceAppDependencies["presence"];
   share: TraceAppDependencies["share"];
   broadcast: TraceAppDependencies["broadcast"];
@@ -246,6 +247,7 @@ export function composeTraceAppDependencies(
     projects: options.projects,
     evaluations: options.evaluations,
     codingAgents: options.codingAgents,
+    storedObjects: options.storedObjects,
     ...(options.presence ? { presence: options.presence } : {}),
     share: options.share,
     broadcast: options.broadcast,

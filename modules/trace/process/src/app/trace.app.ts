@@ -18,6 +18,7 @@ import type { PresenceApi } from "@langwatch/presence-contract";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
@@ -113,6 +114,7 @@ import type { TraceIngestionService } from "../services/trace-ingestion.service.
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import { TraceReadableSpanService } from "../services/trace-readable-span.service.ts";
+import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
 import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
 import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import type {
@@ -388,6 +390,7 @@ export type TraceProjectReader = Readonly<{
 
 /** What the process composes this feature's application from. */
 export interface TraceAppDependencies {
+  storedObjects: StoredObjectApi;
   spanIngest?: TraceSpanIngest;
   viewer?: TraceViewerService;
   protections?: TraceViewerProtectionService;
@@ -558,10 +561,12 @@ export class TraceApp implements TraceApi, CollectorApp {
   #contentReader: TraceContentReadService;
   #readBounds: TraceReadBoundsService;
   #exportDownload: TraceExportDownloadService | null;
+  #scenarioEventMedia: TraceScenarioEventMediaService;
   #dependencies: TraceAppDependencies;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
     this.#contentReader = ConcreteTraceContentReadService.create(dependencies.traces.read);
+    this.#scenarioEventMedia = TraceScenarioEventMediaService.create(dependencies.storedObjects);
     this.#readBounds = TraceReadBoundsService.create({
       entitlement: dependencies.requestBounds,
       projects: dependencies.projects,
@@ -575,6 +580,16 @@ export class TraceApp implements TraceApi, CollectorApp {
             presence: dependencies.presence,
           })
         : null;
+  }
+
+  extractInlineMediaFromEvent(input: {
+    event: unknown;
+    projectId: string;
+    ownerKind: "scenario_run";
+    ownerId: string;
+    purpose: "scenario_event";
+  }): Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }> {
+    return this.#scenarioEventMedia.extractInlineMediaFromEvent(input);
   }
 
   downloadTraceExport(input: TraceExportDownloadInput): Promise<TraceExportDownload> {
