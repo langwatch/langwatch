@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The shape that stopped the whole application: a `useQuery` on a tRPC key
- * whose `queryFn` dispatches the same procedure through `UiRpc`.
+ * A `useQuery` on a tRPC key whose `queryFn` dispatches that same procedure.
  * Spec: specs/ui/by-path-dispatch.feature
  */
 
@@ -11,17 +10,17 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { BrowserUiRpc } from "../browser-rpc";
-import type { UiFeatureApiTransport } from "../transport";
+import { BrowserUiRpc, type UiRpcTransport } from "../browser-rpc";
 
 const PROCEDURE = "organization.getAll";
 const INPUT = { isDemo: false };
 
-function transportAnswering(answer: unknown): UiFeatureApiTransport {
+function transportAnswering(answer: unknown): UiRpcTransport {
   return {
     query: vi.fn(async () => answer),
     mutation: vi.fn(async () => answer),
-  } as unknown as UiFeatureApiTransport;
+    subscription: vi.fn(() => ({ unsubscribe: () => {} })),
+  };
 }
 
 /** Exactly what the chrome, the org facts and the `?org` reader all do. */

@@ -10,16 +10,16 @@ import type { QueryClient } from "@tanstack/react-query";
 import { UiRpc, type UiRpcSubscription, type UiRpcSubscriptionHandlers } from "./capabilities";
 import type { UiFeatureApiTransport } from "./transport";
 
+/** The three lanes this dispatcher uses, so a caller hands the narrowest thing. */
+export type UiRpcTransport = Pick<UiFeatureApiTransport, "query" | "mutation" | "subscription">;
+
 export class BrowserUiRpc extends UiRpc {
-  static create(input: {
-    transport: UiFeatureApiTransport;
-    queryClient: QueryClient;
-  }): BrowserUiRpc {
+  static create(input: { transport: UiRpcTransport; queryClient: QueryClient }): BrowserUiRpc {
     return new BrowserUiRpc(input.transport, input.queryClient);
   }
 
   private constructor(
-    private readonly transport: UiFeatureApiTransport,
+    private readonly transport: UiRpcTransport,
     private readonly queryClient: QueryClient,
   ) {
     super();
@@ -27,10 +27,8 @@ export class BrowserUiRpc extends UiRpc {
 
   /**
    * The transport directly, then published under the shared key. NOT
-   * `fetchQuery`: it joins a fetch already in flight for that key, and the
-   * caller of this IS regularly that fetch — a `useQuery` on the same key
-   * whose `queryFn` dispatches here then awaits its own promise and never
-   * settles. See `browser-rpc-self-dispatch.integration.test.tsx`.
+   * `fetchQuery`, which joins the caller's own in-flight fetch and deadlocks
+   * it. specs/ui/by-path-dispatch.feature.
    */
   async query(path: string, input: unknown): Promise<unknown> {
     const answer = await this.transport.query(path, input);
