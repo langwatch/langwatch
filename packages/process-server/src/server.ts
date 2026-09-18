@@ -4,7 +4,9 @@ import process from "node:process";
 
 import { ResourceScope } from "@langwatch/kernel";
 
+import { browserBundleDoor, type BrowserBundle } from "./browser-bundle.ts";
 import { GracefulShutdown } from "./graceful-shutdown.ts";
+import { hostedRuntime } from "./hosted-runtime.ts";
 
 /** What this package needs of a logger, so it depends on no logging implementation. */
 export interface ServerLogger {
@@ -41,11 +43,30 @@ export type HealthRoute = Readonly<{
   handle: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>;
 }>;
 
-/** Whatever `.with()` accepts: a lifecycle component, or a health-door route. */
-export type ServerContribution = ServerComponent | HealthRoute;
+/**
+ * A request handler contributed to the same door, tried in `order` once no
+ * exact route matched. Returning false declines the request, so the next
+ * contribution — and ultimately the 404 — sees it.
+ */
+export type DoorHandler = Readonly<{
+  name: string;
+  /** Lower answers first. A mounted transport is 100, the browser bundle 1000. */
+  order?: number;
+  handle: (request: IncomingMessage, response: ServerResponse) => boolean | Promise<boolean>;
+}>;
+
+/** Whatever `.with()` accepts: a lifecycle component, or something on the door. */
+export type ServerContribution = ServerComponent | HealthRoute | DoorHandler;
+
+/** Where a contribution with no order of its own is tried. */
+const DEFAULT_DOOR_ORDER = 100;
 
 function isHealthRoute(contribution: ServerContribution): contribution is HealthRoute {
   return "path" in contribution && "handle" in contribution;
+}
+
+function isDoorHandler(contribution: ServerContribution): contribution is DoorHandler {
+  return "handle" in contribution && !("path" in contribution);
 }
 
 /**
@@ -97,7 +118,9 @@ export class Server {
 
   private readonly components: ServerComponent[] = [];
   private readonly healthRoutes = new Map<string, HealthRoute>();
+  private readonly doorHandlers: DoorHandler[] = [];
   private healthListener: http.Server | undefined;
+  private draining = false;
   private disposeFatal: (() => void) | undefined;
   private disposeSignals: (() => void) | undefined;
   private listening: Promise<void> | undefined;
@@ -126,6 +149,13 @@ export class Server {
   with(contribution: ServerContribution): this {
     if (isHealthRoute(contribution)) {
       this.healthRoutes.set(contribution.path, contribution);
+      return this;
+    }
+    if (isDoorHandler(contribution)) {
+      this.doorHandlers.push(contribution);
+      this.doorHandlers.sort(
+        (left, right) => (left.order ?? DEFAULT_DOOR_ORDER) - (right.order ?? DEFAULT_DOOR_ORDER),
+      );
       return this;
     }
     if (this.sealed) {
@@ -166,15 +196,76 @@ export class Server {
     }
 
     const route = request.url === undefined ? undefined : this.healthRoutes.get(request.url);
-    if (route === undefined) {
-      response.writeHead(404).end();
+    if (route !== undefined) {
+      void this.answer(route.path, () => route.handle(request, response), response);
       return;
     }
 
-    void Promise.resolve(route.handle(request, response)).catch((error: unknown) => {
-      this.logger.error({ error, path: route.path }, `${this.name}: health route failed`);
+    // A draining process still answers its probes — that is why the health
+    // door stops last — but it takes no new work, and says so by name.
+    if (this.draining) {
+      response
+        .writeHead(503, { "Content-Type": "text/plain" })
+        .end(`${this.name} is shutting down`);
+      return;
+    }
+
+    void this.dispatch(request, response);
+  }
+
+  /** The door's contributions, in order, until one answers. Then the 404. */
+  private async dispatch(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    for (const handler of this.doorHandlers) {
+      const answered = await this.answer(
+        handler.name,
+        () => handler.handle(request, response),
+        response,
+      );
+      if (answered) return;
+    }
+    if (!response.headersSent) response.writeHead(404).end();
+  }
+
+  /**
+   * One contribution's turn at the request. A failure is the door's to report
+   * and to answer for, so a handler that throws cannot leave a socket open.
+   */
+  private async answer(
+    name: string,
+    run: () => void | boolean | Promise<void | boolean>,
+    response: ServerResponse,
+  ): Promise<boolean> {
+    try {
+      return (await run()) !== false;
+    } catch (error) {
+      this.logger.error({ error, handler: name }, `${this.name}: door handler failed`);
       if (!response.headersSent) response.writeHead(500).end();
-    });
+      return true;
+    }
+  }
+
+  /**
+   * The booted application, on this server's one door: every mounted
+   * transport answers behind the built-in routes, the browser bundle answers
+   * last so it shadows none of them, and then the process listens.
+   */
+  serve(application: ServedApplication, options: ServeOptions = {}): Promise<void> {
+    this.with(hostedRuntime({ name: `${application.name} runtime`, runtime: application }));
+    for (const handler of doorHandlersOf(application)) this.with(handler);
+    if (options.ui !== undefined) this.with(browserBundleDoor(options.ui));
+
+    return this.listen();
+  }
+
+  /**
+   * The same binding for a process with no HTTP surface of its own: the
+   * application's background work is hosted drain-first, so it finishes what
+   * it took before anything it calls into is closed under it.
+   */
+  run(application: ServedApplication): Promise<void> {
+    this.with(hostedRuntime({ name: `${application.name} runtime`, runtime: application, drain: true }));
+
+    return this.listen();
   }
 
   /**
@@ -202,6 +293,14 @@ export class Server {
       throw error;
     }
 
+    // Before every teardown phase, so a signal makes the door refuse new work
+    // by name while the graph behind it is still whole.
+    this.graceful.phase({
+      name: `${this.name} door`,
+      run: () => {
+        this.draining = true;
+      },
+    });
     for (const component of [...this.components].reverse()) {
       this.graceful.phase({
         name: component.name,
@@ -225,6 +324,7 @@ export class Server {
 
   /** Runs the teardown once, whoever asked. Signals call the same path. */
   close(): Promise<void> {
+    this.draining = true;
     this.closing ??= Promise.resolve()
       .then(() => this.graceful.run())
       .then(() => void 0)
@@ -234,6 +334,61 @@ export class Server {
       });
     return this.closing;
   }
+}
+
+/**
+ * A booted application, as the server that hosts it reads one. Transports are
+ * erased here on purpose: this package knows no protocol, and a process's own
+ * doors are what turned a declaration into something that answers a request.
+ */
+export type ServedApplication = Readonly<{
+  name: string;
+  start: () => void | Promise<void>;
+  stop: () => void | Promise<void>;
+  transports: Readonly<{
+    rest: readonly unknown[];
+    trpc: Readonly<Record<string, unknown>>;
+  }>;
+}>;
+
+/** What a process states about its surface beyond the application itself. */
+export type ServeOptions = Readonly<{
+  /** The built browser application, answered after every mounted transport. */
+  ui?: BrowserBundle;
+}>;
+
+/**
+ * Every door handler a booted application carries, each one once: a process
+ * whose REST families and tRPC namespaces mounted on ONE door is handed that
+ * door once per mount, and hosting it repeatedly would try it repeatedly.
+ */
+function doorHandlersOf(application: ServedApplication): readonly DoorHandler[] {
+  const handlers = new Set<DoorHandler>();
+  const mounted = [
+    ...application.transports.rest,
+    ...Object.values(application.transports.trpc),
+  ];
+
+  for (const transport of mounted) {
+    if (!isServable(transport)) {
+      throw new Error(
+        `"${application.name}" mounted a transport this server cannot serve. A process's own ` +
+          `door must return something answering { name, handle } from each mount.`,
+      );
+    }
+    handlers.add(transport);
+  }
+
+  return [...handlers];
+}
+
+function isServable(transport: unknown): transport is DoorHandler {
+  return (
+    typeof transport === "object" &&
+    transport !== null &&
+    "handle" in transport &&
+    typeof (transport as DoorHandler).handle === "function"
+  );
 }
 
 /**

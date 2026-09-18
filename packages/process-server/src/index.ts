@@ -1,3 +1,4 @@
+export { browserBundleDoor, type BrowserBundle } from "./browser-bundle.ts";
 export {
   GracefulShutdown,
   type GracefulShutdownOptions,
@@ -9,7 +10,10 @@ export {
 export { hostedRuntime } from "./hosted-runtime.ts";
 export {
   Server,
+  type DoorHandler,
   type HealthRoute,
+  type ServedApplication,
+  type ServeOptions,
   type ServerComponent,
   type ServerContribution,
   type ServerLogger,

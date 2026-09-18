@@ -55,7 +55,6 @@ describe("API process configuration", () => {
         serviceName: "langwatch-api",
         deploymentEnvironment: "production",
       },
-      instanceAdminApiKey: undefined,
       apiKeyPepper: undefined,
       // The credentials this process reads and never logs. Every one of them
       // is an unvalidated optional string on purpose: an operator who exports
@@ -76,7 +75,10 @@ describe("API process configuration", () => {
       // Unset, and NODE_ENV is not production under vitest, so declared tRPC
       // outputs are checked.
       validateTrpcOutput: true,
-      cronApiKey: undefined,
+      internalAuth: { cronBearerToken: undefined, langyInternalBearerToken: undefined, instanceAdminBearerToken: undefined },
+      // No BASE_HOST, so this deployment serves no browser application: the
+      // page would carry a projection with no origin for the browser to call.
+      ui: undefined,
       opsApiKey: undefined,
       platformHealth: { apiKey: undefined, probeApiKey: undefined },
       // `ADMIN_EMAILS`, unset here: nobody is instance staff on this deployment.
@@ -357,13 +359,15 @@ describe("API process configuration", () => {
   it("carries the instance administrator credential through the process's one environment read", () => {
     expect(
       resolveApiConfig({ LANGWATCH_INSTANCE_ADMIN_API_KEY: "  instance-admin-secret  " })
-        .instanceAdminApiKey,
+        .internalAuth.instanceAdminBearerToken,
     ).toBe("  instance-admin-secret  ");
-    expect(resolveApiConfig({}).instanceAdminApiKey).toBeUndefined();
+    expect(resolveApiConfig({}).internalAuth.instanceAdminBearerToken).toBeUndefined();
   });
 
   it("boots with a blank instance administrator credential rather than refusing the process", () => {
-    expect(resolveApiConfig({ LANGWATCH_INSTANCE_ADMIN_API_KEY: "" }).instanceAdminApiKey).toBe("");
+    expect(
+      resolveApiConfig({ LANGWATCH_INSTANCE_ADMIN_API_KEY: "" }).internalAuth.instanceAdminBearerToken,
+    ).toBe("");
   });
 
   it("gives the whole shutdown sequence more budget than the listener drain alone", () => {

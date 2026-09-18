@@ -140,7 +140,7 @@ const statements = {
   doorsSession:
     'createApp({ role: "api" }).withTransportAuth((auth) => auth.withBrowserSession({}), () => ({})).boot();',
   doorsTokens:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withStaticTokens({ cron: "test", langyInternal: "test", instanceAdmin: "test" }), () => ({})).boot();',
+    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withStaticTokens({ cronBearerToken: "test", langyInternalBearerToken: "test", instanceAdminBearerToken: "test" }), () => ({})).boot();',
   goodService:
     'createApp({ role: "worker" }).withService({ name: "producer", start: () => void 0, stop: () => void 0 }).boot();',
   ...truncationStatements,

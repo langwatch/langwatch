@@ -1,3 +1,5 @@
+import { resolveUiBundle, type ApiUiBundle } from "./door/api-ui-bundle.ts";
+
 import { agentServerConfigDefinition } from "@langwatch/agent-contract";
 import {
   analyticsServerConfigDefinition,
@@ -168,16 +170,14 @@ export const apiConfigDefinition = RuntimeConfig.define({
   logger: { ...loggerConfigDefinition },
   observability: { ...observabilityConfigDefinition },
   /**
-   * The provisioning family's admin credential. Blank means unconfigured,
-   * never a boot refusal.
+   * The provisioning family's instance-administrator bearer token. Composed
+   * into {@link ApiInternalAuthConfig} below with the other two, which is how
+   * the process hands them to its doors.
    */
   instanceAdminApiKey: Config.value(optionalEnvironmentString, {
     env: "LANGWATCH_INSTANCE_ADMIN_API_KEY",
   }),
-  /**
-   * The internal cron family's shared bearer. Blank means unconfigured — the
-   * destructive door stays off — never a boot refusal.
-   */
+  /** The internal cron family's bearer token. @see instanceAdminApiKey */
   cronApiKey: Config.value(optionalEnvironmentString, {
     env: "CRON_API_KEY",
   }),
@@ -579,6 +579,20 @@ function resolveNlpLambdaFleetConfig(
   });
 }
 
+/**
+ * The static bearers this process opens its internal doors on. The names are
+ * the transport chain's own, so the whole object goes through `withStaticTokens`
+ * and no main picks it apart key by key.
+ */
+export type ApiInternalAuthConfig = Readonly<{
+  /** The internal cron family's bearer token. */
+  cronBearerToken: string | undefined;
+  /** The Langy agent manager's callback bearer token. */
+  langyInternalBearerToken: string | undefined;
+  /** The instance administrator's bearer token, unset on SaaS. */
+  instanceAdminBearerToken: string | undefined;
+}>;
+
 export type ApiConfig = Readonly<
   Omit<
     ApiConfigProjection,
@@ -586,7 +600,9 @@ export type ApiConfig = Readonly<
     | "billing"
     | "browserSession"
     | "dataRetention"
+    | "cronApiKey"
     | "infrastructure"
+    | "instanceAdminApiKey"
     | "langy"
     | "mail"
     | "requestBounds"
@@ -620,6 +636,16 @@ export type ApiConfig = Readonly<
      * rather than falling open — a deployment with no Langy agent needs none.
      */
     langyInternalSecret: string | undefined;
+    /**
+     * The bearer tokens this deployment answers its own internal doors on,
+     * as one object the transport chain takes whole. @see ApiInternalAuthConfig
+     */
+    internalAuth: ApiInternalAuthConfig;
+    /**
+     * The built browser application served off the same listener. Absent
+     * where this build carries none, and Vite owns the browser instead.
+     */
+    ui: ApiUiBundle | undefined;
     /** Absent when the deployment named no `BASE_HOST`; see `resolveApiMailConfig`. */
     mail?: ApiMailConfig;
     /**
@@ -682,6 +708,8 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
   const mail = resolveApiMailConfig(mailSource, value.infrastructure.execution.publicBaseUrl);
   const {
     billing: billingSource,
+    cronApiKey,
+    instanceAdminApiKey,
     langy,
     requestBounds: requestBoundsConfig,
     ...withoutBilling
@@ -690,6 +718,21 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
     ...withoutBilling,
     requestBounds: resolveRequestBoundsOverrides(requestBoundsConfig),
     langyInternalSecret: langy.internalSecret,
+    // Frozen: the chain, both doors and every family read the same object,
+    // and a reader that could edit it could open a door nobody configured.
+    internalAuth: Object.freeze({
+      cronBearerToken: cronApiKey,
+      langyInternalBearerToken: langy.internalSecret,
+      instanceAdminBearerToken: instanceAdminApiKey,
+    }),
+    // The two values the browser projection is built on come from THIS parse,
+    // not from a second read of the environment: one deployment, one answer
+    // for what its base address and mode are.
+    ui: resolveUiBundle({
+      ...source,
+      BASE_HOST: value.infrastructure.execution.publicBaseUrl,
+      NODE_ENV: value.nodeEnvironment,
+    }),
     ...(mail ? { mail } : {}),
     billing: resolveApiBillingConfig(billingSource),
     featureFlags: resolveFeatureFlagConfig(source),

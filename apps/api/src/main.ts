@@ -10,10 +10,11 @@ import { createServerApp } from "@langwatch/installed-modules/server";
 import { configureLogger, createLogger } from "@langwatch/observability";
 import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
 import { prometheusMetrics, startOtlpMetricsExport } from "@langwatch/observability/node";
-import { hostedRuntime, Server } from "@langwatch/process-server";
+import { Server } from "@langwatch/process-server";
 import { createProcessMembers, hostedMembers } from "@langwatch/process-stores";
 import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
 
+import { ApiDoor } from "./door/api-door.ts";
 import {
   apiLoggerConfiguration,
   apiModuleConfig,
@@ -47,7 +48,7 @@ export async function startApi(): Promise<Server> {
   });
   server.with(hostedMembers(members));
 
-  const runtime = await createServerApp("api")
+  const app = await createServerApp("api")
     // The audit sink is this deployment's choice: OSS records nothing, enterprise swaps in its own.
     .withModules([auditLogNullServer] as const)
     .withConfig(apiModuleConfig(config))
@@ -63,6 +64,20 @@ export async function startApi(): Promise<Server> {
       requestClustering: () =>
         Promise.reject(new Error(`${config.serviceName} composes no topic clustering worker`)),
     })
+    .withTransportAuth(
+      (auth) => auth.withStaticTokens(config.internalAuth),
+      (peers, auth) =>
+        ApiDoor.create({
+          peers,
+          auth,
+          members,
+          stores: {
+            database: config.infrastructure.database.url !== void 0,
+            redis: config.infrastructure.redis.configured,
+          },
+          logger,
+        }).hosts,
+    )
     .provide({
       licenseSource: createActivatedLicenseSource({
         prisma: members.read("prisma"),
@@ -72,8 +87,7 @@ export async function startApi(): Promise<Server> {
     })
     .boot();
 
-  server.with(hostedRuntime({ name: "api runtime", runtime }));
-  await server.listen();
+  await server.serve(app, { ui: config.ui });
   return server;
 }
 

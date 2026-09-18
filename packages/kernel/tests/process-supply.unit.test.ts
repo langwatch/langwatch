@@ -137,7 +137,7 @@ describe("process supply", () => {
       .withModules([transportedClockModule])
       .withClock(clock)
       .withTransportAuth(
-        (auth) => auth.withStaticTokens({ cron: "cron-secret" }),
+        (auth) => auth.withStaticTokens({ cronBearerToken: "cron-secret" }),
         (peers, auth) => {
           const clockApi = peers.app(ClockApp.contract);
 
@@ -145,14 +145,14 @@ describe("process supply", () => {
             rest: {
               mount: () => ({
                 protocol: "rest" as const,
-                cron: auth.staticTokens.cron,
+                cron: auth.staticTokens.cronBearerToken,
                 now: clockApi.now(),
               }),
             },
             trpc: {
               mount: () => ({
                 protocol: "trpc" as const,
-                cron: auth.staticTokens.cron,
+                cron: auth.staticTokens.cronBearerToken,
                 now: clockApi.now(),
               }),
             },

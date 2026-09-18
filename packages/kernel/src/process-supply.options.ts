@@ -29,9 +29,9 @@ export class ObservabilitySupply<
 }
 
 export interface StaticTransportTokens {
-  readonly cron?: string;
-  readonly langyInternal?: string;
-  readonly instanceAdmin?: string;
+  readonly cronBearerToken?: string;
+  readonly langyInternalBearerToken?: string;
+  readonly instanceAdminBearerToken?: string;
 }
 
 export class TransportAuthSupply {

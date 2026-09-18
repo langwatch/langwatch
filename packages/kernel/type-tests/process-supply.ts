@@ -100,7 +100,7 @@ const ready = all
   .withTransportAuth(
     (auth) =>
       auth
-        .withStaticTokens({ cron: "test", langyInternal: "test", instanceAdmin: "test" })
+        .withStaticTokens({ cronBearerToken: "test", langyInternalBearerToken: "test", instanceAdminBearerToken: "test" })
         .withBrowserSession({}),
     () => ({}),
   );
