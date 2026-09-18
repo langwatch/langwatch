@@ -6,7 +6,8 @@
  * @see ../../../../../../specs/instant-evals/instant-eval-pipeline.feature
  */
 
-import { describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   fakes,
@@ -83,8 +84,9 @@ describe("given a run about to be planned", () => {
       expect(rowSource.keys).toHaveBeenCalledWith(
         expect.objectContaining({ limit: 50 }),
       );
-      const call = (rowSource.texts as ReturnType<typeof vi.fn>).mock
-        .calls[0]?.[0] as { traceIds: string[] };
+      const call = (rowSource.texts as Mock).mock.calls[0]?.[0] as {
+        traceIds: string[];
+      };
       expect(call.traceIds).toHaveLength(50);
     });
   });

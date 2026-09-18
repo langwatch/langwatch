@@ -31,6 +31,9 @@ function execution(
     rows: [{ TraceId: "t1" }],
     truncated: false,
     statistics: { elapsedMs: 1, rowsRead: 1, bytesRead: 1, rowsReturned: 1 },
+    diagnostics: [],
+    followsTimeWindow: false,
+    followsGranularity: false,
     ...overrides,
   };
 }
