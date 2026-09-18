@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -242,7 +243,7 @@ export function IngestionTemplatesEditor({ organizationId }: { organizationId: s
         <Spacer />
         <Text fontSize="xs" color="fg.muted">
           OTTL authoring guide:{" "}
-          <Link href="/docs/ai-governance/ingestion-templates" color="orange.600">
+          <Link href={docsUrl("/ai-governance/ingestion-templates")} color="orange.600">
             two-tier trust model
           </Link>
           .
