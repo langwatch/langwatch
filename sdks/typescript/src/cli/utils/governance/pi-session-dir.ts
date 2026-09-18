@@ -497,22 +497,33 @@ export function offersCrossProjectSessionPicker(
  * to all of them, and it is bounded by the same two filters — the modification
  * window and the per-row clock. It is accepted only for the launch that asks for
  * a cross-project picker.
+ *
+ * `sessionsDir` is the directory {@link resolvePiSessionDir} already gave the
+ * caller. Passing it is not only cheaper — every caller needs that directory
+ * anyway, and resolving it twice reads both settings files a second time — it
+ * also removes a way for the two answers to disagree: capture would watch one
+ * directory while this decided whether to widen from another. The same shape as
+ * `codex-rollout-otlp.ts`'s own resolved-directory option. Omitting it resolves,
+ * so a caller that has not already done so is not forced to.
  */
 export async function crossProjectSessionsRoot({
   toolArgs = [],
   env = process.env,
   home = homedir(),
   cwd = process.cwd(),
+  sessionsDir,
 }: {
   toolArgs?: readonly string[];
   env?: NodeJS.ProcessEnv;
   home?: string;
   cwd?: string;
+  sessionsDir?: string;
 } = {}): Promise<string | null> {
   if (!offersCrossProjectSessionPicker(toolArgs)) return null;
 
   const agentDir = piAgentDir({ env, home });
-  const resolved = await resolvePiSessionDir({ toolArgs, env, home, cwd });
+  const resolved =
+    sessionsDir ?? (await resolvePiSessionDir({ toolArgs, env, home, cwd }));
   if (resolved !== defaultPiProjectSessionsDir({ cwd, agentDir })) return null;
 
   return defaultPiSessionsRoot(agentDir);

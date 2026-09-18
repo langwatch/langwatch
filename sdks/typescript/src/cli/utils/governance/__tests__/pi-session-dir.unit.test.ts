@@ -979,6 +979,44 @@ describe("deciding whether a resume can reach another project's sessions", () =>
   });
 
   /**
+   * The caller has already resolved this directory and passes it in. Two tests,
+   * because the option has to be USED rather than merely accepted: a directory
+   * that is the default answers with the root, and one that is not answers
+   * null, which an implementation that ignored the argument and resolved for
+   * itself could not do — it would answer the same way to both.
+   *
+   * @scenario "A session resumed from another project is captured where it lives"
+   */
+  it("decides from the directory it is handed rather than resolving again", async () => {
+    const theDefault = defaultPiProjectSessionsDir({
+      cwd,
+      agentDir: defaultAgentDir(),
+    });
+
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume"],
+        env: {},
+        home,
+        cwd,
+        sessionsDir: theDefault,
+      }),
+    ).resolves.toBe(defaultPiSessionsRoot(defaultAgentDir()));
+
+    // Nothing on the command line or in the environment has moved anything, so
+    // a resolver asked to work it out again would say the default and widen.
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume"],
+        env: {},
+        home,
+        cwd,
+        sessionsDir: "/somewhere/the/user/moved/it",
+      }),
+    ).resolves.toBeNull();
+  });
+
+  /**
    * `--continue` takes the most recent session of THIS project, so it needs no
    * widening; reading it as a resume would capture other projects for a launch
    * that never leaves this one.

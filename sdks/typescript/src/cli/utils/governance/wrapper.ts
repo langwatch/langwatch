@@ -896,18 +896,19 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	let piInFlight: Promise<unknown> = Promise.resolve();
 	if (tool === "pi") {
 		if (modeResult.endpoint && modeResult.ingestionToken) {
+			// The working directory is not incidental here: with nothing moving
+			// pi's session directory, it is what names the folder pi writes
+			// into, and reading its parent finds only folders.
+			const piSessionsDir = await resolvePiSessionDir({
+				toolArgs,
+				env: process.env,
+				cwd: process.cwd(),
+			});
 			const capture = createPiCapture({
 				// Stamped before the spawn: a session file untouched since then is
 				// one this run never wrote to, and belongs to nobody's launch of ours.
 				sinceMs: sessionStartMs,
-				// The working directory is not incidental here: with nothing moving
-				// pi's session directory, it is what names the folder pi writes
-				// into, and reading its parent finds only folders.
-				sessionsDir: await resolvePiSessionDir({
-					toolArgs,
-					env: process.env,
-					cwd: process.cwd(),
-				}),
+				sessionsDir: piSessionsDir,
 				// A session named by path is opened where it lies rather than copied
 				// into the directory above, so it needs naming separately or it is
 				// never read. Empty when pi was given an id or nothing, because every
@@ -922,6 +923,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 					toolArgs,
 					env: process.env,
 					cwd: process.cwd(),
+					// The directory resolved above, so this decides whether to widen
+					// from the same place capture is watching rather than from a
+					// second reading of both settings files.
+					sessionsDir: piSessionsDir,
 				}),
 				// Events, never spans: a pi turn on both lanes would be counted twice.
 				logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
