@@ -1106,9 +1106,9 @@ export async function startShareControl({
     shims,
   );
   const script = path.join(repo.root, "..", `${sessionName}.sh`);
-  // The terminal signs in through the login config alone: a project key in
-  // its environment would make the command line act as the project, and a
-  // control request is addressed to the person.
+  // The terminal signs in through the login config alone, which is the one
+  // credential the command takes: a control request is addressed to the
+  // person.
   await fs.writeFile(
     script,
     shareControlProfile({
@@ -1602,9 +1602,10 @@ export function judgeMessages(message: {
 /**
  * The shell profile the shared terminal starts from.
  *
- * The terminal signs in through the login config alone: a project key in its
- * environment would make the command line act as the project, and a control
- * request is addressed to the person.
+ * The terminal signs in through the login config alone, which is the one
+ * credential the command takes: a control request is addressed to the person.
+ * The key is unset so the commands Langy runs in the folder start from a clean
+ * shell, not because the command line would read it.
  */
 export function shareControlProfile({
   root,

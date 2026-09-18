@@ -123,14 +123,6 @@ export const resolveCredentials = async (
   opts: {
     apiKey?: string;
     project?: string;
-    /**
-     * Resolve the device session before a key from the environment or the
-     * folder's .env. For a command that acts as a person: a control request
-     * is addressed to the developer who asked, and the project key Langy
-     * wrote into the folder's .env carries no person, so it can never answer
-     * one. The flag key still wins, since it was typed on this command.
-     */
-    preferSession?: boolean;
   } = {},
 ): Promise<ResolvedCredentials> => {
   // Load environment variables from .env file (scoped, see above)
@@ -141,11 +133,6 @@ export const resolveCredentials = async (
   // would be sent to the cloud default. `??=` keeps an explicit env value
   // authoritative, matching the 4-source resolver's order (env above config).
   process.env.LANGWATCH_ENDPOINT ??= endpoint;
-
-  if (opts.preferSession && !opts.apiKey?.trim()) {
-    const session = await resolveFromSession({ opts, endpoint });
-    if (session) return session;
-  }
 
   const flagKey = opts.apiKey?.trim();
   if (flagKey) {
@@ -176,22 +163,56 @@ export const resolveCredentials = async (
     return { apiKey: envKey, source: "env", endpoint, projectId };
   }
 
-  const session = await resolveFromSession({ opts, endpoint });
+  const session = await resolveFromSession({
+    project: opts.project,
+    endpoint,
+    asPerson: false,
+  });
   if (session) return session;
 
   return reportMissingCredentials(endpoint);
 };
 
 /**
+ * The credentials of a command that acts as a person: the login key of the
+ * device session in ~/.langwatch/config.json, and nothing else.
+ *
+ * `LANGWATCH_API_KEY` is never the credential here, whether it comes from the
+ * folder's .env or from the shell. A project key carries no person, and
+ * nothing in a key tells the command line whether a person stands behind it,
+ * so the login is the only credential that is known to. The variable is left
+ * as it is for the app in the folder and for every other command.
+ *
+ * Resolves to nothing when the machine has no login, when the server refuses
+ * the one it has, or when that login holds no login key: the caller signs in
+ * and asks again.
+ *
+ * Spec: specs/typescript-sdk/cli-langy-share-control.feature
+ */
+export const resolvePersonCredentials = async (): Promise<
+  ResolvedCredentials | undefined
+> => {
+  // The folder's .env still names the endpoint the folder works against.
+  loadEnvFileScoped();
+  const endpoint = getEndpoint();
+  process.env.LANGWATCH_ENDPOINT ??= endpoint;
+  return resolveFromSession({ endpoint, asPerson: true });
+};
+
+/**
  * The device session's credential, published into the request-scoped store,
- * or nothing when the machine holds no live session.
+ * or nothing when the machine holds no live session. `asPerson` accepts the
+ * user-scoped login key only, since the personal project's key carries no
+ * person.
  */
 async function resolveFromSession({
-  opts,
+  project,
   endpoint,
+  asPerson,
 }: {
-  opts: { project?: string; preferSession?: boolean };
+  project?: string;
   endpoint: string;
+  asPerson: boolean;
 }): Promise<ResolvedCredentials | undefined> {
   // Stored state. Re-read from disk on every call, never cached in-process
   // (the daemon identity boundary again; loadConfig is built for this).
@@ -204,20 +225,20 @@ async function resolveFromSession({
   if (!cfg || !isLoggedIn(cfg)) return undefined;
   const session = await resolveSessionCredential(cfg);
   if (!session) return undefined;
+  if (asPerson && !session.isLoginKey) return undefined;
 
   setResolvedApiKey(session.apiKey);
   // `--project` decides the target BEFORE anything is published: the
   // personal project is the default only when no flag says otherwise,
   // and a flag that does not resolve must leave no target behind at all.
   const projectId =
-    (await applyProjectScope({ project: opts.project, cfg })) ??
-    session.projectId;
+    (await applyProjectScope({ project, cfg })) ?? session.projectId;
   setResolvedProjectId(projectId);
   // An explicit --project names the identity on the command line, so
   // there is nothing implicit left to warn about. A command that acts as
   // the person reads no project either way, so the notice about which
   // project it reads would be wrong; that command names its own login.
-  if (opts.project === undefined && !opts.preferSession) {
+  if (project === undefined && !asPerson) {
     await maybePrintIdentityNotice({
       mode: session.isLoginKey ? "device-login-key" : "device",
       apiKey: session.apiKey,
