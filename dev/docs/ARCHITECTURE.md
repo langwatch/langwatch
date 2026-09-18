@@ -203,22 +203,65 @@ shell implements from `browser-host` capabilities. The half is declared with
 exported at `./declaration`; the generated `browserModules` list installs it.
 
 **One layout, nested** (ruled 2026-09-18). Those layers are the whole
-vocabulary. A package that outgrows a single `ui/sections/` folder does not
-invent a layer, it nests: `features/<name>/` repeats `model/ behavior/ ui/`
-inside itself and holds everything that feature owns. The module-level
-`behavior/` then keeps only what genuinely crosses features — behaviour
-belongs to the feature that owns it, never to a package-wide bucket every
-feature reaches into. A feature that is one component is a section.
+vocabulary. A package that outgrows one `ui/sections/` folder does not invent
+a layer, it nests — and a feature is the same shape again, one level down:
+
+```
+modules/ops/browser/src/
+├── ops.web.ts                  the declaration — the only export (below)
+├── model/                      what EVERY feature here shares, and no more
+├── behavior/                   likewise: crosses features, or it moves down
+├── ui/elements|blocks|sections
+└── features/
+    ├── queue/                  a feature owns its whole stack
+    │   ├── model/
+    │   ├── behavior/           queue's hooks live HERE, not in the bucket above
+    │   └── ui/elements|blocks|sections
+    └── foundry/                same shape, again
+```
+
+Behaviour belongs to the feature that owns it, never to a package-wide bucket
+every feature reaches into — that bucket is how `behavior/` became a junk
+drawer in the packages that have one. A feature that is one component is a
+section, not a feature.
 
 **A browser package exports `./declaration` and nothing else** (ruled
-2026-09-18). Rule 4 below stops a KIT being a subpath; nothing stopped an
-OWNER growing subpaths, and that is the hole the tree fell through — 23
-packages opened `./surfaces/*` entries and 626 cross-module import lines
-walked in, none of them a dependency-graph edge any baseline could hold. The
-exports map IS the enforcement: what is not exported cannot be reached, so
-closure is structural rather than a lint the next refactor forgets. This is
-why rule 1 needed no new rule, only a door that shuts. `surfaces/` and
-`screens/` are deleted spellings (§15).
+2026-09-18):
+
+```jsonc
+// modules/trace/browser/package.json — after. One entry, and this is its
+// full shape: the declaration source is what the generator reads.
+"exports": {
+  "./declaration": {
+    "langwatch-declaration-source": "./src/trace.web.ts",
+    "types": "./dist/trace.web.d.ts",
+    "default": "./src/trace.web.ts"
+  }
+}
+
+// before: 35 entries, 29 of them side doors
+"exports": {
+  "./declaration":            { /* … */ },
+  "./surfaces/trace-filters": { /* … */ },   // ← scenario imported this
+  "./surfaces/conversation":  { /* … */ },   // ← and this
+  "./surfaces/trace-id-peek": { /* … */ },   // ← and 17 more like it
+  "./screens/traces":         { /* … */ }
+}
+```
+
+Rule 4 below stops a KIT being a subpath; nothing stopped an OWNER growing
+them, and that is the hole the tree fell through — 23 packages opened
+`./surfaces/*` entries and 626 cross-module import lines walked in, none of
+them a dependency-graph edge any baseline could hold. The exports map IS the
+enforcement: what is not exported cannot be reached, so closure is structural
+rather than a lint the next refactor forgets. Rule 1 never needed a new rule,
+only a door that shuts. `surfaces/` and `screens/` are deleted spellings
+(§15), and a kit answers the same way with one entry:
+
+```jsonc
+// modules/trace/browser-kit/package.json
+"exports": { ".": "./src/index.ts" }   // no subpaths: inside a kit is unreachable
+```
 
 **The kit law** — each rule earned by a measured failure:
 
@@ -995,8 +1038,26 @@ invented:
   router, theme) directly.
 - **A capability travels by declaration** (ruled 2026-09-18). `defineWebModule`
   carries a capability slot, and the composition root reaches a module's
-  capability implementation through `./declaration` like everything else. The
-  gap that forced it: a capability implementation had no legal home once a
+  capability implementation through `./declaration` like everything else:
+
+  ```ts
+  // modules/organization/browser/src/organization.web.ts
+  export const organizationWeb = defineWebModule("organization")
+    .withScreens({ /* … */ })
+    // "Where they are standing" is organization's to answer. It RUNS
+    // organization.getAll, so it is not kit-legal (rule 3) — it is declared.
+    .withCapabilities({
+      scope: { load: () => import("./behavior/scope-capability.ts") },
+    });
+  ```
+
+  ```ts
+  // apps/ui/src/main.tsx — the composition root reads what was declared.
+  // It never names a module's internals, so the exports map stays shut.
+  const ui = await createUi({ mount: "root" }).withModules(browserModules);
+  ```
+
+  The gap that forced it: a capability implementation had no legal home once a
   browser package closed. It cannot be a kit — kit rule 3 says a kit fetches
   nothing, and `useUiScopeReading` runs `organization.getAll` — and it cannot
   be reached directly, because that is the side door §3.4 just shut. The two
