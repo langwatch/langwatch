@@ -128,6 +128,18 @@ const TOOL_BY_AGENT: Record<string, string> = {
  * the user's, never overwritten, and a request that carried no bearer at all
  * was rejected for another reason).
  *
+ * A token read out of the AGENT'S OWN WIRING is the one exception to that
+ * cached-key identity check (`rejectedTokenSource: "wiring"`, #7958): the
+ * cache and the wiring can drift, and the drifted wired key is exactly the
+ * credential the agent's exporter is dying on. Its place in the settings
+ * file does not make it this device's, though — a person can wire that file
+ * to any collector by hand — so ownership is established from the token
+ * itself: it has to be a personal ingest key (`ik-lw-…`, the only kind
+ * `installTelemetryWiring` writes) AND the platform has to recognise it as
+ * one of this account's. A wired token the platform does not know declines,
+ * where a cached one would mint: the cache is this device's own record, the
+ * wiring is not.
+ *
  * Withholds the repair when the platform says a person revoked the cached
  * key, or recorded no cause for the revoke. A revoke from the API-keys page
  * is a decision about this device, and a device that minted its way past it
@@ -145,11 +157,19 @@ const TOOL_BY_AGENT: Record<string, string> = {
 export async function healRevokedIngestKey({
   agent,
   rejectedToken,
+  rejectedTokenSource = "cache",
   deps = REAL_DEPS,
 }: {
   agent: string;
   /** The bearer the collector answered 401 to, without the `Bearer ` word. */
   rejectedToken: string | undefined;
+  /**
+   * Where the rejected bearer was read from. `"cache"` (the default) is the
+   * CLI's own config and demands identity with the cached key; `"wiring"`
+   * says the caller read it out of the agent's wired settings file, where
+   * drift from the cache is the very defect being repaired (#7958).
+   */
+  rejectedTokenSource?: "cache" | "wiring";
   deps?: HealDeps;
 }): Promise<HealOutcome> {
   const tool = TOOL_BY_AGENT[agent];
@@ -159,13 +179,31 @@ export async function healRevokedIngestKey({
   if (!deps.isLoggedIn(cfg)) return DECLINED;
   if (cfg.tool_project_keys?.[tool]?.secret) return DECLINED;
 
-  // Only the cached personal key is ours to replace, and only when it is
-  // demonstrably the credential that was rejected. A 401 the device carried
-  // no bearer for, or carried someone else's, is not this key's failure.
+  // Only a key this device wrote is ours to replace. For the cache source
+  // that means identity with the cached personal key: a 401 the device
+  // carried no bearer for, or carried someone else's, is not this key's
+  // failure. For the wiring source the settings file proves nothing by
+  // itself, so the bearer has to be a personal ingest key — anything else
+  // (a pasted credential, a project key) was never this path's to write —
+  // and the platform has to know it as this account's, checked below.
   const cached = cfg.default_personal_ingest_keys?.[agent]?.secret;
-  if (!cached || rejectedToken !== cached) return DECLINED;
+  if (!rejectedToken) return DECLINED;
+  if (rejectedTokenSource === "cache" && (!cached || rejectedToken !== cached)) {
+    return DECLINED;
+  }
+  if (
+    rejectedTokenSource === "wiring" &&
+    !extractLookupIdFromToken(rejectedToken)
+  ) {
+    return DECLINED;
+  }
 
-  const blocked = await revocationBlocksHeal({ cfg, cached, deps });
+  const blocked = await revocationBlocksHeal({
+    cfg,
+    rejected: rejectedToken,
+    mustBeKnown: rejectedTokenSource === "wiring",
+    deps,
+  });
   if (blocked) return blocked;
 
   const resolved = await deps.resolveLiveIngestionKey({
@@ -192,17 +230,29 @@ export async function healRevokedIngestKey({
  * on `expired`, which is the one outcome that names a repair the person can
  * make. A key retired because its person was offboarded is that same wall,
  * read from the key rather than from a refused call.
+ *
+ * `unknown` — the platform has no such key of THIS account's — is read two
+ * ways. For the cached key it is a server from before causes were recorded,
+ * or a key the cap evicted long ago, and the device repairs itself. For a
+ * key read out of the wiring (`mustBeKnown`) it is the end of the heal: the
+ * only proof that wiring is this device's is the platform recognising its
+ * key, and a key it does not recognise may be another account's or another
+ * collector's, whose wiring a mint here would overwrite.
  */
 async function revocationBlocksHeal({
   cfg,
-  cached,
+  rejected,
+  mustBeKnown = false,
   deps,
 }: {
   cfg: GovernanceConfig;
-  cached: string;
+  /** The rejected bearer itself — cached or wired, whichever 401'd. */
+  rejected: string;
+  /** Decline, rather than mint, when the platform does not know the key. */
+  mustBeKnown?: boolean;
   deps: HealDeps;
 }): Promise<HealOutcome | null> {
-  const lookupId = extractLookupIdFromToken(cached);
+  const lookupId = extractLookupIdFromToken(rejected);
   if (!lookupId) return null;
 
   const described = await deps
@@ -212,6 +262,7 @@ async function revocationBlocksHeal({
     );
   if (!described) return { status: "failed" };
   if (described === EXPIRED_SESSION) return { status: "expired" };
+  if (described.status === "unknown" && mustBeKnown) return DECLINED;
   if (described.status === "revoked") {
     if (
       described.revocationCause === USER_REVOCATION_CAUSE ||
