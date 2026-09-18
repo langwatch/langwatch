@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT TeamName AS team, sum(Cost) AS cost FROM finops_usage WHERE DepartmentId = 'engineering' AND TeamName != '' AND TeamName != 'unallocated' AND Day >= toStartOfYear(now()) GROUP BY team ORDER BY cost DESC LIMIT 8", "parameters": [] }
+]

@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT toDate(PrMergedAt) AS date, count() AS value FROM pull_requests WHERE PrMergedAt >= subtractDays(now(), 90) GROUP BY date ORDER BY date", "parameters": [] }
+]

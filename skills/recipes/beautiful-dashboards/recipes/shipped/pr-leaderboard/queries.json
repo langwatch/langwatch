@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT p.PrNumber AS pr, any(p.Title) AS title, any(p.RepositoryFullName) AS repo, any(p.State) AS state, count(DISTINCT s.SessionId) AS sessions, sum(s.InputTokens + s.OutputTokens) AS tokens, sum(s.CostUsd) AS cost FROM agent_sessions AS s INNER JOIN pull_requests AS p ON concat(s.RepositoryOwner, '/', s.RepositoryName) = p.RepositoryFullName AND s.GitBranch = p.HeadBranch WHERE p.PrMergedAt >= {dashboard_context_period_start:DateTime} AND p.PrMergedAt < {dashboard_context_period_end:DateTime} GROUP BY pr ORDER BY cost DESC LIMIT 6", "parameters": [] }
+]

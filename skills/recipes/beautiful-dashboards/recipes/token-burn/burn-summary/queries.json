@@ -1,0 +1,7 @@
+[
+  {
+    "name": "main",
+    "sql": "SELECT sum(CostUsd) AS cost, sum(InputTokens + OutputTokens) AS total_tokens, sumIf(CostUsd, StartedAt >= subtractDays(now(), 7)) AS week_cost, sumIf(CostUsd, StartedAt >= subtractDays(now(), 14) AND StartedAt < subtractDays(now(), 7)) AS prior_week_cost, sum(RateLimited) AS rate_limited FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}",
+    "parameters": []
+  }
+]

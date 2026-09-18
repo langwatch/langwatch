@@ -1,0 +1,22 @@
+[
+  {
+    "name": "big_context",
+    "sql": "SELECT count() AS sessions, max(PeakContextTokens) AS peak, sum(CostUsd) AS cost FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 7) AND PeakContextTokens > 600000",
+    "parameters": []
+  },
+  {
+    "name": "retries",
+    "sql": "SELECT count() AS retries, sum(RetryDurationMs) / 60000 AS minutes_lost FROM agent_session_events WHERE EventKind = 'api_error' AND TimeUnixMs >= subtractDays(now(), 7)",
+    "parameters": []
+  },
+  {
+    "name": "oversized_tools",
+    "sql": "SELECT count() AS results, uniqExact(ToolName) AS tools, sum(ToolResultBytes) / 4 * 0.000003 AS cost FROM agent_session_events WHERE EventKind = 'tool_result' AND ToolResultBytes > 200000 AND TimeUnixMs >= subtractDays(now(), 7)",
+    "parameters": []
+  },
+  {
+    "name": "rebuilds",
+    "sql": "SELECT sum(CacheRebuildCount) AS rebuilds, max(LargestCacheRebuildTokens) AS largest FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 7)",
+    "parameters": []
+  }
+]

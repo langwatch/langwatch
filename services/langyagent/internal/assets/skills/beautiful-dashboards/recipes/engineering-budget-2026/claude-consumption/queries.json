@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT toStartOfMonth(Day) AS month, sum(TokensIn + TokensOut) AS tokens FROM finops_usage WHERE DepartmentId = 'engineering' AND Tool = 'claude-code' AND Charge = 'usage' AND Day >= toStartOfYear(now()) GROUP BY month ORDER BY month", "parameters": [] }
+]

@@ -1,0 +1,13 @@
+{
+  "slug": "context-health",
+  "title": "Context health",
+  "hint": "How big your context runs and where you compact. Smaller context means cheaper calls.",
+  "cards": [
+    { "slug": "context-per-call", "name": "Context per call", "sub": "How big your context runs each day. Try to stay between 250k and 450k.", "gridColumn": 0, "gridRow": 0, "colSpan": 8, "rowSpan": 3 },
+    { "slug": "compaction", "name": "Where you compact", "sub": "Each dot is one compaction, at the context size where it happened. Try to compact near the optimum line.", "gridColumn": 0, "gridRow": 3, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "call-cost", "name": "What a call costs", "sub": "Average price of one model call at each context size. Compact earlier and calls get cheaper.", "gridColumn": 4, "gridRow": 3, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "oversized-context", "name": "Spent on oversized context", "sub": "Money spent carrying context above the 450k line. Compact earlier to bring it down.", "gridColumn": 0, "gridRow": 6, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "subagent-context", "name": "Subagent context", "sub": "Median context per subagent type. A fork inherits the whole conversation; Explore starts small.", "gridColumn": 4, "gridRow": 6, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "steps", "name": "Steps per prompt", "sub": "How many model calls your agents take per task, and the long tail.", "gridColumn": 0, "gridRow": 9, "colSpan": 8, "rowSpan": 3 }
+  ]
+}

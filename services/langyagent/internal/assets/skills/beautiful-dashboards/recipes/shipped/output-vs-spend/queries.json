@@ -1,0 +1,4 @@
+[
+  { "name": "sessions", "sql": "SELECT toStartOfWeek(StartedAt) AS week, sum(Commits) AS commits, sum(CostUsd) AS cost FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime} GROUP BY week ORDER BY week", "parameters": [] },
+  { "name": "prs", "sql": "SELECT toStartOfWeek(PrMergedAt) AS week, count() AS merged FROM pull_requests WHERE PrMergedAt >= {dashboard_context_period_start:DateTime} AND PrMergedAt < {dashboard_context_period_end:DateTime} GROUP BY week ORDER BY week", "parameters": [] }
+]

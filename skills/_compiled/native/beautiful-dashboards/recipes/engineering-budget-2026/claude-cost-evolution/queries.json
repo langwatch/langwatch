@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT toStartOfMonth(Day) AS month, Charge AS charge, sum(Cost) AS cost FROM finops_usage WHERE DepartmentId = 'engineering' AND Tool = 'claude-code' AND Charge IN ('seat', 'usage') AND Day >= toStartOfYear(now()) GROUP BY month, charge ORDER BY month", "parameters": [] }
+]

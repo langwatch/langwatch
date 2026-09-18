@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT if(AgentType = '', 'main thread', AgentType) AS agent_type, quantile(0.5)(ctx) / 1000 AS median_k, arrayMap(x -> round(x / 1000), quantiles(0.1, 0.3, 0.5, 0.7, 0.9)(ctx)) AS dots FROM (SELECT AgentType, InputTokens + CacheReadTokens + CacheCreationTokens AS ctx FROM agent_session_events WHERE EventKind = 'model_call' AND TimeUnixMs >= {dashboard_context_period_start:DateTime} AND TimeUnixMs < {dashboard_context_period_end:DateTime}) GROUP BY agent_type ORDER BY median_k DESC LIMIT 8", "parameters": [] }
+]

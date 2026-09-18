@@ -1,0 +1,20 @@
+{
+  "slug": "engineering-budget-2026",
+  "title": "Engineering budget 2026",
+  "hint": "The engineering annual budget against actual spend, phased month by month.",
+  "note": "Budget curves are authored plan constants — no Plan model exists yet (see SKILL.mdx).",
+  "cards": [
+    { "slug": "budget-summary", "name": "Cost and budget", "sub": "Budget, cost to date, and how much of the year is spent.", "gridColumn": 0, "gridRow": 0, "colSpan": 8, "rowSpan": 2 },
+    { "slug": "budget-vs-actual", "name": "Budget vs actual", "sub": "By team, budget allocated pro-rata by cost share.", "gridColumn": 0, "gridRow": 2, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "budget-vs-actual-by-month", "name": "Budget vs actual by month", "sub": "Monthly phasing against actual.", "gridColumn": 4, "gridRow": 2, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "pct-cost-by-dim", "name": "Cost by tool share", "sub": "Share of spend by tool this year.", "gridColumn": 0, "gridRow": 5, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "cost-evolution", "name": "Cost evolution", "sub": "Monthly cost, split by tool.", "gridColumn": 4, "gridRow": 5, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "claude-cost-evolution", "name": "Claude Code cost evolution", "sub": "Seat vs usage, month by month.", "gridColumn": 0, "gridRow": 8, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "claude-consumption", "name": "Claude Code consumption", "sub": "Tokens, not dollars.", "gridColumn": 4, "gridRow": 8, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "trend-projection", "name": "Trend projection", "sub": "Where the year lands at the current run rate, against the monthly budget.", "gridColumn": 0, "gridRow": 11, "colSpan": 8, "rowSpan": 3 },
+    { "slug": "claude-vs-budget", "name": "Claude Code cost vs budget", "sub": "Child plan ENG_2026_CLAUDE, monthly.", "gridColumn": 0, "gridRow": 14, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "dbx-evolution", "name": "Databricks Genie cost evolution", "sub": "DBU-driven, company-wide.", "gridColumn": 4, "gridRow": 14, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "dbx-vs-budget", "name": "Databricks Genie cost vs budget", "sub": "Child plan ENG_2026_DBX, flat monthly budget.", "gridColumn": 0, "gridRow": 17, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "trends-by-dim", "name": "Trends by tool", "sub": "Indexed to the first month = 100.", "gridColumn": 4, "gridRow": 17, "colSpan": 4, "rowSpan": 3 }
+  ]
+}

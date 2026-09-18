@@ -1,0 +1,4 @@
+[
+  { "name": "total", "sql": "SELECT sum(ListCost) AS list_cost FROM finops_usage WHERE Tool = 'claude-code' AND Charge = 'usage' AND Day >= subtractDays(now(), 30)", "parameters": [] },
+  { "name": "daily", "sql": "SELECT Day AS day, sum(ListCost) AS cost FROM finops_usage WHERE Tool = 'claude-code' AND Charge = 'usage' AND Day >= subtractDays(now(), 30) GROUP BY day ORDER BY day", "parameters": [] }
+]

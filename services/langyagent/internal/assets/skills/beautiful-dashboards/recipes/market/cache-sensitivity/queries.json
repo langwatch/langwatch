@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT sum(InputTokens) AS input_total, sum(OutputTokens) AS output FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 30)", "parameters": [] }
+]

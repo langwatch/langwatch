@@ -1,0 +1,14 @@
+{
+  "slug": "harness",
+  "title": "My harness",
+  "hint": "The skills, MCP servers and CLIs you installed: adoption, effect, speed.",
+  "cards": [
+    { "slug": "harness-effect", "name": "Is it helping?", "sub": "Tokens per session with each element vs without. Correlation, not a controlled test.", "gridColumn": 0, "gridRow": 0, "colSpan": 8, "rowSpan": 3 },
+    { "slug": "tool-mix", "name": "Tool mix", "sub": "Result tokens by tool.", "gridColumn": 0, "gridRow": 3, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "clis-mcps", "name": "Your CLIs and MCP servers", "sub": "The CLIs and MCP servers you installed: adoption across your sessions.", "gridColumn": 4, "gridRow": 3, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "harness-changes", "name": "Changed since last week", "sub": "What changed in your harness since last week.", "gridColumn": 0, "gridRow": 6, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "skills-in-use", "name": "Skills in use", "sub": "Your skills: how often they run.", "gridColumn": 4, "gridRow": 6, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "harness-speed", "name": "Harness speed", "sub": "How slow each tool is, and its total wall time this week.", "gridColumn": 0, "gridRow": 9, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "dead-weight", "name": "Dead weight", "sub": "MCP servers loaded into most sessions but rarely the reason a session ran.", "gridColumn": 4, "gridRow": 9, "colSpan": 4, "rowSpan": 3 }
+  ]
+}

@@ -1,0 +1,4 @@
+[
+  { "name": "this_week", "sql": "SELECT skill, count() AS n FROM (SELECT arrayJoin(Skills) AS skill FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 7)) GROUP BY skill", "parameters": [] },
+  { "name": "prior_week", "sql": "SELECT skill, count() AS n FROM (SELECT arrayJoin(Skills) AS skill FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 14) AND StartedAt < subtractDays(now(), 7)) GROUP BY skill", "parameters": [] }
+]

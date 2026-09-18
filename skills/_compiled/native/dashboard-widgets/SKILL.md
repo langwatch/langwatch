@@ -15,6 +15,8 @@ Turn a question ("show cost per model as a bar chart") into a saved dashboard wi
 
 Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
 
+For the shared **design language** — the colour ramp and tone semantics, formats, grid sizing, when to use which `@langwatch/charts` primitive, verdict badges, reference lines and bands — and for ready-made recipes of the ten agent-economics boards (token burn, shipping, building speed, context health, harness, the market, checkout health, customer billing, and the two engineering finops boards), see the `beautiful-dashboards` recipe. It carries a `widget.tsx` + `queries.json` for every card and the grid placement to lay each board out.
+
 ## Prerequisites
 
 LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.

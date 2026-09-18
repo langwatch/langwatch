@@ -1,0 +1,16 @@
+{
+  "slug": "token-burn",
+  "title": "Token burn",
+  "hint": "Where your tokens and money go: by pull request, by actor, by token class, by model.",
+  "cards": [
+    { "slug": "burn-summary", "name": "Burn summary", "sub": "Spend, tokens, this week's pace, and rate limits.", "gridColumn": 0, "gridRow": 0, "colSpan": 8, "rowSpan": 2 },
+    { "slug": "expensive-sessions", "name": "Most expensive sessions", "sub": "Your most expensive sessions. Click one to inspect it.", "gridColumn": 0, "gridRow": 2, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "by-pr", "name": "Where it went, by pull request", "sub": "Where the tokens went, by pull request.", "gridColumn": 4, "gridRow": 2, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "spend-by-model", "name": "Spend by model", "sub": "Daily cost, split by model.", "gridColumn": 0, "gridRow": 5, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "pace", "name": "Pace vs your typical week", "sub": "Money spent day by day, against your typical week. Dots mark rate limits.", "gridColumn": 4, "gridRow": 5, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "cache-gauge", "name": "Cache hit rate", "sub": "How much of your input the model reads from cache instead of reprocessing. Higher is cheaper.", "gridColumn": 0, "gridRow": 8, "colSpan": 8, "rowSpan": 4 },
+    { "slug": "tool-round-trips", "name": "Heaviest tool round-trips", "sub": "Single tool calls that returned the most tokens. Filter or paginate these first.", "gridColumn": 0, "gridRow": 12, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "main-vs-subagents", "name": "Main thread vs subagents", "sub": "Tokens by agent type, day by day.", "gridColumn": 4, "gridRow": 12, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "leaks", "name": "Leak detectors", "sub": "Fixed rules that find wasted spend in your session data.", "gridColumn": 0, "gridRow": 15, "colSpan": 8, "rowSpan": 4 }
+  ]
+}

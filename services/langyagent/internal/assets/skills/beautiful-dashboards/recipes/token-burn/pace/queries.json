@@ -1,0 +1,12 @@
+[
+  {
+    "name": "this_week",
+    "sql": "SELECT toDate(StartedAt) AS day, sum(CostUsd) AS cost, max(RateLimited) AS rate_limited FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 7) GROUP BY day ORDER BY day",
+    "parameters": []
+  },
+  {
+    "name": "typical",
+    "sql": "SELECT toDayOfWeek(StartedAt) AS dow, quantile(0.5)(daily) AS typical, quantile(0.25)(daily) AS low, quantile(0.75)(daily) AS high FROM (SELECT toDate(StartedAt) AS d, toDayOfWeek(StartedAt) AS dow, sum(CostUsd) AS daily FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 35) AND StartedAt < subtractDays(now(), 7) GROUP BY d, dow) GROUP BY dow ORDER BY dow",
+    "parameters": []
+  }
+]

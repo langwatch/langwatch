@@ -1,0 +1,10 @@
+{
+  "slug": "checkout-health",
+  "title": "Checkout health",
+  "hint": "Cost, errors and error rate over time for this project.",
+  "cards": [
+    { "slug": "cost-over-time", "name": "Cost over time", "sub": "Daily total cost.", "gridColumn": 0, "gridRow": 0, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "errors-over-time", "name": "Errors over time", "sub": "Daily error count.", "gridColumn": 4, "gridRow": 0, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "error-rate", "name": "Error rate", "sub": "Errors as a share of requests, day by day.", "gridColumn": 0, "gridRow": 3, "colSpan": 4, "rowSpan": 3 }
+  ]
+}

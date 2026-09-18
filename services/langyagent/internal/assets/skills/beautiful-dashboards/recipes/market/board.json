@@ -1,0 +1,13 @@
+{
+  "slug": "market",
+  "title": "The market",
+  "hint": "Your real traffic priced on other vendors' public rate cards. Prices only, no quality adjustment.",
+  "theoretical": true,
+  "cards": [
+    { "slug": "sub-vs-api", "name": "Subscription vs API list price", "sub": "Your last 30 days priced at API list rates.", "gridColumn": 0, "gridRow": 0, "colSpan": 8, "rowSpan": 3 },
+    { "slug": "provider-replay", "name": "Your month on other providers", "sub": "Your last 30 days priced on other vendors' rate cards. Prices only, no quality adjustment.", "gridColumn": 0, "gridRow": 3, "colSpan": 8, "rowSpan": 3 },
+    { "slug": "context-fit", "name": "Context fit", "sub": "The share of your calls too big for each vendor's context cap.", "gridColumn": 0, "gridRow": 6, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "cache-sensitivity", "name": "Cache sensitivity", "sub": "Your bill at different cache hit rates, per vendor.", "gridColumn": 4, "gridRow": 6, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "peak-hours", "name": "Peak-hours exposure", "sub": "When your tokens happen during the day. Shaded hours are vendor peak windows.", "gridColumn": 0, "gridRow": 9, "colSpan": 8, "rowSpan": 3 }
+  ]
+}

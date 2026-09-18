@@ -1,0 +1,10 @@
+{
+  "slug": "customer-billing",
+  "title": "Customer billing",
+  "hint": "The gateway's spend and traffic by customer key.",
+  "cards": [
+    { "slug": "spend-by-key", "name": "Spend by key", "sub": "Top customer keys by cost.", "gridColumn": 0, "gridRow": 0, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "gateway-spend", "name": "Gateway spend over time", "sub": "Daily total cost across the gateway.", "gridColumn": 4, "gridRow": 0, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "requests-over-time", "name": "Requests over time", "sub": "Daily request count across the gateway.", "gridColumn": 0, "gridRow": 3, "colSpan": 4, "rowSpan": 3 }
+  ]
+}

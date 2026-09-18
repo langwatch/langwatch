@@ -1,0 +1,4 @@
+[
+  { "name": "main", "sql": "SELECT Title AS title, RepositoryName AS repo, BlockedOnUserMs / 60000 AS wait_min FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 7) AND BlockedOnUserMs > 0 ORDER BY wait_min DESC LIMIT 5", "parameters": [] },
+  { "name": "total", "sql": "SELECT sum(BlockedOnUserMs) / 60000 AS total_min FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 7)", "parameters": [] }
+]

@@ -1,0 +1,4 @@
+[
+  { "name": "per_skill", "sql": "SELECT skill, avg(tokens) AS with_avg, count() AS n_with FROM (SELECT arrayJoin(Skills) AS skill, InputTokens + OutputTokens AS tokens FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}) GROUP BY skill ORDER BY n_with DESC LIMIT 8", "parameters": [] },
+  { "name": "global", "sql": "SELECT avg(InputTokens + OutputTokens) AS avg_tokens, count() AS n FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}", "parameters": [] }
+]

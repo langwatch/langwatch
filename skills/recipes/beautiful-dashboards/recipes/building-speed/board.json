@@ -1,0 +1,13 @@
+{
+  "slug": "building-speed",
+  "title": "Building speed",
+  "hint": "Your sessions through the day: parallel work, idle time, what ran at night.",
+  "cards": [
+    { "slug": "today", "name": "Today", "sub": "Your sessions across the day. Solid is working, faded is waiting on you.", "gridColumn": 0, "gridRow": 0, "colSpan": 8, "rowSpan": 4 },
+    { "slug": "waiting-on-you", "name": "Waiting on you", "sub": "Sessions that sat the longest waiting for your reply this week.", "gridColumn": 0, "gridRow": 4, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "reply-latency", "name": "Your reply latency", "sub": "How long agents wait for your reply after they finish a turn.", "gridColumn": 4, "gridRow": 4, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "parallel-heatmap", "name": "Parallel work, by hour", "sub": "How many sessions ran at the same time, by hour and day.", "gridColumn": 0, "gridRow": 7, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "overnight", "name": "Overnight runs", "sub": "What ran between midnight and 07:00 this week.", "gridColumn": 4, "gridRow": 7, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "active-waiting", "name": "Working vs waiting", "sub": "Time your agents spent working vs waiting on you, per day.", "gridColumn": 0, "gridRow": 10, "colSpan": 8, "rowSpan": 3 }
+  ]
+}

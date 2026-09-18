@@ -1,0 +1,7 @@
+[
+  {
+    "name": "main",
+    "sql": "SELECT SessionId AS id, Title AS title, RepositoryName AS repo, toDate(StartedAt) AS day, InputTokens + OutputTokens AS tokens, CostUsd AS cost FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime} ORDER BY cost DESC LIMIT 5",
+    "parameters": []
+  }
+]

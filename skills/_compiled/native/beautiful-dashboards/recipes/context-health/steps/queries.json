@@ -1,0 +1,4 @@
+[
+  { "name": "hist", "sql": "SELECT bucket, count() AS value FROM (SELECT multiIf(n <= 10, '1-10', n <= 25, '11-25', n <= 50, '26-50', n <= 100, '51-100', n <= 350, '101-350', '350+') AS bucket FROM (SELECT PromptId, count() AS n FROM agent_session_events WHERE EventKind = 'model_call' AND TimeUnixMs >= {dashboard_context_period_start:DateTime} AND TimeUnixMs < {dashboard_context_period_end:DateTime} GROUP BY PromptId)) GROUP BY bucket", "parameters": [] },
+  { "name": "stats", "sql": "SELECT quantile(0.5)(n) AS p50, quantile(0.9)(n) AS p90, quantile(0.99)(n) AS p99 FROM (SELECT PromptId, count() AS n FROM agent_session_events WHERE EventKind = 'model_call' AND TimeUnixMs >= {dashboard_context_period_start:DateTime} AND TimeUnixMs < {dashboard_context_period_end:DateTime} GROUP BY PromptId)", "parameters": [] }
+]

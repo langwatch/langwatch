@@ -1,0 +1,7 @@
+[
+  {
+    "name": "main",
+    "sql": "SELECT coalesce(toString(p.PrNumber), 'none') AS pr, any(p.Title) AS title, any(s.RepositoryName) AS repo, sum(s.CostUsd) AS cost FROM agent_sessions AS s LEFT JOIN pull_requests AS p ON concat(s.RepositoryOwner, '/', s.RepositoryName) = p.RepositoryFullName AND s.GitBranch = p.HeadBranch WHERE s.StartedAt >= {dashboard_context_period_start:DateTime} AND s.StartedAt < {dashboard_context_period_end:DateTime} GROUP BY pr ORDER BY cost DESC LIMIT 6",
+    "parameters": []
+  }
+]

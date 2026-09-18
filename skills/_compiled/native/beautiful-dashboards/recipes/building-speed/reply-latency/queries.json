@@ -1,0 +1,4 @@
+[
+  { "name": "buckets", "sql": "SELECT multiIf(BlockedOnUserMs < 60000, '<1m', BlockedOnUserMs < 300000, '1-5m', BlockedOnUserMs < 900000, '5-15m', BlockedOnUserMs < 3600000, '15-60m', '>1h') AS bucket, count() AS value FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime} AND BlockedOnUserMs > 0 GROUP BY bucket", "parameters": [] },
+  { "name": "stats", "sql": "SELECT quantile(0.5)(BlockedOnUserMs) / 60000 AS p50_min, quantile(0.9)(BlockedOnUserMs) / 60000 AS p90_min FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime} AND BlockedOnUserMs > 0", "parameters": [] }
+]

@@ -1,0 +1,7 @@
+[
+  {
+    "name": "main",
+    "sql": "SELECT toDate(TimeUnixMs) AS day, if(AgentType = '', 'main thread', AgentType) AS agent_type, sum(InputTokens + OutputTokens) AS tokens FROM agent_session_events WHERE EventKind = 'model_call' AND TimeUnixMs >= {dashboard_context_period_start:DateTime} AND TimeUnixMs < {dashboard_context_period_end:DateTime} GROUP BY day, agent_type ORDER BY day",
+    "parameters": []
+  }
+]

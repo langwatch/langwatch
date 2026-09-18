@@ -1,0 +1,17 @@
+{
+  "slug": "engineering-2026",
+  "title": "Engineering 2026",
+  "hint": "The engineering department's AI spend: seats, tokens and cloud compute together.",
+  "cards": [
+    { "slug": "finops-summary", "name": "Engineering AI cost", "sub": "Seats, tokens and cloud compute together, plus adoption.", "gridColumn": 0, "gridRow": 0, "colSpan": 8, "rowSpan": 2 },
+    { "slug": "pct-cost-by-tool", "name": "Cost by tool share", "sub": "Share of spend by bought product.", "gridColumn": 0, "gridRow": 2, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "cost-evolution", "name": "Cost evolution", "sub": "Monthly cost, split by tool.", "gridColumn": 4, "gridRow": 2, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "cost-by-tool", "name": "Cost by tool", "sub": "What each bought product costs this department.", "gridColumn": 0, "gridRow": 5, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "cost-by-agent", "name": "Cost by agent", "sub": "Which agent costs the most. Agent traffic only.", "gridColumn": 4, "gridRow": 5, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "cost-by-model", "name": "Cost by model", "sub": "Which model is expensive. Metered token spend only.", "gridColumn": 0, "gridRow": 8, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "cost-by-user", "name": "Cost by user", "sub": "Who uses AI the most. Metered spend only.", "gridColumn": 4, "gridRow": 8, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "genie-questions", "name": "Genie questions over time", "sub": "Counted exactly, billed at zero.", "gridColumn": 0, "gridRow": 11, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "tokens-over-time", "name": "Tokens over time", "sub": "Consumption, not dollars.", "gridColumn": 4, "gridRow": 11, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "committed-vs-metered", "name": "Committed vs metered", "sub": "Seats bought ahead against tokens and compute consumed.", "gridColumn": 0, "gridRow": 14, "colSpan": 8, "rowSpan": 3 }
+  ]
+}

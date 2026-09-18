@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT p.PrNumber AS pr, sumIf(s.CostUsd, s.StartedAt < p.PrCreatedAt) AS doing, sumIf(s.CostUsd, s.StartedAt >= p.PrCreatedAt) AS babysitting FROM agent_sessions AS s INNER JOIN pull_requests AS p ON concat(s.RepositoryOwner, '/', s.RepositoryName) = p.RepositoryFullName AND s.GitBranch = p.HeadBranch WHERE p.PrMergedAt >= {dashboard_context_period_start:DateTime} AND p.PrMergedAt < {dashboard_context_period_end:DateTime} GROUP BY pr ORDER BY p.PrMergedAt", "parameters": [] }
+]

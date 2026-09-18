@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT sumIf(1, ctx > 200000) / count() * 100 AS calls_200, sumIf(tokens, ctx > 200000) / sum(tokens) * 100 AS tokens_200, sumIf(1, ctx > 256000) / count() * 100 AS calls_256, sumIf(tokens, ctx > 256000) / sum(tokens) * 100 AS tokens_256, sumIf(1, ctx > 500000) / count() * 100 AS calls_500, sumIf(tokens, ctx > 500000) / sum(tokens) * 100 AS tokens_500 FROM (SELECT InputTokens + CacheReadTokens + CacheCreationTokens AS ctx, InputTokens + OutputTokens AS tokens FROM agent_session_events WHERE EventKind = 'model_call' AND TimeUnixMs >= subtractDays(now(), 30))", "parameters": [] }
+]

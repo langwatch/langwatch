@@ -1,0 +1,12 @@
+[
+  {
+    "name": "overall",
+    "sql": "SELECT sum(CacheReadTokens) / nullif(sum(CacheReadTokens + CacheCreationTokens + (InputTokens - CacheReadTokens - CacheCreationTokens)), 0) AS hit_rate FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}",
+    "parameters": []
+  },
+  {
+    "name": "per_session",
+    "sql": "SELECT SessionId AS id, Title AS title, CostUsd AS cost, CacheReadTokens / nullif(CacheReadTokens + CacheCreationTokens + (InputTokens - CacheReadTokens - CacheCreationTokens), 0) AS hit FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime} AND InputTokens > 0 ORDER BY hit DESC",
+    "parameters": []
+  }
+]

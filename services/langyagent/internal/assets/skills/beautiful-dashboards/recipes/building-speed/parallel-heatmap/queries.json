@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT toDayOfWeek(StartedAt) AS weekday, toHour(StartedAt) AS hour, count() AS value FROM agent_sessions WHERE StartedAt >= subtractDays(now(), 7) GROUP BY weekday, hour", "parameters": [] }
+]

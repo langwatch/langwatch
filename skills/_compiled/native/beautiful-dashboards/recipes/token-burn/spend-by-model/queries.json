@@ -1,0 +1,7 @@
+[
+  {
+    "name": "main",
+    "sql": "SELECT toDate(TimeUnixMs) AS day, Model AS model, sum(CostUsd) AS cost FROM agent_session_events WHERE EventKind = 'model_call' AND TimeUnixMs >= {dashboard_context_period_start:DateTime} AND TimeUnixMs < {dashboard_context_period_end:DateTime} GROUP BY day, model ORDER BY day",
+    "parameters": []
+  }
+]

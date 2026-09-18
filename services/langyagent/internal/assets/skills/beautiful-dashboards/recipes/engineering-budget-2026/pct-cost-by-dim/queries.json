@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT Tool AS tool, sum(Cost) AS cost FROM finops_usage WHERE DepartmentId = 'engineering' AND Day >= toStartOfYear(now()) GROUP BY tool ORDER BY cost DESC LIMIT 5", "parameters": [] }
+]

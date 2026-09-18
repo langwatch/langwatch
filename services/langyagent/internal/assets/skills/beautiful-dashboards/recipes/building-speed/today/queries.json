@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT SessionId AS id, Title AS label, RepositoryName AS repo, toUnixTimestamp(StartedAt) AS start_s, ActiveTimeCliSec AS active_sec, BlockedOnUserMs / 1000 AS blocked_sec, CostUsd AS cost FROM agent_sessions WHERE toDate(StartedAt) = today() ORDER BY StartedAt", "parameters": [] }
+]

@@ -1,0 +1,13 @@
+{
+  "slug": "shipped",
+  "title": "What I shipped",
+  "hint": "What your merged pull requests cost in assistant usage.",
+  "cards": [
+    { "slug": "value-per-token", "name": "Value per token", "sub": "What one merged pull request costs you in assistant usage.", "gridColumn": 0, "gridRow": 0, "colSpan": 8, "rowSpan": 2 },
+    { "slug": "shipping-calendar", "name": "Shipping streak", "sub": "Merged pull requests, day by day.", "gridColumn": 0, "gridRow": 2, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "cost-per-pr", "name": "Cost per merged pull request", "sub": "Assistant cost of each merged pull request. Red bars are far above your median.", "gridColumn": 4, "gridRow": 2, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "babysit", "name": "Doing vs babysitting", "sub": "Cost before the pull request opened vs after it opened.", "gridColumn": 0, "gridRow": 5, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "pr-leaderboard", "name": "Expensive pull requests", "sub": "Your pull requests, ranked by assistant cost.", "gridColumn": 4, "gridRow": 5, "colSpan": 4, "rowSpan": 3 },
+    { "slug": "output-vs-spend", "name": "Output vs spend", "sub": "Merged pull requests and commits next to what you spent each week.", "gridColumn": 0, "gridRow": 8, "colSpan": 8, "rowSpan": 3 }
+  ]
+}

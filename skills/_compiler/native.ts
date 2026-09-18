@@ -61,6 +61,25 @@ export function renderSkill(skill: PublishedSkill): string {
   return inlineMdx(skill.src, { excludeShared: LANGY_EXCLUDED_PARTIALS });
 }
 
+/**
+ * Copy a skill's sibling `recipes/` tree verbatim next to its SKILL.md.
+ *
+ * SKILL.md is the only file the compiler inlines; a skill whose walkthrough is
+ * too large to live in one prompt (the beautiful-dashboards board recipes:
+ * dozens of widget.tsx + queries.json pairs) instead ships the per-item files
+ * beside it and points the reader at them by path. The agent loads the tight
+ * SKILL.md, then opens one recipe file at a time — the same file-per-item shape
+ * the north-star widgets use — rather than carrying every board in context.
+ *
+ * Only a `recipes/` subdirectory travels, and only when one exists, so every
+ * other skill's output is byte-for-byte unchanged.
+ */
+function copyRecipeAssets(skill: PublishedSkill, outDir: string): void {
+  const recipesSrc = path.join(path.dirname(skill.src), "recipes");
+  if (!fs.existsSync(recipesSrc)) return;
+  fs.cpSync(recipesSrc, path.join(outDir, "recipes"), { recursive: true });
+}
+
 function main() {
   const args = process.argv.slice(2);
   let outDir = DEFAULT_OUT;
@@ -73,6 +92,7 @@ function main() {
     const dir = path.join(outDir, skill.slug); // flattened — recipes included
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, "SKILL.md"), renderSkill(skill));
+    copyRecipeAssets(skill, dir);
   }
   console.log(`Generated ${skills.length} native skills in ${outDir}/`);
   for (const skill of skills) {

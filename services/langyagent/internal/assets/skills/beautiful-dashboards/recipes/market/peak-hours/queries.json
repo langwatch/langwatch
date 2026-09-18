@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT toHour(TimeUnixMs) AS hour, sum(InputTokens + OutputTokens) AS tokens FROM agent_session_events WHERE EventKind = 'model_call' AND toDate(TimeUnixMs) = today() GROUP BY hour ORDER BY hour", "parameters": [] }
+]

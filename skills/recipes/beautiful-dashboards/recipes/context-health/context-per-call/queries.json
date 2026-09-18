@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT toDate(TimeUnixMs) AS day, quantile(0.5)(InputTokens + CacheReadTokens + CacheCreationTokens) / 1000 AS p50, quantile(0.9)(InputTokens + CacheReadTokens + CacheCreationTokens) / 1000 AS p90, max(InputTokens + CacheReadTokens + CacheCreationTokens) / 1000 AS max_k FROM agent_session_events WHERE EventKind = 'model_call' AND TimeUnixMs >= {dashboard_context_period_start:DateTime} AND TimeUnixMs < {dashboard_context_period_end:DateTime} GROUP BY day ORDER BY day", "parameters": [] }
+]

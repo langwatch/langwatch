@@ -1,0 +1,4 @@
+[
+  { "name": "servers", "sql": "SELECT name, count() AS sessions FROM (SELECT arrayJoin(arrayConcat(McpServers, arrayMap(t -> concat(t, ' (CLI)'), mapKeys(ToolCounts)))) AS name FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}) GROUP BY name ORDER BY sessions DESC LIMIT 8", "parameters": [] },
+  { "name": "total", "sql": "SELECT count() AS n FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}", "parameters": [] }
+]

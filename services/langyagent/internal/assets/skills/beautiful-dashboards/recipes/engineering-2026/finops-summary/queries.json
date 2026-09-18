@@ -1,0 +1,4 @@
+[
+  { "name": "main", "sql": "SELECT sum(Cost) AS total_cost, uniqExact(PersonId) AS users, sum(Requests) AS interactions FROM finops_usage WHERE DepartmentId = 'engineering' AND Day >= {dashboard_context_period_start:DateTime} AND Day < {dashboard_context_period_end:DateTime}", "parameters": [] },
+  { "name": "genie", "sql": "SELECT sumIf(ListCost, Resource = 'dbx-genie-warehouse' AND Charge = 'cloud') AS compute, sumIf(Units, Charge = 'activity') AS conversations FROM finops_usage WHERE Day >= {dashboard_context_period_start:DateTime} AND Day < {dashboard_context_period_end:DateTime}", "parameters": [] }
+]

@@ -1,0 +1,5 @@
+[
+  { "name": "servers", "sql": "SELECT server AS name, count() AS sessions FROM (SELECT arrayJoin(McpServers) AS server FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}) GROUP BY name ORDER BY sessions DESC LIMIT 5", "parameters": [] },
+  { "name": "calls", "sql": "SELECT tool AS name, count() AS calls FROM (SELECT arrayJoin(McpTools) AS tool FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}) GROUP BY name", "parameters": [] },
+  { "name": "total", "sql": "SELECT count() AS n FROM agent_sessions WHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}", "parameters": [] }
+]

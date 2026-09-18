@@ -1,0 +1,3 @@
+[
+  { "name": "main", "sql": "SELECT Day AS day, sum(Errors) / nullif(sum(Requests), 0) AS rate FROM finops_usage WHERE Day >= {dashboard_context_period_start:DateTime} AND Day < {dashboard_context_period_end:DateTime} GROUP BY day ORDER BY day", "parameters": [] }
+]

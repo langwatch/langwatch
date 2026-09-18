@@ -1,0 +1,7 @@
+[
+  {
+    "name": "main",
+    "sql": "SELECT ToolName AS tool, count() AS times, max(ToolResultBytes) AS max_bytes, sum(ToolResultBytes) AS total_bytes FROM agent_session_events WHERE EventKind = 'tool_result' AND TimeUnixMs >= subtractDays(now(), 7) GROUP BY tool ORDER BY max_bytes DESC LIMIT 5",
+    "parameters": []
+  }
+]
