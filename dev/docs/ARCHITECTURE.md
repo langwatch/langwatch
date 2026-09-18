@@ -1036,6 +1036,27 @@ invented:
   by modules only through their declared `*HostApi`. Ambient React context is
   never a cross-module transport; modules never import a vendor (posthog,
   router, theme) directly.
+- **A declaration slot nothing consumes is deleted, not kept** (ruled
+  2026-09-18). The declaration is a contract, and a slot with no consumer is
+  not one — it is an invitation to declare something that will never be read.
+  Counted across `defineWebModule`'s ten module-facing slots:
+
+  | slot | declarers | consumer |
+  | --- | --- | --- |
+  | `withScreens` | 33 | `installedModuleScreens` |
+  | `withDrawers` | 11 | `installedDrawerLoaders` |
+  | `withConfig` | 3 | yes |
+  | `withApi` | 1 of 33 | `installedModuleApis` |
+  | `withCapabilities` | 0 | being built |
+  | `withSlots` | **0** | built and waiting (`browser-host/src/slots.tsx`) |
+  | `withFlags` · `withCommands` · `withFailureInterceptors` · `withSeatTypeCopy` | **0** | **none** |
+
+  The last row is public builder surface that does nothing;
+  `withSeatTypeCopy()` takes no argument at all and sets a boolean nobody
+  reads. Those four go, and come back when something needs them. `withSlots`
+  is the opposite case and stays: its consumer is built, and what it lacks is
+  declarers.
+
 - **An unmounted host is refused at install, not thrown at render** (ruled
   2026-09-18). A screen declares a `*HostApi`; if nothing mounts it, `createUi`
   refuses by name — the same way the kernel already refuses a screen name two
