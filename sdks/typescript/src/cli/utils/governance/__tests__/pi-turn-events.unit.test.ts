@@ -158,9 +158,8 @@ describe("building pi's turn events", () => {
      *
      * Lengths and names are asserted alongside, because "no text" must not be
      * satisfiable by dropping the turn.
-     *
-     * @scenario "A captured pi session records every turn in the order pi wrote them"
      */
+    /** @scenario "A captured pi session records every turn in the order pi wrote them" */
     it("records each turn's speaker, timing and usage, and none of its text", () => {
       const promptText = "SECRETPROMPT";
       const replyText = "PRIVATEREPLY";

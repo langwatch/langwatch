@@ -651,9 +651,8 @@ describe("given a default pi install, where pi writes below the sessions root", 
    * bearing half. Pointing the same capture at the parent must yield nothing,
    * which is precisely the bug as it shipped: no error, no file, no turns, and
    * every test green.
-   *
-   * @scenario "A default pi launch is read from the folder pi makes for this project"
    */
+  /** @scenario "A default pi launch is read from the folder pi makes for this project" */
   it("captures the session pi wrote, which the parent directory does not hold", async () => {
     const home = join(dir, "home");
     const cwd = "/work/project";
@@ -705,9 +704,8 @@ describe("given a default pi install, where pi writes below the sessions root", 
    * global file would harvest from there and pass a test that only asked for
    * turns. Asking for nothing at the global directory is what pins the
    * precedence to the thing that actually reads.
-   *
-   * @scenario "A session directory the project moved is the one capture reads"
    */
+  /** @scenario "A session directory the project moved is the one capture reads" */
   it("captures from the directory the project's own settings name", async () => {
     const home = join(dir, "home");
     const cwd = join(dir, "project");
@@ -976,9 +974,8 @@ describe("given pi was pointed at one session file by name", () => {
      * with the same file on disk and the same directory watched, not naming it
      * sends nothing at all. If this ever starts passing turns through, the
      * directory walk has widened into somewhere it was never meant to reach.
-     *
-     * @scenario "A session pi was told to open by path is captured where it lies"
      */
+    /** @scenario "A session pi was told to open by path is captured where it lies" */
     it("records nothing from it when capture is not told its name", async () => {
       const fetchImpl = vi.fn(async () => {
         throw new Error("nothing should be posted");
@@ -1008,9 +1005,8 @@ describe("given pi was pointed at one session file by name", () => {
      * deleted outright, and passed again with the line that ages the file
      * removed. Without the fresh pass, a reader that captured nothing at all
      * would look correct here.
-     *
-     * @scenario "A session pi was told to open by path is captured where it lies"
      */
+    /** @scenario "A session pi was told to open by path is captured where it lies" */
     it("still leaves a file untouched since the run began alone", async () => {
       const startedMs = Date.now();
       await writeFile(
@@ -1169,9 +1165,8 @@ describe("given a resume that reopened another project's session", () => {
      * The defect, and the reason the wider root is opt-in: with the same files
      * on disk and only this project's folder watched, the resumed session is
      * invisible.
-     *
-     * @scenario "A session resumed from another project is captured where it lives"
      */
+    /** @scenario "A session resumed from another project is captured where it lives" */
     it("records nothing from it on a launch that does not widen", async () => {
       const fetchImpl = vi.fn(async () => {
         throw new Error("nothing should be posted");
@@ -1193,9 +1188,8 @@ describe("given a resume that reopened another project's session", () => {
      * One level and no further. A session file two levels below the root is not
      * somewhere pi puts one, and reaching it would mean the walk had widened
      * past what pi's picker actually offered.
-     *
-     * @scenario "A session resumed from another project is captured where it lives"
      */
+    /** @scenario "A session resumed from another project is captured where it lives" */
     it("does not reach below the one level pi's layout uses", async () => {
       const deeper = join(theirs, "archive");
       await mkdir(deeper, { recursive: true });
@@ -1227,9 +1221,8 @@ describe("given a resume that reopened another project's session", () => {
      * The window still decides. A resumed session nobody has written to since
      * the run began belongs to an earlier conversation, and widening the search
      * must not start shipping the user's history.
-     *
-     * @scenario "A session resumed from another project is captured where it lives"
      */
+    /** @scenario "A session resumed from another project is captured where it lives" */
     it("still leaves a sibling session untouched since the run began alone", async () => {
       const startedMs = Date.now();
       const sibling = join(theirs, "resumed.jsonl");
@@ -1364,9 +1357,8 @@ describe("given a session reached through a link", () => {
    * A link whose target has been deleted is the normal end state of a disk that
    * was unplugged. Resolving it throws, and a sweep that lets that escape takes
    * the whole run's capture with it.
-   *
-   * @scenario "A session reached through a link is captured like any other"
    */
+  /** @scenario "A session reached through a link is captured like any other" */
   it("steps over a link that points nowhere and keeps reading", async () => {
     await symlink(join(elsewhere, "gone.jsonl"), join(dir, "dangling.jsonl"));
     await writeFile(join(dir, "real.jsonl"), sessionLines("aaaaaaaa"), "utf8");
