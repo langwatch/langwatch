@@ -32,6 +32,7 @@ import {
 import { runDeviceFlowLogin } from "./login-flow";
 import { createPiCapture, type PiCapture } from "./pi-capture";
 import {
+	crossProjectSessionsRoot,
 	explicitSessionFileFromArgs,
 	resolvePiSessionDir,
 } from "./pi-session-dir";
@@ -914,6 +915,14 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 				sessionFiles: [
 					explicitSessionFileFromArgs({ toolArgs, cwd: process.cwd() }),
 				].filter((path): path is string => path !== null),
+				// A resume can pick another project's session, which pi then keeps
+				// writing where it already lives. Null on every other launch, which
+				// keeps capture to this project.
+				crossProjectSessionsRoot: await crossProjectSessionsRoot({
+					toolArgs,
+					env: process.env,
+					cwd: process.cwd(),
+				}),
 				// Events, never spans: a pi turn on both lanes would be counted twice.
 				logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
 				token: modeResult.ingestionToken,

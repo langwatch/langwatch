@@ -180,11 +180,14 @@ export interface PiCapture {
 async function sessionFilesTouchedSince({
   dir,
   files,
+  crossProjectRoot,
   sinceMs,
 }: {
   dir: string;
   /** Exact files pi was told to open, which may sit outside `dir`. */
   files: readonly string[];
+  /** A sessions root holding one folder per project, or null. */
+  crossProjectRoot: string | null;
   sinceMs: number;
 }): Promise<string[]> {
   const touched = await findFilesModifiedSince({
@@ -218,6 +221,22 @@ async function sessionFilesTouchedSince({
   // stay green. The cursor damage that DOES exist needs two passes running at
   // once, and the wrapper's re-entrancy guard is what holds that.
   const offered = new Set(touched);
+
+  // A resume can land in ANOTHER project's folder, and pi keeps writing the
+  // session there. One level below the root is exactly every project's folder,
+  // which is exactly what pi's picker offered — deeper would be somewhere pi
+  // does not put sessions, and shallower is the root itself, which holds none.
+  if (crossProjectRoot !== null) {
+    for (const path of await findFilesModifiedSince({
+      root: crossProjectRoot,
+      maxDepth: 1,
+      sinceMs: sinceMs - FS_CLOCK_SKEW_GRACE_MS,
+      matchesName: (name) => name.endsWith(SESSION_FILE_SUFFIX),
+    })) {
+      offered.add(path);
+    }
+  }
+
   for (const file of files) {
     if (offered.has(file)) continue;
     try {
@@ -294,6 +313,15 @@ export interface PiCaptureOptions {
    * sessions in the directory during the same run.
    */
   sessionFiles?: readonly string[];
+  /**
+   * The root holding one session folder per project, scanned one level deep, or
+   * null to watch only `sessionsDir`.
+   *
+   * Set only for a launch that opens pi's cross-project session picker, because
+   * pi keeps writing a resumed session in the folder it already lives in.
+   * Leaving it null is the normal case and keeps capture to this project.
+   */
+  crossProjectSessionsRoot?: string | null;
   /** The OTLP logs endpoint, spelled out — pi emits events, never spans. */
   logsEndpoint: string;
   token: string;
@@ -330,6 +358,7 @@ export function createPiCapture({
   sinceMs,
   sessionsDir,
   sessionFiles = [],
+  crossProjectSessionsRoot = null,
   logsEndpoint,
   token,
   scopeVersion = LANGWATCH_SDK_VERSION,
@@ -354,6 +383,7 @@ export function createPiCapture({
       const paths = await sessionFilesTouchedSince({
         dir: sessionsDir,
         files: sessionFiles,
+        crossProjectRoot: crossProjectSessionsRoot,
         sinceMs,
       });
 

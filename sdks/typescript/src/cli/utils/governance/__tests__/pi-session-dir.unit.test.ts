@@ -11,9 +11,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  crossProjectSessionsRoot,
   defaultPiProjectSessionsDir,
+  defaultPiSessionsRoot,
   encodePiCwdDirName,
   explicitSessionFileFromArgs,
+  offersCrossProjectSessionPicker,
   PI_AGENT_DIR_ENV,
   PI_SESSION_DIR_ENV,
   piAgentDir,
@@ -825,5 +828,111 @@ describe("reading an explicitly named session file out of pi's arguments", () =>
         cwd: launchedIn,
       }),
     ).toBeNull();
+  });
+});
+
+/**
+ * `--resume` opens pi's session picker, and the picker is fed from every
+ * project's sessions as well as this one's. Whatever the user picks, pi keeps
+ * writing it where it already lives — so a resume is the one ordinary launch
+ * that can spend its whole life in another project's folder, out of reach of a
+ * capture watching one directory. Nothing is reported when that happens.
+ *
+ * It is also the common route there: naming another project's file by path is
+ * rare, while `--resume` is how people actually reopen work.
+ */
+describe("deciding whether a resume can reach another project's sessions", () => {
+  /** @scenario "A session resumed from another project is captured where it lives" */
+  it("finds no wider root on an ordinary launch", async () => {
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: [], env: {}, home, cwd }),
+    ).resolves.toBeNull();
+  });
+
+  /** @scenario "A session resumed from another project is captured where it lives" */
+  it("names the root holding every project's sessions when pi will offer them", async () => {
+    const root = defaultPiSessionsRoot(defaultAgentDir());
+
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: ["--resume"], env: {}, home, cwd }),
+    ).resolves.toBe(root);
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: ["-r"], env: {}, home, cwd }),
+    ).resolves.toBe(root);
+  });
+
+  /**
+   * A relocation moves the root too, so the wider search has to follow it
+   * rather than reaching back into the default that pi is no longer filling.
+   *
+   * @scenario "A session resumed from another project is captured where it lives"
+   */
+  it("follows a moved agent directory", async () => {
+    const agentDir = makeAgentDir("relocated-agent");
+
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume"],
+        env: { [PI_AGENT_DIR_ENV]: agentDir },
+        home,
+        cwd,
+      }),
+    ).resolves.toBe(defaultPiSessionsRoot(agentDir));
+  });
+
+  /**
+   * When the user has named a session directory, pi's picker lists that one
+   * directory and nothing else, so it is already entirely watched. Widening
+   * then would reach into folders pi is not offering.
+   *
+   * @scenario "A session resumed from another project is captured where it lives"
+   */
+  it("stays narrow when the session directory has been moved", async () => {
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume", "--session-dir", "/elsewhere/sessions"],
+        env: {},
+        home,
+        cwd,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume"],
+        env: { [PI_SESSION_DIR_ENV]: "/from-env" },
+        home,
+        cwd,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  /**
+   * `--continue` takes the most recent session of THIS project, so it needs no
+   * widening; reading it as a resume would capture other projects for a launch
+   * that never leaves this one.
+   *
+   * @scenario "A session resumed from another project is captured where it lives"
+   */
+  it("does not widen for the flags that stay in this project", async () => {
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: ["--continue"], env: {}, home, cwd }),
+    ).resolves.toBeNull();
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: ["-c"], env: {}, home, cwd }),
+    ).resolves.toBeNull();
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--session", "abc123"],
+        env: {},
+        home,
+        cwd,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  /** @scenario "A directory named in a spelling pi ignores does not move capture" */
+  it("does not read a resume flag behind the argument terminator", () => {
+    expect(offersCrossProjectSessionPicker(["--", "--resume"])).toBe(false);
+    expect(offersCrossProjectSessionPicker(["-r", "--", "--resume"])).toBe(true);
   });
 });

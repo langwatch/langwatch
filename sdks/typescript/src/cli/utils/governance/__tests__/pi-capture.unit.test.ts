@@ -987,3 +987,148 @@ describe("given pi was pointed at one session file by name", () => {
     });
   });
 });
+
+describe("given a resume that reopened another project's session", () => {
+  /**
+   * pi's picker offers every project's sessions, and it opens whichever one the
+   * user picks where that file already lives. So the session this run is
+   * actually having sits in a sibling folder of the one capture watches, and
+   * the run ends with nothing recorded and nothing said.
+   *
+   * The layout here is pi's own: a root with one folder per working directory,
+   * this project's folder watched as usual, and the resumed session in a
+   * sibling.
+   */
+  describe("when the session lives under a sibling project's folder", () => {
+    let root: string;
+    let ours: string;
+    let theirs: string;
+
+    beforeEach(async () => {
+      root = await mkdtemp(join(tmpdir(), "pi-sessions-root-"));
+      ours = join(root, "--work-ours--");
+      theirs = join(root, "--work-theirs--");
+      await mkdir(ours, { recursive: true });
+      await mkdir(theirs, { recursive: true });
+      await writeFile(
+        join(theirs, "resumed.jsonl"),
+        sessionLines("aaaaaaaa"),
+        "utf8",
+      );
+    });
+
+    afterEach(async () => {
+      await rm(root, { recursive: true, force: true });
+    });
+
+    /** @scenario "A session resumed from another project is captured where it lives" */
+    it("captures it when the wider root is being watched", async () => {
+      const bodies: string[] = [];
+      const fetchImpl = vi.fn(
+        async (_url: unknown, init?: { body?: string }) => {
+          if (init?.body) bodies.push(init.body);
+          return { ok: true, status: 200 } as Response;
+        },
+      ) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: 0,
+        sessionsDir: ours,
+        crossProjectSessionsRoot: root,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      });
+
+      expect(await capture.harvest()).toBeGreaterThan(0);
+      expect(bodies.join("")).toContain(SESSION_ID);
+    });
+
+    /**
+     * The defect, and the reason the wider root is opt-in: with the same files
+     * on disk and only this project's folder watched, the resumed session is
+     * invisible.
+     *
+     * @scenario "A session resumed from another project is captured where it lives"
+     */
+    it("records nothing from it on a launch that does not widen", async () => {
+      const fetchImpl = vi.fn(async () => {
+        throw new Error("nothing should be posted");
+      }) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: 0,
+        sessionsDir: ours,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      });
+
+      expect(await capture.harvest()).toBe(0);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    /**
+     * One level and no further. A session file two levels below the root is not
+     * somewhere pi puts one, and reaching it would mean the walk had widened
+     * past what pi's picker actually offered.
+     *
+     * @scenario "A session resumed from another project is captured where it lives"
+     */
+    it("does not reach below the one level pi's layout uses", async () => {
+      const deeper = join(theirs, "archive");
+      await mkdir(deeper, { recursive: true });
+      await rm(join(theirs, "resumed.jsonl"));
+      await writeFile(
+        join(deeper, "buried.jsonl"),
+        sessionLines("aaaaaaaa"),
+        "utf8",
+      );
+
+      const fetchImpl = vi.fn(async () => {
+        throw new Error("nothing should be posted");
+      }) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: 0,
+        sessionsDir: ours,
+        crossProjectSessionsRoot: root,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      });
+
+      expect(await capture.harvest()).toBe(0);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The window still decides. A resumed session nobody has written to since
+     * the run began belongs to an earlier conversation, and widening the search
+     * must not start shipping the user's history.
+     *
+     * @scenario "A session resumed from another project is captured where it lives"
+     */
+    it("still leaves a sibling session untouched since the run began alone", async () => {
+      const startedMs = Date.now();
+      const longBefore = new Date(startedMs - 60 * 60 * 1000);
+      await utimes(join(theirs, "resumed.jsonl"), longBefore, longBefore);
+
+      const fetchImpl = vi.fn(async () => {
+        throw new Error("nothing should be posted");
+      }) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: startedMs,
+        sessionsDir: ours,
+        crossProjectSessionsRoot: root,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      });
+
+      expect(await capture.harvest()).toBe(0);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+  });
+});

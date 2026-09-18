@@ -167,6 +167,36 @@ Feature: pi session capture
     And the folder we looked in is the one pi makes for the working directory, not its parent
 
   @unit
+  # Naming a file by path is the rare way to reach another project's session.
+  # `--resume` is the common one: it opens pi's picker, the picker is fed from
+  # every project's sessions as well as this one's, and pi keeps writing
+  # whichever is picked in the folder it already lives in. So the session the
+  # run is actually having can sit in a sibling folder of the one being watched,
+  # and the run records nothing and says nothing.
+  #
+  # The wider search is one level below the sessions root, which is exactly
+  # every project's folder — exactly what pi's picker offered. Deeper is not
+  # somewhere pi puts sessions; the root itself holds none.
+  #
+  # It is opt-in for that one launch, and narrow everywhere else. `--continue`
+  # takes the most recent session of THIS project. `--session <id>` either
+  # matches locally or forks another project's session into this one. And when
+  # the user has moved the session directory, pi's picker lists that single
+  # directory and nothing else, so it is already entirely watched.
+  #
+  # The cost is stated rather than hidden: one level below the root is every
+  # project, so a plain `pi` started by hand in a DIFFERENT project during this
+  # run is now inside the window too. That is the second-terminal limit this
+  # feature already carries, widened from one project to all of them, and it is
+  # bounded by the same two filters — the modification window and the per-row
+  # clock.
+  Scenario: A session resumed from another project is captured where it lives
+    Given a launch that lets pi offer sessions from every project
+    When the resumed session is written in another project's folder
+    Then its turns are recorded
+    And a session in that folder untouched since the run began is still left alone
+
+  @unit
   # Resolving the right DIRECTORY is not the whole job, because pi can be told
   # to open one specific FILE. `--session <path>` opens that exact file and pi
   # keeps writing to it where it lies, rather than copying it into the session

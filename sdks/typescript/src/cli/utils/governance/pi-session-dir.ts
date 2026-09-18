@@ -425,3 +425,73 @@ export async function resolvePiSessionDir({
 
   return defaultPiProjectSessionsDir({ cwd, agentDir });
 }
+
+/**
+ * Whether pi will offer the user a session to pick from every project.
+ *
+ * `--resume` (and its `-r`) opens pi's session picker, and the picker is fed
+ * from two lists: this project's sessions, and `SessionManager.listAll`, which
+ * is every project's (`main.js:322-328`). Whichever the user picks is then
+ * handed to `SessionManager.open`, which writes to that file where it lies. So
+ * a resume is the one ordinary launch that can spend its whole life in another
+ * project's folder.
+ *
+ * `--continue` is not this: it takes the most recent session of THIS project
+ * (`main.js:334`). Neither is `--session <id>` — a local match is already in the
+ * directory, and a match in another project is forked into this one rather than
+ * opened in place.
+ */
+export function offersCrossProjectSessionPicker(
+  args: readonly string[],
+): boolean {
+  for (const arg of args) {
+    // pi stops reading flags here, so a `--resume` behind it is a message.
+    if (arg === "--") return false;
+    if (arg === "--resume" || arg === "-r") return true;
+  }
+  return false;
+}
+
+/**
+ * The sessions ROOT to search one level deep as well, or null.
+ *
+ * Capture normally watches one directory: the folder pi writes this project's
+ * sessions into. A resume breaks that assumption, because the session the user
+ * picks may belong to another project and pi keeps writing it where it already
+ * lives. Watching only this project's folder means the run records nothing and
+ * says nothing — and `--resume` is a far more common way to reach another
+ * project's session than naming its file.
+ *
+ * Only the default layout has anywhere else to look. When the user has moved the
+ * session directory, pi's picker lists that one directory and nothing else
+ * (`core/session-manager.js:1322-1326` takes the flat branch for a custom
+ * directory), so the directory already being watched is the whole picker and
+ * widening would reach into folders pi is not offering.
+ *
+ * The cost is stated rather than hidden: one level below the root is every
+ * project's sessions, so a plain `pi` the user starts by hand in a DIFFERENT
+ * project while this run is going is now inside the window too. That is the
+ * second-terminal limit this module already documents, widened from one project
+ * to all of them, and it is bounded by the same two filters — the modification
+ * window and the per-row clock. It is accepted only for the launch that asks for
+ * a cross-project picker.
+ */
+export async function crossProjectSessionsRoot({
+  toolArgs = [],
+  env = process.env,
+  home = homedir(),
+  cwd = process.cwd(),
+}: {
+  toolArgs?: readonly string[];
+  env?: NodeJS.ProcessEnv;
+  home?: string;
+  cwd?: string;
+} = {}): Promise<string | null> {
+  if (!offersCrossProjectSessionPicker(toolArgs)) return null;
+
+  const agentDir = piAgentDir({ env, home });
+  const resolved = await resolvePiSessionDir({ toolArgs, env, home, cwd });
+  if (resolved !== defaultPiProjectSessionsDir({ cwd, agentDir })) return null;
+
+  return defaultPiSessionsRoot(agentDir);
+}
