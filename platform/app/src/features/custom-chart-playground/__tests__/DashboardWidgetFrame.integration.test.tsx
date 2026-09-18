@@ -259,7 +259,7 @@ describe("a widget that reports what it rendered", () => {
       lastFrameProps().onRenderReceipt?.({
         status: "ok",
         markup: '<div id="lw-root"><svg /></div>',
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 240,
       });
     });
@@ -297,7 +297,7 @@ describe("a widget that reports what it rendered", () => {
       lastFrameProps().onRenderReceipt?.({
         status: "ok",
         markup: "<div/>",
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 100,
       });
     });
@@ -306,6 +306,54 @@ describe("a widget that reports what it rendered", () => {
     ).toBeDefined();
 
     unmount();
+    expect(
+      useWidgetRenderReceiptStore.getState().receipts.graph_1,
+    ).toBeUndefined();
+  });
+
+  /** @scenario "The dashboard page clears stale receipts when the frame cannot be rendered" */
+  it("clears the receipt when the graph definition becomes invalid", () => {
+    periodMock.mockReturnValue(period({ startMs: 1_000, endMs: 2_000 }));
+    executorMock.mockReturnValue(receiptExecutor());
+
+    const { rerender } = render(
+      <ChakraProvider value={defaultSystem}>
+        <DashboardWidgetFrame
+          id="graph_1"
+          graph={GRAPH}
+          projectId="project_1"
+          projectSlug="project"
+          maxHeight={300}
+          dashboardId="dash_1"
+        />
+      </ChakraProvider>,
+    );
+
+    act(() => {
+      lastFrameProps().onRenderReceipt?.({
+        status: "ok",
+        markup: "<div/>",
+        isMarkupTruncated: false,
+        height: 100,
+      });
+    });
+    expect(
+      useWidgetRenderReceiptStore.getState().receipts.graph_1,
+    ).toBeDefined();
+
+    rerender(
+      <ChakraProvider value={defaultSystem}>
+        <DashboardWidgetFrame
+          id="graph_1"
+          graph={null as any}
+          projectId="project_1"
+          projectSlug="project"
+          maxHeight={300}
+          dashboardId="dash_1"
+        />
+      </ChakraProvider>,
+    );
+
     expect(
       useWidgetRenderReceiptStore.getState().receipts.graph_1,
     ).toBeUndefined();

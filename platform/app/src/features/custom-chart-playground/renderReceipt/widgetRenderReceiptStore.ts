@@ -65,10 +65,13 @@ export const useWidgetRenderReceiptStore = create<WidgetRenderReceiptState>()(
  * tree. Sorted by widget name (id as a stable tie-break) so the agent reads
  * the same order a person scanning the dashboard would.
  */
-export function listWidgetRenderReceipts(
-  receipts: Record<string, WidgetRenderReceipt>,
-  filter: { dashboardId?: string; widgetId?: string } = {},
-): WidgetRenderReceipt[] {
+export function listWidgetRenderReceipts({
+  receipts,
+  filter = {},
+}: {
+  receipts: Record<string, WidgetRenderReceipt>;
+  filter?: { dashboardId?: string; widgetId?: string };
+}): WidgetRenderReceipt[] {
   return Object.values(receipts)
     .filter(
       (receipt) =>
@@ -94,7 +97,7 @@ export interface WidgetRenderResultRow {
   timeWindow: { start: number; end: number };
   capturedAt: string;
   markup?: string;
-  markupTruncated: boolean;
+  isMarkupTruncated: boolean;
 }
 
 export interface WidgetRenderResult {
@@ -107,7 +110,7 @@ export interface WidgetRenderResult {
  * the page handler so it can be unit-tested without a React tree (the handler
  * is only the store read + this call).
  *
- * `includeMarkup` defaults to true for a single widget and false for the whole
+ * `shouldIncludeMarkup` defaults to true for a single widget and false for the whole
  * list — the markup of every card at once is a lot to hand an agent that only
  * wanted to know which ones errored. `capturedAt` becomes an ISO string, the
  * shape the result schema (and the agent) reads.
@@ -116,17 +119,20 @@ export function buildWidgetRenderResult({
   receipts,
   dashboardId,
   widgetId,
-  includeMarkup,
+  shouldIncludeMarkup,
 }: {
   receipts: Record<string, WidgetRenderReceipt>;
   dashboardId: string | null;
   widgetId?: string;
-  includeMarkup?: boolean;
+  shouldIncludeMarkup?: boolean;
 }): WidgetRenderResult {
-  const withMarkup = includeMarkup ?? widgetId !== undefined;
-  const list = listWidgetRenderReceipts(receipts, {
-    ...(dashboardId === null ? {} : { dashboardId }),
-    ...(widgetId === undefined ? {} : { widgetId }),
+  const isMarkupIncluded = shouldIncludeMarkup ?? widgetId !== undefined;
+  const list = listWidgetRenderReceipts({
+    receipts,
+    filter: {
+      ...(dashboardId === null ? {} : { dashboardId }),
+      ...(widgetId === undefined ? {} : { widgetId }),
+    },
   });
   return {
     dashboardId,
@@ -139,8 +145,8 @@ export function buildWidgetRenderResult({
       theme: receipt.theme,
       timeWindow: receipt.timeWindow,
       capturedAt: new Date(receipt.capturedAt).toISOString(),
-      ...(withMarkup ? { markup: receipt.markup } : {}),
-      markupTruncated: receipt.markupTruncated,
+      ...(isMarkupIncluded ? { markup: receipt.markup } : {}),
+      isMarkupTruncated: receipt.isMarkupTruncated,
     })),
   };
 }

@@ -17,12 +17,14 @@ export function useWidgetRenderReceiptPublisher({
   dashboardId,
   theme,
   timeWindow,
+  isRendered = true,
 }: {
   readonly id: string;
   readonly widgetName?: string;
   readonly dashboardId?: string;
   readonly theme: "light" | "dark";
   readonly timeWindow: { start: number; end: number };
+  readonly isRendered?: boolean;
 }) {
   const publishReceipt = useWidgetRenderReceiptStore((state) => state.publish);
   const removeReceipt = useWidgetRenderReceiptStore((state) => state.remove);
@@ -43,6 +45,12 @@ export function useWidgetRenderReceiptPublisher({
   );
 
   useEffect(() => () => removeReceipt(id), [id, removeReceipt]);
+
+  useEffect(() => {
+    if (!isRendered) {
+      removeReceipt(id);
+    }
+  }, [isRendered, id, removeReceipt]);
 
   return onRenderReceipt;
 }

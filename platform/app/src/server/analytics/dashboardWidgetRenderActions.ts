@@ -32,7 +32,7 @@ export const getWidgetRenderPayloadSchema = z
       .describe(
         "Return one widget's receipt including its rendered markup. Omit to list every widget on the open dashboard without markup.",
       ),
-    includeMarkup: z
+    shouldIncludeMarkup: z
       .boolean()
       .optional()
       .describe(
@@ -55,7 +55,7 @@ export const getWidgetRenderResultSchema = z.object({
       /** ISO 8601 — when the receipt was captured in the open tab. */
       capturedAt: z.string(),
       markup: z.string().optional(),
-      markupTruncated: z.boolean(),
+      isMarkupTruncated: z.boolean(),
     }),
   ),
 });

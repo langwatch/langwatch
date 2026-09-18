@@ -206,7 +206,7 @@ describe("given a sandboxed chart frame reports what it rendered", () => {
         type: "lw:render-receipt",
         status: "ok",
         markup: '<div id="lw-root"><svg /></div>',
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 240,
       });
 
@@ -218,7 +218,7 @@ describe("given a sandboxed chart frame reports what it rendered", () => {
       expect(receipt).toMatchObject({
         status: "ok",
         markup: '<div id="lw-root"><svg /></div>',
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 240,
       });
     });
@@ -226,7 +226,7 @@ describe("given a sandboxed chart frame reports what it rendered", () => {
 
   describe("when the frame posts oversized markup directly on the port", () => {
     /** @scenario "An oversized render receipt is clamped and flagged" */
-    it("clamps the markup to the cap and flags markupTruncated", async () => {
+    it("clamps the markup to the cap and flags isMarkupTruncated", async () => {
       const onRenderReceipt = vi.fn();
       const { framePort } = mountBridge(vi.fn(), undefined, {
         onRenderReceipt,
@@ -240,7 +240,7 @@ describe("given a sandboxed chart frame reports what it rendered", () => {
         type: "lw:render-receipt",
         status: "ok",
         markup: oversized,
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 100,
       });
 
@@ -249,7 +249,7 @@ describe("given a sandboxed chart frame reports what it rendered", () => {
       });
       const receipt = onRenderReceipt.mock.calls[0]![0];
       expect(receipt.markup).toHaveLength(CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS);
-      expect(receipt.markupTruncated).toBe(true);
+      expect(receipt.isMarkupTruncated).toBe(true);
     });
   });
 
@@ -266,14 +266,14 @@ describe("given a sandboxed chart frame reports what it rendered", () => {
         type: "lw:render-receipt",
         status: "pending",
         markup: "<div />",
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 10,
       });
       framePort.postMessage({
         type: "lw:render-receipt",
         status: "ok",
         markup: 42,
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 10,
       });
 
@@ -297,7 +297,7 @@ describe("given a sandboxed chart frame reports what it rendered", () => {
           type: "lw:render-receipt",
           status: "ok",
           markup: `<div>${i}</div>`,
-          markupTruncated: false,
+          isMarkupTruncated: false,
           height: i,
         });
       }

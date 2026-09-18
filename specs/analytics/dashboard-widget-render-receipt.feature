@@ -62,7 +62,7 @@ Feature: A dashboard widget reports what it rendered so the agent can see it
   Scenario: An oversized render receipt is clamped and flagged
     When the frame posts markup larger than the receipt size cap
     Then the receipt markup is truncated to the cap
-    And the receipt's markupTruncated flag is set to true
+    And the receipt's isMarkupTruncated flag is set to true
 
   @integration
   Scenario: A malformed render receipt is dropped

@@ -18,14 +18,14 @@ describe("given a raw lw:render-receipt payload", () => {
       const receipt = sanitizeRenderReceipt({
         status: "ok",
         markup: "<div />",
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 120,
       });
 
       expect(receipt).toEqual({
         status: "ok",
         markup: "<div />",
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 120,
       });
     });
@@ -35,7 +35,7 @@ describe("given a raw lw:render-receipt payload", () => {
       const receipt = sanitizeRenderReceipt({
         status: "error",
         markup: "",
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 0,
         errorText: oversized,
       });
@@ -46,32 +46,32 @@ describe("given a raw lw:render-receipt payload", () => {
   });
 
   describe("when markup exceeds the cap", () => {
-    it("clamps markup and flags markupTruncated regardless of the reported flag", () => {
+    it("clamps markup and flags isMarkupTruncated regardless of the reported flag", () => {
       const oversized = "x".repeat(CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS + 500);
       const receipt = sanitizeRenderReceipt({
         status: "ok",
         markup: oversized,
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 10,
       });
 
       expect(receipt?.markup).toHaveLength(
         CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS,
       );
-      expect(receipt?.markupTruncated).toBe(true);
+      expect(receipt?.isMarkupTruncated).toBe(true);
     });
   });
 
-  describe("when the frame itself reported markupTruncated", () => {
-    it("keeps markupTruncated true even though markup fits under the cap", () => {
+  describe("when the frame itself reported isMarkupTruncated", () => {
+    it("keeps isMarkupTruncated true even though markup fits under the cap", () => {
       const receipt = sanitizeRenderReceipt({
         status: "ok",
         markup: "<div />",
-        markupTruncated: true,
+        isMarkupTruncated: true,
         height: 10,
       });
 
-      expect(receipt?.markupTruncated).toBe(true);
+      expect(receipt?.isMarkupTruncated).toBe(true);
     });
   });
 
@@ -86,7 +86,7 @@ describe("given a raw lw:render-receipt payload", () => {
       const receipt = sanitizeRenderReceipt({
         status: "ok",
         markup: "<div />",
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height,
       });
 
@@ -106,7 +106,7 @@ describe("given a raw lw:render-receipt payload", () => {
       const receipt = sanitizeRenderReceipt({
         status,
         markup: "<div />",
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 10,
       });
 
@@ -124,7 +124,7 @@ describe("given a raw lw:render-receipt payload", () => {
       const receipt = sanitizeRenderReceipt({
         status: "ok",
         markup,
-        markupTruncated: false,
+        isMarkupTruncated: false,
         height: 10,
       });
 

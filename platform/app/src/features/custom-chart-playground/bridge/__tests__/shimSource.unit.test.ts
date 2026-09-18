@@ -143,7 +143,7 @@ describe("given the shim has been initialised by its parent", () => {
         expect(receipt?.status).toBe("ok");
         expect(String(receipt?.markup)).toContain('id="lw-root"');
         expect(String(receipt?.markup)).toContain("data-chart");
-        expect(receipt?.markupTruncated).toBe(false);
+        expect(receipt?.isMarkupTruncated).toBe(false);
       } finally {
         document.getElementById("lw-root")?.remove();
         vi.useRealTimers();

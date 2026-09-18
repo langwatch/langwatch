@@ -23,7 +23,7 @@ function makeReceipt(
   return {
     status: "ok",
     markup: '<div id="lw-root"></div>',
-    markupTruncated: false,
+    isMarkupTruncated: false,
     height: 200,
     widgetName: undefined,
     dashboardId: "dash_1",
@@ -73,14 +73,20 @@ describe("listWidgetRenderReceipts", () => {
       other: makeReceipt({ widgetId: "c", dashboardId: "d2" }),
     };
 
-    const onDashboard = listWidgetRenderReceipts(receipts, {
-      dashboardId: "d1",
+    const onDashboard = listWidgetRenderReceipts({
+      receipts,
+      filter: {
+        dashboardId: "d1",
+      },
     });
     expect(onDashboard.map((r) => r.widgetId)).toEqual(["a", "b"]);
 
-    const one = listWidgetRenderReceipts(receipts, {
-      dashboardId: "d1",
-      widgetId: "b",
+    const one = listWidgetRenderReceipts({
+      receipts,
+      filter: {
+        dashboardId: "d1",
+        widgetId: "b",
+      },
     });
     expect(one.map((r) => r.widgetId)).toEqual(["b"]);
   });
@@ -138,7 +144,7 @@ describe("buildWidgetRenderResult", () => {
       expect(result.widgets[1]?.errorText).toBe("boom");
     });
 
-    it("still includes markup when includeMarkup is explicitly true", () => {
+    it("still includes markup when shouldIncludeMarkup is explicitly true", () => {
       const receipts = {
         w1: makeReceipt({ widgetId: "w1", markup: "<svg/>" }),
       };
@@ -146,7 +152,7 @@ describe("buildWidgetRenderResult", () => {
       const result = buildWidgetRenderResult({
         receipts,
         dashboardId: "dash_1",
-        includeMarkup: true,
+        shouldIncludeMarkup: true,
       });
 
       expect(result.widgets[0]?.markup).toBe("<svg/>");

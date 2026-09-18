@@ -122,6 +122,7 @@ export function DashboardWidgetFrame({
     dashboardId,
     theme: dashboardContext.theme,
     timeWindow: dashboardContext.timeWindow,
+    isRendered: parsed.success,
   });
 
   if (!parsed.success) {

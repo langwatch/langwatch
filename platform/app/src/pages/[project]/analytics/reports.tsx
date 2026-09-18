@@ -119,12 +119,12 @@ function ReportsContent() {
     () => ({
       "dashboard.getWidgetRender": {
         payloadSchema: getWidgetRenderPayloadSchema,
-        run: (payload: { widgetId?: string; includeMarkup?: boolean }) =>
+        run: (payload: { widgetId?: string; shouldIncludeMarkup?: boolean }) =>
           buildWidgetRenderResult({
             receipts: useWidgetRenderReceiptStore.getState().receipts,
             dashboardId: activeDashboardId ?? null,
             widgetId: payload.widgetId,
-            includeMarkup: payload.includeMarkup,
+            shouldIncludeMarkup: payload.shouldIncludeMarkup,
           }),
       },
     }),

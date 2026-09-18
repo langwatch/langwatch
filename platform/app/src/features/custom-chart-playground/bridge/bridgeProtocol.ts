@@ -217,7 +217,7 @@ export interface LwRenderReceiptMessage {
    * SVG, so this markup IS the chart — the agent reads it to "see" the widget.
    */
   readonly markup: string;
-  readonly markupTruncated: boolean;
+  readonly isMarkupTruncated: boolean;
   /** `document.documentElement.scrollHeight` in px at capture time. */
   readonly height: number;
 }
@@ -251,7 +251,7 @@ export const CHART_FRAME_HEARTBEAT_TIMEOUT_MS = 10000;
  * Upper bound on the receipt's `markup` string. A widget's rendered SVG is
  * usually a few KB, but a pathological one (a huge table, a data-URI image)
  * could post megabytes over the port on every mutation — the cap keeps one
- * receipt bounded and its `markupTruncated` flag tells the reader it was cut.
+ * receipt bounded and its `isMarkupTruncated` flag tells the reader it was cut.
  */
 export const CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS = 60_000;
 

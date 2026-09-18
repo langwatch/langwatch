@@ -376,12 +376,12 @@ export function sanitizeRenderReceipt(
   if (candidate.status !== "ok" && candidate.status !== "error") return null;
   if (typeof candidate.markup !== "string") return null;
 
-  const markupOverCap =
+  const isMarkupOverCap =
     candidate.markup.length > CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS;
-  const markup = markupOverCap
+  const markup = isMarkupOverCap
     ? candidate.markup.slice(0, CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS)
     : candidate.markup;
-  const markupTruncated = markupOverCap || candidate.markupTruncated === true;
+  const isMarkupTruncated = isMarkupOverCap || candidate.isMarkupTruncated === true;
 
   const errorText =
     typeof candidate.errorText === "string"
@@ -391,7 +391,7 @@ export function sanitizeRenderReceipt(
   return {
     status: candidate.status,
     markup,
-    markupTruncated,
+    isMarkupTruncated,
     height: sanitizeReceiptHeight(candidate.height),
     ...(errorText !== undefined ? { errorText } : {}),
   };

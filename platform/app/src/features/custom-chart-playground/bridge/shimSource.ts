@@ -301,10 +301,10 @@ export function buildShimScript(): string {
     var root = document.getElementById("lw-root");
     if (!root) return;
     var markup = root.outerHTML || "";
-    var markupTruncated = false;
+    var isMarkupTruncated = false;
     if (markup.length > ${CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS}) {
       markup = markup.slice(0, ${CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS});
-      markupTruncated = true;
+      isMarkupTruncated = true;
     }
     var height = (document.documentElement && document.documentElement.scrollHeight) || 0;
     post({
@@ -312,7 +312,7 @@ export function buildShimScript(): string {
       status: renderStatus.status,
       errorText: renderStatus.errorText,
       markup: markup,
-      markupTruncated: markupTruncated,
+      isMarkupTruncated: isMarkupTruncated,
       height: height
     });
   }
