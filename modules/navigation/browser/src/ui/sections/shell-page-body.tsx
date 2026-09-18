@@ -18,8 +18,9 @@ import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { navigationApi } from "../../behavior/navigation-api.ts";
-import { useNavigationHost } from "../../model/navigation-host.ts";
+import { type NavigationTeam, useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
+import { isResolverAddress } from "../../model/resolve-shell-route.ts";
 import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { PageErrorFallback } from "../elements/page-error-fallback.tsx";
@@ -42,6 +43,41 @@ export { planManagementHref };
  * which a governed web package may not import.
  */
 const ORGANIZATION_ADMIN_ROLE = "ADMIN";
+
+/**
+ * Whether the page draws for this reader, or the "not part of any team"
+ * refusal does. Lifted out of the component so the chrome's one refusal
+ * decision reads on its own, and the component stays inside its budget.
+ */
+function readerMayOpenThePage({
+  pathname,
+  isPersonalScopeRoute,
+  isDemoProject,
+  team,
+  userId,
+  organizationRole,
+}: {
+  pathname: string;
+  isPersonalScopeRoute: boolean;
+  isDemoProject: boolean;
+  team: NavigationTeam | undefined;
+  userId: string | undefined;
+  organizationRole: string | undefined;
+}): boolean {
+  // The resolver refuses nobody: it renders a redirect, and its refusal's one
+  // link points back at itself. Membership is the destination's question.
+  if (isResolverAddress(pathname)) return true;
+  // Personal-scope addresses are the reader's by construction, even when
+  // membership of the ambient team cannot be confirmed: without this a member
+  // on /me/* hits the refusal and the page never renders.
+  if (isPersonalScopeRoute || isDemoProject) return true;
+  // Administrators created through a role binding alone have no membership row
+  // and still have full team access.
+  if (organizationRole === ORGANIZATION_ADMIN_ROLE) return true;
+  // The same predicate the host's own ambient team resolution prefers on, so
+  // the team the application picks and the one the chrome draws cannot diverge.
+  return !!team && !!userId && (team.members ?? []).some((member) => member.userId === userId);
+}
 
 export const ShellPageBody = ({
   children,
@@ -110,20 +146,14 @@ export const ShellPageBody = ({
   const isDemoProject =
     !!deployment.demoProjectSlug && deployment.demoProjectSlug === project?.slug;
 
-  const userIsPartOfTeam =
-    // Personal-scope addresses are the reader's by construction, even when
-    // membership of the ambient team cannot be confirmed. Without this clause
-    // a member on /me/* hits the "not part of any team" overlay and the page
-    // never renders.
-    isPersonalScopeRoute ||
-    isDemoProject ||
-    // The same predicate the host's own ambient team resolution prefers on, so
-    // the team the application picks and the team the chrome renders for
-    // cannot diverge.
-    (!!team && !!user?.id && (team.members ?? []).some((member) => member.userId === user.id)) ||
-    // Administrators created through a role binding alone have no membership
-    // row and still have full team access.
-    organizationRole === ORGANIZATION_ADMIN_ROLE;
+  const userIsPartOfTeam = readerMayOpenThePage({
+    pathname,
+    isPersonalScopeRoute,
+    isDemoProject,
+    team,
+    userId: user?.id,
+    organizationRole,
+  });
 
   return (
     <VStack width="full" gap={0} {...props}>

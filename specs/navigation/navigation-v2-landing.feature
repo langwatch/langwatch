@@ -25,6 +25,17 @@ Feature: Landing
     When they open "/"
     Then the chrome draws the address rather than waiting on a project
 
+  # The page body refuses a reader it cannot place on a team, and offers them
+  # one way out: a link to "/". For a reader whose team has not resolved, that
+  # is the address they are already on — the refusal hands them a door back to
+  # itself. "/" resolves rather than displays, so membership is the
+  # DESTINATION's question, asked once they have been sent somewhere.
+  @integration
+  Scenario: The front door does not refuse a reader it has not placed yet
+    Given a reader on "/" whose team has not resolved
+    When the chrome draws the front door
+    Then it draws the resolver rather than refusing them for want of a team
+
   @unit
   Scenario: An explicit pin outranks everything
     Given I pinned my home to "/governance"

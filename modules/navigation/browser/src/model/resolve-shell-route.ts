@@ -6,6 +6,15 @@ import {
   productFromPathname,
 } from "./products.ts";
 
+/**
+ * The root address, which resolves where a reader belongs rather than
+ * displaying anything. Named once: the chrome's data gate and the page body's
+ * membership gate both have to agree, and neither may refuse a reader here.
+ */
+export function isResolverAddress(pathname: string): boolean {
+  return pathname === "/";
+}
+
 export interface ShellRoute {
   /**
    * The settings detour, which covers the settings pages and the
@@ -55,7 +64,7 @@ export function resolveShellRoute({
     isSettingsRoute,
     isPersonalScopeRoute,
     isOrgScopeRoute,
-    isResolverRoute: pathname === "/",
+    isResolverRoute: isResolverAddress(pathname),
     activeProductId,
   };
 }

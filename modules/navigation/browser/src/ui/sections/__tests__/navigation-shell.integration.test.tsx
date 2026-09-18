@@ -174,6 +174,23 @@ describe("the front door at /", () => {
     expect(screen.queryByTestId("waiting")).toBeNull();
     expect(screen.getByTestId("page-body")).toBeTruthy();
   });
+
+  /** @scenario The front door does not refuse a reader it has not placed yet */
+  it("does not refuse a reader whose team has not resolved, whose only way out is / itself", () => {
+    renderShell({
+      // No team, and no ADMIN role to carry them past the membership gate:
+      // the refusal's one link points at "/", which is where they already are.
+      readings: {
+        pathname: "/",
+        project: undefined,
+        team: undefined,
+        waiting: <div data-testid="waiting" />,
+      },
+    });
+
+    expect(screen.queryByText(/not part of any team/i)).toBeNull();
+    expect(screen.getByTestId("page-body")).toBeTruthy();
+  });
 });
 
 /** The switcher row for a product, which is what carries its state. */
