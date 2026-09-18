@@ -31,7 +31,12 @@ import {
 	getCliBootstrap,
 	listIngestionKeys,
 } from "./cli-api";
-import { type GovernanceConfig, loadConfig, saveConfig } from "./config";
+import {
+	type GovernanceConfig,
+	displayConfigPath,
+	loadConfig,
+	saveConfig,
+} from "./config";
 import {
 	type CredentialType,
 	DeviceFlowError,
@@ -77,7 +82,7 @@ export async function runUnifiedLoginFlow(
 		chalk.gray(
 			kind === "project_api_key"
 				? "Mode: project SDK API key (will write .env)"
-				: "Mode: device session (will write ~/.langwatch/config.json)",
+				: `Mode: device session (will write ${displayConfigPath()})`,
 		),
 	);
 

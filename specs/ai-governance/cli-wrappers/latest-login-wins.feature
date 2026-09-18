@@ -18,6 +18,12 @@ Feature: The latest login wins over stale persisted telemetry wiring
   in place to the current login's endpoint and key, on login and on every
   wrapper run. Wiring langwatch did not author is never touched.
 
+  A login alone takes the wiring over only when it is this machine's login
+  against a deployment: a login kept in its own config file
+  (LANGWATCH_CLI_CONFIG) never does, and a login against localhost leaves
+  wiring that reports to a deployment elsewhere until the user runs
+  `langwatch <tool>` on it, which is the wrapper-run half of the rule.
+
   As a developer who switches between LangWatch instances,
   I want every `langwatch <tool>` session to land on the instance I am
   logged into right now, so telemetry never silently goes to a previous
@@ -181,6 +187,12 @@ Feature: The latest login wins over stale persisted telemetry wiring
       Given the codex config file carries a langwatch gateway block whose base_url is not on this machine
       When the user completes `langwatch login --device` against a localhost instance
       Then the gateway block is left exactly as it was
+
+    @unit @cli-wrappers @latest-login-wins @isolated-config
+    Scenario: The login names the config file it writes
+      Given LANGWATCH_CLI_CONFIG names a config file other than the home's default one
+      When the user starts `langwatch login --device`
+      Then the login says it will write that file, not `~/.langwatch/config.json`
 
     @unit @cli-wrappers @latest-login-wins
     Scenario: The login says which wiring it left alone and how to move it

@@ -315,6 +315,15 @@ export function defaultConfigPath(): string {
   return path.join(os.homedir(), ".langwatch", "config.json");
 }
 
+/** The config path as shown to a person: the home is written `~`. */
+export function displayConfigPath(): string {
+  const file = configPath();
+  const home = os.homedir();
+  return file.startsWith(`${home}${path.sep}`)
+    ? `~${file.slice(home.length)}`
+    : file;
+}
+
 /**
  * True when this process runs on a config of its own: LANGWATCH_CLI_CONFIG
  * names a file other than the home's default one.
