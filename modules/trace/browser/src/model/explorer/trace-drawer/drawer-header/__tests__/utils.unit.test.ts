@@ -3,6 +3,7 @@
  * where every value is a string and a key may simply be absent.
  */
 import { describe, expect, it } from "vitest";
+
 import { readNumberAttribute } from "../utils.ts";
 
 const RESERVED_SUM = "langwatch.reserved.cache_read_tokens";

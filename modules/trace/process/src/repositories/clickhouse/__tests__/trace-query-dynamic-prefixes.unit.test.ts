@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 
 const traceQueryRepository = ClickHouseTraceQueryRepository.create();

@@ -3,8 +3,9 @@
  * Grouping chat messages into conversation turns. Media-only messages are user.
  */
 import { describe, expect, it } from "vitest";
-import { groupMessagesIntoTurns } from "../turns.ts";
+
 import type { ChatMessage } from "../../../model/transcript/types.ts";
+import { groupMessagesIntoTurns } from "../turns.ts";
 
 const kindsOf = (messages: ChatMessage[]) =>
   groupMessagesIntoTurns(messages).map((turn) => turn.kind);

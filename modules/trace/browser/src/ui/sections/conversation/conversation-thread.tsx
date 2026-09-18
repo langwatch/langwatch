@@ -1,7 +1,12 @@
 import { Box, VStack } from "@chakra-ui/react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
+
+import type {
+  ConversationAudioPlayback,
+  ConversationRoleMode,
+  DisplayPart,
+} from "./conversation.types.ts";
 import { groupIntoTurns } from "./flatten-messages.ts";
-import { PendingReply } from "./pending-reply.tsx";
 import {
   ErrorPart,
   ImagePart,
@@ -10,11 +15,7 @@ import {
   TextPart,
   ToolPart,
 } from "./parts.tsx";
-import type {
-  ConversationAudioPlayback,
-  ConversationRoleMode,
-  DisplayPart,
-} from "./conversation.types.ts";
+import { PendingReply } from "./pending-reply.tsx";
 
 // Single renderer for playground, simulations grid, and drawer; reuses
 // existing components (Bubble, ToolPairCard, MediaPart) in one place.

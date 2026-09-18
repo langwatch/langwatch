@@ -1,19 +1,19 @@
 import { Box, Grid, GridItem, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
-
-import { Select as MultiSelect } from "chakra-react-select";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight } from "react-feather";
-import type { Trace } from "@langwatch/trace-contract";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
-import { nowInstant } from "@langwatch/time";
 import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPING_LABELS,
   TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
+import { nowInstant } from "@langwatch/time";
+import type { Trace } from "@langwatch/trace-contract";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { Select as MultiSelect } from "chakra-react-select";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowRight } from "react-feather";
+
 import { api } from "../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 
 /**
  * Thread mappings - simplified set of options for thread-based data

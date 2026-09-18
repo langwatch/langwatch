@@ -1,14 +1,20 @@
-import type { Protections,Evaluation,LLMSpan,Trace,TracesForProjectResult,ExportRequest } from "@langwatch/trace-contract";
+import type {
+  Protections,
+  Evaluation,
+  LLMSpan,
+  Trace,
+  TracesForProjectResult,
+  ExportRequest,
+} from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Integration tests for TraceExportService: mocks TraceService (external
  * boundary) and verifies the async generator yields correct chunks with progress.
  */
-
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
 import { TraceExportService } from "../../trace-export.service.ts";
+import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
 
 const fullProtections: Protections = {
   canSeeCosts: true,

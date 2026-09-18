@@ -1,12 +1,12 @@
-import { createTenantId,FoldProjectionExecutor } from "@langwatch/eventing";
+import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { MAX_PROCESSED_SPANS, TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createInitState, createTestRuntime } from "./trace-summary-test.fixtures.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 
 /** Regression guard for the 2026-07-09 re-fold storm. Hot traces reach the fold
  * out of occurredAt order; the trace summary is order-insensitive, so spans fold

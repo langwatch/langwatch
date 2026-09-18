@@ -4,18 +4,19 @@
  * input still reads nothing. Extras reset with the subject; inherited ones are read-only.
  */
 
-import { useCallback } from "react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
+import { useCallback } from "react";
+
 import { useOpenScenarioEvaluatorEditor } from "../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
 import { useProjectEvaluators } from "../../../../behavior/agent-testing/evaluators/use-project-evaluators.ts";
 import { useOpenSuiteEditor } from "../../../../behavior/agent-testing/suite/use-open-suite-editor.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import type { ScopeScenario } from "./run-scope-section.tsx";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { RunScope } from "./run-configuration";
 import { isEvaluatorFlowDrawer, type SuiteRow } from "./run-evaluators";
+import type { ScopeScenario } from "./run-scope-section.tsx";
 import { useExtraEvaluatorsFlow } from "./use-edit-and-attach-extra";
 import { useInheritedEvaluators, useOffenderActions } from "./use-evaluator-offenders";
 

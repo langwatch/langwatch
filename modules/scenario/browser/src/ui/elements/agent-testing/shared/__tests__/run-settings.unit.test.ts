@@ -3,9 +3,10 @@
  * @see specs/scenarios/resolved-run-models-on-runs.feature
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import { readRunSettings } from "../../../../sections/agent-testing/results/run-settings.ts";
 
 /** One finished run of a batch, carrying the reserved namespace given. */

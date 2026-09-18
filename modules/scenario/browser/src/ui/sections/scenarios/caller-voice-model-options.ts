@@ -17,26 +17,16 @@ export interface ProviderCredentialView {
  * values and their capitalised labels, keyed by value. Credentialed means
  * enabled for the project; none credentialed shows the "add a provider" empty state.
  */
-export function callerVoiceOptions({
-  providers,
-}: {
-  providers: ProviderCredentialView[];
-}): {
+export function callerVoiceOptions({ providers }: { providers: ProviderCredentialView[] }): {
   options: string[];
   displayNames: Record<string, string>;
 } {
   const enabledProviders = new Set(
-    providers
-      .filter((provider) => provider.enabled === true)
-      .map((provider) => provider.provider),
+    providers.filter((provider) => provider.enabled === true).map((provider) => provider.provider),
   );
-  const voices = CALLER_VOICES.filter((voice) =>
-    enabledProviders.has(voice.provider),
-  );
+  const voices = CALLER_VOICES.filter((voice) => enabledProviders.has(voice.provider));
   return {
     options: voices.map((voice) => voice.value),
-    displayNames: Object.fromEntries(
-      voices.map((voice) => [voice.value, voice.label]),
-    ),
+    displayNames: Object.fromEntries(voices.map((voice) => [voice.value, voice.label])),
   };
 }

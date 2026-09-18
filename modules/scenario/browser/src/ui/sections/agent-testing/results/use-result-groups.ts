@@ -3,10 +3,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { useMemo } from "react";
 import type { Period, PeriodMode } from "@langwatch/analytics-browser-kit/period-selector";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useTargetIdentityMap } from "../../../../behavior/use-target-name-map.ts";
 import type {
   CodeScenario,
   ResultAtom,
@@ -17,10 +14,14 @@ import type {
   RunParameterValues,
 } from "@langwatch/scenario-contract";
 import { splitTargetKey } from "@langwatch/suite-contract";
+import { useMemo } from "react";
+
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useTargetIdentityMap } from "../../../../behavior/use-target-name-map.ts";
 import type { TargetKind } from "../../../../model/target-kind.ts";
 import type { PlanRowModel } from "./plan-rows-table.tsx";
-import type { ResultsFilterOption } from "./results-filter-menu.tsx";
 import {
   codeTargetNames,
   filterOutcome,
@@ -33,7 +34,7 @@ import {
   targetParametersOf,
   toResultRows,
 } from "./result-atoms.ts";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import type { ResultsFilterOption } from "./results-filter-menu.tsx";
 
 /**
  * How often the reads refresh while the live stream is down.
@@ -337,7 +338,9 @@ function useResultFilterOptions({
     for (const scenario of scenarios ?? []) {
       for (const label of scenario.labels) seen.add(label);
     }
-    return [...seen].toSorted().map((label) => ({ value: label, label }) satisfies ResultsFilterOption);
+    return [...seen]
+      .toSorted()
+      .map((label) => ({ value: label, label }) satisfies ResultsFilterOption);
   }, [scenarios]);
 
   // The project's agents and prompts, and beside them the targets the window

@@ -22,7 +22,7 @@ const mockAgents = [
     type: "connected",
     environment: "production",
     status: "offline",
-    owner: { userId: "user-1", name: "Test User" },
+    owner: null,
     updatedAt: new Date("2025-01-01"),
   },
   {
@@ -76,17 +76,13 @@ describe("given an offline connected agent", () => {
 
       await user.click(screen.getByTestId("target-selector-trigger"));
       await waitFor(() => {
-        expect(
-          screen.getByTestId("target-option-agent-off"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("target-option-agent-off")).toBeInTheDocument();
       });
 
       const offline = screen.getByTestId("target-option-agent-off");
       expect(offline).toHaveAttribute("aria-disabled", "true");
       await user.hover(offline);
-      expect(await screen.findByRole("tooltip")).toHaveTextContent(
-        OFFLINE_AGENT_SELECT_COPY,
-      );
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(OFFLINE_AGENT_SELECT_COPY);
       await user.click(offline);
       expect(onChange).not.toHaveBeenCalled();
 
@@ -105,10 +101,7 @@ describe("given a voice target is selected", () => {
     it("names the selected voice agent", () => {
       render(
         <ChakraProvider value={defaultSystem}>
-          <TargetSelector
-            value={{ type: "voice", id: "agent-voice" }}
-            onChange={vi.fn()}
-          />
+          <TargetSelector value={{ type: "voice", id: "agent-voice" }} onChange={vi.fn()} />
         </ChakraProvider>,
       );
 

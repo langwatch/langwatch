@@ -1,9 +1,10 @@
 import { HStack, Icon, Text } from "@chakra-ui/react";
 import { Key } from "lucide-react";
-import { Link } from "../../../blocks/link.tsx";
+
+import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { apiKeySettingsHref } from "../../../../model/api-key-anchor.ts";
-import { api } from "../../../../behavior/trace-api.ts";
+import { Link } from "../../../blocks/link.tsx";
 import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 
 /**

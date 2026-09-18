@@ -4,11 +4,12 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
-import { useState } from "react";
-import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "@langwatch/browser-host/errors";
-import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
+import { toaster } from "@langwatch/design-system/toaster";
+import { useState } from "react";
+
 import { api } from "../../scenario-api.ts";
+import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
 
 export type VersionRestore = ReturnType<typeof useVersionRestore>;
 

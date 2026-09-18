@@ -1,8 +1,9 @@
-import { useCallback } from "react";
+import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
-import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
+import { useCallback } from "react";
+
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";

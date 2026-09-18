@@ -4,6 +4,7 @@
  * here — see `sharedTrace.get` (ADR-057).
  */
 import { on } from "node:events";
+
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import {
   customersAndLabelsResultSchema,
@@ -135,7 +136,9 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
 
   .procedure("getCustomersAndLabels")
   .withPermission("traces:view")
-  .handle(async ({ app, input }) => customersAndLabelsResultSchema.parse(await app.readCustomersAndLabels(input)))
+  .handle(async ({ app, input }) =>
+    customersAndLabelsResultSchema.parse(await app.readCustomersAndLabels(input)),
+  )
 
   .procedure("getTracesByThreadId")
   .withPermission("traces:view")
@@ -188,7 +191,8 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     return Object.fromEntries(
       await Promise.all(
         traces.map(
-          async (t) => [t.trace_id, await TraceReadableSpanService.formatSpansDigest(t.spans ?? [])] as const,
+          async (t) =>
+            [t.trace_id, await TraceReadableSpanService.formatSpansDigest(t.spans ?? [])] as const,
         ),
       ),
     );

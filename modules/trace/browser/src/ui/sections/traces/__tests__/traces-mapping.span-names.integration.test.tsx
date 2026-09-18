@@ -3,12 +3,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Trace } from "@langwatch/trace-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Trace } from "@langwatch/trace-contract";
 import { TracesMapping } from "../traces-mapping.tsx";
 
 // Project-wide span names returned for the last 30 days — note that

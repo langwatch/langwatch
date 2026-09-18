@@ -1,9 +1,10 @@
 import { Box, HoverCard, Icon, Portal } from "@chakra-ui/react";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Eye } from "lucide-react";
 import type React from "react";
 import { type ReactNode, useState } from "react";
+
 import { useDrawer } from "../../../behavior/use-drawer.ts";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { TracePeekSummary } from "../trace-peek-summary.tsx";
 
 interface TracePreviewHoverCardProps {

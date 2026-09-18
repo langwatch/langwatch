@@ -57,8 +57,8 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store.ts";
+import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 import type { TurnLayout } from "../types.ts";

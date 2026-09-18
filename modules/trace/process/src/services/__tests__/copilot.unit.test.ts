@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalisation } from "./canonicalisation/test-helpers.ts";
 import { CopilotCanonicaliserService } from "../copilot-canonicaliser.service.ts";
+import { canonicalisation } from "./canonicalisation/test-helpers.ts";
 import { createExtractorContext } from "./test-helpers.ts";
 
 describe("CopilotCanonicaliserService", () => {

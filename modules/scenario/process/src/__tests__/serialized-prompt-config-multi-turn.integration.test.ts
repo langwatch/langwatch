@@ -3,6 +3,7 @@
  */
 
 import { createServer, type Server } from "node:http";
+
 import { createLogger } from "@langwatch/observability";
 import {
   type AgentInput,
@@ -10,9 +11,9 @@ import {
   type ScenarioConfig,
   ScenarioExecutionState,
 } from "@langwatch/scenario";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
 import { SerializedPromptConfigAdapter } from "@langwatch/scenario-process";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const LITELLM_PARAMS: LiteLLMParams = {
   api_key: "test-key",

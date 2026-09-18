@@ -1,23 +1,24 @@
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { computeRelativeWindow } from "@langwatch/analytics-browser-kit/period-selector";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import type { ScenarioRunData } from "@langwatch/scenario-contract";
 /**
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */
 import { Temporal } from "@langwatch/time";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computeRelativeWindow } from "@langwatch/analytics-browser-kit/period-selector";
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { SuiteNameDialog } from "../suite-name-dialog.tsx";
-import { SuiteRail } from "../suite-rail.tsx";
+
 import {
   orderSuitesDefaultFirst,
   type TestSuiteEntry,
 } from "../../../../../model/agent-testing/cases/test-cases.ts";
+import { SuiteNameDialog } from "../suite-name-dialog.tsx";
+import { SuiteRail } from "../suite-rail.tsx";
 import type { SuiteLastRun } from "../use-test-cases-data.ts";
 
 const routerPush = vi.fn();

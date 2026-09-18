@@ -1,8 +1,8 @@
 import { Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
-import { Settings } from "lucide-react";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "@langwatch/scenario-contract";
 import type { ScenarioSetData } from "@langwatch/scenario-contract";
-import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { Settings } from "lucide-react";
 
 export interface SetCardProps extends ScenarioSetData {
   onClick: () => void;

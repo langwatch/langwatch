@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import type { RAGChunk, RAGSpan, Span } from "./trace-format.schemas.ts";
+
 import {
   flattenSpanTree,
   getFirstInputAsText,
@@ -7,6 +7,7 @@ import {
   organizeSpansIntoTree,
   type SpanWithChildren,
 } from "./trace-collector-common.ts";
+import type { RAGChunk, RAGSpan, Span } from "./trace-format.schemas.ts";
 
 export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
   const inputOutputMap: Record<string, { input: RAGSpan["input"]; output: RAGSpan["output"] }> = {};

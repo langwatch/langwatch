@@ -1,6 +1,7 @@
 /** @integration */
 import { RedisConnectionService, type RedisConnection } from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import {
   RedisCancellationPublisherAdapter,
   RedisCancellationSubscriberAdapter,

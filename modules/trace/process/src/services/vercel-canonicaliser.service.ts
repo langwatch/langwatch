@@ -1,6 +1,6 @@
-import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 import { canonicaliseVercelCore } from "../rules/vercel-core.rules.ts";
 import { canonicaliseVercelIO } from "../rules/vercel-io.rules.ts";
+import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 export class VercelCanonicaliserService implements AttributeCanonicaliser {
   static create(): VercelCanonicaliserService {

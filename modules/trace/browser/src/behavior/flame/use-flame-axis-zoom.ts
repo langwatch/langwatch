@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+
 import { DRAG_THRESHOLD_PX, MIN_VIEWPORT_MS } from "../../model/flame/constants.ts";
 import type { Viewport } from "./types.ts";
 

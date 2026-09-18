@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { simulationMessageSchema } from "./simulation.ts";
+
 import { scenarioEvaluationResultSchema } from "./schemas/event-schemas.ts";
+import { simulationMessageSchema } from "./simulation.ts";
 
 const simulationRunIdentitySchema = z.object({
   tenantId: z.string(),
@@ -149,6 +150,4 @@ export const recordEvaluationsCommandDataSchema = z.object({
   evaluations: z.array(scenarioEvaluationResultSchema),
   occurredAt: z.number(),
 });
-export type RecordEvaluationsCommandData = z.infer<
-  typeof recordEvaluationsCommandDataSchema
->;
+export type RecordEvaluationsCommandData = z.infer<typeof recordEvaluationsCommandDataSchema>;

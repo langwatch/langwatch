@@ -1,16 +1,16 @@
 import { ScenarioExecutionService as ScenarioExecutionServiceContract } from "@langwatch/scenario-contract";
-import { nowInstant } from "@langwatch/time";
 import type {
   ScenarioAgentInstance,
   ScenarioExecutionJob,
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
   ScenarioExecutionPreparation,
-  ScenarioUnsuccessfulExecutionInput,SimulationService
+  ScenarioUnsuccessfulExecutionInput,
+  SimulationService,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 
-
-import type { CancellationPublisher,ScenarioExecutionPool } from "../app/scenario.app.ts";
+import type { CancellationPublisher, ScenarioExecutionPool } from "../app/scenario.app.ts";
 import type { ScenarioExecutionPrefetcherService } from "./scenario-execution-prefetcher.service.ts";
 import type { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
 

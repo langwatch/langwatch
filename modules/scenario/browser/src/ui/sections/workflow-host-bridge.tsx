@@ -2,6 +2,8 @@
  * The workflow host, answered from this family's own.
  */
 
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import {
   WorkflowHostApi,
   WorkflowHostProvider,
@@ -13,8 +15,6 @@ import {
 } from "@langwatch/workflow-browser/surfaces/workflow-host";
 import { useMemo, type ReactNode } from "react";
 
-import { showErrorToast } from "@langwatch/browser-host/errors";
-import { useRouter } from "@langwatch/browser-host/use-router";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 
 type Reading = {

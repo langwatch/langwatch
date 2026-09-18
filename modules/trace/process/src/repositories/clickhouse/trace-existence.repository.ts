@@ -2,8 +2,9 @@
  * Set membership over trace_summaries without dedup via TenantId-first predicate.
  */
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
+
 import { TraceExistenceRepository } from "../read/trace-existence.repository.ts";
+import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
 
 export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository {
   static create(options: {

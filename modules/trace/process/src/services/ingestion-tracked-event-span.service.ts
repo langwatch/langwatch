@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
-import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
+
 import {
   TRACK_EVENT_SPAN_NAME,
   type OtlpKeyValue,
   type OtlpSpan,
   type TrackEventRESTParamsValidator,
 } from "@langwatch/trace-contract";
+import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
 
 /** How many hex characters an OTLP span id carries. */
 const SPAN_ID_LENGTH = 16;

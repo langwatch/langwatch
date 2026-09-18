@@ -1,7 +1,7 @@
+import { toEpochMs } from "@langwatch/time";
 // POST /api/trace/search body; shared analytics filter plus four additive
 // fields, parsed STRICTLY to reject unknown keys as it always has
 import { traceListInputSchema } from "@langwatch/trace-contract";
-import { toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 

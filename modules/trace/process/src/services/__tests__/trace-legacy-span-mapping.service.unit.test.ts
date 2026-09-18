@@ -1,7 +1,8 @@
-import * as TraceLegacySpanMappingService from "../../rules/trace-legacy-span-mapping.rules.ts";
-import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import * as TraceLegacySpanMappingService from "../../rules/trace-legacy-span-mapping.rules.ts";
 
 const makeSpan = (overrides: Partial<NormalizedSpan> = {}): NormalizedSpan => ({
   id: "test-id",

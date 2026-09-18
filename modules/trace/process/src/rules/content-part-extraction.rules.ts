@@ -4,10 +4,16 @@
  * Pure apart from the store it is handed, so the dispatcher stays a table of shapes.
  */
 
-import { parseBase64DataUri,resolveRawPcmFormat,wrapRawPcmToWav,isInlineDataCarrier } from "@langwatch/trace-contract";
 import { isReadbackSafe } from "@langwatch/stored-object-contract";
-import type { TraceMediaStore } from "../app/trace.members.ts";
+import {
+  parseBase64DataUri,
+  resolveRawPcmFormat,
+  wrapRawPcmToWav,
+  isInlineDataCarrier,
+} from "@langwatch/trace-contract";
 import { z } from "zod";
+
+import type { TraceMediaStore } from "../app/trace.members.ts";
 
 /**
  * Runtime invariant: a binary content part must carry exactly one of data, url or id, since

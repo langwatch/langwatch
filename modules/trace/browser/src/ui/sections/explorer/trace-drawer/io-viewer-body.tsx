@@ -1,6 +1,7 @@
 import { Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import type { ReactNode } from "react";
+
 import { RenderedMarkdown } from "../../../blocks/markdown/rendered-markdown.tsx";
 import { ShikiCodeBlock } from "../../../elements/markdown/shiki-highlight.tsx";
 import {

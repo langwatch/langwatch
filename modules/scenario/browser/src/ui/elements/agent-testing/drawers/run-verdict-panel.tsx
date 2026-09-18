@@ -7,6 +7,12 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatScore } from "@langwatch/design-system/metric-value-formatters";
 import {
+  ScenarioRunStatus,
+  resolveScenarioError,
+  scenarioErrorDetail,
+  scenarioErrorTitle,
+} from "@langwatch/scenario-contract";
+import {
   ChevronDown,
   ChevronRight,
   CircleCheck,
@@ -16,19 +22,14 @@ import {
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
+
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import {
   failedRequiredEvaluatorName,
   type RunEvaluation,
 } from "../../../sections/agent-testing/results/evaluation-summaries.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { PASS_RATE_AMBER_COLOR } from "../shared/pass-rate-color.ts";
-import {
-  ScenarioRunStatus,
-  resolveScenarioError,
-  scenarioErrorDetail,
-  scenarioErrorTitle,
-} from "@langwatch/scenario-contract";
 
 /**
  * The colour a passed and a failed verdict read in, taken from the status

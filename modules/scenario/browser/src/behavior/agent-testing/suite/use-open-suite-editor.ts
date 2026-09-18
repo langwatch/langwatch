@@ -5,8 +5,8 @@
  * @see specs/features/agent-testing/suite-editor.feature
  */
 
-import { useCallback } from "react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useCallback } from "react";
 
 export type OpenSuiteEditorParams = {
   testSuiteId: string;
@@ -20,9 +20,7 @@ export function useOpenSuiteEditor(): (params: OpenSuiteEditorParams) => void {
   return useCallback(
     ({ testSuiteId, attachmentId }: OpenSuiteEditorParams) => {
       openDrawer("suiteEditor", {
-        urlParams: attachmentId
-          ? { suiteId: testSuiteId, attachmentId }
-          : { suiteId: testSuiteId },
+        urlParams: attachmentId ? { suiteId: testSuiteId, attachmentId } : { suiteId: testSuiteId },
       });
     },
     [openDrawer],

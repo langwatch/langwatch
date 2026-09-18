@@ -4,11 +4,12 @@
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
+import type { HttpAgentData } from "@langwatch/scenario-contract";
 import { context, trace } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import type { HttpAgentData } from "@langwatch/scenario-contract";
+
 import { createOtelEchoServer } from "./support/otel-echo-server.ts";
 import { createNativeHttpAgentAdapter } from "./support/test-scenario-http.port.ts";
 

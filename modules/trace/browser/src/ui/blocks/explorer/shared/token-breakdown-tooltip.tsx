@@ -1,4 +1,5 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
+
 import { TooltipRow } from "../../../elements/explorer/shared/tooltip-row.tsx";
 
 interface TokenBreakdownTooltipContentProps {

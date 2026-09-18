@@ -1,10 +1,11 @@
 import type { AgentAdapter } from "@langwatch/scenario";
-import { describe, expect, it, vi } from "vitest";
+import type { VoiceAgentData } from "@langwatch/scenario-contract";
 import {
   phoneTransport,
   type voiceTransportRegistry,
 } from "@langwatch/scenario-contract/voice-runtime";
-import type { VoiceAgentData } from "@langwatch/scenario-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { createSerializedVoiceAgentAdapter, NO_OPENAI_KEY_MESSAGE } from "../voice-agent.adapter";
 
 const fakeAdapter = { call: async () => "" } as unknown as AgentAdapter;

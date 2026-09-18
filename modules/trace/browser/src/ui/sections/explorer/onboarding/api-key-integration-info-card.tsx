@@ -1,15 +1,16 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { CLOUD_ENDPOINT } from "@langwatch/onboarding-browser/surfaces/build-mcp-config";
+import { CodePreview } from "@langwatch/onboarding-browser/surfaces/code-preview";
+import { InlineCopyButton } from "@langwatch/onboarding-browser/surfaces/inline-copy-button";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { showErrorToast } from "../../errors/index.ts";
-import { CodePreview } from "@langwatch/onboarding-browser/surfaces/code-preview";
-import { CLOUD_ENDPOINT } from "@langwatch/onboarding-browser/surfaces/build-mcp-config";
-import { InlineCopyButton } from "@langwatch/onboarding-browser/surfaces/inline-copy-button";
-import { RoleBindingScopeType, TeamUserRole } from "../../../../model/prisma-types.ts";
-import { usePublicEnv } from "../../use-public-env.ts";
+
 import { api } from "../../../../behavior/trace-api.ts";
 import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint.ts";
+import { RoleBindingScopeType, TeamUserRole } from "../../../../model/prisma-types.ts";
+import { showErrorToast } from "../../errors/index.ts";
+import { usePublicEnv } from "../../use-public-env.ts";
 
 interface ApiKeyIntegrationInfoCardProps {
   organizationId: string;

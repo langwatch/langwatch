@@ -4,14 +4,15 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { useMemo } from "react";
 import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
 import {
   computeBatchRunSummary,
   groupRunsByBatchId,
 } from "@langwatch/suite-browser/run-formatters";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useMemo } from "react";
+
 import { api } from "../../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { type PlanIdentity, planOfSet } from "./plan-of-set.ts";
 
 /** How many runs the list holds. It is a way into a run, not a run history. */

@@ -1,10 +1,11 @@
+import { nowInstant } from "@langwatch/time";
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { previewTraceId } from "../../../../../model/preview-trace-id.ts";
-import type { EvaluationRunData } from "../../../../../model/evaluation-run-data.ts";
+
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
+import type { EvaluationRunData } from "../../../../../model/evaluation-run-data.ts";
+import { previewTraceId } from "../../../../../model/preview-trace-id.ts";
 import type { TraceEvalResult, TraceListItem } from "../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../types/trace.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * Conversation turn exactly as the `tracesV2.conversationContext` procedure returns it

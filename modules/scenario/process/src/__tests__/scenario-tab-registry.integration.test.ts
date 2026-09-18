@@ -3,10 +3,12 @@
  * Scenario tab presence against real Redis (specs/scenarios/scenario-tab-handoff.feature).
  */
 
+import { randomUUID } from "node:crypto";
+
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import {
   RedisScenarioTabStoreRepository,
   SCENARIO_TAB_DISCONNECT_GRACE_SECONDS,

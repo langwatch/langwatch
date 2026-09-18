@@ -23,10 +23,7 @@ export async function proxyAudioStream({
   forceContentType?: string;
 }): Promise<Response> {
   const timeoutController = new AbortController();
-  const timeout = setTimeout(
-    () => timeoutController.abort(),
-    VOICE_HTTP_TIMEOUT_MS,
-  );
+  const timeout = setTimeout(() => timeoutController.abort(), VOICE_HTTP_TIMEOUT_MS);
   // The abort event fires at most once. A signal already aborted before we
   // got here would never reach a freshly-added listener, so the fetch would
   // start anyway and could wait the full timeout.
@@ -58,9 +55,7 @@ export async function proxyAudioStream({
     status: 200,
     headers: {
       "content-type":
-        forceContentType ??
-        upstream.headers.get("content-type") ??
-        fallbackContentType,
+        forceContentType ?? upstream.headers.get("content-type") ?? fallbackContentType,
       "cache-control": "no-store",
     },
   });

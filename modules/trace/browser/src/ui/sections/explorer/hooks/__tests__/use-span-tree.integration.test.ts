@@ -1,7 +1,7 @@
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 import { LIVE_REFETCH_MS } from "../../../../../model/trace-freshness.ts";
 import { useSpanTree } from "../use-span-tree.ts";

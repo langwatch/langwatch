@@ -1,10 +1,11 @@
 import { Box, chakra, HStack, Icon, Link, Text } from "@chakra-ui/react";
+import type { AiActionError } from "@langwatch/trace-contract";
 import { AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { explainAnyError } from "../../errors/index.ts";
-import type { AiActionError } from "@langwatch/trace-contract";
+
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { explainAnyError } from "../../errors/index.ts";
 import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
 
 /**

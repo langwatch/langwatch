@@ -3,9 +3,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SimulationMessage } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { SimulationMessage } from "@langwatch/scenario-contract";
+
 import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
 // RunTurnSeparator internally calls useOrganizationTeamProject() and
@@ -543,18 +544,12 @@ describe("<ScenarioMessageRenderer/>", () => {
       // wrapper (co-contained), and matches the text the judge was given.
       const calleeTranscript = screen.getByText("Hello, thanks for calling");
       const calleePlayer = players[0]!;
-      expect(calleePlayer.closest("[data-align]")).toContainElement(
-        calleeTranscript,
-      );
+      expect(calleePlayer.closest("[data-align]")).toContainElement(calleeTranscript);
 
       // The simulator's turn renders the same way: audio + transcript beside it.
-      const simulatorTranscript = screen.getByText(
-        "Hi, I have a question about my order",
-      );
+      const simulatorTranscript = screen.getByText("Hi, I have a question about my order");
       const simulatorPlayer = players[1]!;
-      expect(simulatorPlayer.closest("[data-align]")).toContainElement(
-        simulatorTranscript,
-      );
+      expect(simulatorPlayer.closest("[data-align]")).toContainElement(simulatorTranscript);
     });
   });
 });

@@ -9,10 +9,7 @@ export type GatedVerdict = "success" | "failure" | "inconclusive";
  * evaluator that failed, or that errored before it could decide.
  */
 export function evaluationFailsRun(evaluation: ScenarioEvaluationResult): boolean {
-  return (
-    evaluation.required &&
-    (evaluation.status === "failed" || evaluation.status === "error")
-  );
+  return evaluation.required && (evaluation.status === "failed" || evaluation.status === "error");
 }
 
 /** Returns verdict after evaluations; required failures or errors return

@@ -1,10 +1,11 @@
 // Registry of voice transports: one interface per transport. Vendors stay inside transports/.
 
 import type { AgentAdapter } from "@langwatch/scenario";
+
 import type { CallRecord } from "./call-record.ts";
-import type { VoiceTransport } from "./voice-transport.ts";
 import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport.ts";
 import { phoneTransport } from "./transports/phone.transport.ts";
+import type { VoiceTransport } from "./voice-transport.ts";
 
 // Credential for reading/dialing. Never reaches browser (stays with runner).
 // Discriminated union: ElevenLabs (key + host) vs Twilio (SID + token + number).
@@ -20,10 +21,7 @@ export type VoiceTransportCredential =
 /** The ElevenLabs branch of {@link VoiceTransportCredential}, narrowed for
  *  callers that only ever handle ElevenLabs conversations (recording
  *  playback has no meaning for a phone target). */
-export type ElevenLabsCredential = Extract<
-  VoiceTransportCredential,
-  { kind: "elevenlabs" }
->;
+export type ElevenLabsCredential = Extract<VoiceTransportCredential, { kind: "elevenlabs" }>;
 
 /** What a minted browser session needs to open the call, minus the id and
  *  limit the service adds. The signed URL is short-lived and safe to hand out;
@@ -69,10 +67,7 @@ export interface VoiceTransportRunner {
   readonly missingKeyMessage: string;
 }
 
-export const voiceTransportRegistry: Record<
-  VoiceTransport,
-  VoiceTransportRunner
-> = {
+export const voiceTransportRegistry: Record<VoiceTransport, VoiceTransportRunner> = {
   elevenlabs_convai: elevenLabsConvaiTransport,
   phone: phoneTransport,
 };

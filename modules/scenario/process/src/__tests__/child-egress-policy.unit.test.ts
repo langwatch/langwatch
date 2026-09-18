@@ -4,6 +4,7 @@
  * Spec: specs/scenarios/child-execution-contract.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   buildChildEnvironment,
   decodeScenarioEgressPolicy,

@@ -21,9 +21,7 @@ vi.mock("~/hooks/useProjectSpanNames", () => ({
 }));
 
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
-const flowCallbacksStore = vi.hoisted(
-  () => ({}) as Record<string, Record<string, unknown>>,
-);
+const flowCallbacksStore = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>);
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: mockOpenDrawer }),
   setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
@@ -36,6 +34,7 @@ import {
   REQUIRED_TO_PASS_COPY,
   SCORE_ONLY_COPY,
 } from "@langwatch/evaluator-browser/surfaces/evaluator-editor-shared";
+
 import { Harness, Wrapper } from "./scenarioEvaluatorEditorHarness";
 
 describe("the evaluator editor gate", () => {
@@ -68,8 +67,7 @@ describe("the evaluator editor gate", () => {
       const mappings = screen.getByTestId("mapping-input-output");
       // The gate reads after the inputs it gates on.
       expect(
-        mappings.compareDocumentPosition(section) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        mappings.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
 
       const toggle = screen.getByTestId("evaluator-required-switch");
@@ -107,12 +105,8 @@ describe("the evaluator editor gate", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.queryByTestId("evaluator-gate-section"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("evaluator-remove-button"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("evaluator-gate-section")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("evaluator-remove-button")).not.toBeInTheDocument();
     });
   });
 
@@ -122,11 +116,7 @@ describe("the evaluator editor gate", () => {
       const user = userEvent.setup();
       const onRemove = vi.fn();
       render(
-        <Harness
-          gate={{ required: true, canRequire: true }}
-          required={true}
-          onRemove={onRemove}
-        />,
+        <Harness gate={{ required: true, canRequire: true }} required={true} onRemove={onRemove} />,
         { wrapper: Wrapper },
       );
 

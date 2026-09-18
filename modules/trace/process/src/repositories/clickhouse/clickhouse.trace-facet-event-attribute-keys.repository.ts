@@ -1,4 +1,7 @@
-import { ClickHouseTraceFacetQueryRepository,KEY_DISCOVERY_SETTINGS } from "./clickhouse.trace-facet-query.repository.ts";
+import {
+  ClickHouseTraceFacetQueryRepository,
+  KEY_DISCOVERY_SETTINGS,
+} from "./clickhouse.trace-facet-query.repository.ts";
 import type {
   DynamicKeysDef,
   FacetQuery,

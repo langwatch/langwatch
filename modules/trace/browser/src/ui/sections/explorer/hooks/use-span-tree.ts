@@ -1,10 +1,11 @@
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { applyOverlayToSpanTreeNodes } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
-import { api } from "../../../../behavior/trace-api.ts";
+
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
 import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness.ts";
+import { applyOverlayToSpanTreeNodes } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
 import {
   mergeSpanTreeDelta,

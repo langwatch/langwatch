@@ -2,6 +2,7 @@
 // SPAN_STORAGE_MAP_SHARD_COUNT lanes pinned by span id. @see ADR-066
 
 import type { Event } from "@langwatch/eventing";
+
 import { shardIndexFor } from "./trace-command-shard.rules.ts";
 
 // Lanes per tenant; matches MAX_SPAN_SHARD_COUNT on recordSpan side

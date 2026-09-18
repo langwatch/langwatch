@@ -3,10 +3,11 @@
 // @vitest-environment jsdom
 // Spec: specs/traces-v2/span-unmapped-cost-suggestion.feature
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SpanDetail, SpanTreeNode } from "@langwatch/trace-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SpanDetail, SpanTreeNode } from "@langwatch/trace-contract";
+
 import { SpanAccordions } from "../span-accordions.tsx";
 
 const { mockDetailState } = vi.hoisted(() => ({

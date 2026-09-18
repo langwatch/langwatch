@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   buildTree,
   countDescendants,

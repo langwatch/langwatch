@@ -1,6 +1,7 @@
-import { useCallback } from "react";
-import { api } from "../../../../../behavior/trace-api.ts";
 import { nowInstant } from "@langwatch/time";
+import { useCallback } from "react";
+
+import { api } from "../../../../../behavior/trace-api.ts";
 
 /**
  * User-scoped persistence for automatic Traces Explorer tours.

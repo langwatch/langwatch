@@ -6,6 +6,7 @@
 import type { HttpAgentData } from "@langwatch/scenario-contract";
 import { AGENT_TEST_SCENARIO_ID, AGENT_TEST_USER_MESSAGE } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { AgentTestPrefetchService } from "../agent-test-prefetch.service.ts";
 import type { ScenarioExecutionPrefetchConfig } from "../scenario-execution-prefetcher.service.ts";
 

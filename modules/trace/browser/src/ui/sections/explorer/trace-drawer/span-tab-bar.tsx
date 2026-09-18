@@ -1,4 +1,8 @@
 import { Badge, Button, Circle, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-browser";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { memo, useMemo, useRef } from "react";
 import {
   LuChevronDown,
@@ -11,16 +15,13 @@ import {
   LuX,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
-import { Menu } from "@langwatch/design-system/menu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-browser";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
-import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail.ts";
+
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 import { formatDuration } from "../../../../model/display-formatters.ts";
-import { spanTypeColor } from "../utils/span-type-color.ts";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
+import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail.ts";
+import { spanTypeColor } from "../utils/span-type-color.ts";
 
 /**
  * Tab / menu label for a span: generic tool spans (claude_code.tool ...)

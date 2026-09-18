@@ -1,9 +1,3 @@
-import type { WireOf } from "@langwatch/api/web";
-/**
- * The mapping half of the "Add to Dataset" drawer: which trace field fills which
- * dataset column, and what the rows will look like once it does.
- */
-
 import {
   Badge,
   Box,
@@ -16,18 +10,28 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+/**
+ * The mapping half of the "Add to Dataset" drawer: which trace field fills which
+ * dataset column, and what the rows will look like once it does.
+ */
+import type { WireOf } from "@langwatch/api/web";
 import { DatasetPreviewTable } from "@langwatch/dataset-browser/surfaces/dataset-image-preview-table";
-import type { Dataset, DatasetColumns, DatasetRecordEntry,MappingState } from "@langwatch/dataset-contract";
+import type {
+  Dataset,
+  DatasetColumns,
+  DatasetRecordEntry,
+  MappingState,
+} from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 
+import { api } from "../../../behavior/trace-api.ts";
 import { useDebouncedCallback } from "../../../behavior/use-debounced-callback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { ThreadMapping, type ThreadMappingState } from "../traces/thread-mapping.tsx";
 import { TracesMapping } from "../traces/traces-mapping.tsx";
-import { api } from "../../../behavior/trace-api.ts";
 
 interface DatasetMappingPreviewProps {
   traces: Trace[];

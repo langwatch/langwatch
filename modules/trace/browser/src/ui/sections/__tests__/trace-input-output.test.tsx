@@ -4,6 +4,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { TraceInputOutput, type TraceInputOutputProps } from "../../blocks/trace-input-output.tsx";
 import { TraceMediaStrip, type TraceMediaPartData } from "../../elements/trace-media-strip.tsx";
 

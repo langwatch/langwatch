@@ -1,11 +1,15 @@
-/**
- * `/api/scenario-events` - the events an SDK reports while a scenario runs.
- * Everything from the process arrives as a port: services, tenant broadcast,
- * media externalisation. Trace-usage and body-cap middleware are the mount's own concern.
- */
-import type { z } from "zod";
+import {
+  type AppRestBroadcast,
+  baseResponses,
+  defineRestRouter,
+  BadRequestError,
+  MANAGEMENT_API_VERSION,
+  projectRestFacts,
+  resolver,
+  type PlatformUrlBuilder,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 import {
   SimulationRunNotFoundError,
   DEFAULT_SET_ID,
@@ -25,16 +29,13 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import {
-  type AppRestBroadcast,
-  baseResponses,
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  projectRestFacts,
-  resolver,
-  type PlatformUrlBuilder,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
+import { nowInstant } from "@langwatch/time";
+/**
+ * `/api/scenario-events` - the events an SDK reports while a scenario runs.
+ * Everything from the process arrives as a port: services, tenant broadcast,
+ * media externalisation. Trace-usage and body-cap middleware are the mount's own concern.
+ */
+import type { z } from "zod";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
@@ -271,7 +272,7 @@ async function archiveScenarioEventScope({
   }
 
   if (scenarioSetId === void 0) {
-    throw new Error("A validated scenario-event archive has no scope");
+    throw new BadRequestError("A scenario-event archive requires a run or set scope");
   }
 
   return archiveScenarioSetRuns({ simulations, projectId, scenarioSetId });

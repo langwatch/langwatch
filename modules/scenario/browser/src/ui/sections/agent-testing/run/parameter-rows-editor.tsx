@@ -4,14 +4,15 @@
  */
 
 import { chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
-import { Lock, LockOpen, Plus, X } from "lucide-react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { DIALOG_FIELD_STYLE } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
-import type { ParameterRow } from "../../../../model/agent-testing/run/parameter-rows.ts";
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import { Lock, LockOpen, Plus, X } from "lucide-react";
+
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
+import type { ParameterRow } from "../../../../model/agent-testing/run/parameter-rows.ts";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
+import { DIALOG_FIELD_STYLE } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { ParameterLineField } from "./parameter-line-field.tsx";
 import { errorOnRow, type ParameterFieldError } from "./parameter-suggestions.ts";
 

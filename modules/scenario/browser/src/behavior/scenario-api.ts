@@ -3,12 +3,12 @@
  */
 
 import type { AgentApiUpdateOutput, UpdateAgentCommand } from "@langwatch/agent-contract";
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type {
   ModelDefaultResolvedTrpcOutput,
   ModelProviderListAllForProjectTrpcOutput,
 } from "@langwatch/model-provider-contract";
-import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 
 /**
  * A payload no contract package publishes yet.
@@ -85,6 +85,7 @@ export type ScenarioApiMap = {
     testSuites: {
       getAll: QL;
       create: M;
+      update: M;
       rename: M;
       archive: M;
     };

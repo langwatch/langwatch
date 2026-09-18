@@ -3,6 +3,7 @@
  * attribute rows and the canonical metadata keys line up.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   isTraceMetadataKeyEditable,
   traceAttributeKeyForMetadata,

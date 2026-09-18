@@ -4,7 +4,8 @@
  * @see specs/scenarios/scenario-versioning.feature
  */
 
-import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   DEFAULT_CALLER_VOICE,
   type CallerVoiceConfig,
@@ -16,15 +17,15 @@ import {
   type ScenarioParameterDefinition,
   type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
-import type { Scenario } from "../../../../model/prisma-types.ts";
+import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { api } from "../../../../behavior/scenario-api.ts";
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import {
   formatParameterLine,
   toParameterDefinitions,
 } from "../../../../model/agent-testing/run/parameter-line.ts";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import type { Scenario } from "../../../../model/prisma-types.ts";
 import { type CaseCustomizeBlocks, useCaseCustomizeBlocks } from "./use-case-customize-blocks.ts";
 
 /** What a person types into the editor. */
@@ -71,9 +72,7 @@ const EMPTY_DRAFT: CaseDraft = {
  * scenario never customized it (absent, or parsed back to exactly the
  * defaults), otherwise the config to seed the block with open.
  */
-export function callerVoiceFromScenario(
-  raw: unknown,
-): CallerVoiceConfig | null {
+export function callerVoiceFromScenario(raw: unknown): CallerVoiceConfig | null {
   if (raw === null || raw === undefined) return null;
   const parsed = parseCallerVoiceConfig(raw);
   const isDefault =
@@ -90,9 +89,7 @@ function draftFromScenario(scenario: Scenario): CaseDraft {
     situation: scenario.situation,
     criteria: scenario.criteria.join("\n"),
     labels: scenario.labels,
-    parameters: formatParameterLine(
-      parseScenarioParameterDefinitions(scenario.parameters),
-    ),
+    parameters: formatParameterLine(parseScenarioParameterDefinitions(scenario.parameters)),
     fields: parseScenarioFieldValues(scenario.fields),
     testSuiteId: scenario.testSuiteId,
     simulatorModel: scenario.simulatorModel,
@@ -517,9 +514,11 @@ export function useCaseEditor({
   // callback built on an earlier render, so this cannot be state.
   const runAfterSave = useRef(false);
 
-  const { scenario, isScenarioLoading, refetchScenario } = useCaseScenarioQuery(
-    { open, projectId, scenarioId },
-  );
+  const { scenario, isScenarioLoading, refetchScenario } = useCaseScenarioQuery({
+    open,
+    projectId,
+    scenarioId,
+  });
 
   const { draft, setDraft, version, seedCount, seedFrom } = useCaseDraft({
     open,

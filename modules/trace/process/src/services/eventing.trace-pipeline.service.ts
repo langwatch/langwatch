@@ -12,9 +12,17 @@ import {
   type TraceSummaryData,
   RECORD_SPAN_COALESCE_MAX_BATCH,
   TRACE_CORRELATION_COALESCE_MAX_BATCH,
-  type RecordSpanCommandData,type TraceCanonicalisationService
+  type RecordSpanCommandData,
+  type TraceCanonicalisationService,
 } from "@langwatch/trace-contract";
-import { type TraceIoExtraction,type TraceMediaReferenceResolver,type TraceModelCost,type TraceSpanNormalization } from "../app/trace.members.ts";
+
+import {
+  type TraceIoExtraction,
+  type TraceMediaReferenceResolver,
+  type TraceModelCost,
+  type TraceSpanNormalization,
+} from "../app/trace.members.ts";
+import { SpanStorageMapProjection } from "../eventing/span-storage.projection.ts";
 import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
@@ -23,9 +31,11 @@ import {
   type TraceAnalyticsRollupRow,
   TraceAnalyticsRollupMapProjection,
 } from "../eventing/trace-rollup.projection.ts";
-import { SpanStorageMapProjection } from "../eventing/span-storage.projection.ts";
 import { TraceSummaryFoldProjection } from "../eventing/trace-summary.projection.ts";
-import { TraceProjectionRuntimeService } from "./projection/trace-projection-runtime.service.ts";
+import {
+  clampSpanShardCount,
+  spanCommandGroupKey,
+} from "../rules/trace-span-command-shard.rules.ts";
 import {
   EventingRecordSpanAdapter,
   RECORD_SPAN_DEDUPLICATION,
@@ -33,7 +43,7 @@ import {
 import { EventingTraceOriginAdapter } from "./eventing.trace-origin.service.ts";
 import { EventingTraceProcessingAdapter } from "./eventing.trace-processing.service.ts";
 import { EventingTraceTopicAdapter } from "./eventing.trace-topic-assignment.service.ts";
-import { clampSpanShardCount, spanCommandGroupKey } from "../rules/trace-span-command-shard.rules.ts";
+import { TraceProjectionRuntimeService } from "./projection/trace-projection-runtime.service.ts";
 
 /** Trace pipeline name; shared by both full and producer-only registration shapes. */
 export const TRACE_PROCESSING_PIPELINE_NAME = "trace_processing";

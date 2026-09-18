@@ -1,3 +1,5 @@
+import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
+import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
 /**
  * @vitest-environment node
  * @unit
@@ -5,8 +7,6 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
-import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
 import { createSnapshotUpdateBroadcastSubscriber } from "../snapshot-update-broadcast.subscriber.ts";
 
 vi.mock("@langwatch/observability", () => ({

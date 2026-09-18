@@ -1,6 +1,7 @@
-import { TraceMediaPart } from "../../../traces/trace-media-part.tsx";
 import { TerminalOutput } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+
 import { TranscriptRenderProvider } from "../../../../elements/transcript-render-ports.tsx";
+import { TraceMediaPart } from "../../../traces/trace-media-part.tsx";
 import {
   BlockStack as TraceWebBlockStack,
   type BlockStackProps,

@@ -8,15 +8,16 @@ import { createSandboxedLiquid } from "@langwatch/automation-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
-import { trace } from "@opentelemetry/api";
-import { generateText } from "ai";
 import type {
   LiteLLMParams,
   PromptConfigData,
   RunParameterValues,
 } from "@langwatch/scenario-contract";
-import { createModelFromParams } from "./litellm-model.service.ts";
+import { trace } from "@opentelemetry/api";
+import { generateText } from "ai";
+
 import * as PromptTemplateAdapter from "../rules/prompt-template.rules.ts";
+import { createModelFromParams } from "./litellm-model.service.ts";
 import { SerializedAgent } from "./serialized-agent.service.ts";
 
 // Shared Liquid engine for template interpolation. Sandboxed: a customer

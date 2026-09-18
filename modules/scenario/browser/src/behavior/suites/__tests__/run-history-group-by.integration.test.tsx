@@ -4,17 +4,18 @@
  * @see specs/features/suites/run-history-group-by.feature - @integration scenarios
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { GroupRow } from "@langwatch/suite-browser/run-cards";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
-  computeGroupSummary,type RunGroup
+  computeGroupSummary,
+  type RunGroup,
 } from "@langwatch/suite-browser/run-formatters";
 import { makeScenarioRunData } from "@langwatch/suite-browser/testing";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),

@@ -2,7 +2,8 @@ import { defineCommand } from "@langwatch/eventing";
 import {
   CHANGE_TRACE_NAME_COMMAND_TYPE,
   TRACE_NAME_CHANGED_EVENT_TYPE,
-  TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,traceNameChangedEventDataSchema
+  TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
+  traceNameChangedEventDataSchema,
 } from "@langwatch/trace-contract";
 
 /** Persists user-driven rename with idempotency; resilient against later root-span arrivals. */

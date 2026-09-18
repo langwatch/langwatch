@@ -1,11 +1,12 @@
-import { TraceDeferredOriginEventingAdapter } from "../../services/eventing.deferred-origin.service.ts";
 import type { TriggerContext } from "@langwatch/eventing";
+import type { TraceSummaryData, TraceProcessingEvent } from "@langwatch/trace-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData,TraceProcessingEvent } from "@langwatch/trace-contract";
+
 import type {
   DeferredOriginPayload,
   TraceDeferredOriginScheduler,
 } from "../../app/trace.members.ts";
+import { TraceDeferredOriginEventingAdapter } from "../../services/eventing.deferred-origin.service.ts";
 
 function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {

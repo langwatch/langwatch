@@ -1,17 +1,18 @@
-import type { Protections } from "@langwatch/trace-contract";
+import { createLogger } from "@langwatch/observability";
 /**
  * @see ADR-022
  * Tests blob-resolution at the TraceLegacyReadClickHouseRepository seam with real services.
  */
-
-import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
-import { createLogger } from "@langwatch/observability";
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import type { Protections } from "@langwatch/trace-contract";
+import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+
 import type { TraceBlobStoreService } from "../../../services/trace-blob-store.service.ts";
 import { BlobNotFoundError } from "../../../services/trace-blob-store.service.ts";
-import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service.ts";
+import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary

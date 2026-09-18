@@ -105,7 +105,6 @@ export function ScenarioCriteriaInput({
                 autoresize
                 rows={2}
                 maxHeight={CRITERION_MAX_HEIGHT}
-                
               />
               <HStack gap={1}>
                 <IconButton

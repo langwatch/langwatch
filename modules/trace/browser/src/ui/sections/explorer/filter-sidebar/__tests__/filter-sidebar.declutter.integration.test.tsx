@@ -130,6 +130,7 @@ vi.mock("@dnd-kit/sortable", () => ({
 }));
 
 import type React from "react";
+
 import { FilterSidebar } from "../filter-sidebar.tsx";
 
 afterEach(() => {

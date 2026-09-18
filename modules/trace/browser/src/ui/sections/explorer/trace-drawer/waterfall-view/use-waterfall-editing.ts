@@ -1,9 +1,13 @@
-import { useCallback, useMemo } from "react";
-import type { SpanTreeNode,TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import type { SpanTreeNode, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { expandDeletedSpanIds } from "@langwatch/trace-contract";
-import type { SpanEditDraft } from "../../../../../behavior/trace-edit.store.ts";
+import { useCallback, useMemo } from "react";
+
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
-import { selectIsSpanDeleted, useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
+import type { SpanEditDraft } from "../../../../../behavior/trace-edit.store.ts";
+import {
+  selectIsSpanDeleted,
+  useTraceEditStore,
+} from "../../../../../behavior/trace-edit.store.ts";
 
 const NO_DRAFT_NAMES: ReadonlyMap<string, string> = new Map();
 

@@ -7,6 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import {
   CONTENT_COLUMN_CENTERING_WIDTH,
   CONTENT_COLUMN_MAX_WIDTH,

@@ -1,4 +1,5 @@
-import type { Protections,
+import type {
+  Protections,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
   PromptStudioSpanResult,
@@ -7,8 +8,8 @@ import type { Protections,
   TracesForProjectResult,
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
-  GetAllTracesForProjectOptions } from "@langwatch/trace-contract";
-
+  GetAllTracesForProjectOptions,
+} from "@langwatch/trace-contract";
 
 /**
  * Partition-key bound for multi-trace reads: earliest and latest occurrence
@@ -32,7 +33,9 @@ export abstract class TraceLegacyReadRepository {
     options?: GetAllTracesForProjectOptions,
   ): Promise<TracesForProjectResult>;
 
-  abstract findCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult>;
+  abstract findCustomersAndLabels(
+    input: AggregationFiltersInput,
+  ): Promise<CustomersAndLabelsResult>;
 
   abstract findDistinctFieldNames(
     projectId: string,

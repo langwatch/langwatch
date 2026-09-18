@@ -1,5 +1,6 @@
-import { api } from "../../../../behavior/trace-api.ts";
 import { nowInstant, toEpochMs } from "@langwatch/time";
+
+import { api } from "../../../../behavior/trace-api.ts";
 
 const NEW_ACCOUNT_WINDOW_MS = 5 * 24 * 60 * 60 * 1000;
 

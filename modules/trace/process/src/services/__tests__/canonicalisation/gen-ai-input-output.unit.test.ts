@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { canonicalisation, makeStubSpan } from "./test-helpers.ts";
 
 const stubSpan = makeStubSpan({

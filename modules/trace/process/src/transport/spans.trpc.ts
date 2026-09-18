@@ -4,7 +4,12 @@
  * application's; viewer redactions resolve per request, handed through unchanged.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { SpanNotFoundError, TraceApi, promptStudioSpanSchema, spansTrpc } from "@langwatch/trace-contract";
+import {
+  SpanNotFoundError,
+  TraceApi,
+  promptStudioSpanSchema,
+  spansTrpc,
+} from "@langwatch/trace-contract";
 
 export const spansTrpcTransport = defineTrpcRouter(TraceApi, spansTrpc)
   .procedure("getAllForTrace")

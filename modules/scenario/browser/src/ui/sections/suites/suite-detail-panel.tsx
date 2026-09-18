@@ -3,6 +3,10 @@
  */
 
 import { Box, Button, Center, EmptyState, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { getSuiteSetId, parseSuiteTargets } from "@langwatch/suite-contract";
+import { SetupWithAgentButton } from "@langwatch/trace-browser/surfaces/setup-with-agent-button";
 import {
   BarChart3,
   CheckCircle,
@@ -17,12 +21,9 @@ import {
   Target,
 } from "lucide-react";
 import { useState } from "react";
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
-import { SetupWithAgentButton } from "@langwatch/trace-browser/surfaces/setup-with-agent-button";
-import type { SimulationSuite } from "../../../model/prisma-types.ts";
+
 import { useNow } from "../../../behavior/use-now.ts";
-import { getSuiteSetId, parseSuiteTargets } from "@langwatch/suite-contract";
-import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import type { SimulationSuite } from "../../../model/prisma-types.ts";
 import { RunHistoryPanel, type RunHistoryStats } from "./run-history-panel.tsx";
 
 type SuiteDetailPanelProps = {

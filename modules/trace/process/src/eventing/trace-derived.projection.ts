@@ -1,4 +1,10 @@
-import { type FoldProjectionOptions, type FoldProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
+import {
+  type FoldProjectionOptions,
+  type FoldProjectionStore,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
 import {
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
@@ -25,12 +31,13 @@ import {
   traceNameChangedEventSchema,
   type TraceCanonicalisationService,
   type TraceSummaryData,
-  METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE
+  METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
 } from "@langwatch/trace-contract";
-import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service.ts";
-import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
+
 import { trimAttributesForAnalytics } from "../rules/analytics-attribute-trim.rules.ts";
 import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules.ts";
+import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
+import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service.ts";
 import {
   MAX_PROCESSED_SPANS,
   RESERVED_CACHE_CREATION_TOKENS,
@@ -38,7 +45,6 @@ import {
   RESERVED_REASONING_TOKENS,
   TraceSummaryFoldProjection,
 } from "./trace-summary.projection.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * Deterministic fold for the slim `trace_analytics` table: hoisted

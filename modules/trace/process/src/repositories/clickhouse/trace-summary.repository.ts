@@ -1,21 +1,22 @@
-import { nowInstant } from "@langwatch/time";
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   isStorageAnchoredVersion,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+
 import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
-import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
 import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
 } from "../projection/trace-summary-projection.repository.ts";
+import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 
 /**
  * Fields shared between trace summary and list repositories from trace_summaries.

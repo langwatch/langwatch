@@ -1,5 +1,5 @@
-import { capPayloadString } from "./trace-payload-cap.rules.ts";
 import { isRecord } from "./canonical-guard.rules.ts";
+import { capPayloadString } from "./trace-payload-cap.rules.ts";
 
 /** The display text one content block contributes, or "" when it contributes none. */
 function contentBlockToText(block: unknown): string {

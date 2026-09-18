@@ -5,22 +5,19 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { isHumanCallerRun } from "../caller-display";
 
 describe("isHumanCallerRun", () => {
   describe("given metadata naming a human caller", () => {
     it("returns true", () => {
-      expect(isHumanCallerRun({ langwatch: { callerKind: "human" } })).toBe(
-        true,
-      );
+      expect(isHumanCallerRun({ langwatch: { callerKind: "human" } })).toBe(true);
     });
   });
 
   describe("given metadata naming a simulated caller", () => {
     it("returns false", () => {
-      expect(isHumanCallerRun({ langwatch: { callerKind: "simulated" } })).toBe(
-        false,
-      );
+      expect(isHumanCallerRun({ langwatch: { callerKind: "simulated" } })).toBe(false);
     });
   });
 

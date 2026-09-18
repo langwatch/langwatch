@@ -1,6 +1,7 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+
 import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
 import { useDrawer } from "../../../../../../../behavior/use-drawer.ts";
 import type { TraceEvalResult, TraceListItem } from "../../../../types/trace.ts";

@@ -28,8 +28,7 @@ export class RedisScenarioTabStoreRepository implements ScenarioTabStore {
     return new RedisScenarioTabStoreRepository(connection);
   }
 
-  private constructor(private readonly connection: ScenarioTabRedisConnection) {
-  }
+  private constructor(private readonly connection: ScenarioTabRedisConnection) {}
 
   async refresh(input: {
     key: string;

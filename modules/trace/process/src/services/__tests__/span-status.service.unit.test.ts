@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
 
 import { SpanStatusService } from "../span-status.service.ts";
 

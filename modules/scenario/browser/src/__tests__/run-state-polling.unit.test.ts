@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import { getRunStatePollInterval } from "../model/run-state-polling.ts";
 
 describe("getRunStatePollInterval()", () => {

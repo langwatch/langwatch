@@ -3,8 +3,9 @@
  * Model resolution chain for runs.
  */
 
-import { describe, expect, it, vi } from "vitest";
 import { resolveLatestAlias } from "@langwatch/model-provider-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   JUDGE_MODEL_FEATURE_KEY,
   resolveRunModels,

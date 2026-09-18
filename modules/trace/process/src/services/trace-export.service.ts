@@ -1,17 +1,22 @@
-import type { Protections,Evaluation,Trace,ExportProgress,ExportRequest } from "@langwatch/trace-contract";
+import { createLogger } from "@langwatch/observability";
 /**
  * TraceExportService — the download half of the trace read. It orchestrates batch fetching and CSV
  * or JSON serialization, yielding chunks progressively so the API layer streams straight to the
  * HTTP response; only one batch, up to 100 traces, is held in memory at a time.
  */
-
-import { createLogger } from "@langwatch/observability";
-import { enrichTracesWithEvaluations } from "../rules/trace-evaluation-enrichment.rules.ts";
+import type {
+  Protections,
+  Evaluation,
+  Trace,
+  ExportProgress,
+  ExportRequest,
+} from "@langwatch/trace-contract";
 
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it
 // composed its legacy read as.
 import type { TraceLegacyRead } from "../app/trace.members.ts";
+import { enrichTracesWithEvaluations } from "../rules/trace-evaluation-enrichment.rules.ts";
 import {
   CSV_NEWLINE,
   serializeTracesToFullCsv,

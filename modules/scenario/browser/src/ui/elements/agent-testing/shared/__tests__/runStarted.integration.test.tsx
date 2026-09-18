@@ -12,6 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { useRunStartedHandler } from "../../../../sections/agent-testing/cases/use-case-run-actions.ts";
 import type { RunStartedInfo } from "../../../../sections/agent-testing/run/run-dialog-types.ts";
 import { useAgentTestingStore } from "../../../../sections/agent-testing/use-agent-testing-store.ts";
@@ -76,9 +77,7 @@ describe("where a queued run lands", () => {
 
         expect(mockRouterPush).toHaveBeenCalledTimes(1);
         const [route, address] = mockRouterPush.mock.calls[0]!;
-        expect(address).toBe(
-          "/test-project/agent-testing/results/refunds-prod-agent/batch_new",
-        );
+        expect(address).toBe("/test-project/agent-testing/results/refunds-prod-agent/batch_new");
         expect(route).toMatchObject({
           query: {
             project: "test-project",
@@ -99,12 +98,9 @@ describe("where a queued run lands", () => {
     /** @scenario "A run of one scenario opens in the run drawer" */
     it("opens the run drawer on that scenario and stays on the page", async () => {
       const user = userEvent.setup();
-      render(
-        <StartRun
-          info={{ ...SUITE_RUN, scenarioId: "case_1", targetId: "agent_1" }}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<StartRun info={{ ...SUITE_RUN, scenarioId: "case_1", targetId: "agent_1" }} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByRole("button", { name: "Start" }));
 

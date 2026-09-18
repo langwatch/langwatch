@@ -1,7 +1,10 @@
 import { readUiStorage, writeUiStorage } from "@langwatch/browser-host/storage";
+import { nowInstant } from "@langwatch/time";
 import { useMemo } from "react";
 import { create, type StateCreator } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+
+import type { RowKind } from "../model/trace-row-kind.ts";
 import { getCurrentFilterText, useFilterStore } from "./filter.store.ts";
 import {
   LENS_CAPABILITIES,
@@ -9,8 +12,6 @@ import {
   reconcileColumns,
   reconcileSort,
 } from "./lens-capabilities.ts";
-import type { RowKind } from "../model/trace-row-kind.ts";
-import { nowInstant } from "@langwatch/time";
 
 export type GroupingMode = "flat" | "by-conversation" | "by-service" | "by-user" | "by-model";
 

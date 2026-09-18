@@ -26,6 +26,21 @@ export const scenarioRunExportRequestSchema = z.object({
 });
 export type ScenarioRunExportRequest = z.infer<typeof scenarioRunExportRequestSchema>;
 
+/** The export application opens one download for an authenticated person. */
+export type ScenarioRunExportDownloadInput = Readonly<{
+  request: ScenarioRunExportRequest;
+  userId: string;
+  signal?: AbortSignal;
+}>;
+
+/** A byte stream the REST door writes without buffering a complete CSV. */
+export type ScenarioRunExportDownload = Readonly<{
+  exportId: string;
+  totalCount: number;
+  stream: AsyncIterable<Uint8Array>;
+  cancel: (reason: unknown) => Promise<void>;
+}>;
+
 /**
  * Progress is counted in runs *visited*, not rows written: a criteria-mode
  * export emits several rows per run, and a category filter drops some runs

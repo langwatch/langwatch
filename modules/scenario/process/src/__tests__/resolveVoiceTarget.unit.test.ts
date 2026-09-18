@@ -4,36 +4,32 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/env.mjs", () => ({
-  env: {
-    LANGWATCH_NLP_SERVICE: "http://nlp:5561",
-    LANGWATCH_ENDPOINT: "http://app:5560",
-  },
-}));
-
 const findTwilioProviderForProject = vi.fn();
 const getTwilioCredential = vi.fn();
-vi.mock("~/server/gateway/twilioCredential.service", () => ({
-  findTwilioProviderForProject: (...a: unknown[]) => findTwilioProviderForProject(...a),
-  getTwilioCredential: (...a: unknown[]) => getTwilioCredential(...a),
-}));
 
 const findElevenLabsProviderForProject = vi.fn();
 const getElevenLabsApiCredential = vi.fn();
-vi.mock("~/server/gateway/elevenLabsCredential.service", () => ({
-  findElevenLabsProviderForProject: (...a: unknown[]) => findElevenLabsProviderForProject(...a),
-  getElevenLabsApiCredential: (...a: unknown[]) => getElevenLabsApiCredential(...a),
-}));
 
 import { PHONE_NO_CREDENTIAL_MESSAGE } from "@langwatch/scenario-contract/voice-runtime";
-// DANGLING: `resolveVoiceTarget` (and data-prefetcher.ts) was never ported;
-// its replacement, scenario-execution-prefetcher.service.ts, carries no
-// voice resolution. Do not invent one here — see handoff
-// merge-scenario-dangling-imports.
-import { resolveVoiceTarget } from "../data-prefetcher";
+
+import {
+  resolveVoiceTarget,
+  type VoiceTransportCredentialReader,
+} from "../rules/voice-target.rules.ts";
 import { createSerializedVoiceAgentAdapter } from "../voice-agent.adapter.ts";
 
 beforeEach(() => vi.clearAllMocks());
+
+const credentials: VoiceTransportCredentialReader = {
+  findElevenLabs: async (projectId) => {
+    const provider = await findElevenLabsProviderForProject({ projectId });
+    return provider ? getElevenLabsApiCredential({ modelProviderId: provider.id }) : null;
+  },
+  findTwilio: async (projectId) => {
+    const provider = await findTwilioProviderForProject({ projectId });
+    return provider ? getTwilioCredential({ modelProviderId: provider.id }) : null;
+  },
+};
 
 describe("resolveVoiceTarget", () => {
   describe("given a phone target", () => {
@@ -52,6 +48,7 @@ describe("resolveVoiceTarget", () => {
             phoneNumber: "+14155559999",
             isAgentSpeaksFirst: false,
           },
+          credentials,
         });
         expect(target).toEqual({
           transport: "phone",
@@ -78,6 +75,7 @@ describe("resolveVoiceTarget", () => {
             phoneNumber: "+14155559999",
             isAgentSpeaksFirst: false,
           },
+          credentials,
         });
         expect(target).toEqual({
           transport: "phone",
@@ -132,6 +130,7 @@ describe("resolveVoiceTarget", () => {
         const target = await resolveVoiceTarget({
           projectId: "p1",
           config: { transport: "elevenlabs_convai", agentId: "el_1" },
+          credentials,
         });
         expect(target).toEqual({
           transport: "elevenlabs_convai",

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { analyzeOrGroups, parse } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { routeToggleViaOrGroups } from "../route-toggle-via-or-groups.ts";
 
 describe("routeToggleViaOrGroups", () => {

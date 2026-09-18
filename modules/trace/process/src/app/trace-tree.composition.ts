@@ -1,23 +1,27 @@
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   TraceNotFoundError,
   type TraceByIdInput,
   type TraceDerivedEventsInput,
 } from "@langwatch/trace-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
+import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
+import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
+import { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
+import { TracePayloadReaderRepository } from "../repositories/read/trace-payload-reader.repository.ts";
+import { TraceRecordRepository } from "../repositories/read/trace-record.repository.ts";
+import { TraceSummaryReaderRepository } from "../repositories/read/trace-summary-reader.repository.ts";
 import {
   TraceClickHouse,
   type TraceClickHouseClient,
   type TraceClickHouseResolver,
 } from "../repositories/trace-clickhouse-client.repository.ts";
-import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
-import { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
-import { type TraceQueryClassifier,type TraceEventDerivation,type TraceFullIo } from "./trace.members.ts";
-import { TraceSummaryReaderRepository } from "../repositories/read/trace-summary-reader.repository.ts";
-import { TraceRecordRepository } from "../repositories/read/trace-record.repository.ts";
-import { TracePayloadReaderRepository } from "../repositories/read/trace-payload-reader.repository.ts";
-import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import { TraceService } from "../services/trace.service.ts";
+import {
+  type TraceQueryClassifier,
+  type TraceEventDerivation,
+  type TraceFullIo,
+} from "./trace.members.ts";
 
 export type TraceTreeCompositionOptions = {
   resolveClient: TraceClickHouseResolver;
@@ -92,8 +96,7 @@ class NullTraceEventDerivation implements TraceEventDerivation {
 }
 
 class NullTraceQueryClassificationAdapter implements TraceQueryClassifier {
-  private constructor() {
-  }
+  private constructor() {}
 
   static create(): NullTraceQueryClassificationAdapter {
     return new NullTraceQueryClassificationAdapter();

@@ -4,10 +4,10 @@
  * standalone-adapters.ts and scenario-worker.ts.
  */
 
-import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { LiteLLMParams } from "@langwatch/scenario-contract";
+import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 
 interface CreateModelFromParamsInput {

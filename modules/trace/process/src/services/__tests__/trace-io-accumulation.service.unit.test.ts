@@ -5,22 +5,22 @@
 
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
+
 import {
   type TraceMediaReferenceResolver,
   type TraceMediaReference,
   type TraceIoExtraction,
   type TraceIoSide,
-  type TraceIoValue
+  type TraceIoValue,
 } from "../../app/trace.members.ts";
+import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 import { OUTPUT_SOURCE, TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
 
 type Extracted = { rich?: TraceIoValue | null; fallback?: TraceIoValue | null };
 
 /** Returns whatever the case asks for, per side. Never looks at the span. */
 class FakeExtraction implements TraceIoExtraction {
-  constructor(private readonly sides: { input?: Extracted; output?: Extracted }) {
-  }
+  constructor(private readonly sides: { input?: Extracted; output?: Extracted }) {}
   extractRichIOFromSpan(_span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
     return this.sides[side]?.rich ?? null;
   }
@@ -31,8 +31,7 @@ class FakeExtraction implements TraceIoExtraction {
 
 /** Collects one reference per span so "did this span contribute?" is visible. */
 class FakeMediaReferences implements TraceMediaReferenceResolver {
-  constructor(private readonly found: TraceMediaReference[] = []) {
-  }
+  constructor(private readonly found: TraceMediaReference[] = []) {}
   collect(): TraceMediaReference[] {
     return this.found;
   }

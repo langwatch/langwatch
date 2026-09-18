@@ -1,4 +1,10 @@
-import { ATTR_KEYS, type TraceCanonicalisationService,type TraceSummaryData,type NormalizedSpan } from "@langwatch/trace-contract";
+import {
+  ATTR_KEYS,
+  type TraceCanonicalisationService,
+  type TraceSummaryData,
+  type NormalizedSpan,
+} from "@langwatch/trace-contract";
+
 import {
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,

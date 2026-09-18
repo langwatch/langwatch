@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext } from "react";
+
 import type { MediaPartData } from "../../model/transcript/types.ts";
 
 /** Host-owned widgets needed by transcript blocks at a browser boundary. */

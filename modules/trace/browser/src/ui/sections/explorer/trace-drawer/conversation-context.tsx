@@ -1,4 +1,5 @@
 import { Box, chakra, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { memo, type RefObject, useCallback, useMemo } from "react";
 import {
@@ -8,19 +9,19 @@ import {
   LuLanguages,
   LuMessageCircle,
 } from "react-icons/lu";
-import { RedactedInline } from "../../redacted-field.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
+import { getDrawerDensityTokens, useDensityStore } from "../../../../behavior/density.store.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { formatPreview } from "../../../../behavior/preview-formatter.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
 import type { ConversationTurn } from "../../../../model/explorer/conversation-turn.ts";
+import { RedactedInline } from "../../redacted-field.tsx";
 import { useConversationContext } from "../hooks/use-conversation-context.ts";
 import {
   type UseTextTranslationResult,
   useTextTranslation,
 } from "../hooks/use-text-translation.ts";
 import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation.ts";
-import { getDrawerDensityTokens, useDensityStore } from "../../../../behavior/density.store.ts";
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
-import { formatPreview } from "../../../../behavior/preview-formatter.ts";
 import { useDisplayRoleVisuals } from "./scenario-roles.tsx";
 
 interface ConversationContextProps {

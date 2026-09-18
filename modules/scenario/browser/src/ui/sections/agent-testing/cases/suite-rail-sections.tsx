@@ -6,15 +6,16 @@
 
 import { Icon, Skeleton, VStack } from "@chakra-ui/react";
 import { Folder, FolderCode, FolderPlus } from "lucide-react";
+
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import type { SuiteRailProps } from "./suite-rail.tsx";
 import {
   RailAddButton,
   RailItem,
   RailSectionHeading,
 } from "../../../elements/agent-testing/cases/suite-rail-item.tsx";
 import { SuiteRailMenu } from "./suite-rail-menu.tsx";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import type { SuiteRailProps } from "./suite-rail.tsx";
 
 /** What the section of the sets a code run writes into is called. */
 export const FROM_CODE_HEADING = "From Code";

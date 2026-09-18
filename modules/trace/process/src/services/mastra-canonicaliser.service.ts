@@ -1,6 +1,7 @@
 /** Maps Mastra span metadata, model-step I/O, and thread IDs to canonical keys. */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+
 import { recordValueType } from "../rules/canonical-extraction.rules.ts";
 import { asNumber } from "../rules/canonical-guard.rules.ts";
 import {
@@ -9,11 +10,8 @@ import {
   normalizeToMessages,
   stripSystemMessages,
 } from "../rules/canonical-message.rules.ts";
+import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 import { MastraValuesService } from "./mastra-value.service.ts";
-import type {
-  AttributeCanonicaliser,
-  ExtractorContext,
-} from "./canonical-attributes.service.ts";
 
 const mastraValuesService = MastraValuesService.create();
 

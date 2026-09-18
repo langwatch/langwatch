@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { useMemo } from "react";
+import type { RunParameterValues, ScenarioRunData } from "@langwatch/scenario-contract";
 import {
   computeGroupSummary,
   groupRunsByTargetKey,
@@ -12,16 +12,17 @@ import {
   targetKeyOfRun,
 } from "@langwatch/suite-browser/run-formatters";
 import {
-  type TargetIdentity,
-  useTargetIdentityMap,
-} from "../../../../behavior/use-target-name-map.ts";
-import type { RunParameterValues, ScenarioRunData } from "@langwatch/scenario-contract";
-import {
   differingParameterNames,
   targetLabels,
   targetParametersLabel,
   targetSortKey,
 } from "@langwatch/suite-contract";
+import { useMemo } from "react";
+
+import {
+  type TargetIdentity,
+  useTargetIdentityMap,
+} from "../../../../behavior/use-target-name-map.ts";
 import type { TargetKind } from "../../../../model/target-kind.ts";
 import { targetColor } from "../../../elements/agent-testing/shared/target-colors.ts";
 

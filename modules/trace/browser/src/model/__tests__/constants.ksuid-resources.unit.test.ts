@@ -4,6 +4,7 @@
  */
 import { generate } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
+
 import { KSUID_RESOURCES } from "../constants.ts";
 
 describe("KSUID resource patterns", () => {

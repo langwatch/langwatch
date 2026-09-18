@@ -1,8 +1,27 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annotation-contract";
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+import {
+  LLM_PARAMETER_MAP,
+  parsePromptTraceReference,
+  findPromptReferenceInAncestors,
+} from "@langwatch/prompt-contract";
 import { nowInstant } from "@langwatch/time";
-import type { Protections,TraceCanonicalisationService,TraceSummaryData,
+import type {
+  Protections,
+  TraceCanonicalisationService,
+  TraceSummaryData,
   NormalizedSpan,
   NormalizedSpanKind,
-  NormalizedStatusCode,Event,Span,Trace,ProjectableTrace,ProjectedAnnotation,
+  NormalizedStatusCode,
+  Event,
+  Span,
+  Trace,
+  ProjectableTrace,
+  ProjectedAnnotation,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
   PromptStudioSpanResult,
@@ -12,8 +31,18 @@ import type { Protections,TraceCanonicalisationService,TraceSummaryData,
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
-  TraceDateField } from "@langwatch/trace-contract";
+  TraceDateField,
+} from "@langwatch/trace-contract";
 import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
+import { getLangWatchTracer } from "langwatch";
+
+import type { ExtractedIO } from "#rules/trace-io-text.rules";
+import {
+  isTraceSpansBatchResolverContractError,
+  traceSpansBatchResolverCardinalityError,
+  traceSpansBatchResolverMisalignedError,
+} from "#rules/trace-spans-batch-resolver-contract-error.rules";
+
 import {
   mapClickHouseEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
@@ -21,34 +50,20 @@ import {
   EVALUATION_RUN_COLUMNS_WITH_INPUTS,
 } from "../../rules/trace-evaluation-mapping.rules.ts";
 import { mapEventAttrsToEvent } from "../../rules/trace-event-attribute-mapping.rules.ts";
-import { parseLLMSpanMessages } from "../../rules/trace-llm-span-messages.rules.ts";
-import type { ClickHouseClient } from "@clickhouse/client";
-import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annotation-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
-import { LLM_PARAMETER_MAP, parsePromptTraceReference, findPromptReferenceInAncestors } from "@langwatch/prompt-contract";
-import { getLangWatchTracer } from "langwatch";
-import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service.ts";
-import { TraceLegacyReadRepository } from "../trace-legacy-read.repository.ts";
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
-import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
-import type { ExtractedIO } from "#rules/trace-io-text.rules";
-import { TraceReadRedactionService } from "../../services/trace-read-redaction.service.ts";
+import { type EventSpanRow } from "../../rules/trace-event-attribute-mapping.rules.ts";
 import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { mapTraceSummaryToTrace } from "../../rules/trace-legacy-summary-mapping.rules.ts";
-import { type EventSpanRow } from "../../rules/trace-event-attribute-mapping.rules.ts";
+import { parseLLMSpanMessages } from "../../rules/trace-llm-span-messages.rules.ts";
+import type { BlobResolutionDeps } from "../../services/trace-legacy-read.service.ts";
+import { TraceOffloadResolutionBatchService } from "../../services/trace-offload-resolution-batch.service.ts";
 import {
   TraceOffloadResolutionService,
   type ResolvedTraceSpans,
 } from "../../services/trace-offload-resolution.service.ts";
-import { TraceOffloadResolutionBatchService } from "../../services/trace-offload-resolution-batch.service.ts";
-import type { BlobResolutionDeps } from "../../services/trace-legacy-read.service.ts";
-import {
-  isTraceSpansBatchResolverContractError,
-  traceSpansBatchResolverCardinalityError,
-  traceSpansBatchResolverMisalignedError,
-} from "#rules/trace-spans-batch-resolver-contract-error.rules";
+import { TraceReadRedactionService } from "../../services/trace-read-redaction.service.ts";
+import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service.ts";
+import { TraceLegacyReadRepository } from "../trace-legacy-read.repository.ts";
+import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
 
 /**
  * Callback injected from TraceService that resolves offloaded blob refs for

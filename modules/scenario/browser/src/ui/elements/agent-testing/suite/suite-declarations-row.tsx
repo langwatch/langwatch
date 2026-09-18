@@ -6,15 +6,16 @@
  */
 
 import { chakra, HStack, Icon, Text } from "@chakra-ui/react";
-import { Hash, ToggleLeft, Type } from "lucide-react";
 import type {
   EvaluatorAttachment,
   SuiteFieldDefinition,
   SuiteFieldType,
 } from "@langwatch/scenario-contract";
+import { Hash, ToggleLeft, Type } from "lucide-react";
+
+import { useProjectEvaluators } from "../../../../behavior/agent-testing/evaluators/use-project-evaluators.ts";
 import { missingInputsOf } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import { useProjectEvaluators } from "../../../../behavior/agent-testing/evaluators/use-project-evaluators.ts";
 import { EvaluatorAttachmentPill } from "./suite-evaluators-section.tsx";
 
 /** The icon each field type reads with. */
@@ -24,13 +25,7 @@ const FIELD_TYPE_ICONS: Record<SuiteFieldType, typeof Type> = {
   boolean: ToggleLeft,
 };
 
-function FieldChip({
-  field,
-  onClick,
-}: {
-  field: SuiteFieldDefinition;
-  onClick?: () => void;
-}) {
+function FieldChip({ field, onClick }: { field: SuiteFieldDefinition; onClick?: () => void }) {
   return (
     <chakra.button
       type="button"
@@ -103,11 +98,7 @@ function EvaluatorsGroup({
   );
 }
 
-export function SuiteDeclarationsRow({
-  fields,
-  evaluators,
-  onEdit,
-}: SuiteDeclarationsRowProps) {
+export function SuiteDeclarationsRow({ fields, evaluators, onEdit }: SuiteDeclarationsRowProps) {
   if (fields.length === 0 && evaluators.length === 0) return null;
 
   return (
@@ -130,9 +121,7 @@ export function SuiteDeclarationsRow({
           ))}
         </HStack>
       )}
-      {evaluators.length > 0 && (
-        <EvaluatorsGroup evaluators={evaluators} onEdit={onEdit} />
-      )}
+      {evaluators.length > 0 && <EvaluatorsGroup evaluators={evaluators} onEdit={onEdit} />}
     </HStack>
   );
 }
@@ -152,9 +141,7 @@ export function declarationsCountLine({
     parts.push(`${fieldCount} ${fieldCount === 1 ? "field" : "fields"}`);
   }
   if (evaluatorCount > 0) {
-    parts.push(
-      `${evaluatorCount} ${evaluatorCount === 1 ? "evaluator" : "evaluators"}`,
-    );
+    parts.push(`${evaluatorCount} ${evaluatorCount === 1 ? "evaluator" : "evaluators"}`);
   }
   return parts.join(" · ");
 }

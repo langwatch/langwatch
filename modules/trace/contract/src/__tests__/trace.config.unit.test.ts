@@ -1,9 +1,10 @@
-import { RuntimeConfig } from "@langwatch/config";
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { traceServerConfigDefinition } from "../trace.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "trace", definition: traceServerConfigDefinition, source }).value;
+import { traceConfig } from "../trace.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({ owners: [{ name: "trace", config: traceConfig }], environment }).trace;
 
 describe("trace server configuration", () => {
   describe("given the tokenizer timeout is written the way the tokenizer reads it", () => {

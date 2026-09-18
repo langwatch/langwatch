@@ -7,6 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ResultsTab } from "../../../../sections/agent-testing/results/results-tab.tsx";
 import { ScenarioWorkflowHostBridge } from "../../../../sections/workflow-host-bridge.tsx";
 

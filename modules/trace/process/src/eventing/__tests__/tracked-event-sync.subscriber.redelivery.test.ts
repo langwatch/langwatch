@@ -4,6 +4,7 @@
  * Event ID hashed from trace, span, event type, ordinal — deterministic, so redelivery repeats.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { TrackedEventSync } from "../tracked-event-sync.subscriber.ts";
 import {
   createContext,

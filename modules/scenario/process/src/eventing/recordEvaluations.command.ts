@@ -1,8 +1,13 @@
 import { createHash } from "node:crypto";
-import { createLogger } from "@langwatch/observability";
-import { ValidationError,createTenantId,defineCommandSchema,EventUtils } from "@langwatch/eventing";
+
+import {
+  ValidationError,
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "@langwatch/eventing";
 import type { Command, CommandHandler } from "@langwatch/eventing";
-import { SimulationRunStateFoldProjection } from "./simulation-run-state.projection.ts";
+import { createLogger } from "@langwatch/observability";
 import {
   type GatedVerdict,
   gatedStatus,
@@ -23,9 +28,9 @@ import {
   isSimulationRunQueuedEvent,
 } from "@langwatch/scenario-contract";
 
-const logger = createLogger(
-  "langwatch:simulation-processing:record-evaluations",
-);
+import { SimulationRunStateFoldProjection } from "./simulation-run-state.projection.ts";
+
+const logger = createLogger("langwatch:simulation-processing:record-evaluations");
 
 export interface RecordEvaluationsDeps {
   /**
@@ -50,13 +55,8 @@ const SCHEMA = defineCommandSchema(
  * it so a retry of the same results records one event, while a different
  * set (the evaluators ran again) records a new one that replaces the first.
  */
-export function evaluationsFingerprint(
-  evaluations: ScenarioEvaluationResult[],
-): string {
-  return createHash("sha256")
-    .update(JSON.stringify(evaluations))
-    .digest("hex")
-    .slice(0, 16);
+export function evaluationsFingerprint(evaluations: ScenarioEvaluationResult[]): string {
+  return createHash("sha256").update(JSON.stringify(evaluations)).digest("hex").slice(0, 16);
 }
 
 /**
@@ -106,12 +106,8 @@ function derivePriorGateState(params: {
     explicitStatus: finished.data.status,
     verdict: judgeVerdict,
   });
-  const previousVerdict = lastEvaluated
-    ? lastEvaluated.data.verdict
-    : judgeVerdict;
-  const previousStatus = lastEvaluated
-    ? (lastEvaluated.data.status ?? judgeStatus)
-    : judgeStatus;
+  const previousVerdict = lastEvaluated ? lastEvaluated.data.verdict : judgeVerdict;
+  const previousStatus = lastEvaluated ? (lastEvaluated.data.status ?? judgeStatus) : judgeStatus;
 
   return { judgeVerdict, judgeStatus, previousVerdict, previousStatus };
 }
@@ -144,8 +140,7 @@ function buildEvaluatedEventData(params: {
 
   const scenarioId = finished.data.scenarioId ?? queued?.data.scenarioId;
   const batchRunId = finished.data.batchRunId ?? queued?.data.batchRunId;
-  const scenarioSetId =
-    finished.data.scenarioSetId ?? queued?.data.scenarioSetId;
+  const scenarioSetId = finished.data.scenarioSetId ?? queued?.data.scenarioSetId;
 
   return {
     scenarioRunId,
@@ -164,13 +159,10 @@ function buildEvaluatedEventData(params: {
  * Handler that records evaluator results on finished runs: emits RunEvaluated
  * with results/verdict/status from prior events (not fold); rejects unfinished runs.
  */
-export class RecordEvaluationsCommand
-  implements
-    CommandHandler<
-      Command<RecordEvaluationsCommandData>,
-      SimulationProcessingEvent
-    >
-{
+export class RecordEvaluationsCommand implements CommandHandler<
+  Command<RecordEvaluationsCommandData>,
+  SimulationProcessingEvent
+> {
   static readonly schema = SCHEMA;
 
   constructor(private readonly deps: RecordEvaluationsDeps) {}
@@ -189,12 +181,12 @@ export class RecordEvaluationsCommand
 
     const finished = getFinishedEventOrThrow({ priorEvents, scenarioRunId });
     const queued = priorEvents.find(isSimulationRunQueuedEvent);
-    const lastEvaluated = priorEvents
-      .filter(isSimulationRunEvaluatedEvent)
-      .at(-1);
+    const lastEvaluated = priorEvents.filter(isSimulationRunEvaluatedEvent).at(-1);
 
-    const { judgeVerdict, judgeStatus, previousVerdict, previousStatus } =
-      derivePriorGateState({ finished, lastEvaluated });
+    const { judgeVerdict, judgeStatus, previousVerdict, previousStatus } = derivePriorGateState({
+      finished,
+      lastEvaluated,
+    });
 
     const verdict = gatedVerdict({ evaluations, judgeVerdict });
     const status = gatedStatus({ status: judgeStatus, verdict });

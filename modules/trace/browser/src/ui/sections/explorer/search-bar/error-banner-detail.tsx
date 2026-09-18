@@ -1,7 +1,7 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
-import type React from "react";
 import { safeProse } from "@langwatch/handled-error/read-handled-error";
 import type { AiActionError } from "@langwatch/trace-contract";
+import type React from "react";
 
 /**
  * Renders a labelled key/value row inside the expandable error banner.

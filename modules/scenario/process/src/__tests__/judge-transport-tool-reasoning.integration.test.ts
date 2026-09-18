@@ -4,11 +4,12 @@
  * reasoning disabled retries with it off; unrelated rejections propagate.
  */
 
+import type { LiteLLMParams } from "@langwatch/scenario-contract";
+import { createJudgeModelFromParams, createModelFromParams } from "@langwatch/scenario-process";
 import { APICallError, generateText, tool } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { createJudgeModelFromParams, createModelFromParams } from "@langwatch/scenario-process";
-import type { LiteLLMParams } from "@langwatch/scenario-contract";
+
 import {
   type StubEndpoint,
   startEndpoint,

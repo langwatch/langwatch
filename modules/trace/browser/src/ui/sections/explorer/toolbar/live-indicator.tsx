@@ -1,13 +1,14 @@
 import { Box, Flex, IconButton } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { nowInstant } from "@langwatch/time";
+import type { ConnectionState } from "@langwatch/trace-browser-kit/sse-subscription";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { ConnectionState } from "@langwatch/trace-browser-kit/sse-subscription";
-import { useTraceListRefresh } from "../hooks/use-trace-list-refresh.ts";
+
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { type LiveUpdatesMode, useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
-import { nowInstant } from "@langwatch/time";
+import { useTraceListRefresh } from "../hooks/use-trace-list-refresh.ts";
 
 const SSE_STATE_STYLE: Record<ConnectionState, { dotColor: string; pulse: boolean }> = {
   connected: { dotColor: "green.solid", pulse: true },

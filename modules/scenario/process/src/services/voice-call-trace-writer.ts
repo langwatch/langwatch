@@ -7,16 +7,13 @@
 import { createHash } from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
-
 import type {
   CallRecord,
   CallTurn,
   VoiceSessionInfrastructure,
 } from "@langwatch/scenario-contract";
-import {
-  DEFAULT_PII_REDACTION_LEVEL,
-  type RecordSpanCommandData,
-} from "@langwatch/trace-contract";
+import { DEFAULT_PII_REDACTION_LEVEL, type RecordSpanCommandData } from "@langwatch/trace-contract";
+
 import { HUMAN_CALLER_KIND } from "./voice-run-writer.ts";
 
 /**
@@ -75,9 +72,7 @@ function applyTurnContent(exchange: VoiceExchange, turn: CallTurn): void {
     return;
   }
   exchange.agentText =
-    exchange.agentText === undefined
-      ? turn.text
-      : `${exchange.agentText}\n${turn.text}`;
+    exchange.agentText === undefined ? turn.text : `${exchange.agentText}\n${turn.text}`;
 }
 
 function applyTurnTiming(exchange: VoiceExchange, turn: CallTurn): void {
@@ -98,8 +93,7 @@ export function groupTurnsIntoExchanges(turns: CallTurn[]): VoiceExchange[] {
   const exchanges: VoiceExchange[] = [];
   let open: VoiceExchange | undefined;
   turns.forEach((turn, index) => {
-    const current =
-      isCallerTurn(turn) || open === undefined ? openExchange(exchanges) : open;
+    const current = isCallerTurn(turn) || open === undefined ? openExchange(exchanges) : open;
     open = current;
     current.turnIndices.push(index);
     applyTurnContent(current, turn);
@@ -120,8 +114,7 @@ export function voiceCallTraceIds({
   conversationId: string;
   exchangeIndex: number;
 }): { traceId: string; spanId: string } {
-  const sha = (input: string) =>
-    createHash("sha256").update(input).digest("hex");
+  const sha = (input: string) => createHash("sha256").update(input).digest("hex");
   return {
     traceId: sha(`${conversationId}:${exchangeIndex}`).slice(0, 32),
     spanId: sha(`${conversationId}:${exchangeIndex}:root`).slice(0, 16),
@@ -167,9 +160,7 @@ function exchangeAttributes({
     attrs.push({
       key: "gen_ai.input.messages",
       value: {
-        stringValue: JSON.stringify([
-          { role: "user", content: exchange.callerText },
-        ]),
+        stringValue: JSON.stringify([{ role: "user", content: exchange.callerText }]),
       },
     });
   }
@@ -177,9 +168,7 @@ function exchangeAttributes({
     attrs.push({
       key: "gen_ai.output.messages",
       value: {
-        stringValue: JSON.stringify([
-          { role: "assistant", content: exchange.agentText },
-        ]),
+        stringValue: JSON.stringify([{ role: "assistant", content: exchange.agentText }]),
       },
     });
   }
@@ -199,9 +188,7 @@ function exchangeAttributes({
 /** Whether every turn reports both a start and end offset, so the measured
  *  windows can be trusted for the whole call. */
 function everyTurnHasOffsets(turns: CallTurn[]): boolean {
-  return turns.every(
-    (turn) => turn.startMs !== undefined && turn.endMs !== undefined,
-  );
+  return turns.every((turn) => turn.startMs !== undefined && turn.endMs !== undefined);
 }
 
 /** The exchange's [start, end] in epoch ms. When every turn in the call reports
@@ -220,18 +207,13 @@ function exchangeWindowMs({
   record: CallRecord;
   useMeasuredOffsets: boolean;
 }): { startMs: number; endMs: number } {
-  if (
-    useMeasuredOffsets &&
-    exchange.startMs !== undefined &&
-    exchange.endMs !== undefined
-  ) {
+  if (useMeasuredOffsets && exchange.startMs !== undefined && exchange.endMs !== undefined) {
     return {
       startMs: record.startedAt + exchange.startMs,
       endMs: record.startedAt + exchange.endMs,
     };
   }
-  const slice =
-    (record.endedAt - record.startedAt) / Math.max(exchangeCount, 1);
+  const slice = (record.endedAt - record.startedAt) / Math.max(exchangeCount, 1);
   const startMs = record.startedAt + slice * exchange.index;
   return { startMs, endMs: startMs + slice };
 }
@@ -360,8 +342,7 @@ export function createVoiceCallTraceRecorder(
         conversationId: record.conversationId,
         exchangeIndex: exchange.index,
       });
-      for (const turnIndex of exchange.turnIndices)
-        turnTraceIds[turnIndex] = traceId;
+      for (const turnIndex of exchange.turnIndices) turnTraceIds[turnIndex] = traceId;
 
       const { startMs, endMs } = exchangeWindowMs({
         exchange,

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { buildDisplayInput, type Span } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { capturedInputForEditing } from "../span-input-seed.ts";
 
 const MESSAGES = [

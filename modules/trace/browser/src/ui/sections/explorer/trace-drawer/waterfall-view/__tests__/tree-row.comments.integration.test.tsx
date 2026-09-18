@@ -2,12 +2,13 @@
 // read-only view.
 // @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 const mocks = vi.hoisted(() => ({
   canManage: true,

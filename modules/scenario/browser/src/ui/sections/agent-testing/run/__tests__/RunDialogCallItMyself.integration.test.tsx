@@ -6,10 +6,11 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+
 import { RunDialogFooter } from "../run-dialog-footer.tsx";
 import type { RunDialogController } from "../use-run-dialog-submit.ts";
 
@@ -48,9 +49,7 @@ describe("RunDialog footer", () => {
     it("shows both Run and Call it myself", () => {
       renderFooter({ onCallItMyself: vi.fn() });
       expect(screen.getByTestId("run-dialog-run")).toBeInTheDocument();
-      expect(
-        screen.getByTestId("run-dialog-call-it-myself"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("run-dialog-call-it-myself")).toBeInTheDocument();
     });
   });
 
@@ -59,9 +58,7 @@ describe("RunDialog footer", () => {
     it("shows Run alone and no Call it myself", () => {
       renderFooter();
       expect(screen.getByTestId("run-dialog-run")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("run-dialog-call-it-myself"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-dialog-call-it-myself")).not.toBeInTheDocument();
     });
   });
 });

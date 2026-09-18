@@ -5,9 +5,9 @@
  * OTLP attributes, timestamp fallback, recordSpan best-effort.
  */
 
+import type { CallRecord, CallTurn } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CallRecord, CallTurn } from "@langwatch/scenario-contract";
 import {
   createVoiceCallTraceRecorder,
   groupTurnsIntoExchanges,

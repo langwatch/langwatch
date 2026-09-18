@@ -4,6 +4,7 @@
  * @see specs/features/suites/external-sdk-ci-sets-in-sidebar.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   EXTERNAL_SET_PREFIX,
   extractExternalSetId,

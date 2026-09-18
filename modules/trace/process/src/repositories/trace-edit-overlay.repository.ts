@@ -1,5 +1,5 @@
-import type { TraceEditOverlayAuthor, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import type { Instant } from "@langwatch/time";
+import type { TraceEditOverlayAuthor, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 /**
  * One stored reviewer correction with attribution lines a trace view renders.

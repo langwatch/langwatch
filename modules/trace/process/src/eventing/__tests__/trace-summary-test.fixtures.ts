@@ -1,11 +1,17 @@
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+import type {
+  NormalizedSpan,
+  OtlpSpan,
+  SpanReceivedEvent,
+  TraceSummaryData,
+} from "@langwatch/trace-contract";
+
+import { ModelCatalogTraceModelCostAdapter } from "../../services/model-catalog.trace-model-cost.service.ts";
+import { TraceProjectionRuntimeService } from "../../services/projection/trace-projection-runtime.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceIoExtractionAdapter } from "../../services/trace-io-extraction-adapter.service.ts";
 import { TraceMediaReferenceAdapter } from "../../services/trace-media-reference.service.ts";
-import { ModelCatalogTraceModelCostAdapter } from "../../services/model-catalog.trace-model-cost.service.ts";
 import { TraceSpanNormalizationAdapter } from "../../services/trace-span-normalization-adapter.service.ts";
-import { TraceProjectionRuntimeService } from "../../services/projection/trace-projection-runtime.service.ts";
-import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
-import type { NormalizedSpan, OtlpSpan, SpanReceivedEvent,TraceSummaryData } from "@langwatch/trace-contract";
 
 /**
  * The deterministic, no-I/O runtime the trace-summary fold projection folds

@@ -1,5 +1,4 @@
 import { Box, VStack } from "@chakra-ui/react";
-import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
 import {
   AnnotateBody,
   FormFooter,
@@ -7,7 +6,9 @@ import {
   SuggestBody,
   type AnnotationFormState,
 } from "@langwatch/annotation-browser/annotation-form";
+import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
 import { useEffect } from "react";
+
 import {
   type AnnotationDraft,
   useAnnotationDraftStore,

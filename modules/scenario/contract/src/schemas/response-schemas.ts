@@ -3,6 +3,7 @@
  * Defines the structure of API responses for scenario runs, batches, and events.
  */
 import { z } from "zod";
+
 import { ScenarioRunStatus } from "../scenario-run.ts";
 import {
   batchRunIdSchema,

@@ -1,6 +1,7 @@
 import { Box, Button, chakra, HoverCard, HStack, Portal, Text } from "@chakra-ui/react";
-import { type ReactNode, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { type ReactNode, useState } from "react";
+
 import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
 
 /**

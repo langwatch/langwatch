@@ -3,12 +3,13 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
+
 import type { TimeRange } from "../../../../behavior/filter.store.ts";
-import type { LensConfig } from "../../../../behavior/view.store.ts";
-import type { BarStateOverrides, FragmentState } from "../../../../model/url-state.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { getPresetById } from "../../../../behavior/time-range-presets.ts";
+import type { LensConfig } from "../../../../behavior/view.store.ts";
 import { getPersistedActiveLensId, useViewStore } from "../../../../behavior/view.store.ts";
+import type { BarStateOverrides, FragmentState } from "../../../../model/url-state.ts";
 import {
   buildFragment,
   computeOverrides,

@@ -3,6 +3,7 @@
  * Queue names must have Redis Cluster hash tags for CROSSSLOT avoidance.
  */
 import { describe, expect, it } from "vitest";
+
 import { SCENARIO_QUEUE } from "../scenario-execution.constants.ts";
 
 /**

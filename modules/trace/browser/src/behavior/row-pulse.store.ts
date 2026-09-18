@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import { nowInstant } from "@langwatch/time";
+import { create } from "zustand";
 
 /**
  * How long a pulse animation lasts. After this the traceId is evicted

@@ -4,7 +4,11 @@
  * tests follow it wherever it goes.
  */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,capPayloadString } from "../../rules/trace-payload-cap.rules.ts";
+
+import {
+  DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+  capPayloadString,
+} from "../../rules/trace-payload-cap.rules.ts";
 
 const MARKER = /…\[langwatch: truncated.*, \d+ bytes total\]$/u;
 

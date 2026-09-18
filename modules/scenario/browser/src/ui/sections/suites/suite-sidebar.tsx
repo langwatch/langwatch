@@ -14,6 +14,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
+import {
+  getPassRateGradientColor,
+  PassRateCircle,
+} from "@langwatch/design-system/pass-rate-indicator";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
 import {
   FlaskConical,
   List,
@@ -25,18 +34,10 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import {
-  getPassRateGradientColor,
-  PassRateCircle,
-} from "@langwatch/design-system/pass-rate-indicator";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { SimulationSuite } from "../../../model/prisma-types.ts";
-import { useNow } from "../../../behavior/use-now.ts";
-import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
-import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
-import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
-import { SearchInput } from "@langwatch/design-system/search-input";
+
 import { ALL_RUNS_ID, toExternalSetSelection } from "../../../behavior/suites/use-suite-routing.ts";
+import { useNow } from "../../../behavior/use-now.ts";
+import type { SimulationSuite } from "../../../model/prisma-types.ts";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 

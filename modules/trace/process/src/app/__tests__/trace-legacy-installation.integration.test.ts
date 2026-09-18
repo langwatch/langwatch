@@ -4,8 +4,8 @@
  * all required members are read and refusals answer correctly.
  */
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
 import { createRestRuntime } from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -14,12 +14,10 @@ import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import { TraceLegacyCredentialService } from "../../services/trace-legacy-credential.service.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
+import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
-import type { TraceLegacyRead } from "../trace.members.ts";
-import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
@@ -28,6 +26,8 @@ import {
   type TracesV2SessionGroupsReader,
   type TracesV2SpanReader,
 } from "../trace.app.ts";
+import type { TraceLegacyRead } from "../trace.members.ts";
+import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 
 const PROJECT = {
   id: "project-1",

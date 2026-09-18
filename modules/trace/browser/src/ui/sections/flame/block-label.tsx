@@ -1,5 +1,5 @@
-import { formatDuration } from "../../../model/display-formatters.ts";
 import { formatPercent } from "../../../behavior/flame/tree.ts";
+import { formatDuration } from "../../../model/display-formatters.ts";
 
 export function BlockLabel({
   name,

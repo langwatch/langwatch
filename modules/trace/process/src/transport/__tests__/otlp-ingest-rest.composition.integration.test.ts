@@ -1,11 +1,11 @@
+import { AnnotationApi } from "@langwatch/annotation-contract";
+import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
  * `POST /api/otel/v1/{...}` against the COMPOSITION-built app and
  * MODULE-declared transports — sibling of the collector composition test.
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -13,23 +13,23 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/kernel";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/kernel";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it } from "vitest";
 
-import { TraceApp } from "../../app/trace.app.ts";
 import { composeTraceAppDependencies } from "../../app/trace-read.composition.ts";
+import { TraceApp } from "../../app/trace.app.ts";
 import type { TraceProcessingCommands } from "../../app/trace.members.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { NullTraceSpanDedupAdapter } from "../../services/trace-span-dedup.service.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { NullTraceSpanDedupAdapter } from "../../services/trace-span-dedup.service.ts";
 import { traceServer } from "../../trace.server.ts";
 import { OtlpIngestApi, otlpIngestRest } from "../otlp-ingest.rest.ts";
 

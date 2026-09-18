@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { scenarioEvaluationResultSchema } from "./scenario-evaluation-result.ts";
 
 /** Values written by the Simulation event pipeline. */

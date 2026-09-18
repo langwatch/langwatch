@@ -12,32 +12,33 @@ import {
   useRef,
   useState,
 } from "react";
-import { PIIRedactionAlert } from "../../../../blocks/pii-redaction-notice.tsx";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
-import { useConversationAnnotations } from "../../hooks/use-conversation-annotations.ts";
-import { useConversationTurnEvents } from "../../hooks/use-conversation-turn-events.ts";
-import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
+
+import { ConversationExpandContext } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
 import {
   isTurnRailDraft,
   RenderedMarkdown,
   useAnnotationDraftStore,
   useCopyToClipboard,
 } from "../../../../../index.ts";
+import { FormatSelect } from "../../../../blocks/explorer/trace-drawer/format-select.tsx";
+import { PIIRedactionAlert } from "../../../../blocks/pii-redaction-notice.tsx";
+import {
+  FOCUS_SCROLL_REST_MS,
+  useFocusedTurnBlink,
+  useScrollFocusedTurnIntoView,
+} from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn.tsx";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import { useConversationAnnotations } from "../../hooks/use-conversation-annotations.ts";
+import { useConversationTurnEvents } from "../../hooks/use-conversation-turn-events.ts";
+import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
 import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation.ts";
 import type { TraceListItem } from "../../types/trace.ts";
-import { FormatSelect } from "../../../../blocks/explorer/trace-drawer/format-select.tsx";
 import {
   extractReadableText,
   extractReasoningText,
   extractSystemText,
 } from "../transcript/index.ts";
 import { AnnotatedTurnRow } from "./annotated-turn-row.tsx";
-import { ConversationExpandContext } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
-import {
-  FOCUS_SCROLL_REST_MS,
-  useFocusedTurnBlink,
-  useScrollFocusedTurnIntoView,
-} from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn.tsx";
 import { SystemPromptBanner } from "./system-prompt-banner.tsx";
 import { EMPTY_TURNS, type Mode, type ParsedTurn, type TurnLayout } from "./types.ts";
 import {

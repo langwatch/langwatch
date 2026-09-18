@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-import { getSuiteSetId } from "@langwatch/suite-contract";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
+import { getSuiteSetId } from "@langwatch/suite-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   createScenarioEvaluationsSubscriber,
   type ScenarioEvaluationsSubscriberDeps,
@@ -29,9 +30,7 @@ const CONTEXT = {
   state: undefined,
 };
 
-function finishedEvent(
-  data: Record<string, unknown> = {},
-): SimulationProcessingEvent {
+function finishedEvent(data: Record<string, unknown> = {}): SimulationProcessingEvent {
   return {
     id: "evt-1",
     aggregateId: "run-1",
@@ -219,10 +218,7 @@ describe("scenario evaluations subscriber", () => {
     it("queues nothing", async () => {
       const deps = makeDeps([]);
 
-      await createScenarioEvaluationsSubscriber(deps).handler(
-        finishedEvent(),
-        CONTEXT,
-      );
+      await createScenarioEvaluationsSubscriber(deps).handler(finishedEvent(), CONTEXT);
 
       expect(deps.enqueue).not.toHaveBeenCalled();
     });

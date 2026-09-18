@@ -1,8 +1,9 @@
 import { Box, HStack, type SystemStyleObject, Text } from "@chakra-ui/react";
-import type React from "react";
 import type { LangyContextTargetProps } from "@langwatch/langy-browser/surfaces/langy-context";
-import type { TraceStatus } from "../types/trace.ts";
+import type React from "react";
+
 import { Tbody } from "../../../elements/explorer/trace-table/table-primitives.tsx";
+import type { TraceStatus } from "../types/trace.ts";
 
 type Color = NonNullable<SystemStyleObject["color"]>;
 

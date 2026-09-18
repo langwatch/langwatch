@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+
 import { useAllPromptsForProject } from "../use-all-prompts-for-project.ts";
 
 const { useQueryMock } = vi.hoisted(() => ({

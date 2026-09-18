@@ -1,11 +1,12 @@
-import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { type ScenarioChipData, useScenarioChipData } from "../trace-drawer/scenario-chip.tsx";
-import type { SdkInfo } from "../../../../model/sdk-info.ts";
+
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useFocusSectionStore } from "../../../../behavior/focus-section.store.ts";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
+import type { SdkInfo } from "../../../../model/sdk-info.ts";
 import { parseSdkInfo } from "../../../../model/sdk-info.ts";
+import { type ScenarioChipData, useScenarioChipData } from "../trace-drawer/scenario-chip.tsx";
 import { usePromptByHandle } from "./use-prompt-by-handle.ts";
 import { type RichEval, useTraceEvaluations } from "./use-trace-evaluations.ts";
 

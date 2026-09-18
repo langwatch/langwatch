@@ -4,24 +4,20 @@
  * @see specs/suites/run-notes.feature
  */
 
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { declaredDefaults } from "@langwatch/suite-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TargetValue } from "../../../../model/scenario-target.ts";
+
+import { useSession } from "../../../../behavior/auth-session.ts";
+import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
 import { useFilteredAgents } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import {
   unionParameterDefinitions,
   type DeclaredParameter,
 } from "../../../../behavior/suites/use-run-suite.ts";
-import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import { api } from "../../../../behavior/scenario-api.ts";
-import type { CustomizeChip } from "../../../elements/agent-testing/shared/customize-chips.tsx";
-import type { PromptEntry } from "./prompt-picker.tsx";
-import { declaredDefaults } from "@langwatch/suite-contract";
-import { useSession } from "../../../../behavior/auth-session.ts";
-import { applyConfigurationTo } from "./apply-configuration.ts";
-import { type CompareRow, compareRowParameters, type ParameterDefaults } from "./compare-rows.ts";
 import {
   formatParameterLine,
   formatStoredParameterLine,
@@ -37,11 +33,16 @@ import {
   toRowsRunParameters,
   toStorableRowParameters,
 } from "../../../../model/agent-testing/run/parameter-rows.ts";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
+import type { CustomizeChip } from "../../../elements/agent-testing/shared/customize-chips.tsx";
+import { applyConfigurationTo } from "./apply-configuration.ts";
+import { type CompareRow, compareRowParameters, type ParameterDefaults } from "./compare-rows.ts";
 import type { ParameterFieldError } from "./parameter-suggestions.ts";
-import { type ScopeScenario, scenariosInScope } from "./run-scope-section.tsx";
-import type { RunDialogAgent } from "./run-target-picker.tsx";
+import type { PromptEntry } from "./prompt-picker.tsx";
 import { normaliseRunScope, type RunScope } from "./run-configuration.ts";
 import type { RunDialogMode, RunDialogSubject, RunTarget } from "./run-dialog-types.ts";
+import { type ScopeScenario, scenariosInScope } from "./run-scope-section.tsx";
+import type { RunDialogAgent } from "./run-target-picker.tsx";
 import {
   lineWithoutUndeclared,
   undeclaredNamesOnLine,

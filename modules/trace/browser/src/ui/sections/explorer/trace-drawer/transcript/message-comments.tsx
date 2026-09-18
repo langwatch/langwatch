@@ -1,9 +1,10 @@
 import { Box, HStack } from "@chakra-ui/react";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
+
+import { TranscriptRenderProvider } from "../../../../elements/transcript-render-ports.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import { type TraceAnchor, useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
 import { AnchorCommentButton } from "../anchored-comments/anchor-comment-button.tsx";
-import { TranscriptRenderProvider } from "../../../../elements/transcript-render-ports.tsx";
 
 interface MessageCommentScopeValue {
   /** The trace a comment left on a message in this transcript is about. */

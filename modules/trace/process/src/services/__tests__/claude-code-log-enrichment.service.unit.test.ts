@@ -1,13 +1,15 @@
+import type { Span } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+
+import type { StoredLogRecordRow } from "../../repositories/log-record-storage.repository.ts";
 /**
  * Tests Claude Code log enrichment: joins llm_request spans (tokens + request_id) with
  * message content from OTLP log records. Tests gate, join, and best-effort degradation.
  */
 import { ClaudeCodeLogEnrichmentService } from "../claude-code-log-enrichment.service.ts";
-import { describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
-import type { Span } from "@langwatch/trace-contract";
 import type { LogRecordStorageService } from "../trace-log-record-read.service.ts";
-import type { StoredLogRecordRow } from "../../repositories/log-record-storage.repository.ts";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";

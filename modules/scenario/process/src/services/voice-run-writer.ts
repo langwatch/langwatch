@@ -19,15 +19,9 @@ import {
  */
 export interface VoiceCallRunWriterCollaborators {
   agents: {
-    findById(input: {
-      projectId: string;
-      id: string;
-    }): Promise<{ id: string } | null>;
+    findById(input: { projectId: string; id: string }): Promise<{ id: string } | null>;
   };
-  simulations: Pick<
-    SimulationService,
-    "startRun" | "messageSnapshot" | "finishRun"
-  >;
+  simulations: Pick<SimulationService, "startRun" | "messageSnapshot" | "finishRun">;
 }
 
 /** How the run records who spoke as the caller: a person, not a simulator. */

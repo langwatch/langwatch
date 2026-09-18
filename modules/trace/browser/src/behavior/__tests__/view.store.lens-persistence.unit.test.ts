@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ACTIVE_LENS_KEY } from "../view.store.ts";
 
 /**

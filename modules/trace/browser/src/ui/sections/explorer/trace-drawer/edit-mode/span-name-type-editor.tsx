@@ -1,6 +1,7 @@
 import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useMemo } from "react";
 import { type SpanTypes, spanTypesSchema } from "@langwatch/trace-contract";
+import { useCallback, useMemo } from "react";
+
 import {
   selectSpanEditBaseline,
   useTraceEditStore,

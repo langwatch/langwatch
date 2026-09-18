@@ -1,5 +1,6 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+
 import type { CellDef } from "../../types.ts";
 import { dotColorForIndex, type TraceGroup } from "./types.ts";
 

@@ -31,6 +31,7 @@ import posthog from "posthog-js";
 // that carries it as a plain function property instead.
 const mockedPosthog = posthog as unknown as { capture: ReturnType<typeof vi.fn> };
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
+
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference.ts";
 import { NewSimulationsCallout } from "../../../sections/suites/new-simulations-callout.tsx";
 

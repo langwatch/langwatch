@@ -52,13 +52,13 @@ vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
 });
 vi.stubGlobal("cancelAnimationFrame", () => undefined);
 
+import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 import {
   type AnchorRect,
   isAnchorParkedOffscreen,
   isAnchorSettled,
   SpotlightOverlay,
 } from "../spotlight-overlay.tsx";
-import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

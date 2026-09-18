@@ -1,4 +1,12 @@
-import type { TraceCanonicalisationService,TraceSummaryData,Event,Span,Trace,TraceMetadata } from "@langwatch/trace-contract";
+import type {
+  TraceCanonicalisationService,
+  TraceSummaryData,
+  Event,
+  Span,
+  Trace,
+  TraceMetadata,
+} from "@langwatch/trace-contract";
+
 import {
   addOtelLogRecordCountAlias,
   createError,

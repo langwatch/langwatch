@@ -4,9 +4,9 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
 
 import { contentAttrKeys, logContentKeys } from "@langwatch/coding-agent-contract";
+import { describe, expect, it } from "vitest";
 
 function categoryOf(eventName: string, key: string): string | undefined {
   return logContentKeys(eventName).find((entry) => entry.key === key)?.category;

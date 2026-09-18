@@ -1,8 +1,9 @@
-import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.service.ts";
-import { describe, expect, it } from "vitest";
-import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { ClickHouseEventRow } from "@langwatch/eventing/server";
 import { rowToEvent } from "@langwatch/eventing/server";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.service.ts";
 
 function makeRow(overrides: Partial<ClickHouseEventRow>): ClickHouseEventRow {
   return {

@@ -4,8 +4,8 @@
  * cached facet's identity.
  */
 
-import type { CategoricalFacetResult } from "@langwatch/trace-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
+import type { CategoricalFacetResult } from "@langwatch/trace-contract";
 
 export class TraceTopicNamingService {
   private constructor(private readonly topicService: TopicApi) {}

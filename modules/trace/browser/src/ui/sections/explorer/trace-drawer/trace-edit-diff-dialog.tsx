@@ -1,16 +1,17 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
-import { Dialog } from "../../dialog.tsx";
-import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { applyOverlayToSpansFull, useSpansFullCanonical } from "../hooks/use-spans-full.ts";
-import { useTraceHeaderCanonical } from "../hooks/use-trace-header.ts";
-import { SegmentedToggle } from "../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
 import {
   computeLineDiff,
   type DiffLine,
   diffStat,
 } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { useMemo, useState } from "react";
+
+import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
+import { SegmentedToggle } from "../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
+import { Dialog } from "../../dialog.tsx";
+import { applyOverlayToSpansFull, useSpansFullCanonical } from "../hooks/use-spans-full.ts";
+import { useTraceHeaderCanonical } from "../hooks/use-trace-header.ts";
 
 type DiffTab = "trace" | "spans";
 

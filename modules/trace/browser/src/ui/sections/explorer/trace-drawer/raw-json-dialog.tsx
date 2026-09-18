@@ -1,13 +1,14 @@
 import { Box, Button, HStack, Icon, Input, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
-import { LuCheck, LuCopy, LuMinus, LuSearch, LuWrapText, LuX } from "react-icons/lu";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { Dialog } from "../../dialog.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceHeader } from "@langwatch/trace-contract";
+import { useEffect, useMemo, useState } from "react";
+import { LuCheck, LuCopy, LuMinus, LuSearch, LuWrapText, LuX } from "react-icons/lu";
+
 import { ShikiCodeBlock, useCopyToClipboard } from "../../../../index.ts";
-import { useSpansFull } from "../hooks/use-spans-full.ts";
 import { SegmentedToggle } from "../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
+import { Dialog } from "../../dialog.tsx";
+import { useSpansFull } from "../hooks/use-spans-full.ts";
 
 type RawTab = "trace" | "spans";
 

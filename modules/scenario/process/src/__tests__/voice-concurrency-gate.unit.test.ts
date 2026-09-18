@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { VoiceConcurrencyGate } from "../voice-concurrency-gate";
 
 describe("VoiceConcurrencyGate", () => {

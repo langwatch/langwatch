@@ -1,7 +1,8 @@
 import type React from "react";
-import type { TraceListItem } from "../../../../types/trace.ts";
+
 import { formatISOTimestamp } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";
 import { TimeHoverCard } from "./time-hover-card.tsx";
 

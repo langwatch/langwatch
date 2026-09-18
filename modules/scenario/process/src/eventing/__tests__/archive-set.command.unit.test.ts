@@ -4,13 +4,15 @@
  */
 
 import type { TenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
-import { ArchiveSetCommand } from "../simulation-processing.commands.ts";
 import {
   type SimulationProcessingEvent,
   SimulationSetArchivedEventSchema,
-  simulationSetArchivedEventDataSchema,isSimulationSetArchivedEvent
+  simulationSetArchivedEventDataSchema,
+  isSimulationSetArchivedEvent,
 } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
+import { ArchiveSetCommand } from "../simulation-processing.commands.ts";
 
 function makeArchiveSetCommand(overrides?: {
   tenantId?: string;

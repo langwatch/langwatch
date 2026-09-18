@@ -4,11 +4,12 @@
  * @see specs/features/scenarios/run-view-side-by-side-layout.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
-import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 
 const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());

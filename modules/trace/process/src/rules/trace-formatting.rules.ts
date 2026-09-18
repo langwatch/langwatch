@@ -1,5 +1,5 @@
-import type { LLMModeTrace, Span, Trace } from "@langwatch/trace-contract";
 import { format, formatDistanceToNow, nowInstant } from "@langwatch/time";
+import type { LLMModeTrace, Span, Trace } from "@langwatch/trace-contract";
 
 /**
  * "3 minutes ago", or a date once that stops being useful. Stated here rather than imported: a

@@ -1,6 +1,7 @@
-import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
-import { describe, expect, it } from "vitest";
 import { getStaticModelCostRates, matchModelCost } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
+
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
 
 /** Long-context [1m] suffix is absorbed by prefix-anchored regexes, so base
  * model rates apply (no [1m] premium). */

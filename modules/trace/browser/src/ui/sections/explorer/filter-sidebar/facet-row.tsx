@@ -1,12 +1,13 @@
 import { Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { Ban, Minus } from "lucide-react";
 import { memo, useCallback } from "react";
-import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
-import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
+
 import type {
   FacetItem,
   FacetValueState,
 } from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
+import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 import { formatCount, paletteFromColor } from "./utils.ts";
 
 const MIN_VISIBLE_FILL_PCT = 4;

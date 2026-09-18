@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../../behavior/auth-session.ts";
 import { api } from "../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 
 export type PersonalFeatureKey = "evaluations" | "datasets" | "annotations" | "automations";
 

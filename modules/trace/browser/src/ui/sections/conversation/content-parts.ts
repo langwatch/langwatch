@@ -1,3 +1,5 @@
+import type { MediaPartData } from "../../../behavior/shared/traces/media-parts.ts";
+import { mediaPartToMediaData } from "../../../behavior/shared/traces/media-parts.ts";
 /**
  * Decoding one message's `content` into display parts. Split from the
  * message-level walk so each file answers one question: this is "what is
@@ -5,8 +7,6 @@
  */
 import type { ContentPartVisitor } from "../../../model/shared/content-parts/visit-content-part.ts";
 import { visitContentPart } from "../../../model/shared/content-parts/visit-content-part.ts";
-import type { MediaPartData } from "../../../behavior/shared/traces/media-parts.ts";
-import { mediaPartToMediaData } from "../../../behavior/shared/traces/media-parts.ts";
 import type { DisplayPart } from "./conversation.types.ts";
 
 /** Identity a decoded part inherits from the message it came from. */

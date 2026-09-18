@@ -1,9 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
-
-import { getSuiteSetId } from "@langwatch/suite-contract";
-
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
+import { getSuiteSetId } from "@langwatch/suite-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   createSuiteRunSyncSubscriber,
   type SuiteRunSyncSubscriberDeps,

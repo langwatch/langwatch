@@ -1,11 +1,12 @@
 import { Box, Circle, Code, HStack, Text, VStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
 import {
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunResult as ScenarioResults,
 } from "@langwatch/scenario-contract";
-import { CriteriaDetails } from "./criteria-details.tsx";
+import type { ReactNode } from "react";
+
 import { CONSOLE_COLORS } from "../../../model/simulation-console/constants.ts";
+import { CriteriaDetails } from "./criteria-details.tsx";
 import { ErrorDetails } from "./error-details.tsx";
 import { MetricsSummary } from "./metrics-summary.tsx";
 import { StatusDisplay } from "./status-display.tsx";

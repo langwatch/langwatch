@@ -1,12 +1,12 @@
 import { Button, HStack, Input, Stack } from "@chakra-ui/react";
-import type React from "react";
-import { useState } from "react";
 import {
   PopoverBody,
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
+import type React from "react";
+import { useState } from "react";
 
 interface LensNamePopoverProps {
   /** Pre-fill the name input (e.g. "All (copy)"). */
@@ -70,7 +70,6 @@ export const LensNamePopover: React.FC<LensNamePopoverProps> = ({
           <Stack gap={3}>
             <HStack gap={2}>
               <Input
-                
                 size="sm"
                 placeholder="Lens name"
                 value={name}

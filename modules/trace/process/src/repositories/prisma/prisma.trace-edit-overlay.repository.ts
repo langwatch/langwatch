@@ -3,8 +3,9 @@
  */
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { fromDate } from "@langwatch/time";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+
 import {
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,

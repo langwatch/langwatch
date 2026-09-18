@@ -429,7 +429,9 @@ export const organizeSpansIntoTree = (spans: Span[]): SpanWithChildren[] => {
   const spanMap = new Map<string, SpanWithChildren>();
 
   // Sort based on started_at timestamp, so that all siblings are in started_at order
-  const sortedSpans = [...spans].toSorted((a, b) => a.timestamps.started_at - b.timestamps.started_at);
+  const sortedSpans = [...spans].toSorted(
+    (a, b) => a.timestamps.started_at - b.timestamps.started_at,
+  );
 
   // Initialize each span with an empty children array
   sortedSpans.forEach((span) => {

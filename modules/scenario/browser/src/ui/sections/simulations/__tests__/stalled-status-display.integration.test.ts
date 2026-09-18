@@ -1,10 +1,11 @@
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { getOverlayConfig } from "@langwatch/suite-browser/run-cards";
 /**
  * Integration tests for stalled scenario run visual treatment.
  * @see specs/scenarios/stalled-scenario-runs.feature - UI Display integration scenarios
  */
 import { describe, expect, it } from "vitest";
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { getOverlayConfig } from "@langwatch/suite-browser/run-cards";
+
 import { STATUS_DISPLAY_TEXT_MAP } from "../../../../model/simulation-console/constants.ts";
 
 // ============================================================================

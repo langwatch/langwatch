@@ -24,7 +24,25 @@ import {
   type ExtractMessageTextInput,
   TraceCanonicalisationService as TraceCanonicalisationServiceContract,
 } from "@langwatch/trace-contract";
+
+import { parseJsonStringValues } from "../rules/canonical-json.rules.ts";
+import {
+  extractLastUserMessageText,
+  extractMessageContentText,
+} from "../rules/canonical-message.rules.ts";
+import {
+  claudeCacheWritesLongLived,
+  isConversationalQuerySource,
+} from "../rules/claude-code-call-policy.rules.ts";
+import type { ExtractorContext, LogExtractorContext } from "./canonical-attributes.service.ts";
+import {
+  AttributeCanonicaliser,
+  CanonicalLogRecordStore,
+  CanonicalSpanStore,
+} from "./canonical-attributes.service.ts";
 import { ClaudeCodeCanonicaliserService } from "./claude-code-canonicaliser.service.ts";
+import { ClaudeCodeRequestService } from "./claude-code-request.service.ts";
+import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";
 import { CodexCanonicaliserService } from "./codex-canonicaliser.service.ts";
 import { CopilotCanonicaliserService } from "./copilot-canonicaliser.service.ts";
 import { FallbackCanonicaliserService } from "./fallback-canonicaliser.service.ts";
@@ -40,23 +58,6 @@ import { StrandsCanonicaliserService } from "./strands-canonicaliser.service.ts"
 import { TraceloopCanonicaliserService } from "./traceloop-canonicaliser.service.ts";
 import { VercelCanonicaliserService } from "./vercel-canonicaliser.service.ts";
 import { VertexAdkCanonicaliserService } from "./vertex-adk-canonicaliser.service.ts";
-import type { ExtractorContext, LogExtractorContext } from "./canonical-attributes.service.ts";
-import {
-  AttributeCanonicaliser,
-  CanonicalLogRecordStore,
-  CanonicalSpanStore,
-} from "./canonical-attributes.service.ts";
-import { parseJsonStringValues } from "../rules/canonical-json.rules.ts";
-import {
-  extractLastUserMessageText,
-  extractMessageContentText,
-} from "../rules/canonical-message.rules.ts";
-import {
-  claudeCacheWritesLongLived,
-  isConversationalQuerySource,
-} from "../rules/claude-code-call-policy.rules.ts";
-import { ClaudeCodeRequestService } from "./claude-code-request.service.ts";
-import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
 

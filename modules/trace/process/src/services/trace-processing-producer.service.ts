@@ -15,11 +15,17 @@ import {
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { type TraceIoExtraction,type TraceMediaReferenceResolver,type TraceModelCost,type TraceSpanNormalization,
+
+import {
+  type TraceIoExtraction,
+  type TraceMediaReferenceResolver,
+  type TraceModelCost,
+  type TraceSpanNormalization,
   type TraceSpanContentDrop,
   type TraceSpanCostEnrichment,
   type TraceSpanPiiRedaction,
-  type TraceSpanTokenEstimation } from "../app/trace.members.ts";
+  type TraceSpanTokenEstimation,
+} from "../app/trace.members.ts";
 import type { TraceAnalyticsData } from "../eventing/trace-derived.projection.ts";
 import type { TraceAnalyticsRollupRow } from "../eventing/trace-rollup.projection.ts";
 import { EventingRecordSpanAdapter } from "./eventing.record-span.service.ts";
@@ -99,8 +105,7 @@ class ProducerOnlyCanonicalisation extends TraceCanonicalisationService {
 }
 
 class ProducerOnlyIoExtraction implements TraceIoExtraction {
-  constructor(private readonly processName: string) {
-  }
+  constructor(private readonly processName: string) {}
 
   extractRichIOFromSpan(): never {
     throw producerOnly(this.processName, "extract a span's captured input or output");
@@ -112,8 +117,7 @@ class ProducerOnlyIoExtraction implements TraceIoExtraction {
 }
 
 class ProducerOnlyMediaReferences implements TraceMediaReferenceResolver {
-  constructor(private readonly processName: string) {
-  }
+  constructor(private readonly processName: string) {}
 
   private refuse(): never {
     throw producerOnly(this.processName, "resolve a span's media references");
@@ -137,8 +141,7 @@ class ProducerOnlyMediaReferences implements TraceMediaReferenceResolver {
 }
 
 class ProducerOnlyModelCosts implements TraceModelCost {
-  constructor(private readonly processName: string) {
-  }
+  constructor(private readonly processName: string) {}
 
   estimate(): number {
     throw producerOnly(this.processName, "price a span against the model catalogue");
@@ -146,8 +149,7 @@ class ProducerOnlyModelCosts implements TraceModelCost {
 }
 
 class ProducerOnlySpanNormalization implements TraceSpanNormalization {
-  constructor(private readonly processName: string) {
-  }
+  constructor(private readonly processName: string) {}
 
   normalizeSpanReceived(): NormalizedSpan {
     throw producerOnly(this.processName, "normalise a received span");
@@ -159,8 +161,7 @@ class ProducerOnlySpanNormalization implements TraceSpanNormalization {
 }
 
 class ProducerOnlyPiiRedaction implements TraceSpanPiiRedaction {
-  constructor(private readonly processName: string) {
-  }
+  constructor(private readonly processName: string) {}
 
   redact(_span: unknown, _resource: unknown, _level: unknown, _tenantId: TenantId): Promise<void> {
     return Promise.reject(producerOnly(this.processName, "redact a span"));
@@ -168,8 +169,7 @@ class ProducerOnlyPiiRedaction implements TraceSpanPiiRedaction {
 }
 
 class ProducerOnlyCostEnrichment implements TraceSpanCostEnrichment {
-  constructor(private readonly processName: string) {
-  }
+  constructor(private readonly processName: string) {}
 
   enrich(): Promise<void> {
     return Promise.reject(producerOnly(this.processName, "enrich a span with its cost"));
@@ -177,8 +177,7 @@ class ProducerOnlyCostEnrichment implements TraceSpanCostEnrichment {
 }
 
 class ProducerOnlyTokenEstimation implements TraceSpanTokenEstimation {
-  constructor(private readonly processName: string) {
-  }
+  constructor(private readonly processName: string) {}
 
   estimate(): Promise<void> {
     return Promise.reject(producerOnly(this.processName, "estimate a span's tokens"));
@@ -186,8 +185,7 @@ class ProducerOnlyTokenEstimation implements TraceSpanTokenEstimation {
 }
 
 class ProducerOnlyContentDrop implements TraceSpanContentDrop {
-  constructor(private readonly processName: string) {
-  }
+  constructor(private readonly processName: string) {}
 
   drop(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "drop a span's captured content"));

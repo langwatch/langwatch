@@ -1,4 +1,8 @@
-export { asMarkdownBody, tryParseJSON, tryPrettyJson } from "../../model/transcript/content-format.ts";
+export {
+  asMarkdownBody,
+  tryParseJSON,
+  tryPrettyJson,
+} from "../../model/transcript/content-format.ts";
 
 export {
   applyChatTextLeaves,

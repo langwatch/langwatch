@@ -3,8 +3,9 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 
 /** Where amber starts. Under this a pass rate reads red. */
 export const PASS_RATE_AMBER_FLOOR = 40;

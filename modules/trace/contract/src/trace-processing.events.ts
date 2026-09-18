@@ -1,3 +1,6 @@
+import { z } from "zod";
+
+import { piiRedactionLevelSchema } from "./trace-ingress.commands.ts";
 import {
   isSpanReceivedEvent,
   spanReceivedEventDataSchema,
@@ -7,8 +10,9 @@ import {
   type SpanReceivedEventData,
   type SpanReceivedEventMetadata,
 } from "./trace-ingress.events.ts";
-import { piiRedactionLevelSchema } from "./trace-ingress.commands.ts";
-import { z } from "zod";
+import { logTraceContributionSchema } from "./trace-log-contribution.ts";
+import { metricCorrelationFields } from "./trace-metric-correlation.ts";
+import { recordTraceSpanEventDataSchema } from "./trace-processing.commands.ts";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_REMOVED_EVENT_TYPE,
@@ -27,9 +31,6 @@ import {
   TRACE_NAME_MIN_LENGTH,
 } from "./trace.constants.ts";
 import { fixed64Schema } from "./trace.otlp.ts";
-import { metricCorrelationFields } from "./trace-metric-correlation.ts";
-import { recordTraceSpanEventDataSchema } from "./trace-processing.commands.ts";
-import { logTraceContributionSchema } from "./trace-log-contribution.ts";
 
 export {
   isSpanReceivedEvent,
@@ -76,7 +77,8 @@ const traceEventSchema = z.object({
  */
 const eventMetadataBaseSchema = eventMetadataSchema;
 
-export const spanRecordedEventSchema = z.object({ ...traceEventSchema.shape,
+export const spanRecordedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(SPAN_RECORDED_EVENT_TYPE),
   data: recordTraceSpanEventDataSchema,
   metadata: eventMetadataBaseSchema,
@@ -199,7 +201,8 @@ export const topicAssignedEventDataSchema = z.object({
   isIncremental: z.boolean(),
 });
 
-export const topicAssignedEventSchema = z.object({ ...traceEventSchema.shape,
+export const topicAssignedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(TOPIC_ASSIGNED_EVENT_TYPE),
   data: topicAssignedEventDataSchema,
   metadata: topicAssignedEventMetadataSchema,
@@ -239,7 +242,8 @@ export const logRecordReceivedEventDataSchema = z.object({
   piiRedactionLevel: piiRedactionLevelSchema,
 });
 
-export const logRecordReceivedEventSchema = z.object({ ...traceEventSchema.shape,
+export const logRecordReceivedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(LOG_RECORD_RECEIVED_EVENT_TYPE),
   data: logRecordReceivedEventDataSchema,
   metadata: logRecordReceivedEventMetadataSchema,
@@ -259,7 +263,8 @@ export const logContributedEventDataSchema = logTraceContributionSchema.omit({
   occurredAt: true,
 });
 
-export const logContributedEventSchema = z.object({ ...traceEventSchema.shape,
+export const logContributedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(LOG_CONTRIBUTED_EVENT_TYPE),
   data: logContributedEventDataSchema,
   metadata: eventMetadataBaseSchema,
@@ -284,7 +289,8 @@ export const metricDataPointCorrelatedEventMetadataSchema = z
 
 export const metricDataPointCorrelatedEventDataSchema = z.object(metricCorrelationFields);
 
-export const metricDataPointCorrelatedEventSchema = z.object({ ...traceEventSchema.shape,
+export const metricDataPointCorrelatedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(METRIC_DATA_POINT_CORRELATED_EVENT_TYPE),
   data: metricDataPointCorrelatedEventDataSchema,
   metadata: metricDataPointCorrelatedEventMetadataSchema,
@@ -318,7 +324,8 @@ export const originResolvedEventDataSchema = z.object({
   reason: z.string(),
 });
 
-export const originResolvedEventSchema = z.object({ ...traceEventSchema.shape,
+export const originResolvedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(ORIGIN_RESOLVED_EVENT_TYPE),
   data: originResolvedEventDataSchema,
   metadata: originResolvedEventMetadataSchema,
@@ -351,7 +358,8 @@ export const annotationAddedEventDataSchema = z.object({
   annotationId: z.string(),
 });
 
-export const annotationAddedEventSchema = z.object({ ...traceEventSchema.shape,
+export const annotationAddedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(ANNOTATION_ADDED_EVENT_TYPE),
   data: annotationAddedEventDataSchema,
   metadata: annotationAddedEventMetadataSchema,
@@ -384,7 +392,8 @@ export const annotationRemovedEventDataSchema = z.object({
   annotationId: z.string(),
 });
 
-export const annotationRemovedEventSchema = z.object({ ...traceEventSchema.shape,
+export const annotationRemovedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(ANNOTATION_REMOVED_EVENT_TYPE),
   data: annotationRemovedEventDataSchema,
   metadata: annotationRemovedEventMetadataSchema,
@@ -419,7 +428,8 @@ export const annotationsBulkSyncedEventDataSchema = z.object({
   annotationIds: z.array(z.string()),
 });
 
-export const annotationsBulkSyncedEventSchema = z.object({ ...traceEventSchema.shape,
+export const annotationsBulkSyncedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(ANNOTATIONS_BULK_SYNCED_EVENT_TYPE),
   data: annotationsBulkSyncedEventDataSchema,
   metadata: annotationsBulkSyncedEventMetadataSchema,
@@ -459,7 +469,8 @@ export const traceNameChangedEventDataSchema = z.object({
   changedByUserId: z.string().nullable(),
 });
 
-export const traceNameChangedEventSchema = z.object({ ...traceEventSchema.shape,
+export const traceNameChangedEventSchema = z.object({
+  ...traceEventSchema.shape,
   type: z.literal(TRACE_NAME_CHANGED_EVENT_TYPE),
   data: traceNameChangedEventDataSchema,
   metadata: traceNameChangedEventMetadataSchema,

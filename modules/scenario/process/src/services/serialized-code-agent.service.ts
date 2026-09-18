@@ -3,16 +3,18 @@
  * via nlpgo's /go/studio/execute_sync endpoint.
  */
 
+import { randomBytes } from "crypto";
+
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
-import { SpanKind } from "@opentelemetry/api";
-import { randomBytes } from "crypto";
-import { getLangWatchTracer } from "langwatch";
-import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 import type { CodeAgentData, RunParameterValues } from "@langwatch/scenario-contract";
 import { resolveFieldMappings, sourceFieldOf } from "@langwatch/scenario-contract";
+import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
+
 import type { NlpEngineResult } from "../rules/execution-error.rules.ts";
 import {
   formatEngineError,

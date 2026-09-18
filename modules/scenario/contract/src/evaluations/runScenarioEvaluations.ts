@@ -1,24 +1,25 @@
 /** Runs scenario evaluators for a finished run and records their results. */
 
-import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 import {
   CODE_EVALUATOR_CHECK_PREFIX,
   type EvaluatorWithFields,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
+import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import { type Span, type Trace } from "@langwatch/trace-contract";
-import type { Scenario } from "../scenario.ts";
-import type { RecordEvaluationsCommandData } from "../simulation.commands.ts";
+
 import { evaluatorInputSpecsOf, type EvaluatorAttachment } from "../evaluator-attachments.ts";
 import {
   type RunEvaluatorDefinition,
   type RunEvaluators,
   runEvaluatorDefinitionOf,
 } from "../scenario-run-evaluators.ts";
+import type { Scenario } from "../scenario.ts";
 import type { ScenarioEvaluationResult } from "../schemas/event-schemas.ts";
+import type { RecordEvaluationsCommandData } from "../simulation.commands.ts";
 import { parseScenarioFieldValues, type ScenarioFieldValues } from "../suite-fields.ts";
 import {
   attachmentsReadTrace,

@@ -1,5 +1,6 @@
 import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authz-contract";
 import { useCallback, useMemo } from "react";
+
 import { api } from "./scenario-api.ts";
 import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 

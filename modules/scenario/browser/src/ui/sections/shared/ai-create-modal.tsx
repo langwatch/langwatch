@@ -9,18 +9,20 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { CARD } from "@langwatch/langy-browser/surfaces/asaplangy";
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-browser/surfaces/langy-mark";
 import { AlertCircle, ArrowRight, PencilLine, Sparkles } from "lucide-react";
+
+import "@langwatch/langy-browser/surfaces/langy-theme.css";
 import { useCallback, useEffect, useState } from "react";
+
 // Deep import on purpose: `ErrorActions` is deliberately absent from the
 // `~/features/errors` barrel, which would put it in an import cycle with the
 // toaster. `components/ui/toaster.tsx` reaches for it the same way.
 import { ErrorActions } from "../../../behavior/errors.tsx";
-import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-browser/surfaces/langy-mark";
-import "@langwatch/langy-browser/surfaces/langy-theme.css";
-import { CARD } from "@langwatch/langy-browser/surfaces/asaplangy";
 import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error.ts";
 import { useAiGeneration } from "../../../behavior/use-ai-generation.ts";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

@@ -63,9 +63,10 @@ vi.mock("@langwatch/langy-browser/surfaces/langy-store", async (importOriginal) 
   return { ...actual, useLangyStore };
 });
 
-import { explainAnyError } from "../../../errors/index.ts";
 import type { AiActionError } from "@langwatch/trace-contract";
+
 import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import { explainAnyError } from "../../../errors/index.ts";
 import { SearchBar } from "../search-bar.tsx";
 
 /**

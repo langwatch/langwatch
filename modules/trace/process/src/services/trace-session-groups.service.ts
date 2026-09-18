@@ -1,18 +1,19 @@
-import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import { z } from "zod";
 import type {
   SessionGroupCodingAgentDto,
   SessionGroupDto,
   SessionGroupsResult,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
+
 import type {
   SessionGroupRow,
   SessionGroupSortColumn,
   SessionGroupsRepository,
   SessionGroupCursor,
 } from "../repositories/session-groups.repository.ts";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 
 const SORT_COLUMN_KEYS = {
   lastActivity: true,

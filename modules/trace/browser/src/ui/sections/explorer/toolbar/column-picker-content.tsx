@@ -1,17 +1,18 @@
 import { chakra, HStack, Icon, Input, Stack, Text } from "@chakra-ui/react";
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { toaster } from "@langwatch/design-system/toaster";
 import { Search } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { toaster } from "@langwatch/design-system/toaster";
-import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
+
 import type { LensColumnOption } from "../../../../behavior/lens-capabilities.ts";
-import type { TimeColumnFormat } from "../../../../behavior/time-format.store.ts";
 import { LENS_CAPABILITIES } from "../../../../behavior/lens-capabilities.ts";
+import type { TimeColumnFormat } from "../../../../behavior/time-format.store.ts";
 import { useTimeFormatStore } from "../../../../behavior/time-format.store.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useViewStore } from "../../../../behavior/view.store.ts";
 import { isEvalColumnId, parseEvalColumnId } from "../../../../model/lens-eval-column-id.ts";
+import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
 import { evalColumnLabel } from "../trace-table/eval-columns.ts";
 import { AddEvalColumnForm, COLUMN_APPENDED_HINT } from "./column-picker/add-eval-column-form.tsx";
 import { VisibleOrderStrip } from "./column-picker/visible-order-strip.tsx";

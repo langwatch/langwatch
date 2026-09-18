@@ -4,7 +4,9 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
+
 import { describe, expect, it, vi } from "vitest";
+
 import {
   handleVoiceNonceRegisterMessage,
   isVoiceMediaUpgradeRefusedMessage,
@@ -45,9 +47,7 @@ describe("isVoiceNonceRegisterAckMessage", () => {
       ok: true,
     };
     expect(isVoiceNonceRegisterAckMessage(ack)).toBe(true);
-    expect(isVoiceNonceRegisterAckMessage({ type: "something-else" })).toBe(
-      false,
-    );
+    expect(isVoiceNonceRegisterAckMessage({ type: "something-else" })).toBe(false);
   });
 });
 
@@ -65,10 +65,8 @@ function fakeIpcProcess() {
         cb?.(null);
         return true;
       }),
-      on: (event: "message", listener: (message: unknown) => void) =>
-        emitter.on(event, listener),
-      off: (event: "message", listener: (message: unknown) => void) =>
-        emitter.off(event, listener),
+      on: (event: "message", listener: (message: unknown) => void) => emitter.on(event, listener),
+      off: (event: "message", listener: (message: unknown) => void) => emitter.off(event, listener),
     },
     emitMessage: (message: unknown) => emitter.emit("message", message),
   };
@@ -121,12 +119,8 @@ describe("requestNonceRegistration", () => {
         ok: false,
         error: "no voice listener booted in this process",
       });
-      await expect(promise).rejects.toBeInstanceOf(
-        VoiceNonceRegistrationFailedError,
-      );
-      await expect(promise).rejects.toThrow(
-        "no voice listener booted in this process",
-      );
+      await expect(promise).rejects.toBeInstanceOf(VoiceNonceRegistrationFailedError);
+      await expect(promise).rejects.toThrow("no voice listener booted in this process");
     });
   });
 
@@ -145,9 +139,9 @@ describe("requestNonceRegistration", () => {
         on: () => {},
         off: () => {},
       };
-      await expect(
-        requestNonceRegistration({ nonce: "n1", proc }),
-      ).rejects.toBeInstanceOf(VoiceNonceRegistrationNoChannelError);
+      await expect(requestNonceRegistration({ nonce: "n1", proc })).rejects.toBeInstanceOf(
+        VoiceNonceRegistrationNoChannelError,
+      );
     });
   });
 });
@@ -216,9 +210,7 @@ describe("isVoiceMediaUpgradeRefusedMessage", () => {
         reason: "nonce expired",
       }),
     ).toBe(true);
-    expect(isVoiceMediaUpgradeRefusedMessage({ type: "something-else" })).toBe(
-      false,
-    );
+    expect(isVoiceMediaUpgradeRefusedMessage({ type: "something-else" })).toBe(false);
     expect(isVoiceMediaUpgradeRefusedMessage(null)).toBe(false);
   });
 });
@@ -227,9 +219,9 @@ describe("raceAgainstUpgradeRefusal", () => {
   describe("given no refusal ever arrives", () => {
     it("resolves with the promise's own outcome", async () => {
       const { proc } = fakeIpcProcess();
-      await expect(
-        raceAgainstUpgradeRefusal(Promise.resolve("dialled"), proc),
-      ).resolves.toBe("dialled");
+      await expect(raceAgainstUpgradeRefusal(Promise.resolve("dialled"), proc)).resolves.toBe(
+        "dialled",
+      );
     });
   });
 

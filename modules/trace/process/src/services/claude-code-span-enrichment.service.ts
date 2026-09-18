@@ -4,7 +4,7 @@
  * request_id, input positionally, the Nth request body with the Nth span in one query source.
  */
 import type { SpanInputOutput, TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
+
 import {
   ASSISTANT_RESPONSE_EVENT,
   buildInputIndex,
@@ -24,6 +24,7 @@ import {
   TOOL_DECISION_EVENT,
   TOOL_RESULT_EVENT,
 } from "../rules/claude-code-tool-enrichment.rules.ts";
+import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
 
 export class ClaudeCodeSpanEnrichmentService {
   static create(): ClaudeCodeSpanEnrichmentService {
@@ -65,9 +66,7 @@ export class ClaudeCodeSpanEnrichmentService {
   }
 
   /** First log per (event, tool_use_id) wins, mirroring buildOutputIndex. */
-  static #indexToolLogsByUseId(
-    toolLogs: ClaudeToolLog[],
-  ): Readonly<{
+  static #indexToolLogsByUseId(toolLogs: ClaudeToolLog[]): Readonly<{
     resultByUseId: Map<string, ClaudeToolLog>;
     decisionByUseId: Map<string, ClaudeToolLog>;
   }> {

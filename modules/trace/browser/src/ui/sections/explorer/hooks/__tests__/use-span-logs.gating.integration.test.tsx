@@ -3,6 +3,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { api } from "../../../../../behavior/trace-api.ts";
 import { useSpanLogs } from "../use-span-logs.ts";
 

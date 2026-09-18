@@ -3,6 +3,7 @@
 
 import { voice as scenarioVoice } from "@langwatch/scenario";
 import { nowInstant } from "@langwatch/time";
+
 import { ensureCloudflaredOnPath } from "./voice-cloudflared-binary.ts";
 
 type OpenedTunnel = Awaited<ReturnType<typeof scenarioVoice.openTwilioTunnel>>;

@@ -29,9 +29,7 @@ export function parsePositiveIntEnv({
   return parsed;
 }
 
-export function voiceCallMaxSeconds(
-  env: NodeJS.ProcessEnv = process.env,
-): number {
+export function voiceCallMaxSeconds(env: NodeJS.ProcessEnv = process.env): number {
   const parsed = parsePositiveIntEnv({
     raw: env.VOICE_CALL_MAX_SECONDS,
     fallback: VOICE_CALL_MAX_SECONDS_DEFAULT,
@@ -39,9 +37,7 @@ export function voiceCallMaxSeconds(
   return Math.min(parsed, VOICE_CALL_MAX_SECONDS_CEILING);
 }
 
-export function voiceRunsMaxConcurrent(
-  env: NodeJS.ProcessEnv = process.env,
-): number {
+export function voiceRunsMaxConcurrent(env: NodeJS.ProcessEnv = process.env): number {
   return parsePositiveIntEnv({
     raw: env.VOICE_RUNS_MAX_CONCURRENT,
     fallback: VOICE_RUNS_MAX_CONCURRENT_DEFAULT,

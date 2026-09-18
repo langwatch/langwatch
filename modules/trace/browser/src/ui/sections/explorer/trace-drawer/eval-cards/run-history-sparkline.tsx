@@ -1,4 +1,5 @@
 import { Circle, HStack, Text } from "@chakra-ui/react";
+
 import type { EvalRunHistoryEntry } from "./utils.ts";
 
 /** Dot color per run status. `processed` (a verdict-less completed run) is

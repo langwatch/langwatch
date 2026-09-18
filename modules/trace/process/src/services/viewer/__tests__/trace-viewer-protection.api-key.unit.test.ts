@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import type { Protections } from "@langwatch/trace-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { Protections } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { TraceViewerProtectionService } from "../../trace-viewer-protection.service.ts";
 
 const anonymous: Protections = {

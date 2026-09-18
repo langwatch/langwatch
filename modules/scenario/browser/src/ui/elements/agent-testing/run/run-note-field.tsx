@@ -6,6 +6,7 @@
 
 import { Box, Input, Text } from "@chakra-ui/react";
 import { MAX_RUN_NOTE_LENGTH } from "@langwatch/scenario-contract";
+
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../shared/remove-block-button.tsx";
 
@@ -30,7 +31,7 @@ export function RunNoteField({ value, onChange, onRemove }: RunNoteFieldProps) {
       </FieldLabel>
       <Input
         {...DIALOG_FIELD_STYLE}
-        
+
         value={value}
         aria-label="Note for the run"
         aria-invalid={isTooLong || undefined}

@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * The correction contract: what a stored patch may say and what a malformed one degrades to.
- */
-import { describe, expect, it } from "vitest";
 import {
   emptyTraceEditOverlayPatch,
   encodeSpanIOFromEditedText,
@@ -11,6 +6,11 @@ import {
   TRACE_EDIT_OVERLAY_MAX_PATCH_BYTES,
   traceEditOverlayPatchSchema,
 } from "@langwatch/trace-contract";
+/**
+ * @vitest-environment node
+ * The correction contract: what a stored patch may say and what a malformed one degrades to.
+ */
+import { describe, expect, it } from "vitest";
 
 describe("trace edit overlay patch contract", () => {
   describe("given a patch written by this build", () => {

@@ -3,9 +3,10 @@
  * @see specs/scenarios/scenario-failure-handler.feature "Polling Logic Improvements"
  */
 
-import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { BatchRunDataResult, ScenarioRunData } from "@langwatch/scenario-contract";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
 import { pollForScenarioRun } from "../poll-for-scenario-run.ts";
 
 type FetchBatchRunData = (params: {

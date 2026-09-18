@@ -4,8 +4,9 @@
  * span.attribute) to their respective stores.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceListRead } from "@langwatch/trace-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { TraceListService } from "../trace-list-read.service.ts";
 
 const emptyResult = { values: [], totalDistinct: 0 };

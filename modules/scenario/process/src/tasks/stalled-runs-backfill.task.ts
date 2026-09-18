@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { Task } from "@langwatch/task";
 import { nowInstant } from "@langwatch/time";
+
 import {
   BACKFILL_STALE_THRESHOLD_MS,
   type SimulationStalledRun,

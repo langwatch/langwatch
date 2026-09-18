@@ -5,8 +5,9 @@
  */
 import { ChildProcess } from "child_process";
 import { EventEmitter } from "events";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { ChildProcessJobData } from "@langwatch/scenario-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../services/child-process-spawn.service.ts", () => ({
   resolveChildProcessSpawn: () => ({ command: "node", args: ["/dist/bundle.cjs"] }),
@@ -29,8 +30,8 @@ vi.mock("node:child_process", () => ({
   }),
 }));
 
-import { NodeScenarioChildProcessAdapter } from "../services/node-scenario-child-process.service.ts";
 import { ScenarioExecutionPoolService, type ScenarioExecutionRunner } from "../index.ts";
+import { NodeScenarioChildProcessAdapter } from "../services/node-scenario-child-process.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 /** A runner that never actually executes — the pool only needs the job
@@ -54,7 +55,14 @@ function job(): ExecutionJobData {
 const jobData = {
   context: { projectId: "proj-1", scenarioId: "scen-1", setId: "set-1", batchRunId: "batch-1" },
   scenario: { id: "scen-1", name: "Test", situation: "Ask", criteria: [], labels: [] },
-  adapterData: { type: "http", agentId: "agent-1", url: "https://x.test", method: "POST", headers: [], secrets: {} },
+  adapterData: {
+    type: "http",
+    agentId: "agent-1",
+    url: "https://x.test",
+    method: "POST",
+    headers: [],
+    secrets: {},
+  },
   nlpServiceUrl: "http://langwatch_nlp:5561",
   target: { type: "http", referenceId: "agent-1" },
   parameters: {},

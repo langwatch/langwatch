@@ -1,5 +1,6 @@
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
+
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import {
   createInitState,

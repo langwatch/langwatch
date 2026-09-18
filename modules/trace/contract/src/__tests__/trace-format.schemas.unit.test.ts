@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { langWatchEventSchema } from "../trace-format.schemas.ts";
 
 const baseEvent = {

@@ -4,6 +4,7 @@
  * Metadata assertion (idempotent) + milestone (guarded) + reconciliation (unguarded).
  */
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+
 import {
   type ProjectMetadataSubscriberDeps,
   ProjectMetadataSync,

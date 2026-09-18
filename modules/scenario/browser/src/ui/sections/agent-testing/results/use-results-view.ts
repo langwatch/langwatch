@@ -4,8 +4,9 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useCallback, useMemo, useState } from "react";
+
 import {
   type AgentTestingRoutingState,
   buildAgentTestingPush,

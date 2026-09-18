@@ -1,10 +1,11 @@
-import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../behavior/scenario-api.ts";
 import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
 } from "@langwatch/model-provider-browser/surfaces/provider-model-selector";
+import { useMemo } from "react";
+
+import { api } from "../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { callerVoiceOptions } from "./caller-voice-model-options";
 
 /**
@@ -24,11 +25,10 @@ export function CallerVoiceModelSelect({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const projectProviders =
-    api.modelProvider.listAllForProjectForFrontend.useQuery(
-      { projectId },
-      { enabled: !!projectId, refetchOnMount: false },
-    );
+  const projectProviders = api.modelProvider.listAllForProjectForFrontend.useQuery(
+    { projectId },
+    { enabled: !!projectId, refetchOnMount: false },
+  );
 
   const { options, displayNames } = useMemo(
     () => callerVoiceOptions({ providers: projectProviders.data ?? [] }),

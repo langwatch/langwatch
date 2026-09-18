@@ -1,8 +1,9 @@
 import { Box, Button, Code, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { AlertTriangle, ArrowLeft, Check, Copy, Inbox, RotateCw, SearchX, X } from "lucide-react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type ErrorExplanation, explainAnyError } from "../../errors/index.ts";
+import { AlertTriangle, ArrowLeft, Check, Copy, Inbox, RotateCw, SearchX, X } from "lucide-react";
+
 import { useCopyToClipboard } from "../../../../index.ts";
+import { type ErrorExplanation, explainAnyError } from "../../errors/index.ts";
 
 interface TraceDrawerEmptyStateProps {
   /**

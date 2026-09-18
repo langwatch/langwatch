@@ -1,4 +1,5 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
+
 import { EVAL_FIELD_LABELS, type EvalColumnField } from "../../../../model/lens-eval-column-id.ts";
 import type { TraceEvalResult, TraceListItem } from "../types/trace.ts";
 

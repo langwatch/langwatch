@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { runActorFromRequest, withActor } from "../run-actor.ts";
 
 describe("the actor of a REST run", () => {

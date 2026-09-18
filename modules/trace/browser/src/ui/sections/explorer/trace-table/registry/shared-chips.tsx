@@ -4,7 +4,11 @@ import type React from "react";
 import { useState } from "react";
 import type { IconType } from "react-icons";
 import { LuCircleAlert, LuCircleSlash } from "react-icons/lu";
-import { type EvalChipDisplay, getEvalChipDisplay } from "../../../../../model/evaluation-results.ts";
+
+import {
+  type EvalChipDisplay,
+  getEvalChipDisplay,
+} from "../../../../../model/evaluation-results.ts";
 import type { TraceEvalResult, TraceListEventGroup } from "../../types/trace.ts";
 
 /**

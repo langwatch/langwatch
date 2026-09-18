@@ -19,6 +19,7 @@ import {
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
+
 import {
   COLUMN_DRAG_THRESHOLD_PX,
   useColumnEducationStore,

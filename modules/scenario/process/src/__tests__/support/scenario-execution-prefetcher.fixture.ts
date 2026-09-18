@@ -10,8 +10,8 @@ import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contrac
 import { type LiteLLMParams, scenarioSchema } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
-import type { TraceApi } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import {
   workflowDslSchema,
   workflowSchema,
@@ -19,11 +19,13 @@ import {
   WorkflowNotFoundError,
   type WorkflowApi,
 } from "@langwatch/workflow-contract";
+
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
   type ScenarioSecretCipher,
 } from "../../index.ts";
+import type { VoiceTargetReader } from "../../services/scenario-target-prefetch.service.ts";
 import type { ScenarioService } from "../../services/scenario.service.ts";
 
 export interface ScenarioFetcher {
@@ -38,6 +40,7 @@ export interface ScenarioFetcher {
     parameters?: unknown;
     maxTurns?: number | null;
     minTurns?: number | null;
+    callerVoice?: unknown;
   } | null>;
 }
 
@@ -49,7 +52,7 @@ export interface SuiteConfigFetcher {
     simulatorModel: string | null;
     judgeModel: string | null;
     targets?: {
-      type: "prompt" | "http" | "code" | "workflow" | "connected";
+      type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
       referenceId: string;
       scenarioMappings?: Record<
         string,
@@ -128,6 +131,7 @@ export interface ScenarioPrefetchFixture {
    * backstop) needs the real service, or it proves the stand-in instead.
    */
   modelProviders?: ModelProviderApi;
+  voiceTargets?: VoiceTargetReader;
 }
 
 class TestScenarioSecretCipher implements ScenarioSecretCipher {
@@ -437,5 +441,18 @@ export function createTestScenarioExecutionPrefetcherService(
       resolveIngestWaitTimeout: (input) =>
         deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),
     }),
+    voiceTargets: deps.voiceTargets ?? {
+      resolve: async ({ agentId }) => ({
+        type: "voice",
+        agentId,
+        voiceTarget: {
+          transport: "elevenlabs_convai",
+          agentId: "test-agent",
+          credential: null,
+        },
+        callerEnv: {},
+        maxCallSeconds: 300,
+      }),
+    },
   });
 }

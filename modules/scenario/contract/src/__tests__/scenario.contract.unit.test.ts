@@ -1,10 +1,11 @@
+import { describe, expect, it } from "vitest";
+
 import {
   runParameterValuesSchema,
   scenarioCreateInputSchema,
   scenarioParameterDefinitionsSchema,
   scenarioSchema,
 } from "../index.ts";
-import { describe, expect, it } from "vitest";
 
 /** A full scenario row shape, as `transaction.scenario.create`/`findFirst`
  *  hand back from Postgres — every Prisma model column carries a key, so a

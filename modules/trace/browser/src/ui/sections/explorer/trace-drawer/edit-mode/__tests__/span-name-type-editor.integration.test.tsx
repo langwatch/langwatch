@@ -2,10 +2,11 @@
 // reviewer's work (not reverted on touch).
 // @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import "@testing-library/jest-dom/vitest";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   buildTraceEditPatch,
   selectIsTraceEditDirty,

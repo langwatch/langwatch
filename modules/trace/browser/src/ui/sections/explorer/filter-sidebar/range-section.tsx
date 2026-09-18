@@ -1,8 +1,9 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import type React from "react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type React from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+
 import { useFacetLensStore } from "../../../../behavior/facet-lens.store.ts";
 import {
   commitRange as commitRangeShared,

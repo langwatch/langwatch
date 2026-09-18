@@ -6,11 +6,13 @@ import {
   partitionParameterDefinitions,
   renderScenarioContent,
   type RunParameterValues,
-  withoutParameterNames,type ScenarioConfig
+  withoutParameterNames,
+  type ScenarioConfig,
 } from "@langwatch/scenario-contract";
-import type { ScenarioService } from "./scenario.service.ts";
+import { parseCallerVoiceConfig, type CallerVoiceConfig } from "@langwatch/scenario-contract";
 import { extractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 
+import type { ScenarioService } from "./scenario.service.ts";
 
 type FetchProjectResult =
   | { success: true; data: { apiKey: string } }
@@ -48,6 +50,7 @@ export class ScenarioExecutionLookupService {
     parameters: RunParameterValues;
     simulatorModel: string | null;
     judgeModel: string | null;
+    callerVoice: CallerVoiceConfig;
   } | null> {
     const scenario = await this.options.scenarios.tryGetById({
       projectId,
@@ -100,6 +103,7 @@ export class ScenarioExecutionLookupService {
       parameters,
       simulatorModel: scenario.simulatorModel ?? null,
       judgeModel: scenario.judgeModel ?? null,
+      callerVoice: parseCallerVoiceConfig(scenario.callerVoice),
     };
   }
 

@@ -4,17 +4,16 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { describe, expect, it } from "vitest";
 import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   evaluationKind,
   failedRequiredEvaluatorName,
   summarizeEvaluations,
 } from "../evaluation-summaries";
 
-function evaluation(
-  overrides: Partial<ScenarioEvaluationResult> = {},
-): ScenarioEvaluationResult {
+function evaluation(overrides: Partial<ScenarioEvaluationResult> = {}): ScenarioEvaluationResult {
   return {
     evaluatorId: "eval_sql",
     name: "SQL Query Equivalence",
@@ -38,9 +37,7 @@ describe("summarizeEvaluations", () => {
           withEvaluations([evaluation()]),
           withEvaluations([evaluation()]),
           withEvaluations([evaluation({ status: "failed", passed: false })]),
-          withEvaluations([
-            evaluation({ status: "skipped", passed: undefined }),
-          ]),
+          withEvaluations([evaluation({ status: "skipped", passed: undefined })]),
         ],
       });
 
@@ -101,10 +98,7 @@ describe("summarizeEvaluations", () => {
         ],
       });
 
-      expect(summaries.map((summary) => summary.evaluatorId)).toEqual([
-        "eval_sql",
-        "eval_pii",
-      ]);
+      expect(summaries.map((summary) => summary.evaluatorId)).toEqual(["eval_sql", "eval_pii"]);
     });
 
     it("reads by the name the latest result carries", () => {
@@ -122,9 +116,7 @@ describe("summarizeEvaluations", () => {
   describe("given runs without evaluations", () => {
     /** @scenario "A run without evaluators shows no evaluator pills" */
     it("reads nothing", () => {
-      expect(summarizeEvaluations({ runs: [{ results: null }, {}] })).toEqual(
-        [],
-      );
+      expect(summarizeEvaluations({ runs: [{ results: null }, {}] })).toEqual([]);
     });
   });
 });
@@ -165,17 +157,11 @@ describe("evaluationKind", () => {
   describe("given an evaluation's status and score", () => {
     it("reads a verdict, a number, or nothing", () => {
       expect(evaluationKind(evaluation())).toBe("passfail");
-      expect(
-        evaluationKind(
-          evaluation({ status: "scored", passed: undefined, score: 1 }),
-        ),
-      ).toBe("score");
-      expect(
-        evaluationKind(evaluation({ status: "skipped", passed: undefined })),
-      ).toBeNull();
-      expect(
-        evaluationKind(evaluation({ status: "error", passed: undefined })),
-      ).toBeNull();
+      expect(evaluationKind(evaluation({ status: "scored", passed: undefined, score: 1 }))).toBe(
+        "score",
+      );
+      expect(evaluationKind(evaluation({ status: "skipped", passed: undefined }))).toBeNull();
+      expect(evaluationKind(evaluation({ status: "error", passed: undefined }))).toBeNull();
     });
   });
 });

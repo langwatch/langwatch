@@ -6,15 +6,16 @@
  */
 
 import { chakra, VStack } from "@chakra-ui/react";
-import type { TargetValue } from "../../../../model/scenario-target.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { getRoutePath } from "@langwatch/workflow-browser/surfaces/workflow-routes";
-import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
+import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
 import { type PromptEntry, PromptPicker } from "./prompt-picker.tsx";
-import { AgentBlocks, type RunDialogAgent, SetupAgentBox } from "./run-target-picker.tsx";
 import type { RunDialogMode } from "./run-dialog-types.ts";
+import { AgentBlocks, type RunDialogAgent, SetupAgentBox } from "./run-target-picker.tsx";
 
 type TargetSectionProps = {
   mode: RunDialogMode;

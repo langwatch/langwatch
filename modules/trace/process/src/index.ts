@@ -27,27 +27,86 @@ export { createTraceClickHouseResolver } from "./app/trace-composition.build.ts"
 
 // Restored: these names have consumers outside this module.
 export { traceRepositories } from "./repositories/trace-repositories.registry.ts";
-export { EventingTracePipelineAdapter, type EventingTracePipelineAdapterOptions } from "./services/eventing.trace-pipeline.service.ts";
+export {
+  EventingTracePipelineAdapter,
+  type EventingTracePipelineAdapterOptions,
+} from "./services/eventing.trace-pipeline.service.ts";
 export { TraceProcessingServerInstallerAdapter } from "./services/eventing.trace-processing-installer.service.ts";
-export type { TraceProcessingInstaller, TraceDeferredOriginScheduler, TraceProcessingPipeline, TraceSpanTokenEstimation, TraceSpoolLegacyObject, TraceSpoolStorage, TraceSpoolObjectStore, TraceProjectMetadata, TraceModelCostCatalog, TraceEvaluationMonitor, TraceEvaluationLoopMetrics, TraceEvaluationLoopBlockReason, TraceEvaluationDispatch } from "./app/trace.members.ts";
-export { ORIGIN_GATE_DEDUP_TTL_MS, ORIGIN_GATE_DELAY_MS, TraceDeferredOriginEventingAdapter } from "./services/eventing.deferred-origin.service.ts";
-export { CUSTOM_EVAL_SYNC_DEDUP_TTL_MS, CUSTOM_EVAL_SYNC_DELAY_MS, CustomEvaluationSync } from "./eventing/custom-evaluation-sync.subscriber.ts";
-export { EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS, EXPERIMENT_METRICS_SYNC_DELAY_MS, createExperimentMetricsSyncHandler, hasExperimentCostMetrics } from "./eventing/experiment-metrics-sync.subscriber.ts";
-export { PROJECT_METADATA_WINDOW_MS, ProjectMetadataSync } from "./eventing/project-metadata.subscriber.ts";
-export { SIMULATION_METRICS_SYNC_DEDUP_TTL_MS, SIMULATION_METRICS_SYNC_DELAY_MS, createSimulationMetricsSyncHandler, hasSimulationMetrics } from "./eventing/simulation-metrics-sync.subscriber.ts";
-export { SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS, createSpanStorageBroadcastHandler } from "./eventing/span-storage-broadcast.subscriber.ts";
-export { TRACE_UPDATE_BROADCAST_WINDOW_MS, createTraceUpdateBroadcastHandler } from "./eventing/trace-update-broadcast.subscriber.ts";
-export { TRACKED_EVENT_SYNC_DEDUP_TTL_MS, TRACKED_EVENT_SYNC_DELAY_MS, TrackedEventSync } from "./eventing/tracked-event-sync.subscriber.ts";
-export type { TraceClickHouseResolver, TraceClickHouseWriteResolver } from "./repositories/trace-clickhouse-client.repository.ts";
+export type {
+  TraceProcessingInstaller,
+  TraceDeferredOriginScheduler,
+  TraceProcessingPipeline,
+  TraceSpanTokenEstimation,
+  TraceSpoolLegacyObject,
+  TraceSpoolStorage,
+  TraceSpoolObjectStore,
+  TraceProjectMetadata,
+  TraceModelCostCatalog,
+  TraceEvaluationMonitor,
+  TraceEvaluationLoopMetrics,
+  TraceEvaluationLoopBlockReason,
+  TraceEvaluationDispatch,
+} from "./app/trace.members.ts";
+export {
+  ORIGIN_GATE_DEDUP_TTL_MS,
+  ORIGIN_GATE_DELAY_MS,
+  TraceDeferredOriginEventingAdapter,
+} from "./services/eventing.deferred-origin.service.ts";
+export {
+  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
+  CUSTOM_EVAL_SYNC_DELAY_MS,
+  CustomEvaluationSync,
+} from "./eventing/custom-evaluation-sync.subscriber.ts";
+export {
+  EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
+  EXPERIMENT_METRICS_SYNC_DELAY_MS,
+  createExperimentMetricsSyncHandler,
+  hasExperimentCostMetrics,
+} from "./eventing/experiment-metrics-sync.subscriber.ts";
+export {
+  PROJECT_METADATA_WINDOW_MS,
+  ProjectMetadataSync,
+} from "./eventing/project-metadata.subscriber.ts";
+export {
+  SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
+  SIMULATION_METRICS_SYNC_DELAY_MS,
+  createSimulationMetricsSyncHandler,
+  hasSimulationMetrics,
+} from "./eventing/simulation-metrics-sync.subscriber.ts";
+export {
+  SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
+  createSpanStorageBroadcastHandler,
+} from "./eventing/span-storage-broadcast.subscriber.ts";
+export {
+  TRACE_UPDATE_BROADCAST_WINDOW_MS,
+  createTraceUpdateBroadcastHandler,
+} from "./eventing/trace-update-broadcast.subscriber.ts";
+export {
+  TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
+  TRACKED_EVENT_SYNC_DELAY_MS,
+  TrackedEventSync,
+} from "./eventing/tracked-event-sync.subscriber.ts";
+export type {
+  TraceClickHouseResolver,
+  TraceClickHouseWriteResolver,
+} from "./repositories/trace-clickhouse-client.repository.ts";
 export { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
 export { TraceQueryClassificationAdapter } from "./services/trace-query-classification.service.ts";
 export { TraceSpanStorageRepository } from "./repositories/span-storage-write.repository.ts";
-export { TraceSpanStorageClickHouseRepository, TraceStoredSpanReaderClickHouseRepository } from "./repositories/clickhouse/trace-span-storage.repository.ts";
+export {
+  TraceSpanStorageClickHouseRepository,
+  TraceStoredSpanReaderClickHouseRepository,
+} from "./repositories/clickhouse/trace-span-storage.repository.ts";
 export { TraceStoredSpanReaderRepository } from "./repositories/read/trace-stored-span-reader.repository.ts";
 export { TraceDerivationSpanClickHouseRepository } from "./repositories/clickhouse/trace-derivation-span.repository.ts";
 export { TraceEventDerivationService } from "./services/trace-event-derivation.service.ts";
 export { ScenarioRoleMetricsDerivationService } from "./services/scenario-role-metrics-derivation.service.ts";
-export { TraceSpanCollectionService, TraceIngressCommand, TraceSpanDedup, type SpanDedupRef } from "./services/trace-ingestion.service.ts";
+export {
+  TraceSpanCollectionService,
+  TraceIngressCommand,
+  TraceSpanDedup,
+  type SpanDedupRef,
+} from "./services/trace-ingestion.service.ts";
 export { TrackedEventSpanService } from "./services/tracked-event-span.service.ts";
 export { TraceSummaryProjectionClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository.ts";
 export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/trace-metrics-analytics.repository.ts";

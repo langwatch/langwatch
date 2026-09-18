@@ -3,8 +3,10 @@
  * logs as other trace reads.
  */
 
-import type { Protections, SpanDetail, TraceLogRecordDto } from "@langwatch/trace-contract";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import type { Protections, SpanDetail, TraceLogRecordDto } from "@langwatch/trace-contract";
+
+import type { TraceApp } from "#app/trace.app";
 
 import {
   gateTraceLogVisibility,
@@ -12,7 +14,6 @@ import {
   type TraceDerivedAttrPrefixes,
   type TraceReadMapperMembers,
 } from "../transport/api-trpc/trace-read-mappers.api.ts";
-import type { TraceApp } from "#app/trace.app";
 
 /**
  * The ports this read needs that Trace does not own. Free of the metadata

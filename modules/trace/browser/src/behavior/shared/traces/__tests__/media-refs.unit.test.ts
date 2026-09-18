@@ -3,6 +3,7 @@
  * Compact trace-level media refs: fold-derived, not span payloads.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   collectMediaRefs,
   MAX_TRACE_MEDIA_REFS,

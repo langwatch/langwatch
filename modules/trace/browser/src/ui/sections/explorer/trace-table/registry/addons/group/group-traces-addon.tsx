@@ -1,9 +1,8 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer.ts";
-import type { DensityTokens } from "../../../../hooks/use-density-tokens.ts";
-import type { TraceListItem } from "../../../../types/trace.ts";
+
 import { formatPreview } from "../../../../../../../behavior/preview-formatter.ts";
+import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer.ts";
 import {
   formatCost,
   formatDuration,
@@ -11,8 +10,10 @@ import {
   formatTokens,
 } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
-import { ROW_STYLES, rowVariantFor, StatusDot } from "../../../status-row.tsx";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
+import type { DensityTokens } from "../../../../hooks/use-density-tokens.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { ROW_STYLES, rowVariantFor, StatusDot } from "../../../status-row.tsx";
 import type { TraceGroup } from "../../cells/group/types.ts";
 import type { AddonDef } from "../../types.ts";
 

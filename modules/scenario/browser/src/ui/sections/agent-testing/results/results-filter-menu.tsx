@@ -5,8 +5,9 @@
  */
 
 import { Button, HStack, Text } from "@chakra-ui/react";
-import { ChevronDown } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
+import { ChevronDown } from "lucide-react";
+
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 export type ResultsFilterOption = {

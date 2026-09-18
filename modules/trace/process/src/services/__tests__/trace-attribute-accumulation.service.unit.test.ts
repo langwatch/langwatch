@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   createInitState,
   createTestSpan,

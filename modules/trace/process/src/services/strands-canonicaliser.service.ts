@@ -2,16 +2,14 @@
 
 import type { CanonicalEvent } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+
 import { extractOutputMessages, recordValueType } from "../rules/canonical-extraction.rules.ts";
 import { isRecord, safeJsonParse } from "../rules/canonical-guard.rules.ts";
 import {
   extractSystemInstructionFromMessages,
   stripSystemMessages,
 } from "../rules/canonical-message.rules.ts";
-import type {
-  AttributeCanonicaliser,
-  ExtractorContext,
-} from "./canonical-attributes.service.ts";
+import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 /** Strands emits one event name for each message role. */
 const ROLE_EVENT_NAMES = [

@@ -2,9 +2,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SpanDetail } from "@langwatch/trace-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { SpanDetail } from "@langwatch/trace-contract";
+
 import { CorrectedSpanScalars } from "../corrected-span-scalars.tsx";
 
 function detail(over: Partial<SpanDetail>): SpanDetail {

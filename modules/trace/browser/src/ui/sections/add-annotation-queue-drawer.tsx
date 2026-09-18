@@ -11,20 +11,21 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
+import { toaster } from "@langwatch/design-system/toaster";
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
-import { applyHandledErrorToForm, FormServerError, showErrorToast } from "./errors/index.ts";
+
+import { api } from "../../behavior/trace-api.ts";
 import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import { api } from "../../behavior/trace-api.ts";
 import { slugify } from "../../model/slugify.ts";
-import { Drawer } from "./drawer.tsx";
-import { Popover } from "@langwatch/design-system/popover";
-import { toaster } from "@langwatch/design-system/toaster";
-import { AddOrEditAnnotationScore } from "./annotations/add-or-edit-annotation-score.tsx";
-import { FullWidthFormControl } from "../elements/full-width-form-control.tsx";
 import { RandomColorAvatar } from "../blocks/random-color-avatar.tsx";
+import { FullWidthFormControl } from "../elements/full-width-form-control.tsx";
+import { AddOrEditAnnotationScore } from "./annotations/add-or-edit-annotation-score.tsx";
+import { Drawer } from "./drawer.tsx";
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "./errors/index.ts";
 
 export const AddAnnotationQueueDrawer = ({
   open = true,

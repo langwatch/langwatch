@@ -1,5 +1,4 @@
 import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
-import * as React from "react";
 import {
   LANGY_DOCK_GAP,
   LANGY_DODGE_STAGGER_MS,
@@ -7,6 +6,8 @@ import {
   SIDEBAR_PANEL_WIDTH,
 } from "@langwatch/langy-browser/surfaces/langy-panel-layout";
 import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import * as React from "react";
+
 import { CloseButton } from "../elements/close-button.tsx";
 import { IsolatedErrorBoundary } from "./isolated-error-boundary.tsx";
 

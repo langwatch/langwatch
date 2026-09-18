@@ -10,8 +10,9 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentTestingCaseEditor } from "../agent-testing-case-editor.tsx";
+
 import { AgentTestingCaseEditorDrawer } from "../agent-testing-case-editor-drawer.tsx";
+import { AgentTestingCaseEditor } from "../agent-testing-case-editor.tsx";
 import { NO_RUN_YET_HINT } from "../case-recent-runs-button.tsx";
 
 const mockCreate = vi.hoisted(() => vi.fn());

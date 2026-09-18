@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { evaluationSchema,sharedTraceDtoSchema,
+
+import {
+  evaluationSchema,
+  sharedTraceDtoSchema,
   spanDetailSchema,
   spanTreeNodeSchema,
   traceHeaderSchema,
-  traceResourceInfoSchema } from "../index.ts";
+  traceResourceInfoSchema,
+} from "../index.ts";
 
 /**
  * Share payload output schema enforces the leak-prevention contract (ADR-057):

@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { spanTreeCursorSchema } from "./trace.ts";
 
 /** Exact transport input of `tracesV2.spanTreePaginated`. */

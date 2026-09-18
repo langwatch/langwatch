@@ -1,5 +1,5 @@
-import * as observability from "@langwatch/observability";
 import type { AppRestBroadcast } from "@langwatch/api/rest";
+import * as observability from "@langwatch/observability";
 import { SimulationRunStatus } from "@langwatch/scenario-contract";
 import type {
   ScenarioTabRegistry,

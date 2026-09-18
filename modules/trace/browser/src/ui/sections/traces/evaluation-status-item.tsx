@@ -1,23 +1,24 @@
 import { Box, Circle, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
-import { formatDistanceToNow } from "@langwatch/time";
-import { MoreVertical, Pencil } from "lucide-react";
-import numeral from "numeral";
-import { useMemo } from "react";
-import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import { api } from "../../../behavior/trace-api.ts";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { useDrawer } from "../../../behavior/use-drawer.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   evaluationPassed,
   evaluationStatusColor,
 } from "@langwatch/evaluator-browser/surfaces/evaluation-status";
-import { HoverableBigText } from "../hoverable-big-text.tsx";
-import { Menu } from "@langwatch/design-system/menu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { formatDistanceToNow } from "@langwatch/time";
+import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
+import { MoreVertical, Pencil } from "lucide-react";
+import numeral from "numeral";
+import { useMemo } from "react";
+
+import { api } from "../../../behavior/trace-api.ts";
+import { useDrawer } from "../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { readableDate } from "../../../model/display-formatters.ts";
+import { HoverableBigText } from "../hoverable-big-text.tsx";
 
 export function formatEvaluationSingleValue(evaluation: {
   score?: number | null;

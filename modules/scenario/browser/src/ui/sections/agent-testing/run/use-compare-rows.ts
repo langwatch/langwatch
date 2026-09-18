@@ -4,7 +4,9 @@
  */
 
 import { useCallback } from "react";
+
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
+import { lineFromRows, rowsFromLine } from "../../../../model/agent-testing/run/parameter-rows.ts";
 import {
   addCompareRow,
   type CompareRow,
@@ -13,7 +15,6 @@ import {
   MAX_COMPARE_ROWS,
   type ParameterDefaults,
 } from "./compare-rows.ts";
-import { lineFromRows, rowsFromLine } from "../../../../model/agent-testing/run/parameter-rows.ts";
 import type { RunDialogAgent } from "./run-target-picker.tsx";
 import type { RunDialogFields } from "./use-run-dialog-form.ts";
 import type { RunPlanFields } from "./use-run-plan-fields.ts";

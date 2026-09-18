@@ -1,4 +1,5 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
+
 import type { TraceListItem } from "../types/trace.ts";
 import type { ConversationGroup } from "./conversation-groups.ts";
 import type { TraceGroup } from "./registry/cells/group/types.ts";

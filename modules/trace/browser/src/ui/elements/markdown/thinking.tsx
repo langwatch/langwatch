@@ -1,7 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import React from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import React from "react";
 
 const thinkingShimmer = keyframes`
   0% { background-position: 200% center; }

@@ -1,9 +1,9 @@
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { isOnPlatformSet } from "@langwatch/scenario-contract";
 /**
  * Hook for path-based suite routing.
  */
 import { useCallback } from "react";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { isOnPlatformSet } from "@langwatch/scenario-contract";
 
 export const ALL_RUNS_ID = "all-runs" as const;
 export const EXTERNAL_SET_PREFIX = "external:" as const;

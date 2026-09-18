@@ -1,5 +1,15 @@
 import type { LiqeQuery, LiteralExpressionToken, RangeExpressionToken, TagToken } from "liqe";
 import { describe, expect, it } from "vitest";
+
+import {
+  analyzeOrGroups,
+  buildFacetStateLookup,
+  getFacetValues,
+  getRangeValue,
+  type OrGroup,
+  type OrGroupAnalysis,
+  validateAst,
+} from "../trace-query-analysis.ts";
 import {
   addSameFieldOrValue,
   addToOrGroupAtLocation,
@@ -12,15 +22,6 @@ import {
   toggleFacetInQuery,
 } from "../trace-query-mutations.ts";
 import { ParseError, parse, serialize, stripAtSigils } from "../trace-query-parser.ts";
-import {
-  analyzeOrGroups,
-  buildFacetStateLookup,
-  getFacetValues,
-  getRangeValue,
-  type OrGroup,
-  type OrGroupAnalysis,
-  validateAst,
-} from "../trace-query-analysis.ts";
 
 function locationOf(query: string, fragment: string): { start: number; end: number } {
   const start = query.indexOf(fragment);

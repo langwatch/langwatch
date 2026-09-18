@@ -1,11 +1,11 @@
-import type { Protections } from "./trace-viewer-protections.contract.ts";
+import { z } from "zod";
 /**
  * Projection DSL: public contract for declaring which trace columns to fetch in
  * one query instead of per-trace fan-out. Optional fields `from` + `select`.
  */
 
-import { z } from "zod";
 import type { Trace } from "./trace-format.schemas.ts";
+import type { Protections } from "./trace-viewer-protections.contract.ts";
 
 /**
  * Entity roots the DSL can read `from`. Only "traces" ships in M1; the RFC

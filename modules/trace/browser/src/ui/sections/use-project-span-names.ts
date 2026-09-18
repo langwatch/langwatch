@@ -1,7 +1,8 @@
-import { useMemo } from "react";
-import { reservedTraceMetadataSchema } from "@langwatch/trace-contract";
-import { api } from "../../behavior/trace-api.ts";
 import { nowInstant } from "@langwatch/time";
+import { reservedTraceMetadataSchema } from "@langwatch/trace-contract";
+import { useMemo } from "react";
+
+import { api } from "../../behavior/trace-api.ts";
 
 /**
  * @param projectId - project ID to fetch field names from

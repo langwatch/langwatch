@@ -4,10 +4,11 @@
  * workflow/code/http targets (real Postgres and model-provider boundary).
  */
 import { randomBytes } from "node:crypto";
-import { createLogger } from "@langwatch/observability";
+
 import type { Agent } from "@langwatch/agent-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { CODEX_DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   CodexTokenRefresher,
   ModelProviderConnectionRateLimiter,
@@ -18,9 +19,9 @@ import {
   UnavailableModelProviderCredentialProbeAdapter,
   UnmanagedModelProviderGatewayAdapter,
   VercelAiModelTranslationAdapter,
-} from "@langwatch/model-provider-server";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+} from "@langwatch/model-provider-process";
+import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -31,6 +32,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -87,7 +89,7 @@ function database(): PrismaClient {
 
 /** The real service, over the real repositories, with only the outbound edges stood down. */
 function realModelProviders(prisma: PrismaClient): ModelProviderApi {
-  return PostgresModelProviderAdapter.create({
+  const service = PostgresModelProviderAdapter.create({
     database: prisma,
     projects: {
       findWithTeam: async (id: string) =>
@@ -123,20 +125,26 @@ function realModelProviders(prisma: PrismaClient): ModelProviderApi {
         }));
       },
     } as unknown as ProjectApi,
-    organizations: {
+    organizations: createApiFixture<OrganizationApi>({
       getBillingProfile: async ({ organizationId }: { organizationId: string }) => {
         const organization = await prisma.organization.findUnique({
           where: { id: organizationId },
         });
         if (!organization) throw new Error(`organization ${organizationId} not found`);
-        return organization;
+        return {
+          id: organization.id,
+          name: organization.name,
+          billingCustomerId: organization.stripeCustomerId,
+        };
       },
       listTeams: async ({ organizationId }: { organizationId: string }) => {
         const data = await prisma.team.findMany({ where: { organizationId } });
         return { data, pagination: { page: 1, limit: data.length, total: data.length } };
       },
-    } as unknown as OrganizationService,
-    authorization: { getDecision: async () => ({ permitted: true }) } as unknown as AuthzService,
+    }),
+    authorization: createApiFixture<AuthzApi>({
+      getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
+    }),
     credentials: new IdentityCredentialCodec(),
     codexTokenRefresher: new UnusedCodexTokenRefresher(),
     connectionRateLimiter: new UnlimitedConnections(),
@@ -154,6 +162,13 @@ function realModelProviders(prisma: PrismaClient): ModelProviderApi {
       suffix: () => randomBytes(6).toString("hex"),
     }),
   }).build();
+
+  return createApiFixture<ModelProviderApi>({
+    findProviderForProject: service.findProviderForProject.bind(service),
+    getExecutionProviders: service.getExecutionProviders.bind(service),
+    prepareExecution: service.prepareExecution.bind(service),
+    findResolvedDefault: service.findResolvedDefault.bind(service),
+  });
 }
 
 describe.skipIf(!databaseUrl)("given a project whose FAST role default is a codex model", () => {

@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
 import {
   encodeContent,
   encodeEnd,
   encodeStart,
   isCompactStreamingEvent,
 } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
 
 describe("streaming-event-codec", () => {
   const baseFields = {

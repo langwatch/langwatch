@@ -1,6 +1,3 @@
-// Data-privacy content DROP wired into EventingRecordSpanAdapter; runs at
-// command choke point so SpanReceivedEvent carries already-dropped span
-import { createTenantId, type Command, type TenantId } from "@langwatch/eventing";
 import {
   PRIVACY_DROPPED_MARKER_ATTR,
   EMPTY_AUDIENCE,
@@ -8,6 +5,9 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { OtlpSpanContentDropService } from "@langwatch/data-privacy-process";
+// Data-privacy content DROP wired into EventingRecordSpanAdapter; runs at
+// command choke point so SpanReceivedEvent carries already-dropped span
+import { createTenantId, type Command, type TenantId } from "@langwatch/eventing";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -20,16 +20,16 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { EventingRecordSpanAdapter } from "../eventing.record-span.service.ts";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
-import { TraceSummaryFoldProjection } from "../../eventing/trace-summary.projection.ts";
-import { createTestRuntime } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import {
   type TraceSpanContentDrop,
   type TraceSpanCostEnrichment,
   type TraceSpanPiiRedaction,
   type TraceSpanTokenEstimation,
 } from "../../app/trace.members.ts";
+import { createTestRuntime } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
+import { TraceSummaryFoldProjection } from "../../eventing/trace-summary.projection.ts";
+import { EventingRecordSpanAdapter } from "../eventing.record-span.service.ts";
+import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 
 function policy({
   input = "capture" as Disposition,
@@ -69,8 +69,7 @@ const dropService = OtlpSpanContentDropService.create({
 });
 
 class ContentDropWithPolicy implements TraceSpanContentDrop {
-  constructor(private readonly dropPolicy: ResolvedDataPrivacy | null) {
-  }
+  constructor(private readonly dropPolicy: ResolvedDataPrivacy | null) {}
 
   async drop(span: OtlpSpan, _projectId: string) {
     if (!this.dropPolicy) {

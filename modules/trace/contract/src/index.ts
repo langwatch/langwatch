@@ -33,8 +33,6 @@ export * from "./trace.errors.ts";
 export * from "./otlp-ingest.rest.ts";
 export * from "./traces.trpc.ts";
 export * from "./spans.trpc.ts";
-export { tracesV2Trpc } from "./traces-v2.trpc.ts";
-export { sharedTraceTrpc } from "./shared-trace.trpc.ts";
 export * from "./trace-edit-overlay.trpc.ts";
 export * from "./trace-projection.ts";
 export * from "./trace-processing.commands.ts";

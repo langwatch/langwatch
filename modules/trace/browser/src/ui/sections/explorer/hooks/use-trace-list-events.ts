@@ -1,9 +1,10 @@
+import type { TraceEventRollup } from "@langwatch/trace-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import type { TraceEventRollup } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api.ts";
+
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useViewStore } from "../../../../behavior/view.store.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../types/trace.ts";

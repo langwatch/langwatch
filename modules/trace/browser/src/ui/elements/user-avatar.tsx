@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { Avatar, type AvatarRootProps } from "@langwatch/design-system/avatar";
+import { useState } from "react";
 
 /**
  * Person avatar: image → initials → silhouette. Single fallback chain shared.

@@ -3,13 +3,20 @@
  * `MediaPartData` shape the simulations `MediaPart` renders: audio players, inline
  * images, video, and file-attachment chips.
  */
-import { rawPcmBase64ToWavBase64, resolveRawPcmFormat, isMediaPartRole, type MediaPartRole, type TraceMediaRef } from "@langwatch/trace-contract";
-import { containsMediaMarkers } from "../content-parts/media-markers.ts";
+import {
+  rawPcmBase64ToWavBase64,
+  resolveRawPcmFormat,
+  isMediaPartRole,
+  type MediaPartRole,
+  type TraceMediaRef,
+} from "@langwatch/trace-contract";
+
 import {
   parseBase64DataUri,
   type ContentPartVisitor,
   visitContentPart,
 } from "../../../model/shared/content-parts/visit-content-part.ts";
+import { containsMediaMarkers } from "../content-parts/media-markers.ts";
 
 /**
  * A single renderable media content part, as produced after content

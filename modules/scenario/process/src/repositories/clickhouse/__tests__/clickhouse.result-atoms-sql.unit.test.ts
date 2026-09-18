@@ -2,9 +2,9 @@
  * @see specs/features/agent-testing/results-atoms.feature
  */
 
-import { describe, expect, it } from "vitest";
 import { categorizeRunStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { mapStatus } from "../simulation-run.mapper.ts";
+import { describe, expect, it } from "vitest";
+
 import {
   CODE_TARGET_NAME_EXPR,
   DEDUP_WINDOW_SLACK_MS,
@@ -17,6 +17,7 @@ import {
   TARGET_REF_EXPR,
   TARGET_STAMP_KEY_EXPR,
 } from "../clickhouse.result-atoms.repository.ts";
+import { mapStatus } from "../simulation-run.mapper.ts";
 
 const buildAtomFilters = (
   ...args: Parameters<typeof ResultAtomsClickHouseRepository.buildAtomFilters>

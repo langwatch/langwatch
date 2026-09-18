@@ -1,10 +1,11 @@
+import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 /**
  * @vitest-environment node
  * @unit
  * evaluation_id is hashed from trace+payload; queue dedup alone is insufficient (30s TTL).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
+
 import { CustomEvaluationSync } from "../custom-evaluation-sync.subscriber.ts";
 import {
   createContext,

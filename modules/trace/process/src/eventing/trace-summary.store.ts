@@ -1,5 +1,6 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
+
 import { TraceSummaryProjectionRepository } from "../repositories/projection/trace-summary-projection.repository.ts";
 
 /**

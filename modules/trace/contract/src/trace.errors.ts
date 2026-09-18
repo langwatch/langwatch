@@ -1,4 +1,5 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
+
 import type { AiActionErrorDetails } from "./trace-ai-query.ts";
 
 /** The configured model provider did not produce a usable trace query. */

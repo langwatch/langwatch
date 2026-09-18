@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+
 import {
   type CancellationPublisher as CancellationPublisherPort,
   type CancellationSubscriber as CancellationSubscriberPort,
@@ -24,8 +25,7 @@ export class RedisCancellationPublisherAdapter implements CancellationPublisherP
     return new RedisCancellationPublisherAdapter(publisher);
   }
 
-  private constructor(private readonly publisher: CancellationPublisher) {
-  }
+  private constructor(private readonly publisher: CancellationPublisher) {}
 
   async publish(message: CancellationMessage): Promise<void> {
     await this.publisher.publish(CANCELLATION_CHANNEL, JSON.stringify(message));
@@ -41,8 +41,7 @@ export class UnavailableCancellationPublisherAdapter implements CancellationPubl
     return new UnavailableCancellationPublisherAdapter();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   publish(message: CancellationMessage): Promise<void> {
     return Promise.reject(
@@ -56,8 +55,7 @@ export class RedisCancellationSubscriberAdapter implements CancellationSubscribe
     return new RedisCancellationSubscriberAdapter(subscriber);
   }
 
-  private constructor(private readonly subscriber: CancellationSubscriber) {
-  }
+  private constructor(private readonly subscriber: CancellationSubscriber) {}
 
   async subscribe(
     onCancellation: (message: CancellationMessage) => void,

@@ -1,10 +1,10 @@
 import { Box, Circle, HStack, Icon, Text } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
 import { forwardRef } from "react";
 import type { IconType } from "react-icons";
 import { LuFilter } from "react-icons/lu";
-import { Popover } from "@langwatch/design-system/popover";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export type ChipTone = "neutral" | "purple" | "blue" | "green" | "yellow" | "red";
 

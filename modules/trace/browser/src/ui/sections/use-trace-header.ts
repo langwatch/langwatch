@@ -1,4 +1,5 @@
 import type { TraceHeader, TraceHeaderReadInput } from "@langwatch/trace-contract";
+
 import { traceApi } from "../../behavior/trace-api.ts";
 
 export type UseTraceHeaderResult = {

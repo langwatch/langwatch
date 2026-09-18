@@ -1,8 +1,9 @@
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../../behavior/trace-api.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 import { toEpochMs } from "@langwatch/time";
+
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
 
 export interface VisibleTraceIds {
   /** Set of traceIds currently rendered in the list. */

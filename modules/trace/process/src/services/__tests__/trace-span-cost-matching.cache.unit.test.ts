@@ -1,8 +1,8 @@
-import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
-import { describe, expect, it } from "vitest";
-
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
 
 // Prompt-cache cost: a span whose prompt was mostly served from cache must be
 // priced at the provider's cache-read rate, not the full input rate. A cached

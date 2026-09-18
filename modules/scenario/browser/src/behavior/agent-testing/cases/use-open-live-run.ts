@@ -4,8 +4,8 @@
  * @see specs/features/agent-testing/live-single-scenario-run.feature
  */
 
-import { useCallback } from "react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useCallback } from "react";
 
 export type OpenLiveRunParams = {
   batchRunId: string;

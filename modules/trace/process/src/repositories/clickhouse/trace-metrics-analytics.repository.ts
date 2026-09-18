@@ -1,6 +1,7 @@
+import { queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsRow,
@@ -9,7 +10,7 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
 } from "../projection/trace-analytics-projection.repository.ts";
-import { queryWindowed } from "@langwatch/clickhouse-client";
+import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 
 const TABLE_NAME = "trace_analytics" as const;
 
@@ -204,10 +205,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<TraceAnalyticsProjectionRead | null> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "TraceAnalyticsClickHouseRepository.findByTraceId",
-    );
+    EventUtils.validateTenantId({ tenantId }, "TraceAnalyticsClickHouseRepository.findByTraceId");
 
     try {
       return await queryWindowed<{

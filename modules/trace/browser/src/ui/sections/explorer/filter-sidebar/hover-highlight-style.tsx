@@ -1,4 +1,5 @@
 import type React from "react";
+
 import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
 
 /**

@@ -5,8 +5,9 @@
  */
 
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
-import { formatCost } from "@langwatch/suite-browser/run-formatters";
 import type { AtomCost, ResultTotals, SeriesBucket } from "@langwatch/scenario-contract";
+import { formatCost } from "@langwatch/suite-browser/run-formatters";
+
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   formatPassRate,

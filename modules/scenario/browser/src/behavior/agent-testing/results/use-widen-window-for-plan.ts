@@ -4,9 +4,10 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
+import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
 import { fromDate, nowInstant, subDays, type Instant } from "@langwatch/time";
 import { useEffect } from "react";
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+
 import { widenedWindowDays } from "./run-plans.ts";
 
 /**

@@ -1,8 +1,9 @@
 /** The Sessions lens forwards a query's positive free-text terms to the
  * transcript content search. Only implicit-field terms qualify. */
 import { describe, expect, it } from "vitest";
-import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
+
 import { MAX_VALUE_LENGTH } from "../clickhouse.trace-query-values.repository.ts";
+import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 
 const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 

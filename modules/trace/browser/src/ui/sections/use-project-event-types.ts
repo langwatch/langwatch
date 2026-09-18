@@ -1,6 +1,7 @@
-import { useMemo } from "react";
-import { api } from "../../behavior/trace-api.ts";
 import { nowInstant } from "@langwatch/time";
+import { useMemo } from "react";
+
+import { api } from "../../behavior/trace-api.ts";
 
 /**
  * @param projectId - The project ID to fetch event types for

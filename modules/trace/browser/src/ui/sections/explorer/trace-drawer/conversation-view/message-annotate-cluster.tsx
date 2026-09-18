@@ -1,17 +1,18 @@
 import { createLogger } from "@langwatch/observability/browser";
 import { Edit3, Languages, Lightbulb } from "lucide-react";
-import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
-import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
-import { showErrorToast } from "../../../errors/index.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+
 import {
   isSameAnnotationTarget,
   useAnnotationDraftStore,
 } from "../../../../../behavior/annotation-draft.store.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   HoverActionButton,
   HoverActionCluster,
 } from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster.tsx";
+import { showErrorToast } from "../../../errors/index.ts";
+import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
+import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
 
 const logger = createLogger("MessageAnnotateCluster");
 

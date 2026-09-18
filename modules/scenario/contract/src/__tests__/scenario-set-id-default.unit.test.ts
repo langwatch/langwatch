@@ -3,6 +3,7 @@
  * @see specs/scenarios/scenario-set-id-default.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   ScenarioEventType,
   scenarioMessageSnapshotSchema,

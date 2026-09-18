@@ -5,12 +5,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Span } from "@langwatch/trace-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import type { Project } from "../../../../model/prisma-types.ts";
-import type { Span } from "@langwatch/trace-contract";
 import { SpanDetails } from "../span-details.tsx";
 
 const mockBuildUrl = vi.fn((spanId: string, action?: string) => {

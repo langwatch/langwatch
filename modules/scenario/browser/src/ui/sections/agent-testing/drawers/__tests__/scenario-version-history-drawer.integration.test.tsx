@@ -9,6 +9,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ScenarioFormDrawer } from "../../../scenarios/scenario-form-drawer.tsx";
 import { ScenarioVersionHistoryDrawer } from "../scenario-version-history-drawer.tsx";
 

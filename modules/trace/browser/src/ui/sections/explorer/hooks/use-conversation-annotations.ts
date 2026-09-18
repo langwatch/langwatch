@@ -1,9 +1,10 @@
 import { useMemo } from "react";
+
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
 } from "../../use-annotations-by-trace-ids.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 export interface ConversationAnnotations {
   /**

@@ -1,7 +1,8 @@
-import { TraceReadableSpanService } from "../trace-readable-span.service.ts";
+import type { BaseSpan, LLMSpan, RAGSpan, Span, SpanTypes } from "@langwatch/trace-contract";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { describe, expect, it } from "vitest";
-import type { BaseSpan, LLMSpan, RAGSpan, Span, SpanTypes } from "@langwatch/trace-contract";
+
+import { TraceReadableSpanService } from "../trace-readable-span.service.ts";
 
 function makeBaseSpan(overrides: Partial<BaseSpan> = {}): BaseSpan {
   return {
@@ -805,7 +806,9 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
   describe("given multiple spans mapped at once", () => {
     it("handles empty spans array via map", () => {
       const spans: Span[] = [];
-      const results = spans.map((span) => TraceReadableSpanService.langwatchSpanToReadableSpan(span));
+      const results = spans.map((span) =>
+        TraceReadableSpanService.langwatchSpanToReadableSpan(span),
+      );
       expect(results).toEqual([]);
     });
 
@@ -814,7 +817,9 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
         makeBaseSpan({ span_id: "s1", name: "first" }),
         makeBaseSpan({ span_id: "s2", name: "second", parent_id: "s1" }),
       ];
-      const results = spans.map((span) => TraceReadableSpanService.langwatchSpanToReadableSpan(span));
+      const results = spans.map((span) =>
+        TraceReadableSpanService.langwatchSpanToReadableSpan(span),
+      );
       expect(results).toHaveLength(2);
       expect(results[0]!.name).toBe("first");
       expect(results[1]!.name).toBe("second");

@@ -2,9 +2,10 @@
  * @see specs/features/agent-testing/results-atoms.feature
  */
 
-import { describe, expect, it, vi } from "vitest";
-import { getSuiteSetId } from "@langwatch/suite-contract";
 import { ScenarioRunStatus, type ResultsFilter } from "@langwatch/scenario-contract";
+import { getSuiteSetId } from "@langwatch/suite-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import type {
   RawAtomRow,
   RawGroupRow,

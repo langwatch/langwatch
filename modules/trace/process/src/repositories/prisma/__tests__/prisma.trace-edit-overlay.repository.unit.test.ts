@@ -3,11 +3,12 @@
  * Tests correction row writes: dual-constraint upserts can race into duplicate inserts.
  */
 
-import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaTraceEditOverlayRepository } from "../prisma.trace-edit-overlay.repository.ts";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { Temporal } from "@langwatch/time";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { PrismaTraceEditOverlayRepository } from "../prisma.trace-edit-overlay.repository.ts";
 
 const patch: TraceEditOverlayPatch = {
   version: 1,

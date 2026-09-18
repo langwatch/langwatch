@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+
 import {
   defaultOpenTunnel,
   openVoicePublicUrlTunnel,
@@ -37,9 +38,9 @@ describe("tunnelHostFromUrl", () => {
 
   /** @scenario "A voice worker opens a quick tunnel when no public base URL is configured" */
   it("strips a path or trailing slash", () => {
-    expect(
-      tunnelHostFromUrl("https://random-words.trycloudflare.com/twilio/abc"),
-    ).toBe("random-words.trycloudflare.com");
+    expect(tunnelHostFromUrl("https://random-words.trycloudflare.com/twilio/abc")).toBe(
+      "random-words.trycloudflare.com",
+    );
     expect(tunnelHostFromUrl("http://plain-host/")).toBe("plain-host");
   });
 });
@@ -65,9 +66,7 @@ describe("waitUntilTunnelResolvable", () => {
 
   /** @scenario "A voice worker's public URL tunnel fails fast when it never becomes reachable" */
   it("throws VoiceTunnelNotReadyError once the timeout elapses without a resolution", async () => {
-    const resolveHost = vi
-      .fn<(host: string) => Promise<boolean>>()
-      .mockResolvedValue(false);
+    const resolveHost = vi.fn<(host: string) => Promise<boolean>>().mockResolvedValue(false);
 
     await expect(
       waitUntilTunnelResolvable({
@@ -80,9 +79,7 @@ describe("waitUntilTunnelResolvable", () => {
 
   /** @scenario "A voice worker's public URL tunnel fails fast when it never becomes reachable" */
   it("names the tunnel URL and timeout in the failure message", async () => {
-    const resolveHost = vi
-      .fn<(host: string) => Promise<boolean>>()
-      .mockResolvedValue(false);
+    const resolveHost = vi.fn<(host: string) => Promise<boolean>>().mockResolvedValue(false);
 
     await expect(
       waitUntilTunnelResolvable({

@@ -20,7 +20,9 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
+
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+
 import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 
 const canonicaliser = TraceCanonicalisationService.create();

@@ -1,5 +1,6 @@
-import { isValidTimestamp } from "./span-timing.rules.ts";
 import { nowInstant } from "@langwatch/time";
+
+import { isValidTimestamp } from "./span-timing.rules.ts";
 
 // Storage-anchor rule of ADR-071; shared by every trace-processing fold that
 // writes PARTITION BY / TTL column. Frozen on first usable business time.

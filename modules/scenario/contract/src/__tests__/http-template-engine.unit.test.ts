@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 
-import type { FieldMapping, ScenarioInput } from "../index.ts";
 import { describe, expect, it } from "vitest";
+
 import {
   buildTemplateContext,
   renderBodyTemplate,
@@ -11,6 +11,7 @@ import {
   renderUrlTemplate,
   TemplateRenderError,
 } from "../http-template-engine.ts";
+import type { FieldMapping, ScenarioInput } from "../index.ts";
 
 function inputWith(content: string | unknown[]): ScenarioInput {
   return {

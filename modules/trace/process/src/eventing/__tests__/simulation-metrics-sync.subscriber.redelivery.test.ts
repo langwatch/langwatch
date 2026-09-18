@@ -1,10 +1,11 @@
+import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
 /**
  * @vitest-environment node
  * @unit
  * Redelivery contract: keyed replace, not add; occurredAt month-crossing defect pinned below.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
+
 import { createSimulationMetricsSyncHandler } from "../simulation-metrics-sync.subscriber.ts";
 import { createContext, createFoldState, createTraceEvent } from "./trace-subscriber.fixtures.ts";
 

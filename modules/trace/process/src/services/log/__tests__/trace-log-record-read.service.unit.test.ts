@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
 import type { LogApi } from "@langwatch/log-contract";
-import { LogRecordStorageService } from "../../trace-log-record-read.service.ts";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
 } from "../../../repositories/log-record-storage.repository.ts";
+import { LogRecordStorageService } from "../../trace-log-record-read.service.ts";
 
 const row: StoredLogRecordRow = {
   traceId: "trace-1",

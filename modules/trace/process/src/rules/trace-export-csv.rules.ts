@@ -4,7 +4,7 @@
  * fields denormalized. Every heading and cell goes through formula guard.
  */
 
-import Parse from "papaparse";
+import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 import type {
   ErrorCapture,
   Evaluation,
@@ -14,8 +14,9 @@ import type {
   SpanInputOutput,
   Trace,
 } from "@langwatch/trace-contract";
+import Parse from "papaparse";
+
 import { RESERVED_METADATA_KEYS } from "./trace-export-columns.rules.ts";
-import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 
 /**
  * RFC 4180 line ending, explicit rather than PapaParse's default. Every

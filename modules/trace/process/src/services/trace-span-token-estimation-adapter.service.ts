@@ -1,6 +1,7 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { type TraceSpanTokenEstimation,type TraceTokenCounter } from "../app/trace.members.ts";
+
+import { type TraceSpanTokenEstimation, type TraceTokenCounter } from "../app/trace.members.ts";
 import { OtlpSpanTokenEstimationService } from "./span-token-estimation.service.ts";
 
 /**
@@ -16,8 +17,7 @@ export class TraceSpanTokenEstimationAdapter implements TraceSpanTokenEstimation
     return new TraceSpanTokenEstimationAdapter(OtlpSpanTokenEstimationService.create(options));
   }
 
-  private constructor(private readonly service: OtlpSpanTokenEstimationService) {
-  }
+  private constructor(private readonly service: OtlpSpanTokenEstimationService) {}
 
   async estimate(span: OtlpSpan, tenantId: string): Promise<void> {
     await this.service.estimateSpanTokens({ span, tenantId });

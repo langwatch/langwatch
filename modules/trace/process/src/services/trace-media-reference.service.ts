@@ -5,6 +5,7 @@ import {
   serializeMediaRefList,
   type TraceMediaRef,
 } from "@langwatch/trace-contract";
+
 import {
   type TraceMediaReferenceResolver,
   type TraceMediaReference,
@@ -17,8 +18,7 @@ export class TraceMediaReferenceAdapter implements TraceMediaReferenceResolver {
     return new TraceMediaReferenceAdapter();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   collect(value: unknown): TraceMediaReference[] {
     return collectMediaRefs(value);

@@ -3,12 +3,13 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { useCallback, useRef } from "react";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import type { ScenarioTabNavigatePayload } from "@langwatch/scenario-contract";
+import { useCallback, useRef } from "react";
+
+import { api } from "../scenario-api.ts";
 import { useScenarioTabFollow } from "../use-scenario-tab-follow.ts";
 import { useSimulationUpdateListener } from "../use-simulation-update-listener.ts";
-import { api } from "../scenario-api.ts";
-import { useRouter } from "@langwatch/browser-host/use-router";
 import { toAgentTestingRunPath } from "./results/run-plans.ts";
 
 /**

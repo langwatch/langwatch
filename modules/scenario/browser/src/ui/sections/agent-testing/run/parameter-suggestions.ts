@@ -3,18 +3,19 @@
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 
-import type {
-  DeclaredParameter,
-  ParameterSource,
-} from "../../../../behavior/suites/use-run-suite.ts";
+import { displayTypedValue } from "@langwatch/design-system/json-value-text";
+import { rankByMatch } from "@langwatch/trace-browser/surfaces/suggestion-items";
 import {
   getSuggestionState,
   PARAMETER_LINE_GRAMMAR,
   type SuggestionState,
 } from "@langwatch/trace-browser/surfaces/suggestion-state";
-import { rankByMatch } from "@langwatch/trace-browser/surfaces/suggestion-items";
 import type { SuggestionRow } from "@langwatch/trace-browser/surfaces/suggestion-ui";
-import { displayTypedValue } from "@langwatch/design-system/json-value-text";
+
+import type {
+  DeclaredParameter,
+  ParameterSource,
+} from "../../../../behavior/suites/use-run-suite.ts";
 import { parseParameterLine } from "../../../../model/agent-testing/run/parameter-line.ts";
 
 /** What the line shows while it is empty and nothing is declared. */

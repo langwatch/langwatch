@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type {
   BatchedFacetResult,
   DiscoverResult,
@@ -12,24 +13,24 @@ import type {
   FacetDescriptor,
   TraceListRead,
 } from "@langwatch/trace-contract";
+
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,
   FacetTable,
   RangeFacetDef,
 } from "#repositories/clickhouse/clickhouse.trace-facet-registry.repository";
-import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 
+import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import {
   discoverCacheKey,
   snapToWindowPreset,
   type DiscoverParams,
 } from "../rules/trace-list-cache-key.rules.ts";
-import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
-import { TtlCache } from "./trace-ttl-cache.service.ts";
-import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 import { TraceFacetDescriptorService } from "./trace-facet-descriptor.service.ts";
-import { nowInstant } from "@langwatch/time";
+import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
+import { TtlCache } from "./trace-ttl-cache.service.ts";
 
 /**
  * Stale-while-revalidate cache for the full discover payload. The table view fires `discover` on

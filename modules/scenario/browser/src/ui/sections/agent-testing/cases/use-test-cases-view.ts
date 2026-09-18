@@ -4,15 +4,16 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { useCallback, useMemo, useState } from "react";
 import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import { useCallback, useMemo, useState } from "react";
+
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
-import type { ExternalCaseRow } from "./cases-panel.tsx";
 import {
   filterCasesByLabels,
   type TestCase,
   type TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
+import type { ExternalCaseRow } from "./cases-panel.tsx";
 import { useExternalSetCases } from "./use-test-cases-data.ts";
 
 export type TestCasesView = {

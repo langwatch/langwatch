@@ -4,13 +4,14 @@
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import {
   highlightedRow,
   navigateSuggestion,
   type SuggestionUIState,
 } from "@langwatch/trace-browser/surfaces/suggestion-ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import { useReportOpenList } from "../../../elements/agent-testing/shared/open-list-context.ts";
 import {
   acceptParameterField,

@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { readVoiceWorkerEnv, VOICE_WS_PORT_DEFAULT } from "../voice-worker-env";
 
 describe("readVoiceWorkerEnv", () => {
@@ -21,15 +22,9 @@ describe("readVoiceWorkerEnv", () => {
   describe("given VOICE_WORKER_ONLY values", () => {
     /** @scenario "The voice worker reads its three infrastructure environment variables" */
     it("stays off for anything that is not the literal true", () => {
-      expect(
-        readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "false" }).voiceWorkerOnly,
-      ).toBe(false);
-      expect(
-        readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "1" }).voiceWorkerOnly,
-      ).toBe(false);
-      expect(
-        readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "yes" }).voiceWorkerOnly,
-      ).toBe(false);
+      expect(readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "false" }).voiceWorkerOnly).toBe(false);
+      expect(readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "1" }).voiceWorkerOnly).toBe(false);
+      expect(readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "yes" }).voiceWorkerOnly).toBe(false);
     });
 
     /** @scenario "The voice worker reads its three infrastructure environment variables" */
@@ -46,21 +41,17 @@ describe("readVoiceWorkerEnv", () => {
   describe("given a websocket port", () => {
     /** @scenario "The voice worker reads its three infrastructure environment variables" */
     it("parses a valid port and defaults a blank one", () => {
-      expect(readVoiceWorkerEnv({ VOICE_WS_PORT: "4400" }).voiceWsPort).toBe(
-        4400,
-      );
-      expect(readVoiceWorkerEnv({ VOICE_WS_PORT: "" }).voiceWsPort).toBe(
-        VOICE_WS_PORT_DEFAULT,
-      );
+      expect(readVoiceWorkerEnv({ VOICE_WS_PORT: "4400" }).voiceWsPort).toBe(4400);
+      expect(readVoiceWorkerEnv({ VOICE_WS_PORT: "" }).voiceWsPort).toBe(VOICE_WS_PORT_DEFAULT);
     });
   });
 
   describe("given voice worker only is on", () => {
     /** @scenario "A voice worker refuses to start without a public base URL" */
     it("refuses to start without a public base URL", () => {
-      expect(() =>
-        readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "true" }),
-      ).toThrowError(/VOICE_PUBLIC_BASE_URL/);
+      expect(() => readVoiceWorkerEnv({ VOICE_WORKER_ONLY: "true" })).toThrowError(
+        /VOICE_PUBLIC_BASE_URL/,
+      );
     });
 
     /** @scenario "A voice worker refuses to start without a public base URL" */

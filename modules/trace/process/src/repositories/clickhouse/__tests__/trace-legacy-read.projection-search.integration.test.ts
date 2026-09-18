@@ -1,23 +1,31 @@
-import type { Protections,ProjectableTrace,ProjectionFrom,GetAllTracesForProjectInput } from "@langwatch/trace-contract";
+import type { ClickHouseClient } from "@clickhouse/client";
+import type {
+  AnnotationScoreName,
+  ProjectionAnnotation,
+  AnnotationApi,
+} from "@langwatch/annotation-contract";
+import type {
+  Protections,
+  ProjectableTrace,
+  ProjectionFrom,
+  GetAllTracesForProjectInput,
+} from "@langwatch/trace-contract";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
 /** @vitest-environment node
  * @integration
  * Integration coverage for the trace search projection DSL. Proves
  * specs/traces/trace-search-projection.feature against real infra. */
 import { TraceProjectionCompileService } from "../../../services/projection/trace-projection-compile.service.ts";
-import type { AnnotationScoreName, ProjectionAnnotation, AnnotationApi } from "@langwatch/annotation-contract";
-import type { ClickHouseClient } from "@clickhouse/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
-import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
-
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+import { openProtections } from "./open-protections.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support.ts";
-import { openProtections } from "./open-protections.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 

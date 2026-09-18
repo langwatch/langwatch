@@ -1,8 +1,8 @@
+import { tryParseJSON } from "../../model/transcript/content-format.ts";
+import { isRecord } from "../../model/transcript/record.ts";
 import type { ChatMessage, ContentBlock } from "../../model/transcript/types.ts";
 import { coerceToChatMessages } from "./chat-message-coercion.ts";
 import { parseContentBlocks } from "./content-parser.ts";
-import { tryParseJSON } from "../../model/transcript/content-format.ts";
-import { isRecord } from "../../model/transcript/record.ts";
 
 function joinTextBlocks(blocks: ContentBlock[]): string {
   return blocks

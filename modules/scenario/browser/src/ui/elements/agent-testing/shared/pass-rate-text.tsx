@@ -4,6 +4,7 @@
  */
 
 import { Text } from "@chakra-ui/react";
+
 import { formatPassRate, passRateColor } from "./pass-rate-color.ts";
 
 export type PassRateTextProps = {

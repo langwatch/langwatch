@@ -1,11 +1,12 @@
+import type { TriggerContext } from "@langwatch/eventing";
+import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * @unit
  * Deterministic from event+fold state; clock only restricts, so redelivery is idempotent.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TriggerContext } from "@langwatch/eventing";
-import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
+
 import {
   defineOriginGuardedTraceSubscriber,
   passesTraceOriginGuards,

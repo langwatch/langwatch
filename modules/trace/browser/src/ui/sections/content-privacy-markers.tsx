@@ -1,10 +1,11 @@
 import { Alert, HStack, Icon, Link, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { CategoryPrivacy, ContentPrivacy } from "@langwatch/trace-contract";
 import type React from "react";
 import { Eye, Lock, Slash } from "react-feather";
+
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import type { CategoryPrivacy, ContentPrivacy } from "@langwatch/trace-contract";
 import NextLink from "../elements/next-link.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * Generic, per-category read-time privacy markers for a span's content. Every content

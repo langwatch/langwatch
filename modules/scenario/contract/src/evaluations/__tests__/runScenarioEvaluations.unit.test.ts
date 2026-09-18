@@ -1,12 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import type {
-  EvaluatorWithFields,
-  SingleEvaluationResult,
-} from "@langwatch/evaluator-contract";
+import type { EvaluatorWithFields, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { Span } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import type { EvaluatorAttachment } from "../../evaluator-attachments";
-import type { JsonValue } from "../../scenario.ts";
 import { runEvaluatorDefinitionOf } from "../../scenario-run-evaluators";
+import type { JsonValue } from "../../scenario.ts";
 import { MAX_STORED_INPUT_LENGTH } from "../constants";
 import {
   checkTypeOf,
@@ -29,9 +27,7 @@ vi.mock("@langwatch/observability", () => ({
 
 const projectId = "project-1";
 
-const evaluator = (
-  overrides: Partial<EvaluatorWithFields> = {},
-): EvaluatorWithFields =>
+const evaluator = (overrides: Partial<EvaluatorWithFields> = {}): EvaluatorWithFields =>
   ({
     id: "eval-exact",
     projectId,
@@ -67,9 +63,7 @@ const toolMapping = {
   path: ["tool_calls", "run_sql", "input"],
 };
 
-const attachment = (
-  overrides: Partial<EvaluatorAttachment> = {},
-): EvaluatorAttachment => ({
+const attachment = (overrides: Partial<EvaluatorAttachment> = {}): EvaluatorAttachment => ({
   id: "att-1",
   evaluatorId: "eval-exact",
   required: true,
@@ -98,9 +92,7 @@ function makeDeps({
   fields = { golden_sql: "SELECT 1" },
   spans = [] as Span[],
   traceIds = ["trace-1"],
-  result = processed({ passed: true, score: 1 }) as
-    | SingleEvaluationResult
-    | Error,
+  result = processed({ passed: true, score: 1 }) as SingleEvaluationResult | Error,
 }: {
   attachments?: EvaluatorAttachment[];
   evaluators?: EvaluatorWithFields[];
@@ -365,10 +357,7 @@ describe("runScenarioEvaluations", () => {
     it("records the error and the other evaluators still record their results", async () => {
       const failing = evaluator({ id: "eval-failing", name: "Judge" });
       const deps = makeDeps({
-        attachments: [
-          attachment({ id: "att-failing", evaluatorId: "eval-failing" }),
-          attachment(),
-        ],
+        attachments: [attachment({ id: "att-failing", evaluatorId: "eval-failing" }), attachment()],
         evaluators: [failing, evaluator()],
       });
       vi.mocked(deps.runEvaluation)
@@ -445,12 +434,11 @@ describe("runScenarioEvaluations", () => {
       await runScenarioEvaluations({ deps, payload, isFinalAttempt: false });
 
       expect(
-        vi.mocked(deps.runEvaluation).mock.calls[0]?.[0].data.data
-          .expected_output,
+        vi.mocked(deps.runEvaluation).mock.calls[0]?.[0].data.data.expected_output,
       ).toHaveLength(long.length);
-      expect(
-        recorded(deps)?.evaluations[0]?.inputs?.expected_output,
-      ).toHaveLength(MAX_STORED_INPUT_LENGTH);
+      expect(recorded(deps)?.evaluations[0]?.inputs?.expected_output).toHaveLength(
+        MAX_STORED_INPUT_LENGTH,
+      );
     });
   });
 
@@ -476,9 +464,7 @@ describe("runScenarioEvaluations", () => {
     /** @scenario "A trace report failure does not lose a graded result" */
     it("still records the result instead of failing the whole run", async () => {
       const deps = makeDeps();
-      vi.mocked(deps.reportEvaluation).mockRejectedValueOnce(
-        new Error("clickhouse unavailable"),
-      );
+      vi.mocked(deps.reportEvaluation).mockRejectedValueOnce(new Error("clickhouse unavailable"));
 
       await expect(
         runScenarioEvaluations({ deps, payload, isFinalAttempt: false }),
@@ -569,12 +555,8 @@ describe("checkTypeOf", () => {
     runEvaluatorDefinitionOf(evaluator(overrides));
 
   it("dispatches a workflow evaluator on its workflow, a code one on its id, a built-in on its type", () => {
-    expect(
-      checkTypeOf(definition({ type: "workflow", workflowId: "wf-1" })),
-    ).toBe("custom/wf-1");
-    expect(checkTypeOf(definition({ type: "code", id: "eval-code" }))).toBe(
-      "code/eval-code",
-    );
+    expect(checkTypeOf(definition({ type: "workflow", workflowId: "wf-1" }))).toBe("custom/wf-1");
+    expect(checkTypeOf(definition({ type: "code", id: "eval-code" }))).toBe("code/eval-code");
     expect(checkTypeOf(definition())).toBe("langevals/exact_match");
     expect(checkTypeOf(definition({ config: {} }))).toBeNull();
   });

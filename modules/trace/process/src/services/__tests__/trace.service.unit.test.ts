@@ -1,22 +1,22 @@
 import type { SpanTreeNode, TraceFullRecord } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { TestModelProviderService } from "../../__tests__/support/model-provider.service.fake.ts";
+import { TestTraceQueryClassification } from "../../__tests__/support/query-classification.fake.ts";
+import { traceReadPorts } from "../../__tests__/support/trace-read-ports.fake.ts";
 import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
 } from "../../repositories/read/query-field-values.repository.ts";
+import { TraceFullRecordRepository } from "../../repositories/read/trace-full-record.repository.ts";
+import { TraceSummaryReaderRepository } from "../../repositories/read/trace-summary-reader.repository.ts";
 import {
   TraceProjectedReadRepository,
   type TraceSpanSummaryRecord,
   type TraceSpanPage,
 } from "../../repositories/trace-projected-read.repository.ts";
-import { TraceSummaryReaderRepository } from "../../repositories/read/trace-summary-reader.repository.ts";
 import { TraceService } from "../trace.service.ts";
-import { TraceFullRecordRepository } from "../../repositories/read/trace-full-record.repository.ts";
-import { TestModelProviderService } from "../../__tests__/support/model-provider.service.fake.ts";
-import { TestTraceQueryClassification } from "../../__tests__/support/query-classification.fake.ts";
-import { traceReadPorts } from "../../__tests__/support/trace-read-ports.fake.ts";
 
 const node: SpanTreeNode = {
   spanId: "span_1",

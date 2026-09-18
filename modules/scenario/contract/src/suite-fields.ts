@@ -41,8 +41,7 @@ export const SUITE_FIELD_IDENTIFIER_MESSAGE =
 
 export const SUITE_FIELD_IDENTIFIER_RESERVED_MESSAGE = `Field identifiers cannot be ${RESERVED_FIELD_IDENTIFIERS.join(", ")}`;
 
-export const SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE =
-  "Two fields cannot share an identifier";
+export const SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE = "Two fields cannot share an identifier";
 
 /** One field a suite declares. */
 export const suiteFieldDefinitionSchema = z.object({
@@ -52,16 +51,13 @@ export const suiteFieldDefinitionSchema = z.object({
     .max(MAX_SUITE_FIELD_IDENTIFIER_LENGTH)
     .regex(SUITE_FIELD_IDENTIFIER_PATTERN, SUITE_FIELD_IDENTIFIER_MESSAGE)
     .refine(
-      (identifier) =>
-        !(RESERVED_FIELD_IDENTIFIERS as readonly string[]).includes(identifier),
+      (identifier) => !(RESERVED_FIELD_IDENTIFIERS as readonly string[]).includes(identifier),
       { message: SUITE_FIELD_IDENTIFIER_RESERVED_MESSAGE },
     )
     .describe(
       "The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.",
     ),
-  type: z
-    .enum(SUITE_FIELD_TYPES)
-    .describe("The value type every scenario carries for this field."),
+  type: z.enum(SUITE_FIELD_TYPES).describe("The value type every scenario carries for this field."),
 });
 export type SuiteFieldDefinition = z.infer<typeof suiteFieldDefinitionSchema>;
 
@@ -99,9 +95,7 @@ export const scenarioFieldValuesSchema = z.record(
 export type ScenarioFieldValues = z.infer<typeof scenarioFieldValuesSchema>;
 
 /** Reads a stored `fields` column. Null and a bad shape both read as none. */
-export function parseSuiteFieldDefinitions(
-  raw: unknown,
-): SuiteFieldDefinition[] {
+export function parseSuiteFieldDefinitions(raw: unknown): SuiteFieldDefinition[] {
   if (raw === null || raw === undefined) return [];
   const parsed = suiteFieldDefinitionsSchema.safeParse(raw);
   return parsed.success ? parsed.data : [];

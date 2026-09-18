@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   ANALYTICS_METADATA_VALUE_CAP,
   ANALYTICS_STANDARD_VALUE_CAP,

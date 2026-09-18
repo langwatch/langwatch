@@ -1,8 +1,12 @@
 import { createTenantId } from "@langwatch/eventing";
-import { ATTR_KEYS, type TraceNameChangedEvent,
+import {
+  ATTR_KEYS,
+  type TraceNameChangedEvent,
   TRACE_NAME_CHANGED_EVENT_TYPE,
-  TRACE_NAME_CHANGED_EVENT_VERSION_LATEST } from "@langwatch/trace-contract";
+  TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
+
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import {

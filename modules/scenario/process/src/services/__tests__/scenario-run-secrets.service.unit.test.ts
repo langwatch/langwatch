@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { ScenarioSecretCipher } from "../../index.ts";
 import { ScenarioRunSecretsService } from "../scenario-run-secrets.service.ts";
 

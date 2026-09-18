@@ -2,8 +2,9 @@ import { Box, chakra } from "@chakra-ui/react";
 
 const ChakraButton = chakra("button");
 
-import type React from "react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import type React from "react";
+
 import { useSelectionStore } from "../../../../behavior/selection.store.ts";
 import { ariaCheckedFor, checkboxStateFor } from "../../../../model/tri-state-checkbox.ts";
 

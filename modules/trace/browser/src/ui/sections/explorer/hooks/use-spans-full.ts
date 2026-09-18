@@ -1,9 +1,10 @@
+import type { SpanDetail, TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { expandDeletedSpanIds, indexSpanPatches } from "@langwatch/trace-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import type { SpanDetail,TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { expandDeletedSpanIds, indexSpanPatches } from "@langwatch/trace-contract";
-import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
+
 import { api } from "../../../../behavior/trace-api.ts";
+import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
 import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay.ts";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";

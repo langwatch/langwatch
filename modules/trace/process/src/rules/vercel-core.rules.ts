@@ -1,4 +1,5 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+
 import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
 import {
   extractModelToBoth,

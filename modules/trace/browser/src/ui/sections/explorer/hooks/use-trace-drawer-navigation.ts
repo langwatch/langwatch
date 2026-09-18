@@ -1,6 +1,7 @@
 import { useCallback } from "react";
-import { useDrawer } from "../../../../behavior/use-drawer.ts";
+
 import { type DrawerViewMode, useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import { guardTraceEditExit } from "../utils/trace-edit-mode.ts";
 
 /**

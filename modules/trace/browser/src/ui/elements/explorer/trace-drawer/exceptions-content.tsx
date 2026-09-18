@@ -1,6 +1,7 @@
 import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LuCircleX } from "react-icons/lu";
+
 import type { ErrorSpanRanked } from "../../../../model/explorer/error-spans.ts";
 
 interface ExceptionsContentProps {

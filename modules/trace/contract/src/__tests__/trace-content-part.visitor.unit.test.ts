@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { visitContentPart } from "../trace-content-part.visitor.ts";
 
 const PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAE=";

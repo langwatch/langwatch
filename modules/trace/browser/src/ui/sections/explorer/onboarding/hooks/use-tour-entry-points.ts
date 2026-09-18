@@ -1,11 +1,12 @@
 import { useCallback } from "react";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../../../behavior/trace-api.ts";
-import { useProjectHasTraces } from "../../../../../behavior/explorer/use-project-has-traces.ts";
-import { INITIAL_TIME_RANGE, useFilterStore } from "../../../../../behavior/filter.store.ts";
-import { useViewStore } from "../../../../../behavior/view.store.ts";
+
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useOnboardingActive } from "../../../../../behavior/explorer/onboarding/use-onboarding-active.ts";
+import { useProjectHasTraces } from "../../../../../behavior/explorer/use-project-has-traces.ts";
+import { INITIAL_TIME_RANGE, useFilterStore } from "../../../../../behavior/filter.store.ts";
+import { api } from "../../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { useViewStore } from "../../../../../behavior/view.store.ts";
 
 export interface OnboardingEntryState {
   /**

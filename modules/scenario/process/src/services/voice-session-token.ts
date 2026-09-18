@@ -4,11 +4,12 @@
  * Server-only; signing secret supplied by caller, never read from environment.
  */
 
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import {
   type VoiceSessionTokenPayload,
   voiceSessionTokenPayloadSchema,
 } from "@langwatch/scenario-contract";
-import { createHmac, timingSafeEqual } from "node:crypto";
 
 function sign(body: string, secret: string): string {
   return createHmac("sha256", secret).update(body).digest("base64url");
@@ -25,9 +26,7 @@ export function signVoiceSessionToken({
   payload: VoiceSessionTokenPayload;
   secret: string;
 }): string {
-  const body = Buffer.from(JSON.stringify(payload), "utf8").toString(
-    "base64url",
-  );
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
   return `${body}.${sign(body, secret)}`;
 }
 

@@ -8,6 +8,7 @@ import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
 import { nowInstant } from "@langwatch/time";
+
 import type { CallRecord, CallTurn } from "../call-record.ts";
 import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits.ts";
 import type {

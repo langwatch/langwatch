@@ -1,3 +1,4 @@
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 /**
  * The overlay read keeps the previous trace's data while the next one is in flight, so
  * the hook has to say which trace the correction it is holding belongs to.
@@ -5,7 +6,6 @@
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const openTraceId = vi.hoisted(() => ({ current: "trace-2" }));
 const overlayRow = vi.hoisted(() => ({

@@ -1,9 +1,9 @@
+import { VoiceTargetSchema } from "@langwatch/scenario-contract";
 /** @vitest-environment node
  * VoiceTargetSchema discriminates on transport: each branch carries only
  * the credentials its transport can use.
  */
 import { describe, expect, it } from "vitest";
-import { VoiceTargetSchema } from "@langwatch/scenario-contract";
 
 describe("VoiceTargetSchema", () => {
   describe("when the target is an ElevenLabs agent", () => {

@@ -1,5 +1,4 @@
 import "./model/types/ambient.d.ts";
-
 import type { ComponentType } from "react";
 
 export type ScenarioScreenLoader = () => Promise<{ default: ComponentType }>;

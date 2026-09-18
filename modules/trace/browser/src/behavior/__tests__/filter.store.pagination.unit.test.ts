@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { INITIAL_TIME_RANGE, useFilterStore } from "../filter.store.ts";
 
 /**

@@ -1,12 +1,15 @@
-import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
-import { TraceOffloadResolutionService } from "./trace-offload-resolution.service.ts";
-import {
-  mapNormalizedSpanToSpan,
-  mapNormalizedSpansToSpans,
-} from "../rules/trace-legacy-span-mapping.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import type { DerivedTraceEvent,NormalizedSpan,ElasticSearchEvent,Span,SpanResourceInfo,SpanSummaryRow,TraceEventRollup,SpanInsertData } from "@langwatch/trace-contract";
-import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
+import type {
+  DerivedTraceEvent,
+  NormalizedSpan,
+  ElasticSearchEvent,
+  Span,
+  SpanResourceInfo,
+  SpanSummaryRow,
+  TraceEventRollup,
+  SpanInsertData,
+} from "@langwatch/trace-contract";
+
 import type {
   ModelSpanSampleRow,
   ModelUsageStatsRow,
@@ -16,7 +19,14 @@ import type {
   SpanStorageRepository,
   TraceEventRollupParams,
 } from "../repositories/span-storage.repository.ts";
+import {
+  mapNormalizedSpanToSpan,
+  mapNormalizedSpansToSpans,
+} from "../rules/trace-legacy-span-mapping.rules.ts";
+import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service.ts";
+import { TraceOffloadResolutionService } from "./trace-offload-resolution.service.ts";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 
 /**
  * Optional blob-offload resolution dependencies for the v2 read path (ADR-022). When provided, the

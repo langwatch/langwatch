@@ -1,12 +1,10 @@
 /** Maps Haystack retrieval documents to canonical RAG contexts. */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+
 import { inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
 import { isRecord } from "../rules/canonical-guard.rules.ts";
-import type {
-  AttributeCanonicaliser,
-  ExtractorContext,
-} from "./canonical-attributes.service.ts";
+import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 export class HaystackCanonicaliserService implements AttributeCanonicaliser {
   static create(): HaystackCanonicaliserService {

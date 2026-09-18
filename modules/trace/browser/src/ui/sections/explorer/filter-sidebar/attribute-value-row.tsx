@@ -1,8 +1,9 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo } from "react";
+
+import type { FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { hashColor } from "../../../../model/display-formatters.ts";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
-import type { FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { paletteFromColor } from "./utils.ts";
 
 export const AttributeValueRow = memo(function AttributeValueRow({

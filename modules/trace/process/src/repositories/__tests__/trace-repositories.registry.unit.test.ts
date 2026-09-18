@@ -5,8 +5,8 @@
  */
 import { instantiateRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
-import { createInitState } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 
+import { createInitState } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { traceRepositories } from "../trace-repositories.registry.ts";
 
 function memoryTier() {
@@ -66,7 +66,11 @@ describe("given the memory-backed trace repositories", () => {
           projectId: "project-1",
           traceId: "trace-1",
         }),
-      ).resolves.toMatchObject({ projectId: "project-1", traceId: "trace-1", updatedById: "user-1" });
+      ).resolves.toMatchObject({
+        projectId: "project-1",
+        traceId: "trace-1",
+        updatedById: "user-1",
+      });
     });
   });
 

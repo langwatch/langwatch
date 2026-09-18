@@ -1,10 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  type AnnotationAnchorColumns,
-  type AnnotationMode,
-  type ScoreOptions,
-  describeAnnotationAnchor,
-} from "@langwatch/annotation-contract";
 import {
   readAnnotationScoreOptions,
   type AnnotationDraftValues,
@@ -13,13 +6,21 @@ import {
   type PopoverAnnotationFormInput,
   type TraceAnnotation,
 } from "@langwatch/annotation-browser/annotation-form";
+import {
+  type AnnotationAnchorColumns,
+  type AnnotationMode,
+  type ScoreOptions,
+  describeAnnotationAnchor,
+} from "@langwatch/annotation-contract";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../../errors/index.ts";
-import { useAnnotationInvalidation } from "../../../use-annotation-invalidation.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../../../behavior/trace-api.ts";
+import { useEffect, useMemo, useState } from "react";
+
 import { useAnnotationQueueSessionStore } from "../../../../../behavior/annotation-queue-session.store.ts";
 import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store.ts";
+import { api } from "../../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { showErrorToast } from "../../../errors/index.ts";
+import { useAnnotationInvalidation } from "../../../use-annotation-invalidation.ts";
 
 /** The toast-and-invalidate pair every annotation write ends on. */
 function saveCallbacks({

@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from "react";
 import {
   traceAttributeKeyForMetadata,
   traceMetadataKeyForAttribute,
 } from "@langwatch/trace-contract";
+import { useCallback, useMemo } from "react";
+
 import {
   selectTraceMetadataBaseline,
   useTraceEditStore,

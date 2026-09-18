@@ -15,6 +15,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+
 import { BlockStack } from "../../explorer/trace-drawer/transcript/block-stack.tsx";
 import { parseContentBlocks } from "../../explorer/trace-drawer/transcript/parsing.ts";
 import { RenderInputOutput } from "../render-input-output.tsx";

@@ -1,19 +1,20 @@
 import { Button, HStack, Icon, Spinner, Text } from "@chakra-ui/react";
+import { toaster } from "@langwatch/design-system/toaster";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuFileOutput, LuPencil } from "react-icons/lu";
-import { Dialog } from "../../../dialog.tsx";
-import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../../errors/index.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../../../behavior/trace-api.ts";
+
 import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store.ts";
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
+import { api } from "../../../../../behavior/trace-api.ts";
 import {
   buildTraceEditPatch,
   summarizeTraceEdit,
   useTraceEditStore,
 } from "../../../../../behavior/trace-edit.store.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { Dialog } from "../../../dialog.tsx";
+import { showErrorToast } from "../../../errors/index.ts";
 import { exitTraceEditMode } from "../../utils/trace-edit-mode.ts";
 
 /** "3 fields changed, 1 span deleted", with only the non-zero parts. */

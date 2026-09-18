@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-  evaluationFailsRun,
-  gatedStatus,
-  gatedVerdict,
-} from "../scenario-evaluation-gate";
+
+import { evaluationFailsRun, gatedStatus, gatedVerdict } from "../scenario-evaluation-gate";
 import type { ScenarioEvaluationResult } from "../schemas/event-schemas";
 
-function evaluation(
-  overrides: Partial<ScenarioEvaluationResult> = {},
-): ScenarioEvaluationResult {
+function evaluation(overrides: Partial<ScenarioEvaluationResult> = {}): ScenarioEvaluationResult {
   return {
     evaluatorId: "eval-1",
     name: "Check",
@@ -31,15 +26,9 @@ describe("gatedVerdict", () => {
         evaluation({ status: "passed", passed: true }),
       ];
 
-      expect(gatedVerdict({ evaluations, judgeVerdict: "success" })).toBe(
-        "success",
-      );
-      expect(gatedVerdict({ evaluations, judgeVerdict: "failure" })).toBe(
-        "failure",
-      );
-      expect(
-        gatedVerdict({ evaluations, judgeVerdict: undefined }),
-      ).toBeUndefined();
+      expect(gatedVerdict({ evaluations, judgeVerdict: "success" })).toBe("success");
+      expect(gatedVerdict({ evaluations, judgeVerdict: "failure" })).toBe("failure");
+      expect(gatedVerdict({ evaluations, judgeVerdict: undefined })).toBeUndefined();
     });
   });
 
@@ -67,12 +56,8 @@ describe("gatedVerdict", () => {
 
   describe("given a failed evaluation that is not required", () => {
     it("keeps the judge's verdict", () => {
-      const evaluations = [
-        evaluation({ status: "failed", passed: false, required: false }),
-      ];
-      expect(gatedVerdict({ evaluations, judgeVerdict: "success" })).toBe(
-        "success",
-      );
+      const evaluations = [evaluation({ status: "failed", passed: false, required: false })];
+      expect(gatedVerdict({ evaluations, judgeVerdict: "success" })).toBe("success");
       expect(evaluationFailsRun(evaluations[0]!)).toBe(false);
     });
   });
@@ -93,34 +78,22 @@ describe("gatedVerdict", () => {
 describe("gatedStatus", () => {
   describe("given a judged run", () => {
     it("follows the gated verdict", () => {
-      expect(gatedStatus({ status: "SUCCESS", verdict: "failure" })).toBe(
-        "FAILURE",
-      );
-      expect(gatedStatus({ status: "FAILURE", verdict: "success" })).toBe(
-        "SUCCESS",
-      );
-      expect(gatedStatus({ status: "SUCCESS", verdict: "inconclusive" })).toBe(
-        "FAILURE",
-      );
+      expect(gatedStatus({ status: "SUCCESS", verdict: "failure" })).toBe("FAILURE");
+      expect(gatedStatus({ status: "FAILURE", verdict: "success" })).toBe("SUCCESS");
+      expect(gatedStatus({ status: "SUCCESS", verdict: "inconclusive" })).toBe("FAILURE");
     });
   });
 
   describe("given a run that errored or was cancelled", () => {
     it("keeps the status whatever the evaluators said", () => {
-      expect(gatedStatus({ status: "ERROR", verdict: "success" })).toBe(
-        "ERROR",
-      );
-      expect(gatedStatus({ status: "CANCELLED", verdict: "failure" })).toBe(
-        "CANCELLED",
-      );
+      expect(gatedStatus({ status: "ERROR", verdict: "success" })).toBe("ERROR");
+      expect(gatedStatus({ status: "CANCELLED", verdict: "failure" })).toBe("CANCELLED");
     });
   });
 
   describe("given no verdict", () => {
     it("keeps the status", () => {
-      expect(gatedStatus({ status: "SUCCESS", verdict: undefined })).toBe(
-        "SUCCESS",
-      );
+      expect(gatedStatus({ status: "SUCCESS", verdict: undefined })).toBe("SUCCESS");
     });
   });
 });

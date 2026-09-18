@@ -1,42 +1,43 @@
 import { Box, Circle, Flex, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Markdown } from "../../../markdown.tsx";
-import { TraceMediaStrip } from "../../../traces/trace-media-strip.tsx";
-import { RedactedInline } from "../../../redacted-field.tsx";
-import type { MediaPartData } from "../../../../../behavior/shared/traces/media-parts.ts";
-import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
-import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
-import {
-  type UseTextTranslationResult,
-  useTextTranslation,
-} from "../../hooks/use-text-translation.ts";
+
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
 } from "../../../../../behavior/annotation-queue-session.store.ts";
+import { useConversationExpand } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
+import type { MediaPartData } from "../../../../../behavior/shared/traces/media-parts.ts";
+import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
+import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
 import {
   formatCost,
   formatDuration,
   formatRelativeTimeAgo,
 } from "../../../../../model/display-formatters.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
-import type { TraceListItem } from "../../types/trace.ts";
+import { MessageExpandToggle } from "../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
+import { Markdown } from "../../../markdown.tsx";
+import { RedactedInline } from "../../../redacted-field.tsx";
+import { TraceMediaStrip } from "../../../traces/trace-media-strip.tsx";
+import {
+  type UseTextTranslationResult,
+  useTextTranslation,
+} from "../../hooks/use-text-translation.ts";
 import {
   Bubble,
   type BubbleSide,
   type BubbleTone,
   truncateMarkdown,
 } from "../../trace-table/registry/addons/conversation/bubble.tsx";
+import type { TraceListItem } from "../../types/trace.ts";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenario-roles.tsx";
 import { getRolePalette, ReasoningBlock } from "../transcript/index.ts";
-import { useConversationExpand } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
 import {
   MessageAnnotateCluster,
   type MessageAnnotateTarget,
   type MessageTranslation,
 } from "./message-annotate-cluster.tsx";
-import { MessageExpandToggle } from "../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
 import {
   TurnAnnotationBadges,
   TurnEditTraceAction,

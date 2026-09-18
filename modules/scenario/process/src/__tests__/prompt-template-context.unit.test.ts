@@ -10,6 +10,7 @@ import {
   type ScenarioConfig,
 } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+
 import * as PromptTemplateAdapter from "../rules/prompt-template.rules.ts";
 
 /**

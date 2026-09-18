@@ -1,9 +1,10 @@
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 /**
  * Applying a correction to the drawer header: span count, and metadata
  * attributes read from the header row the way they were ingested.
  */
 import { describe, expect, it } from "vitest";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+
 import {
   applyOverlayToTraceHeader,
   changedTraceMetadataKeys,

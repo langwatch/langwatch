@@ -5,12 +5,14 @@ import {
   isContentVisibleToPublic,
   type ContentCategory,
   type ResolvedCategory,
-  type ResolvedDataPrivacy,type DataPrivacyApi
+  type ResolvedDataPrivacy,
+  type DataPrivacyApi,
 } from "@langwatch/data-privacy-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { Protections } from "@langwatch/trace-contract";
+
 import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 
 export type TraceViewerProtectionOptions = Readonly<{

@@ -1,12 +1,13 @@
-import type { TraceSpanIngest } from "../app/trace.members.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   type CustomMetadata,
   type ReservedTraceMetadata,
   type TraceMetadataUpdate,
 } from "@langwatch/trace-contract";
+
+import type { TraceSpanIngest } from "../app/trace.members.ts";
 import { TraceCollectorSpanService } from "./trace-collector-span.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** Metadata keys that map onto the trace's first-class identity fields rather
  *  than free-form custom metadata. */

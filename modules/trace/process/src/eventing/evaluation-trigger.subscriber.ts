@@ -10,15 +10,19 @@ import {
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "../services/eventing.deferred-origin.service.ts";
-import type { TraceEvaluationDispatch,
+
+import type {
+  TraceEvaluationDispatch,
   TraceEvaluationLoopBlockReason,
-  TraceEvaluationLoopMetrics,TraceEvaluationMonitor } from "../app/trace.members.ts";
-import { MAX_PROCESSED_SPANS } from "./trace-summary.projection.ts";
+  TraceEvaluationLoopMetrics,
+  TraceEvaluationMonitor,
+} from "../app/trace.members.ts";
+import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "../services/eventing.deferred-origin.service.ts";
 import {
   defineOriginGuardedTraceSubscriber,
   type TraceSummarySubscriber,
 } from "./origin-guarded.subscriber.ts";
+import { MAX_PROCESSED_SPANS } from "./trace-summary.projection.ts";
 
 const CAUSALITY_LOOP_GUARD_DISABLED_FLAG = "ops_es_causality_loop_guard_disabled";
 

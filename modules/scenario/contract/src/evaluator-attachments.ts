@@ -3,8 +3,9 @@
  */
 
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
-import { z } from "zod";
 import type { ComponentType, Field } from "@langwatch/workflow-contract";
+import { z } from "zod";
+
 import type { SuiteFieldDefinition } from "./suite-fields.ts";
 
 /** Mapping picker's contract, declared here to avoid web package dependency
@@ -37,13 +38,8 @@ export type AvailableSource = {
 };
 
 /** The sources an evaluator input can read from. */
-export const SCENARIO_MAPPING_SOURCE_IDS = [
-  "conversation",
-  "scenario",
-  "trace",
-] as const;
-export type ScenarioMappingSourceId =
-  (typeof SCENARIO_MAPPING_SOURCE_IDS)[number];
+export const SCENARIO_MAPPING_SOURCE_IDS = ["conversation", "scenario", "trace"] as const;
+export type ScenarioMappingSourceId = (typeof SCENARIO_MAPPING_SOURCE_IDS)[number];
 
 /** The paths under the conversation source. */
 export const CONVERSATION_PATHS = [
@@ -87,10 +83,7 @@ export const evaluatorAttachmentSchema = z.object({
     .min(1)
     .max(64)
     .describe("The attachment id. Stable across edits of the attachment."),
-  evaluatorId: z
-    .string()
-    .min(1)
-    .describe("The id of the saved evaluator this attachment runs."),
+  evaluatorId: z.string().min(1).describe("The id of the saved evaluator this attachment runs."),
   required: z
     .boolean()
     .describe(
@@ -98,9 +91,7 @@ export const evaluatorAttachmentSchema = z.object({
     ),
   mappings: z
     .record(z.string().min(1).max(128), scenarioMappingSchema)
-    .describe(
-      "Where each evaluator input reads its value from, keyed by input name.",
-    ),
+    .describe("Where each evaluator input reads its value from, keyed by input name."),
 });
 export type EvaluatorAttachment = z.infer<typeof evaluatorAttachmentSchema>;
 
@@ -138,13 +129,9 @@ export interface ScenarioMappingContext {
   toolNames: string[];
 }
 
-export const SCENARIO_MISSING_MAPPING_TOOLTIP =
-  "Missing variable mappings - Click to configure";
+export const SCENARIO_MISSING_MAPPING_TOOLTIP = "Missing variable mappings - Click to configure";
 
-const FIELD_TYPE_TO_MAPPING_TYPE: Record<
-  SuiteFieldDefinition["type"],
-  NestedField["type"]
-> = {
+const FIELD_TYPE_TO_MAPPING_TYPE: Record<SuiteFieldDefinition["type"], NestedField["type"]> = {
   text: "str",
   number: "float",
   boolean: "bool",
@@ -258,24 +245,8 @@ const EXPECTED_LIKE = new Set(["golden", "reference", "ground_truth"]);
  * schema or the tables the answer was written against.
  */
 const EXPECTED_FIELD_WORDS: Record<string, readonly string[]> = {
-  expected_output: [
-    "expected",
-    "golden",
-    "reference",
-    "answer",
-    "sql",
-    "query",
-    "label",
-    "target",
-  ],
-  expected_contexts: [
-    "schema",
-    "schemas",
-    "context",
-    "contexts",
-    "table",
-    "tables",
-  ],
+  expected_output: ["expected", "golden", "reference", "answer", "sql", "query", "label", "target"],
+  expected_contexts: ["schema", "schemas", "context", "contexts", "table", "tables"],
 };
 
 const DEFAULT_EXPECTED_WORDS = [
@@ -321,10 +292,11 @@ function inferExpectedField({
   return undefined;
 }
 
-const source = (
-  sourceId: ScenarioMappingSourceId,
-  path: string[],
-): ScenarioMapping => ({ type: "source", sourceId, path });
+const source = (sourceId: ScenarioMappingSourceId, path: string[]): ScenarioMapping => ({
+  type: "source",
+  sourceId,
+  path,
+});
 
 /** The mapping an input name reads as on its own, with no scenario fields involved. */
 function inferMappingFromInputName(lower: string): ScenarioMapping | undefined {
@@ -380,10 +352,7 @@ export function inferScenarioMapping({
   isPlanLevel?: boolean;
 }): ScenarioMapping | undefined {
   const lower = inputId.toLowerCase();
-  return (
-    inferMappingFromInputName(lower) ??
-    inferScenarioFieldMapping({ lower, ctx, isPlanLevel })
-  );
+  return inferMappingFromInputName(lower) ?? inferScenarioFieldMapping({ lower, ctx, isPlanLevel });
 }
 
 /**
@@ -427,9 +396,7 @@ export function attachmentMissingInputs({
   attachment: Pick<EvaluatorAttachment, "mappings">;
   inputs: EvaluatorInputSpec[];
 }): EvaluatorInputSpec[] {
-  return inputs.filter(
-    (input) => input.required && !mappingIsSet(attachment.mappings[input.id]),
-  );
+  return inputs.filter((input) => input.required && !mappingIsSet(attachment.mappings[input.id]));
 }
 
 /**
@@ -453,9 +420,7 @@ const pathText = (path: readonly string[]): string => path.join(".");
 function conversationPathIssue(path: readonly string[]): string | null {
   const [head] = path;
   const known = (CONVERSATION_PATHS as readonly string[]).includes(head ?? "");
-  return path.length === 1 && known
-    ? null
-    : `The conversation has no ${pathText(path)}`;
+  return path.length === 1 && known ? null : `The conversation has no ${pathText(path)}`;
 }
 
 function scenarioPathIssue({
@@ -468,10 +433,7 @@ function scenarioPathIssue({
   isPlanLevel: boolean;
 }): string | null {
   const [head, second] = path;
-  if (
-    path.length === 1 &&
-    (SCENARIO_PATHS as readonly string[]).includes(head ?? "")
-  ) {
+  if (path.length === 1 && (SCENARIO_PATHS as readonly string[]).includes(head ?? "")) {
     return null;
   }
   if (head !== "fields" || path.length !== 2 || !second) {
@@ -485,10 +447,7 @@ function scenarioPathIssue({
 
 function tracePathIssue(path: readonly string[]): string | null {
   const [head, second, third] = path;
-  if (
-    path.length === 1 &&
-    (head === TRACE_CONTEXTS_PATH || head === TRACE_SPANS_PATH)
-  ) {
+  if (path.length === 1 && (head === TRACE_CONTEXTS_PATH || head === TRACE_SPANS_PATH)) {
     return null;
   }
   const isToolCall =

@@ -1,4 +1,5 @@
 import type { SpanTreeNode } from "@langwatch/trace-contract";
+
 import {
   COLLAPSE_TIMELINE_BELOW_PX,
   type FlatRow,

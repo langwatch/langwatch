@@ -1,3 +1,6 @@
+import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
+
 import {
   SPAN_MAX_PAST_MS,
   spanTreeCursorSchema,
@@ -5,8 +8,6 @@ import {
   spanTreePageSchema,
   spanTreeTransportInputSchema,
 } from "../index.ts";
-import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
 
 type LiveSpanTreeNodeShape = {
   spanId: string;

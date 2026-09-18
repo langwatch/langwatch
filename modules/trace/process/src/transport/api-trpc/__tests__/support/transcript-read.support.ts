@@ -1,19 +1,20 @@
 // Real implementations everywhere; only the two stores are mocked.
 
-import { TraceReadRedactionService } from "../../../../services/trace-read-redaction.service.ts";
-import { vi } from "vitest";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
 } from "@langwatch/data-privacy-contract";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
+import { vi } from "vitest";
+
 import { TraceApp } from "../../../../app/trace.app.ts";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "../../../../rules/trace-log-content-derivation.rules.ts";
+import { TraceReadRedactionService } from "../../../../services/trace-read-redaction.service.ts";
 import type { TracesV2ReadMembers } from "../../../../services/trace-transcript-read.service.ts";
 
 /** One of the two stores the read is driven from. */

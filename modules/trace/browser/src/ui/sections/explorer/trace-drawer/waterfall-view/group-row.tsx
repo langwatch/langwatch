@@ -1,7 +1,8 @@
 import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { memo, useCallback } from "react";
 import { LuLayers } from "react-icons/lu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import { formatDuration } from "../../../../../model/display-formatters.ts";
 import { isSkillSpan } from "../transcript/skill-invocation.ts";
 import {

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import { hasNoResults, shouldShowNoResponse } from "../model/scenario-run-status.utils.ts";
 
 // Regression: #2295

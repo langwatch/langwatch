@@ -1,10 +1,11 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
+import { Temporal } from "@langwatch/time";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Temporal } from "@langwatch/time";
 import type { ReactElement } from "react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
 import { type ScenarioListItem } from "../model/scenario-list.types.ts";
 import { ScenarioTable } from "../ui/elements/scenario-table.tsx";
 

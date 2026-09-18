@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+
 import { useDensityStore } from "../../../../behavior/density.store.ts";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useFindStore } from "../../../../behavior/find-store.ts";

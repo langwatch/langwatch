@@ -4,6 +4,7 @@
  */
 
 import type { LiqeQuery } from "liqe";
+
 import { filterAST, walkAST } from "./trace-query-ast.ts";
 import type { FacetState } from "./trace-query-metadata.ts";
 import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";

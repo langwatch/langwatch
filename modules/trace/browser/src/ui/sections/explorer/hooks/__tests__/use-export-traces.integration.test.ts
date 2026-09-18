@@ -1,3 +1,4 @@
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 /**
  * Integration tests for the useExportTraces hook.
  * @vitest-environment jsdom
@@ -5,9 +6,9 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
-import { showErrorToast } from "../../../errors/index.ts";
+
 import type { TraceFailureNotice, TraceHostApi } from "../../../../../behavior/trace-host.ts";
+import { showErrorToast } from "../../../errors/index.ts";
 import { useExportTraces } from "../use-export-traces.ts";
 
 const { mockToasterCreate } = vi.hoisted(() => ({

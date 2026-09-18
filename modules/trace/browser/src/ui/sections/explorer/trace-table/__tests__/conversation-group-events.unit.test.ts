@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { TraceListItem } from "../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../types/trace.ts";
 import { groupTracesByConversation } from "../conversation-groups.ts";

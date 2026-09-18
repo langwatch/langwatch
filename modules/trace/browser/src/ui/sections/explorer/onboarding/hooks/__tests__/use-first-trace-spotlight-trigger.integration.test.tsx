@@ -3,6 +3,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { useOnboardingStore } from "../../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 
 let isTourDismissed = false;

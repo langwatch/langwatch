@@ -1,5 +1,6 @@
-import * as TraceEventAttributeMappingService from "../../rules/trace-event-attribute-mapping.rules.ts";
 import { describe, expect, it } from "vitest";
+
+import * as TraceEventAttributeMappingService from "../../rules/trace-event-attribute-mapping.rules.ts";
 import { type EventSpanRow } from "../../rules/trace-event-attribute-mapping.rules.ts";
 
 function row(attrs: Record<string, string>): EventSpanRow {

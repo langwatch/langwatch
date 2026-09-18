@@ -5,7 +5,7 @@
  */
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceMediaReferenceAdapter } from "../trace-media-reference.service.ts";
+
 import {
   type TraceIoExtraction,
   type TraceIoSide,
@@ -13,13 +13,13 @@ import {
 } from "../../app/trace.members.ts";
 import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 import { TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
+import { TraceMediaReferenceAdapter } from "../trace-media-reference.service.ts";
 
 type Rich = { raw: unknown; text: string; source: "gen_ai" | "langwatch" };
 
 /** Returns whatever the case asks for, per side. Never looks at the span. */
 class StubExtraction implements TraceIoExtraction {
-  constructor(private readonly sides: { input?: Rich; output?: Rich }) {
-  }
+  constructor(private readonly sides: { input?: Rich; output?: Rich }) {}
   extractRichIOFromSpan(_span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
     return (this.sides[side] as TraceIoValue | undefined) ?? null;
   }

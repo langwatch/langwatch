@@ -1,5 +1,6 @@
-import { type TraceSpanIngest,type TraceProcessingCommands } from "../app/trace.members.ts";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
+
+import { type TraceSpanIngest, type TraceProcessingCommands } from "../app/trace.members.ts";
 
 export class TraceProcessingSpanIngestAdapter implements TraceSpanIngest {
   readonly #commands: TraceProcessingCommands;

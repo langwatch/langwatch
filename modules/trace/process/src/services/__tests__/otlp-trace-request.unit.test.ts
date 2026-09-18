@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { OtlpAnyValue } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { OtlpTraceRequestService } from "../otlp-trace-request.service.ts";
 
 describe("traceRequest.utils", () => {
@@ -424,10 +425,7 @@ describe("traceRequest.utils", () => {
         // NOTE: The boolValue check asks whether the value is there, not
         // whether it is truthy, so false is correctly returned. intValue and
         // doubleValue now ask the same question.
-        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
-          { boolValue: false },
-          "flag",
-        );
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ boolValue: false }, "flag");
 
         expect(result).toEqual({ flag: false });
       });
@@ -452,30 +450,21 @@ describe("traceRequest.utils", () => {
 
       /** @scenario "A neutral vote is kept as the value it was sent as" */
       it("keeps intValue 0", () => {
-        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
-          { intValue: 0 },
-          "count",
-        );
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ intValue: 0 }, "count");
 
         expect(result).toEqual({ count: 0 });
       });
 
       /** @scenario "A neutral vote is kept as the value it was sent as" */
       it("keeps doubleValue 0", () => {
-        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
-          { doubleValue: 0 },
-          "value",
-        );
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ doubleValue: 0 }, "value");
 
         expect(result).toEqual({ value: 0 });
       });
 
       /** @scenario "A neutral vote is kept as the value it was sent as" */
       it("keeps doubleValue 0.0", () => {
-        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
-          { doubleValue: 0.0 },
-          "value",
-        );
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ doubleValue: 0.0 }, "value");
 
         expect(result).toEqual({ value: 0 });
       });
@@ -1012,10 +1001,7 @@ describe("traceRequest.utils", () => {
             key: "event.metrics.scores",
             value: {
               arrayValue: {
-                values: [
-                  { doubleValue: 0 },
-                  { doubleValue: 0.5 },
-                ] as OtlpAnyValue[],
+                values: [{ doubleValue: 0 }, { doubleValue: 0.5 }] as OtlpAnyValue[],
               },
             },
           },

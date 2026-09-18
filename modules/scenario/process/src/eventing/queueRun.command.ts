@@ -1,5 +1,3 @@
-import { z } from "zod";
-import { createLogger } from "@langwatch/observability";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import {
   createTenantId,
@@ -8,10 +6,12 @@ import {
   stripEnvelope,
   withCommandEnvelope,
 } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,
-  SIMULATION_RUN_EVENT_TYPES,simulationRunQueuedEventDataSchema
+  SIMULATION_RUN_EVENT_TYPES,
+  simulationRunQueuedEventDataSchema,
 } from "@langwatch/scenario-contract";
 import type {
   RunEvaluators,
@@ -19,12 +19,11 @@ import type {
   SimulationRunQueuedEvent,
 } from "@langwatch/scenario-contract";
 import { extractSuiteId } from "@langwatch/suite-contract";
+import { z } from "zod";
 
 const logger = createLogger("langwatch:simulation-processing:queue-run");
 
-export const queueRunCommandDataSchema = withCommandEnvelope(
-  simulationRunQueuedEventDataSchema,
-);
+export const queueRunCommandDataSchema = withCommandEnvelope(simulationRunQueuedEventDataSchema);
 export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;
 
 export interface QueueRunDeps {
@@ -46,24 +45,21 @@ const SCHEMA = defineCommandSchema(
  * Handler for scheduling runs: resolves evaluators and records on event
  * (caller can supply to skip); lookup failure doesn't prevent grading.
  */
-export class QueueRunCommand
-  implements
-    CommandHandler<Command<QueueRunCommandData>, SimulationProcessingEvent>
-{
+export class QueueRunCommand implements CommandHandler<
+  Command<QueueRunCommandData>,
+  SimulationProcessingEvent
+> {
   static readonly schema = SCHEMA;
 
   constructor(private readonly deps?: QueueRunDeps) {}
 
-  async handle(
-    command: Command<QueueRunCommandData>,
-  ): Promise<SimulationProcessingEvent[]> {
+  async handle(command: Command<QueueRunCommandData>): Promise<SimulationProcessingEvent[]> {
     const { tenantId: tenantIdStr, data } = command;
     const tenantId = createTenantId(tenantIdStr);
 
     const eventData = stripEnvelope(data);
     const evaluators =
-      data.evaluators ??
-      (await this.resolveEvaluators({ tenantId: tenantIdStr, data }));
+      data.evaluators ?? (await this.resolveEvaluators({ tenantId: tenantIdStr, data }));
 
     const event = EventUtils.createEvent<SimulationRunQueuedEvent>({
       aggregateType: "simulation_run",
@@ -92,9 +88,7 @@ export class QueueRunCommand
       return await this.deps.loadRunAttachments({
         projectId: tenantId,
         scenarioId: data.scenarioId,
-        planId: data.scenarioSetId
-          ? extractSuiteId(data.scenarioSetId)
-          : null,
+        planId: data.scenarioSetId ? extractSuiteId(data.scenarioSetId) : null,
       });
     } catch (error) {
       logger.warn(

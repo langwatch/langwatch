@@ -4,7 +4,6 @@
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
 
-import { describe, expect, it } from "vitest";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import {
@@ -17,6 +16,8 @@ import type {
   SimulationRunFinishedEvent,
   SimulationRunQueuedEvent,
 } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,

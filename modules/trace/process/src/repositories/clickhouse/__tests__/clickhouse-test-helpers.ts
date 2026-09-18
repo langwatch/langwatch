@@ -1,5 +1,6 @@
-import type { TraceClickHouseWriteClient } from "../../trace-clickhouse-client.repository.ts";
 import type { WindowedReadMetrics, WindowedReadOutcome } from "@langwatch/clickhouse-client";
+
+import type { TraceClickHouseWriteClient } from "../../trace-clickhouse-client.repository.ts";
 
 export class TestWindowedReadMetrics implements WindowedReadMetrics {
   private readonly counts = new Map<string, number>();

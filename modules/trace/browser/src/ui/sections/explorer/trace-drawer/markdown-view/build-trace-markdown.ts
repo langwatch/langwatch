@@ -1,5 +1,15 @@
-import type { SpanDetail as FullSpan, SpanTreeNode, TraceHeader,DerivedTraceEvent } from "@langwatch/trace-contract";
-import { formatCost, formatDuration,readableDate } from "../../../../../model/display-formatters.ts";
+import type {
+  SpanDetail as FullSpan,
+  SpanTreeNode,
+  TraceHeader,
+  DerivedTraceEvent,
+} from "@langwatch/trace-contract";
+
+import {
+  formatCost,
+  formatDuration,
+  readableDate,
+} from "../../../../../model/display-formatters.ts";
 import { type MarkdownConfig } from "../../../../../model/markdown/types.ts";
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "rag", "tool", "evaluation"]);

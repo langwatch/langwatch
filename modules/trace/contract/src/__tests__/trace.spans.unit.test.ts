@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+
 import { normalizedSpanSchema, NormalizedSpanKind, NormalizedStatusCode } from "../trace.spans.ts";
 
 describe("normalized span contract", () => {

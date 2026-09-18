@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -7,9 +8,7 @@ import {
 
 const FINISHED_AT = 2_200;
 
-function makeRow(
-  overrides: Partial<ClickHouseSimulationRunRow> = {},
-): ClickHouseSimulationRunRow {
+function makeRow(overrides: Partial<ClickHouseSimulationRunRow> = {}): ClickHouseSimulationRunRow {
   return {
     ScenarioRunId: "run-1",
     ScenarioId: "scenario-1",
@@ -47,9 +46,7 @@ describe("mapping a run that awaits its evaluators", () => {
   describe("when the row is stored PENDING_EVALUATION", () => {
     /** @scenario "A pending run reads as PENDING_EVALUATION" */
     it("reads as PENDING_EVALUATION while still reporting the judge's verdict", () => {
-      const run = mapClickHouseRowToScenarioRunData(
-        makeRow({ Status: "PENDING_EVALUATION" }),
-      );
+      const run = mapClickHouseRowToScenarioRunData(makeRow({ Status: "PENDING_EVALUATION" }));
 
       expect(run.status).toBe(ScenarioRunStatus.PENDING_EVALUATION);
       expect(run.results?.verdict).toBe(Verdict.SUCCESS);
@@ -59,9 +56,7 @@ describe("mapping a run that awaits its evaluators", () => {
   describe("when the row is stored with a terminal status", () => {
     /** @scenario "A settled run reads with its stored status" */
     it("reads with the status the gate wrote", () => {
-      const passed = mapClickHouseRowToScenarioRunData(
-        makeRow({ Status: "SUCCESS" }),
-      );
+      const passed = mapClickHouseRowToScenarioRunData(makeRow({ Status: "SUCCESS" }));
       const failed = mapClickHouseRowToScenarioRunData(
         makeRow({ Status: "FAILURE", Verdict: "failure" }),
       );

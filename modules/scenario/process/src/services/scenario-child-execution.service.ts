@@ -3,22 +3,23 @@
  * @see specs/scenarios/simulation-runner.feature (Worker-Based Execution scenarios)
  */
 
-import * as ScenarioRunner from "@langwatch/scenario";
-import { type TracerProvider, trace } from "@opentelemetry/api";
 import type { Logger } from "@langwatch/observability";
+import * as ScenarioRunner from "@langwatch/scenario";
+import type { ChildProcessJobData } from "@langwatch/scenario-contract";
+import { type TracerProvider, trace } from "@opentelemetry/api";
+
+import type { ScenarioHttp } from "../app/scenario.app.ts";
 import {
   buildIsAgentSpeaksFirstScript,
   isAgentSpeaksFirst,
 } from "../rules/agent-first-script.rules.ts";
-import { AgentTestScriptAdapter } from "./agent-test-script.service.ts";
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
+import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
+import { AgentTestScriptAdapter } from "./agent-test-script.service.ts";
+import { createJudgeModelFromParams, createModelFromParams } from "./litellm-model.service.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.service.ts";
 import { SerializedAgentRegistryAdapter } from "./serialized-agent-registry.service.ts";
-import { createJudgeModelFromParams, createModelFromParams } from "./litellm-model.service.ts";
-import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.service.ts";
-import type { ChildProcessJobData } from "@langwatch/scenario-contract";
-import type { ScenarioHttp } from "../app/scenario.app.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MAXIMIZE_EDGE_PX,

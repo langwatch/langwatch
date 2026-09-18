@@ -6,7 +6,7 @@ import {
   LOG_CONTRIBUTED_EVENT_TYPE,
   LOG_CONTRIBUTED_EVENT_VERSION_LATEST,
   RECORD_LOG_CONTRIBUTION_COMMAND_TYPE,
-  type LogContributedEvent
+  type LogContributedEvent,
 } from "@langwatch/trace-contract";
 
 export class EventingTraceLogContributionAdapter implements CommandHandler<

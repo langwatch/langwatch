@@ -5,6 +5,7 @@
 
 import { Box, chakra, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+
 import {
   FG_MUTED,
   ROW_HOVER_BG,

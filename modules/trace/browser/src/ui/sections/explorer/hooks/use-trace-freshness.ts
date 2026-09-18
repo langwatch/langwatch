@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
-import { useTraceUpdateListener } from "../../use-trace-update-listener.ts";
-import { api } from "../../../../behavior/trace-api.ts";
+import { useCallback, useEffect, useRef } from "react";
+
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useRowPulseStore } from "../../../../behavior/row-pulse.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useTraceUpdateListener } from "../../use-trace-update-listener.ts";
 import { useVisibleTraceIds } from "./use-visible-trace-ids.ts";
 
 // Facets (`tracesV2.discover`) are ~10x more expensive than the table list

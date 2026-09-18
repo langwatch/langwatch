@@ -3,9 +3,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../scenario-welcome.tsx";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../scenario-welcome.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -3,13 +3,14 @@
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   classifyScenarioInfraError,
   ScenarioInfraErrorCode,
   TemplateRenderError,
 } from "@langwatch/scenario-contract";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   createMockHttpAgentAdapter,
   mockScenarioHttpFetch,

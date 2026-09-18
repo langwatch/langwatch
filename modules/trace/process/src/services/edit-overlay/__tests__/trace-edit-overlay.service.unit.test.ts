@@ -1,15 +1,16 @@
+import { Temporal } from "@langwatch/time";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Stored correction service: write validation, merge output-only patches,
  * degrade incompatible versions.
  */
 import { describe, expect, it, vi } from "vitest";
+
 import type {
   TraceEditOverlayRepository,
   TraceEditOverlayRow,
 } from "../../../repositories/trace-edit-overlay.repository.ts";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { Temporal } from "@langwatch/time";
 import { TraceEditOverlayService } from "../../trace-edit-overlay.service.ts";
 
 const row = (patch: unknown): TraceEditOverlayRow =>

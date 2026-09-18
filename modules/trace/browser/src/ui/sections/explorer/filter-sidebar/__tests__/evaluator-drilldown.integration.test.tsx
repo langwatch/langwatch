@@ -3,13 +3,13 @@
 // @vitest-environment jsdom
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import "@testing-library/jest-dom/vitest";
-
 import { EMPTY_AST, parse } from "@langwatch/trace-contract";
-import { EvaluatorDrilldown } from "../evaluator-drilldown.tsx";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
+import { EvaluatorDrilldown } from "../evaluator-drilldown.tsx";
 
 const buildItem = (aggregates?: Partial<NonNullable<FacetItem["aggregates"]>>): FacetItem => ({
   value: "faithfulness",

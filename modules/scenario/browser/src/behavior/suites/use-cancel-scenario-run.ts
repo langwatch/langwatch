@@ -3,8 +3,9 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { useCallback } from "react";
 import { isCancellableStatus } from "@langwatch/scenario-contract";
+import { useCallback } from "react";
+
 import { api } from "../scenario-api.ts";
 
 export { isCancellableStatus };

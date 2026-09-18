@@ -1,7 +1,13 @@
 import type { TriggerContext } from "@langwatch/eventing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData,SpanReceivedEvent,TraceProcessingEvent,OtlpSpan } from "@langwatch/trace-contract";
+import type {
+  TraceSummaryData,
+  SpanReceivedEvent,
+  TraceProcessingEvent,
+  OtlpSpan,
+} from "@langwatch/trace-contract";
 import { TRACK_EVENT_SPAN_NAME } from "@langwatch/trace-contract";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   TrackedEventSync,
   type TrackedEventSyncSubscriberDeps,

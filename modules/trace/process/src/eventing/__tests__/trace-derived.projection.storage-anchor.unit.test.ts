@@ -1,11 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { createTenantId } from "@langwatch/eventing";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
-import { createTenantId } from "@langwatch/eventing";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { describe, expect, it, vi } from "vitest";
+
+import { TraceAnalyticsProjectionRepository } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 import { anchorStorageTime } from "../../rules/trace-storage-anchor.rules.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
@@ -13,7 +15,6 @@ import {
   type TraceAnalyticsRow,
 } from "../trace-derived.projection.ts";
 import { TraceAnalyticsStore } from "../trace-derived.store.ts";
-import { TraceAnalyticsProjectionRepository } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 import {
   createSpanReceivedEvent,
   createTestRuntime,

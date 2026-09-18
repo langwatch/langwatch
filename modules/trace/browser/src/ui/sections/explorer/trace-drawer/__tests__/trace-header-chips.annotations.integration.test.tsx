@@ -43,6 +43,7 @@ vi.mock("../../../../../behavior/drawer.store.ts", () => ({
 }));
 
 import type { TraceHeader } from "@langwatch/trace-contract";
+
 import { TraceHeaderChips } from "../trace-header-chips.tsx";
 
 function annotation(over: Record<string, unknown> = {}) {

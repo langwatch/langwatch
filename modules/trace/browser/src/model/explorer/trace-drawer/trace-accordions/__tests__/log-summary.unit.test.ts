@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { TraceLogRecordDto } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { logEventTone, summarizeLogEvent } from "../log-summary.ts";
 
 function log(attributes: Record<string, string>): TraceLogRecordDto {

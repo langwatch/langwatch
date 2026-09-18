@@ -5,22 +5,23 @@
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, renderHook, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { Temporal } from "@langwatch/time";
-import type React from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { CasesPanel } from "../cases-panel.tsx";
-import type { CaseLastResult } from "../cases-table.tsx";
+import { Temporal } from "@langwatch/time";
+import { cleanup, render, renderHook, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type React from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { AgentTestingSelection } from "../../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import type {
   TestCase,
   TestSuiteEntry,
 } from "../../../../../model/agent-testing/cases/test-cases.ts";
+import { CasesPanel } from "../cases-panel.tsx";
+import type { CaseLastResult } from "../cases-table.tsx";
 import { useSuiteRecentRuns } from "../use-suite-recent-runs.ts";
 import { useTestCasesView } from "../use-test-cases-view.ts";
-import type { AgentTestingSelection } from "../../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 
 const suiteRunDataQuery = vi.hoisted(() => vi.fn());
 const suitesGetAllQuery = vi.hoisted(() => vi.fn());

@@ -1,4 +1,5 @@
 import { Box, Flex } from "@chakra-ui/react";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useEffect, useRef, useState } from "react";
 import {
   type ImperativePanelHandle,
@@ -6,10 +7,10 @@ import {
   PanelGroup,
   PanelResizeHandle,
 } from "react-resizable-panels";
-import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
-import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { useConversationContext } from "../../hooks/use-conversation-context.ts";
+
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
+import { useConversationContext } from "../../hooks/use-conversation-context.ts";
 import { ConversationContext } from "../conversation-context.tsx";
 import { VizPlaceholder } from "../viz-placeholder.tsx";
 import { SpanDetailPane } from "./span-detail-pane.tsx";

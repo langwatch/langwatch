@@ -4,10 +4,7 @@
  * trace spans) so service stays testable against fake reader.
  */
 
-import type {
-  SimulationService,
-  WholeCallAudioInfrastructure,
-} from "@langwatch/scenario-contract";
+import type { SimulationService, WholeCallAudioInfrastructure } from "@langwatch/scenario-contract";
 
 /** What resolving a call's audio reaches outside itself. */
 export interface WholeCallAudioCollaborators {
@@ -40,11 +37,7 @@ export function createWholeCallAudioInfrastructure(
       const seen = new Set<string>();
       for (const message of run.messages ?? []) {
         const traceId = message.trace_id;
-        if (
-          typeof traceId === "string" &&
-          traceId.length > 0 &&
-          !seen.has(traceId)
-        ) {
+        if (typeof traceId === "string" && traceId.length > 0 && !seen.has(traceId)) {
           seen.add(traceId);
           traceIds.push(traceId);
         }

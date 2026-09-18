@@ -3,16 +3,17 @@ import {
   type BulkAppendContext,
   type ProjectionStoreContext,
 } from "@langwatch/eventing";
-import { describe, expect, it, vi } from "vitest";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
 } from "@langwatch/scenario-contract";
 import type { SimulationRunMetricsComputedEvent } from "@langwatch/scenario-contract";
-import { SimulationRunMetricsMapProjection } from "../simulation-run-metrics.projection.ts";
-import { SimulationRunMetricsAppendStore } from "../simulation-run-metrics.store.ts";
+import { describe, expect, it, vi } from "vitest";
+
 import type { SimulationRunMetricsRepository } from "../../repositories/simulation-run-metrics.repository.ts";
+import { SimulationRunMetricsMapProjection } from "../simulation-run-metrics.projection.ts";
 import type { SimulationRunMetricsProjectionRecord } from "../simulation-run-metrics.projection.ts";
+import { SimulationRunMetricsAppendStore } from "../simulation-run-metrics.store.ts";
 
 const projectionStoreContext: ProjectionStoreContext = {
   aggregateId: "run-1",

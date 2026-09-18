@@ -2,6 +2,7 @@
  * inheritance. */
 
 import { describe, expect, it } from "vitest";
+
 import { TraceSpanDedup, type SpanDedupRef } from "../trace-ingestion.service.ts";
 
 describe("TraceSpanDedup", () => {

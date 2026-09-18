@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Text, type ButtonProps } from "@chakra-ui/react";
 import { memo, useMemo, useState, type ReactNode } from "react";
+
 import { TraceMediaStrip, type TraceMediaPartData } from "../elements/trace-media-strip.tsx";
 
 export type TraceJsonViewOptions = {

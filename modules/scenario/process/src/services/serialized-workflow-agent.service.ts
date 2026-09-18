@@ -3,13 +3,15 @@
  * workflow DSL and doesn't require database access.
  */
 
+import { randomBytes } from "crypto";
+
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
-import { randomBytes } from "crypto";
 import { resolveFieldMappings } from "@langwatch/scenario-contract";
 import type { RunParameterValues, WorkflowAgentData } from "@langwatch/scenario-contract";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
+
 import {
   type FetchInitWithDispatcher,
   NlpFetchAdapter,

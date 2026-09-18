@@ -5,19 +5,25 @@
  */
 
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { Menu } from "@langwatch/design-system/menu";
+import type { ResultGroup } from "@langwatch/scenario-contract";
+import { SuiteArchiveDialog } from "@langwatch/suite-browser/run-dialogs";
 import { Archive, Crosshair, Folder, FolderCode, Layers, MoreVertical, Tag } from "lucide-react";
 import { useState } from "react";
-import { SuiteArchiveDialog } from "@langwatch/suite-browser/run-dialogs";
-import { Menu } from "@langwatch/design-system/menu";
+
+import type {
+  RunPlan,
+  RunPlanScopeKind,
+} from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { useNow } from "../../../../behavior/use-now.ts";
-import type { ResultGroup } from "@langwatch/scenario-contract";
-import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import type { TargetKind } from "../../../../model/target-kind.ts";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
 import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text.tsx";
 import { TargetMark } from "../../../elements/agent-testing/shared/target-mark.tsx";
-import type { TargetKind } from "../../../../model/target-kind.ts";
 import { TrendSparkline } from "../../../elements/agent-testing/shared/trend-sparkline.tsx";
+import { targetsLabel } from "./result-atoms.ts";
 import {
   ResultsTableBody,
   ResultsTableCard,
@@ -25,11 +31,6 @@ import {
   ResultsTableHead,
   ResultsTableRow,
 } from "./results-table-chrome.tsx";
-import { targetsLabel } from "./result-atoms.ts";
-import type {
-  RunPlan,
-  RunPlanScopeKind,
-} from "../../../../behavior/agent-testing/results/run-plans.ts";
 
 /**
  * The mark beside what a plan covers. A scope is a rule rather than a list, so the mark

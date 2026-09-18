@@ -5,7 +5,9 @@
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import type { Socket } from "node:net";
+
 import { describe, expect, it, vi } from "vitest";
+
 import {
   createVoiceSocketReceiver,
   handOffVoiceSocket,
@@ -40,21 +42,15 @@ describe("isVoiceMediaSocketMessage", () => {
     });
 
     it("rejects a message with a non-string nonce", () => {
-      expect(isVoiceMediaSocketMessage({ ...message(), nonce: 123 })).toBe(
-        false,
-      );
+      expect(isVoiceMediaSocketMessage({ ...message(), nonce: 123 })).toBe(false);
     });
 
     it("rejects a message with null headers", () => {
-      expect(isVoiceMediaSocketMessage({ ...message(), headers: null })).toBe(
-        false,
-      );
+      expect(isVoiceMediaSocketMessage({ ...message(), headers: null })).toBe(false);
     });
 
     it("rejects a message with array headers", () => {
-      expect(
-        isVoiceMediaSocketMessage({ ...message(), headers: ["websocket"] }),
-      ).toBe(false);
+      expect(isVoiceMediaSocketMessage({ ...message(), headers: ["websocket"] })).toBe(false);
     });
 
     it("rejects a message with a non-string, non-array header value", () => {
@@ -137,12 +133,10 @@ describe("handOffVoiceSocket", () => {
   });
 
   it("sends the message and the socket handle, then resolves", async () => {
-    const send = vi.fn(
-      (_msg: unknown, _handle: unknown, cb: (error: Error | null) => void) => {
-        cb(null);
-        return true;
-      },
-    );
+    const send = vi.fn((_msg: unknown, _handle: unknown, cb: (error: Error | null) => void) => {
+      cb(null);
+      return true;
+    });
     const child = { send } as unknown as ChildProcess;
     const socket = { id: "sock" } as unknown as Socket;
 

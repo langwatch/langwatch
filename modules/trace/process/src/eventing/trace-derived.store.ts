@@ -1,11 +1,12 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+
+import { TraceAnalyticsProjectionRepository } from "../repositories/projection/trace-analytics-projection.repository.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "./trace-derived.projection.ts";
-import { TraceAnalyticsProjectionRepository } from "../repositories/projection/trace-analytics-projection.repository.ts";
 
 /**
  * The projection stamps `getWithApplied` will decode: the current shape, and the pre-split

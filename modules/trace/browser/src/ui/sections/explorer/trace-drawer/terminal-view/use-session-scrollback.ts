@@ -1,8 +1,3 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import { api } from "../../../../../behavior/trace-api.ts";
-import type { ConversationTurn } from "../../../../../model/explorer/conversation-turn.ts";
-import { useConversationContext } from "../../hooks/use-conversation-context.ts";
 import {
   CONVERSATION_TURN_CAP,
   type EarlierTotals,
@@ -10,8 +5,15 @@ import {
   mergeSessionTurns,
   type ScrollbackStatus,
   type TurnDivider,
-  type TerminalToolSpan,indexToolSpansBySpanId
+  type TerminalToolSpan,
+  indexToolSpansBySpanId,
 } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { api } from "../../../../../behavior/trace-api.ts";
+import type { ConversationTurn } from "../../../../../model/explorer/conversation-turn.ts";
+import { useConversationContext } from "../../hooks/use-conversation-context.ts";
 
 /**
  * How many turns `tracesV2.conversationContext` returns. A session longer than

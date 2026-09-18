@@ -1,24 +1,28 @@
-import { ScenarioNotFoundError,SimulationService } from "@langwatch/scenario-contract";
-import { describe, expect, it } from "vitest";
-import { ScenarioRepository } from "../scenario.repository.ts";
-import { ScenarioService } from "../../services/scenario.service.ts";
-import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
-import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
+import { ScenarioNotFoundError, SimulationService } from "@langwatch/scenario-contract";
 import { fromDate, type Instant } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import type {
+  ScenarioClock,
+  ScenarioTestSuiteId,
+  ScenarioId,
+  ScenarioSecretCipher,
+} from "../../app/scenario.app.ts";
+import { ScenarioService } from "../../services/scenario.service.ts";
+import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
+import { ScenarioRepository } from "../scenario.repository.ts";
 
 const simulations = Object.create(SimulationService.prototype) as SimulationService;
 
 class TestScenarioId implements ScenarioId {
-  constructor(private readonly value: string) {
-  }
+  constructor(private readonly value: string) {}
   next(): string {
     return this.value;
   }
 }
 
 class TestScenarioTestSuiteId implements ScenarioTestSuiteId {
-  constructor(private readonly value: string) {
-  }
+  constructor(private readonly value: string) {}
 
   next(): string {
     return this.value;
@@ -26,8 +30,7 @@ class TestScenarioTestSuiteId implements ScenarioTestSuiteId {
 }
 
 class TestScenarioClock implements ScenarioClock {
-  constructor(private readonly value: Date = new Date(0)) {
-  }
+  constructor(private readonly value: Date = new Date(0)) {}
   now(): Instant {
     return fromDate(this.value);
   }
@@ -59,6 +62,107 @@ function serviceOptions(
 }
 
 describe("ScenarioService", () => {
+  describe("ScenarioService field values", () => {
+    function fieldService() {
+      const repository = MemoryScenarioRepository.create();
+      return ScenarioService.create(serviceOptions(repository, "scenario_1"));
+    }
+
+    async function suiteWithFields(service: ScenarioService) {
+      return service.createTestSuite({
+        projectId: "project-a",
+        name: "Case lookups",
+        fields: [
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "max_rows", type: "number" },
+          { identifier: "needs_approval", type: "boolean" },
+        ],
+      });
+    }
+
+    /** @scenario "A scenario carries a value per suite field" */
+    it("stores values in each declared field's type", async () => {
+      const service = fieldService();
+      const suite = await suiteWithFields(service);
+
+      const scenario = await service.create({
+        projectId: "project-a",
+        name: "Chargebacks by quarter",
+        situation: "An analyst asks for chargebacks per quarter",
+        criteria: [],
+        labels: [],
+        testSuiteId: suite.id,
+        fields: { golden_sql: "SELECT 1", max_rows: "12", needs_approval: "yes" },
+      });
+
+      expect(scenario.fields).toEqual({
+        golden_sql: "SELECT 1",
+        max_rows: 12,
+        needs_approval: true,
+      });
+    });
+
+    /** @scenario "A value for a field the suite does not declare is refused" */
+    it("refuses an undeclared field before storing the scenario", async () => {
+      const service = fieldService();
+      const suite = await suiteWithFields(service);
+
+      await expect(
+        service.create({
+          projectId: "project-a",
+          name: "Chargebacks",
+          situation: "An analyst asks",
+          criteria: [],
+          labels: [],
+          testSuiteId: suite.id,
+          fields: { table_schema: "CREATE TABLE" },
+        }),
+      ).rejects.toMatchObject({ code: "scenario_field_unknown" });
+      await expect(service.count({ projectId: "project-a" })).resolves.toBe(0);
+    });
+
+    /** @scenario "A value of the wrong type is refused" */
+    it("refuses a value that cannot be read as its declared type", async () => {
+      const service = fieldService();
+      const suite = await suiteWithFields(service);
+
+      await expect(
+        service.create({
+          projectId: "project-a",
+          name: "Chargebacks",
+          situation: "An analyst asks",
+          criteria: [],
+          labels: [],
+          testSuiteId: suite.id,
+          fields: { max_rows: "twelve" },
+        }),
+      ).rejects.toMatchObject({ code: "scenario_field_type_invalid" });
+    });
+
+    /** @scenario "A blank value clears the field on the scenario" */
+    it("drops a blank field value on update", async () => {
+      const service = fieldService();
+      const suite = await suiteWithFields(service);
+      const scenario = await service.create({
+        projectId: "project-a",
+        name: "Chargebacks",
+        situation: "An analyst asks",
+        criteria: [],
+        labels: [],
+        testSuiteId: suite.id,
+        fields: { golden_sql: "SELECT 1", max_rows: 12 },
+      });
+
+      await expect(
+        service.update({
+          id: scenario.id,
+          projectId: "project-a",
+          fields: { golden_sql: "", max_rows: 12 },
+        }),
+      ).resolves.toMatchObject({ fields: { max_rows: 12 } });
+    });
+  });
+
   /** @scenario "A required scenario read is tenant scoped" */
   /** @scenario "Optional scenario discovery is explicit" */
   it("keeps reads project-scoped and only makes optional reads nullable", async () => {

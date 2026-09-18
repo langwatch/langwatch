@@ -6,6 +6,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   startMigratedTraceClickHouse,
@@ -69,56 +70,59 @@ async function insertRows(rows: ReturnType<typeof makeTraceSummaryRow>[]) {
   });
 }
 
-describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository.findAll cache/reasoning/context attributes", () => {
-  const cacheTenant = `test-cache-attrs-${nanoid()}`;
+describe.skipIf(!clickHouseConfigured)(
+  "TraceListClickHouseRepository.findAll cache/reasoning/context attributes",
+  () => {
+    const cacheTenant = `test-cache-attrs-${nanoid()}`;
 
-  beforeAll(async () => {
-    if (!clickHouseConfigured) return;
-    ch = await startMigratedTraceClickHouse();
-    repo = TraceListClickHouseRepository.create(async () => ch);
+    beforeAll(async () => {
+      if (!clickHouseConfigured) return;
+      ch = await startMigratedTraceClickHouse();
+      repo = TraceListClickHouseRepository.create(async () => ch);
 
-    await insertRows([
-      makeTraceSummaryRow(0, {
-        TenantId: cacheTenant,
-        TraceId: "cache-trace",
-        Attributes: {
-          "langwatch.origin": "coding_agent",
-          "langwatch.reserved.cache_read_tokens": "31680",
-          "langwatch.reserved.cache_creation_tokens": "6",
-          "langwatch.reserved.reasoning_tokens": "100",
-          "langwatch.reserved.context_size_tokens": "52878",
-        },
-      }),
-    ]);
-  }, 120_000);
+      await insertRows([
+        makeTraceSummaryRow(0, {
+          TenantId: cacheTenant,
+          TraceId: "cache-trace",
+          Attributes: {
+            "langwatch.origin": "coding_agent",
+            "langwatch.reserved.cache_read_tokens": "31680",
+            "langwatch.reserved.cache_creation_tokens": "6",
+            "langwatch.reserved.reasoning_tokens": "100",
+            "langwatch.reserved.context_size_tokens": "52878",
+          },
+        }),
+      ]);
+    }, 120_000);
 
-  afterAll(async () => {
-    if (!ch) return;
-    await ch.exec({
-      query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
-      query_params: { tenantId: cacheTenant },
-    });
-  });
-
-  describe("given a trace carries fold-summed cache + reasoning token attributes", () => {
-    /** @scenario "Context size is shown in the trace list next to tokens" */
-    it("surfaces the reserved cache/reasoning/context keys so the list and drawer header can show them", async () => {
-      const page = await repo.findAll({
-        tenantId: cacheTenant,
-        timeRange: { from: base - 60_000, to: base + 60_000 },
-        sort: { column: "OccurredAt", direction: "desc" },
-        limit: 50,
-        offset: 0,
+    afterAll(async () => {
+      if (!ch) return;
+      await ch.exec({
+        query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: cacheTenant },
       });
-
-      const row = page.rows.find((r) => r.traceId === "cache-trace");
-      expect(row).toBeDefined();
-      expect(row?.attributes["langwatch.reserved.cache_read_tokens"]).toBe("31680");
-      expect(row?.attributes["langwatch.reserved.cache_creation_tokens"]).toBe("6");
-      expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe("100");
-      expect(row?.attributes["langwatch.reserved.context_size_tokens"]).toBe("52878");
-      // The pre-existing allow-listed keys still flow through.
-      expect(row?.attributes["langwatch.origin"]).toBe("coding_agent");
     });
-  });
-});
+
+    describe("given a trace carries fold-summed cache + reasoning token attributes", () => {
+      /** @scenario "Context size is shown in the trace list next to tokens" */
+      it("surfaces the reserved cache/reasoning/context keys so the list and drawer header can show them", async () => {
+        const page = await repo.findAll({
+          tenantId: cacheTenant,
+          timeRange: { from: base - 60_000, to: base + 60_000 },
+          sort: { column: "OccurredAt", direction: "desc" },
+          limit: 50,
+          offset: 0,
+        });
+
+        const row = page.rows.find((r) => r.traceId === "cache-trace");
+        expect(row).toBeDefined();
+        expect(row?.attributes["langwatch.reserved.cache_read_tokens"]).toBe("31680");
+        expect(row?.attributes["langwatch.reserved.cache_creation_tokens"]).toBe("6");
+        expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe("100");
+        expect(row?.attributes["langwatch.reserved.context_size_tokens"]).toBe("52878");
+        // The pre-existing allow-listed keys still flow through.
+        expect(row?.attributes["langwatch.origin"]).toBe("coding_agent");
+      });
+    });
+  },
+);

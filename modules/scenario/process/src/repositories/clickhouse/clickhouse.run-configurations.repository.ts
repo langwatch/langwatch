@@ -1,7 +1,3 @@
-import {
-  type RawRunConfigurationRow,
-  RunConfigurationsRepository,
-} from "../run-configurations.repository.ts";
 import { MAX_RUN_CONFIGURATIONS } from "@langwatch/scenario-contract";
 /**
  * The expressions that read a configuration off a run row, and the repository that reads the
@@ -9,6 +5,11 @@ import { MAX_RUN_CONFIGURATIONS } from "@langwatch/scenario-contract";
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
 import type { ResultsFilter } from "@langwatch/scenario-contract";
+
+import {
+  type RawRunConfigurationRow,
+  RunConfigurationsRepository,
+} from "../run-configurations.repository.ts";
 import {
   ATOM_SORT_KEY,
   LANGWATCH_METADATA,

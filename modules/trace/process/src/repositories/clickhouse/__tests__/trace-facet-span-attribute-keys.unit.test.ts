@@ -1,7 +1,11 @@
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
-import { ClickHouseTraceFacetSpanAttributeKeysRepository,SPAN_ATTRIBUTE_KEYS_FACET } from "../clickhouse.trace-facet-span-attribute-keys.repository.ts";
 import { describe, expect, it } from "vitest";
+
 import { KEY_DISCOVERY_SETTINGS } from "../clickhouse.trace-facet-query.repository.ts";
+import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
+import {
+  ClickHouseTraceFacetSpanAttributeKeysRepository,
+  SPAN_ATTRIBUTE_KEYS_FACET,
+} from "../clickhouse.trace-facet-span-attribute-keys.repository.ts";
 
 const traceFacetSpanAttributeKeysRepository =
   ClickHouseTraceFacetSpanAttributeKeysRepository.create();

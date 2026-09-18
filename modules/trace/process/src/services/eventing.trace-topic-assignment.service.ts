@@ -1,8 +1,6 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { SpanKind } from "@opentelemetry/api";
-import { getLangWatchTracer } from "langwatch";
 import {
   assignTopicCommandDataSchema,
   type AssignTopicCommandData,
@@ -10,8 +8,11 @@ import {
   ASSIGN_TOPIC_COMMAND_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
-  type TopicAssignedEvent
+  type TopicAssignedEvent,
 } from "@langwatch/trace-contract";
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
+
 import { type TraceTopicAssignmentCommand } from "../app/trace.members.ts";
 
 /**

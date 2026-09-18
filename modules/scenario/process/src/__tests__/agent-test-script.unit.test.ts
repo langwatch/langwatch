@@ -5,13 +5,17 @@
  */
 
 import * as ScenarioRunner from "@langwatch/scenario";
+import type { ConnectedAgentData } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
-import { AgentTestScriptAdapter, ScriptedUserAgent } from "../services/agent-test-script.service.ts";
+
+import {
+  AgentTestScriptAdapter,
+  ScriptedUserAgent,
+} from "../services/agent-test-script.service.ts";
 import {
   ConnectedAgentCallError,
   SerializedConnectedAgentAdapter,
 } from "../services/serialized-connected-agent.service.ts";
-import type { ConnectedAgentData } from "@langwatch/scenario-contract";
 
 class AnsweringAgent extends ScenarioRunner.AgentAdapter {
   role = ScenarioRunner.AgentRole.AGENT;

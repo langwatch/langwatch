@@ -1,6 +1,12 @@
-import { ClickHouseTraceFacetSpanStatusRepository } from "./clickhouse.trace-facet-span-status.repository.ts";
-import { ClickHouseTraceFacetSpanNameRepository } from "./clickhouse.trace-facet-span-name.repository.ts";
-import { deriveTraceOrigin, TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,deriveTraceStatus,TRACE_STATUS_CLICKHOUSE_EXPRESSION,UNSUPPORTED } from "@langwatch/trace-contract";
+import {
+  deriveTraceOrigin,
+  TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
+  deriveTraceStatus,
+  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
+  UNSUPPORTED,
+} from "@langwatch/trace-contract";
+import type { CategoricalRead, RangeRead } from "@langwatch/trace-contract";
+
 import { EVALUATOR_FACET } from "./clickhouse.trace-facet-evaluator.repository.ts";
 import { EVENT_ATTRIBUTE_KEYS_FACET } from "./clickhouse.trace-facet-event-attribute-keys.repository.ts";
 import { EVENT_FACET } from "./clickhouse.trace-facet-events.repository.ts";
@@ -10,7 +16,8 @@ import {
   TRACE_METADATA_FACET,
 } from "./clickhouse.trace-facet-metadata-keys.repository.ts";
 import { SPAN_ATTRIBUTE_KEYS_FACET } from "./clickhouse.trace-facet-span-attribute-keys.repository.ts";
-import type { CategoricalRead, RangeRead } from "@langwatch/trace-contract";
+import { ClickHouseTraceFacetSpanNameRepository } from "./clickhouse.trace-facet-span-name.repository.ts";
+import { ClickHouseTraceFacetSpanStatusRepository } from "./clickhouse.trace-facet-span-status.repository.ts";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
 export type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";

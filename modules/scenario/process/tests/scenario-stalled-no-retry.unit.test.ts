@@ -3,8 +3,8 @@
  * @see specs/scenarios/scenario-failure-handler.feature "Stalled jobs fail without retry"
  */
 
-import { describe, expect, it } from "vitest";
 import { SCENARIO_QUEUE } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
 
 describe("Stalled jobs fail without retry", () => {
   describe("given a scenario job has stalled", () => {

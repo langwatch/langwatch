@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+
 import {
   ELEVENLABS_CONVERSATION_ID_ATTR,
   resolveWholeCallAudio,
@@ -21,9 +22,7 @@ function fakeInfrastructure({
 }): WholeCallAudioInfrastructure {
   return {
     loadRunTraceIds: vi.fn(async () => traceIds),
-    readSpanAttributes: vi.fn(
-      async ({ traceId }) => spansByTrace[traceId] ?? [],
-    ),
+    readSpanAttributes: vi.fn(async ({ traceId }) => spansByTrace[traceId] ?? []),
   };
 }
 
@@ -35,10 +34,7 @@ describe("resolveWholeCallAudio", () => {
         const infrastructure = fakeInfrastructure({
           traceIds: ["trace_0"],
           spansByTrace: {
-            trace_0: [
-              { "some.other": "x" },
-              { [TWILIO_CALL_SID_ATTR]: "CA123" },
-            ],
+            trace_0: [{ "some.other": "x" }, { [TWILIO_CALL_SID_ATTR]: "CA123" }],
           },
         });
 

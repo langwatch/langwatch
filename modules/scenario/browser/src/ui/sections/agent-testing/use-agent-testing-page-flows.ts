@@ -4,12 +4,13 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { useEffect } from "react";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../behavior/scenario-api.ts";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { useOpenNewRunPlan } from "./run/run-plan-dialog-host.tsx";
+import { useEffect } from "react";
+
 import type { AgentTestingSelection } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { api } from "../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useOpenNewRunPlan } from "./run/run-plan-dialog-host.tsx";
 import { useAgentTestingStore } from "./use-agent-testing-store.ts";
 
 /** The id of the suite the address names, or nothing for any other selection. */
@@ -39,7 +40,7 @@ export function useHydrateViewFromUrl(): void {
   useEffect(() => {
     if (!router.isReady) return;
     hydrateFromUrl(router.query);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, viewParam, hydrateFromUrl]);
 }
 

@@ -1,17 +1,18 @@
 import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { LangwatchSignalBucket, SpanTreeNode } from "@langwatch/trace-contract";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
+import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
+import { formatDuration } from "../../../../../model/display-formatters.ts";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
-import type { LangwatchSignalBucket, SpanTreeNode } from "@langwatch/trace-contract";
 import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
 import { useSpanLangwatchSignals } from "../../hooks/use-span-langwatch-signals.ts";
 import { useSpanLogs } from "../../hooks/use-span-logs.ts";
 import { useTraceQueryArgs } from "../../hooks/use-trace-query-args.ts";
-import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
-import { formatDuration } from "../../../../../model/display-formatters.ts";
 import { GroupRow } from "./group-row.tsx";
 import { GroupTimelineBar, TimelineBar } from "./timeline-bar.tsx";
 import { TreeRow } from "./tree-row.tsx";

@@ -1,12 +1,15 @@
-import { TraceSpanCostMatchingService } from "../services/trace-span-cost-matching.service.ts";
-import { coerceToNumber } from "./trace-number-coercion.rules.ts";
-import type { NormalizedAttributes, NormalizedSpan,
+import type {
+  NormalizedAttributes,
+  NormalizedSpan,
   BaseSpan,
   Span,
   SpanMetrics,
   SpanTimestamps,
-  SpanTypes } from "@langwatch/trace-contract";
+  SpanTypes,
+} from "@langwatch/trace-contract";
 import { safeUnflatten } from "@langwatch/trace-contract";
+
+import { TraceSpanCostMatchingService } from "../services/trace-span-cost-matching.service.ts";
 import {
   extractContexts,
   extractError,
@@ -15,6 +18,7 @@ import {
   extractOutput,
   findVendor,
 } from "./legacy-span-attributes.rules.ts";
+import { coerceToNumber } from "./trace-number-coercion.rules.ts";
 
 /**
  * Extracts metrics from canonical span attributes only.

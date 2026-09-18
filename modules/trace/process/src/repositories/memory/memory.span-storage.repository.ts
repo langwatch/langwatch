@@ -4,6 +4,7 @@ import type {
   Span,
   SpanInsertData,
 } from "@langwatch/trace-contract";
+
 import { NullSpanStorageRepository, type OccurredAtHint } from "../span-storage.repository.ts";
 import type { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
 

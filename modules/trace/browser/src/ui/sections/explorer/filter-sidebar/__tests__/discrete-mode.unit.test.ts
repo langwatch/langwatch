@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
+
 import type { RangeSectionData } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
+import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 
 /**
  * `discreteMode` factors two pure helpers out of `useFilterSidebarData`:

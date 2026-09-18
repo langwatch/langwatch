@@ -1,8 +1,8 @@
 import type { SubscriberSpec, TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData,TraceProcessingEvent } from "@langwatch/trace-contract";
-import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
+import type { TraceSummaryData, TraceProcessingEvent } from "@langwatch/trace-contract";
+import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:origin-guarded-subscriber");
 

@@ -8,16 +8,17 @@ import type { EventSourcing, FoldProjectionStore } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
+
 import type { TraceLegacyFilterConditions } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
 } from "../repositories/trace-clickhouse-client.repository.ts";
-import { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
 import { TRACE_PROCESSING_PIPELINE_NAME } from "../services/eventing.trace-pipeline.service.ts";
 import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
-import { TraceProcessingProducerAdapter } from "../services/trace-processing-producer.service.ts";
+import { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
 import type { TraceSpanDedup } from "../services/trace-ingestion.service.ts";
+import { TraceProcessingProducerAdapter } from "../services/trace-processing-producer.service.ts";
 import {
   RedisTraceSpanDedupAdapter,
   type TraceSpanDedupConnection,

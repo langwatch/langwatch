@@ -1,12 +1,13 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 /**
  * @vitest-environment node
  * @integration
  * Verifies that filters encounter stale trace versions before version dedup collapses them.
  */
 import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
-import type { ClickHouseClient } from "@clickhouse/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {

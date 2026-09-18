@@ -4,7 +4,12 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { CancellationMessage, CancellationPublisher, CancellationSubscriber } from "../index.ts";
+
+import type {
+  CancellationMessage,
+  CancellationPublisher,
+  CancellationSubscriber,
+} from "../index.ts";
 import {
   CANCELLATION_CHANNEL,
   RedisCancellationPublisherAdapter,

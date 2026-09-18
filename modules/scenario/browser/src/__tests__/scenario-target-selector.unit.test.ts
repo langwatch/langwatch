@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { scenarioAgentsOf } from "../behavior/scenarios/use-filtered-scenario-targets.ts";
 
 describe("scenarioAgentsOf", () => {

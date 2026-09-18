@@ -1,15 +1,16 @@
 import { Box, HStack, Icon, IconButton, Link, Text, VStack } from "@chakra-ui/react";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { Temporal, nowInstant } from "@langwatch/time";
+import { ArrowRight, Sparkles, X } from "lucide-react";
 import posthog from "posthog-js";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { ArrowRight, Sparkles, X } from "lucide-react";
+
 import {
   preferLegacySimulations,
   useLegacySimulationsPreference,
 } from "../../../behavior/suites/use-legacy-simulations-preference.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { Temporal, nowInstant } from "@langwatch/time";
 
 /**
  * Small announcement card pinned to the bottom of the Agent Testing sidebars.

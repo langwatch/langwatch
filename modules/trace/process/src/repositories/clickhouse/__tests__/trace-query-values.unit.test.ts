@@ -2,6 +2,7 @@
  * values. Removes the key's character check and nothing fails. */
 
 import { describe, expect, it } from "vitest";
+
 import {
   MAX_ATTRIBUTE_KEY_LENGTH,
   MAX_VALUE_LENGTH,

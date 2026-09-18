@@ -3,8 +3,9 @@
  * Owes results until evaluation job completes and gate writes terminal status.
  */
 
-import { z } from "zod";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import { z } from "zod";
+
 import { evaluatorAttachmentsSchema } from "./evaluator-attachments.ts";
 import { scenarioFieldValuesSchema } from "./suite-fields.ts";
 
@@ -31,9 +32,7 @@ export const runEvaluatorDefinitionSchema = z.object({
   settings: z.record(z.string(), z.unknown()),
   fields: z.array(runEvaluatorFieldSchema),
 });
-export type RunEvaluatorDefinition = z.infer<
-  typeof runEvaluatorDefinitionSchema
->;
+export type RunEvaluatorDefinition = z.infer<typeof runEvaluatorDefinitionSchema>;
 
 /**
  * The evaluators a run was queued with: the attachments and where they came
@@ -62,10 +61,7 @@ export type RunEvaluators = z.infer<typeof runEvaluatorsSchema>;
 
 /** The definition the worker keeps of a saved evaluator. */
 export function runEvaluatorDefinitionOf(
-  evaluator: Pick<
-    EvaluatorWithFields,
-    "id" | "name" | "type" | "config" | "workflowId" | "fields"
-  >,
+  evaluator: Pick<EvaluatorWithFields, "id" | "name" | "type" | "config" | "workflowId" | "fields">,
 ): RunEvaluatorDefinition {
   const config = evaluator.config as {
     evaluatorType?: string;

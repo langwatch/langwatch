@@ -2,6 +2,7 @@
  * @see specs/scenarios/secret-run-parameters.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   mapClickHouseRowToScenarioRunData,
   type ClickHouseSimulationRunRow,

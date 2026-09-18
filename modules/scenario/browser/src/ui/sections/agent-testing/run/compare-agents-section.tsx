@@ -6,13 +6,14 @@
 
 import { Box, chakra, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
-import { agentHasDevTunnel } from "../../../../model/agent-dev-tunnel.ts";
+
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
+import { agentHasDevTunnel } from "../../../../model/agent-dev-tunnel.ts";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
 } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
 import { targetColor } from "../../../elements/agent-testing/shared/target-colors.ts";
 import {

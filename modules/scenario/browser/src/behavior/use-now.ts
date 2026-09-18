@@ -1,8 +1,8 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * Returns the current time, updating every minute via NowProvider.
  */
 import { createContext, useContext } from "react";
-import { nowInstant } from "@langwatch/time";
 
 export const NowContext = createContext<number>(nowInstant().epochMilliseconds);
 

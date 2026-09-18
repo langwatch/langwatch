@@ -1,10 +1,11 @@
+import type { ComputeExperimentRunMetricsCommandData } from "@langwatch/experiment-contract";
 /**
  * @vitest-environment node
  * @unit
  * Redelivery contract: timestamp-free identity records one fact; `occurredAt` stamps `Date.now()`.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { ComputeExperimentRunMetricsCommandData } from "@langwatch/experiment-contract";
+
 import { createExperimentMetricsSyncHandler } from "../experiment-metrics-sync.subscriber.ts";
 import {
   createContext,

@@ -4,9 +4,6 @@
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { GroupRow, RunRow } from "@langwatch/suite-browser/run-cards";
 import {
   RunHistoryFilters,
@@ -15,6 +12,9 @@ import {
   type RunHistoryFilterValues,
 } from "@langwatch/suite-browser/run-formatters";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-browser/testing";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),

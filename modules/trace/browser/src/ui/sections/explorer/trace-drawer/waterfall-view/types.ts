@@ -1,3 +1,4 @@
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import type { IconType } from "react-icons";
 import {
   LuBot,
@@ -11,7 +12,7 @@ import {
   LuWorkflow,
   LuWrench,
 } from "react-icons/lu";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
+
 import { spanTypeColor } from "../../utils/span-type-color.ts";
 import { isSkillSpan } from "../transcript/skill-invocation.ts";
 

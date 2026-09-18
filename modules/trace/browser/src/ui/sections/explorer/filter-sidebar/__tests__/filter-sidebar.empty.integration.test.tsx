@@ -150,6 +150,7 @@ vi.mock("@dnd-kit/sortable", () => ({
 // ─── Module under test ────────────────────────────────────────────────────────
 
 import type React from "react";
+
 import { FilterSidebar } from "../filter-sidebar.tsx";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────

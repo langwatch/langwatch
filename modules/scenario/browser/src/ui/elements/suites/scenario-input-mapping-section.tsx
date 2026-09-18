@@ -3,7 +3,6 @@
  */
 
 import { Box, Link, Separator, Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -15,6 +14,7 @@ import {
   resolveOutputField,
   toOutputFieldState,
 } from "@langwatch/suite-browser/run-formatters";
+import { useMemo } from "react";
 
 /** The scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [

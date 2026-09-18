@@ -1,8 +1,8 @@
+import type { CanonicalAttributes, CanonicalEvent } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
-import type { CanonicalAttributes, CanonicalEvent } from "@langwatch/trace-contract";
 import { parseJsonStringValues as parseJsonStringAttrs } from "../../rules/canonical-json.rules.ts";
-import { CanonicalLogRecordStore,CanonicalSpanStore } from "../canonical-attributes.service.ts";
+import { CanonicalLogRecordStore, CanonicalSpanStore } from "../canonical-attributes.service.ts";
 import type { ExtractorContext, LogExtractorContext } from "../canonical-attributes.service.ts";
 
 export { parseJsonStringAttrs };

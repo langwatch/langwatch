@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { commitRange, stepForSpan } from "../range-controls.tsx";
 
 describe("stepForSpan", () => {

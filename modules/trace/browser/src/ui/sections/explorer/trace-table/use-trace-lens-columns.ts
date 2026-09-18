@@ -1,13 +1,14 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
+
 import { timeColumnSizing, useTimeFormatStore } from "../../../../behavior/time-format.store.ts";
 import { parseEvalColumnId } from "../../../../model/lens-eval-column-id.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { addColumnColumnDef } from "./add-column-header.tsx";
 import { getTraceColumnDef } from "./columns.ts";
 import { buildEvalColumnDef, evalColumnLabel } from "./eval-columns.ts";
-import { type Registry, traceRegistry } from "./registry/index.ts";
 import { makeEvalCellDef } from "./registry/cells/trace/eval-result-cell.tsx";
+import { type Registry, traceRegistry } from "./registry/index.ts";
 import type { CellDef } from "./registry/types.ts";
 import { traceSelectColumnDef } from "./select-column.tsx";
 

@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { ScenarioTabRegistry, type ScenarioTabRegistration } from "@langwatch/scenario-contract";
-import type { ScenarioClock,ScenarioTabStore } from "../app/scenario.app.ts";
+
+import type { ScenarioClock, ScenarioTabStore } from "../app/scenario.app.ts";
 
 const logger = createLogger("langwatch:scenario-tab-registry");
 const KEY_PREFIX = "scenario_tab:v1";

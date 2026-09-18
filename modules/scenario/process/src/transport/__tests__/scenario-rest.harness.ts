@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -9,8 +10,10 @@ import {
 } from "@langwatch/api/rest";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { Encryption } from "@langwatch/process-stores/members";
 import type { ResourceOwnership } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
+import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   type ScenarioExecutionService,
@@ -65,6 +68,9 @@ export function createScenarioRestTestApp(
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      presence: createApiFixture<PresenceApi>(),
+      auditLog: createApiFixture<AuditLogApi>(),
     },
     members: {
       agentTesting: createApiFixture<AgentTestService>(),
@@ -86,9 +92,10 @@ export function createScenarioRestTestApp(
       scenarioTabStore: createApiFixture<ScenarioTabStore>(),
       encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
+      publicBaseUrl: "https://app.langwatch.test",
     },
     resources: createApiFixture<ResourceOwnership>(),
-    config: { publicBaseUrl: "https://app.langwatch.test" },
+    config: undefined,
   });
 
   return { app, simulations, scenarioTabs };

@@ -1,12 +1,11 @@
-import type { Protections,Trace,TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Spec: specs/traces-v2/trace-edit-overlay.feature
  * withEditOverlay: applies per-trace corrections, wins over ClickHouse reads.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 
 const { mockGetTracesWithSpans, mockGetTracesWithSpansByThreadIds, mockGetPatchesByTraceIds } =
   vi.hoisted(() => ({
@@ -25,9 +24,9 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
 import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
+import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
 const PROJECT_ID = "project_test";
 

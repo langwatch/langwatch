@@ -1,5 +1,4 @@
 import "../../model/ambient.d.ts";
-
 import type { ComponentType } from "react";
 
 export type TraceScreenLoader = () => Promise<{ default: ComponentType }>;

@@ -5,17 +5,14 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { useCallback, useMemo } from "react";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import {
-  type EvaluatorAttachment,
-  parseEvaluatorAttachments,
-} from "@langwatch/scenario-contract";
+import { type EvaluatorAttachment, parseEvaluatorAttachments } from "@langwatch/scenario-contract";
+import { useCallback, useMemo } from "react";
+
 import {
   type AttachableEvaluator,
   missingInputsOf,
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import type { ScopeScenario } from "./run-scope-section.tsx";
 import type { RunScope } from "./run-configuration";
 import {
   type EvaluatorOffender,
@@ -24,6 +21,7 @@ import {
   type SuiteRow,
   suiteIdsInScope,
 } from "./run-evaluators";
+import type { ScopeScenario } from "./run-scope-section.tsx";
 
 /** The evaluators inherited from the suites in scope, and the offender. */
 export function useInheritedEvaluators({
@@ -95,9 +93,7 @@ function resolveMappingsMissingTarget({
   if (typeof evaluatorId !== "string") return null;
   const suite = testSuites.find((row) => row.id === suiteId);
   const attachment = suite
-    ? parseEvaluatorAttachments(suite.evaluators).find(
-        (entry) => entry.evaluatorId === evaluatorId,
-      )
+    ? parseEvaluatorAttachments(suite.evaluators).find((entry) => entry.evaluatorId === evaluatorId)
     : undefined;
   if (suite && attachment) {
     return { kind: "suite", suiteId: suite.id, attachmentId: attachment.id };

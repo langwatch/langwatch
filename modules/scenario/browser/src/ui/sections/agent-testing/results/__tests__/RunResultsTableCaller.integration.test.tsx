@@ -5,12 +5,10 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ScenarioRunStatus, type ScenarioRunData } from "@langwatch/scenario-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  ScenarioRunStatus,
-  type ScenarioRunData,
-} from "@langwatch/scenario-contract";
+
 import { RunResultsTable } from "../run-results-table.tsx";
 
 afterEach(cleanup);
@@ -69,9 +67,7 @@ describe("RunResultsTable Caller column", () => {
       expect(within(header).getByText("Caller")).toBeInTheDocument();
 
       expect(
-        within(screen.getByTestId("run-result-row-pool")).getByText(
-          "Simulated",
-        ),
+        within(screen.getByTestId("run-result-row-pool")).getByText("Simulated"),
       ).toBeInTheDocument();
       expect(
         within(screen.getByTestId("run-result-row-panel")).getByText("You"),

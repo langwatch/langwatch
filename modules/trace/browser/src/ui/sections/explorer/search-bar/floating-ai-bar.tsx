@@ -4,8 +4,9 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import type { FloatRect } from "../../../../behavior/use-float-rect.ts";
+
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import type { FloatRect } from "../../../../behavior/use-float-rect.ts";
 import { AiQueryComposer } from "./ai-query-composer.tsx";
 import { AiShaderBackdrop } from "./ai-shader-backdrop.tsx";
 import { FloatingAiErrorRow } from "./floating-ai-error-row.tsx";

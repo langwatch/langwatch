@@ -1,6 +1,7 @@
 /** Maps Traceloop span kinds and entity messages to canonical GenAI keys. */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+
 import {
   ALLOWED_SPAN_TYPES,
   extractInputMessages,

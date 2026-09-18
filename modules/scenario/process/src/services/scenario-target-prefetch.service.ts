@@ -1,10 +1,12 @@
-import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
+import {
+  AgentNotFoundError,
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
+  type Agent,
+  type AgentApi,
+} from "@langwatch/agent-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { FieldMappingSchema,AuthConfigSchema } from "@langwatch/scenario-contract";
-import type { SecretApi } from "@langwatch/secret-contract";
-import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
-import { z } from "zod";
-
+import { AuthConfigSchema, FieldMappingSchema } from "@langwatch/scenario-contract";
 import type {
   CodeAgentData,
   HttpAgentData,
@@ -12,7 +14,12 @@ import type {
   TargetAdapterData,
   TargetConfig,
   WorkflowAgentData,
+  VoiceAgentData,
 } from "@langwatch/scenario-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
+import { z } from "zod";
+
 import type { ModelParamsFailureReason } from "./scenario-model-parameters.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 import { ScenarioWorkflowMappingService } from "./scenario-workflow-mapping.service.ts";
@@ -24,6 +31,10 @@ type HydrationFailure = {
   message: string;
 };
 
+export interface VoiceTargetReader {
+  resolve(input: { projectId: string; agentId: string }): Promise<VoiceAgentData | null>;
+}
+
 export class ScenarioTargetPrefetchService {
   static create(options: {
     prompts: PromptApi;
@@ -32,6 +43,8 @@ export class ScenarioTargetPrefetchService {
     secrets: SecretApi;
     workflowHydrator: ScenarioWorkflowHydratorService;
     legacyDefaultModel: string;
+    langwatchEndpoint: string;
+    voiceTargets: VoiceTargetReader | null;
   }): ScenarioTargetPrefetchService {
     return new ScenarioTargetPrefetchService(options, ScenarioWorkflowMappingService.create());
   }
@@ -44,6 +57,8 @@ export class ScenarioTargetPrefetchService {
       secrets: SecretApi;
       workflowHydrator: ScenarioWorkflowHydratorService;
       legacyDefaultModel: string;
+      langwatchEndpoint: string;
+      voiceTargets: VoiceTargetReader | null;
     },
     private readonly workflowMappings: ScenarioWorkflowMappingService,
   ) {}
@@ -65,6 +80,10 @@ export class ScenarioTargetPrefetchService {
       return this.fetchCodeAgentTarget(projectId, target.referenceId, runSecretValues);
     }
 
+    if (target.type === "connected") {
+      return this.fetchConnectedAgentTarget(projectId, target.referenceId);
+    }
+
     if (target.type === "workflow") {
       return this.fetchWorkflowAgentTarget({
         projectId,
@@ -73,11 +92,25 @@ export class ScenarioTargetPrefetchService {
       });
     }
 
+    if (target.type === "voice") {
+      return this.fetchVoiceAgentTarget(projectId, target.referenceId);
+    }
+
     return this.fetchHttpAgentTarget({
       projectId,
       agentId: target.referenceId,
       runSecretValues,
     });
+  }
+
+  private async fetchVoiceAgentTarget(
+    projectId: string,
+    agentId: string,
+  ): Promise<VoiceAgentData | null> {
+    if (!this.options.voiceTargets) {
+      throw new Error("Voice target prefetch is not installed");
+    }
+    return this.options.voiceTargets.resolve({ projectId, agentId });
   }
 
   private async tryGetAgent(projectId: string, agentId: string): Promise<Agent | null> {
@@ -194,6 +227,21 @@ export class ScenarioTargetPrefetchService {
       sessionPath: config.sessionPath,
       scenarioMappings: config.scenarioMappings,
       secrets: secretValues,
+    };
+  }
+
+  private async fetchConnectedAgentTarget(
+    projectId: string,
+    agentId: string,
+  ): Promise<TargetAdapterData | null> {
+    const agent = await this.tryGetAgent(projectId, agentId);
+    if (agent?.type !== "connected") return null;
+
+    return {
+      type: "connected",
+      agentId: agent.id,
+      endpoint: this.options.langwatchEndpoint,
+      timeoutMs: Math.min(agent.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
     };
   }
 

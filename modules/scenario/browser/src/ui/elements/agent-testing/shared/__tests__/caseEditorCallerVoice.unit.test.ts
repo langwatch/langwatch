@@ -5,6 +5,7 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { callerVoiceFromScenario } from "../../../../sections/agent-testing/cases/use-case-editor.ts";
 
 describe("callerVoiceFromScenario", () => {

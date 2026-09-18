@@ -2,8 +2,18 @@
  * Unit tests for model selection logic with dependency injection.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError, resolveLatestAlias } from "@langwatch/model-provider-contract";
+import type {
+  ScenarioChildEnvironment,
+  ScenarioExecutionPrefetchInput,
+  ScenarioExecutionPrefetchResult,
+  ExecutionContext,
+  LiteLLMParams,
+  TargetConfig,
+} from "@langwatch/scenario-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { VoiceTargetReader } from "../services/scenario-target-prefetch.service.ts";
 import {
   type AgentFetcher,
   createTestScenarioExecutionPrefetcherService,
@@ -19,15 +29,12 @@ import {
   type TraceWaitBudgetResolver,
   type WorkflowVersionFetcher,
 } from "./support/scenario-execution-prefetcher.fixture.ts";
-import type {
-  ScenarioChildEnvironment,
-  ScenarioExecutionPrefetchInput,
-  ScenarioExecutionPrefetchResult,
-  ExecutionContext,
-  LiteLLMParams,
-  TargetConfig,
-} from "@langwatch/scenario-contract";
 const DEFAULT_MODEL = "openai/gpt-5-mini";
+
+const findElevenLabsProviderForProject = vi.fn();
+const getElevenLabsApiCredential = vi.fn();
+const getProjectModelProviders = vi.fn();
+const prepareEnvKeys = vi.fn();
 
 async function prefetchWithFixture({
   context,
@@ -52,6 +59,8 @@ async function prefetchWithFixture({
   await environment;
   return result;
 }
+
+const prefetchScenarioData = prefetchWithFixture;
 
 describe("prefetchWithFixture", () => {
   const defaultContext: ExecutionContext = {
@@ -141,6 +150,35 @@ describe("prefetchWithFixture", () => {
       }),
     };
 
+    const voiceTargets: VoiceTargetReader = {
+      resolve: async ({ agentId }: { projectId: string; agentId: string }) => {
+        const provider = await findElevenLabsProviderForProject();
+        const credential = provider
+          ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
+          : null;
+        const providers = await getProjectModelProviders();
+        const openai = providers.openai;
+        const openaiKey: unknown = openai?.enabled
+          ? prepareEnvKeys(openai).OPENAI_API_KEY
+          : undefined;
+        const callerEnv: Record<string, string> = {};
+        if (typeof openaiKey === "string") {
+          callerEnv.OPENAI_API_KEY = openaiKey;
+        }
+        return {
+          type: "voice" as const,
+          agentId,
+          voiceTarget: {
+            transport: "elevenlabs_convai" as const,
+            agentId: "el_agent",
+            credential: credential ? { kind: "elevenlabs" as const, ...credential } : null,
+          },
+          callerEnv,
+          maxCallSeconds: 300,
+        };
+      },
+    };
+
     return {
       scenarioFetcher,
       suiteConfigFetcher,
@@ -152,6 +190,7 @@ describe("prefetchWithFixture", () => {
       modelResolver,
       projectSecretsFetcher,
       traceWaitBudgetResolver,
+      voiceTargets,
       ...overrides,
     };
   }
@@ -1596,9 +1635,9 @@ describe("prefetchWithFixture", () => {
           throw new Error("expected a workflow adapter");
         }
         const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
-        const signatureNode = nodes.find(
-          (n) => (n as { type?: unknown }).type === "signature",
-        ) as Record<string, unknown> | undefined;
+        const signatureNode = nodes.find((n) => (n as { type?: unknown }).type === "signature") as
+          | Record<string, unknown>
+          | undefined;
 
         expect(signatureNode).toBeDefined();
 
@@ -1973,9 +2012,9 @@ describe("prefetchWithFixture", () => {
           throw new Error("expected a workflow adapter");
         }
         const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
-        const signatureNode = nodes.find(
-          (n) => (n as { type?: unknown }).type === "signature",
-        ) as Record<string, unknown> | undefined;
+        const signatureNode = nodes.find((n) => (n as { type?: unknown }).type === "signature") as
+          | Record<string, unknown>
+          | undefined;
         const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
           | Record<string, unknown>[]
           | undefined;
@@ -2047,9 +2086,9 @@ describe("prefetchWithFixture", () => {
           throw new Error("expected a workflow adapter");
         }
         const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
-        const signatureNode = nodes.find(
-          (n) => (n as { type?: unknown }).type === "signature",
-        ) as Record<string, unknown> | undefined;
+        const signatureNode = nodes.find((n) => (n as { type?: unknown }).type === "signature") as
+          | Record<string, unknown>
+          | undefined;
         const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
           | Record<string, unknown>[]
           | undefined;

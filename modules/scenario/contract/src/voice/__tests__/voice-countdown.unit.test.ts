@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { isRedCountdown, remainingSeconds } from "../voice-countdown";
 
 describe("voice countdown", () => {

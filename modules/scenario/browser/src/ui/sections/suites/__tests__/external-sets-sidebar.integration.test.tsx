@@ -20,8 +20,8 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: vi.fn(() => ({ project: { id: "project_1" } })),
 }));
 
-import { SuiteSidebar } from "../suite-sidebar.tsx";
 import { toExternalSetSelection } from "../../../../behavior/suites/use-suite-routing.ts";
+import { SuiteSidebar } from "../suite-sidebar.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

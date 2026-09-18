@@ -3,14 +3,18 @@
  * @see specs/scenarios/scenario-failure-handler.feature
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type AgentApi, type AgentOverview, type HttpAgentConfig } from "@langwatch/agent-contract";
-import { SimulationService,
+import {
+  SimulationService,
   type ScenarioFailureResults,
   ScenarioRunStatus,
-  Verdict,decodeScenarioError,ScenarioInfraErrorCode } from "@langwatch/scenario-contract";
+  Verdict,
+  decodeScenarioError,
+  ScenarioInfraErrorCode,
+} from "@langwatch/scenario-contract";
 import { ScenarioFailureHandlerService } from "@langwatch/scenario-process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
 

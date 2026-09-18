@@ -1,12 +1,13 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   STALE_TRACE_THRESHOLD_MS,
   type ResolveOriginCommandData,
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { nowInstant } from "@langwatch/time";
+
 import type { DeferredOriginPayload, TraceDeferredOriginScheduler } from "../app/trace.members.ts";
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");

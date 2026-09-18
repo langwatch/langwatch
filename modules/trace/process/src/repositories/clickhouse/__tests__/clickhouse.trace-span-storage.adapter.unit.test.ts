@@ -1,10 +1,11 @@
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
+
+import { TraceSpanStorageRepository } from "../../span-storage-write.repository.ts";
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
 } from "../../trace-clickhouse-client.repository.ts";
-import { TraceSpanStorageRepository } from "../../span-storage-write.repository.ts";
 import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository.ts";
 
 // Adapter seam: verify it matches the port and batch survives crossing

@@ -5,9 +5,12 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceClickHouse, type TraceClickHouseClient } from "../../trace-clickhouse-client.repository.ts";
-import { TracePayloadReaderRepository } from "../../read/trace-payload-reader.repository.ts";
 import { type TraceFullIo } from "../../../app/trace.members.ts";
+import { TracePayloadReaderRepository } from "../../read/trace-payload-reader.repository.ts";
+import {
+  TraceClickHouse,
+  type TraceClickHouseClient,
+} from "../../trace-clickhouse-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 
 class TenantClickHouseResolver extends TraceClickHouse {

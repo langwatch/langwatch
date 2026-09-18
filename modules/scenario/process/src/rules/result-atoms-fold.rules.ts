@@ -14,6 +14,7 @@ import {
   type SeriesBucket,
   type TrendPoint,
 } from "@langwatch/scenario-contract";
+
 import type {
   RawAtomRow,
   RawGroupRow,

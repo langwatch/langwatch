@@ -1,8 +1,8 @@
+import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
-import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 
 import { TraceListService } from "../trace-list-read.service.ts";
 

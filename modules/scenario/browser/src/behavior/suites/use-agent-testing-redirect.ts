@@ -1,13 +1,14 @@
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 /**
  * Sends a simulations address to Agent Testing when the project reads it.
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { useEffect } from "react";
+
 import { useFeatureFlag } from "../use-feature-flag.ts";
-import { useLegacySimulationsPreference } from "./use-legacy-simulations-preference.ts";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { useRouter } from "@langwatch/browser-host/use-router";
+import { useLegacySimulationsPreference } from "./use-legacy-simulations-preference.ts";
 import { toAgentTestingAddress } from "./use-suite-routing.ts";
 
 export function useAgentTestingRedirect({

@@ -2,12 +2,15 @@
  * @vitest-environment node
  */
 
+import type { LiteLLMParams, TargetAdapterData } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
-import { SerializedAgentRegistryAdapter,
+
+import {
+  SerializedAgentRegistryAdapter,
   SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
-  SerializedPromptConfigAdapter } from "../index.ts";
-import type { LiteLLMParams, TargetAdapterData } from "@langwatch/scenario-contract";
+  SerializedPromptConfigAdapter,
+} from "../index.ts";
 
 describe("SerializedAgentRegistryAdapter", () => {
   const defaultModelParams: LiteLLMParams = {

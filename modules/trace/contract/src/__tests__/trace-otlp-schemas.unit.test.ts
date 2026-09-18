@@ -1,6 +1,6 @@
+import { anyValueSchema, bytesSchema, idSchema, spanSchema } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
-import { anyValueSchema, bytesSchema, idSchema, spanSchema } from "@langwatch/trace-contract";
 
 /** Parses with `schema`, failing the test when it refuses, and hands back the parsed value. */
 function expectParsed<T>(schema: ZodType<T>, input: unknown): T {

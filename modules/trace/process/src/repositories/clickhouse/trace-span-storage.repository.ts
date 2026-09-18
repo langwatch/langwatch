@@ -1,15 +1,16 @@
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedSpan, SpanInsertData } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+
 import { TraceStoredSpanReaderRepository } from "../read/trace-stored-span-reader.repository.ts";
 import { TraceSpanStorageRepository } from "../span-storage-write.repository.ts";
+import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 import {
   type FullSpanRow,
   mapChRowToNormalized,
   serializeAttributes,
 } from "./stored-span-row.mapper.ts";
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 
 const logger = createLogger("langwatch:trace:span-storage-repository");
 

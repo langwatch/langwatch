@@ -1,6 +1,7 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import { classifyClickHouseError, StoreError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClient } from "@clickhouse/client";
+
 import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
 import type { SimulationRunMetricsRepository } from "../simulation-run-metrics.repository.ts";
 

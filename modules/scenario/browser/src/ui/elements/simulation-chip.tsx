@@ -1,9 +1,9 @@
 import { Box, Circle, HStack, Icon, Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
 import { forwardRef } from "react";
 import type { IconType } from "react-icons";
 import { LuFilter } from "react-icons/lu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export type SimulationChipTone = "neutral" | "purple" | "blue" | "green" | "yellow" | "red";
 

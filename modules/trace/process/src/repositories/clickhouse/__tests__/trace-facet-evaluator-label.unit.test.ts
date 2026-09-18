@@ -1,7 +1,8 @@
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
-import { describe, expect, it } from "vitest";
-import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
+import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 
 const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 const TENANT = "project_test";

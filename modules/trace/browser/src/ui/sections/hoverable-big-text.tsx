@@ -1,11 +1,12 @@
 import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { isJson } from "../../model/is-json.ts";
-import { Markdown } from "./markdown.tsx";
-import { RenderInputOutput } from "./traces/render-input-output.tsx";
-import { Dialog } from "./dialog.tsx";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { isJson } from "../../model/is-json.ts";
+import { Dialog } from "./dialog.tsx";
+import { Markdown } from "./markdown.tsx";
+import { RenderInputOutput } from "./traces/render-input-output.tsx";
 
 /** The dialog body: formatted JSON, rendered markdown, or the raw text. */
 function ExpandedTextBody({

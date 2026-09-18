@@ -5,15 +5,16 @@
  */
 
 import { Accordion, Box, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { isHumanCallerRun } from "../results/caller-display.ts";
-import { RunDetailSection } from "../../../elements/run-detail-section.tsx";
-import { ScenarioMessageRenderer } from "../../simulations/scenario-message-renderer.tsx";
-import { ParameterRow, SECRET_VALUE_MASK } from "../../simulations/scenario-run-detail-drawer.tsx";
-import { ConversationExpandContext } from "@langwatch/trace-browser/surfaces/conversation-expand-context";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { ConversationExpandContext } from "@langwatch/trace-browser/surfaces/conversation-expand-context";
+
 import { RunVerdictPanel } from "../../../elements/agent-testing/drawers/run-verdict-panel.tsx";
 import { nextSpeakerOf } from "../../../elements/next-speaker.ts";
+import { RunDetailSection } from "../../../elements/run-detail-section.tsx";
 import { TypingBubble } from "../../../elements/typing-bubble.tsx";
+import { ScenarioMessageRenderer } from "../../simulations/scenario-message-renderer.tsx";
+import { ParameterRow, SECRET_VALUE_MASK } from "../../simulations/scenario-run-detail-drawer.tsx";
+import { isHumanCallerRun } from "../results/caller-display.ts";
 import { hasVerdict, type RunDetail, type RunScenarioState } from "./use-run-drawer-state.ts";
 
 /** How wide the results read beside the conversation. */

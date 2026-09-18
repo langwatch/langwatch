@@ -8,13 +8,13 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
+import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 import {
   customersAndLabelsResultSchema,
   distinctFieldNamesResultSchema,
   namedTopicCountsSchema,
   tracesForProjectResultSchema,
 } from "./trace-read.contract.ts";
-import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 
 /**
  * The outer validation shell is the registry's enterprise ceiling; the

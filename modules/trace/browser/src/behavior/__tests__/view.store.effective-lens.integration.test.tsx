@@ -2,6 +2,7 @@
 /** Spec: specs/traces-v2/trace-table.feature */
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
 import { useEffectiveLens, useViewStore } from "../view.store.ts";
 
 describe("useEffectiveLens", () => {

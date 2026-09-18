@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
 import type { CanonicalAttributes } from "@langwatch/trace-contract";
-import { CanonicalSpanStore } from "../canonical-attributes.service.ts";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { CanonicalSpanStore } from "../canonical-attributes.service.ts";
 import type { ExtractorContext } from "../canonical-attributes.service.ts";
 import { StrandsCanonicaliserService } from "../strands-canonicaliser.service.ts";
 import { createExtractorContext } from "./test-helpers.ts";

@@ -4,16 +4,21 @@
  * @see specs/scenarios/scenario-run-export.feature
  */
 
+import type {
+  SimulationExportRun,
+  SimulationService,
+  ScenarioRunExportRequest,
+} from "@langwatch/scenario-contract";
+import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import Parse from "papaparse";
-import type { SimulationExportRun, SimulationService,ScenarioRunExportRequest } from "@langwatch/scenario-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   SimulationExecutionRepository as SimulationExecution,
   NullSimulationRepository,
 } from "../../index.ts";
-import { SimulationService as SimulationServiceClass } from "../simulation.service.ts";
-import { describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { ScenarioRunExportService } from "../scenario-run-export.service.ts";
+import { SimulationService as SimulationServiceClass } from "../simulation.service.ts";
 
 function buildRun(overrides: Partial<SimulationExportRun> = {}): SimulationExportRun {
   return {

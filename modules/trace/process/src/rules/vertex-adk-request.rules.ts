@@ -1,8 +1,9 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+
 import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
 import { recordValueType } from "./canonical-extraction.rules.ts";
-import { convertGeminiContent, systemInstructionText } from "./gemini-content.rules.ts";
 import { asNumber, isNonEmptyString, isRecord, safeJsonParse } from "./canonical-guard.rules.ts";
+import { convertGeminiContent, systemInstructionText } from "./gemini-content.rules.ts";
 import { setIfMissing, VERTEX_ADK_KEYS, VERTEX_ADK_RULE_PREFIX } from "./vertex-adk-core.rules.ts";
 
 /** The request's `contents` become the canonical input messages, when nothing set them first. */

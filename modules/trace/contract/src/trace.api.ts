@@ -1,7 +1,29 @@
-import type { Trace,Span,ElasticSearchEvent } from "./trace-format.schemas.ts";
-import type { Protections } from "./trace-viewer-protections.contract.ts";
-import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "./trace-edit-overlay.contract.ts";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type { RecordCapturedSpanInput } from "./trace-captured-span.commands.ts";
+import type { DerivedTraceEvent } from "./trace-derived-event.ts";
+import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "./trace-edit-overlay.contract.ts";
+import type {
+  EvaluationTraceReadInput,
+  EvaluationTraceSpan,
+  EvaluationTraceEvent,
+} from "./trace-evaluation.contract.ts";
+import type { TraceExportDownload, TraceExportDownloadInput } from "./trace-export.vocabulary.ts";
+import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
+import type {
+  TraceFullReadInput,
+  TraceFullRecord,
+  TraceFullThreadReadInput,
+} from "./trace-full-read.contract.ts";
+import type { TraceDateField } from "./trace-legacy-read.types.ts";
+import type { TraceSummaryData } from "./trace-projection.ts";
+import type {
+  TraceQueryClassification,
+  TraceQueryClassificationInput,
+  TraceQueryFieldCatalogueInput,
+} from "./trace-query.contract.ts";
+import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
+import type { TraceRecord } from "./trace-record.ts";
 import type {
   SpanSummaryRow,
   SpanResourceInfo,
@@ -11,32 +33,16 @@ import type {
   ModelSpanSampleRow,
 } from "./trace-span-read-model.ts";
 import type { SpanDetail, SpanLangwatchSignals } from "./trace-view.contract.ts";
-import type { DerivedTraceEvent } from "./trace-derived-event.ts";
-import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
-import type { SpanTreeDeltaInput, SpanTreeInput, TraceIngestWaitInput,
+import type { Protections } from "./trace-viewer-protections.contract.ts";
+import type {
+  SpanTreeDeltaInput,
+  SpanTreeInput,
+  TraceIngestWaitInput,
   TraceByIdInput,
   TraceDerivedEventsInput,
-  TraceSummaryLookupInput } from "./trace.queries.ts";
-import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
-import type { TraceDateField } from "./trace-legacy-read.types.ts";
-import { moduleApi } from "@langwatch/kernel";
-import type {
-  EvaluationTraceReadInput,
-  EvaluationTraceSpan,
-  EvaluationTraceEvent,
-} from "./trace-evaluation.contract.ts";
-import type { TraceRecord } from "./trace-record.ts";
-import type { TraceSummaryData } from "./trace-projection.ts";
-import type {
-  TraceFullReadInput,
-  TraceFullRecord,
-  TraceFullThreadReadInput,
-} from "./trace-full-read.contract.ts";
-import type {
-  TraceQueryClassification,
-  TraceQueryClassificationInput,
-  TraceQueryFieldCatalogueInput,
-} from "./trace-query.contract.ts";
+  TraceSummaryLookupInput,
+} from "./trace.queries.ts";
+import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 
 /** A reviewer correction target owned by Trace, shared structurally with Annotation. */
 export type TraceSuggestionTarget =
@@ -58,6 +64,7 @@ export type TraceAnnotationCommands = Readonly<{
 
 /** Public Trace operations shared by process peers after boot composition. */
 export interface TraceApi {
+  downloadTraceExport(input: TraceExportDownloadInput): Promise<TraceExportDownload>;
   formatSpansDigest(input: { spans: Span[] }): Promise<string>;
   recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void>;
   resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;

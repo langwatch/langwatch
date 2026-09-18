@@ -1,5 +1,4 @@
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_PROJECTION_VERSIONS,
@@ -10,11 +9,13 @@ import type {
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
 } from "@langwatch/scenario-contract";
-import { SimulationRunStateStoreAdapter } from "../clickhouse.simulation-eventing.repository.ts";
+import { describe, expect, it } from "vitest";
+
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
 } from "../../../eventing/simulation-run-state.projection.ts";
+import { SimulationRunStateStoreAdapter } from "../clickhouse.simulation-eventing.repository.ts";
 
 const TENANT_ID = createTenantId("project-acme");
 const RUN_ID = "scenariorun_0005FFcHZ7IBvPE1OSWymml0ikKqB";

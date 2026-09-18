@@ -1,3 +1,6 @@
+import { Buffer } from "node:buffer";
+
+import { queryWindowed, type WindowFragment } from "@langwatch/clickhouse-client";
 import {
   AGENT_TEST_SET_SUFFIX,
   RUN_ACTOR_LABELS,
@@ -12,8 +15,8 @@ import {
   type SimulationSetData,
   type SimulationExportRun,
 } from "@langwatch/scenario-contract";
-import { Buffer } from "node:buffer";
-import { queryWindowed, type WindowFragment } from "@langwatch/clickhouse-client";
+
+import { SimulationRepository } from "../simulation.repository.ts";
 import {
   EVALUATION_COLUMNS_SQL,
   EVALUATION_LIST_COLUMNS_SQL,
@@ -23,7 +26,6 @@ import {
   mapClickHouseRowToScenarioRunData,
   mapStatus,
 } from "./simulation-run.mapper.ts";
-import { SimulationRepository } from "../simulation.repository.ts";
 
 const DEFAULT_SET_ID = "default";
 const INTERNAL_SET_PREFIX = "__internal__";

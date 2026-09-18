@@ -9,16 +9,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { format, Temporal, toEpochMs } from "@langwatch/time";
 import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { Popover } from "@langwatch/design-system/popover";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+
 import type { TimeRange } from "../../../../behavior/filter.store.ts";
 import type { TimeRangePreset } from "../../../../behavior/time-range-presets.ts";
-import { readableDate } from "../../../../model/display-formatters.ts";
 import {
   getPresetById,
   matchPreset,
@@ -26,6 +26,7 @@ import {
   useCopyToClipboard,
   useFilterStore,
 } from "../../../../index.ts";
+import { readableDate } from "../../../../model/display-formatters.ts";
 
 export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const timeRange = useFilterStore((s) => s.timeRange);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { withoutHiddenResourceAttrs } from "../trace-view-gates.api.ts";
 
 describe("withoutHiddenResourceAttrs", () => {

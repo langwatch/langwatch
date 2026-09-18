@@ -5,6 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { Row } from "@tanstack/react-table";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { TraceListItem } from "../../../../../types/trace.ts";
 import { ROW_STYLES } from "../../../../status-row.tsx";
 import { IOPreviewAddon } from "../io-preview-addon.tsx";

@@ -48,10 +48,7 @@ export async function resolveTwilioRecordingWavUrl({
   // applies its own: a Twilio edge that withholds response headers must not
   // hang this request indefinitely. The caller's abort still propagates.
   const timeoutController = new AbortController();
-  const timeout = setTimeout(
-    () => timeoutController.abort(),
-    VOICE_HTTP_TIMEOUT_MS,
-  );
+  const timeout = setTimeout(() => timeoutController.abort(), VOICE_HTTP_TIMEOUT_MS);
   // The abort event fires at most once. A signal already aborted before we
   // got here would never reach a freshly-added listener, so the fetch would
   // start anyway and could wait the full timeout.

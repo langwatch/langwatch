@@ -8,12 +8,15 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
-import { SuiteExecutionService, type QueueSimulationRunCommandData } from "@langwatch/suite-process";
+import {
+  SuiteExecutionService,
+  type QueueSimulationRunCommandData,
+} from "@langwatch/suite-process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;

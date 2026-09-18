@@ -5,6 +5,7 @@
  */
 
 import { createHash } from "node:crypto";
+
 import type { VoiceTransport } from "./voice-transport.ts";
 
 export type CallTurnRole = "caller" | "agent";
@@ -87,9 +88,6 @@ export const VOICE_RUN_ID_PREFIX = "voicecall_";
  * resolve to the same id, so the writer can check it already exists (AC14).
  */
 export function scenarioRunIdForConversation(conversationId: string): string {
-  const digest = createHash("sha256")
-    .update(conversationId)
-    .digest("hex")
-    .slice(0, 32);
+  const digest = createHash("sha256").update(conversationId).digest("hex").slice(0, 32);
   return `${VOICE_RUN_ID_PREFIX}${digest}`;
 }

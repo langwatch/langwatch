@@ -5,10 +5,8 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
-import {
-  type VoiceTransport,
-  voiceAgentConfigSchema,
-} from "@langwatch/scenario-contract";
+import { type VoiceTransport, voiceAgentConfigSchema } from "@langwatch/scenario-contract";
+
 import type { RunDialogSubject } from "./run-dialog-types";
 import type { RunDialogForm } from "./use-run-dialog-form.ts";
 
@@ -38,9 +36,7 @@ export function voiceCallTargetOf({
 }): VoiceCallTarget | null {
   const target = form.target;
   if (target?.type !== "voice") return null;
-  const agent = form.scenarioAgents.find(
-    (candidate) => candidate.id === target.id,
-  );
+  const agent = form.scenarioAgents.find((candidate) => candidate.id === target.id);
   if (!agent) return null;
   const parsed = voiceAgentConfigSchema.safeParse(agent.config);
   if (!parsed.success) return null;

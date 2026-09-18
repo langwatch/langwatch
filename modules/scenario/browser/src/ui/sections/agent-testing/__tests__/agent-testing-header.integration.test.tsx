@@ -8,6 +8,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { AgentTestingHeader } from "../agent-testing-header.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

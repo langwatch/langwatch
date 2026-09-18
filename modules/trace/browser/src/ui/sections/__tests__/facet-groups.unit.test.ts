@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   ATTRIBUTES_SECTION_KEY,
   DEFAULT_PERSPECTIVE_ID,

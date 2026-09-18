@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import type { TraceListItem } from "../types/trace.ts";
 import { nowInstant } from "@langwatch/time";
+import { useEffect, useRef, useState } from "react";
+
+import type { TraceListItem } from "../types/trace.ts";
 
 const NEW_ID_TTL_MS = 3500;
 /** Cap the seen-ids memory in long sessions — old entries get evicted FIFO. */

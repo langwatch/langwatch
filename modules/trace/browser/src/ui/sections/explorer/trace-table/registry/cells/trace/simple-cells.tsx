@@ -1,13 +1,14 @@
 import { Badge, Text } from "@chakra-ui/react";
+
 import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
 import { formatTokens } from "../../../../../../../model/display-formatters.ts";
 import { originColorPalette, originLabel } from "../../../../../../../model/origin-display.ts";
-import type { TraceListItem } from "../../../../types/trace.ts";
+import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
+import type { TraceListItem } from "../../../../types/trace.ts";
 import { StatusIndicator } from "../../../status-row.tsx";
 import type { CellDef } from "../../types.ts";
-import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
-import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 
 /**
  * Origin badge that doubles as a facet filter — clicking it toggles the `origin` facet

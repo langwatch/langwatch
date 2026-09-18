@@ -1,31 +1,40 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import { RESERVED_INPUT_MEDIA_REFS, RESERVED_OUTPUT_MEDIA_REFS } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
-import { TraceMediaPart } from "../../../traces/trace-media-part.tsx";
-import { PrivacyDroppedNotice } from "../../../privacy-dropped-notice.tsx";
-import { RedactedField } from "../../../redacted-field.tsx";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { changedTraceMetadataKeys } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
-import { RESERVED_INPUT_MEDIA_REFS, RESERVED_OUTPUT_MEDIA_REFS } from "@langwatch/trace-contract";
+
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
+import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
+import { mediaRefToMediaData } from "../../../../../behavior/shared/traces/media-parts.ts";
 import {
   mediaRefBelongsToSide,
   parseMediaRefs,
   type TraceMediaSide,
 } from "../../../../../behavior/shared/traces/media-refs.ts";
-import { mediaRefToMediaData } from "../../../../../behavior/shared/traces/media-parts.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
+import { countFlatLeaves } from "../../../../../model/explorer/trace-drawer/trace-accordions/utils.ts";
+import { changedTraceMetadataKeys } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
+import {
+  EmptyHint,
+  EmptySignalCard,
+} from "../../../../blocks/explorer/trace-drawer/trace-accordions/empty-states.tsx";
+import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content.tsx";
+import { ScopeBlock } from "../../../../elements/explorer/trace-drawer/scope-chip.tsx";
+import { SectionFocusGlow } from "../../../../elements/explorer/trace-drawer/trace-accordions/section-focus-glow.tsx";
+import { PrivacyDroppedNotice } from "../../../privacy-dropped-notice.tsx";
+import { RedactedField } from "../../../redacted-field.tsx";
+import { TraceMediaPart } from "../../../traces/trace-media-part.tsx";
 import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
 import { useAppliedTraceEditPatch } from "../../hooks/use-trace-edit-overlay.ts";
 import { useTraceEvaluations } from "../../hooks/use-trace-evaluations.ts";
 import { useTraceEvents } from "../../hooks/use-trace-events.ts";
 import { useTraceHeaderCanonical } from "../../hooks/use-trace-header.ts";
 import { useTraceResources } from "../../hooks/use-trace-resources.ts";
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
-import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
-import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
-import { type AttributeComments, AttributeTable } from "../attribute-table.tsx";
 import { commentCountsBySection } from "../anchored-comments/section-comments.ts";
-import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content.tsx";
+import { type AttributeComments, AttributeTable } from "../attribute-table.tsx";
 import { CorrectedFieldFrame } from "../edit-mode/corrected-field.tsx";
 import { TraceEditableInput } from "../edit-mode/trace-editable-input.tsx";
 import { TraceEditableOutput } from "../edit-mode/trace-editable-output.tsx";
@@ -33,17 +42,9 @@ import { useTraceMetadataEditing } from "../edit-mode/use-trace-metadata-editing
 import { EvalsList } from "../eval-cards/index.ts";
 import { IOViewer } from "../io-viewer.tsx";
 import { PromptsPanel } from "../prompts-panel.tsx";
-import { ScopeBlock } from "../../../../elements/explorer/trace-drawer/scope-chip.tsx";
 import { AccordionShell, Section } from "./accordion-shell.tsx";
-import {
-  EmptyHint,
-  EmptySignalCard,
-} from "../../../../blocks/explorer/trace-drawer/trace-accordions/empty-states.tsx";
 import { EventCard } from "./event-card.tsx";
-import { SectionFocusGlow } from "../../../../elements/explorer/trace-drawer/trace-accordions/section-focus-glow.tsx";
-import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import { useSectionFocusGlow } from "./use-section-focus-glow.ts";
-import { countFlatLeaves } from "../../../../../model/explorer/trace-drawer/trace-accordions/utils.ts";
 
 export function TraceSummaryAccordions({
   trace,
@@ -734,7 +735,16 @@ function traceSectionIds({
   hasIO: boolean;
   showOther: boolean;
 }): ("io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other")[] {
-  const list: ("io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other")[] = [];
+  const list: (
+    | "io"
+    | "prompts"
+    | "attributes"
+    | "scope"
+    | "evals"
+    | "events"
+    | "exceptions"
+    | "other"
+  )[] = [];
   if (hasError && !hasIO) list.push("exceptions");
   list.push("io");
   if (hasError && hasIO) list.push("exceptions");

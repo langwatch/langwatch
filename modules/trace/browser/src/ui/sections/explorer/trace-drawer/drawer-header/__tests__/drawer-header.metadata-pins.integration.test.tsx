@@ -119,6 +119,7 @@ vi.mock("../../edit-mode/edited-original-toggle.tsx", () => ({
 vi.mock("../../raw-json-dialog.tsx", () => ({ RawJsonDialog: () => null }));
 
 import type { TraceHeader } from "@langwatch/trace-contract";
+
 import { usePinnedAttributesStore } from "../../../../../../behavior/pinned-attributes.store.ts";
 import { DrawerHeader } from "../drawer-header.tsx";
 

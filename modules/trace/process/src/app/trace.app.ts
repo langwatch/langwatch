@@ -11,11 +11,12 @@ import {
   type EvaluationApi,
   reportEvaluationCommandDataSchema,
 } from "@langwatch/evaluation-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import type { PresenceApi } from "@langwatch/presence-contract";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
 import { nowInstant } from "@langwatch/time";
 import type { TopicApi } from "@langwatch/topic-contract";
@@ -50,6 +51,8 @@ import {
   type Trace,
   type TraceIngestWaitInput,
   type TraceCanonicalisationService,
+  type TraceExportDownload,
+  type TraceExportDownloadInput,
   type TraceEditOverlayDto,
   type TraceEventRollup,
   type TraceLegacyFilterInput,
@@ -96,6 +99,8 @@ import {
   TraceExportBoundsService,
   type TraceExportBounds,
 } from "../services/trace-export-bounds.service.ts";
+import { TraceExportDownloadService } from "../services/trace-export-download.service.ts";
+import { TraceExportService } from "../services/trace-export.service.ts";
 import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
@@ -416,6 +421,7 @@ export interface TraceAppDependencies {
   broadcast: TracesTrpcEmitters;
   evaluations: EvaluationApi;
   codingAgents: CodingAgentApi;
+  presence?: PresenceApi;
   share: ShareApi;
   projects: ProjectApi;
   /**
@@ -468,36 +474,30 @@ function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Recor
 }
 
 /**
- * What the deployment states for this module. `fallbackVisibilityDays`
- * defaults to the free plan's 14 days, since both processes must read the
- * same number and a core module may not import the licensing contract.
+ * The free plan's 14 days. A constant, not config: both processes must read
+ * the same number, no deployment ever stated it, and a core module may not
+ * import the licensing contract.
  */
-const traceAppConfigSchema = z
-  .object({
-    processName: z.string().default("langwatch-api"),
-    fallbackVisibilityDays: z.number().default(14),
-    publicBaseUrl: z.string().optional(),
-    /**
-     * Registers the `trace_processing` pipeline while composing Trace
-     * (the producer role, default `true`). A process that ALSO drains it
-     * states `false` — one runtime holds one registration per pipeline name.
-     */
-    registersProcessingPipeline: z.boolean().default(true),
-  })
-  // Defaulted as a whole so a process that states no `trace` slice still boots:
-  // every field here names a refusal or a link, and none of them decides what
-  // a caller may read.
-  .default(() => ({
-    processName: "langwatch-api",
-    fallbackVisibilityDays: 14,
-    registersProcessingPipeline: true,
-  }));
-export type TraceAppConfig = z.infer<typeof traceAppConfigSchema>;
+const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
+
+/**
+ * The store members this process opens, plus the three facts the process
+ * itself knows: its public origin, its own name, and whether it produces the
+ * pipeline. None of the three is a deployment fact, so none is config.
+ */
+type TraceMembers = MembersRead<
+  readonly ["clickhouse", "eventing", "logger", "redis", "rateLimiter"]
+> &
+  Readonly<{
+    publicBaseUrl: string | undefined;
+    processName: string;
+    producesPipelines: boolean;
+  }>;
 
 type TraceSetup = FeatureSetup<
   typeof traceDependencies,
-  MembersRead<typeof TraceApp.reads>,
-  TraceAppConfig,
+  TraceMembers,
+  undefined,
   TraceRepositories
 >;
 
@@ -509,20 +509,34 @@ type TraceSetup = FeatureSetup<
 export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
-  static readonly configSchema = traceAppConfigSchema;
   /**
    * ClickHouse holds every captured span; `eventing` is the pipeline this
    * process stages commands on; the logger names the process in a blob
    * read's refusal. Everything else is a peer Api or its own repository.
    */
-  static readonly reads = reads("clickhouse", "eventing", "logger", "redis", "rateLimiter");
+  /** Every name is from the process's vocabulary; boot refuses by name. */
+  static readonly reads = [
+    "clickhouse",
+    "eventing",
+    "logger",
+    "redis",
+    "rateLimiter",
+    "publicBaseUrl",
+    "processName",
+    "producesPipelines",
+  ] as const;
 
   static create(input: TraceAppDependencies | TraceSetup): TraceApp {
     if (!("members" in input)) return new TraceApp(input);
 
     const collaborators = buildTraceCollaborators({
       members: input.members,
-      config: input.config,
+      config: {
+        processName: input.members.processName,
+        fallbackVisibilityDays: TRACE_FALLBACK_VISIBILITY_DAYS,
+        publicBaseUrl: input.members.publicBaseUrl,
+        registersProcessingPipeline: input.members.producesPipelines,
+      },
     });
     return new TraceApp(
       composeTraceAppDependencies({
@@ -536,6 +550,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
           rateLimiter: input.members.rateLimiter,
           redis: input.members.redis,
         }),
+        presence: input.dependencies.presence,
         protections: {
           authz: input.dependencies.authz,
           projects: input.dependencies.projects,
@@ -550,6 +565,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
 
   #contentReader: TraceContentReadService;
   #readBounds: TraceReadBoundsService;
+  #exportDownload: TraceExportDownloadService | null;
   #dependencies: TraceAppDependencies;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
@@ -558,6 +574,25 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
       entitlement: dependencies.requestBounds,
       projects: dependencies.projects,
     });
+    this.#exportDownload =
+      dependencies.protections && dependencies.exportBounds && dependencies.presence
+        ? TraceExportDownloadService.create({
+            exports: TraceExportService.create({ traceService: dependencies.traces.read }),
+            protections: dependencies.protections,
+            bounds: dependencies.exportBounds,
+            presence: dependencies.presence,
+          })
+        : null;
+  }
+
+  downloadTraceExport(input: TraceExportDownloadInput): Promise<TraceExportDownload> {
+    if (!this.#exportDownload) {
+      throw new Error(
+        "The trace export download asked for its reader, protections, budget, and Presence progress peer, but this process composed Trace without all of them",
+      );
+    }
+
+    return this.#exportDownload.download(input);
   }
 
   resolveIngestWaitTimeout(input: TraceIngestWaitInput) {

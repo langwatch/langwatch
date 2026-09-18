@@ -1,17 +1,17 @@
 import { NullLogRecordStorageRepository } from "../log-record-storage.repository.ts";
-import type { TraceRepositories } from "../trace.repositories.ts";
-import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
-import { MemoryTraceDerivationSpanRepository } from "./memory.trace-derivation-span.repository.ts";
-import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
-import { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
-import { MemoryTraceSummaryRepository } from "./memory.trace-summary.repository.ts";
-import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics.repository.ts";
-import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
-import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.repository.ts";
-import { MemoryTraceSummaryProjectionRepository } from "./memory.trace-summary-projection.repository.ts";
-import { MemoryTracePayloadReaderRepository } from "./memory.trace-payload-reader.repository.ts";
 import { NullSessionGroupsRepository } from "../session-groups.repository.ts";
+import type { TraceRepositories } from "../trace.repositories.ts";
 import { MemoryNullTraceListRepository } from "./memory.null-trace-list.repository.ts";
+import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
+import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
+import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics.repository.ts";
+import { MemoryTraceDerivationSpanRepository } from "./memory.trace-derivation-span.repository.ts";
+import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.repository.ts";
+import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
+import { MemoryTracePayloadReaderRepository } from "./memory.trace-payload-reader.repository.ts";
+import { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
+import { MemoryTraceSummaryProjectionRepository } from "./memory.trace-summary-projection.repository.ts";
+import { MemoryTraceSummaryRepository } from "./memory.trace-summary.repository.ts";
 
 /** The "memory" tier: every trace repository the app is tested without a database. */
 export class MemoryTraceRepositories {

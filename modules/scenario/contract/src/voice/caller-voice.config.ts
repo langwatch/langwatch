@@ -9,11 +9,7 @@ import { z } from "zod";
  * child maps each to the SDK's audio-effect functions when it builds the
  * simulator.
  */
-export const CALLER_VOICE_EFFECTS = [
-  "none",
-  "phone_line",
-  "background_noise",
-] as const;
+export const CALLER_VOICE_EFFECTS = ["none", "phone_line", "background_noise"] as const;
 export type CallerVoiceEffect = (typeof CALLER_VOICE_EFFECTS)[number];
 
 /**
@@ -83,10 +79,8 @@ const OPENAI_CALLER_VOICE_NAMES = [
 /** Explicit caller voice list (not derived from catalog): SDK needs voice name,
  * not model id; ElevenLabs voices are per-account, not listed here.
  */
-export const CALLER_VOICES: CallerVoiceOption[] = OPENAI_CALLER_VOICE_NAMES.map(
-  (name) => ({
-    provider: "openai",
-    value: `openai/${name}`,
-    label: name.charAt(0).toUpperCase() + name.slice(1),
-  }),
-);
+export const CALLER_VOICES: CallerVoiceOption[] = OPENAI_CALLER_VOICE_NAMES.map((name) => ({
+  provider: "openai",
+  value: `openai/${name}`,
+  label: name.charAt(0).toUpperCase() + name.slice(1),
+}));

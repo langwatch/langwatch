@@ -4,6 +4,7 @@
  * the rule of thumb. See modules/annotation/specs/annotation-queue-workflow.feature.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   isSessionMarked,
   sessionTraceIds,

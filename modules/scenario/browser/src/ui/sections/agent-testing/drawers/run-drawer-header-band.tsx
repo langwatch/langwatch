@@ -5,20 +5,21 @@
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 
-import type { SimulationRunStatus } from "@langwatch/scenario-contract";
 import { Button, Heading, HStack, VStack, Icon } from "@chakra-ui/react";
-import { Square, Edit2 } from "lucide-react";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import type { SimulationRunStatus } from "@langwatch/scenario-contract";
+import { Chip } from "@langwatch/trace-browser/surfaces/trace-drawer-chip";
+import { Square, Edit2 } from "lucide-react";
+
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { hasNoResults } from "../../../../model/scenario-run-status.utils.ts";
+import { CaseVersionChip } from "../../../elements/agent-testing/shared/case-version-chip.tsx";
 import { CopyIdChip } from "../../../elements/copy-id-chip.tsx";
 import { CutAtLimitBadge, isCutAtLimitOf } from "../../../elements/cut-at-limit-badge.tsx";
 import { RunCriteriaChip } from "../../../elements/run-criteria-chip.tsx";
 import { ScenarioRunActions } from "../../../elements/scenario-run-actions.tsx";
 import { ScenarioRunStatusIcon } from "../../../elements/scenario-run-status-icon.tsx";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { Chip } from "@langwatch/trace-browser/surfaces/trace-drawer-chip";
-import { CaseVersionChip } from "../../../elements/agent-testing/shared/case-version-chip.tsx";
 import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys.ts";
 import type {
   RunDetail,

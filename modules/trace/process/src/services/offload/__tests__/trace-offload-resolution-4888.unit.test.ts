@@ -4,9 +4,11 @@
  * preview, fast-path skip, and partial resolution across IO fields.
  */
 
-import { TraceOffloadResolutionService } from "../../trace-offload-resolution.service.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+
+import { TraceOffloadResolutionService } from "../../trace-offload-resolution.service.ts";
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -23,12 +25,15 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
-import { BlobFieldNotFoundError, BlobNotFoundError } from "../../trace-blob-store.service.ts";
-import { EVENTREF_ATTR_PREFIX,
+import {
+  EVENTREF_ATTR_PREFIX,
   type NormalizedSpan,
   NormalizedSpanKind,
-  NormalizedStatusCode } from "@langwatch/trace-contract";
+  NormalizedStatusCode,
+} from "@langwatch/trace-contract";
+
+import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
+import { BlobFieldNotFoundError, BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------

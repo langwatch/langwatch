@@ -102,9 +102,7 @@ export interface CloudflaredScope {
  * that can resolve `cloudflared/package.json` — the robust presence check,
  * since the package root then re-exports both. Throws naming every scope tried.
  */
-export function resolveCloudflaredFromScopes(
-  scopes: CloudflaredScope[],
-): CloudflaredModule {
+export function resolveCloudflaredFromScopes(scopes: CloudflaredScope[]): CloudflaredModule {
   for (const scope of scopes) {
     if (scope.require === null) continue;
     try {
@@ -173,13 +171,7 @@ function withTimeout<T>({
 }
 
 /** Prepend `dir` to `env.PATH`, unless it is already the leading entry. */
-function prependToPath({
-  env,
-  dir,
-}: {
-  env: NodeJS.ProcessEnv;
-  dir: string;
-}): void {
+function prependToPath({ env, dir }: { env: NodeJS.ProcessEnv; dir: string }): void {
   const current = env.PATH ?? "";
   if (current.split(path.delimiter)[0] === dir) return;
   env.PATH = current ? `${dir}${path.delimiter}${current}` : dir;
@@ -236,17 +228,13 @@ export async function ensureCloudflaredOnPath(
 
   const resolveModule = deps.resolveModule ?? defaultResolveModule;
   const binaryExists = deps.binaryExists ?? fs.existsSync;
-  const installTimeoutMs =
-    deps.installTimeoutMs ?? CLOUDFLARED_INSTALL_TIMEOUT_MS_DEFAULT;
+  const installTimeoutMs = deps.installTimeoutMs ?? CLOUDFLARED_INSTALL_TIMEOUT_MS_DEFAULT;
 
   let mod: CloudflaredModule;
   try {
     mod = resolveModule();
   } catch (error) {
-    throw new VoiceTunnelBinaryError(
-      "could not resolve the cloudflared package",
-      error,
-    );
+    throw new VoiceTunnelBinaryError("could not resolve the cloudflared package", error);
   }
 
   await ensureBinaryPresent({ mod, binaryExists, installTimeoutMs });

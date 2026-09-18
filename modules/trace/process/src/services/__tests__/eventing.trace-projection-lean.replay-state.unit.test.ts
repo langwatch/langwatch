@@ -1,4 +1,3 @@
-import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.service.ts";
 import {
   nullLog,
   type ProjectionStoreContext,
@@ -10,9 +9,10 @@ import {
   type StateProjectionStore,
   type StoredProjection,
 } from "@langwatch/eventing";
-import { describe, expect, it, vi } from "vitest";
 import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import { describe, expect, it, vi } from "vitest";
 
+import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.service.ts";
 import { makeFakeClickHouse, type FakeEventLogRow as Row } from "./fixtures/fake-event-log.ts";
 
 interface CounterState {

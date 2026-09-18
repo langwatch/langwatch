@@ -4,9 +4,10 @@
  * text. Met-every-criterion-but-failed-required reads "Failed"; hover names it.
  */
 import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
-import { formatRunStatusLabel } from "@langwatch/suite-browser/run-formatters";
 import type { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { formatRunStatusLabel } from "@langwatch/suite-browser/run-formatters";
+
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import {
   failedRequiredEvaluatorName,
   type RunEvaluation,

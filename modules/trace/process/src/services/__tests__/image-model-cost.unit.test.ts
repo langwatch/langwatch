@@ -1,6 +1,7 @@
-import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
-import { describe, expect, it } from "vitest";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
 
 // Catalog rates under test (model-catalog.overlay.json), per token, from
 // OpenAI's pricing page: gpt-image-2 $5 text in, $8 image in, $30 image out

@@ -3,6 +3,7 @@
  * OOM the read retries in batches, merged into one map. Spec:
  * specs/clickhouse/bounded-reads.feature */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 const mockClickHouseQuery = vi.hoisted(() => vi.fn());

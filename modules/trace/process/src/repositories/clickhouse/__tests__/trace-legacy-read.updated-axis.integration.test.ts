@@ -3,17 +3,20 @@
  * ensuring each trace appears exactly once across pages.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import type {
+  GetAllTracesForProjectInput,
+  TracesForProjectResult,
+} from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
-import type { GetAllTracesForProjectInput,TracesForProjectResult } from "@langwatch/trace-contract";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
+import { openProtections } from "./open-protections.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
 } from "./support/clickhouse-endpoint.support.ts";
-import { openProtections } from "./open-protections.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
 

@@ -1,13 +1,11 @@
 import { Box, Text } from "@chakra-ui/react";
-import {
-  presenceUserColor,
-  presenceUserDisplayName,
-} from "@langwatch/presence-browser";
+import { presenceUserColor, presenceUserDisplayName } from "@langwatch/presence-browser";
 import { memo, useRef } from "react";
+
+import { usePresenceFeatureEnabled } from "../../../behavior/presence/use-presence-feature-enabled.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useCursorBroadcast } from "./hooks/use-cursor-broadcast.ts";
 import { type PeerCursor, usePeerCursors } from "./hooks/use-peer-cursors.ts";
-import { usePresenceFeatureEnabled } from "../../../behavior/presence/use-presence-feature-enabled.ts";
 
 interface PeerCursorOverlayProps {
   /**

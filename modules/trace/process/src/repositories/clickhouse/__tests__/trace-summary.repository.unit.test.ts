@@ -1,12 +1,13 @@
 // Unit tests for `findByTraceId` OccurredAt-resolution branch selection.
 // Three paths: no row -> null; positive ms -> partition-pruned; 0 -> legacy fallback
 import type { ClickHouseClient } from "@clickhouse/client";
-import { describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
 } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 
 const heavyRow = {

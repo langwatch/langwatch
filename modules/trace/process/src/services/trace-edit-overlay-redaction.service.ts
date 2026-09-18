@@ -1,4 +1,5 @@
-import { type Protections,
+import {
+  type Protections,
   TRACE_EDIT_SPAN_FIELDS,
   TRACE_EDIT_TRACE_FIELDS,
   type TraceEditOverlayPatch,
@@ -7,7 +8,9 @@ import { type Protections,
   type TraceEditTraceField,
   traceEditSpanPatchSchema,
   traceEditTracePatchSchema,
-  traceAttributeKeyForMetadata } from "@langwatch/trace-contract";
+  traceAttributeKeyForMetadata,
+} from "@langwatch/trace-contract";
+
 import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
 
 /**

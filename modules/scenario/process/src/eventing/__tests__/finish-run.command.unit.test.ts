@@ -1,5 +1,4 @@
 import { createTenantId, type Command } from "@langwatch/eventing";
-import { describe, expect, it, vi } from "vitest";
 import {
   decodeScenarioError,
   ScenarioInfraErrorCode,
@@ -12,6 +11,8 @@ import {
   type SimulationTextMessageEndEvent,
   type SimulationEventResults as SimulationResults,
 } from "@langwatch/scenario-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import type { FinishRunDeps } from "../finish-run.commands.ts";
 import { FinishRunCommand } from "../finish-run.commands.ts";
 

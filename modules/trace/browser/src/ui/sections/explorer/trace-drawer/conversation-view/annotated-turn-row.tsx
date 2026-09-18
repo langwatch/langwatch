@@ -1,8 +1,9 @@
 import { Box, Grid, VStack } from "@chakra-ui/react";
 import { memo } from "react";
+
+import { FocusedTurnFrame } from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import { ChatTurnRow } from "./chat-turn-row.tsx";
-import { FocusedTurnFrame } from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn.tsx";
 import { TurnAnnotationRail } from "./turn-annotation-rail.tsx";
 import type { ParsedTurn, TurnLayout } from "./types.ts";
 import { type RailLayout, THREAD_COLUMN_MAX_WIDTH_PX } from "./use-rail-layout.ts";

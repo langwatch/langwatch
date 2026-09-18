@@ -11,11 +11,12 @@ import {
   REMOVE_ANNOTATION_COMMAND_TYPE,
   annotationAddedEventDataSchema,
   annotationRemovedEventDataSchema,
-  annotationsBulkSyncedEventDataSchema
+  annotationsBulkSyncedEventDataSchema,
 } from "@langwatch/trace-contract";
+
+import { changeTraceNameCommand } from "./eventing.change-trace-name.service.ts";
 import { recordLogContributionCommand } from "./eventing.trace-log-contribution.service.ts";
 import { recordMetricCorrelationCommand } from "./eventing.trace-metric-correlation.service.ts";
-import { changeTraceNameCommand } from "./eventing.change-trace-name.service.ts";
 
 const addAnnotationCommand = defineCommand({
   commandType: ADD_ANNOTATION_COMMAND_TYPE,

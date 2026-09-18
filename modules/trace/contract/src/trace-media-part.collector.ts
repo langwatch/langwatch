@@ -1,12 +1,12 @@
+import { visitContentPart } from "./trace-content-part.dispatcher.ts";
+import { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
+import type { ContentSource } from "./trace-content-part.types.ts";
 /**
  * FROZEN TWIN: platform/app/src/shared/traces/mediaParts.ts (collector half).
  * Walk that extracts media parts from span input/output. Must match ingestion walker
  * for consistent reference collection. See `trace-media-ref.ts` for references.
  */
 import { containsMediaMarkers } from "./trace-media-markers.ts";
-import { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
-import { visitContentPart } from "./trace-content-part.dispatcher.ts";
-import type { ContentSource } from "./trace-content-part.types.ts";
 import { isMediaPartRole, type MediaPartRole } from "./trace-media-role.ts";
 
 /**

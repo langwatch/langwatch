@@ -5,6 +5,7 @@
  */
 
 import type { LiqeQuery, TagToken } from "liqe";
+
 import { filterAST, walkAST } from "./trace-query-ast.ts";
 import { escapeValue } from "./trace-query-mutations.ts";
 import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";

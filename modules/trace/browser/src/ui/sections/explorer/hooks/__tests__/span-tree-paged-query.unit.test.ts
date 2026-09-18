@@ -1,7 +1,7 @@
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { QueryClient } from "@tanstack/react-query";
 import { createTRPCClientProxy, httpBatchLink, TRPCUntypedClient } from "@trpc/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 import {
   fetchSpanTreePages,

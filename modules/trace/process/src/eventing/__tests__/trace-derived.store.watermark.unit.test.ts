@@ -1,12 +1,16 @@
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import {
+  TraceAnalyticsFoldProjection,
+  type TraceAnalyticsData,
+} from "../trace-derived.projection.ts";
 import { TraceAnalyticsStore } from "../trace-derived.store.ts";
-import { TraceAnalyticsFoldProjection, type TraceAnalyticsData } from "../trace-derived.projection.ts";
 import { createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { CALLER_VOICES } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import { callerVoiceOptions } from "../caller-voice-model-options";
 
 describe("callerVoiceOptions", () => {

@@ -1,14 +1,15 @@
 import { ATTR_KEYS, CLAUDE_CODE_LLM_REQUEST_SPAN_NAME } from "@langwatch/trace-contract";
-import type {
-  AttributeCanonicaliser,
-  ExtractorContext,
-  LogExtractorContext,
-} from "./canonical-attributes.service.ts";
+
 import { asNumber } from "../rules/canonical-guard.rules.ts";
 import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
 } from "../rules/claude-code-call-policy.rules.ts";
+import type {
+  AttributeCanonicaliser,
+  ExtractorContext,
+  LogExtractorContext,
+} from "./canonical-attributes.service.ts";
 import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
@@ -130,9 +131,7 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
    * fold sums per-call values, which can never double-count a span.
    */
   private liftApiResponseBodyUsage(ctx: LogExtractorContext): void {
-    const usage = claudeCodeResponseService.extractCacheCreationTtlSplit(
-      ctx.bag.attrs.get("body"),
-    );
+    const usage = claudeCodeResponseService.extractCacheCreationTtlSplit(ctx.bag.attrs.get("body"));
     if (usage === null) {
       return;
     }

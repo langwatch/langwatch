@@ -4,12 +4,12 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { RunRow, ScenarioTargetRow } from "@langwatch/suite-browser/run-cards";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-browser/testing";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),

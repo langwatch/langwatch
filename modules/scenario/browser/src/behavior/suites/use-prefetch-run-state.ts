@@ -4,8 +4,9 @@
  */
 
 import { useCallback } from "react";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
+
 import { api } from "../scenario-api.ts";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 const PREFETCH_STALE_TIME_MS = 5000;
 

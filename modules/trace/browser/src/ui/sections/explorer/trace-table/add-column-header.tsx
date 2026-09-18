@@ -1,10 +1,11 @@
 import { IconButton } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
 import type React from "react";
-import { Popover } from "@langwatch/design-system/popover";
-import type { TraceListItem } from "../types/trace.ts";
+
 import { ColumnPickerContent } from "../toolbar/column-picker-content.tsx";
+import type { TraceListItem } from "../types/trace.ts";
 
 /** Id of the trailing "+" column. Kept out of the lens column list — it's a
  *  synthetic UI affordance, like the leading row-select column. */

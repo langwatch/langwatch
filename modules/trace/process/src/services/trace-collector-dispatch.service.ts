@@ -4,7 +4,6 @@ import crypto from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   SPAN_MAX_PAST_MS,
@@ -12,9 +11,8 @@ import {
   type Span,
 } from "@langwatch/trace-contract";
 
-import { TraceCollectorSpanService } from "#services/trace-collector-span.service";
-
 import type { CollectorMetadata } from "#rules/trace-collector-body.rules";
+import { TraceCollectorSpanService } from "#services/trace-collector-span.service";
 
 const logger = createLogger("langwatch.collector");
 

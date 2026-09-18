@@ -1,4 +1,5 @@
 import { createTenantId, type Command, type TenantId } from "@langwatch/eventing";
+import { applyOtlpReceiverPolicy } from "@langwatch/otlp";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -10,14 +11,15 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { EventingRecordSpanAdapter } from "../eventing.record-span.service.ts";
-import { applyOtlpReceiverPolicy } from "@langwatch/otlp";
 import {
   type TraceSpanContentDrop,
   type TraceSpanCostEnrichment,
   type TraceSpanPiiRedaction,
-  type TraceSpanTokenEstimation,type TraceSpanSpool,type TraceSpanSpoolIdentity
+  type TraceSpanTokenEstimation,
+  type TraceSpanSpool,
+  type TraceSpanSpoolIdentity,
 } from "../../app/trace.members.ts";
+import { EventingRecordSpanAdapter } from "../eventing.record-span.service.ts";
 
 class PiiRedactionFake implements TraceSpanPiiRedaction {
   readonly redact = vi.fn(

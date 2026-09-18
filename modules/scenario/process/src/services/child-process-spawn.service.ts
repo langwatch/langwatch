@@ -3,9 +3,10 @@
  * dev uses bundle if current else tsx. See specs/scenarios/pre-compiled-child-process.feature.
  */
 
-import { createLogger } from "@langwatch/observability";
 import fs from "fs";
 import path from "path";
+
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:scenarios:child-process-spawn");
 

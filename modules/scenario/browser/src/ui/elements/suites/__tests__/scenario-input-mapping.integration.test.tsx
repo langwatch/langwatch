@@ -5,11 +5,12 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { FieldMapping } from "@langwatch/prompt-browser-kit/variables";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { FieldMapping } from "@langwatch/prompt-browser-kit/variables";
+
 import {
   ScenarioInputMappingSection,
   type ScenarioInputMappingSectionProps,

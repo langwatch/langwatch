@@ -3,8 +3,8 @@
  */
 
 import { Button, createListCollection, Field, HStack, Spinner, Text } from "@chakra-ui/react";
-import { Select } from "@langwatch/design-system/select";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { Select } from "@langwatch/design-system/select";
 import { type ReactNode, useEffect, useState } from "react";
 import type { FieldErrors, Path, PathValue, UseFormSetValue } from "react-hook-form";
 

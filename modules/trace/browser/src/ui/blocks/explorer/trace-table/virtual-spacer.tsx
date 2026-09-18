@@ -1,4 +1,5 @@
 import type React from "react";
+
 import { Tbody } from "../../../elements/explorer/trace-table/table-primitives.tsx";
 
 interface VirtualSpacerProps {

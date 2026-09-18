@@ -5,6 +5,7 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { FieldMapping, Variable } from "@langwatch/prompt-browser-kit/variables";
 import type { SuiteTarget } from "@langwatch/suite-contract";
+
 import { ScenarioInputMappingSection } from "./scenario-input-mapping-section.tsx";
 
 /** A prompt as the run-plan form knows it. */

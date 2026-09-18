@@ -5,10 +5,7 @@
  * @see specs/scenarios/scenario-fields.feature
  */
 
-import {
-  ScenarioFieldTypeInvalidError,
-  ScenarioFieldUnknownError,
-} from "./scenario.errors.ts";
+import { ScenarioFieldTypeInvalidError, ScenarioFieldUnknownError } from "./scenario.errors.ts";
 import {
   coerceFieldValue,
   fieldValueIsBlank,
@@ -31,9 +28,7 @@ export function readScenarioFieldValues({
   const byIdentifier = new Map(
     definitions.map((definition) => [definition.identifier, definition]),
   );
-  const unknown = Object.keys(values).filter(
-    (identifier) => !byIdentifier.has(identifier),
-  );
+  const unknown = Object.keys(values).filter((identifier) => !byIdentifier.has(identifier));
   if (unknown.length > 0) {
     throw new ScenarioFieldUnknownError({
       identifiers: unknown,

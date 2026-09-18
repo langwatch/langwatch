@@ -4,12 +4,16 @@
  * @see specs/features/dialog-backdrop-transparency-blur.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { UiCapabilityContextProvider, type UiCapabilities } from "@langwatch/browser-host/capabilities";
+import {
+  UiCapabilityContextProvider,
+  type UiCapabilities,
+} from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cssRulesForElement } from "./emotion-test-css.ts";
+
 import { Dialog } from "../dialog.tsx";
+import { cssRulesForElement } from "./emotion-test-css.ts";
 
 /** The misuse warning is a development affordance, so the shell says so here. */
 const capabilities: UiCapabilities = {

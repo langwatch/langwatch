@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { SimulationRunStatus, SimulationVerdict } from "@langwatch/scenario-contract";
 import type { SimulationRunData, SimulationService } from "@langwatch/scenario-contract";
+import { describe, expect, it, vi } from "vitest";
 
 import { createSimulationRunsRest } from "../simulation-run.rest.ts";
 import {

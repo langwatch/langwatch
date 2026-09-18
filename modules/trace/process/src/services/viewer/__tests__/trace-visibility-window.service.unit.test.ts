@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-
 import type { Span, Trace } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   TEASER_ELLIPSIS,

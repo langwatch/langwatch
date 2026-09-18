@@ -7,9 +7,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const listenerOptions = vi.hoisted(
-  () => ({}) as { refetch?: () => void; enabled?: boolean },
-);
+const listenerOptions = vi.hoisted(() => ({}) as { refetch?: () => void; enabled?: boolean });
 const invalidations = vi.hoisted(() => ({
   suiteSummaries: vi.fn(),
   externalSetSummaries: vi.fn(),
@@ -19,10 +17,7 @@ const invalidations = vi.hoisted(() => ({
 }));
 
 vi.mock("~/hooks/useSimulationUpdateListener", () => ({
-  useSimulationUpdateListener: (options: {
-    refetch: () => void;
-    enabled: boolean;
-  }) => {
+  useSimulationUpdateListener: (options: { refetch: () => void; enabled: boolean }) => {
     listenerOptions.refetch = options.refetch;
     listenerOptions.enabled = options.enabled;
     return { isConnected: true };
@@ -63,9 +58,7 @@ describe("the Agent Testing live updates", () => {
     describe("when a simulation update arrives", () => {
       /** @scenario "A simulation update makes the results read again" */
       it("reads the results overview and the result atoms again", () => {
-        const { result } = renderHook(() =>
-          useAgentTestingLiveUpdates("project_1"),
-        );
+        const { result } = renderHook(() => useAgentTestingLiveUpdates("project_1"));
         expect(result.current.isSseConnected).toBe(true);
         expect(listenerOptions.enabled).toBe(true);
 

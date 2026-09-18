@@ -3,6 +3,7 @@ import type { Protections } from "@langwatch/trace-contract";
  * page of log-only traces (epoch sentinel) left nothing, scanning every weekly
  * part and dying with MEMORY_LIMIT_EXCEEDED. These assert on the SQL. */
 import { describe, expect, it, vi } from "vitest";
+
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 const { mockClickHouseQuery } = vi.hoisted(() => ({
@@ -111,7 +112,8 @@ function matchRows({
  * read is a broken fixture, not a failed expectation. Throws to report setup
  * break as a setup break, keeping assertions in the it blocks. */
 async function readTraces(traceIds: string[]) {
-  const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
+  const { TraceLegacyReadClickHouseRepository } =
+    await import("../trace-legacy-read.repository.ts");
   const service = new TraceLegacyReadClickHouseRepository({
     resolveClickHouseClient: testResolveClickHouseClient,
     traceCanonicalisation,

@@ -4,11 +4,12 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { describe, expect, it } from "vitest";
-import type { TargetIdentity } from "../../../../../behavior/use-target-name-map.ts";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { targetKeyOf } from "@langwatch/suite-contract";
+import { describe, expect, it } from "vitest";
+
+import type { TargetIdentity } from "../../../../../behavior/use-target-name-map.ts";
 import {
   batchTargetsOf,
   isComparison,

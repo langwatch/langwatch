@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useMemo } from "react";
+
 import type { TraceListItem } from "../types/trace.ts";
 
 interface TraceStatistics {
@@ -42,7 +43,9 @@ function percentile(sorted: number[], p: number): number {
 }
 
 function positiveSorted(values: (number | null | undefined)[]): number[] {
-  return values.filter((v): v is number => typeof v === "number" && v > 0).toSorted((a, b) => a - b);
+  return values
+    .filter((v): v is number => typeof v === "number" && v > 0)
+    .toSorted((a, b) => a - b);
 }
 
 interface TraceStatisticsProviderProps {

@@ -1,5 +1,5 @@
-import type { TraceLogRecordDto } from "@langwatch/trace-contract";
 import { type CodingAgentEvent, normalizeEventName } from "@langwatch/coding-agent-contract";
+import type { TraceLogRecordDto } from "@langwatch/trace-contract";
 
 /**
  * A one-line, human summary for a log record whose `event.name` is one of the canonical

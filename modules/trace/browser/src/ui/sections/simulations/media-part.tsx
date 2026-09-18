@@ -4,6 +4,7 @@ import {
   type MediaProbeResult,
 } from "@langwatch/scenario-browser/surfaces/media-part";
 import { useEffect, useState } from "react";
+
 import { api } from "../../../behavior/trace-api.ts";
 
 /** Where the part's bytes live: a binary's own url, or a url-typed source. */

@@ -1,13 +1,18 @@
-import type { Protections,Span,Trace,TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 /**
  * Claude Code content enrichment at read time: real enrichment adapter + join,
  * mocked trace read and log-record store (no Docker).
  * @vitest-environment node
  */
-
+import type {
+  Protections,
+  Span,
+  Trace,
+  TraceCanonicalisationService,
+} from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { TraceLogRecordReader } from "../claude-code-log-enrichment.service.ts";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 
 const {
   mockGetTracesWithSpans,
@@ -31,9 +36,9 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
 import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
+import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";

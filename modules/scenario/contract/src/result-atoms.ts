@@ -2,8 +2,8 @@
  * browser and read side (types only).
  */
 
-import type { RunParameterValues } from "./scenario.parameters.ts";
 import type { ScenarioRunStatus } from "./scenario-run.ts";
+import type { RunParameterValues } from "./scenario.parameters.ts";
 import type { ScenarioEvaluationStatus } from "./schemas/event-schemas.ts";
 
 /** The target key a run carries when it names no platform target. */

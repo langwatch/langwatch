@@ -4,7 +4,6 @@
  * runs, their live stream, cancellation, Results and configuration history.
  */
 
-import { simulationTargetSchema } from "./simulation-target.ts";
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
@@ -14,7 +13,6 @@ import {
   runParameterValuesSchema,
   scenarioParameterDefinitionsSchema,
 } from "./scenario.parameters.ts";
-import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 import {
   MAX_RUN_CONFIGURATIONS,
   resultAtomsPageSchema,
@@ -30,6 +28,7 @@ import {
 } from "./scenario.responses.ts";
 import { scenarioSchema } from "./scenario.ts";
 import { scenarioVersionDetailSchema } from "./scenario.version.ts";
+import { simulationTargetSchema } from "./simulation-target.ts";
 import {
   simulationAllSuitesRunDataSchema,
   simulationBatchHistorySchema,
@@ -43,6 +42,7 @@ import {
   simulationSetDataSchema,
   simulationStreamFrameSchema,
 } from "./simulation.ts";
+import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 
 /** The project every procedure below is asked of. */
 const projectSchema = z.object({ projectId: z.string() });
@@ -235,7 +235,9 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   .withOutput(scenarioCancelJobResultSchema)
 
   .mutation("cancelBatchRun")
-  .withInput(z.object({ ...projectSchema.shape, scenarioSetId: z.string(), batchRunId: z.string() }))
+  .withInput(
+    z.object({ ...projectSchema.shape, scenarioSetId: z.string(), batchRunId: z.string() }),
+  )
   .withOutput(scenarioCancelBatchRunResultSchema)
 
   // -- reading what ran ------------------------------------------------------

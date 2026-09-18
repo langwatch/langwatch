@@ -1,13 +1,14 @@
 import { z } from "zod";
+
 import { evaluatorAttachmentsSchema, parseEvaluatorAttachments } from "./evaluator-attachments.ts";
 import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
-import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 import {
   parseScenarioFieldValues,
   parseSuiteFieldDefinitions,
   scenarioFieldValuesSchema,
   suiteFieldDefinitionsSchema,
 } from "./suite-fields.ts";
+import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 
 export const scenarioAuthorLabelSchema = z.enum(["user", "api", "cli", "langy"]);
 export type ScenarioAuthorLabel = z.infer<typeof scenarioAuthorLabelSchema>;

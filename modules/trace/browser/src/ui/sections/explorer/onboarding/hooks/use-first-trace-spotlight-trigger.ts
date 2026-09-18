@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { writeSpotlightFragment } from "../spotlights/spotlight-overlay.tsx";
-import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../model/explorer/onboarding/spotlights/spotlights.ts";
+
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../model/explorer/onboarding/spotlights/spotlights.ts";
+import { writeSpotlightFragment } from "../spotlights/spotlight-overlay.tsx";
 import { useTraceExplorerTourPreference } from "./use-trace-explorer-tour-preference.ts";
 
 interface UseFirstTraceSpotlightTriggerArgs {

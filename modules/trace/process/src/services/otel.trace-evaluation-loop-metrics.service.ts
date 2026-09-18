@@ -1,4 +1,5 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
+
 import {
   type TraceEvaluationLoopMetrics,
   type TraceEvaluationLoopBlockReason,
@@ -25,8 +26,7 @@ export class OtelTraceEvaluationLoopMetricsAdapter implements TraceEvaluationLoo
     );
   }
 
-  private constructor(private readonly blocked: CounterHandle) {
-  }
+  private constructor(private readonly blocked: CounterHandle) {}
 
   loopBlocked(reason: TraceEvaluationLoopBlockReason): void {
     this.blocked.inc({ [EVALUATOR_LOOP_BLOCKED_REASON_LABEL]: reason });

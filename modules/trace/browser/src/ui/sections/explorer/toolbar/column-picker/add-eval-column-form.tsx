@@ -1,15 +1,16 @@
 import { Button, chakra, HStack, Input, Stack, Text } from "@chakra-ui/react";
+import { toaster } from "@langwatch/design-system/toaster";
 import { BadgeCheck, Gauge, type LucideIcon, Tag, X } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { toaster } from "@langwatch/design-system/toaster";
-import type { EvaluatorOption } from "../../hooks/use-evaluator-options.ts";
+
 import {
   EVAL_COLUMN_FIELDS,
   EVAL_FIELD_LABELS,
   type EvalColumnField,
   formatEvalColumnId,
 } from "../../../../../model/lens-eval-column-id.ts";
+import type { EvaluatorOption } from "../../hooks/use-evaluator-options.ts";
 import { evalColumnLabel } from "../../trace-table/eval-columns.ts";
 
 /** Toast hint shown after a column is added, shared with the picker's own

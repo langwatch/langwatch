@@ -1,3 +1,4 @@
+import { parse as cachedParse, SCENARIO_FIELDS, SEARCH_FIELDS } from "@langwatch/trace-contract";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet, type EditorView } from "@tiptap/pm/view";
@@ -9,7 +10,6 @@ import type {
   TagToken,
   UnaryOperatorToken,
 } from "liqe";
-import { parse as cachedParse, SCENARIO_FIELDS, SEARCH_FIELDS } from "@langwatch/trace-contract";
 
 /**
  * The grammar's actual operator vocabulary — anything else uppercase-shaped in

@@ -2,6 +2,7 @@
 // Signing/verification server-side (@langwatch/scenario-process). Short-lived (call budget + grace).
 
 import { z } from "zod";
+
 import { VOICE_TRANSPORTS, type VoiceTransport } from "./voice-transport.ts";
 
 /** The claims carried in a signed voice session token. */

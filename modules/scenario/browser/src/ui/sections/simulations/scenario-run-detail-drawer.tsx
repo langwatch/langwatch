@@ -1,21 +1,24 @@
 import { Accordion, Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
+import { ConversationExpandContext } from "@langwatch/trace-browser/surfaces/conversation-expand-context";
+import { Chip } from "@langwatch/trace-browser/surfaces/trace-drawer-chip";
+import { CopyButton } from "@langwatch/workflow-browser/surfaces/copy-button";
+import { useDejaViewLink } from "@langwatch/workflow-browser/surfaces/deja-view-link";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { Suspense, useCallback, useState } from "react";
-import { isHumanCallerRun } from "../agent-testing/results/caller-display.ts";
-import { CopyButton } from "@langwatch/workflow-browser/surfaces/copy-button";
-import { RunScenarioModal } from "../scenarios/run-scenario-modal.tsx";
-import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
-import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
+
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
-import { Chip } from "@langwatch/trace-browser/surfaces/trace-drawer-chip";
-import { ConversationExpandContext } from "@langwatch/trace-browser/surfaces/conversation-expand-context";
-import { useDejaViewLink } from "@langwatch/workflow-browser/surfaces/deja-view-link";
-import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../behavior/scenario-api.ts";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { ScenarioMessageRenderer } from "./scenario-message-renderer.tsx";
+import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts.ts";
+import {
+  useRunStateStream,
+  type ScenarioRunState,
+} from "../../../behavior/simulations/use-run-state-stream.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { hasNoResults } from "../../../model/scenario-run-status.utils.ts";
 import { CopyIdChip } from "../../elements/copy-id-chip.tsx";
 import { CutAtLimitBadge, isCutAtLimitOf } from "../../elements/cut-at-limit-badge.tsx";
@@ -24,14 +27,12 @@ import { RunDetailSection } from "../../elements/run-detail-section.tsx";
 import { ScenarioRunActions } from "../../elements/scenario-run-actions.tsx";
 import { ScenarioRunStatusIcon } from "../../elements/scenario-run-status-icon.tsx";
 import { SimulationConsole } from "../../elements/simulation-console/simulation-console.tsx";
-import { useRunAgainActions } from "./use-run-again-actions.ts";
-import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts.ts";
-import {
-  useRunStateStream,
-  type ScenarioRunState,
-} from "../../../behavior/simulations/use-run-state-stream.ts";
-import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
 import { AgentTestingRunDrawer } from "../agent-testing/drawers/agent-testing-run-drawer.tsx";
+import { isHumanCallerRun } from "../agent-testing/results/caller-display.ts";
+import { RunScenarioModal } from "../scenarios/run-scenario-modal.tsx";
+import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
+import { ScenarioMessageRenderer } from "./scenario-message-renderer.tsx";
+import { useRunAgainActions } from "./use-run-again-actions.ts";
 
 /**
  * The Agent Testing variant: wider, side by side when the width allows, and

@@ -2,9 +2,10 @@
 // page traces (keys only), outer reads payload. Dedup is full-window aggregate.
 // Assertions on emitted SQL; companion integration test proves semantics
 import type { ClickHouseClient } from "@clickhouse/client";
-import { describe, expect, it, vi } from "vitest";
-import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import type { TraceListQuery } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 
 /** The full-window version dedup, identified by its GROUP BY. */
 const DEDUP_AGGREGATE = "GROUP BY TenantId, TraceId";
@@ -12,13 +13,7 @@ const DEDUP_AGGREGATE = "GROUP BY TenantId, TraceId";
 /** Where the outer page stage hands the chosen row identities to the inner one. */
 const IDENTITY_HANDOVER = "(TenantId, TraceId, UpdatedAt) IN (";
 
-function occurrences({
-  haystack,
-  needle,
-}: {
-  haystack: string;
-  needle: string;
-}): number {
+function occurrences({ haystack, needle }: { haystack: string; needle: string }): number {
   return haystack.split(needle).length - 1;
 }
 
@@ -62,9 +57,7 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
 
       const pageQuery = queries.find(isPageQuery);
       expect(pageQuery).toBeDefined();
-      expect(
-        occurrences({ haystack: pageQuery!, needle: DEDUP_AGGREGATE }),
-      ).toBe(1);
+      expect(occurrences({ haystack: pageQuery!, needle: DEDUP_AGGREGATE })).toBe(1);
     });
 
     it("carries the winning row's identity from the inner page stage to the outer read", async () => {
@@ -86,9 +79,7 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
 
       const countQuery = queries.find(isCountQuery);
       expect(countQuery).toBeDefined();
-      expect(
-        occurrences({ haystack: countQuery!, needle: DEDUP_AGGREGATE }),
-      ).toBe(1);
+      expect(occurrences({ haystack: countQuery!, needle: DEDUP_AGGREGATE })).toBe(1);
     });
   });
 
@@ -136,12 +127,8 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
       // The outer WHERE is written before the handover, the inner one inside it.
       const outerStage = pageQuery.slice(0, handover);
       const innerStage = pageQuery.slice(handover);
-      expect(occurrences({ haystack: outerStage, needle: USER_FILTER })).toBe(
-        1,
-      );
-      expect(occurrences({ haystack: innerStage, needle: USER_FILTER })).toBe(
-        1,
-      );
+      expect(occurrences({ haystack: outerStage, needle: USER_FILTER })).toBe(1);
+      expect(occurrences({ haystack: innerStage, needle: USER_FILTER })).toBe(1);
     });
   });
 });

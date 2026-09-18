@@ -1,22 +1,11 @@
-/**
- * Read-time Claude Code log-to-span content enrichment. Real `llm_request` spans carry tokens but
- * no message content, which lives only in OTLP log records, so every read path wanting whole spans
- * joins the two server-side. Cost is not joined here: it is computed at ingest and stored once.
- */
-import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.service.ts";
-import type { Logger } from "@langwatch/observability";
 import { contentAttrKeys, type CodingAgentApi } from "@langwatch/coding-agent-contract";
-import type { TraceCanonicalisationService,Span,SpanSummaryRow } from "@langwatch/trace-contract";
-import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
+import type { Logger } from "@langwatch/observability";
+import type { TraceCanonicalisationService, Span, SpanSummaryRow } from "@langwatch/trace-contract";
+
 import {
   type ClaudeContentLog,
   type ClaudeSpanRef,
 } from "../rules/claude-code-message-index.rules.ts";
-import {
-  type ClaudeToolLog,
-  type ClaudeToolSpanRef,
-} from "../rules/claude-code-tool-enrichment.rules.ts";
-import { DERIVED_ATTRS } from "../rules/trace-log-content-derivation.rules.ts";
 import {
   CLAUDE_SPAN_NAME_PREFIX,
   isInteractionSpan,
@@ -29,6 +18,18 @@ import {
   SPAN_USER_PROMPT_KEY,
   findSpanToolUseId,
 } from "../rules/claude-code-span-keys.rules.ts";
+import {
+  type ClaudeToolLog,
+  type ClaudeToolSpanRef,
+} from "../rules/claude-code-tool-enrichment.rules.ts";
+import { DERIVED_ATTRS } from "../rules/trace-log-content-derivation.rules.ts";
+import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
+/**
+ * Read-time Claude Code log-to-span content enrichment. Real `llm_request` spans carry tokens but
+ * no message content, which lives only in OTLP log records, so every read path wanting whole spans
+ * joins the two server-side. Cost is not joined here: it is computed at ingest and stored once.
+ */
+import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.service.ts";
 
 /**
  * The trace-log read this join issues for itself, and the row it answers with. Taken off the trace

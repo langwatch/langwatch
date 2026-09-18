@@ -4,6 +4,7 @@
  */
 import { chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronRight, Folder, type LucideIcon } from "lucide-react";
+
 import {
   FG_MUTED,
   GROUP_HEADER_BG,

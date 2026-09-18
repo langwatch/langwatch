@@ -1,10 +1,11 @@
+import { resolveRequestBound } from "@langwatch/plans";
 /**
  * The registry enterprise ceiling is the outer validation shell: inputs above
  * it refuse at the schema, inputs at it parse. The tier-effective value is
  * enforced in the trace application, not here.
  */
 import { describe, expect, it } from "vitest";
-import { resolveRequestBound } from "@langwatch/plans";
+
 import { traceFilterInputSchema, tracesTrpc } from "../traces.trpc.ts";
 
 const ENTERPRISE_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "ENTERPRISE");

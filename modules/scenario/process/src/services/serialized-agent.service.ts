@@ -3,8 +3,8 @@
  * for that conversation (ADR-128). The platform holds it here, per thread,
  */
 
-import { AgentAdapter } from "@langwatch/scenario";
 import { SESSION_MAX_BYTES } from "@langwatch/agent-contract";
+import { AgentAdapter } from "@langwatch/scenario";
 
 /** The marker the failure classifier reads a refused session by. */
 export const SESSION_TOO_LARGE_PREFIX = "Agent session too large";

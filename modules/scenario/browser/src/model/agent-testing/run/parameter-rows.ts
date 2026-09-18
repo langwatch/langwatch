@@ -3,8 +3,9 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type { RunParameterValues, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { serializeOptionalTypedScalarValue } from "@langwatch/design-system/json-value-text";
+import type { RunParameterValues, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+
 import { parameterTypes, parseParameterLine } from "./parameter-line.ts";
 
 /** One parameter of the block, as the rows editor holds it. */

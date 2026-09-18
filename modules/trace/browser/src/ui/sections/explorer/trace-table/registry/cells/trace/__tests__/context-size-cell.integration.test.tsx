@@ -6,6 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import type { TraceListItem } from "../../../../../types/trace.ts";
 import { ContextSizeCell } from "../context-size-cell.tsx";
 

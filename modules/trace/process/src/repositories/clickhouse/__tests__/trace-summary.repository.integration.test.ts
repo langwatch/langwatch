@@ -4,6 +4,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 import {
   startMigratedTraceClickHouse,
@@ -112,42 +113,45 @@ function recordingRepo(): {
   };
 }
 
-describe.skipIf(!clickHouseConfigured)("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
-  it("returns the trace when no occurredAtMs hint is passed", async () => {
-    const result = await repo.findByTraceId({ tenantId, traceId: presentTraceId });
+describe.skipIf(!clickHouseConfigured)(
+  "TraceSummaryClickHouseRepository.findByTraceId (integration)",
+  () => {
+    it("returns the trace when no occurredAtMs hint is passed", async () => {
+      const result = await repo.findByTraceId({ tenantId, traceId: presentTraceId });
 
-    expect(result).not.toBeNull();
-    expect(result?.traceId).toBe(presentTraceId);
-  });
+      expect(result).not.toBeNull();
+      expect(result?.traceId).toBe(presentTraceId);
+    });
 
-  it("resolves OccurredAt and bounds the heavy read for a hint-less call", async () => {
-    const { repo: rec, queries } = recordingRepo();
+    it("resolves OccurredAt and bounds the heavy read for a hint-less call", async () => {
+      const { repo: rec, queries } = recordingRepo();
 
-    const result = await rec.findByTraceId({ tenantId, traceId: presentTraceId });
+      const result = await rec.findByTraceId({ tenantId, traceId: presentTraceId });
 
-    expect(result?.traceId).toBe(presentTraceId);
-    // One cheap resolve (min(OccurredAt)) + the heavy read, and the heavy read
-    // is partition-bounded on OccurredAt rather than unbounded.
-    const resolveQuery = queries.find((q) => q.includes("min(OccurredAt)"));
-    const heavyQuery = queries.find((q) => q.includes("ComputedInput"));
-    expect(resolveQuery).toBeDefined();
-    expect(heavyQuery).toBeDefined();
-    expect(heavyQuery!).toContain("OccurredAt >=");
-  });
+      expect(result?.traceId).toBe(presentTraceId);
+      // One cheap resolve (min(OccurredAt)) + the heavy read, and the heavy read
+      // is partition-bounded on OccurredAt rather than unbounded.
+      const resolveQuery = queries.find((q) => q.includes("min(OccurredAt)"));
+      const heavyQuery = queries.find((q) => q.includes("ComputedInput"));
+      expect(resolveQuery).toBeDefined();
+      expect(heavyQuery).toBeDefined();
+      expect(heavyQuery!).toContain("OccurredAt >=");
+    });
 
-  it("skips the heavy read entirely for a trace that does not exist", async () => {
-    const { repo: rec, queries } = recordingRepo();
+    it("skips the heavy read entirely for a trace that does not exist", async () => {
+      const { repo: rec, queries } = recordingRepo();
 
-    const result = await rec.findByTraceId({ tenantId, traceId: `missing-${nanoid()}` });
+      const result = await rec.findByTraceId({ tenantId, traceId: `missing-${nanoid()}` });
 
-    expect(result).toBeNull();
-    // The light resolve confirms absence; the heavy unbounded read is never
-    // issued (this is the win for the not-found case).
-    expect(queries.some((q) => q.includes("min(OccurredAt)"))).toBe(true);
-    expect(queries.some((q) => q.includes("ComputedInput"))).toBe(false);
-  });
+      expect(result).toBeNull();
+      // The light resolve confirms absence; the heavy unbounded read is never
+      // issued (this is the win for the not-found case).
+      expect(queries.some((q) => q.includes("min(OccurredAt)"))).toBe(true);
+      expect(queries.some((q) => q.includes("ComputedInput"))).toBe(false);
+    });
 
-  // The OccurredAt=0 sentinel fallback is covered deterministically in
-  // trace-summary.clickhouse.repository.unit.test.ts, not here: round-tripping
-  // an epoch timestamp through a shared CI ClickHouse container proved flaky.
-});
+    // The OccurredAt=0 sentinel fallback is covered deterministically in
+    // trace-summary.clickhouse.repository.unit.test.ts, not here: round-tripping
+    // an epoch timestamp through a shared CI ClickHouse container proved flaky.
+  },
+);

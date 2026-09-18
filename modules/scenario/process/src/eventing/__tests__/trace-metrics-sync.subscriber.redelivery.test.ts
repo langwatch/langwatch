@@ -1,3 +1,8 @@
+import type {
+  ComputeRunMetricsCommandData,
+  SimulationProcessingEvent,
+} from "@langwatch/scenario-contract";
+import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 /**
  * @vitest-environment node
  * @unit
@@ -5,8 +10,6 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ComputeRunMetricsCommandData,SimulationProcessingEvent } from "@langwatch/scenario-contract";
-import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { createTraceMetricsSyncSubscriber } from "../trace-metrics-sync.subscriber.ts";
 
 vi.mock("@langwatch/observability", () => ({

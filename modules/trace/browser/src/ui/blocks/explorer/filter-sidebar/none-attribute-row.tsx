@@ -1,5 +1,6 @@
 import { HStack, Text } from "@chakra-ui/react";
 import type React from "react";
+
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 
 export const NoneAttributeRow: React.FC<{

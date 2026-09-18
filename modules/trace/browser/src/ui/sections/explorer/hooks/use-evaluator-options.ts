@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+
 import { useTraceFacets } from "./use-trace-facets.ts";
 
 export interface EvaluatorOption {

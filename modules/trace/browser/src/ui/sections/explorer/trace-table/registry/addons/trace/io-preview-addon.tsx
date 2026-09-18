@@ -1,6 +1,6 @@
+import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";
 import { IOPreview } from "../../../io-preview.tsx";
-import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
 import type { AddonDef } from "../../types.ts";
 
 /**

@@ -1,7 +1,8 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
 import { AlertTriangle, BookOpen, X } from "lucide-react";
 import type React from "react";
-import { Popover } from "@langwatch/design-system/popover";
+
 import { useUIStore } from "../../../../behavior/ui.store.ts";
 
 /**

@@ -4,6 +4,7 @@
  * side as You.
  */
 import { describe, expect, it } from "vitest";
+
 import { getDisplayRoleVisuals } from "../scenario-roles.tsx";
 
 describe("getDisplayRoleVisuals", () => {

@@ -1,6 +1,7 @@
-import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
-import { describe, expect, it } from "vitest";
 import { getProviderModelOptions } from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
+
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service.ts";
 
 // Catalog rates under test (model-catalog.overlay.json): flash v2 $0.05/1k
 // chars, scribe $0.22/hour, gpt-4o-transcribe $2.50/$10.00 per million

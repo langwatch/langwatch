@@ -1,15 +1,7 @@
 import { Flex, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  DENSE_SPAN_THRESHOLD,
-  ROW_GAP,
-  ROW_HEIGHT,
-  ZOOM_FIT_PADDING,
-} from "../../../model/flame/constants.ts";
-import { FlameCanvas } from "./flame-canvas.tsx";
-import { FlameBreadcrumbs } from "./flame-breadcrumbs.tsx";
-import { FlameContextStrip } from "./flame-context-strip.tsx";
+
 import { buildTree, computeSpanContext, generateTicks } from "../../../behavior/flame/tree.ts";
 import type {
   FlameNode,
@@ -22,6 +14,15 @@ import { useFlameAxisZoom } from "../../../behavior/flame/use-flame-axis-zoom.ts
 import { useFlameKeyboard } from "../../../behavior/flame/use-flame-keyboard.ts";
 import { useFlamePanDrag } from "../../../behavior/flame/use-flame-pan-drag.ts";
 import { useFlameViewport } from "../../../behavior/flame/use-flame-viewport.ts";
+import {
+  DENSE_SPAN_THRESHOLD,
+  ROW_GAP,
+  ROW_HEIGHT,
+  ZOOM_FIT_PADDING,
+} from "../../../model/flame/constants.ts";
+import { FlameBreadcrumbs } from "./flame-breadcrumbs.tsx";
+import { FlameCanvas } from "./flame-canvas.tsx";
+import { FlameContextStrip } from "./flame-context-strip.tsx";
 
 export const FlameView = memo(function FlameView({
   spans,

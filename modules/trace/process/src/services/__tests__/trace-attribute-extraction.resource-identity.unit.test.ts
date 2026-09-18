@@ -1,8 +1,8 @@
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 // @see specs/langy/langy-otel-tracing.feature
 // OTLP exporters set reserved keys via RESOURCE attributes, must hoist from
 // resource same way as from span attributes
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 import { TraceAttributeExtractionService } from "../trace-attribute-extraction.service.ts";
 

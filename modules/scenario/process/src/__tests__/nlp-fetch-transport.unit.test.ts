@@ -5,10 +5,12 @@
 
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { NlpFetchAdapter } from "../services/nlp-fetch.service.ts";
 import type { CodeAgentData, WorkflowAgentData } from "@langwatch/scenario-contract";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { NlpFetchAdapter } from "../services/nlp-fetch.service.ts";
 
 // Tracing is not the boundary under test, and the real tracer would need a
 // configured exporter. undici and the global fetch are deliberately left alone.

@@ -5,9 +5,10 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SimulationMessage } from "@langwatch/scenario-contract";
 import { cleanup, render } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SimulationMessage } from "@langwatch/scenario-contract";
+
 import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
 // --------------------------------------------------------------------------- jsdom

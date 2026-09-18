@@ -5,9 +5,10 @@
  */
 
 import { useCallback, useState } from "react";
-import { readScenarioTarget } from "../../use-scenario-target.ts";
+
 import { useOpenLiveRun } from "../../../../behavior/agent-testing/cases/use-open-live-run.ts";
 import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import { readScenarioTarget } from "../../use-scenario-target.ts";
 import type { RunDialogSubject, RunStartedInfo } from "../run/run-dialog.tsx";
 import { useAgentTestingStore } from "../use-agent-testing-store.ts";
 import { useOpenPlanRun } from "./use-open-plan-run.ts";

@@ -3,10 +3,9 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ query: { project: "test-proj" } }),

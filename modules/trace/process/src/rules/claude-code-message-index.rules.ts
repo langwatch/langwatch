@@ -9,6 +9,7 @@ import type {
   SpanInputOutput,
   TraceCanonicalisationService,
 } from "@langwatch/trace-contract";
+
 import { capPayloadString } from "./trace-payload-cap.rules.ts";
 
 /** A claude_code content log record, normalized by the caller. */

@@ -6,7 +6,11 @@
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CancellationSubscriber, ScenarioChildBootstrap, ScenarioProcessorServiceMetrics } from "../../app/scenario.app.ts";
+import type {
+  CancellationSubscriber,
+  ScenarioChildBootstrap,
+  ScenarioProcessorServiceMetrics,
+} from "../../app/scenario.app.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
 import { ScenarioProcessorService } from "../scenario-processor.service.ts";

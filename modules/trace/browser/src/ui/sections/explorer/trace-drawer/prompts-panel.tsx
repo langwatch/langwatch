@@ -1,4 +1,5 @@
 import { Badge, Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo } from "react";
 import {
   LuCircleDashed,
@@ -8,19 +9,19 @@ import {
   LuPencil,
   LuTriangleAlert,
 } from "react-icons/lu";
-import { Link } from "../../../blocks/link.tsx";
-import { useDrawer } from "../../../../behavior/use-drawer.ts";
+
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
-import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";
-import { useSpansFull } from "../hooks/use-spans-full.ts";
-import type { PromptReference } from "../../../../model/prompt-attributes.ts";
+import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import { formatDuration } from "../../../../model/display-formatters.ts";
+import type { PromptReference } from "../../../../model/prompt-attributes.ts";
 import {
   extractPromptReference,
   parseTracePromptIds,
   promptReferenceKey,
 } from "../../../../model/prompt-attributes.ts";
+import { Link } from "../../../blocks/link.tsx";
+import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";
+import { useSpansFull } from "../hooks/use-spans-full.ts";
 
 interface PromptsPanelProps {
   trace: TraceHeader;

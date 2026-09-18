@@ -1,7 +1,4 @@
 import { createLogger } from "@langwatch/observability/browser";
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { z } from "zod";
-import { nowInstant } from "@langwatch/time";
 import {
   isScenarioTabNavigatePayload,
   type ScenarioTabNavigatePayload,
@@ -11,9 +8,13 @@ import {
   type CompactStreamingEvent,
   isCompactStreamingEvent,
 } from "@langwatch/scenario-contract";
-import { api } from "./scenario-api.ts";
-import { usePageVisibility } from "@langwatch/trace-browser/surfaces/page-visibility";
+import { nowInstant } from "@langwatch/time";
 import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { usePageVisibility } from "@langwatch/trace-browser/surfaces/page-visibility";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { z } from "zod";
+
+import { api } from "./scenario-api.ts";
 
 const logger = createLogger("useSimulationUpdateListener");
 

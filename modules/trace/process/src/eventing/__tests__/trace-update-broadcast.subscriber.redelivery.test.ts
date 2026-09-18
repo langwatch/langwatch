@@ -4,12 +4,9 @@
  * State-free notification: all event types, byte-identical message; 2s throttle is cost control.
  */
 import { describe, expect, it, vi } from "vitest";
+
 import { createTraceUpdateBroadcastHandler } from "../trace-update-broadcast.subscriber.ts";
-import {
-  createContext,
-  createFoldState,
-  createTraceEvent,
-} from "./trace-subscriber.fixtures.ts";
+import { createContext, createFoldState, createTraceEvent } from "./trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),

@@ -11,16 +11,16 @@ import {
   parseSuiteFieldDefinitions,
   type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
+
 import {
   type AttachableEvaluator,
   missingInputsOf,
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import type { ScopeScenario } from "./run-scope-section.tsx";
 import type { RunScope } from "./run-configuration";
+import type { ScopeScenario } from "./run-scope-section.tsx";
 
 /** What the footer says over Run while an evaluator still reads nothing. */
-export const RUN_MISSING_MAPPINGS_TOOLTIP =
-  "Configure missing mappings for evaluator";
+export const RUN_MISSING_MAPPINGS_TOOLTIP = "Configure missing mappings for evaluator";
 
 /** A stored test suite row, as much of it as the run dialog reads. */
 export type SuiteRow = {
@@ -115,8 +115,7 @@ export function firstEvaluatorOffender({
     }).length > 0;
   for (const suite of inherited) {
     const attachment = suite.attachments.find(isMissing);
-    if (attachment)
-      return { kind: "suite", suiteId: suite.suiteId, attachment };
+    if (attachment) return { kind: "suite", suiteId: suite.suiteId, attachment };
   }
   const attachment = extras.find(isMissing);
   return attachment ? { kind: "plan", attachment } : null;

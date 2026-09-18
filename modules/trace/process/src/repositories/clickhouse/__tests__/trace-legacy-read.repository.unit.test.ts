@@ -1,8 +1,8 @@
-import type { Protections,GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { Protections, GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks

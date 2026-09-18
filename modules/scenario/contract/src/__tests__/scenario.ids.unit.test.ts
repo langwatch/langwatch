@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { generateBatchRunId, generateScenarioRunId } from "../index.ts";
 
 describe("generateScenarioRunId()", () => {

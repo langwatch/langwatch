@@ -4,6 +4,7 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 import { describe, expect, it } from "vitest";
+
 import type { ScenarioUpdateInput } from "../scenario.ts";
 import {
   buildSnapshotEnvelope,

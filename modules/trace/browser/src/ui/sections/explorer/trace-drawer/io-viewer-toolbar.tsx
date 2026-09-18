@@ -1,13 +1,14 @@
 import { Box, Flex, HStack, Icon } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
-import type { TraceAnchor } from "../hooks/use-anchored-annotations.ts";
+
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
-import type { useTextTranslation } from "../hooks/use-text-translation.ts";
-import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select.tsx";
-import { CopyButton } from "./io-toolbar-buttons.tsx";
+import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
+import type { TraceAnchor } from "../hooks/use-anchored-annotations.ts";
+import type { useTextTranslation } from "../hooks/use-text-translation.ts";
 import { type IOAction, useIOActions } from "./io-actions.tsx";
 import { formatSelectOptions } from "./io-format-options.ts";
+import { CopyButton } from "./io-toolbar-buttons.tsx";
 import type { ChatLayout } from "./transcript/index.ts";
 import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state.ts";
 

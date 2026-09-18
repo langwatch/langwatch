@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { showErrorToast } from "../../errors/index.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../../behavior/trace-api.ts";
+
 import { shouldShowGenericTranslateError } from "../../../../behavior/explorer/utils/translation-error.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { showErrorToast } from "../../errors/index.ts";
 
 export interface UseTextTranslationResult {
   /** The texts to render: translations when active, originals otherwise. */

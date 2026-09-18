@@ -4,9 +4,9 @@
  * readers key off it, so a field landing wrong silently breaks them.
  */
 
+import type { CallRecord } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CallRecord } from "@langwatch/scenario-contract";
 import { createVoiceCallRunWriter } from "../voice-run-writer.ts";
 
 const mockFindById = vi.fn();
@@ -164,10 +164,7 @@ describe("writeVoiceCallRun", () => {
           messages: { trace_id?: string }[];
           traceIds: string[];
         };
-        expect(snapshot.messages.map((m) => m.trace_id)).toEqual([
-          "trace_a",
-          "trace_a",
-        ]);
+        expect(snapshot.messages.map((m) => m.trace_id)).toEqual(["trace_a", "trace_a"]);
         expect(snapshot.traceIds).toEqual(["trace_a", "trace_a"]);
       });
     });

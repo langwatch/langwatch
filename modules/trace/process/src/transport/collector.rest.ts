@@ -3,23 +3,18 @@
  * project credential. MUST mount before `/api/collector/*` wildcard dispatcher.
  */
 import { publicRoute } from "@langwatch/api/access";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestRawResult,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger, validationMeta } from "@langwatch/observability";
-import { HTTPException } from "hono/http-exception";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { moduleApi } from "@langwatch/kernel";
-import type { ZodError } from "zod";
-import { fromZodError } from "zod-validation-error";
-
 import {
   collectorRESTParamsValidatorSchema,
   type CollectorRESTParamsValidator,
   type Span,
 } from "@langwatch/trace-contract";
+import { HTTPException } from "hono/http-exception";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type { ZodError } from "zod";
+import { fromZodError } from "zod-validation-error";
 
 import {
   applyLegacyMetadataFields,

@@ -25,6 +25,7 @@ vi.mock("../../../../../../behavior/trace-edit.store.ts", () => ({
 }));
 
 import type { SpanTreeNode } from "@langwatch/trace-contract";
+
 import { useCorrectionMarks } from "../use-correction-marks.ts";
 
 const SPANS = [

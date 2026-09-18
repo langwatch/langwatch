@@ -7,18 +7,19 @@
 
 import { Circle, chakra, Icon, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { CircleAlert, Plus } from "lucide-react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { REQUIRED_TO_PASS_LABEL } from "@langwatch/evaluator-browser/surfaces/evaluator-editor-shared";
 import {
   SCENARIO_MISSING_MAPPING_TOOLTIP,
   type EvaluatorAttachment,
   type EvaluatorInputSpec,
 } from "@langwatch/scenario-contract";
-import { REQUIRED_TO_PASS_LABEL } from "@langwatch/evaluator-web/surfaces/evaluator-editor-shared";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { CircleAlert, Plus } from "lucide-react";
+
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import { EvaluatorPillRow } from "../shared/evaluator-pill.tsx";
 import { FieldError, FieldLabel } from "../shared/dialog-fields.tsx";
+import { EvaluatorPillRow } from "../shared/evaluator-pill.tsx";
 import { RemoveBlockButton } from "../shared/remove-block-button.tsx";
 import { SmallButton } from "../shared/small-button.tsx";
 

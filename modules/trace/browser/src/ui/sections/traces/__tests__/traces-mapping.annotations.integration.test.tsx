@@ -2,12 +2,11 @@
 // auto-filled in column.
 // @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { DatasetRecordEntry, MappingState } from "@langwatch/dataset-contract";
+import type { Trace } from "@langwatch/trace-contract";
+import "@testing-library/jest-dom/vitest";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import "@testing-library/jest-dom/vitest";
-
-import type { DatasetRecordEntry,MappingState } from "@langwatch/dataset-contract";
-import type { Trace } from "@langwatch/trace-contract";
 
 const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";
 const SPAN_ID = "0af31b2c9d4e5f60";

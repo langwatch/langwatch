@@ -1,4 +1,3 @@
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -10,11 +9,10 @@ import type {
   ScenarioExecutionPrefetchResult,
   ScenarioExecutionPreparation,
 } from "@langwatch/scenario-contract";
-import type { ScenarioService } from "./scenario.service.ts";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
-
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
@@ -22,7 +20,12 @@ import {
   ScenarioPrefetchCompletionService,
   type ScenarioPrefetchLookups,
 } from "./scenario-prefetch-completion.service.ts";
-import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
+import {
+  ScenarioTargetPrefetchService,
+  type VoiceTargetReader,
+} from "./scenario-target-prefetch.service.ts";
+import type { ScenarioService } from "./scenario.service.ts";
+export type { VoiceTargetReader } from "./scenario-target-prefetch.service.ts";
 import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
@@ -53,6 +56,7 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   modelProviders: ModelProviderApi;
   secrets: SecretApi;
   traces: TraceApi;
+  voiceTargets: VoiceTargetReader;
 };
 
 type DecryptedRunSecrets =
@@ -78,6 +82,8 @@ export class ScenarioExecutionPrefetcherService {
       secrets: options.secrets,
       workflowHydrator,
       legacyDefaultModel: options.config.legacyDefaultModel,
+      langwatchEndpoint: options.config.langwatchEndpoint,
+      voiceTargets: options.voiceTargets,
     });
     const completion = ScenarioPrefetchCompletionService.create({
       config: options.config,
@@ -107,9 +113,7 @@ export class ScenarioExecutionPrefetcherService {
   // Arrow instance properties, not prototype methods: tests hold a bare
   // Object.create(prototype) instance and monkey-patch these directly to
   // assert on them, which is unsafe against a method-shorthand member.
-  prefetch = (
-    input: ScenarioExecutionPrefetchInput,
-  ): Promise<ScenarioExecutionPrefetchResult> => {
+  prefetch = (input: ScenarioExecutionPrefetchInput): Promise<ScenarioExecutionPrefetchResult> => {
     return this.prepare(input).result;
   };
 

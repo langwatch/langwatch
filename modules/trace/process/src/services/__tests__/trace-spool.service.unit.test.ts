@@ -1,6 +1,8 @@
 import { Readable } from "node:stream";
+
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   type TraceSpoolLegacyObject,
   type TraceSpoolStorage,
@@ -53,8 +55,7 @@ class Storage implements TraceSpoolStorage {
   constructor(
     private readonly destination: StoredObjectStorageDestination,
     readonly azureRetentionConfirmed = false,
-  ) {
-  }
+  ) {}
 
   objectStoreFor(_projectId: string): TraceSpoolObjectStore {
     return this.store;

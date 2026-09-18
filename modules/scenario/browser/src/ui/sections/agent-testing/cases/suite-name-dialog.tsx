@@ -5,8 +5,8 @@
  */
 
 import { Button, Input, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { useEffect, useState } from "react";
 
 /** What the dialog says when the name is empty. */
 export const SUITE_NAME_REQUIRED = "A test suite needs a name.";
@@ -52,7 +52,6 @@ export function SuiteNameDialog({ open, onClose, onConfirm }: SuiteNameDialogPro
         </Dialog.Header>
         <Dialog.Body>
           <Input
-            
             size="sm"
             placeholder="e.g. Refunds"
             aria-label="Test suite name"

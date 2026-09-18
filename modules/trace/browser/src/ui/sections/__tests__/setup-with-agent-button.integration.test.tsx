@@ -4,17 +4,18 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { TraceFailureNotice, TraceHostApi } from "../../../behavior/trace-host.ts";
 import {
   SETUP_SURFACES,
   type SetupSurface,
   SetupWithAgentButton,
   setupAgentPrompt,
 } from "../setup-with-agent-button.tsx";
-import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
-import type { TraceFailureNotice, TraceHostApi } from "../../../behavior/trace-host.ts";
 
 const canAskMock = vi.fn(() => true);
 vi.mock("../../../behavior/langy/use-can-ask-langy.ts", () => ({

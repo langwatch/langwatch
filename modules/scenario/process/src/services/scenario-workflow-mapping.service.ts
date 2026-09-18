@@ -3,8 +3,8 @@
  * when multi-input workflow receives empty strings.
  */
 
-import { TRPCError } from "@trpc/server";
 import type { WorkflowAgentData } from "@langwatch/scenario-contract";
+import { TRPCError } from "@trpc/server";
 
 /**
  * Validates workflow agent's scenario mappings. Throws BAD_REQUEST for multi-input

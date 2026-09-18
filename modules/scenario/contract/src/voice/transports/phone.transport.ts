@@ -6,6 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
+
 import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../voice-public-url-env.ts";
 import type {
   VoiceTransportCredential,

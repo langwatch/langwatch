@@ -1,11 +1,12 @@
-import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { getIconAndColor } from "../ui/elements/scenario-run-status-icon.tsx";
+import { describe, expect, it } from "vitest";
+
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,
   type ScenarioRunStatusConfig,
 } from "../model/scenario-run-status-config.ts";
+import { getIconAndColor } from "../ui/elements/scenario-run-status-icon.tsx";
 
 const allStatuses = Object.values(ScenarioRunStatus);
 
@@ -69,14 +70,11 @@ describe("scenario-run-status-config", () => {
   describe("when a run is waiting on its evaluators", () => {
     /** @scenario "The results page draws a pending run as still going" */
     it("reads as evaluating and not as a completed run", () => {
-      const config =
-        SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.PENDING_EVALUATION];
+      const config = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.PENDING_EVALUATION];
 
       expect(config.label).toBe("evaluating");
       expect(config.isComplete).toBe(false);
-      expect(
-        SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING_EVALUATION],
-      ).toBeDefined();
+      expect(SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING_EVALUATION]).toBeDefined();
     });
   });
 

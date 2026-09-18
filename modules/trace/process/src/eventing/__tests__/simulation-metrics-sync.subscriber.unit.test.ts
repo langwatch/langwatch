@@ -1,10 +1,11 @@
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData,SpanReceivedEvent } from "@langwatch/trace-contract";
+import type { TraceSummaryData, SpanReceivedEvent } from "@langwatch/trace-contract";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   createSimulationMetricsSyncHandler,
   hasSimulationMetrics,

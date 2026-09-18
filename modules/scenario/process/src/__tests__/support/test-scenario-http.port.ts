@@ -1,5 +1,10 @@
-import { type ScenarioHttpResponse, SerializedHttpAgentAdapter,type ScenarioHttp } from "../../index.ts";
 import { vi } from "vitest";
+
+import {
+  type ScenarioHttpResponse,
+  SerializedHttpAgentAdapter,
+  type ScenarioHttp,
+} from "../../index.ts";
 
 type ScenarioHttpRequest = Parameters<ScenarioHttp["fetch"]>[0];
 type ScenarioHttpAdapterOptions = ConstructorParameters<typeof SerializedHttpAgentAdapter>[0];

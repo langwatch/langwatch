@@ -5,6 +5,7 @@
 
 import { HStack, IconButton, Text } from "@chakra-ui/react";
 import { Pencil } from "lucide-react";
+
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 /** What the rename control is called, for the pointer and for a screen reader. */

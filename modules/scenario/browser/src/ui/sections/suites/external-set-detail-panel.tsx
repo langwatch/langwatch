@@ -3,21 +3,14 @@
  */
 
 import { Box, Button, EmptyState, HStack, Text, VStack } from "@chakra-ui/react";
-import { FlaskConical, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
-import { ShadowDivider } from "../../elements/shadow-divider.tsx";
-import { HandledErrorAlert } from "../../../behavior/errors.tsx";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import {
   LangyContextTarget,
   scenarioContextChip,
 } from "@langwatch/langy-browser/surfaces/langy-context";
-import { useDrawer } from "@langwatch/browser-host/drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { api } from "../../../behavior/scenario-api.ts";
 import {
   GroupRow,
   RunHistorySkeleton,
@@ -39,8 +32,16 @@ import {
   useRunHistoryStore,
   useScrollToBatch,
 } from "@langwatch/suite-browser/run-history-store";
-import { useSuiteRunFreshness } from "../../../behavior/suites/use-suite-run-freshness.ts";
+import { FlaskConical, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+
+import { HandledErrorAlert } from "../../../behavior/errors.tsx";
+import { api } from "../../../behavior/scenario-api.ts";
 import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state.ts";
+import { useSuiteRunFreshness } from "../../../behavior/suites/use-suite-run-freshness.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
+import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 
 const renderScenarioContext: ScenarioRunContextRenderer = ({ scenarioRunId, name, children }) => (
   <LangyContextTarget target={scenarioContextChip({ scenarioId: scenarioRunId, name })}>

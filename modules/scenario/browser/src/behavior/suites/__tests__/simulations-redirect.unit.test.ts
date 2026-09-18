@@ -4,6 +4,7 @@
  * @see specs/langy/langy-capability-cards.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { resolveSimulationsRedirect } from "../use-suite-routing.ts";
 
 const redirect = (segments: string[], query: Record<string, unknown> = {}) =>

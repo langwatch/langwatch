@@ -1,3 +1,4 @@
+import { EventUtils } from "@langwatch/eventing";
 import {
   EVENTREF_ATTR_PREFIX,
   TraceNotFoundError,
@@ -6,16 +7,18 @@ import {
   type TraceFullReadInput,
   type TraceFullThreadReadInput,
 } from "@langwatch/trace-contract";
-import { EventUtils } from "@langwatch/eventing";
 
-import type { TraceClickHouseClient, TraceClickHouse } from "../trace-clickhouse-client.repository.ts";
-import { TraceFullRecordRepository } from "../read/trace-full-record.repository.ts";
 import type { TraceFullIo } from "../../app/trace.members.ts";
-import type { TracePayloadReaderRepository } from "../read/trace-payload-reader.repository.ts";
 import {
   internalTraceFullReadProtections,
   TraceFullProtectionMapper,
 } from "../../repositories/clickhouse/trace-full-protection.mapper.ts";
+import { TraceFullRecordRepository } from "../read/trace-full-record.repository.ts";
+import type { TracePayloadReaderRepository } from "../read/trace-payload-reader.repository.ts";
+import type {
+  TraceClickHouseClient,
+  TraceClickHouse,
+} from "../trace-clickhouse-client.repository.ts";
 import { type StoredSpanRow, TraceFullRecordMapper } from "./trace-full-record.mapper.ts";
 
 const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;

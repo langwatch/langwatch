@@ -1,4 +1,5 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
 
 /**

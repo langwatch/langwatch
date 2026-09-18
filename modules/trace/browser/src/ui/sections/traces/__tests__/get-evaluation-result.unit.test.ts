@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { Span } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { getEvaluationResult } from "../span-details.tsx";
 
 function buildSpan(output: Span["output"]): Span {

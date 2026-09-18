@@ -16,6 +16,8 @@ import {
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
+
 import {
   type RawRunConfigurationRow,
   type RunConfigurationsRepository,
@@ -24,7 +26,6 @@ import type {
   ScenarioPlanRecord,
   ScenarioRepository,
 } from "../repositories/scenario.repository.ts";
-import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 
 /** How far back a configuration is still offered, in days. */
 const RUN_CONFIGURATION_WINDOW_DAYS = 30;

@@ -10,30 +10,36 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { generate } from "@langwatch/ksuid";
-import { History, Lock, Play } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { type FieldErrors, useFormState, useWatch } from "react-hook-form";
-import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { FormServerError, HandledErrorState } from "../../../behavior/errors.tsx";
-import type { Scenario } from "@langwatch/scenario-contract";
-import { useRouter } from "@langwatch/browser-host/use-router";
+import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
 import {
   getComplexProps,
   setFlowCallbacks,
   useDrawer,
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { useRunScenario } from "../use-run-scenario.ts";
-import { useScenarioTarget } from "../use-scenario-target.ts";
-import type { CustomComponentConfig } from "@langwatch/workflow-contract";
-import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { toaster } from "@langwatch/design-system/toaster";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "@langwatch/ksuid";
+import { PromptEditorDrawer } from "@langwatch/prompt-browser/surfaces/prompt-editor-drawer";
+import type { Scenario } from "@langwatch/scenario-contract";
 import {
   parseCallerVoiceConfig,
   parseScenarioParameterDefinitions,
 } from "@langwatch/scenario-contract";
+import type { CustomComponentConfig } from "@langwatch/workflow-contract";
+import { History, Lock, Play } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { type FieldErrors, useFormState, useWatch } from "react-hook-form";
+
+import { FormServerError, HandledErrorState } from "../../../behavior/errors.tsx";
+import { api } from "../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import type { TargetValue } from "../../../model/scenario-target.ts";
+import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip.tsx";
 import {
   ScenarioForm,
   type ScenarioFormController,
@@ -42,18 +48,13 @@ import {
   type ScenarioTestSuiteOption,
 } from "../../elements/scenario-form.tsx";
 import { ScenarioParametersDialog } from "../../elements/scenarios/scenario-parameters-dialog.tsx";
-import { ScenarioRunModelDialog } from "./scenario-run-model-dialog.tsx";
-import type { TargetValue } from "../../../model/scenario-target.ts";
-import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip.tsx";
-import { api } from "../../../behavior/scenario-api.ts";
-import { KSUID_RESOURCES } from "@langwatch/ksuid";
-import { PromptEditorDrawer } from "@langwatch/prompt-browser/surfaces/prompt-editor-drawer";
 import { hasScenarioInputMapping } from "../../elements/suites/scenario-input-mapping-section.tsx";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { TagList } from "../../elements/tag-list.tsx";
-import { toaster } from "@langwatch/design-system/toaster";
+import { useRunScenario } from "../use-run-scenario.ts";
+import { useScenarioTarget } from "../use-scenario-target.ts";
 import { SaveAndRunMenu } from "./save-and-run-menu.tsx";
 import { ScenarioEditorSidebar } from "./scenario-editor-sidebar.tsx";
+import { ScenarioRunModelDialog } from "./scenario-run-model-dialog.tsx";
 
 export type ScenarioFormDrawerProps = {
   open?: boolean;

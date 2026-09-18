@@ -1,9 +1,9 @@
+import { canonicaliseGenAILog } from "../rules/gen-ai-log.rules.ts";
 import type {
   AttributeCanonicaliser,
   ExtractorContext,
   LogExtractorContext,
 } from "./canonical-attributes.service.ts";
-import { canonicaliseGenAILog } from "../rules/gen-ai-log.rules.ts";
 import { GenAiSpanService } from "./gen-ai-span.service.ts";
 
 const genAiSpanService = GenAiSpanService.create();

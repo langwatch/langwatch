@@ -1,9 +1,9 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import type {
   Projection,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
 } from "@langwatch/eventing";
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   classifyClickHouseError,
   createTenantId,
@@ -13,17 +13,18 @@ import {
   ValidationError,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+
+import type {
+  SimulationRunState,
+  SimulationRunStateData,
+} from "../../eventing/simulation-run-state.projection.ts";
+import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
 import {
   type ClickHouseEvaluationColumns,
   columnsToEvaluations,
   EVALUATION_COLUMNS_SQL,
   evaluationsToColumns,
 } from "./simulation-evaluations.columns.ts";
-import type {
-  SimulationRunState,
-  SimulationRunStateData,
-} from "../../eventing/simulation-run-state.projection.ts";
-import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
 
 const TABLE_NAME = "simulation_runs" as const;
 

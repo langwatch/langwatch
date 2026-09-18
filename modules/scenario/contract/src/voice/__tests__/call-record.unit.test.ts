@@ -3,10 +3,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  browserTranscriptToCallRecord,
-  scenarioRunIdForConversation,
-} from "../call-record";
+
+import { browserTranscriptToCallRecord, scenarioRunIdForConversation } from "../call-record";
 
 describe("scenarioRunIdForConversation", () => {
   describe("given two attempts with the same conversation id and one with a different id", () => {

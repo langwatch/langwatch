@@ -1,7 +1,10 @@
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { Encryption } from "@langwatch/process-stores/members";
 import type { ResourceOwnership } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
+import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * `ScenarioApp.queueSimulationRun` — the metadata envelope a queued run carries.
@@ -55,13 +58,17 @@ function harness() {
       users: {} as UserApi,
       projects: {} as ProjectApi,
       plans: {} as EntitlementApi,
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      presence: createApiFixture<PresenceApi>(),
+      auditLog: createApiFixture<AuditLogApi>(),
     },
-    config: {},
+    config: undefined,
     resources: {} as ResourceOwnership,
     // Nothing below is reached: assembling the envelope reads only its
     // argument and the run capability. A reach for any of them throws on the
     // missing property, which is the loud failure we want.
     members: {
+      publicBaseUrl: "https://langwatch.test",
       agentTesting: createApiFixture<AgentTestService>(),
       simulations: simulations as SimulationService,
       scenarioExecution: {} as ScenarioExecutionService,
@@ -354,8 +361,11 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           users: createApiFixture<UserApi>(),
           projects: createApiFixture<ProjectApi>(),
           plans: createApiFixture<EntitlementApi>(),
+          modelProviders: createApiFixture<ModelProviderApi>(),
+          presence: createApiFixture<PresenceApi>(),
+          auditLog: createApiFixture<AuditLogApi>(),
         },
-        config: {},
+        config: undefined,
         resources: {} as ResourceOwnership,
         members: {
           agentTesting: createApiFixture<AgentTestService>(),

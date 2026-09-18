@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { AuroraSvg } from "../../../../elements/explorer/traces-page/aurora-svg.tsx";
-import { shouldShowAurora } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
+
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { shouldShowAurora } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
+import { AuroraSvg } from "../../../../elements/explorer/traces-page/aurora-svg.tsx";
 
 // Aurora ribbon at trace table top (auroraArrival stage); mirrors
 // RefreshProgressBar's aurora pattern for consistent "arriving" visual.

@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import { z } from "zod";
+import { create } from "zustand";
 
 /**
  * Per-lens column-width overrides. Keyed by `${lensId}:${rowKind}` so the "all-traces"

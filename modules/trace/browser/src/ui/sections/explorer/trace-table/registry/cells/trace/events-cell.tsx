@@ -1,4 +1,5 @@
 import { HStack, Skeleton, Text } from "@chakra-ui/react";
+
 import type { TraceListItem } from "../../../../types/trace.ts";
 import { EventBadge } from "../../shared-chips.tsx";
 import type { CellDef } from "../../types.ts";

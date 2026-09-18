@@ -1,15 +1,16 @@
 import { useState } from "react";
-import {
-  EarlierTurnsExpander,
-  CollapseEarlierToggle,
-} from "../../elements/transcript/conversation-turn-list-controls.tsx";
-import { InlineTurnList, VirtualizedTurnList } from "./conversation-turn-list-virtualized.tsx";
+
 import {
   type ChatLayout,
   type ConversationTurn,
   LONG_THREAD_THRESHOLD,
   VIRTUALIZE_AT,
 } from "../../../model/transcript/types.ts";
+import {
+  EarlierTurnsExpander,
+  CollapseEarlierToggle,
+} from "../../elements/transcript/conversation-turn-list-controls.tsx";
+import { InlineTurnList, VirtualizedTurnList } from "./conversation-turn-list-virtualized.tsx";
 
 const TAIL_VISIBLE_TURNS = 3;
 const COLLAPSE_EARLIER_AT = LONG_THREAD_THRESHOLD;

@@ -2,14 +2,13 @@
  * What the trace screens ask of the application they are mounted in.
  */
 
-import { createContext, createElement, useContext, useMemo } from "react";
-import type { ReactNode } from "react";
-
 import {
   createUiScopeHost,
   UiScopeHostProvider,
   type UiScopeHost,
 } from "@langwatch/browser-host/use-organization-team-project";
+import { createContext, createElement, useContext, useMemo } from "react";
+import type { ReactNode } from "react";
 
 /** The project every trace read is scoped to. */
 export type TraceHostProject = {

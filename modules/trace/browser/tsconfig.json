@@ -65,13 +65,13 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
-      "path": "../../ops/web/tsconfig.build.json"
+      "path": "../../ops/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../presence/browser/tsconfig.build.json"
     },
     {
       "path": "../../presence/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../presence/web/tsconfig.build.json"
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"
@@ -83,22 +83,22 @@
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
+      "path": "../../share/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../share/contract/tsconfig.build.json"
     },
     {
-      "path": "../../share/web/tsconfig.build.json"
-    },
-    {
-      "path": "../../suite/web/tsconfig.build.json"
+      "path": "../../suite/browser/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../browser-kit/tsconfig.build.json"
     },
     {
-      "path": "../web-kit/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"

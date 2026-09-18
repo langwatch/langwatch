@@ -1,4 +1,9 @@
-import { ATTR_KEYS, type TraceSummaryData,NormalizedStatusCode as StatusCode,type NormalizedSpan } from "@langwatch/trace-contract";
+import {
+  ATTR_KEYS,
+  type TraceSummaryData,
+  NormalizedStatusCode as StatusCode,
+  type NormalizedSpan,
+} from "@langwatch/trace-contract";
 
 /**
  * Extracts and accumulates error/OK status from individual spans

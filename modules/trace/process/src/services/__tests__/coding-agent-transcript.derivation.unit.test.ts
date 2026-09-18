@@ -1,14 +1,14 @@
+import {
+  buildCodingAgentTranscript,
+  type TranscriptLogRecord,
+} from "@langwatch/coding-agent-contract";
+import type { SpanDetail } from "@langwatch/trace-contract";
 /**
  * The coding-agent transcript, derived on the SERVER. Pins the two
  * properties worth moving off the client: ordered by what actually
  * happened, and includes moments with NO span (a tool the human refused).
  */
 import { describe, expect, it } from "vitest";
-import {
-  buildCodingAgentTranscript,
-  type TranscriptLogRecord,
-} from "@langwatch/coding-agent-contract";
-import type { SpanDetail } from "@langwatch/trace-contract";
 
 function toolSpan({
   name,

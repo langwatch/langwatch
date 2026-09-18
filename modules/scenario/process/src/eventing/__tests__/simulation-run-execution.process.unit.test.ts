@@ -9,15 +9,11 @@ import {
   type ScenarioUnsuccessfulExecutionInput,
   ScenarioRunStatus,
   SIMULATION_RUN_EVENT_TYPES,
-  type SimulationProcessingEvent
+  type SimulationProcessingEvent,
 } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  SimulationRunExecutionEvolution,
-  STALL_THRESHOLD_MS,
-} from "../simulation-run-execution-evolution.process.ts";
-import { simulationRunExecutionPM } from "../simulation-run-execution.process.ts";
+import { TestSimulationService } from "../../__tests__/support/test-simulation.service.ts";
 import {
   CANCEL_GRACE_MS,
   EVALUATION_DEADLINE_MS,
@@ -28,7 +24,11 @@ import {
   finishRunIntentSchema,
   simulationRunProcessEventViewSchema,
 } from "../simulation-run-execution-data.process.ts";
-import { TestSimulationService } from "../../__tests__/support/test-simulation.service.ts";
+import {
+  SimulationRunExecutionEvolution,
+  STALL_THRESHOLD_MS,
+} from "../simulation-run-execution-evolution.process.ts";
+import { simulationRunExecutionPM } from "../simulation-run-execution.process.ts";
 
 const PROJECT_ID = "project-1";
 const RUN_ID = "run-1";

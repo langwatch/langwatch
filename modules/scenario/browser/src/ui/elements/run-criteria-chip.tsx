@@ -4,6 +4,7 @@
 
 import { HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Check, X } from "lucide-react";
+
 import { SimulationChip } from "./simulation-chip.tsx";
 
 function CriteriaList({

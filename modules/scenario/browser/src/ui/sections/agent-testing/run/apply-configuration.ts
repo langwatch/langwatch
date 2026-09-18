@@ -5,12 +5,13 @@
 
 import type { RunParameterValues } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
-import type { CompareRow } from "./compare-rows.ts";
+
 import { formatStoredParameterLine } from "../../../../model/agent-testing/run/parameter-line.ts";
 import {
   type ParameterRow,
   rowsFromLine,
 } from "../../../../model/agent-testing/run/parameter-rows.ts";
+import type { CompareRow } from "./compare-rows.ts";
 import type { RunConfigurationEntry } from "./run-configuration.ts";
 import type { RunDialogFields } from "./use-run-dialog-form.ts";
 import type { RunPlanFields } from "./use-run-plan-fields.ts";

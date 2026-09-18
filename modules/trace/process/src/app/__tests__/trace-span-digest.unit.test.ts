@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Span, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
+
 import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";
 

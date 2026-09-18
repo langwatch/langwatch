@@ -1,3 +1,5 @@
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 /**
  * Covers specs/scenarios/scenario-tab-handoff.feature — the tab-identity half.
  * @vitest-environment jsdom
@@ -6,9 +8,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useMemo, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { ScenarioHostApi, ScenarioHostProvider } from "../../model/scenario-host.ts";
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { useScenarioTabFollow } from "../use-scenario-tab-follow.ts";
 
 /** Mirrors runs-filter-url-sync.integration.test.tsx's TestScenarioHost. */

@@ -1,12 +1,19 @@
+import { createLogger, type Logger } from "@langwatch/observability";
+import { createContextFromJobData, runWithContext } from "@langwatch/observability/context";
 import type {
   ScenarioExecutionPrefetchResult,
   ScenarioExecutionService,
   ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
-import { createContextFromJobData, runWithContext } from "@langwatch/observability/context";
-import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { type CancellationSubscriber,type ScenarioExecutionRunner,type ScenarioProcessorServiceMetrics,type ScenarioChildBootstrap,type ScenarioChildExecutionSession } from "../app/scenario.app.ts";
+
+import {
+  type CancellationSubscriber,
+  type ScenarioExecutionRunner,
+  type ScenarioProcessorServiceMetrics,
+  type ScenarioChildBootstrap,
+  type ScenarioChildExecutionSession,
+} from "../app/scenario.app.ts";
 import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules.ts";
 import type {
   ExecutionJobData,
@@ -34,8 +41,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
       childProcesses: ScenarioChildBootstrap;
       metrics: ScenarioProcessorServiceMetrics;
     },
-  ) {
-  }
+  ) {}
 
   /**
    * A prefetch refusal the customer's own configuration caused is logged below

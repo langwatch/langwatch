@@ -1,23 +1,25 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
+
 import { TraceApp } from "./app/trace.app.ts";
-import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { ClickHouseTraceEventPayloadRepository } from "./repositories/clickhouse/trace-event-payload.repository.ts";
-import type { TraceClickHouseResolver } from "./repositories/trace-clickhouse-client.repository.ts";
-import type { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
 import {
   TraceLegacyReadClickHouseRepository,
   type ClickHouseTraceLegacyReadOptions,
 } from "./repositories/clickhouse/trace-legacy-read.repository.ts";
+import type { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
+import type { TraceClickHouseResolver } from "./repositories/trace-clickhouse-client.repository.ts";
 import type { TraceLegacyReadRepository } from "./repositories/trace-legacy-read.repository.ts";
+import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
-import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
-import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
+import { traceExportRest } from "./transport/trace-export.rest.ts";
+import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
 import { tracesRest, tracesRestCredential } from "./transport/traces.rest.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
+import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
 
 /** The process-owned collaborators needed to construct the Trace application once. */
 export type { TraceInfrastructure } from "./app/trace-composition.types.ts";
@@ -57,6 +59,7 @@ export const traceServer = defineServerModule("trace")
     tracesTrpcTransport,
     spansTrpcTransport,
     traceEditOverlayTrpcTransport,
+    traceExportRest,
     traceLegacyRest,
     tracesRest,
     // `POST /api/events/track`, the tracked events an SDK reports against a

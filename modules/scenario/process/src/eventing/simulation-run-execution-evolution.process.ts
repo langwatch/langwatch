@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 import type {
   EventHandler,
   ProcessEvolution,
@@ -14,6 +12,7 @@ import {
   ScenarioRunStatus,
 } from "@langwatch/scenario-contract";
 import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
+import { z } from "zod";
 
 import {
   CANCEL_GRACE_MS,

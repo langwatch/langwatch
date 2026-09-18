@@ -1,14 +1,15 @@
 import { HStack, Icon, Link, Text } from "@chakra-ui/react";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { Sparkles } from "lucide-react";
 import posthog from "posthog-js";
 import { useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
-import { useFeatureFlag } from "../../../behavior/use-feature-flag.ts";
+
 import {
   clearLegacySimulationsPreference,
   useLegacySimulationsPreference,
 } from "../../../behavior/suites/use-legacy-simulations-preference.ts";
+import { useFeatureFlag } from "../../../behavior/use-feature-flag.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { clearNewSimulationsCalloutSnooze } from "./new-simulations-callout.tsx";
 
 /**

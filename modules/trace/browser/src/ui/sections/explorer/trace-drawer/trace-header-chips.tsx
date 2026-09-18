@@ -1,4 +1,5 @@
 import { Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import type { TraceHeader } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 import {
   LuBookMarked,
@@ -12,9 +13,12 @@ import {
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
-import type { TraceHeader } from "@langwatch/trace-contract";
+
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import type { EvalChipDisplay } from "../../../../model/evaluation-results.ts";
 import { getEvalChipDisplay } from "../../../../model/evaluation-results.ts";
+import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
+import { ChipBar } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
 import { useConversationAnnotations } from "../hooks/use-conversation-annotations.ts";
 import { useConversationTurns } from "../hooks/use-conversation-turns.ts";
 import { useSpanTree } from "../hooks/use-span-tree.ts";
@@ -25,10 +29,7 @@ import {
   type TraceHeaderChipData,
   useTraceHeaderChips,
 } from "../hooks/use-trace-header-chips.ts";
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { TraceCommentList } from "./anchored-comments/trace-comment-list.tsx";
-import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
-import { ChipBar } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
 import { buildScenarioChipDef } from "./scenario-chip.tsx";
 
 interface TraceHeaderChipsProps {

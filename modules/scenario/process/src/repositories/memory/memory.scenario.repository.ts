@@ -25,6 +25,7 @@ import {
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
+
 import { DEFAULT_SUITE_NAME } from "../../rules/default-suite.rules.ts";
 import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
 

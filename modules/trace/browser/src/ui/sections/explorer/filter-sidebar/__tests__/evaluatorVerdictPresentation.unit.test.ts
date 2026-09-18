@@ -1,16 +1,15 @@
 import { describe, expect, it } from "vitest";
+
+import type { CategoricalSection } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import {
   FACET_DEFAULTS,
   FACET_VALUE_ORDER,
   VIBRANT_FIELDS,
 } from "../../../../../behavior/facet-constants.ts";
 import { buildFacetItems, orderValues } from "../hooks/use-filter-sidebar-data.ts";
-import type { CategoricalSection } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 
 /** A verdict facet as discover hands it over: counts, no order, no colour. */
-const verdictSection = (
-  topValues: { value: string; count: number }[],
-): CategoricalSection =>
+const verdictSection = (topValues: { value: string; count: number }[]): CategoricalSection =>
   ({
     kind: "categorical",
     key: "evaluatorVerdict",
@@ -34,9 +33,7 @@ describe("evaluator verdict presentation", () => {
         isSynthetic: false,
       });
 
-      expect(
-        Object.fromEntries(rows.map((r) => [r.value, r.dotColor])),
-      ).toEqual({
+      expect(Object.fromEntries(rows.map((r) => [r.value, r.dotColor]))).toEqual({
         pass: "green.solid",
         fail: "red.solid",
         error: "yellow.solid",
@@ -52,9 +49,10 @@ describe("evaluator verdict presentation", () => {
         isSynthetic: false,
       });
 
-      expect(
-        Object.fromEntries(rows.map((r) => [r.value, r.dotColor])),
-      ).toEqual({ skipped: "gray.solid", unknown: "gray.solid" });
+      expect(Object.fromEntries(rows.map((r) => [r.value, r.dotColor]))).toEqual({
+        skipped: "gray.solid",
+        unknown: "gray.solid",
+      });
     });
 
     it("renders the curated palette at full strength rather than dimmed", () => {
@@ -109,11 +107,7 @@ describe("evaluator verdict presentation", () => {
 
   describe("given the display order", () => {
     it("reads pass, fail, error — the drilldown's own sequence", () => {
-      expect(FACET_VALUE_ORDER.evaluatorVerdict).toEqual([
-        "pass",
-        "fail",
-        "error",
-      ]);
+      expect(FACET_VALUE_ORDER.evaluatorVerdict).toEqual(["pass", "fail", "error"]);
     });
 
     /**

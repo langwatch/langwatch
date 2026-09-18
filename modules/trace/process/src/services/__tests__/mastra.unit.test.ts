@@ -1,6 +1,6 @@
+import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { MastraCanonicaliserService } from "../mastra-canonicaliser.service.ts";
 import { createExtractorContext } from "./test-helpers.ts";
 

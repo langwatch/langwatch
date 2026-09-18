@@ -9,10 +9,12 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type { SimulationProcessingEvent, SimulationService } from "@langwatch/scenario-contract";
-import { SimulationProcessingCommandsAdapter } from "./simulation-processing.commands.ts";
+import { SIMULATION_PROCESSING_EVENT_TYPES } from "@langwatch/scenario-contract";
+
+import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
 import { RecordEvaluationsCommand } from "./recordEvaluations.command.ts";
-import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
+import { SimulationProcessingCommandsAdapter } from "./simulation-processing.commands.ts";
 import {
   SimulationRunMetricsMapProjection,
   type SimulationRunMetricsProjectionRecord,
@@ -21,7 +23,6 @@ import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
 } from "./simulation-run-state.projection.ts";
-import { SIMULATION_PROCESSING_EVENT_TYPES } from "@langwatch/scenario-contract";
 import {
   createSnapshotUpdateBroadcastSubscriber,
   type SnapshotUpdateBroadcastSubscriberDeps,

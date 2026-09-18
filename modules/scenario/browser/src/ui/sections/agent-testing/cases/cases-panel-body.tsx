@@ -5,6 +5,8 @@
  */
 
 import { useCallback, useState } from "react";
+
+import type { TestCase } from "../../../../model/agent-testing/cases/test-cases.ts";
 import {
   ConnectAgentEmptyState,
   ExternalSetEmptyState,
@@ -15,7 +17,6 @@ import {
 import type { CasesPanelProps } from "./cases-panel.tsx";
 import { CasesTable, CasesTableSkeleton, ExternalCasesTable } from "./cases-table.tsx";
 import { MoveToSuiteSelectionBar } from "./move-to-suite-selection-bar.tsx";
-import type { TestCase } from "../../../../model/agent-testing/cases/test-cases.ts";
 
 export type CasesPanelBodyProps = CasesPanelProps & {
   /** True for a set that runs from code, which the platform cannot write. */

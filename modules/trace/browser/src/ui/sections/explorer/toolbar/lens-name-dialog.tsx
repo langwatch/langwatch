@@ -1,6 +1,7 @@
 import { Button, HStack, Input, Stack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useState } from "react";
+
 import {
   DialogBody,
   DialogContent,
@@ -55,7 +56,6 @@ export const LensNameDialog: React.FC<LensNameDialogProps> = ({
         <DialogBody>
           <Stack gap={3}>
             <Input
-              
               size="sm"
               placeholder="Lens name"
               value={name}

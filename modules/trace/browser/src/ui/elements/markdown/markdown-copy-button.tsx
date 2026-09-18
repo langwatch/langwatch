@@ -1,6 +1,6 @@
 import { Button, Icon, Text } from "@chakra-ui/react";
-import { LuCheck, LuCopy } from "react-icons/lu";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
+import { LuCheck, LuCopy } from "react-icons/lu";
 
 export function MarkdownCopyButton({ markdown }: { markdown: string }) {
   const { copied, copy } = useCopyToClipboard();

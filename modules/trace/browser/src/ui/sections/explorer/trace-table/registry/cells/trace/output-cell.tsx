@@ -1,7 +1,8 @@
 import { Text } from "@chakra-ui/react";
+
+import { contentToText } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
 import { RedactedInline } from "../../../../../redacted-field.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";
-import { contentToText } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
 import type { CellDef } from "../../types.ts";
 
 export const OutputCell = {

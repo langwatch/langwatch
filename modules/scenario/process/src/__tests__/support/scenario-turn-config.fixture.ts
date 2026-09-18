@@ -1,5 +1,6 @@
-import { vi } from "vitest";
 import type { LiteLLMParams } from "@langwatch/scenario-contract";
+import { vi } from "vitest";
+
 import type { ScenarioPrefetchFixture } from "./scenario-execution-prefetcher.fixture.ts";
 
 const defaultModelParams: LiteLLMParams = {

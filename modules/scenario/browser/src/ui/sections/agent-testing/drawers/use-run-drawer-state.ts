@@ -4,19 +4,20 @@
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 
+import { useDrawerParams } from "@langwatch/browser-host/drawer";
+import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { buildDisplayTitle } from "@langwatch/suite-browser/run-formatters";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useScenarioRunDetail } from "../../simulations/scenario-run-detail-drawer.tsx";
+
+import { api } from "../../../../behavior/scenario-api.ts";
 import {
   isCancellableStatus,
   useCancelScenarioRun,
 } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
-import { useDrawerParams } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { api } from "../../../../behavior/scenario-api.ts";
-import { buildDisplayTitle } from "@langwatch/suite-browser/run-formatters";
 import { useTargetNameMap } from "../../../../behavior/use-target-name-map.ts";
+import { useScenarioRunDetail } from "../../simulations/scenario-run-detail-drawer.tsx";
 
 /** Everything one open drawer knows about the run it is showing. */
 export type RunDrawerState = ReturnType<typeof useRunDrawerState>;

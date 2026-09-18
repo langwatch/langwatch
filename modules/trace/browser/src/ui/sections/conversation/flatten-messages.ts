@@ -2,6 +2,7 @@
 // (canonical decoder shared with server extraction).
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
+
 import { coerceContentToArray } from "../../../model/shared/content-parts/coerce-content-to-array.ts";
 import { safeJsonParseOrStringFallback } from "../../../model/shared/content-parts/safe-json-parse.ts";
 import { collapseAudioTranscript, decodeContentPart, type PartContext } from "./content-parts.ts";

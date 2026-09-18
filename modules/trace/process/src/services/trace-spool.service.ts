@@ -3,6 +3,7 @@ import {
   mintStoredObjectUri,
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
+
 import {
   type TraceSpoolLegacyObject,
   type TraceSpoolStorage,

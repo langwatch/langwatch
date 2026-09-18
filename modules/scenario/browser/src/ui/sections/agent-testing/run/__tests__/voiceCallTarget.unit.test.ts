@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import type { RunDialogSubject } from "../run-dialog-types";
 import type { RunDialogForm } from "../use-run-dialog-form.ts";
 import { voiceCallTargetOf } from "../voice-call-target";
@@ -159,9 +160,7 @@ describe("voiceCallTargetOf", () => {
       const result = voiceCallTargetOf({
         form: form({
           target: { type: "voice", id: "agent_voice" },
-          scenarioAgents: [
-            { id: "agent_voice", name: "x", type: "voice", config: {} },
-          ],
+          scenarioAgents: [{ id: "agent_voice", name: "x", type: "voice", config: {} }],
         }),
         subject: CASE_SUBJECT,
       });

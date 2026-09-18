@@ -5,25 +5,26 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ScenarioRunStatus,
   Verdict,
   type ScenarioEvaluationResult,
   type ScenarioRunData,
 } from "@langwatch/scenario-contract";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans.ts";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../../model/scenario-run-status-config.ts";
-import { RunVerdictPanel } from "../../drawers/run-verdict-panel.tsx";
 import { summarizeEvaluations } from "../../../../sections/agent-testing/results/evaluation-summaries.ts";
 import {
   RunPlanDetailHeader,
   type RunPlanDetailHeaderProps,
 } from "../../../../sections/agent-testing/results/run-plan-detail-header.tsx";
 import { RunResultsTable } from "../../../../sections/agent-testing/results/run-results-table.tsx";
-import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans.ts";
+import { RunVerdictPanel } from "../../drawers/run-verdict-panel.tsx";
 import { LastResultLabel } from "../last-result-label.tsx";
 import { passRateColor } from "../pass-rate-color.ts";
 
@@ -36,12 +37,8 @@ function cssVarOfToken(token: string) {
   return `var(--chakra-colors-${token.replace(".", "-")})`;
 }
 
-const PASSED_COLOR = cssVarOfToken(
-  SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor,
-);
-const FAILED_COLOR = cssVarOfToken(
-  SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor,
-);
+const PASSED_COLOR = cssVarOfToken(SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor);
+const FAILED_COLOR = cssVarOfToken(SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor);
 
 function makeEvaluation(
   overrides: Partial<ScenarioEvaluationResult> = {},
@@ -60,8 +57,7 @@ const sqlPassed = makeEvaluation();
 const sqlFailed = makeEvaluation({
   status: "failed",
   passed: false,
-  details:
-    "Generated SQL filters on fiscal quarter; golden uses calendar quarter",
+  details: "Generated SQL filters on fiscal quarter; golden uses calendar quarter",
 });
 const sqlSkipped = makeEvaluation({
   status: "skipped",
@@ -210,16 +206,10 @@ describe("<RunPlanDetailHeader/> evaluator pills", () => {
       const pills = within(line).getByTestId("run-summary-evaluators");
       const note = within(line).getByTestId("run-summary-note");
 
-      expect(
-        pass.compareDocumentPosition(pills) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-      expect(
-        pills.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      expect(pass.compareDocumentPosition(pills) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(pills.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       // The pass block of a header line is 32px tall, and so is every pill.
-      for (const pill of within(pills).getAllByTestId(
-        /^evaluator-pill-eval_/,
-      )) {
+      for (const pill of within(pills).getAllByTestId(/^evaluator-pill-eval_/)) {
         expect(pill).toHaveStyle({ height: "32px" });
       }
     });
@@ -240,9 +230,7 @@ describe("<RunPlanDetailHeader/> evaluator pills", () => {
       expect(latency).toHaveTextContent("Reply Latency");
       // The mean of 2.6, 3 and 2, with no dot, no threshold and no percent.
       expect(latency).toHaveTextContent("2.53");
-      expect(
-        within(latency).queryByTestId("evaluator-pill-dot"),
-      ).not.toBeInTheDocument();
+      expect(within(latency).queryByTestId("evaluator-pill-dot")).not.toBeInTheDocument();
       expect(latency).not.toHaveTextContent("%");
     });
 
@@ -263,9 +251,7 @@ describe("<RunPlanDetailHeader/> evaluator pills", () => {
       );
       renderHeader(runs);
 
-      expect(screen.getByTestId("evaluator-pill-eval_sql")).toHaveTextContent(
-        "67%",
-      );
+      expect(screen.getByTestId("evaluator-pill-eval_sql")).toHaveTextContent("67%");
     });
   });
 
@@ -275,9 +261,7 @@ describe("<RunPlanDetailHeader/> evaluator pills", () => {
       renderHeader([makeRun()]);
 
       expect(screen.getByTestId("run-metrics-summary")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("run-summary-evaluators"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-summary-evaluators")).not.toBeInTheDocument();
     });
   });
 });
@@ -301,9 +285,7 @@ describe("<RunResultsTable/> evaluator cells", () => {
       ]);
 
       const cell = screen.getByTestId("run-result-evaluators");
-      expect(within(cell).getAllByTestId(/^evaluator-pill-eval_/)).toHaveLength(
-        2,
-      );
+      expect(within(cell).getAllByTestId(/^evaluator-pill-eval_/)).toHaveLength(2);
 
       const sql = within(cell).getByTestId("evaluator-pill-eval_sql");
       expect(sql).toHaveTextContent("Fail");
@@ -313,9 +295,7 @@ describe("<RunResultsTable/> evaluator cells", () => {
 
       const latency = within(cell).getByTestId("evaluator-pill-eval_latency");
       expect(latency).toHaveTextContent("2.60");
-      expect(
-        within(latency).queryByTestId("evaluator-pill-dot"),
-      ).not.toBeInTheDocument();
+      expect(within(latency).queryByTestId("evaluator-pill-dot")).not.toBeInTheDocument();
     });
 
     it("reads Pass with a green dot on a scenario the check passed", () => {
@@ -356,9 +336,7 @@ describe("<RunResultsTable/> evaluator cells", () => {
       expect(sql).toHaveTextContent("Skipped");
       expect(sql).toHaveAttribute("data-reading", "skipped");
       expect(sql).toHaveStyle({ opacity: "0.7" });
-      expect(
-        within(sql).queryByTestId("evaluator-pill-dot"),
-      ).not.toBeInTheDocument();
+      expect(within(sql).queryByTestId("evaluator-pill-dot")).not.toBeInTheDocument();
     });
   });
 
@@ -368,12 +346,8 @@ describe("<RunResultsTable/> evaluator cells", () => {
       renderTable([makeRun(), makeRun({ scenarioRunId: "run_2" })]);
 
       expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("run-result-evaluators"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("run-result-evaluators-grading"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-result-evaluators")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-result-evaluators-grading")).not.toBeInTheDocument();
       expect(screen.getByTestId("run-results-table-header")).toHaveStyle({
         gridTemplateColumns: "120px minmax(0,1fr) 130px auto",
       });
@@ -397,23 +371,15 @@ describe("<RunResultsTable/> evaluator cells", () => {
       expect(screen.getByText("Evaluators")).toBeInTheDocument();
 
       const waiting = screen.getByTestId("run-result-row-run_waiting");
-      const grading = within(waiting).getByTestId(
-        "run-result-evaluators-grading",
-      );
+      const grading = within(waiting).getByTestId("run-result-evaluators-grading");
       expect(within(grading).getByText("Grading")).toHaveStyle({
         color: cssVarOfToken("fg.muted"),
       });
-      expect(
-        within(waiting).queryByTestId("run-result-evaluators"),
-      ).not.toBeInTheDocument();
+      expect(within(waiting).queryByTestId("run-result-evaluators")).not.toBeInTheDocument();
 
       const plain = screen.getByTestId("run-result-row-run_plain");
-      expect(
-        within(plain).queryByTestId("run-result-evaluators-grading"),
-      ).not.toBeInTheDocument();
-      expect(
-        within(plain).queryByTestId("run-result-evaluators"),
-      ).not.toBeInTheDocument();
+      expect(within(plain).queryByTestId("run-result-evaluators-grading")).not.toBeInTheDocument();
+      expect(within(plain).queryByTestId("run-result-evaluators")).not.toBeInTheDocument();
     });
   });
 
@@ -426,13 +392,9 @@ describe("<RunResultsTable/> evaluator cells", () => {
       const cells = screen.getAllByTestId("run-result-evaluators");
       expect(cells).toHaveLength(3);
       for (const cell of cells) {
-        expect(
-          within(cell).getAllByTestId(/^evaluator-pill-eval_/),
-        ).toHaveLength(2);
+        expect(within(cell).getAllByTestId(/^evaluator-pill-eval_/)).toHaveLength(2);
       }
-      expect(
-        screen.queryByTestId("run-result-evaluators-grading"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-result-evaluators-grading")).not.toBeInTheDocument();
     });
 
     /** @scenario "The scenario name stays readable on a narrow table" */
@@ -473,10 +435,7 @@ describe("<LastResultLabel/> with evaluator results", () => {
       );
 
       const label = screen.getByText("Failed (3/3)");
-      expect(label.closest("[title]")).toHaveAttribute(
-        "title",
-        "Failed · SQL Query Equivalence",
-      );
+      expect(label.closest("[title]")).toHaveAttribute("title", "Failed · SQL Query Equivalence");
     });
   });
 
@@ -544,34 +503,26 @@ describe("<RunVerdictPanel/> evaluators", () => {
       const section = within(panel).getByTestId("run-verdict-evaluators");
       expect(within(section).getByText("Evaluators")).toBeInTheDocument();
       const text = panel.textContent ?? "";
-      expect(text.indexOf("Passed criteria")).toBeLessThan(
-        text.indexOf("Evaluators"),
-      );
+      expect(text.indexOf("Passed criteria")).toBeLessThan(text.indexOf("Evaluators"));
 
       const failedRow = within(section).getByTestId("evaluation-row-eval_sql");
       expect(failedRow).toHaveTextContent("SQL Query Equivalence");
       expect(within(failedRow).getByTestId("evaluation-verdict")).toHaveStyle({
         color: FAILED_COLOR,
       });
-      expect(
-        within(failedRow).getByTestId("evaluation-verdict"),
-      ).toHaveTextContent("Failed");
+      expect(within(failedRow).getByTestId("evaluation-verdict")).toHaveTextContent("Failed");
       expect(failedRow.querySelector("svg.lucide-circle-x")).not.toBeNull();
-      expect(
-        within(failedRow).getByTestId("evaluation-required-mark"),
-      ).toHaveTextContent("Required");
+      expect(within(failedRow).getByTestId("evaluation-required-mark")).toHaveTextContent(
+        "Required",
+      );
 
       const passedRow = within(section).getByTestId("evaluation-row-eval_pii");
       expect(within(passedRow).getByTestId("evaluation-verdict")).toHaveStyle({
         color: PASSED_COLOR,
       });
-      expect(
-        within(passedRow).getByTestId("evaluation-verdict"),
-      ).toHaveTextContent("Passed");
+      expect(within(passedRow).getByTestId("evaluation-verdict")).toHaveTextContent("Passed");
       expect(passedRow.querySelector("svg.lucide-circle-check")).not.toBeNull();
-      expect(
-        within(passedRow).queryByTestId("evaluation-required-mark"),
-      ).not.toBeInTheDocument();
+      expect(within(passedRow).queryByTestId("evaluation-required-mark")).not.toBeInTheDocument();
     });
 
     /** @scenario "The reason an evaluator gave reads under its verdict" */
@@ -585,9 +536,7 @@ describe("<RunVerdictPanel/> evaluators", () => {
       );
       expect(details).toHaveStyle({ color: cssVarOfToken("fg.muted") });
       const text = row.textContent ?? "";
-      expect(text.indexOf("Failed")).toBeLessThan(
-        text.indexOf("Generated SQL"),
-      );
+      expect(text.indexOf("Failed")).toBeLessThan(text.indexOf("Generated SQL"));
     });
   });
 
@@ -597,9 +546,7 @@ describe("<RunVerdictPanel/> evaluators", () => {
       renderPanel();
 
       expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("run-verdict-evaluators"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-verdict-evaluators")).not.toBeInTheDocument();
     });
   });
 
@@ -609,12 +556,8 @@ describe("<RunVerdictPanel/> evaluators", () => {
       renderPanel({ evaluations: [latencyScore] });
 
       const row = screen.getByTestId("evaluation-row-eval_latency");
-      expect(
-        within(row).getByTestId("evaluation-score-badge"),
-      ).toHaveTextContent("2.60");
-      expect(
-        within(row).queryByTestId("evaluation-verdict"),
-      ).not.toBeInTheDocument();
+      expect(within(row).getByTestId("evaluation-score-badge")).toHaveTextContent("2.60");
+      expect(within(row).queryByTestId("evaluation-verdict")).not.toBeInTheDocument();
       expect(row.querySelector("svg")).toBeNull();
     });
   });
@@ -627,9 +570,7 @@ describe("<RunVerdictPanel/> evaluators", () => {
       const row = screen.getByTestId("evaluation-row-eval_sql");
       expect(row).toHaveAttribute("data-status", "skipped");
       expect(row).toHaveStyle({ opacity: "0.65" });
-      expect(within(row).getByTestId("evaluation-verdict")).toHaveTextContent(
-        "Skipped",
-      );
+      expect(within(row).getByTestId("evaluation-verdict")).toHaveTextContent("Skipped");
       expect(within(row).getByTestId("evaluation-verdict")).toHaveStyle({
         color: cssVarOfToken("fg.muted"),
       });
@@ -650,9 +591,9 @@ describe("<RunVerdictPanel/> evaluators", () => {
 
       const failed = screen.getByTestId("run-verdict-status-failed");
       expect(failed).toHaveTextContent("FAILED · SQL Query Equivalence");
-      expect(
-        screen.getByTestId("run-verdict-failed-evaluator"),
-      ).toHaveTextContent("SQL Query Equivalence");
+      expect(screen.getByTestId("run-verdict-failed-evaluator")).toHaveTextContent(
+        "SQL Query Equivalence",
+      );
     });
 
     it("keeps FAILED on its own when the run failed on its criteria alone", () => {
@@ -663,12 +604,8 @@ describe("<RunVerdictPanel/> evaluators", () => {
         evaluations: [sqlPassed],
       });
 
-      expect(screen.getByTestId("run-verdict-status-failed")).toHaveTextContent(
-        /^FAILED$/,
-      );
-      expect(
-        screen.queryByTestId("run-verdict-failed-evaluator"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("run-verdict-status-failed")).toHaveTextContent(/^FAILED$/);
+      expect(screen.queryByTestId("run-verdict-failed-evaluator")).not.toBeInTheDocument();
     });
 
     it("does not name an evaluator that is not required", () => {
@@ -679,9 +616,7 @@ describe("<RunVerdictPanel/> evaluators", () => {
         evaluations: [makeEvaluation({ ...sqlFailed, required: false })],
       });
 
-      expect(
-        screen.queryByTestId("run-verdict-failed-evaluator"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-verdict-failed-evaluator")).not.toBeInTheDocument();
     });
   });
 
@@ -702,20 +637,14 @@ describe("<RunVerdictPanel/> evaluators", () => {
       });
 
       const row = screen.getByTestId("evaluation-row-eval_sql");
-      expect(
-        within(row).queryByTestId("evaluation-inputs-eval_sql"),
-      ).not.toBeInTheDocument();
+      expect(within(row).queryByTestId("evaluation-inputs-eval_sql")).not.toBeInTheDocument();
 
-      await user.click(
-        within(row).getByTestId("evaluation-inputs-toggle-eval_sql"),
-      );
+      await user.click(within(row).getByTestId("evaluation-inputs-toggle-eval_sql"));
 
       const inputs = within(row).getByTestId("evaluation-inputs-eval_sql");
       expect(within(inputs).getByText("output")).toBeInTheDocument();
       expect(within(inputs).getByText("expected_output")).toBeInTheDocument();
-      const short = within(inputs).getByText(
-        "SELECT merchant, quarter FROM chargebacks",
-      );
+      const short = within(inputs).getByText("SELECT merchant, quarter FROM chargebacks");
       expect(short).toHaveStyle({ fontFamily: "var(--chakra-fonts-mono)" });
       // The long value is cut short on the page and whole in the hover.
       const cut = within(inputs).getByTitle(longValue);

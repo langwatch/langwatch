@@ -1,20 +1,21 @@
-import { describe, expect, it } from "vitest";
 import { createTenantId, type Command } from "@langwatch/eventing";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   type OtlpSpan,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
-import {
-  EventingRecordSpanAdapter,
-  type RecordSpanCommandOptions,
-} from "../eventing.record-span.service.ts";
+import { describe, expect, it } from "vitest";
+
 import type {
   TraceSpanContentDrop,
   TraceSpanCostEnrichment,
   TraceSpanPiiRedaction,
   TraceSpanTokenEstimation,
 } from "../../app/trace.members.ts";
+import {
+  EventingRecordSpanAdapter,
+  type RecordSpanCommandOptions,
+} from "../eventing.record-span.service.ts";
 
 function createSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
   return {

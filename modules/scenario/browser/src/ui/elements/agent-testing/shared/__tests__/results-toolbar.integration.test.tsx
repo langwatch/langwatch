@@ -10,12 +10,13 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { useEffect, useReducer } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ResultsList } from "../../../../sections/agent-testing/results/results-list.tsx";
+
 import {
   buildRunPlans,
   type RunPlanSuite,
 } from "../../../../../behavior/agent-testing/results/run-plans.ts";
 import type { AgentTestingRoutingState } from "../../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { ResultsList } from "../../../../sections/agent-testing/results/results-list.tsx";
 
 const PROJECT_ID = "proj_1";
 const NOW = 1_700_000_000_000;

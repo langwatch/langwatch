@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+
 import {
   buildChildEnvironment,
   type ExecutionJobData,
@@ -45,8 +46,7 @@ function job(projectId: string, runId: string): ExecutionJobData {
 
 const config: ScenarioChildProcessConfig = {
   packageRoot: "/app/modules/scenario/process",
-  sourcePath:
-    "/app/modules/scenario/process/src/services/scenario-child-execution.service.ts",
+  sourcePath: "/app/modules/scenario/process/src/services/scenario-child-execution.service.ts",
   sourceRoots: ["/app/modules/scenario/process/src"],
   nodeEnv: "production",
   isSaas: true,

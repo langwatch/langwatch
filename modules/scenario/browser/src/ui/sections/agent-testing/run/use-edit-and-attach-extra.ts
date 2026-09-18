@@ -5,16 +5,17 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { useCallback } from "react";
-import type { EvaluatorAttachment, ScenarioMapping } from "@langwatch/scenario-contract";
 import type { useDrawer } from "@langwatch/browser-host/drawer";
+import type { EvaluatorAttachment, ScenarioMapping } from "@langwatch/scenario-contract";
+import { useCallback } from "react";
+
+import type { useOpenScenarioEvaluatorEditor } from "../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
 import type { api } from "../../../../behavior/scenario-api.ts";
 import {
   type AttachableEvaluator,
   newAttachment,
   opensOnAttach,
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import type { useOpenScenarioEvaluatorEditor } from "../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
 import type { InheritedSuite } from "./run-evaluators";
 import { useAddExtraFlow } from "./use-add-extra-flow";
 

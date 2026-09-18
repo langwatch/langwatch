@@ -4,9 +4,9 @@
  * the read service stays a query surface and this stays the enrichment policy.
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { applyOverlayToTrace } from "@langwatch/trace-contract";
-import { createLogger } from "@langwatch/observability";
 
 import {
   ClaudeCodeLogEnrichmentService,

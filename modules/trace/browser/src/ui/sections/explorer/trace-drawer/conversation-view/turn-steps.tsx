@@ -1,9 +1,10 @@
 import { Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import type { SpanDetail } from "@langwatch/trace-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import type { SpanDetail } from "@langwatch/trace-contract";
+
 import { api } from "../../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   formatCost,
   formatDuration,

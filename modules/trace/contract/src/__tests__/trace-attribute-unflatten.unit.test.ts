@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { safeUnflatten } from "../trace-attribute-unflatten.ts";
 
 describe("safeUnflatten", () => {

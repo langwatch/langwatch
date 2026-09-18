@@ -4,8 +4,9 @@
  * Used by both SuiteFormDrawer (Save & Run) and suites/index.tsx (sidebar Run).
  */
 
-import { api } from "../scenario-api.ts";
 import { toaster } from "@langwatch/design-system/toaster";
+
+import { api } from "../scenario-api.ts";
 import { showSuiteRunError } from "./show-suite-run-error.ts";
 
 interface UseSuiteRunMutationOptions {

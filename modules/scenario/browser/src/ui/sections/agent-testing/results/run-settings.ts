@@ -4,8 +4,8 @@
  * @see specs/scenarios/run-configuration-on-runs.feature
  */
 
-import { targetKeyOfRun } from "@langwatch/suite-browser/run-formatters";
 import type { RunActor, ScenarioRunData } from "@langwatch/scenario-contract";
+import { targetKeyOfRun } from "@langwatch/suite-browser/run-formatters";
 
 /** One resolved run parameter, as the block prints it. */
 export type RunSettingParameter = {

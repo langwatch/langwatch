@@ -4,6 +4,7 @@
  * ever open. See specs/traces-v2/annotation-rail.feature.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   isSameAnnotationTarget,
   isTurnRailDraft,

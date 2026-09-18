@@ -1,4 +1,6 @@
 import { HelpCircle, type LucideIcon } from "lucide-react";
+
+import type { SectionGroup } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import {
   FACET_ICONS,
   FACET_LABELS,
@@ -8,7 +10,6 @@ import {
 } from "../../../../behavior/facet-constants.ts";
 import { formatBytes } from "../../../../model/display-formatters.ts";
 import { ORIGIN_DISPLAY, originLabel } from "../../../../model/origin-display.ts";
-import type { SectionGroup } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 
 const TOKEN_K = 1_000;
 const TOKEN_M = 1_000_000;

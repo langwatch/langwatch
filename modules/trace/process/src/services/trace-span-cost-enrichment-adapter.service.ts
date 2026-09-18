@@ -1,5 +1,6 @@
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { type TraceModelCostCatalog,type TraceSpanCostEnrichment } from "../app/trace.members.ts";
+
+import { type TraceModelCostCatalog, type TraceSpanCostEnrichment } from "../app/trace.members.ts";
 import { OtlpSpanCostEnrichmentService } from "./span-cost-enrichment.service.ts";
 
 /**
@@ -8,14 +9,11 @@ import { OtlpSpanCostEnrichmentService } from "./span-cost-enrichment.service.ts
  * interchangeable sibling preparation steps.
  */
 export class TraceSpanCostEnrichmentAdapter implements TraceSpanCostEnrichment {
-  static create(options: {
-    modelCosts: TraceModelCostCatalog;
-  }): TraceSpanCostEnrichmentAdapter {
+  static create(options: { modelCosts: TraceModelCostCatalog }): TraceSpanCostEnrichmentAdapter {
     return new TraceSpanCostEnrichmentAdapter(OtlpSpanCostEnrichmentService.create(options));
   }
 
-  private constructor(private readonly service: OtlpSpanCostEnrichmentService) {
-  }
+  private constructor(private readonly service: OtlpSpanCostEnrichmentService) {}
 
   async enrich(span: OtlpSpan, tenantId: string): Promise<void> {
     await this.service.enrichSpan({ span, tenantId });

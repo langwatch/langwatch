@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { SPAN_RECEIVED_EVENT_TYPE } from "./trace-ingress.constants.ts";
+
 import { piiRedactionLevelSchema } from "./trace-ingress.commands.ts";
+import { SPAN_RECEIVED_EVENT_TYPE } from "./trace-ingress.constants.ts";
 import { traceIngressEventEnvelopeSchema } from "./trace-ingress.event-envelope.ts";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./trace.otlp.ts";
 

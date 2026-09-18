@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+
 import type { TraceListItem } from "../../../../types/trace.ts";
 
 export const INITIAL_VISIBLE_TURNS = 7;

@@ -2,7 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@langwatch/trace-process": ["./src/index.ts"]
+      "@langwatch/trace-process": [
+        "./src/index.ts"
+      ]
     },
     "composite": true,
     "declaration": true,
@@ -24,13 +26,16 @@
     "./src/transport/tracked-event.rest.ts",
     "./src/transport/trace-export.rest.ts",
     "./src/transport/otlp-ingest.rest.ts",
-    "./src/transport/otlp-path-alias.rest.ts",
     "./src/transport/traces.rest.ts",
     "./src/transport/trace-legacy.rest.ts",
     "./src/transport/collector.rest.ts",
     "src/repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts"
   ],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json"
+  ],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",
@@ -151,6 +156,9 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../presence/contract/tsconfig.build.json"
     }
   ]
 }

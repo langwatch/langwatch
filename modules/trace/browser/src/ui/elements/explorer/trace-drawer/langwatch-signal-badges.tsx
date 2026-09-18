@@ -1,4 +1,6 @@
 import { HStack, Icon } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import type { IconType } from "react-icons";
 import {
   LuBookOpen,
@@ -10,8 +12,6 @@ import {
   LuTheater,
   LuUser,
 } from "react-icons/lu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 
 interface SignalDisplay {
   icon: IconType;

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "../../behavior/trace-api.ts";
-import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
 import { nowInstant } from "@langwatch/time";
+import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { api } from "../../behavior/trace-api.ts";
 
 interface UseTraceUpdateListenerOptions {
   projectId: string;

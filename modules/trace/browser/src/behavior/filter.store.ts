@@ -1,7 +1,5 @@
-import type { LiqeQuery } from "liqe";
-import { create } from "zustand";
-import type { AiActionError } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
+import type { AiActionError } from "@langwatch/trace-contract";
 import {
   addSameFieldOrValue,
   addToOrGroupAtLocation,
@@ -22,6 +20,8 @@ import {
   toggleFacetInQuery,
   validateAst,
 } from "@langwatch/trace-contract";
+import type { LiqeQuery } from "liqe";
+import { create } from "zustand";
 
 export interface TimeRange {
   from: number;

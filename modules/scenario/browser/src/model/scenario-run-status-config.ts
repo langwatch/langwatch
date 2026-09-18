@@ -1,5 +1,5 @@
-import { AlertTriangle, Check, Clock, type LucideIcon, XCircle } from "lucide-react";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { AlertTriangle, Check, Clock, type LucideIcon, XCircle } from "lucide-react";
 
 export interface ScenarioRunStatusConfig {
   colorPalette: string;

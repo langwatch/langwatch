@@ -2,8 +2,9 @@
  * @vitest-environment jsdom
  */
 import { act, renderHook } from "@testing-library/react";
-import { useScenarioLabelFilter as useLabelFilter } from "../use-scenario-label-filter.ts";
 import { describe, expect, it } from "vitest";
+
+import { useScenarioLabelFilter as useLabelFilter } from "../use-scenario-label-filter.ts";
 
 describe("useLabelFilter()", () => {
   describe("given the allLabels return value", () => {

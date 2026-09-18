@@ -1,10 +1,11 @@
+import type { ScenarioSetData } from "@langwatch/scenario-contract";
 /**
  * How the simulations page orders the scenario sets it lists.
  * @see specs/scenarios/internal-set-namespace.feature
  * @see specs/suites/internal-run-set-surface.feature
  */
 import { describe, expect, it } from "vitest";
-import type { ScenarioSetData } from "@langwatch/scenario-contract";
+
 import { sortScenarioSets } from "../model/sort-scenario-sets.ts";
 
 describe("sortScenarioSets()", () => {

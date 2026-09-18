@@ -1,5 +1,5 @@
 import { EventUtils } from "@langwatch/eventing";
-import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   isStorageAnchoredVersion,
   type TraceListFacetQuery,
@@ -15,7 +15,8 @@ import {
   type EventMetricValues,
   EVENT_METRIC_SEP,
 } from "@langwatch/trace-contract";
-import { nowInstant } from "@langwatch/time";
+
+import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
 
 interface TraceSummaryFieldsBase {
   TraceId: string;

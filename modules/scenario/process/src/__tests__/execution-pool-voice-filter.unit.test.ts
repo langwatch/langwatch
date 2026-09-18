@@ -3,12 +3,13 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
+
+import { isVoiceJob } from "../rules/voice-worker-only.rules.ts";
 import {
   type ExecutionJobData,
   JobNotAcceptedByPoolError,
-  ScenarioExecutionPool,
-} from "./execution-pool.unit.test.ts";
-import { isVoiceJob } from "../rules/voice-worker-only.rules.ts";
+  ScenarioExecutionPoolService,
+} from "../services/scenario-execution-pool.service.ts";
 
 function job({
   n,
@@ -29,18 +30,21 @@ function job({
 
 describe("ScenarioExecutionPool with the voice-only admission filter", () => {
   describe("given a pool that accepts only voice jobs", () => {
-    let pool: ScenarioExecutionPool;
+    let pool: ScenarioExecutionPoolService;
     let started: string[];
 
     beforeEach(() => {
-      pool = new ScenarioExecutionPool({
+      pool = ScenarioExecutionPoolService.create({
         concurrency: 10,
         acceptJob: isVoiceJob,
       });
       started = [];
-      pool.setSpawnFunction((j) => {
-        started.push(j.scenarioRunId);
-        return new Promise<void>(() => {});
+      pool.connect({
+        execute: (j) => {
+          started.push(j.scenarioRunId);
+          return new Promise<void>(() => {});
+        },
+        skipCancelled: () => {},
       });
     });
 
@@ -59,11 +63,14 @@ describe("ScenarioExecutionPool with the voice-only admission filter", () => {
 
   describe("given a pool with no admission filter", () => {
     it("runs every job type, unchanged", () => {
-      const pool = new ScenarioExecutionPool({ concurrency: 10 });
+      const pool = ScenarioExecutionPoolService.create({ concurrency: 10 });
       const started: string[] = [];
-      pool.setSpawnFunction((j) => {
-        started.push(j.scenarioRunId);
-        return new Promise<void>(() => {});
+      pool.connect({
+        execute: (j) => {
+          started.push(j.scenarioRunId);
+          return new Promise<void>(() => {});
+        },
+        skipCancelled: () => {},
       });
 
       pool.submit(job({ n: 1, type: "http" }));

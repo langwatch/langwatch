@@ -1,5 +1,6 @@
-import type { AnnotationByTrace } from "../../use-annotations-by-trace-ids.ts";
 import type { TraceMediaRef } from "@langwatch/trace-contract";
+
+import type { AnnotationByTrace } from "../../use-annotations-by-trace-ids.ts";
 
 export type TraceStatus = "ok" | "error" | "warning";
 

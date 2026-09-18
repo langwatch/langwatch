@@ -5,7 +5,6 @@
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 import {
   generateBatchRunId,
   generateScenarioRunId,
@@ -18,6 +17,7 @@ import {
   scenarioTrpc,
   type RunActor,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 
 import { filterRunsByTimestamp } from "../rules/simulation-run-timestamp-filter.rules.ts";
 

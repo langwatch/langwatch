@@ -1,6 +1,6 @@
-import { MediaPart } from "../simulations/media-part.tsx";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import type { MediaPartData } from "../../../behavior/shared/traces/media-parts.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { MediaPart } from "../simulations/media-part.tsx";
 
 /**
  * Render one media content part (audio, image, video, attachment chip) via the existing

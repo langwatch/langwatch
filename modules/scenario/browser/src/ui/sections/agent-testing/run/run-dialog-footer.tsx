@@ -4,9 +4,10 @@
  */
 
 import { Box, chakra, Text } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Play } from "lucide-react";
 import { useId } from "react";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import type { RunDialogController } from "./use-run-dialog-submit.ts";

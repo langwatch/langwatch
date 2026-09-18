@@ -72,8 +72,8 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-import { RunScenarioModal } from "../run-scenario-modal.tsx";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
+import { RunScenarioModal } from "../run-scenario-modal.tsx";
 
 describe("RunScenarioModal with TargetSelector", () => {
   let onClose: ReturnType<typeof vi.fn<() => void>>;

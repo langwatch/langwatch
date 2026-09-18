@@ -2,8 +2,8 @@
  * One-off scenario for agent test runs: internal set, no suite, excluded from results.
  */
 
-import { INTERNAL_SET_PREFIX } from "./scenario-set-id.ts";
 import type { TargetConfig } from "./scenario-execution-data.ts";
+import { INTERNAL_SET_PREFIX } from "./scenario-set-id.ts";
 
 /** Suffix of the set that holds a project's agent test runs. */
 export const AGENT_TEST_SET_SUFFIX = "__agent-test";

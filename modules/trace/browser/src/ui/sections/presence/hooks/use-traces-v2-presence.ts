@@ -1,13 +1,11 @@
-import { useMemo } from "react";
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { selectMostVisibleSection, useSectionTrackerStore } from "@langwatch/presence-browser";
 import type { PresenceLocation } from "@langwatch/presence-contract";
-import {
-  selectMostVisibleSection,
-  useSectionTrackerStore,
-} from "@langwatch/presence-browser";
-import { usePresence } from "./use-presence.ts";
+import { useMemo } from "react";
+
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { usePresenceFeatureEnabled } from "../../../../behavior/presence/use-presence-feature-enabled.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { usePresence } from "./use-presence.ts";
 
 /**
  * Drives the multiplayer presence channel from traces-v2 page state.

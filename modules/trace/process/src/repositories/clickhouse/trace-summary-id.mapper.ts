@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
+
 import { EventUtils } from "@langwatch/eventing";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
-import { createHash } from "node:crypto";
 
 const TRACE_SUMMARY_RESOURCE = "tracesummary";
 

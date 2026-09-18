@@ -5,11 +5,12 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+
 import { CaseVersionChip } from "../case-version-chip.tsx";
 import { LastResultLabel } from "../last-result-label.tsx";
 import { ResultMetricsInline } from "../result-metrics-inline.tsx";

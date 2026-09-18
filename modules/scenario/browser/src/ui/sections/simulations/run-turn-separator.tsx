@@ -4,12 +4,13 @@
  */
 
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import { LuListTree } from "react-icons/lu";
 import { TRACE_QUERY_CONFIG } from "@langwatch/trace-browser/surfaces/conversation";
 import { TracePreviewHoverCard } from "@langwatch/trace-browser/surfaces/trace-id-peek";
+import { LuListTree } from "react-icons/lu";
+
+import { api } from "../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useTraceDetailsDrawer } from "../../../behavior/use-trace-details-drawer.ts";
-import { api } from "../../../behavior/scenario-api.ts";
 
 /**
  * The line reads solid where it meets the label at the centre and fades to

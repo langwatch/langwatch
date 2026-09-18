@@ -9,17 +9,17 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createCancelExecutionHandler,
-  createExecuteRunHandler,
-  createFinishRunHandler,
-} from "../simulation-run-execution.intent.ts";
+import { TestSimulationService } from "../../__tests__/support/test-simulation.service.ts";
 import type {
   CancelExecutionIntent,
   ExecuteRunIntent,
   FinishRunIntent,
 } from "../simulation-run-execution-data.process.ts";
-import { TestSimulationService } from "../../__tests__/support/test-simulation.service.ts";
+import {
+  createCancelExecutionHandler,
+  createExecuteRunHandler,
+  createFinishRunHandler,
+} from "../simulation-run-execution.intent.ts";
 
 const RUN_ID = "run-1";
 const PROJECT_ID = "project-1";

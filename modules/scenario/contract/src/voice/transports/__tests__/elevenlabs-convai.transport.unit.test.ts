@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import {
   ELEVENLABS_CONNECT_REJECTED_PREFIX,
   elevenLabsConvaiTransport,
@@ -49,9 +50,7 @@ describe("wrapConnectRejection", () => {
         const wrapped = wrapConnectRejection(adapter, 20);
 
         await expect(wrapped.connect()).rejects.toThrow(
-          new RegExp(
-            `^${ELEVENLABS_CONNECT_REJECTED_PREFIX}: connection timed out`,
-          ),
+          new RegExp(`^${ELEVENLABS_CONNECT_REJECTED_PREFIX}: connection timed out`),
         );
       });
     });
@@ -67,9 +66,7 @@ describe("wrapConnectRejection", () => {
         const wrapped = wrapConnectRejection(adapter, 20);
 
         await expect(wrapped.connect()).rejects.toThrow(
-          new RegExp(
-            `^${ELEVENLABS_CONNECT_REJECTED_PREFIX}: connection timed out`,
-          ),
+          new RegExp(`^${ELEVENLABS_CONNECT_REJECTED_PREFIX}: connection timed out`),
         );
         expect(disconnect).toHaveBeenCalled();
       });
@@ -84,9 +81,7 @@ describe("wrapConnectRejection", () => {
         const wrapped = wrapConnectRejection(adapter, 20);
 
         await expect(wrapped.connect()).rejects.toThrow(
-          new RegExp(
-            `^${ELEVENLABS_CONNECT_REJECTED_PREFIX}: connection timed out`,
-          ),
+          new RegExp(`^${ELEVENLABS_CONNECT_REJECTED_PREFIX}: connection timed out`),
         );
       });
     });
@@ -150,9 +145,7 @@ describe("readElevenLabsErrorReason", () => {
     describe("when the body is not JSON", () => {
       /** @scenario "A run with a wrong agent id or a removed key fails without hanging the pool" */
       it("falls back to the status code", () => {
-        expect(readElevenLabsErrorReason(500, "<html>Bad Gateway</html>")).toBe(
-          "Status code: 500",
-        );
+        expect(readElevenLabsErrorReason(500, "<html>Bad Gateway</html>")).toBe("Status code: 500");
       });
     });
 
@@ -185,13 +178,8 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
         });
 
         expect(result).toEqual({ signedUrl: "wss://api.elevenlabs.io/abc" });
-        const [, init] = fetchMock.mock.calls[0] as unknown as [
-          string,
-          RequestInit,
-        ];
-        expect((init.headers as Record<string, string>)["xi-api-key"]).toBe(
-          CREDENTIAL.apiKey,
-        );
+        const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+        expect((init.headers as Record<string, string>)["xi-api-key"]).toBe(CREDENTIAL.apiKey);
       });
     });
 
@@ -262,9 +250,7 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
             agentId: "agent_1",
             credential: CREDENTIAL,
           }),
-        ).rejects.toThrow(
-          `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`,
-        );
+        ).rejects.toThrow(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`);
       });
     });
 
@@ -279,9 +265,7 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
             agentId: "agent_1",
             credential: CREDENTIAL,
           }),
-        ).rejects.toThrow(
-          `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`,
-        );
+        ).rejects.toThrow(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`);
       });
     });
 
@@ -411,9 +395,7 @@ describe("elevenLabsConvaiTransport.fetchCallRecord", () => {
           audioProxyUrl: "/api/voice/session/conv_1/audio",
         });
 
-        expect(record?.turns).toEqual([
-          { role: "caller", text: "hi", startMs: 0 },
-        ]);
+        expect(record?.turns).toEqual([{ role: "caller", text: "hi", startMs: 0 }]);
       });
     });
 

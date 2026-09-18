@@ -2,11 +2,12 @@
  * Freshness probe for the run history views.
  */
 
-import { useEffect, useRef } from "react";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { api } from "../scenario-api.ts";
 import { getAdaptivePollingInterval } from "@langwatch/suite-browser/run-formatters";
+import { useEffect, useRef } from "react";
+
+import { api } from "../scenario-api.ts";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 interface UseSuiteRunFreshnessOptions {
   /** When provided, scopes the probe to a single scenario set. */

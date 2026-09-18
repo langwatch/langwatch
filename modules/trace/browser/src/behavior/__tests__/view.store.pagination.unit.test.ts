@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { useFilterStore } from "../filter.store.ts";
 import { useViewStore } from "../view.store.ts";
 

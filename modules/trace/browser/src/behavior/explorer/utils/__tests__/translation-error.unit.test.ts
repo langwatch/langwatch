@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   extractAiCallFailedInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
 } from "@langwatch/model-provider-browser/surfaces/model-error";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { shouldShowGenericTranslateError } from "../translation-error.ts";
 
 // The gating logic is what we own here; the extractors are a boundary (tested in

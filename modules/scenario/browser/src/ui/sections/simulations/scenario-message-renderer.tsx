@@ -1,13 +1,13 @@
-import { useMemo } from "react";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
 import {
   ConversationThread,
   type DisplayPart,
   flattenMessages,
 } from "@langwatch/trace-browser/surfaces/conversation";
+import { useMemo } from "react";
 
-import type { StreamingMessage } from "../../../behavior/use-simulation-streaming-state.ts";
 import { useSequentialAudioPlayback } from "../../../behavior/use-sequential-audio-playback.ts";
+import type { StreamingMessage } from "../../../behavior/use-simulation-streaming-state.ts";
 import type { NextSpeaker } from "../../elements/next-speaker.ts";
 import { TypingBubble } from "../../elements/typing-bubble.tsx";
 import { MediaPart } from "../media-part.tsx";

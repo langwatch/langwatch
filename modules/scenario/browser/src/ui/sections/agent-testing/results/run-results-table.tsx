@@ -5,8 +5,9 @@
  */
 
 import { Box, Text } from "@chakra-ui/react";
-import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
+
+import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { anyRunHasCaller } from "./caller-display.ts";
 import { runHasEvaluators } from "./evaluation-summaries.ts";
@@ -59,8 +60,7 @@ export function RunResultsTable({
   onRerunCase,
 }: RunResultsTableProps) {
   const hasStoppable =
-    !!onCancelRun &&
-    scenarioRuns.some((scenarioRun) => isCancellableStatus(scenarioRun.status));
+    !!onCancelRun && scenarioRuns.some((scenarioRun) => isCancellableStatus(scenarioRun.status));
   const hasEvaluators = scenarioRuns.some(runHasEvaluators);
   const hasCaller = anyRunHasCaller(scenarioRuns);
   const templateColumns = resultColumns({ hasEvaluators, hasCaller });

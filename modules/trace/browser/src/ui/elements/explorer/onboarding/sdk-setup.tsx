@@ -4,22 +4,22 @@
  * it, so this body carries no credentials of its own.
  */
 import { Box, Grid, VStack } from "@chakra-ui/react";
-import type React from "react";
-import { useMemo, useState } from "react";
 import { DocsLinks } from "@langwatch/onboarding-browser/surfaces/docs-links";
 import { FrameworkGrid } from "@langwatch/onboarding-browser/surfaces/framework-grid";
 import { FrameworkIntegrationCode } from "@langwatch/onboarding-browser/surfaces/framework-integration-code";
 import { InstallPreview } from "@langwatch/onboarding-browser/surfaces/install-preview";
-import { PlatformGrid } from "@langwatch/onboarding-browser/surfaces/platform-grid";
 import { getRegistryEntry } from "@langwatch/onboarding-browser/surfaces/observability-codegen";
-import type {
-  FrameworkKey,
-  PlatformKey,
-} from "@langwatch/onboarding-browser/surfaces/observability-types";
 import {
   FRAMEWORKS_BY_PLATFORM,
   PLATFORM_OPTIONS,
 } from "@langwatch/onboarding-browser/surfaces/observability-options";
+import type {
+  FrameworkKey,
+  PlatformKey,
+} from "@langwatch/onboarding-browser/surfaces/observability-types";
+import { PlatformGrid } from "@langwatch/onboarding-browser/surfaces/platform-grid";
+import type React from "react";
+import { useMemo, useState } from "react";
 
 export function SdkSetup(): React.ReactElement | null {
   const initialPlatform = PLATFORM_OPTIONS[0]?.key ?? null;

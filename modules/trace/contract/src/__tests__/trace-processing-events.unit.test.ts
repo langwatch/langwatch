@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
@@ -7,8 +6,9 @@ import {
   isTopicAssignedEvent,
   parseSpanReferencedPayload,
   topicAssignedEventDataSchema,
-  topicAssignedEventSchema
+  topicAssignedEventSchema,
 } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
 
 describe("events schemas", () => {
   describe("spanReferencedPayloadSchema()", () => {

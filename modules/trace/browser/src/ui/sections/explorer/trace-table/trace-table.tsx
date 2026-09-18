@@ -1,4 +1,7 @@
 import type React from "react";
+
+import type { PageCursor } from "../../../../behavior/filter.store.ts";
+import { rowKindForGrouping, useEffectiveLens } from "../../../../behavior/view.store.ts";
 import { HandledErrorState } from "../../errors/index.ts";
 import {
   SESSIONS_MAX_PAGE_SIZE,
@@ -6,8 +9,6 @@ import {
   useSessionGroups,
 } from "../hooks/use-session-groups.ts";
 import { useTraceList } from "../hooks/use-trace-list.ts";
-import type { PageCursor } from "../../../../behavior/filter.store.ts";
-import { rowKindForGrouping, useEffectiveLens } from "../../../../behavior/view.store.ts";
 import { ConversationLensBody } from "./conversation-lens-body.tsx";
 import { EmptyFilterState } from "./empty-filter-state.tsx";
 import { GroupLensBody } from "./group-lens-body.tsx";

@@ -4,6 +4,7 @@
 
 import { Button, HStack, Input } from "@chakra-ui/react";
 import { useRef, useState } from "react";
+
 import { TagPill, type TagPillTone } from "./tag-pill.tsx";
 
 type TagListProps = {
@@ -86,7 +87,6 @@ export function TagList({ labels, onRemove, onAdd, tone }: TagListProps) {
           onBlur={handleBlur}
           width="100px"
           borderRadius="full"
-          
         />
       )}
     </HStack>

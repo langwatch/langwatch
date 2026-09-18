@@ -5,11 +5,12 @@
  */
 
 import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { useCallback, useState } from "react";
+
+import { isNoteTooLong } from "../../../elements/agent-testing/run/run-note-field.tsx";
+import { OpenListContext } from "../../../elements/agent-testing/shared/open-list-context.ts";
 import { RunDialogFields } from "./run-dialog-fields.tsx";
 import { RunDialogFooter } from "./run-dialog-footer.tsx";
-import { isNoteTooLong } from "../../../elements/agent-testing/run/run-note-field.tsx";
-import { useCallback, useState } from "react";
-import { OpenListContext } from "../../../elements/agent-testing/shared/open-list-context.ts";
 import type { RunDialogProps, RunDialogSubject } from "./run-dialog-types.ts";
 import { type RunDialogForm, useRunDialogForm } from "./use-run-dialog-form.ts";
 import { type RunDialogController, useRunDialogSubmit } from "./use-run-dialog-submit.ts";

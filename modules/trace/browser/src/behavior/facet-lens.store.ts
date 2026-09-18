@@ -1,4 +1,5 @@
 import { create } from "zustand";
+
 import {
   DEFAULT_PERSPECTIVE_ID,
   type FacetPerspectiveId,

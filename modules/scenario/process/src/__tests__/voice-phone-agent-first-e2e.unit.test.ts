@@ -8,6 +8,7 @@
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { TargetAdapterData } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { buildIsAgentSpeaksFirstScript } from "../rules/agent-first-script.rules.ts";
 
 /** A phone voice target's prefetched data, greeting on connect or not. */

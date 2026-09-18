@@ -1,4 +1,5 @@
 import type React from "react";
+
 import { RICH_ARRIVAL_TRACE_ID } from "../data/sample-preview-traces.ts";
 
 /**

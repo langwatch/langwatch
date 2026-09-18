@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
-import { useDrawerParams, useUpdateDrawerParams } from "../../../../behavior/use-drawer.ts";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useEffect, useMemo } from "react";
+
 import {
   type DrawerUrlState,
   type DrawerViewMode,
@@ -13,6 +13,7 @@ import {
   type VizTab,
   viewModeForEditState,
 } from "../../../../behavior/drawer.store.ts";
+import { useDrawerParams, useUpdateDrawerParams } from "../../../../behavior/use-drawer.ts";
 
 const DEFAULTS = {
   // Mirror drawerStore's "summary" default so a popstate into an older

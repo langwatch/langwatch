@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
 import { analyzeOrGroups } from "@langwatch/trace-contract";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import { useFilterStore } from "../filter.store.ts";
 
 const TRANSLATION = {

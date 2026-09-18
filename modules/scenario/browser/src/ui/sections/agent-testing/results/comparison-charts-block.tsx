@@ -7,12 +7,13 @@
 import { Grid } from "@chakra-ui/react";
 import { formatCost, formatLatency } from "@langwatch/suite-browser/run-formatters";
 import type { BatchRun, RunGroupSummary } from "@langwatch/suite-browser/run-formatters";
+
+import { runTitle } from "../../../../behavior/agent-testing/results/run-titles.ts";
 import {
   MiniBarCard,
   type MiniBarGroup,
 } from "../../../elements/agent-testing/shared/mini-bar-card.tsx";
 import { formatPassRate } from "../../../elements/agent-testing/shared/pass-rate-color.ts";
-import { runTitle } from "../../../../behavior/agent-testing/results/run-titles.ts";
 import { type BatchTarget, summaryOfTarget } from "./use-batch-targets.ts";
 
 export type ComparisonChartsBlockProps = {

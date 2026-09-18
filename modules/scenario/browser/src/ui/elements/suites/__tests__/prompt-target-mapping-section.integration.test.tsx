@@ -5,11 +5,15 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SuiteTarget } from "@langwatch/suite-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SuiteTarget } from "@langwatch/suite-contract";
-import { type MappablePrompt, PromptTargetMappingSection } from "../prompt-target-mapping-section.tsx";
+
+import {
+  type MappablePrompt,
+  PromptTargetMappingSection,
+} from "../prompt-target-mapping-section.tsx";
 
 vi.mock("@langwatch/workflow-browser/surfaces/code-editor-transport", () => ({
   CodeEditor: () => null,

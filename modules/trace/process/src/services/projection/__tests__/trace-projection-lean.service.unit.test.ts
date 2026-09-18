@@ -5,10 +5,8 @@
  * ADR-022 plan.
  */
 
-import { TraceProjectionLeanService,IO_ATTR_KEYS,IO_PREVIEW_BYTES } from "../trace-projection-lean.service.ts";
 import type { Event } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import { beforeEach, describe, expect, it } from "vitest";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,
@@ -18,7 +16,15 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
   EVENTREF_ATTR_PREFIX,
 } from "@langwatch/trace-contract";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "#rules/trace-payload-cap.rules";
+
+import {
+  TraceProjectionLeanService,
+  IO_ATTR_KEYS,
+  IO_PREVIEW_BYTES,
+} from "../trace-projection-lean.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

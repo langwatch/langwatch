@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
-import { ClaudeCodeSpanEnrichmentService } from "../claude-code-span-enrichment.service.ts";
 import {
   type ClaudeContentLog,
   type ClaudeSpanRef,
@@ -10,6 +10,7 @@ import {
   type ClaudeToolLog,
   type ClaudeToolSpanRef,
 } from "../../rules/claude-code-tool-enrichment.rules.ts";
+import { ClaudeCodeSpanEnrichmentService } from "../claude-code-span-enrichment.service.ts";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
 

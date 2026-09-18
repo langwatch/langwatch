@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { NO_TRACE_EVENTS } from "../../types/trace.ts";
 import { mapTraceListPayload } from "../map-trace-list-payload.ts";
 

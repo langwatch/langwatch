@@ -1,5 +1,5 @@
-import { getReasoning, parseContentBlocks } from "./parsing.ts";
 import type { ChatMessage, ContentBlock, ConversationTurn } from "../../model/transcript/types.ts";
+import { getReasoning, parseContentBlocks } from "./parsing.ts";
 
 // Fold a user-role message into the preceding assistant turn when every block it
 // carries is an assistant operation.

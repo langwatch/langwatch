@@ -4,10 +4,11 @@
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { STALL_THRESHOLD_MS } from "../../../index.ts";
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;

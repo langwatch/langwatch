@@ -1,10 +1,10 @@
+import type { TraceSummaryData, NormalizedSpan } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Platform-origin precedence: Langy outranks gateway regardless of fold order.
  */
 import { describe, expect, it } from "vitest";
 
-import type { TraceSummaryData,NormalizedSpan } from "@langwatch/trace-contract";
 import { TraceOriginService } from "../trace-origin.service.ts";
 
 function makeSpan(

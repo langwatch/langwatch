@@ -1,4 +1,5 @@
 import type { TraceSummaryData } from "@langwatch/trace-contract";
+
 import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
@@ -24,7 +25,10 @@ export class MemoryTraceSummaryProjectionRepository extends TraceSummaryProjecti
     for (const entry of entries) await this.upsert(entry);
   }
 
-  async findByTraceId(input: { tenantId: string; traceId: string }): Promise<TraceSummaryData | null> {
+  async findByTraceId(input: {
+    tenantId: string;
+    traceId: string;
+  }): Promise<TraceSummaryData | null> {
     return this.summaries.get(`${input.tenantId}:${input.traceId}`) ?? null;
   }
 }

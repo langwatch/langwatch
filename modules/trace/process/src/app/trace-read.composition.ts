@@ -1,56 +1,60 @@
-import { TraceProcessingSpanIngestAdapter } from "../services/trace-processing-span-ingest.service.ts";
-import {
-  TraceIngestionService,
-  TraceIngressCommand,
-  type CodingAgentIngestFilter,
-  type TraceSpanDedup,
-} from "../services/trace-ingestion.service.ts";
-import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
-import { type RecordSpanCommandData,
-  traceRecordValueSchema,
-  traceRecordSchema,
-  TraceNotFoundError,
-  type NormalizedSpan,
-  type TraceSummaryData,type TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { LogApi } from "@langwatch/log-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
-import { TraceTreeComposition } from "./trace-tree.composition.ts";
-import { traceRefusalProxy } from "./trace-composition.build.ts";
-import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
+import {
+  type RecordSpanCommandData,
+  traceRecordValueSchema,
+  traceRecordSchema,
+  TraceNotFoundError,
+  type NormalizedSpan,
+  type TraceSummaryData,
+  type TraceCanonicalisationService,
+} from "@langwatch/trace-contract";
+
+import { type TraceAppDependencies } from "../app/trace.app.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
-import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
-import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
-import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
-import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
-import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
-import { type TraceFullIo, type TraceProcessingCommands } from "./trace.members.ts";
-import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
-import { TraceLegacyReadService } from "../services/trace-legacy-read.service.ts";
-import { TraceListService } from "../services/trace-list-read.service.ts";
-import { TraceQueryClassificationAdapter } from "../services/trace-query-classification.service.ts";
 import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
 } from "../repositories/read/query-field-values.repository.ts";
+import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import { type TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
+import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
+import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
+import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
+import {
+  TraceIngestionService,
+  TraceIngressCommand,
+  type CodingAgentIngestFilter,
+  type TraceSpanDedup,
+} from "../services/trace-ingestion.service.ts";
+import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
+import { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
+import { TraceLegacyReadService } from "../services/trace-legacy-read.service.ts";
+import { TraceListService } from "../services/trace-list-read.service.ts";
+import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
+import { TraceProcessingSpanIngestAdapter } from "../services/trace-processing-span-ingest.service.ts";
+import { TraceQueryClassificationAdapter } from "../services/trace-query-classification.service.ts";
+import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
+import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
 import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
 import {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,
 } from "../services/trace-viewer-protection.service.ts";
 import { TraceViewerReadService } from "../services/trace-viewer.service.ts";
-import { type TraceAppDependencies } from "../app/trace.app.ts";
-import { type TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
-import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
+import { traceRefusalProxy } from "./trace-composition.build.ts";
+import { TraceTreeComposition } from "./trace-tree.composition.ts";
+import { type TraceFullIo, type TraceProcessingCommands } from "./trace.members.ts";
 
 export type TraceReaderCompositionOptions = {
   /** The rows the registry chose for this process, one tier over both stores. */
@@ -99,6 +103,7 @@ export type TraceReaderCompositionOptions = {
     | undefined;
   evaluations: TraceAppDependencies["evaluations"];
   codingAgents: TraceAppDependencies["codingAgents"];
+  presence?: TraceAppDependencies["presence"];
   share: TraceAppDependencies["share"];
   broadcast: TraceAppDependencies["broadcast"];
   commands: TraceProcessingCommands;
@@ -241,6 +246,7 @@ export function composeTraceAppDependencies(
     projects: options.projects,
     evaluations: options.evaluations,
     codingAgents: options.codingAgents,
+    ...(options.presence ? { presence: options.presence } : {}),
     share: options.share,
     broadcast: options.broadcast,
     protections,

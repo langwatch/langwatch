@@ -4,6 +4,7 @@
  * against in-memory fakes.
  */
 
+import { generate } from "@langwatch/ksuid";
 import type {
   CallRecord,
   SimulationService,
@@ -18,7 +19,6 @@ import {
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
-import { generate } from "@langwatch/ksuid";
 
 /**
  * The narrow slice of the Agent, Scenario, Gateway and Simulation surfaces the

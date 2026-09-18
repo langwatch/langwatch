@@ -2,9 +2,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
+
 import { TreeRow } from "../tree-row.tsx";
 import type { WaterfallTreeNode } from "../types.ts";
 

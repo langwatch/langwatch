@@ -3,13 +3,13 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type { RunParameterValues, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import {
   displayOptionalValue,
   displayTypedValue,
   serializeOptionalTypedScalarValue,
   serializeScalarValue,
 } from "@langwatch/design-system/json-value-text";
+import type { RunParameterValues, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 
 /** The declared type of each named parameter, for reading typed values. */
 export function parameterTypes(

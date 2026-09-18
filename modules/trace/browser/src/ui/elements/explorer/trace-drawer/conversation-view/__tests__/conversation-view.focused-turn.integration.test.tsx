@@ -76,8 +76,8 @@ vi.mock(
   }),
 );
 
-import type { TraceListItem } from "../../../../../sections/explorer/types/trace.ts";
 import { ConversationView } from "../../../../../sections/explorer/trace-drawer/conversation-view/conversation-view.tsx";
+import type { TraceListItem } from "../../../../../sections/explorer/types/trace.ts";
 import { FOCUS_SCROLL_REST_MS } from "../focused-turn.tsx";
 
 function renderView({

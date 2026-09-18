@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { isTerminalOrigin } from "../../../model/terminal-origin.ts";
 
 describe("isTerminalOrigin", () => {

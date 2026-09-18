@@ -5,10 +5,11 @@
  */
 
 import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
-import { Square } from "lucide-react";
-import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
+import { Square } from "lucide-react";
+
+import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { FG_MUTED, ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { LastResultLabel } from "../../../elements/agent-testing/shared/last-result-label.tsx";
 import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline.tsx";

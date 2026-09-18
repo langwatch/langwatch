@@ -19,11 +19,11 @@ vi.mock("../../../hooks/useFacetSearch", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
-import { FacetSection } from "../facet-section.tsx";
 import type {
   FacetItem,
   FacetValueState,
 } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
+import { FacetSection } from "../facet-section.tsx";
 
 const ITEMS: FacetItem[] = [
   { value: "eval-a", label: "Faithfulness", count: 12, dimmed: false },
@@ -67,9 +67,7 @@ const Harness = ({
   withDrilldown?: boolean;
   onToggleSpy?: (field: string, value: string) => void;
 }) => {
-  const [states, setStates] = useState<ReadonlyMap<string, FacetValueState>>(
-    () => new Map(),
-  );
+  const [states, setStates] = useState<ReadonlyMap<string, FacetValueState>>(() => new Map());
   const getValueState = useCallback(
     (value: string): FacetValueState => states.get(value) ?? "neutral",
     [states],
@@ -103,12 +101,8 @@ const Harness = ({
         getValueState={getValueState}
         onToggle={onToggle}
         onExclude={vi.fn()}
-        renderActiveRowExtras={
-          withDrilldown ? renderActiveRowExtras : undefined
-        }
-        renderInactiveRowExtras={
-          withDrilldown ? renderInactiveRowExtras : undefined
-        }
+        renderActiveRowExtras={withDrilldown ? renderActiveRowExtras : undefined}
+        renderInactiveRowExtras={withDrilldown ? renderInactiveRowExtras : undefined}
       />
     </ChakraProvider>
   );
@@ -133,9 +127,7 @@ describe("<FacetSection /> click-to-expand", () => {
         render(<Harness onToggleSpy={onToggleSpy} />);
         await openSection(user);
 
-        expect(
-          screen.queryByTestId("drilldown-eval-a"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("drilldown-eval-a")).not.toBeInTheDocument();
 
         await user.click(screen.getByText("Faithfulness"));
 
@@ -150,9 +142,7 @@ describe("<FacetSection /> click-to-expand", () => {
 
         await user.click(screen.getByText("Faithfulness"));
 
-        expect(
-          screen.queryByTestId("drilldown-eval-b"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("drilldown-eval-b")).not.toBeInTheDocument();
       });
     });
 
@@ -202,9 +192,7 @@ describe("<FacetSection /> click-to-expand", () => {
 
         await user.click(screen.getByText("Faithfulness"));
 
-        expect(
-          screen.queryByTestId("drilldown-eval-a"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("drilldown-eval-a")).not.toBeInTheDocument();
       });
     });
 
@@ -220,9 +208,7 @@ describe("<FacetSection /> click-to-expand", () => {
 
         await user.click(screen.getByText("clear all filters"));
 
-        expect(
-          screen.queryByTestId("drilldown-eval-a"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("drilldown-eval-a")).not.toBeInTheDocument();
       });
     });
   });
@@ -239,9 +225,7 @@ describe("<FacetSection /> click-to-expand", () => {
         await user.click(screen.getByText("Faithfulness"));
 
         expect(onToggleSpy).toHaveBeenCalledWith("evaluator", "eval-a");
-        expect(
-          screen.queryByTestId("drilldown-eval-a"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("drilldown-eval-a")).not.toBeInTheDocument();
       });
     });
   });

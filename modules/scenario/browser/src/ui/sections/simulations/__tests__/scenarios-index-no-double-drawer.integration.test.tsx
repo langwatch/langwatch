@@ -5,6 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 const PAGE_PATH = join(process.cwd(), "src/ui/sections/simulations/scenario-library.screen.tsx");

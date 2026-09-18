@@ -2,6 +2,7 @@
  * dependencies. */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 // Passthrough mock for langwatch tracer used by TraceIOExtractionService.
@@ -25,16 +26,19 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   }),
 }));
 
-import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
-import { EVENTREF_ATTR_PREFIX,
+import {
+  EVENTREF_ATTR_PREFIX,
   type NormalizedSpan,
   NormalizedSpanKind,
-  NormalizedStatusCode } from "@langwatch/trace-contract";
+  NormalizedStatusCode,
+} from "@langwatch/trace-contract";
+
 import type { SpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import { NullSpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
-import { SpanStorageService } from "../../trace-span-storage-read.service.ts";
+import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
+import { SpanStorageService } from "../../trace-span-storage-read.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

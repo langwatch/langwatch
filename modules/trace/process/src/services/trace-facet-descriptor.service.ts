@@ -14,14 +14,15 @@ import type {
   RangeFacetDescriptor,
   TraceListRead,
 } from "@langwatch/trace-contract";
+
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,
   FacetTable,
   RangeFacetDef,
 } from "#repositories/clickhouse/clickhouse.trace-facet-registry.repository";
-import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 
+import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";

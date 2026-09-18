@@ -1,17 +1,18 @@
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
+import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
+import { useCallback } from "react";
+
+import { api } from "../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { generateScenarioWithAI } from "../../../model/scenario-generation.ts";
 import { storePromptForScenario } from "../../../model/scenario-prompt-storage.ts";
-import { type ScenarioFormData, type ScenarioInitialData } from "../../elements/scenario-form.tsx";
-import { useCallback } from "react";
-import { useDrawer } from "@langwatch/browser-host/drawer";
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../behavior/scenario-api.ts";
-import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
-import { AICreateModal, type ExampleTemplate } from "../shared/ai-create-modal.tsx";
-import { ModelProviderRequiredModal } from "../../elements/scenarios/model-provider-required-modal.tsx";
-import type { ScenarioEditorVariant } from "./scenario-form-drawer.tsx";
-import { ResolvedModelCaption } from "../../elements/scenarios/resolved-model-caption.tsx";
 import { getDefaultModelState } from "../../../model/scenarios/default-model-state.ts";
+import { type ScenarioFormData, type ScenarioInitialData } from "../../elements/scenario-form.tsx";
+import { ModelProviderRequiredModal } from "../../elements/scenarios/model-provider-required-modal.tsx";
+import { ResolvedModelCaption } from "../../elements/scenarios/resolved-model-caption.tsx";
+import { AICreateModal, type ExampleTemplate } from "../shared/ai-create-modal.tsx";
+import type { ScenarioEditorVariant } from "./scenario-form-drawer.tsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

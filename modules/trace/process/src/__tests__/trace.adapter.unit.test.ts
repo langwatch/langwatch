@@ -1,16 +1,18 @@
+import { describe, expect, it } from "vitest";
+
+import { TraceTreeComposition } from "#app/trace-tree.composition";
 import type { TraceFullIo } from "#app/trace.members";
-import { TracePayloadReaderRepository } from "#repositories/read/trace-payload-reader.repository";
 import { TraceQueryFieldValuesRepository } from "#repositories/read/query-field-values.repository";
+import { TracePayloadReaderRepository } from "#repositories/read/trace-payload-reader.repository";
 import { TraceSummaryReaderRepository } from "#repositories/read/trace-summary-reader.repository";
+
+import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 // From the port that defines them: an in-package test does not need the
 // package's public surface, and `index.ts` publishes what CONSUMERS import.
 import type {
   TraceClickHouseClient,
   TraceClickHouseResolver,
 } from "../repositories/trace-clickhouse-client.repository.ts";
-import { TraceTreeComposition } from "#app/trace-tree.composition";
-import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
-import { describe, expect, it } from "vitest";
 import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
 import { traceReadPorts } from "./support/trace-read-ports.fake.ts";

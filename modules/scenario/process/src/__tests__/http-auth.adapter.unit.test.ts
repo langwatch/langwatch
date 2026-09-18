@@ -2,9 +2,10 @@
  * @vitest-environment node
  */
 
-import { describe, expect, it } from "vitest";
-import { AUTH_STRATEGIES, applyAuthentication } from "../rules/http-auth.rules.ts";
 import type { AuthConfig } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
+import { AUTH_STRATEGIES, applyAuthentication } from "../rules/http-auth.rules.ts";
 
 describe("AUTH_STRATEGIES", () => {
   describe("none()", () => {

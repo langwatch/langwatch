@@ -4,8 +4,9 @@
  */
 
 import { HStack, Text } from "@chakra-ui/react";
-import { useMemo } from "react";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { useMemo } from "react";
+
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { RESULT_GROUPING_LABELS, RESULT_GROUPINGS, type ResultGrouping } from "./result-atoms.ts";
 

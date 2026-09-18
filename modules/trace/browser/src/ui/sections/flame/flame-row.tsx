@@ -1,8 +1,9 @@
 import { Box } from "@chakra-ui/react";
 import type { VirtualItem } from "@tanstack/react-virtual";
+
+import type { FlameNode, Viewport } from "../../../behavior/flame/types.ts";
 import { ROW_HEIGHT } from "../../../model/flame/constants.ts";
 import { FlameBlock } from "./flame-block.tsx";
-import type { FlameNode, Viewport } from "../../../behavior/flame/types.ts";
 
 interface RelatedSpanIds {
   ancestors: Set<string>;

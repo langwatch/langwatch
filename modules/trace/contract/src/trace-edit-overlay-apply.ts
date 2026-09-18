@@ -1,8 +1,3 @@
-/**
- * Apply trace corrections as received. Viewer redaction is handled separately by
- * `redactPatchForViewer`; drawer mirrors corrections via `applyTraceEditOverlayToViews.ts`.
- */
-import type { Span, Trace } from "./trace-format.schemas.ts";
 import {
   patchHasAnyEdit,
   TRACE_EDIT_SPAN_FIELDS,
@@ -10,6 +5,11 @@ import {
   type TraceEditSpanField,
   type TraceEditSpanPatch,
 } from "./trace-edit-overlay.contract.ts";
+/**
+ * Apply trace corrections as received. Viewer redaction is handled separately by
+ * `redactPatchForViewer`; drawer mirrors corrections via `applyTraceEditOverlayToViews.ts`.
+ */
+import type { Span, Trace } from "./trace-format.schemas.ts";
 
 function buildChildrenIndex(
   links: readonly { id: string; parentId?: string | null }[],

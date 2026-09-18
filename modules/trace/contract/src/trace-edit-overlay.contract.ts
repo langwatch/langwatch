@@ -1,5 +1,6 @@
-import { z } from "zod";
 import type { Instant } from "@langwatch/time";
+import { z } from "zod";
+
 import {
   type ChatMessage,
   chatMessageSchema,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { asNumber } from "../rules/canonical-guard.rules.ts";
 import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
 

@@ -1,11 +1,12 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../../behavior/trace-api.ts";
-import { useSamplePreview } from "../onboarding/index.ts";
+
 import type { TraceListCursor } from "../../../../behavior/filter.store.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { DEFAULT_SORT, useViewStore } from "../../../../behavior/view.store.ts";
+import { useSamplePreview } from "../onboarding/index.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { mapTraceListPayload } from "../utils/map-trace-list-payload.ts";
 

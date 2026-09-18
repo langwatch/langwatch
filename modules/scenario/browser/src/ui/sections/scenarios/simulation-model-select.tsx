@@ -1,16 +1,17 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../behavior/scenario-api.ts";
-import {
-  buildCustomModelDisplayNames,
-  LATEST_ALIAS_PROVIDERS,
-} from "@langwatch/model-provider-contract";
 import { modelSelectorOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
 } from "@langwatch/model-provider-browser/surfaces/provider-model-selector";
+import {
+  buildCustomModelDisplayNames,
+  LATEST_ALIAS_PROVIDERS,
+} from "@langwatch/model-provider-contract";
+import { useMemo } from "react";
+
+import { api } from "../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 
 /**
  * Model picker for the scenario user-simulator and judge roles.

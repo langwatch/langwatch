@@ -1,11 +1,3 @@
-/**
- * "Test agent": one turn sent through the same adapter a simulation turn uses (or, for a connected
- * agent, through the same live dispatcher a simulation's connected column uses),
- * @see specs/agents/agent-test-run.feature
- */
-import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { nowInstant } from "@langwatch/time";
-import { generate } from "@langwatch/ksuid";
 import {
   AgentCallTimeoutError,
   AgentTestRefusedError,
@@ -20,6 +12,7 @@ import type {
   AgentTestRunResult,
   AgentTestTurnResult,
 } from "@langwatch/agent-contract";
+import { generate } from "@langwatch/ksuid";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -39,9 +32,16 @@ import {
   type TestAgentTurnInput,
 } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
+import { nowInstant } from "@langwatch/time";
+/**
+ * "Test agent": one turn sent through the same adapter a simulation turn uses (or, for a connected
+ * agent, through the same live dispatcher a simulation's connected column uses),
+ * @see specs/agents/agent-test-run.feature
+ */
+import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { z } from "zod";
 
 import type { AgentAdapterFactory } from "../app/scenario.app.ts";
-import { z } from "zod";
 import {
   AgentTestPrefetchService,
   type AdapterRead,
@@ -125,6 +125,8 @@ export class AgentTestService {
       secrets: options.secrets,
       workflowHydrator,
       legacyDefaultModel: options.config.legacyDefaultModel,
+      langwatchEndpoint: options.config.langwatchEndpoint,
+      voiceTargets: null,
     });
 
     return new AgentTestService(options, targetPrefetch);

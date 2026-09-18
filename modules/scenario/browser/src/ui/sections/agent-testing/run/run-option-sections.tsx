@@ -5,14 +5,15 @@
  */
 
 import { Box, Grid, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { SimulationModelSelect } from "../../scenarios/simulation-model-select.tsx";
 import { MAX_REPEAT_COUNT } from "@langwatch/suite-contract";
+
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
 } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
+import { SimulationModelSelect } from "../../scenarios/simulation-model-select.tsx";
 
 /** The model that plays the user, and the model that judges the runs. */
 export function SimulationModelsSection({

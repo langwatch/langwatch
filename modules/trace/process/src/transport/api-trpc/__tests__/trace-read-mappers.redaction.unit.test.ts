@@ -1,6 +1,14 @@
-import type { CategoryVisibility,TraceLogRecordDto } from "@langwatch/trace-contract";
-import { describe, expect, it } from "vitest";
 import type { ContentCategory } from "@langwatch/data-privacy-contract";
+import {
+  CONTENT_KEY_CATALOG,
+  PRIVACY_DROPPED_MARKER_ATTR,
+  PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+  stripRolesFromChatArrayJson,
+} from "@langwatch/data-privacy-contract";
+import type { CategoryVisibility, TraceLogRecordDto } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
 import {
   buildContentPrivacy,
   contentSearchTermsForViewer,
@@ -10,15 +18,6 @@ import {
   type TraceContentPrivacy,
   type V2Protections,
 } from "../trace-read-mappers.api.ts";
-
-import {
-  CONTENT_KEY_CATALOG,
-  PRIVACY_DROPPED_MARKER_ATTR,
-  PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
-  stripRolesFromChatArrayJson,
-} from "@langwatch/data-privacy-contract";
-
-import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
 
 /**
  * The data-privacy vocabulary the mappers take as a port, wired to the REAL

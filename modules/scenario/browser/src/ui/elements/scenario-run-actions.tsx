@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { Edit2, ExternalLink, ListTree, MessagesSquare, MoreVertical, Play } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Edit2, ExternalLink, ListTree, MessagesSquare, MoreVertical, Play } from "lucide-react";
 
 interface ScenarioRunActionsProps {
   /** The scenario data, or null/undefined if not found. */

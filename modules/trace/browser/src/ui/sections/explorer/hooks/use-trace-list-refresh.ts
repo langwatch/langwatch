@@ -1,8 +1,9 @@
+import { nowInstant } from "@langwatch/time";
 import { useIsFetching } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
-import { api } from "../../../../behavior/trace-api.ts";
+
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
-import { nowInstant } from "@langwatch/time";
+import { api } from "../../../../behavior/trace-api.ts";
 
 /**
  * Smallest gap (ms) between two manual refresh clicks.

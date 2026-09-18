@@ -4,7 +4,6 @@
  */
 
 import type { RunParameterValues } from "@langwatch/scenario-contract";
-import type { Instant } from "@langwatch/time";
 import {
   configurationKey,
   scopeKey,
@@ -12,6 +11,7 @@ import {
   targetSortKey,
 } from "@langwatch/suite-contract";
 import type { SuiteScope, SuiteTarget } from "@langwatch/suite-contract";
+import type { Instant } from "@langwatch/time";
 
 /**
  * What a run covers, as the dialog holds it.

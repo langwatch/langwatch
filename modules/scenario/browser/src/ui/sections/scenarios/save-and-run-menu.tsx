@@ -1,20 +1,21 @@
 import { Box, Button, HStack, Input, Portal, Text, chakra } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs } from "@langwatch/time";
 import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+
+import { useSession } from "../../../behavior/auth-session.ts";
 import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project.ts";
 import { api } from "../../../behavior/scenario-api.ts";
-import { Popover } from "@langwatch/design-system/popover";
-import type { TargetValue } from "../../../model/scenario-target.ts";
-import { useSession } from "../../../behavior/auth-session.ts";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   isAgentTarget,
   notRunnableCopy,
   type ScenarioAgent,
   useFilteredAgents,
 } from "../../../behavior/scenarios/use-filtered-scenario-targets.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import type { TargetValue } from "../../../model/scenario-target.ts";
 
 interface SaveAndRunMenuProps {
   selectedTarget: TargetValue;

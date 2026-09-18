@@ -3,10 +3,8 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  resolveTwilioRecordingWavUrl,
-  type TwilioCredential,
-} from "../twilio-recording.service";
+
+import { resolveTwilioRecordingWavUrl, type TwilioCredential } from "../twilio-recording.service";
 import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits";
 
 const CREDENTIAL: TwilioCredential = {

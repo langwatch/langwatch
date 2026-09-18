@@ -1,10 +1,11 @@
+import { describe, expect, it, vi } from "vitest";
+
 /**
  * @vitest-environment node
  *
  * Unit tests for TraceContentExtractionService.extractInlineMediaFromEvent.
  */
 import { TraceContentExtractionService } from "../trace-content-extraction.service.ts";
-import { describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be declared before any imports that trigger module load

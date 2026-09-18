@@ -1,11 +1,12 @@
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
-import { api } from "../../../../behavior/trace-api.ts";
+
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
 import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness.ts";
+import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
 import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay.ts";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";

@@ -1,5 +1,4 @@
 import type { Tokens } from "@chakra-ui/react";
-
 import {
   SimulationRunStatus as ScenarioRunStatus,
   SimulationVerdict as Verdict,

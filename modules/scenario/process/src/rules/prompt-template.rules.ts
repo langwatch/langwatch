@@ -9,7 +9,8 @@ import {
   computeBestMatchMappings,
   resolveFieldMappings,
   sourceFieldOf,
-  type FieldMapping,type RunParameterValues
+  type FieldMapping,
+  type RunParameterValues,
 } from "@langwatch/scenario-contract";
 
 /** An input variable declared on the prompt. */

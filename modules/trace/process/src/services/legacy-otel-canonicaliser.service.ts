@@ -1,6 +1,7 @@
 /** Maps legacy OTel type, I/O, tool, and error attributes to canonical keys. */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+
 import {
   ALLOWED_SPAN_TYPES,
   extractErrorInfo,

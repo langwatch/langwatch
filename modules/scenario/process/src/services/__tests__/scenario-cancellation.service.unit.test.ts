@@ -1,14 +1,20 @@
+import { SimulationService, ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { Temporal, type Instant } from "@langwatch/time";
 /**
  * Cancellation tests: service dispatches cancel_requested event; process manager
  * finishes queued runs CANCELLED; workers kill active runs.
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SimulationService,ScenarioRunStatus } from "@langwatch/scenario-contract";
+
+import type {
+  ScenarioClock,
+  ScenarioTestSuiteId,
+  ScenarioId,
+  ScenarioSecretCipher,
+} from "../../app/scenario.app.ts";
 import { ScenarioRepository } from "../../repositories/scenario.repository.ts";
 import { ScenarioService } from "../scenario.service.ts";
-import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
-import { Temporal, type Instant } from "@langwatch/time";
 
 class CancellationTestSecretCipher implements ScenarioSecretCipher {
   encrypt(value: string): string {

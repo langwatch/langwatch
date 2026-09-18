@@ -1,6 +1,7 @@
-import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import type { TraceDerivationSpanReaderRepository } from "../repositories/read/trace-derivation-span-reader.repository.ts";
 import { nowInstant } from "@langwatch/time";
+import type { DerivedTraceEvent } from "@langwatch/trace-contract";
+
+import type { TraceDerivationSpanReaderRepository } from "../repositories/read/trace-derivation-span-reader.repository.ts";
 
 /**
  * How long an unused memo entry lingers. Correctness comes from the fold
@@ -23,7 +24,9 @@ interface MemoEntry {
  * during a drain. With no `foldVersion` the read passes straight through, never cached.
  */
 export class TraceEventDerivationService {
-  static create(options: { spans: TraceDerivationSpanReaderRepository }): TraceEventDerivationService {
+  static create(options: {
+    spans: TraceDerivationSpanReaderRepository;
+  }): TraceEventDerivationService {
     return new TraceEventDerivationService(options.spans);
   }
 

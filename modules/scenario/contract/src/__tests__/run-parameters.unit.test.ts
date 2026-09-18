@@ -3,8 +3,12 @@
  * Run parameter resolution and secret protection before scheduling.
  */
 
+import type {
+  ScenarioRunConfig,
+  RunParameterValues,
+  ScenarioParameterDefinition,
+} from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
-import type { ScenarioRunConfig,RunParameterValues,ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 
 import { resolveRunParameters } from "../run-parameters.ts";
 

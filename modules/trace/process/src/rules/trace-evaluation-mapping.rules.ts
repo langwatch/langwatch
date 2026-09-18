@@ -1,7 +1,8 @@
-import { safeJsonParse } from "./trace-safe-json.rules.ts";
 import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluation-contract";
-import type { Evaluation } from "@langwatch/trace-contract";
 import { Temporal } from "@langwatch/time";
+import type { Evaluation } from "@langwatch/trace-contract";
+
+import { safeJsonParse } from "./trace-safe-json.rules.ts";
 
 /**
  * ClickHouse evaluation_runs row shape (PascalCase, matching the table schema).

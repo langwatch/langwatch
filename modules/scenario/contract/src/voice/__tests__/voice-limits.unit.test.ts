@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   VOICE_CALL_MAX_SECONDS_CEILING,
   VOICE_CALL_MAX_SECONDS_DEFAULT,
@@ -11,9 +12,7 @@ describe("voiceCallMaxSeconds", () => {
   describe("given the call time limit env vars", () => {
     describe("when the env var is unset", () => {
       it("returns the default", () => {
-        expect(voiceCallMaxSeconds({} as NodeJS.ProcessEnv)).toBe(
-          VOICE_CALL_MAX_SECONDS_DEFAULT,
-        );
+        expect(voiceCallMaxSeconds({} as NodeJS.ProcessEnv)).toBe(VOICE_CALL_MAX_SECONDS_DEFAULT);
       });
     });
 

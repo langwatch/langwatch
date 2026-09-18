@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { parseEditedValue } from "../range-controls.tsx";
 
 describe("parseEditedValue", () => {

@@ -4,10 +4,11 @@
  * the drawer's edited/original toggle.
  */
 import { describe, expect, it } from "vitest";
-import { datasetSpanSchema } from "../trace-format.schemas.ts";
-import type { Span, Trace } from "../trace-format.schemas.ts";
+
 import { applyOverlayToTrace, expandDeletedSpanIds } from "../trace-edit-overlay-apply.ts";
 import type { TraceEditOverlayPatch } from "../trace-edit-overlay.contract.ts";
+import { datasetSpanSchema } from "../trace-format.schemas.ts";
+import type { Span, Trace } from "../trace-format.schemas.ts";
 
 const span = (overrides: Partial<Span> & Pick<Span, "span_id">): Span =>
   ({

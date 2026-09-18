@@ -1,7 +1,8 @@
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import type { Virtualizer } from "@tanstack/react-virtual";
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect } from "react";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
+
 import { ancestorSpanIds } from "./tree.ts";
 import type { FlatRow } from "./types.ts";
 

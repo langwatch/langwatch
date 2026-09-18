@@ -1,18 +1,19 @@
-import { describe, expect, it } from "vitest";
 import {
   AgentNotFoundError,
   type Agent,
   type AgentApi,
   type AgentOverview,
 } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contract";
-import type { SecretApi } from "@langwatch/secret-contract";
-import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
-import type { TargetConfig } from "@langwatch/scenario-contract";
-import { ScenarioTargetPrefetchService } from "../scenario-target-prefetch.service.ts";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contract";
+import type { TargetConfig } from "@langwatch/scenario-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
+
 import { ScenarioModelParametersService } from "../scenario-model-parameters.service.ts";
+import { ScenarioTargetPrefetchService } from "../scenario-target-prefetch.service.ts";
 import { ScenarioWorkflowHydratorService } from "../scenario-workflow-hydrator.service.ts";
 
 const PROJECT_ID = "project-1";
@@ -101,11 +102,35 @@ function serviceAnswering(answers: Answers = {}) {
       ScenarioModelParametersService.create({} as unknown as ModelProviderApi),
     ),
     legacyDefaultModel: "openai/gpt-5-mini",
+    langwatchEndpoint: "https://app.langwatch.test",
+    voiceTargets: null,
   });
 }
 
 const httpAgent = (config: Record<string, unknown>): Agent =>
   ({ id: "agent-1", type: "http", config }) as unknown as Agent;
+
+const connectedAgent = (timeoutMs: number): Agent => ({
+  id: "agent-1",
+  projectId: PROJECT_ID,
+  name: "support-agent",
+  type: "connected",
+  config: {
+    parameters: [],
+    sdk: { name: "langwatch", version: "1.0.0", language: "typescript" },
+    timeoutMs,
+  },
+  workflowId: null,
+  copiedFromAgentId: null,
+  archivedAt: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  environment: "production",
+  ownerUserId: null,
+  hostLabel: null,
+  identityKey: "support-agent@production",
+  lastSeenAt: new Date(0),
+});
 
 const target = (type: TargetConfig["type"], referenceId = "agent-1"): TargetConfig => ({
   type,
@@ -204,6 +229,19 @@ describe("ScenarioTargetPrefetchService.tryFetch", () => {
       const service = serviceAnswering({ agent: httpAgent({ method: "POST" }) });
 
       await expect(fetchFor(service, "http")).resolves.toBeNull();
+    });
+  });
+
+  describe("given a connected agent", () => {
+    it("packs the platform endpoint and caps the child adapter timeout", async () => {
+      const service = serviceAnswering({ agent: connectedAgent(999_999) });
+
+      await expect(fetchFor(service, "connected")).resolves.toEqual({
+        type: "connected",
+        agentId: "agent-1",
+        endpoint: "https://app.langwatch.test",
+        timeoutMs: 300_000,
+      });
     });
   });
 

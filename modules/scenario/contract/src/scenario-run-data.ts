@@ -1,7 +1,7 @@
 import type { z } from "zod";
+
 import type { RunActor } from "./run-actor.ts";
 import type { ScenarioRunStatus } from "./scenario-run.ts";
-import type { SimulationRunData } from "./simulation.ts";
 import type {
   scenarioBatchSchema,
   scenarioEventSchema,
@@ -15,6 +15,7 @@ import type {
   scenarioToolCallEndSchema,
   scenarioToolCallStartSchema,
 } from "./schemas/index.ts";
+import type { SimulationRunData } from "./simulation.ts";
 
 // Type exports
 export type ScenarioRunStartedEvent = z.infer<typeof scenarioRunStartedSchema>;

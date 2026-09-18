@@ -4,15 +4,15 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+
 import { ComputeRunMetricsCommand } from "../compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "../finish-run.commands.ts";
-import { QueueRunCommand } from "../queueRun.command.ts";
 import { RecordEvaluationsCommand } from "../recordEvaluations.command.ts";
-// DANGLING: `createSimulationProcessingPipeline` is not exported anywhere in
-// this tree. `SimulationProcessingPipelineAdapter` replaces it with a
-// different deps shape this test doesn't build against — half-ported. See
-// handoff merge-scenario-dangling-imports.
-import { createSimulationProcessingPipeline } from "./pipeline.wiring.unit.test.ts";
+import { SimulationProcessingPipelineAdapter } from "../simulation-processing.pipeline.ts";
+import {
+  SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+  simulationRunExecutionPM,
+} from "../simulation-run-execution.process.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -33,12 +33,10 @@ const noAttachments = async () => ({
 describe("the simulation processing pipeline", () => {
   describe("when it is built the way the composition root builds it", () => {
     it("registers every command, the queued one with its evaluator lookup", () => {
-      const pipeline = createSimulationProcessingPipeline({
+      const simulations = {} as never;
+      const pipeline = SimulationProcessingPipelineAdapter.create({
         simulationRunStore: { store: noop, get: async () => null } as never,
         simulationRunMetricsStore: {} as never,
-        queueRunCommand: new QueueRunCommand({
-          loadRunAttachments: noAttachments,
-        }),
         finishRunCommand: new FinishRunCommand({
           loadPriorEvents: async () => [],
           loadRunAttachments: noAttachments,
@@ -51,14 +49,14 @@ describe("the simulation processing pipeline", () => {
           scheduleRetry: noop as never,
           deriveScenarioRoleMetrics: (async () => ({})) as never,
         }),
-        simulationRunExecution: {} as never,
+        scenarioRunExecution: {
+          name: SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+          process: simulationRunExecutionPM({} as never, simulations),
+        },
+        simulations,
         snapshotUpdateBroadcast: {} as never,
         suiteRunSync: {} as never,
         traceMetricsSync: {} as never,
-        scenarioEvaluations: {
-          loadRunAttachments: noAttachments,
-          enqueue: noop,
-        },
       });
 
       const names = pipeline.commands.map((command) => command.name);

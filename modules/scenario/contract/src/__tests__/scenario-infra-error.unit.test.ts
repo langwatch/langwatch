@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 // The shared needle couples this classifier to the four sites that actually
 // throw the codex coding-assistant-surfaces refusal (codexGatewayModel.ts,
 // api/routers/modelProviders.utils.ts and the default-model writer), so a
@@ -621,9 +622,7 @@ describe("resolveScenarioError", () => {
 
       expect(result.code).toBe(ScenarioInfraErrorCode.UserCodeError);
       expect(result.code).not.toBe(ScenarioInfraErrorCode.ExecutionTimeout);
-      expect(result.message).toMatch(
-        /TimeoutException|read operation timed out/,
-      );
+      expect(result.message).toMatch(/TimeoutException|read operation timed out/);
       expect(result.message).not.toMatch(/The simulation timed out/);
     });
 

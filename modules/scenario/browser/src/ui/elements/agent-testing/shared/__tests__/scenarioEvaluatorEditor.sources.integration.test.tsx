@@ -21,9 +21,7 @@ vi.mock("~/hooks/useProjectSpanNames", () => ({
 }));
 
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
-const flowCallbacksStore = vi.hoisted(
-  () => ({}) as Record<string, Record<string, unknown>>,
-);
+const flowCallbacksStore = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>);
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: mockOpenDrawer }),
   setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
@@ -55,27 +53,19 @@ describe("the evaluator editor on an attachment", () => {
       /** @scenario "The evaluator editor offers the conversation, the scenario and the trace as sources" */
       it("lists Conversation, Scenario and Trace, and the suite fields under Scenario", async () => {
         const user = userEvent.setup();
-        render(
-          <Harness
-            gate={{ required: true, canRequire: true }}
-            required={true}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<Harness gate={{ required: true, canRequire: true }} required={true} />, {
+          wrapper: Wrapper,
+        });
 
         await user.click(screen.getByTestId("mapping-input-expected_output"));
-        await waitFor(() =>
-          expect(screen.getByText("Conversation")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByText("Conversation")).toBeInTheDocument());
         expect(screen.getByText("Scenario")).toBeInTheDocument();
         expect(screen.getByText("Trace")).toBeInTheDocument();
 
         // The suite fields are nested under Scenario's "Fields" entry, so they
         // only render once that entry is expanded.
         await user.click(screen.getByTestId("field-option-fields"));
-        await waitFor(() =>
-          expect(screen.getByText("golden_sql")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByText("golden_sql")).toBeInTheDocument());
         expect(screen.getByText("table_schema")).toBeInTheDocument();
       });
     });
@@ -95,9 +85,7 @@ describe("the evaluator editor on an attachment", () => {
         );
 
         await user.click(screen.getByTestId("mapping-input-expected_output"));
-        await waitFor(() =>
-          expect(screen.getByText("Trace")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByText("Trace")).toBeInTheDocument());
         await user.click(screen.getByTestId("field-option-spans"));
 
         expect(onMappingChange).toHaveBeenCalledWith("expected_output", {
@@ -148,13 +136,14 @@ describe("the evaluator editor on an attachment", () => {
         // The drawer reads its callbacks by name; a picked source lands on the
         // attachment in the run's own mapping shape.
         const callbacks = flowCallbacksStore.evaluatorEditor!;
-        (
-          callbacks.onMappingChange as (input: string, mapping: unknown) => void
-        )("expected_output", {
-          type: "source",
-          sourceId: "scenario",
-          path: ["fields", "golden_sql"],
-        });
+        (callbacks.onMappingChange as (input: string, mapping: unknown) => void)(
+          "expected_output",
+          {
+            type: "source",
+            sourceId: "scenario",
+            path: ["fields", "golden_sql"],
+          },
+        );
         expect(onMappingChange).toHaveBeenCalledWith({
           input: "expected_output",
           mapping: {
@@ -196,9 +185,9 @@ describe("the evaluator editor on an attachment", () => {
             }),
             gate: { required: ATTACHMENT.required, canRequire: true },
           });
-          expect(
-            flowCallbacksStore.codeEvaluatorEditor?.onMappingChange,
-          ).toEqual(expect.any(Function));
+          expect(flowCallbacksStore.codeEvaluatorEditor?.onMappingChange).toEqual(
+            expect.any(Function),
+          );
         });
 
         /** @scenario "A code evaluator's own editor carries the gate switch and the remove action" */

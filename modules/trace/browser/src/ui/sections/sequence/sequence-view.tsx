@@ -1,10 +1,14 @@
 import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuCheck, LuCopy, LuFilter, LuMaximize, LuMinus, LuPlus } from "react-icons/lu";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LuCheck, LuCopy, LuFilter, LuMaximize, LuMinus, LuPlus } from "react-icons/lu";
+
+import { useMermaidRenderer } from "../../../behavior/sequence/use-mermaid-renderer.ts";
+import { useKonamiEasterEgg } from "../../../behavior/use-konami-easter-egg.ts";
+import { useViewportZoom } from "../../../behavior/use-viewport-zoom.ts";
 import { generateMermaidSyntax } from "../../../model/sequence/mermaid.ts";
 import { generateTopologySyntax } from "../../../model/sequence/topology-mermaid.ts";
 import {
@@ -13,9 +17,6 @@ import {
   type SequenceSpanType,
   type SequenceViewProps,
 } from "../../../model/sequence/types.ts";
-import { useKonamiEasterEgg } from "../../../behavior/use-konami-easter-egg.ts";
-import { useMermaidRenderer } from "../../../behavior/sequence/use-mermaid-renderer.ts";
-import { useViewportZoom } from "../../../behavior/use-viewport-zoom.ts";
 
 const TYPE_LABELS: Record<SequenceSpanType, string> = {
   agent: "Agents",

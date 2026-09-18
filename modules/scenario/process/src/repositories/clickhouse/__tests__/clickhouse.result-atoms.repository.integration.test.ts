@@ -5,13 +5,17 @@
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { type ResultsFilter,type ScenarioEvaluationResult } from "@langwatch/scenario-contract";
+import { type ResultsFilter, type ScenarioEvaluationResult } from "@langwatch/scenario-contract";
+import { MAX_TREND_POINTS } from "@langwatch/scenario-contract";
 import { targetKeyOf } from "@langwatch/suite-contract";
-import { evaluationsToColumns } from "../simulation-evaluations.columns.ts";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MAX_RUN_TARGETS,ResultAtomsClickHouseRepository } from "../clickhouse.result-atoms.repository.ts";
-import { MAX_TREND_POINTS } from "@langwatch/scenario-contract";
+
+import {
+  MAX_RUN_TARGETS,
+  ResultAtomsClickHouseRepository,
+} from "../clickhouse.result-atoms.repository.ts";
+import { evaluationsToColumns } from "../simulation-evaluations.columns.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;

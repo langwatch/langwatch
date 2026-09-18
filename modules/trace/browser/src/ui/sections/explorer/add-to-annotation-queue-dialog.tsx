@@ -1,14 +1,15 @@
 import { useDisclosure, VStack } from "@chakra-ui/react";
-import { useState } from "react";
-import { AddAnnotationQueueDrawer } from "../add-annotation-queue-drawer.tsx";
-import { AddParticipants } from "../traces/add-participants.tsx";
-import { Dialog } from "../dialog.tsx";
-import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../errors/index.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../behavior/trace-api.ts";
-import { useSession } from "../../../behavior/auth-session.ts";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { toaster } from "@langwatch/design-system/toaster";
+import { useState } from "react";
+
+import { useSession } from "../../../behavior/auth-session.ts";
+import { api } from "../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { AddAnnotationQueueDrawer } from "../add-annotation-queue-drawer.tsx";
+import { Dialog } from "../dialog.tsx";
+import { showErrorToast } from "../errors/index.ts";
+import { AddParticipants } from "../traces/add-participants.tsx";
 
 type Annotator = { id: string; name: string };
 

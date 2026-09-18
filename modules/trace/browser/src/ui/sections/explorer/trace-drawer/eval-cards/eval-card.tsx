@@ -1,7 +1,8 @@
 import { Box, Button, chakra, Flex, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
+import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "@langwatch/evaluation-contract";
 import { type ReactNode, useState } from "react";
 import { LuCircleAlert, LuCircleSlash, LuQuote } from "react-icons/lu";
-import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "@langwatch/evaluation-contract";
+
 import { formatCost, formatDuration } from "../../../../../model/display-formatters.ts";
 import { RunHistorySparkline } from "./run-history-sparkline.tsx";
 import { useEvalInputs } from "./use-eval-inputs.ts";

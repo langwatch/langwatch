@@ -4,7 +4,7 @@
  * one line a reader sees. Pure, so the traversal and its heuristics can be tested apart.
  */
 
-import type { NormalizedSpan,TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { NormalizedSpan, TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 /**

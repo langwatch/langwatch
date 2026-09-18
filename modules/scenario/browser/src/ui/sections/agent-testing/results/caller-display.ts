@@ -14,7 +14,7 @@ export type CallerKind = "simulated" | "human";
  * keeps its own index signature rather than naming just the one it reads.
  */
 type CallerMetadata =
-  | { langwatch?: ({ [key: string]: unknown; callerKind?: unknown } | null) }
+  | { langwatch?: { [key: string]: unknown; callerKind?: unknown } | null }
   | null
   | undefined;
 

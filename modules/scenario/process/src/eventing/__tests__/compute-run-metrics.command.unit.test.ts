@@ -1,8 +1,9 @@
 import { createTenantId, type Command } from "@langwatch/eventing";
-import { describe, expect, it, vi } from "vitest";
 import { SIMULATION_RUN_COMMAND_TYPES } from "@langwatch/scenario-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import type { ComputeRunMetricsDeps } from "../compute-run-metrics.commands.ts";
 import { ComputeRunMetricsCommand } from "../compute-run-metrics.commands.ts";
 

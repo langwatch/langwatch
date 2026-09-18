@@ -46,7 +46,9 @@ export abstract class LogRecordStorageRepository {
       ].join("\0");
       deduped.set(key, row);
     }
-    const sorted = [...deduped.values()].toSorted((left, right) => left.timeUnixMs - right.timeUnixMs);
+    const sorted = [...deduped.values()].toSorted(
+      (left, right) => left.timeUnixMs - right.timeUnixMs,
+    );
     return typeof limit === "number" && limit > 0 ? sorted.slice(0, limit) : sorted;
   }
 }

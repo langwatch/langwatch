@@ -1,6 +1,7 @@
 /** Shared Liquid rendering for both persisted and serialised HTTP agents. */
 
 import { createSandboxedLiquid } from "@langwatch/automation-contract";
+
 import type { FieldMapping } from "./field-mapping.ts";
 import { resolveFieldMappings, sessionAsText, sourceFieldOf } from "./resolve-field-mappings.ts";
 import type { ScenarioInput } from "./resolve-field-mappings.ts";

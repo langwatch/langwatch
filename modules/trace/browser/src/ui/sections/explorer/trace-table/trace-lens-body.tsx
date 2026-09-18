@@ -1,4 +1,5 @@
 import { Box } from "@chakra-ui/react";
+import { traceContextChip } from "@langwatch/langy-browser/surfaces/langy-context";
 import {
   type ColumnSizingState,
   getCoreRowModel,
@@ -9,19 +10,19 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useCallback, useMemo } from "react";
-import { traceContextChip } from "@langwatch/langy-browser/surfaces/langy-context";
-import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
-import type { LensConfig } from "../../../../behavior/view.store.ts";
+
 import {
   getColumnSizingKey,
   useColumnSizingStore,
 } from "../../../../behavior/column-sizing.store.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import type { LensConfig } from "../../../../behavior/view.store.ts";
 import { useViewStore } from "../../../../behavior/view.store.ts";
+import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { ADD_COLUMN_ID } from "./add-column-header.tsx";
-import { RegistryRow } from "./registry/index.ts";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells.tsx";
+import { RegistryRow } from "./registry/index.ts";
 
 /**
  * Module-level singleton so `pinnedColumnIds` stays referentially stable, else SortableContext
@@ -29,14 +30,14 @@ import { SELECT_COLUMN_ID } from "./registry/cells/select-cells.tsx";
  */
 const NON_REORDERABLE_COLUMN_IDS = new Set([SELECT_COLUMN_ID, ADD_COLUMN_ID]);
 
+import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
 import type { TraceTableMeta } from "./select-column.tsx";
 import { buildTracePlaceholderRows } from "./skeleton-placeholders.ts";
-import { TraceTableShell } from "./trace-table-shell.tsx";
 import { TraceStatisticsProvider } from "./trace-statistics-context.tsx";
+import { TraceTableShell } from "./trace-table-shell.tsx";
 import { useTraceLensColumns } from "./use-trace-lens-columns.ts";
 import { useTraceLensKeyboard } from "./use-trace-lens-keyboard.ts";
 import { useTraceTableVirtualizer } from "./use-trace-table-virtualizer.ts";
-import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
 
 interface TraceLensBodyProps {
   traces: TraceListItem[];

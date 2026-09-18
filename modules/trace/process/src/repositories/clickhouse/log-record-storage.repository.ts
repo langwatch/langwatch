@@ -1,12 +1,13 @@
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
-import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
+
 import {
   type LogRecordStorageRepository,
   type StoredLogRecordRow,
   TRACE_LOG_READ_CAP,
 } from "../log-record-storage.repository.ts";
+import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
 
 const TABLE_NAME = "stored_log_records" as const;
 

@@ -4,7 +4,9 @@
  */
 
 import crypto from "crypto";
+
 import { describe, expect, it } from "vitest";
+
 import { SpanNormalizationPipelineService } from "#services/span-normalization.service";
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 

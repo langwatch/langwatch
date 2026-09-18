@@ -3,8 +3,9 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
+
+import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { RunDialogAgent } from "./run-target-picker.tsx";
 
 /** One agent of the run that is not running anywhere. */

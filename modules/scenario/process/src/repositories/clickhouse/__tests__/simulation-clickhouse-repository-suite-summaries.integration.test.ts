@@ -5,10 +5,11 @@
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { getSuiteSetId } from "@langwatch/suite-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { getSuiteSetId } from "@langwatch/suite-contract";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;

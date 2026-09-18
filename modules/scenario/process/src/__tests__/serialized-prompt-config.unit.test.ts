@@ -4,9 +4,9 @@
 
 import { createLogger } from "@langwatch/observability";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
 import { SerializedPromptConfigAdapter } from "@langwatch/scenario-process";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("ai", () => ({

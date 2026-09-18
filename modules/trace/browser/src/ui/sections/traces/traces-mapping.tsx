@@ -1,24 +1,27 @@
 import { Box, Field, Grid, GridItem, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { Select as MultiSelect } from "chakra-react-select";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight } from "react-feather";
-import type { Trace } from "@langwatch/trace-contract";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useAnnotationsByTraceIds } from "../use-annotations-by-trace-ids.ts";
-import { useProjectEventTypes } from "../use-project-event-types.ts";
-import { useProjectSpanNames } from "../use-project-span-names.ts";
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { type DatasetRecordEntry,
+import {
+  type DatasetRecordEntry,
   mapTraceToDatasetEntry,
   type AllTraceMappingSources,
   type MappingState,
   SERVER_ONLY_TRACE_SOURCES,
   TRACE_EXPANSIONS,
   TRACE_MAPPING_LABELS,
-  TRACE_MAPPINGS } from "@langwatch/dataset-contract";
-import { nowInstant } from "@langwatch/time";
-import { api } from "../../../behavior/trace-api.ts";
+  TRACE_MAPPINGS,
+} from "@langwatch/dataset-contract";
 import { Switch } from "@langwatch/design-system/switch";
+import { nowInstant } from "@langwatch/time";
+import type { Trace } from "@langwatch/trace-contract";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { Select as MultiSelect } from "chakra-react-select";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowRight } from "react-feather";
+
+import { api } from "../../../behavior/trace-api.ts";
+import { useAnnotationsByTraceIds } from "../use-annotations-by-trace-ids.ts";
+import { useProjectEventTypes } from "../use-project-event-types.ts";
+import { useProjectSpanNames } from "../use-project-span-names.ts";
 
 /** Trace field options for the threads sub-field selector, excluding thread sources themselves. */
 const THREAD_SUB_FIELD_OPTIONS = Object.keys(TRACE_MAPPINGS)

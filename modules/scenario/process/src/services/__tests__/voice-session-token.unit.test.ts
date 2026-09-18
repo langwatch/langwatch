@@ -6,6 +6,7 @@
  */
 import type { VoiceSessionTokenPayload } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
+
 import { signVoiceSessionToken, verifyVoiceSessionToken } from "../voice-session-token.ts";
 
 const SECRET = "test-secret-value";

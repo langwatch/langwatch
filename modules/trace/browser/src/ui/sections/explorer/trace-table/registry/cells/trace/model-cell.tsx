@@ -1,15 +1,16 @@
 import { Badge, chakra, HoverCard, Icon, Portal, Text, VStack } from "@chakra-ui/react";
 import { CircleHelp } from "lucide-react";
 import type React from "react";
+
+import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
+import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
 } from "../../../../../../blocks/model-providers/icons-map.tsx";
-import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";
-import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 
 // When the +N popover would otherwise render a wall of model names,
 // cap the visible list and direct the user to the drawer for the rest.

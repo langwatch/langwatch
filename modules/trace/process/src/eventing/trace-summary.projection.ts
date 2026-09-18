@@ -1,4 +1,8 @@
-import { type FoldProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
+import {
+  type FoldProjectionStore,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import {
   ATTR_KEYS,
   type AnnotationAddedEvent,
@@ -29,13 +33,14 @@ import {
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
+
+import { anchorStorageTime } from "../rules/trace-storage-anchor.rules.ts";
+import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,
 } from "../services/trace-io-accumulation.service.ts";
 import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
-import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
-import { anchorStorageTime } from "../rules/trace-storage-anchor.rules.ts";
 
 export type { TraceSummaryData };
 

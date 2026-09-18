@@ -3,6 +3,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
+
 import { shouldHideBreakMarker } from "../io-preview.tsx";
 
 describe("shouldHideBreakMarker", () => {

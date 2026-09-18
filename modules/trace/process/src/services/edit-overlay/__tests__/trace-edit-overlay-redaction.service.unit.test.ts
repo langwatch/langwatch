@@ -1,13 +1,14 @@
-import type { Protections,Span,Trace,TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import type { Protections, Span, Trace, TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { applyOverlayToTrace } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { TraceEditOverlayRedactionService } from "../../trace-edit-overlay-redaction.service.ts";
 /**
  * @vitest-environment node
  * Redacts corrections by viewer permissions: hides on read, restores on save.
  * Guards viewer access to corrected content.
  */
 import { TraceEditOverlayRestoreService } from "../../trace-edit-overlay-restore.service.ts";
-import { TraceEditOverlayRedactionService } from "../../trace-edit-overlay-redaction.service.ts";
-import { describe, expect, it } from "vitest";
-import { applyOverlayToTrace } from "@langwatch/trace-contract";
 
 const openProtections: Protections = {
   canSeeCosts: true,

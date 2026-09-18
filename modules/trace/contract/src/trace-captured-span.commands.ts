@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { customMetadataSchema, langWatchSpanSchema } from "./trace-format.schemas.ts";
 
 export const recordCapturedSpanInputSchema = z.object({

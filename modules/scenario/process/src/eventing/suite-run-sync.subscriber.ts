@@ -1,16 +1,18 @@
 import type { SubscriberSpec } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { isSuiteSetId } from "@langwatch/suite-contract";
-import { SIMULATION_RUN_EVENT_TYPES,
+import {
+  SIMULATION_RUN_EVENT_TYPES,
   isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,
-  isSimulationRunStartedEvent } from "@langwatch/scenario-contract";
+  isSimulationRunStartedEvent,
+} from "@langwatch/scenario-contract";
 import type {
   SimulationProcessingEvent,
   SimulationRunEvaluatedEvent,
   SimulationRunFinishedEvent,
   SimulationRunStartedEvent,
 } from "@langwatch/scenario-contract";
+import { isSuiteSetId } from "@langwatch/suite-contract";
 
 const logger = createLogger("langwatch:simulation-processing:suite-run-sync");
 

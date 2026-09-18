@@ -5,6 +5,7 @@ import {
   type TraceLegacyListInput,
   type TracesForProjectResult,
 } from "@langwatch/trace-contract";
+
 import type { TraceLegacyRead } from "../app/trace.members.ts";
 
 export class TraceContentReadService extends TraceContentReadContract {

@@ -8,6 +8,7 @@ import type {
   LogRecordReceivedEventData,
   TraceCanonicalisationService,
 } from "@langwatch/trace-contract";
+
 import { CLAUDE_CODE_SCOPE_NAMES } from "./claude-code-canonicaliser.service.ts";
 import { SPRING_AI_SCOPE_NAMES } from "./spring-ai-canonicaliser.service.ts";
 

@@ -4,10 +4,11 @@
  */
 
 import { useEffect } from "react";
+
+import { getRunStatePollInterval } from "../../model/run-state-polling.ts";
+import { api, type RouterOutputs } from "../scenario-api.ts";
 import { useSimulationStreamingState } from "../use-simulation-streaming-state.ts";
 import { useSimulationUpdateListener } from "../use-simulation-update-listener.ts";
-import { api, type RouterOutputs } from "../scenario-api.ts";
-import { getRunStatePollInterval } from "../../model/run-state-polling.ts";
 
 /** The run record as the run-state read returns it. */
 export type ScenarioRunState = RouterOutputs["scenarios"]["getRunState"];

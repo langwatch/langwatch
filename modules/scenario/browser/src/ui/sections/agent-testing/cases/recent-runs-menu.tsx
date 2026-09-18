@@ -5,13 +5,14 @@
  */
 
 import { Box, type ButtonProps, HStack, Icon, Text } from "@chakra-ui/react";
-import { ChevronDown } from "lucide-react";
-import { useState } from "react";
 import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+
 import { useNow } from "../../../../behavior/use-now.ts";
-import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   formatPassRate,

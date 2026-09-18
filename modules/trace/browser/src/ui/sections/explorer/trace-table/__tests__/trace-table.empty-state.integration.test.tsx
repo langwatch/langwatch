@@ -131,6 +131,7 @@ vi.mock("../query-breakdown-chips.tsx", () => ({
 // ─── Module under test ────────────────────────────────────────────────────────
 
 import type React from "react";
+
 import { TraceTable } from "../trace-table.tsx";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────

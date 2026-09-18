@@ -1,4 +1,3 @@
-import { type Instant, toDate } from "@langwatch/time";
 import { randomBytes } from "node:crypto";
 
 import {
@@ -42,6 +41,8 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
+import { type Instant, toDate } from "@langwatch/time";
+
 import {
   DEFAULT_SUITE_NAME,
   DEFAULT_SUITE_SLUG,

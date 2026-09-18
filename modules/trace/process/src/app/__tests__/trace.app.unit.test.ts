@@ -1,6 +1,9 @@
-import type { TopicApi } from "@langwatch/topic-contract";
-import type { ShareApi } from "@langwatch/share-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { ShareApi } from "@langwatch/share-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 /**
  * @vitest-environment node
  * Trace application rules: full resolution on content-consuming reads,
@@ -13,13 +16,9 @@ import type {
   TraceWithGuardrail,
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
-import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceLegacyRead } from "../trace.members.ts";
-import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
+import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
@@ -28,6 +27,8 @@ import {
   type TracesV2SessionGroupsReader,
   type TracesV2SpanReader,
 } from "../trace.app.ts";
+import type { TraceLegacyRead } from "../trace.members.ts";
+import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 
 const PROTECTIONS = { canSeeCosts: true };
 
@@ -155,6 +156,10 @@ function harness(
 }
 
 describe("TraceApp", () => {
+  it("declares Presence as the export progress peer its composed download service uses", () => {
+    expect(TraceApp.dependencies.presence).toBe(PresenceApi);
+  });
+
   describe("findTrace()", () => {
     describe("given a read that shows the content it fetches", () => {
       it("resolves the trace in full rather than serving the stored preview", async () => {

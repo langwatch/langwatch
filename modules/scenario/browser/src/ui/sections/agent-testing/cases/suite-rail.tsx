@@ -1,26 +1,26 @@
-import type { Instant } from "@langwatch/time";
+import { Box, VStack } from "@chakra-ui/react";
 /**
  * The rail on the left of Scenarios: the project's suites, then the sets that run from code.
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */
-
-import { Box, VStack } from "@chakra-ui/react";
-import { useCallback, useState } from "react";
 import type {
   Period,
   PeriodMode,
   RelativePresetKey,
 } from "@langwatch/analytics-browser-kit/period-selector";
-import { NewSimulationsCallout } from "../../suites/new-simulations-callout.tsx";
 import { SuiteArchiveDialog } from "@langwatch/suite-browser/run-dialogs";
+import type { Instant } from "@langwatch/time";
+import { useCallback, useState } from "react";
+
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
-import { SuiteRailFooter } from "./suite-rail-footer.tsx";
-import { SuiteRailSections } from "./suite-rail-sections.tsx";
 import type {
   ExternalSetEntry,
   TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
+import { NewSimulationsCallout } from "../../suites/new-simulations-callout.tsx";
+import { SuiteRailFooter } from "./suite-rail-footer.tsx";
+import { SuiteRailSections } from "./suite-rail-sections.tsx";
 import type { SuiteLastRun } from "./use-test-cases-data.ts";
 
 /** How wide the rail is when it is open. */

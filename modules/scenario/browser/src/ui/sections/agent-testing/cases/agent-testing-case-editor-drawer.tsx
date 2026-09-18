@@ -4,22 +4,23 @@
  * @see dev/docs/best_practices/drawers.md
  */
 
-import { useCallback, useMemo } from "react";
+import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import {
   parseEvaluatorAttachments,
   parseSuiteFieldDefinitions,
 } from "@langwatch/scenario-contract";
-import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
+import { useCallback, useMemo } from "react";
+
 import { api } from "../../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import type { Scenario } from "../../../../model/prisma-types.ts";
 import { CaseModal } from "./case-modal.tsx";
 // The key lives in a component-free module so a static importer never pulls
 // this drawer's React and Chakra dependencies into its own chunk. The drawer
 // re-exports the key so existing importers stay unaffected.
 import { CASE_EDITOR_DRAWER } from "./drawer-keys.ts";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import { useCaseEditor } from "./use-case-editor.ts";
 
 export { CASE_EDITOR_DRAWER };

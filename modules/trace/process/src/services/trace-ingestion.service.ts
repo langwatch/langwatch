@@ -1,8 +1,6 @@
-import { createLogger } from "@langwatch/observability";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
-import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
-import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-import { getLangWatchTracer } from "langwatch";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   instrumentationScopeSchema,
   resourceSchema,
@@ -14,8 +12,11 @@ import {
   type PIIRedactionLevel,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
+import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import { getLangWatchTracer } from "langwatch";
+
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 

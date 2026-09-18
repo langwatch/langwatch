@@ -177,19 +177,14 @@ describe("evaluator attachments", () => {
     describe("when the mapping sources are listed", () => {
       it("offers the tool call with its input and output", () => {
         const sources = scenarioMappingSources({ ctx });
-        expect(sources.map((source) => source.id)).toEqual([
-          "conversation",
-          "scenario",
-          "trace",
-        ]);
+        expect(sources.map((source) => source.id)).toEqual(["conversation", "scenario", "trace"]);
         const trace = sources[2];
-        const toolCalls = trace?.fields.find(
-          (field) => field.name === "tool_calls",
-        );
+        const toolCalls = trace?.fields.find((field) => field.name === "tool_calls");
         expect(toolCalls?.children?.[0]?.name).toBe("run_sql");
-        expect(
-          toolCalls?.children?.[0]?.children?.map((child) => child.name),
-        ).toEqual(["input", "output"]);
+        expect(toolCalls?.children?.[0]?.children?.map((child) => child.name)).toEqual([
+          "input",
+          "output",
+        ]);
       });
     });
   });
@@ -239,9 +234,7 @@ describe("evaluator attachments", () => {
         const attachment = {
           mappings: inferScenarioMappings({ inputs, ctx }),
         };
-        expect(attachmentMissingInputs({ attachment, inputs })).toEqual([
-          input("expected_sql"),
-        ]);
+        expect(attachmentMissingInputs({ attachment, inputs })).toEqual([input("expected_sql")]);
         expect(attachmentOpensOnAttach({ attachment, inputs })).toBe(true);
       });
     });
@@ -271,9 +264,7 @@ describe("evaluator attachments", () => {
         const attachment = {
           mappings: { ...inferScenarioMappings({ inputs, ctx }) },
         };
-        expect(
-          attachmentMissingInputs({ attachment, inputs: withOptional }),
-        ).toEqual([]);
+        expect(attachmentMissingInputs({ attachment, inputs: withOptional })).toEqual([]);
       });
     });
   });
@@ -427,10 +418,7 @@ describe("evaluator attachments", () => {
           isPlanLevel: true,
         });
         const scenario = sources.find((source) => source.id === "scenario");
-        expect(scenario?.fields.map((field) => field.name)).toEqual([
-          "situation",
-          "criteria",
-        ]);
+        expect(scenario?.fields.map((field) => field.name)).toEqual(["situation", "criteria"]);
         const suiteLevel = scenarioMappingSources({
           ctx: { fields: ctx.fields, toolNames: [] },
         });

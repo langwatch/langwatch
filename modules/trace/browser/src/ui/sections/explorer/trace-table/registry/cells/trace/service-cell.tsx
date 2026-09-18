@@ -1,8 +1,9 @@
 import { Text } from "@chakra-ui/react";
-import type { TraceListItem } from "../../../../types/trace.ts";
+
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
-import type { CellDef } from "../../types.ts";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
 
 export const ServiceCell = {
   id: "service",

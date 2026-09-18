@@ -1,6 +1,10 @@
 import { Ksuid, generate } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
-import { TraceClickHouse, type TraceClickHouseClient } from "../../trace-clickhouse-client.repository.ts";
+
+import {
+  TraceClickHouse,
+  type TraceClickHouseClient,
+} from "../../trace-clickhouse-client.repository.ts";
 import {
   ClickHouseTraceEventPayloadRepository,
   TraceEventPayloadFieldNotFoundError,

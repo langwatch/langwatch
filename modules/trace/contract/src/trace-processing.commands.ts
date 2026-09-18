@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { normalizedSpanSchema } from "./trace.spans.ts";
+
 import { logTraceContributionSchema } from "./trace-log-contribution.ts";
-import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./trace.constants.ts";
 import { metricCorrelationFields } from "./trace-metric-correlation.ts";
+import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./trace.constants.ts";
+import { normalizedSpanSchema } from "./trace.spans.ts";
 
 export {
   DEFAULT_PII_REDACTION_LEVEL,

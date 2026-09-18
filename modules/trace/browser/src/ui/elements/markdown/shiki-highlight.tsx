@@ -1,10 +1,10 @@
 import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
 import {
   ensureShikiLangLoaded,
   isShikiLangReady,
   normalizeShikiLang,
 } from "@langwatch/design-system/shiki";
+import { useEffect, useState } from "react";
 
 /**
  * Resolve a fence language to a grammar that's actually ready to render. Base languages

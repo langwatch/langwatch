@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { TraceAnalyticsStore } from "../trace-derived.store.ts";
-import { TraceSummaryStore } from "../trace-summary.store.ts";
 import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";
+import { TraceAnalyticsStore } from "../trace-derived.store.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
+import { TraceSummaryStore } from "../trace-summary.store.ts";
 import { createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /** A structural contract behind trustAbsentMiss: a get()-only store can never
@@ -41,7 +42,10 @@ describe("trace fold projections", () => {
     const trusted = FOLDS.filter((fold) => optionsOf(fold).trustAbsentMiss === true);
 
     it("covers the folds this contract was written for", () => {
-      expect(trusted.map((fold) => fold.name).toSorted()).toEqual(["traceAnalytics", "traceSummary"]);
+      expect(trusted.map((fold) => fold.name).toSorted()).toEqual([
+        "traceAnalytics",
+        "traceSummary",
+      ]);
     });
 
     /** @scenario trusting absence must not orphan the undecodable net */

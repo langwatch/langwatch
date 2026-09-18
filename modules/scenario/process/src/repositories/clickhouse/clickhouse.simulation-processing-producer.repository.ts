@@ -9,22 +9,23 @@ import type {
 } from "@langwatch/scenario-contract";
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { SimulationExecutionRepository } from "../simulation-execution.repository.ts";
-import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
-import type { SimulationRunStateData } from "../../eventing/simulation-run-state.projection.ts";
-import {
-  SIMULATION_RUN_EXECUTION_PROCESS_NAME,
-  simulationRunExecutionPM,
-} from "../../eventing/simulation-run-execution.process.ts";
+
 import { ComputeRunMetricsCommand } from "../../eventing/compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "../../eventing/finish-run.commands.ts";
 import { RecordEvaluationsCommand } from "../../eventing/recordEvaluations.command.ts";
-import { NullSimulationRepository } from "../simulation.repository.ts";
-import { SimulationService as SimulationServiceClass } from "../../services/simulation.service.ts";
 import {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDefinition,
 } from "../../eventing/simulation-processing.pipeline.ts";
+import {
+  SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+  simulationRunExecutionPM,
+} from "../../eventing/simulation-run-execution.process.ts";
+import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
+import type { SimulationRunStateData } from "../../eventing/simulation-run-state.projection.ts";
+import { SimulationService as SimulationServiceClass } from "../../services/simulation.service.ts";
+import { SimulationExecutionRepository } from "../simulation-execution.repository.ts";
+import { NullSimulationRepository } from "../simulation.repository.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

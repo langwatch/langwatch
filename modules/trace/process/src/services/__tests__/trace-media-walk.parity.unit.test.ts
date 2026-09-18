@@ -1,14 +1,14 @@
+import { containsMediaMarkers, collectMediaParts } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import type { TraceMediaStore } from "../../app/trace.members.ts";
+import { TraceContentExtractionService } from "../trace-content-extraction.service.ts";
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  * Parity pins three media-part views: classifier, marker and render.
  */
 import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
-import { TraceContentExtractionService } from "../trace-content-extraction.service.ts";
-import { containsMediaMarkers, collectMediaParts } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
-
-import type { TraceMediaStore } from "../../app/trace.members.ts";
 import {
   EXTRACTABLE_PART_EXAMPLES,
   NON_EXTRACTABLE_PART_EXAMPLES,

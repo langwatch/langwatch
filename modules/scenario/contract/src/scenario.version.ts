@@ -1,4 +1,6 @@
 import { z } from "zod";
+
+import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
 import {
   scenarioActorSchema,
   scenarioAuthorLabelSchema,
@@ -6,7 +8,6 @@ import {
   type Scenario,
   type ScenarioUpdateInput,
 } from "./scenario.ts";
-import { scenarioParameterDefinitionsSchema } from "./scenario.parameters.ts";
 import {
   parseScenarioFieldValues,
   scenarioFieldValuesSchema,

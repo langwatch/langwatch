@@ -5,6 +5,7 @@ import type { OtlpSpan, PIIRedactionLevel, RecordSpanCommandData } from "@langwa
 import { SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   TraceIngressCommand,
   TraceIngestionService,

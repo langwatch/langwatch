@@ -5,6 +5,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { openProtections } from "../../../repositories/clickhouse/__tests__/open-protections.ts";
 import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
 import { TraceTranscriptReadService } from "../../../services/trace-transcript-read.service.ts";

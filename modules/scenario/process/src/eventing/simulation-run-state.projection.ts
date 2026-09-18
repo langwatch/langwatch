@@ -1,7 +1,10 @@
-import { type FoldProjectionStore, type Projection,
+import {
+  type FoldProjectionStore,
+  type Projection,
   AbstractFoldProjection,
   type FoldEventHandlers,
-  ValidationError } from "@langwatch/eventing";
+  ValidationError,
+} from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   SIMULATION_PROJECTION_VERSIONS,
@@ -67,10 +70,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * written back as JSON. An object that fails to parse is replaced by one
  * holding the merged namespace alone — these fields are what the event records.
  */
-function mergeLangwatchNamespace(
-  metadata: string | null,
-  fields: Record<string, unknown>,
-): string {
+function mergeLangwatchNamespace(metadata: string | null, fields: Record<string, unknown>): string {
   const current = parseMetadataObject(metadata);
   const langwatch =
     typeof current.langwatch === "object" &&
@@ -272,9 +272,7 @@ function settledOnFinish({
     attachmentCount,
   });
   return {
-    status: awaitsEvaluations
-      ? ScenarioRunStatus.PENDING_EVALUATION
-      : judgeStatus,
+    status: awaitsEvaluations ? ScenarioRunStatus.PENDING_EVALUATION : judgeStatus,
     verdict,
   };
 }

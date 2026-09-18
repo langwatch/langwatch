@@ -5,8 +5,9 @@ import {
   type PopoverAnnotationFormInput,
 } from "@langwatch/annotation-browser/annotation-form";
 import { Popover } from "@langwatch/design-system/popover";
-import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+
 import { usePopoverAnnotationForm } from "./use-annotation-form.ts";
 
 interface AnnotationPopoverProps extends PopoverAnnotationFormInput {

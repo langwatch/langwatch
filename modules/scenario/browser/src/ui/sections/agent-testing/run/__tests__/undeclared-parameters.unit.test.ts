@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import type { DeclaredParameter } from "../../../../../behavior/suites/use-run-suite.ts";
 import {
   lineWithoutUndeclared,

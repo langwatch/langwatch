@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { MeshGradient } from "@paper-design/shaders-react";
 import type React from "react";
+
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import { aiBrandPalette } from "../../../../model/explorer/ai/ai-brand-palette.ts";
 

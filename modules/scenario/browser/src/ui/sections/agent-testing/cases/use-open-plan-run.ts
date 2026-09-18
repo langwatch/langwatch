@@ -4,8 +4,9 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { useCallback } from "react";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useCallback } from "react";
+
 import { buildAgentTestingPush } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 
 export type OpenPlanRunParams = {

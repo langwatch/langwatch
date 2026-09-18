@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useSelectionStore } from "../../../../behavior/selection.store.ts";
 import { useViewStore } from "../../../../behavior/view.store.ts";

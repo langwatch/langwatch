@@ -1,5 +1,6 @@
-import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
-import { FilterParseError, type TagToken,
+import {
+  FilterParseError,
+  type TagToken,
   type CategoricalRead,
   type FieldDef,
   type FieldNeeds,
@@ -8,7 +9,10 @@ import { FilterParseError, type TagToken,
   UNSUPPORTED,
   type Unsupported,
   type FieldHandler,
-  type TranslationContext } from "@langwatch/trace-contract";
+  type TranslationContext,
+} from "@langwatch/trace-contract";
+
+import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
 import { ClickHouseTraceQueryValuesRepository } from "./clickhouse.trace-query-values.repository.ts";
 
 // ---------------------------------------------------------------------------

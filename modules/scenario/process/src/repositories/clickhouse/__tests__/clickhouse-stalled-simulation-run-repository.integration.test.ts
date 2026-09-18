@@ -1,6 +1,7 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { BACKFILL_STALE_THRESHOLD_MS } from "../../stalled-simulation-run.repository.ts";
 import { ClickHouseStalledSimulationRunRepository } from "../clickhouse.stalled-simulation-run.repository.ts";
 

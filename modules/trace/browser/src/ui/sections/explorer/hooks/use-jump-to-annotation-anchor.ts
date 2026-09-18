@@ -1,6 +1,7 @@
 import { useCallback } from "react";
-import type { FocusSection } from "../../../../behavior/focus-section.store.ts";
+
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import type { FocusSection } from "../../../../behavior/focus-section.store.ts";
 import { isFocusSection, useFocusSectionStore } from "../../../../behavior/focus-section.store.ts";
 import { useSpanPulseStore } from "../../../../behavior/span-pulse.store.ts";
 

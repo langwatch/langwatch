@@ -1,6 +1,7 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { LuArrowUpRight, LuCalendar } from "react-icons/lu";
+
 import { AttributeValue } from "../attribute-value.tsx";
 
 interface EventCardProps {

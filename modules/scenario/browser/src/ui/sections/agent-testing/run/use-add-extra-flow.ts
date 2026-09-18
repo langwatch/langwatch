@@ -4,8 +4,9 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { useCallback } from "react";
 import { setFlowCallbacks, type useDrawer } from "@langwatch/browser-host/drawer";
+import { useCallback } from "react";
+
 import type { api } from "../../../../behavior/scenario-api.ts";
 import {
   type AttachableEvaluator,

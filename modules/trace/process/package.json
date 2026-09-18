@@ -52,10 +52,6 @@
       "types": "./dist/transport/otlp-ingest.rest.d.ts",
       "default": "./src/transport/otlp-ingest.rest.ts"
     },
-    "./api-rest/otlp-path-alias": {
-      "types": "./dist/transport/otlp-path-alias.rest.d.ts",
-      "default": "./src/transport/otlp-path-alias.rest.ts"
-    },
     "./api-rest/traces": {
       "types": "./dist/transport/traces.rest.d.ts",
       "default": "./src/transport/traces.rest.ts"
@@ -89,7 +85,7 @@
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
@@ -98,10 +94,10 @@
     "@langwatch/otlp": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
@@ -123,7 +119,8 @@
     "papaparse": "catalog:",
     "ts-pattern": "catalog:",
     "zod": "catalog:",
-    "zod-validation-error": "catalog:"
+    "zod-validation-error": "catalog:",
+    "@langwatch/presence-contract": "workspace:*"
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",

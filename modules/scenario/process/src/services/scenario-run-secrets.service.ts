@@ -1,4 +1,5 @@
 import type { RunSecretCiphertext } from "@langwatch/scenario-contract";
+
 import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
 
 /** Owns the durable encryption boundary for per-run secret parameters. */

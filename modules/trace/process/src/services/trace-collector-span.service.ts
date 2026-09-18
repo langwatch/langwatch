@@ -1,10 +1,14 @@
-import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { OtlpKeyValue, OtlpResource, OtlpSpan,
+import type {
+  OtlpKeyValue,
+  OtlpResource,
+  OtlpSpan,
   CustomMetadata,
   ReservedTraceMetadata,
   Span,
-  SpanTypes } from "@langwatch/trace-contract";
+  SpanTypes,
+} from "@langwatch/trace-contract";
+import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
 
 function spanTypeToESpanKind(type: SpanTypes): ESpanKind {
   switch (type) {
@@ -84,7 +88,9 @@ function spanStringAttributes(span: Span): OtlpKeyValue[] {
   }
 
   if ("contexts" in span && span.contexts) {
-    attrs.push(findStringAttribute(ATTR_KEYS.LANGWATCH_RAG_CONTEXTS, JSON.stringify(span.contexts)));
+    attrs.push(
+      findStringAttribute(ATTR_KEYS.LANGWATCH_RAG_CONTEXTS, JSON.stringify(span.contexts)),
+    );
   }
 
   return attrs;

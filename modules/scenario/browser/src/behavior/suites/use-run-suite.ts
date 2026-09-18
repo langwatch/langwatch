@@ -2,24 +2,25 @@
  * Headless hook for running a suite with confirmation state management.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import type { SimulationSuite } from "../../model/prisma-types.ts";
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
+import {
+  displayTypedValue,
+  serializeOptionalTypedScalarValue,
+} from "@langwatch/design-system/json-value-text";
+import { toaster } from "@langwatch/design-system/toaster";
 import {
   parseScenarioParameterDefinitions,
   type RunParameterValues,
   type ScenarioParameterDefinition,
 } from "@langwatch/scenario-contract";
 import { targetLabelOf, parseSuiteTargets, type SuiteRunResult } from "@langwatch/suite-contract";
+import { useCallback, useMemo, useRef, useState } from "react";
+
+import type { SimulationSuite } from "../../model/prisma-types.ts";
 import { api } from "../scenario-api.ts";
-import { useRunAttempt } from "./use-run-attempt.ts";
-import {
-  displayTypedValue,
-  serializeOptionalTypedScalarValue,
-} from "@langwatch/design-system/json-value-text";
-import { toaster } from "@langwatch/design-system/toaster";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import { showSuiteRunError } from "./show-suite-run-error.ts";
+import { useRunAttempt } from "./use-run-attempt.ts";
 
 export interface UseRunSuiteOptions {
   onRunScheduled?: (suiteId: string, batchRunId: string) => void;

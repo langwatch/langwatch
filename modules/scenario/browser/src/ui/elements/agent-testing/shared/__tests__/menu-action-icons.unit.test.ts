@@ -5,7 +5,9 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import { MENU_ACTION_ICONS } from "../../../../sections/agent-testing/cases/menu-action-label.tsx";
 
 /** Both row menus and the button above the table compose behavior, so both are sections. */

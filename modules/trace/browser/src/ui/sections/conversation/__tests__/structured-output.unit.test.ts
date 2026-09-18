@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { findStructuredOutput } from "../structured-output.ts";
 
 describe("findStructuredOutput", () => {

@@ -3,26 +3,29 @@
  */
 
 import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
-import { nowInstant, subDays, toDate } from "@langwatch/time";
-import { Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DashboardLayout } from "../dashboard-layout.tsx";
 import {
   type Period,
   PeriodSelector,
   usePeriodSelector,
 } from "@langwatch/analytics-browser-kit/period-selector";
-import { ExternalSetDetailPanel } from "./external-set-detail-panel.tsx";
-import { ReturnToNewSimulationsBanner } from "./return-to-new-simulations-banner.tsx";
-import { RunHistoryPanel } from "./run-history-panel.tsx";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { toaster } from "@langwatch/design-system/toaster";
+import type { ScenarioTabNavigatePayload, SuiteRunSummary } from "@langwatch/scenario-contract";
 import {
   SuiteArchiveDialog,
   SuiteContextMenu,
   SuiteRunConfirmationDialog,
   NowProvider,
 } from "@langwatch/suite-browser/run-dialogs";
-import { SuiteDetailPanel, SuiteEmptyState } from "./suite-detail-panel.tsx";
-import { SuiteSidebar } from "./suite-sidebar.tsx";
+import { nowInstant, subDays, toDate } from "@langwatch/time";
+import { Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { HandledErrorAlert } from "../../../behavior/errors.tsx";
+import { api } from "../../../behavior/scenario-api.ts";
 import { useRunSuite } from "../../../behavior/suites/use-run-suite.ts";
 import {
   ALL_RUNS_ID,
@@ -30,20 +33,18 @@ import {
   isExternalSetSelection,
   useSuiteRouting,
 } from "../../../behavior/suites/use-suite-routing.ts";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "@langwatch/browser-host/errors";
-import { HandledErrorAlert } from "../../../behavior/errors.tsx";
-import type { SimulationSuite } from "../../../model/prisma-types.ts";
-import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { useScenarioTabFollow } from "../../../behavior/use-scenario-tab-follow.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
-import type { ScenarioTabNavigatePayload, SuiteRunSummary } from "@langwatch/scenario-contract";
-import { api } from "../../../behavior/scenario-api.ts";
-import { useRouter } from "@langwatch/browser-host/use-router";
+import type { SimulationSuite } from "../../../model/prisma-types.ts";
+import { DashboardLayout } from "../dashboard-layout.tsx";
 import { ScenarioWorkflowHostBridge } from "../workflow-host-bridge.tsx";
+import { ExternalSetDetailPanel } from "./external-set-detail-panel.tsx";
+import { ReturnToNewSimulationsBanner } from "./return-to-new-simulations-banner.tsx";
+import { RunHistoryPanel } from "./run-history-panel.tsx";
+import { SuiteDetailPanel, SuiteEmptyState } from "./suite-detail-panel.tsx";
+import { SuiteSidebar } from "./suite-sidebar.tsx";
 
 export default function SimulationsPage() {
   return (

@@ -3,9 +3,10 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { describe, expect, it } from "vitest";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../../model/scenario-run-status-config.ts";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../../model/scenario-run-status-config.ts";
 import {
   formatPassRate,
   PASS_RATE_AMBER_COLOR,

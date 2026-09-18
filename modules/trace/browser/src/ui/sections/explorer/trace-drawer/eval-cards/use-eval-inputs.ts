@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+
 import { api } from "../../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { useIsReadOnlyTrace } from "../../../../elements/explorer/context/trace-viewer-context.tsx";
 import type { EvalEntry } from "./utils.ts";
 

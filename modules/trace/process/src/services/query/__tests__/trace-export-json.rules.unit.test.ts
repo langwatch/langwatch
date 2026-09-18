@@ -4,8 +4,9 @@
  * function tests, no mocking needed.
  */
 
-import { describe, expect, it } from "vitest";
 import type { Evaluation, LLMSpan, RAGSpan, Trace } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   serializeTraceToFullJson,
   serializeTraceToSummaryJson,

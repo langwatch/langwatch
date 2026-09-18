@@ -2,10 +2,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Temporal } from "@langwatch/time";
+import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { Temporal } from "@langwatch/time";
 
 const overlayData = vi.hoisted<{ current: TraceEditOverlayDto | null }>(() => ({ current: null }));
 

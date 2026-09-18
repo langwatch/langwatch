@@ -1,4 +1,5 @@
 import type { NormalizedSpan } from "@langwatch/trace-contract";
+
 import { mapChRowToNormalized, serializeAttributes } from "../stored-span-row.mapper.ts";
 
 /**

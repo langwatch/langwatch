@@ -1,8 +1,9 @@
+import type { Evaluation } from "@langwatch/trace-contract";
 /**
  * Mapping rules for the drawer's rich evaluation entries (#6835 item 1).
  */
 import { describe, expect, it } from "vitest";
-import type { Evaluation } from "@langwatch/trace-contract";
+
 import { mapScore, mapStatus } from "../use-trace-evaluations.ts";
 
 function makeEvaluation(overrides: Partial<Evaluation> = {}): Evaluation {

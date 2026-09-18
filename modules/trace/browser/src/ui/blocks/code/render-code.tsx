@@ -1,9 +1,9 @@
 import { Box, IconButton } from "@chakra-ui/react";
+import { codeToHtml, codeToHtmlDark } from "@langwatch/design-system/shiki";
+import { toaster } from "@langwatch/design-system/toaster";
 import { CopyIcon } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { codeToHtml, codeToHtmlDark } from "@langwatch/design-system/shiki";
-import { toaster } from "@langwatch/design-system/toaster";
 
 /** What a refused clipboard write says. Hoisted so its opt-out marker survives a reformat. */
 const COPY_REFUSED = {

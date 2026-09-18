@@ -4,8 +4,9 @@
  * A queued run records the version read at queue time; a later edit never moves it.
  */
 import { randomUUID } from "node:crypto";
-import { createLogger } from "@langwatch/observability";
+
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -31,12 +32,17 @@ import {
 } from "@langwatch/suite-process";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ScenarioService } from "../services/scenario.service.ts";
+import type {
+  ScenarioClock,
+  ScenarioId,
+  ScenarioTestSuiteId,
+  ScenarioSecretCipher,
+} from "../app/scenario.app.ts";
 import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository.ts";
-import type { ScenarioClock,ScenarioId,ScenarioTestSuiteId,ScenarioSecretCipher } from "../app/scenario.app.ts";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { ScenarioService } from "../services/scenario.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

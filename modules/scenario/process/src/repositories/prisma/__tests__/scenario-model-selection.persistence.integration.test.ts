@@ -1,12 +1,6 @@
-/**
- * @see specs/scenarios/scenario-model-selection.feature
- * @see specs/scenarios/simulation-run-model-resolution.feature
- * @see specs/suites/suite-model-selection.feature
- */
-import type { Scenario } from "@langwatch/scenario-contract";
+import { randomUUID } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
-import { SimulationService } from "@langwatch/scenario-contract";
-import { PrismaScenarioRepository } from "../scenario.repository.ts";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -15,12 +9,25 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+/**
+ * @see specs/scenarios/scenario-model-selection.feature
+ * @see specs/scenarios/simulation-run-model-resolution.feature
+ * @see specs/suites/suite-model-selection.feature
+ */
+import type { Scenario } from "@langwatch/scenario-contract";
+import { SimulationService } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { ScenarioService } from "../../../services/scenario.service.ts";
-import type { ScenarioClock,ScenarioTestSuiteId,ScenarioId,ScenarioSecretCipher } from "../../../app/scenario.app.ts";
 import { nowInstant, type Instant } from "@langwatch/time";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import type {
+  ScenarioClock,
+  ScenarioTestSuiteId,
+  ScenarioId,
+  ScenarioSecretCipher,
+} from "../../../app/scenario.app.ts";
+import { ScenarioService } from "../../../services/scenario.service.ts";
+import { PrismaScenarioRepository } from "../scenario.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

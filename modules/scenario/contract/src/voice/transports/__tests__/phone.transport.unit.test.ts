@@ -4,8 +4,9 @@
 
 import { AgentRole } from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
-import type { VoiceTransportCredential } from "../../voice-transport.registry";
+
 import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../../voice-public-url-env";
+import type { VoiceTransportCredential } from "../../voice-transport.registry";
 import {
   createPhoneTransport,
   PHONE_CONNECT_REJECTED_PREFIX,
@@ -51,10 +52,9 @@ type Connectable = { connect: () => Promise<void> };
  *  the SDK's published `record`, mirroring the (unexported) `SdkTwilioAdapter`
  *  translation in phone.transport.ts. Derived from the exported
  *  `TwilioAdapterLike` so it tracks that type instead of duplicating it. */
-type SdkPlaceCallArgs = Omit<
-  Parameters<TwilioAdapterLike["placeCall"]>[0],
-  "shouldRecord"
-> & { record?: boolean };
+type SdkPlaceCallArgs = Omit<Parameters<TwilioAdapterLike["placeCall"]>[0], "shouldRecord"> & {
+  record?: boolean;
+};
 
 interface FakeAdapter extends TwilioAdapterLike {
   readonly placeCallArgs: Parameters<TwilioAdapterLike["placeCall"]>[0][];
@@ -64,8 +64,7 @@ interface FakeAdapter extends TwilioAdapterLike {
 function fakeAdapter(
   behaviour: { connectRejects?: Error; placeCallRejects?: Error } = {},
 ): FakeAdapter {
-  const placeCallArgs: Parameters<TwilioAdapterLike["placeCall"]>[0][] =
-    [];
+  const placeCallArgs: Parameters<TwilioAdapterLike["placeCall"]>[0][] = [];
   let disconnects = 0;
   return {
     placeCallArgs,
@@ -193,9 +192,9 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 120,
         });
-        await expect(
-          (built as unknown as Connectable).connect(),
-        ).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
+        await expect((built as unknown as Connectable).connect()).rejects.toThrow(
+          PHONE_CONNECT_REJECTED_PREFIX,
+        );
         expect(adapter.disconnectCount()).toBe(1);
       });
     });
@@ -211,9 +210,9 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 120,
         });
-        await expect(
-          (built as unknown as Connectable).connect(),
-        ).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
+        await expect((built as unknown as Connectable).connect()).rejects.toThrow(
+          PHONE_CONNECT_REJECTED_PREFIX,
+        );
         expect(adapter.placeCallArgs).toHaveLength(0);
         expect(adapter.disconnectCount()).toBe(1);
       });
@@ -251,9 +250,7 @@ describe("phoneTransport", () => {
             expect((error as VoicePhoneTransportUnavailableError).code).toBe(
               "voice_phone_transport_unavailable",
             );
-            expect((error as Error).message).toBe(
-              PHONE_NO_BROWSER_CALL_MESSAGE,
-            );
+            expect((error as Error).message).toBe(PHONE_NO_BROWSER_CALL_MESSAGE);
           }
         };
         assertThrows(() => phoneTransport.assertAvailable?.());
@@ -292,9 +289,9 @@ describe("phoneTransport", () => {
       // "no public media URL" fail-fast block below. This asserts the helper's
       // reporting behavior, not that a real call is allowed to use it.
       it("still reports the app's own base host from the resolver helper", () => {
-        expect(
-          resolvePublicBaseUrl({ BASE_HOST: "https://app.example.com" }),
-        ).toBe("https://app.example.com");
+        expect(resolvePublicBaseUrl({ BASE_HOST: "https://app.example.com" })).toBe(
+          "https://app.example.com",
+        );
       });
     });
 
@@ -336,33 +333,31 @@ describe("phoneTransport", () => {
 
     describe("when VOICE_PUBLIC_BASE_URL is a scheme-less localhost value", () => {
       it("is normalized to an http URL", () => {
-        expect(
-          resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "localhost:3000" }),
-        ).toBe("http://localhost:3000");
+        expect(resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "localhost:3000" })).toBe(
+          "http://localhost:3000",
+        );
       });
     });
 
     describe("when VOICE_PUBLIC_BASE_URL is a scheme-less non-local host", () => {
       it("is normalized to an https URL", () => {
-        expect(
-          resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "voice.example.com" }),
-        ).toBe("https://voice.example.com");
+        expect(resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "voice.example.com" })).toBe(
+          "https://voice.example.com",
+        );
       });
     });
 
     describe("when VOICE_PUBLIC_BASE_URL is garbage", () => {
       it("throws naming VOICE_PUBLIC_BASE_URL", () => {
-        expect(() =>
-          resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "not a url at all" }),
-        ).toThrow(/VOICE_PUBLIC_BASE_URL/);
+        expect(() => resolvePublicBaseUrl({ VOICE_PUBLIC_BASE_URL: "not a url at all" })).toThrow(
+          /VOICE_PUBLIC_BASE_URL/,
+        );
       });
     });
 
     describe("when BASE_HOST is malformed and VOICE_PUBLIC_BASE_URL is unset", () => {
       it("throws naming BASE_HOST rather than VOICE_PUBLIC_BASE_URL", () => {
-        expect(() =>
-          resolvePublicBaseUrl({ BASE_HOST: "not a valid url" }),
-        ).toThrow(/BASE_HOST/);
+        expect(() => resolvePublicBaseUrl({ BASE_HOST: "not a valid url" })).toThrow(/BASE_HOST/);
       });
     });
   });
@@ -539,9 +534,7 @@ describe("phoneTransport", () => {
           maxCallSeconds: 120,
         });
 
-        expect((built as unknown as { role: AgentRole }).role).toBe(
-          AgentRole.AGENT,
-        );
+        expect((built as unknown as { role: AgentRole }).role).toBe(AgentRole.AGENT);
       });
 
       /**
@@ -628,10 +621,9 @@ describe("phoneTransport", () => {
           maxCallSeconds: 120,
         });
 
-        expect(
-          (sdkAdapter as unknown as { responseTailSilence: number })
-            .responseTailSilence,
-        ).toBe(PHONE_RESPONSE_TAIL_SILENCE_SECONDS);
+        expect((sdkAdapter as unknown as { responseTailSilence: number }).responseTailSilence).toBe(
+          PHONE_RESPONSE_TAIL_SILENCE_SECONDS,
+        );
         const opts = twilioAgentMock.mock.calls[0]?.[0];
         expect(opts).not.toHaveProperty("speechGate");
       });

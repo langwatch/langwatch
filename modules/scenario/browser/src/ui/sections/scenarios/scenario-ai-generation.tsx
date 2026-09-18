@@ -11,28 +11,29 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import { createLogger } from "@langwatch/observability/browser";
+import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+
+import { api } from "../../../behavior/scenario-api.ts";
+import {
+  classifyGenerationError,
+  reportableGenerationFailure,
+} from "../../../behavior/scenarios/classify-generation-error.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import {
   type GeneratedScenario,
   generateScenarioWithAI,
 } from "../../../model/scenario-generation.ts";
 import { consumeStoredPrompt } from "../../../model/scenario-prompt-storage.ts";
-import { type ScenarioFormController } from "../../elements/scenario-form.tsx";
-import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../behavior/scenario-api.ts";
-import { ResolvedModelCaption } from "../../elements/scenarios/resolved-model-caption.tsx";
-import {
-  classifyGenerationError,
-  reportableGenerationFailure,
-} from "../../../behavior/scenarios/classify-generation-error.ts";
-import { showErrorToast } from "@langwatch/browser-host/errors";
 import {
   getDefaultModelState,
   type DefaultModelState,
 } from "../../../model/scenarios/default-model-state.ts";
+import { type ScenarioFormController } from "../../elements/scenario-form.tsx";
+import { ResolvedModelCaption } from "../../elements/scenarios/resolved-model-caption.tsx";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
 

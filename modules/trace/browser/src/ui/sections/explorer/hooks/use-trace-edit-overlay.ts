@@ -1,9 +1,10 @@
-import { keepPreviousData } from "@tanstack/react-query";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api.ts";
-import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { keepPreviousData } from "@tanstack/react-query";
+
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
 import { useTraceEditStore } from "../../../../behavior/trace-edit.store.ts";
+import { useSharedTrace } from "../context/shared-trace-context.tsx";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /**

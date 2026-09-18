@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { getFieldSuggestions, getValueSuggestions } from "../suggestion-items.ts";
 
 describe("getFieldSuggestions", () => {

@@ -4,8 +4,9 @@
  * @see specs/agents/connected-agents.feature
  */
 
-import { describe, expect, it } from "vitest";
 import type { ConnectedAgentData } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   ConnectedAgentCallError,
   SerializedConnectedAgentAdapter,

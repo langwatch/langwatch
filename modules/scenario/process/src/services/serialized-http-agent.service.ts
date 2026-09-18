@@ -6,7 +6,6 @@
 
 import { createLogger, type Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
-import { nowInstant } from "@langwatch/time";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import {
@@ -16,11 +15,13 @@ import {
   renderHeaderTemplate,
   renderUrlTemplate,
 } from "@langwatch/scenario-contract";
-import { JSONPath } from "jsonpath-plus";
-import { applyAuthentication } from "../rules/http-auth.rules.ts";
 import type { HttpAgentData, RunParameterValues } from "@langwatch/scenario-contract";
-import * as ScenarioSecretReferenceAdapter from "../rules/scenario-secret-reference.rules.ts";
+import { nowInstant } from "@langwatch/time";
+import { JSONPath } from "jsonpath-plus";
+
 import type { ScenarioHttp } from "../app/scenario.app.ts";
+import { applyAuthentication } from "../rules/http-auth.rules.ts";
+import * as ScenarioSecretReferenceAdapter from "../rules/scenario-secret-reference.rules.ts";
 import { SerializedAgent } from "./serialized-agent.service.ts";
 
 /**

@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import { z } from "zod";
+import { create } from "zustand";
 
 /**
  * Cross-feature UI prefs for the traces-v2 page that aren't tied to onboarding state.

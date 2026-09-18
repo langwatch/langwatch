@@ -1,16 +1,21 @@
 import { Box, CodeBlock, Flex, Spinner } from "@chakra-ui/react";
-import { useRef } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
-import { useLangyContextTarget,
+import {
+  useLangyContextTarget,
   traceChipDisplayName,
-  traceContextChip } from "@langwatch/langy-browser/surfaces/langy-context";
-import { PeerCursorOverlay } from "../../presence/peer-cursor-overlay.tsx";
+  traceContextChip,
+} from "@langwatch/langy-browser/surfaces/langy-context";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { useTraceEditSession } from "../hooks/use-trace-edit-session.ts";
-import { useTraceQueryArgs } from "../hooks/use-trace-query-args.ts";
+import { useRef } from "react";
+
+import { useTraceSwitchOverlay } from "../../../../behavior/explorer/trace-drawer/use-trace-switch-overlay.ts";
 import { type DrawerViewMode, useDrawerStore, useShikiAdapter } from "../../../../index.ts";
 import { BlurredContentGate } from "../../../blocks/explorer/blurred-content-gate.tsx";
+import { TraceDrawerSkeleton } from "../../../elements/explorer/trace-drawer/trace-drawer-skeleton.tsx";
+import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
+import { PeerCursorOverlay } from "../../presence/peer-cursor-overlay.tsx";
+import { useTraceEditSession } from "../hooks/use-trace-edit-session.ts";
+import { useTraceQueryArgs } from "../hooks/use-trace-query-args.ts";
 import { ConversationContext } from "./conversation-context.tsx";
 import { ConversationView } from "./conversation-view/index.ts";
 import { DrawerHeader } from "./drawer-header/index.ts";
@@ -19,10 +24,8 @@ import { PaneLayout } from "./panes/pane-layout.tsx";
 import { type DrawerLayout, usePaneLayout } from "./panes/use-pane-layout.ts";
 import { ScenarioRoleProvider } from "./scenario-roles.tsx";
 import { SessionTab } from "./session-view/index.ts";
-import { TraceDrawerSkeleton } from "../../../elements/explorer/trace-drawer/trace-drawer-skeleton.tsx";
 import { TerminalTab } from "./terminal-view/index.ts";
 import { TraceAccordions } from "./trace-accordions/index.ts";
-import { useTraceSwitchOverlay } from "../../../../behavior/explorer/trace-drawer/use-trace-switch-overlay.ts";
 
 export interface TraceDrawerContentProps {
   traceId: string | undefined;

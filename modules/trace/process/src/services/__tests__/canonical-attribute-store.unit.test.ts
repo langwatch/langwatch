@@ -1,6 +1,6 @@
+import type { CanonicalAttributes } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { CanonicalAttributes } from "@langwatch/trace-contract";
 import { CanonicalAttributeStore } from "../canonical-attributes.service.ts";
 
 describe("CanonicalAttributeStore", () => {

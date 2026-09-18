@@ -5,6 +5,7 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 export type MiniBar = {

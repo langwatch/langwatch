@@ -1,6 +1,7 @@
 import { Text } from "@chakra-ui/react";
-import type { TraceListItem } from "../../../../types/trace.ts";
+
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";
 
 export const SpanCountCell = {

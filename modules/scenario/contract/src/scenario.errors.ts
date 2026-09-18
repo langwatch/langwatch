@@ -9,18 +9,14 @@ export class ScenarioGenerateRateLimitedError extends HandledError {
   declare readonly code: "scenario_generate_rate_limited";
 
   constructor(input: { retryAfterSeconds?: number | undefined }) {
-    super(
-      "scenario_generate_rate_limited",
-      "Too many scenario generations for this project",
-      {
-        httpStatus: 429,
-        retryable: true,
-        fault: "customer",
-        ...(input.retryAfterSeconds !== undefined
-          ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
-          : {}),
-      },
-    );
+    super("scenario_generate_rate_limited", "Too many scenario generations for this project", {
+      httpStatus: 429,
+      retryable: true,
+      fault: "customer",
+      ...(input.retryAfterSeconds !== undefined
+        ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+        : {}),
+    });
     this.name = "ScenarioGenerateRateLimitedError";
   }
 }
@@ -175,15 +171,11 @@ export class ScenarioFieldTypeInvalidError extends HandledError {
   declare readonly code: "scenario_field_type_invalid";
 
   constructor({ identifier, type }: { identifier: string; type: string }) {
-    super(
-      "scenario_field_type_invalid",
-      `The value of ${identifier} cannot be read as ${type}`,
-      {
-        httpStatus: 422,
-        fault: "customer",
-        meta: { identifier, type },
-      },
-    );
+    super("scenario_field_type_invalid", `The value of ${identifier} cannot be read as ${type}`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { identifier, type },
+    });
     this.name = "ScenarioFieldTypeInvalidError";
   }
 }
@@ -231,5 +223,25 @@ export class VoiceAgentNotFoundError extends HandledError {
       httpStatus: 404,
     });
     this.name = "VoiceAgentNotFoundError";
+  }
+}
+
+export class ScenarioGenerationFailedError extends HandledError {
+  constructor(cause: unknown) {
+    super("scenario_generation_failed", "Failed to generate scenario", {
+      httpStatus: 500,
+      fault: "platform",
+      ...(cause instanceof Error ? { reasons: [cause] } : {}),
+    });
+  }
+}
+
+export class ScenarioGenerationTimedOutError extends HandledError {
+  constructor() {
+    super("scenario_generation_timed_out", "Scenario generation took too long and was stopped.", {
+      httpStatus: 504,
+      retryable: true,
+      fault: "platform",
+    });
   }
 }

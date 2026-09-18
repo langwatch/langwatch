@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+
 import {
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,

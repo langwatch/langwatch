@@ -4,6 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { TokenBreakdownTooltipContent } from "../token-breakdown-tooltip.tsx";
 
 // Unmount between cases so renders don't leak rows into one another's

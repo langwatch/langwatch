@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { TestModelProviderService } from "../../__tests__/support/model-provider.service.fake.ts";
+import { TestTraceQueryClassification } from "../../__tests__/support/query-classification.fake.ts";
+import { traceReadPorts } from "../../__tests__/support/trace-read-ports.fake.ts";
 import { TraceQueryFieldValuesRepository } from "../../repositories/read/query-field-values.repository.ts";
 import { TraceSummaryReaderRepository } from "../../repositories/read/trace-summary-reader.repository.ts";
 import {
@@ -8,9 +12,6 @@ import {
   type TraceSpanSummaryRecord,
 } from "../../repositories/trace-projected-read.repository.ts";
 import { TraceService } from "../trace.service.ts";
-import { TestModelProviderService } from "../../__tests__/support/model-provider.service.fake.ts";
-import { TestTraceQueryClassification } from "../../__tests__/support/query-classification.fake.ts";
-import { traceReadPorts } from "../../__tests__/support/trace-read-ports.fake.ts";
 
 class IngestLagRepository extends TraceProjectedReadRepository {
   readonly calls: string[] = [];

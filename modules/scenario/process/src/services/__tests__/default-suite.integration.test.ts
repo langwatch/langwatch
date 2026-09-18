@@ -1,12 +1,6 @@
-/**
- * Auto-filing into the project's Default test suite, against real Postgres.
- * Every scenario belongs to exactly one suite: clearing a scenario's suite
- * files it back into Default rather than leaving it loose.
- */
-import { SimulationService } from "@langwatch/scenario-contract";
+import { randomUUID } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
-import { ScenarioService as ScenarioServiceContract } from "../scenario.service.ts";
-import { PrismaScenarioRepository } from "../../repositories/prisma/scenario.repository.ts";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -15,8 +9,14 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+/**
+ * Auto-filing into the project's Default test suite, against real Postgres.
+ * Every scenario belongs to exactly one suite: clearing a scenario's suite
+ * files it back into Default rather than leaving it loose.
+ */
+import { SimulationService } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type {
@@ -25,8 +25,9 @@ import type {
   ScenarioId,
   ScenarioSecretCipher,
 } from "../../app/scenario.app.ts";
+import { PrismaScenarioRepository } from "../../repositories/prisma/scenario.repository.ts";
 import { DEFAULT_SUITE_NAME, DEFAULT_SUITE_SLUG } from "../../rules/default-suite.rules.ts";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { ScenarioService as ScenarioServiceContract } from "../scenario.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

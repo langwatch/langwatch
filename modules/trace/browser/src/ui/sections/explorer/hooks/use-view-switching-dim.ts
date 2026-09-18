@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+
 import { useDensityStore } from "../../../../behavior/density.store.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";

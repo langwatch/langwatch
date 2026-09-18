@@ -4,21 +4,22 @@
  * @see specs/suites/run-notes.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ScenarioRunStatus, Verdict, type ScenarioRunData } from "@langwatch/scenario-contract";
+import { getSuiteSetId, targetKeyOf } from "@langwatch/suite-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus, Verdict, type ScenarioRunData } from "@langwatch/scenario-contract";
-import { getSuiteSetId, targetKeyOf } from "@langwatch/suite-contract";
-import { NOT_IN_RUN_LABEL } from "../comparison-results-row.tsx";
-import { RunPlanDetail } from "../run-plan-detail.tsx";
-import { RUN_AGAIN_LABEL } from "../run-plan-detail-header.tsx";
-import { PROJECT_DEFAULT_MODEL } from "../run-settings-block.tsx";
-import { RunsSidebarEntry } from "../../../../elements/agent-testing/results/runs-sidebar-entry.tsx";
+
 import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans.ts";
+import { RunsSidebarEntry } from "../../../../elements/agent-testing/results/runs-sidebar-entry.tsx";
 import { passRateColor } from "../../../../elements/agent-testing/shared/pass-rate-color.ts";
 import { TARGET_COLORS } from "../../../../elements/agent-testing/shared/target-colors.ts";
 import { useAgentTestingStore } from "../../use-agent-testing-store.ts";
+import { NOT_IN_RUN_LABEL } from "../comparison-results-row.tsx";
+import { RUN_AGAIN_LABEL } from "../run-plan-detail-header.tsx";
+import { RunPlanDetail } from "../run-plan-detail.tsx";
+import { PROJECT_DEFAULT_MODEL } from "../run-settings-block.tsx";
 
 const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
 const mockGetBatchRunCount = vi.hoisted(() => vi.fn());
@@ -817,12 +818,8 @@ describe("<RunPlanDetail/>", () => {
     setRuns([finished]);
     const { view } = renderDetail();
     expect(screen.getByText("Passed (1/1)")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("run-result-evaluators"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("run-summary-evaluators"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-result-evaluators")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-summary-evaluators")).not.toBeInTheDocument();
 
     setRuns([
       makeRun({
@@ -870,9 +867,7 @@ describe("<RunPlanDetail/>", () => {
       ),
     ).toHaveTextContent("Fail");
     expect(
-      within(screen.getByTestId("run-summary-evaluators")).getByTestId(
-        "evaluator-pill-eval_sql",
-      ),
+      within(screen.getByTestId("run-summary-evaluators")).getByTestId("evaluator-pill-eval_sql"),
     ).toHaveTextContent("0%");
   });
 

@@ -1,11 +1,12 @@
-import { useEffect, useRef } from "react";
-import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
-import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
 import {
   usePresencePreferencesStore,
   usePresenceStore,
   useTabSessionId,
 } from "@langwatch/presence-browser";
+import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
+import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { useEffect, useRef } from "react";
+
 import { api } from "../../../../behavior/trace-api.ts";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;

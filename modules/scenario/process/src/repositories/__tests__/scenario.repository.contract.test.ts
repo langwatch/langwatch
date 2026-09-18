@@ -1,10 +1,10 @@
-import { nowInstant, toDate } from "@langwatch/time";
 /**
  * @vitest-environment node
  * The Scenario aggregate's contract, stated once and run against the memory
  * twin always, the Postgres one when `LANGWATCH_TEST_DATABASE_URL` is named.
  */
 import { randomUUID } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -12,11 +12,12 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate } from "@langwatch/time";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
-import type { ScenarioRepository } from "../scenario.repository.ts";
 import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
 import { PrismaScenarioRepository } from "../prisma/scenario.repository.ts";
+import type { ScenarioRepository } from "../scenario.repository.ts";
 
 const PROJECT_ID = "project-scenario-contract";
 

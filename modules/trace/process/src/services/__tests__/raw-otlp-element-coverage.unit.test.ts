@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
 import type { CanonicalAttributes, CanonicalEvent } from "@langwatch/trace-contract";
-import { canonicalisation } from "./canonicalisation/test-helpers.ts";
-import type { ExtractorContext } from "../canonical-attributes.service.ts";
+import { describe, expect, it } from "vitest";
 
+import type { ExtractorContext } from "../canonical-attributes.service.ts";
+import { canonicalisation } from "./canonicalisation/test-helpers.ts";
 import codexBSpan from "./fixtures/codex-b.session-task-turn.json";
 import geminiBSpan from "./fixtures/gemini-b.llm-call.json";
 import opencodeBSpan from "./fixtures/opencode-b.do-stream.json";

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
-import type { PresenceCursorEvent } from "@langwatch/presence-contract";
 import { useTabSessionId } from "@langwatch/presence-browser";
-import { api } from "../../../../behavior/trace-api.ts";
+import type { PresenceCursorEvent } from "@langwatch/presence-contract";
 import { nowInstant } from "@langwatch/time";
+import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { api } from "../../../../behavior/trace-api.ts";
 
 const STALE_AFTER_MS = 3_000;
 const SWEEP_INTERVAL_MS = 750;

@@ -6,14 +6,15 @@
 
 import { HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Folder, FolderCode, Pencil, Play, Plus } from "lucide-react";
+
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
-import { ScenarioLabelFilter as LabelFilterDropdown } from "../../../elements/scenario-library-controls.tsx";
 import {
   declarationsCountLine,
   SuiteDeclarationsRow,
 } from "../../../elements/agent-testing/suite/suite-declarations-row.tsx";
+import { ScenarioLabelFilter as LabelFilterDropdown } from "../../../elements/scenario-library-controls.tsx";
 import type { CasesPanelProps } from "./cases-panel.tsx";
 import { RecentRunsMenu } from "./recent-runs-menu.tsx";
 

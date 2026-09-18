@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { createCallLimitTimer } from "../call-limit-timer";
 
 describe("createCallLimitTimer", () => {
@@ -48,9 +49,7 @@ describe("createCallLimitTimer", () => {
           maxCallSeconds: 90,
           onLimit,
           setTimer: (() =>
-            7 as unknown as ReturnType<
-              typeof setTimeout
-            >) as unknown as typeof setTimeout,
+            7 as unknown as ReturnType<typeof setTimeout>) as unknown as typeof setTimeout,
           clearTimer,
         });
 

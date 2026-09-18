@@ -4,14 +4,15 @@ import {
   type ProjectionStoreContext,
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
 } from "../../repositories/projection/trace-summary-projection.repository.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { TraceSummaryStore } from "../trace-summary.store.ts";
 import type { TraceSummaryData } from "../trace-summary.projection.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
+import { TraceSummaryStore } from "../trace-summary.store.ts";
 import {
   createSpanReceivedEvent,
   createTestRuntime,

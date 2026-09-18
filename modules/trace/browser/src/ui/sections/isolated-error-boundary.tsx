@@ -1,9 +1,8 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import type * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
-
-import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 
 import { explainAnyError } from "./errors/index.ts";
 

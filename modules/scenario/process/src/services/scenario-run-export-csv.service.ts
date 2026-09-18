@@ -4,11 +4,11 @@
  * @see specs/scenarios/scenario-run-export.feature
  */
 
-import Parse from "papaparse";
+import { neutralizeFormula } from "@langwatch/csv";
 import type { SimulationExportRun } from "@langwatch/scenario-contract";
 import { categorizeRunStatus } from "@langwatch/scenario-contract";
-import { neutralizeFormula } from "@langwatch/csv";
 import { Temporal } from "@langwatch/time";
+import Parse from "papaparse";
 
 /**
  * The columns a person reads, shortest and highest-signal first so the useful ones fit on screen

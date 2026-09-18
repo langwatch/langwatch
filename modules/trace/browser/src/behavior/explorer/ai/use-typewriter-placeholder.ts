@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import { useReducedMotion } from "../../use-reduced-motion.ts";
 
 const TYPING_MS = 70;

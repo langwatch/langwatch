@@ -1,16 +1,17 @@
 import { Box, Image, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+
 import { getDisplayRoleVisuals } from "../../elements/scenario-role.tsx";
-import { ToolPairCard } from "../transcript/tool-blocks.tsx";
 import { Bubble } from "../explorer/trace-table/registry/addons/conversation/bubble.tsx";
 import { RenderInputOutput } from "../traces/render-input-output.tsx";
-import { ErrorMessage } from "./error-message.tsx";
-import { findStructuredOutput } from "./structured-output.ts";
+import { ToolPairCard } from "../transcript/tool-blocks.tsx";
 import type {
   ConversationAudioPlayback,
   ConversationRoleMode,
   DisplayPart,
 } from "./conversation.types.ts";
+import { ErrorMessage } from "./error-message.tsx";
+import { findStructuredOutput } from "./structured-output.ts";
 
 /**
  * One component per part kind, so the thread's job is choosing between them

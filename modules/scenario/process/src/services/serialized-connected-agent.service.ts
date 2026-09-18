@@ -4,13 +4,14 @@
  * turn to the relay route with the project key.
  */
 
+import { BUSY_RETRY_AFTER_MS } from "@langwatch/agent-contract";
 import type { Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
-import { nowInstant } from "@langwatch/time";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
-import { BUSY_RETRY_AFTER_MS } from "@langwatch/agent-contract";
 import type { ConnectedAgentData, RunParameterValues } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
+
 import { createChildProcessLogger } from "./child-logger.service.ts";
 import { SerializedAgent } from "./serialized-agent.service.ts";
 

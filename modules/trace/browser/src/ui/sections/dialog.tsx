@@ -1,6 +1,7 @@
 import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
-import * as React from "react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import * as React from "react";
+
 import { CloseButton } from "../elements/close-button.tsx";
 import { IsolatedErrorBoundary } from "./isolated-error-boundary.tsx";
 

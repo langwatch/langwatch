@@ -1,7 +1,7 @@
 import { Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LucideIcon } from "lucide-react";
 import { forwardRef } from "react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * A small toolbar that arrives with the pointer, on a surface of its own.

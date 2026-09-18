@@ -1,26 +1,27 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
-import { useState } from "react";
-import { UserAvatar } from "../../../../elements/user-avatar.tsx";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
-import { useDrawer } from "../../../../../behavior/use-drawer.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { api, type RouterOutputs } from "../../../../../behavior/trace-api.ts";
+import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
+import { useState } from "react";
+
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
 } from "../../../../../behavior/annotation-queue-session.store.ts";
-import {
-  openTraceEditorFromConversation,
-  tracePartitionHint,
-} from "../../utils/trace-edit-mode.ts";
-import { AnnotationPopover } from "./annotation-popover.tsx";
+import { api, type RouterOutputs } from "../../../../../behavior/trace-api.ts";
+import { useDrawer } from "../../../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { readableDate } from "../../../../../model/display-formatters.ts";
 import {
   HoverActionButton,
   HoverActionCluster,
 } from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster.tsx";
+import { UserAvatar } from "../../../../elements/user-avatar.tsx";
+import {
+  openTraceEditorFromConversation,
+  tracePartitionHint,
+} from "../../utils/trace-edit-mode.ts";
+import { AnnotationPopover } from "./annotation-popover.tsx";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 

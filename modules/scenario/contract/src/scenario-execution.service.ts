@@ -1,4 +1,3 @@
-import type { RunParameterValues } from "./scenario.parameters.ts";
 import type { ResolvedRunModels } from "./run-models.ts";
 import type { RunSecretCiphertext } from "./run-secret-ciphertext.ts";
 import type {
@@ -7,6 +6,7 @@ import type {
   ScenarioAgentInstance,
   TargetConfig,
 } from "./scenario-execution-data.ts";
+import type { RunParameterValues } from "./scenario.parameters.ts";
 
 export interface ScenarioExecutionJob {
   projectId: string;

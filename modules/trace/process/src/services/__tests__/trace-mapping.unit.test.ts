@@ -1,5 +1,3 @@
-import { TraceReadableSpanService } from "../trace-readable-span.service.ts";
-import { describe, expect, it } from "vitest";
 import {
   buildMetadataFieldChildren,
   buildSpanFieldChildren,
@@ -14,6 +12,9 @@ import {
   TRACE_MAPPINGS,
   tryAndConvertTo,
 } from "@langwatch/dataset-contract";
+import { describe, expect, it } from "vitest";
+
+import { TraceReadableSpanService } from "../trace-readable-span.service.ts";
 
 describe("SPAN_SUBFIELDS", () => {
   it("contains * (full span object) as first option", () => {

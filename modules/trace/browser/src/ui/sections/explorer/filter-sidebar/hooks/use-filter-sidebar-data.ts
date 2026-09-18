@@ -1,9 +1,16 @@
-import { useCallback, useEffect, useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { analyzeOrGroups, buildFacetStateLookup, getFacetValues } from "@langwatch/trace-contract";
-import { useTraceFacets } from "../../hooks/use-trace-facets.ts";
-import type { NumericMode } from "../../../../../behavior/numeric-mode.store.ts";
+import { useCallback, useEffect, useMemo } from "react";
+
 import { useDensityStore } from "../../../../../behavior/density.store.ts";
+import type {
+  AttributeKey,
+  AttributesSectionData,
+  CategoricalSection,
+  FacetItem,
+  FacetValueState,
+  RangeSectionData,
+  Section,
+} from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import {
   ATTRIBUTES_SECTION_KEY,
   COMFORTABLE_DEFAULT_SECTIONS,
@@ -24,22 +31,16 @@ import {
   useFacetVisibilityStore,
 } from "../../../../../behavior/facet-visibility.store.ts";
 import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import type { NumericMode } from "../../../../../behavior/numeric-mode.store.ts";
 import {
   selectNumericModesFor,
   useNumericModeStore,
 } from "../../../../../behavior/numeric-mode.store.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { hashColor } from "../../../../../model/display-formatters.ts";
-import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups.ts";
-import type {
-  AttributeKey,
-  AttributesSectionData,
-  CategoricalSection,
-  FacetItem,
-  FacetValueState,
-  RangeSectionData,
-  Section,
-} from "../../../../../behavior/explorer/filter-sidebar/types.ts";
+import { useTraceFacets } from "../../hooks/use-trace-facets.ts";
+import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 import { facetLabel, sortBySectionOrder } from "../utils.ts";
 
 export function useFilterSidebarData() {

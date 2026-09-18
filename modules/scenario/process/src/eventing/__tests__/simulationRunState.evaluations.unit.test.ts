@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import { createTenantId } from "@langwatch/eventing";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import {
@@ -12,6 +11,8 @@ import type {
   SimulationRunFinishedEvent,
   SimulationRunQueuedEvent,
 } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,

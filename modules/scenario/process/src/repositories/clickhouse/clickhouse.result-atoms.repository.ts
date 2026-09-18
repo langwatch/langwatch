@@ -1,14 +1,3 @@
-import {
-  type RawAtomRow,
-  type RunOrdinalRow,
-  type RawGroupRow,
-  type RawTrendRow,
-  type RawCodeScenarioRow,
-  type RawRunTargetRow,
-  type RawSeriesRow,
-  type RawTotalsRow,
-  ResultAtomsRepository,
-} from "../result-atoms.repository.ts";
 /**
  * Results tab atom: flat `simulation_runs` for filter/group, distinct from v1 batch/set.
  * SQL builders are static methods per restructure-bug-hunt-2026-09-03.md.
@@ -22,8 +11,20 @@ import {
   type ResultsFilter,
   type ResultsGroupBy,
 } from "@langwatch/scenario-contract";
-import { mapStatus } from "./simulation-run.mapper.ts";
+
+import {
+  type RawAtomRow,
+  type RunOrdinalRow,
+  type RawGroupRow,
+  type RawTrendRow,
+  type RawCodeScenarioRow,
+  type RawRunTargetRow,
+  type RawSeriesRow,
+  type RawTotalsRow,
+  ResultAtomsRepository,
+} from "../result-atoms.repository.ts";
 import { RUN_NOTE_EXPR, TABLE_NAME } from "./simulation-clickhouse.repository.ts";
+import { mapStatus } from "./simulation-run.mapper.ts";
 
 /** How many scenarios that ran from code the filter lists at most. */
 export const MAX_CODE_SCENARIOS = 500;

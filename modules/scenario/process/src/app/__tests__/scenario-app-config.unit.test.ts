@@ -1,14 +1,17 @@
 /**
- * ScenarioApp reads `publicBaseUrl` off its own config slice, the same way
- * SuiteApp does - see specs/scenarios/scenario-api.feature.
+ * ScenarioApp reads `publicBaseUrl` off the process's own member, the same
+ * way SuiteApp does - see specs/scenarios/scenario-api.feature.
  * @vitest-environment node
  */
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { Encryption } from "@langwatch/process-stores/members";
 import type { ResourceOwnership } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
+import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   type ScenarioExecutionService,
@@ -37,7 +40,7 @@ import type {
   ScenarioTabStore,
 } from "../scenario.app.ts";
 
-function buildProductionApp(config: unknown, emitter = new EventEmitter()) {
+function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
   return ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
@@ -45,11 +48,14 @@ function buildProductionApp(config: unknown, emitter = new EventEmitter()) {
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      presence: createApiFixture<PresenceApi>(),
+      auditLog: createApiFixture<AuditLogApi>(),
     },
-    // The same parse boot runs before handing `create` its config.
-    config: ScenarioApp.configSchema.parse(config),
+    config: undefined,
     resources: createApiFixture<ResourceOwnership>(),
     members: {
+      publicBaseUrl,
       encryption: createApiFixture<Encryption>({
         encrypt: (value: string) => value,
         decrypt: (value: string) => value,
@@ -80,7 +86,7 @@ describe("ScenarioApp built the way production composes it", () => {
   describe("given a deployment that configured a public base URL", () => {
     /** @scenario "A scenario's platform link answers when a public base URL is configured" */
     it("answers a platform link instead of refusing by name", () => {
-      const app = buildProductionApp({ publicBaseUrl: "https://app.langwatch.test" });
+      const app = buildProductionApp("https://app.langwatch.test");
 
       expect(app.platformUrl({ projectSlug: "acme", path: "/scenarios/scenario_1" })).toBe(
         "https://app.langwatch.test/acme/scenarios/scenario_1",
@@ -91,17 +97,6 @@ describe("ScenarioApp built the way production composes it", () => {
   describe("given a deployment that named no public base URL", () => {
     /** @scenario "A scenario's platform link refuses by name without a public base URL" */
     it("still refuses by name, as it did before this deployment had a config seam", () => {
-      const app = buildProductionApp({});
-
-      expect(() => app.platformUrl({ projectSlug: "acme", path: "/scenarios/scenario_1" })).toThrow(
-        /named no public base URL/,
-      );
-    });
-  });
-
-  describe("given no config slice at all", () => {
-    /** @scenario "ScenarioApp boots even when its process names no scenario config slice" */
-    it("parses to the same absent-publicBaseUrl default", () => {
       const app = buildProductionApp(undefined);
 
       expect(() => app.platformUrl({ projectSlug: "acme", path: "/scenarios/scenario_1" })).toThrow(
@@ -115,7 +110,7 @@ describe("given a subscriber watching simulation updates", () => {
   /** @scenario "Simulation updates release tenant listeners when the stream aborts" */
   it("delivers the original frame and releases the listener on disconnect", async () => {
     const emitter = new EventEmitter();
-    const app = buildProductionApp({}, emitter);
+    const app = buildProductionApp(undefined, emitter);
     const controller = new AbortController();
     const updates = app
       .simulationUpdates({

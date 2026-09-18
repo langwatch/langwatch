@@ -5,12 +5,13 @@
  * @see specs/suites/test-suites.feature
  */
 
-import { useCallback, useState } from "react";
-import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { toaster } from "@langwatch/design-system/toaster";
+import { useCallback, useState } from "react";
+
+import type { TestCase } from "../../../model/agent-testing/cases/test-cases.ts";
 import { api } from "../../scenario-api.ts";
 import type { AgentTestingSelection } from "../use-agent-testing-routing.ts";
-import type { TestCase } from "../../../model/agent-testing/cases/test-cases.ts";
 
 function toastOnError(fallbackTitle: string) {
   return (error: unknown) => showErrorToast({ error, fallbackTitle });

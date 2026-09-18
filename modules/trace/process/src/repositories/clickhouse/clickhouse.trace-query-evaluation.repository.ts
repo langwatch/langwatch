@@ -9,12 +9,9 @@ import {
   type FieldNeeds,
   type InMemoryTrace,
   UNSUPPORTED,
-  type Unsupported
+  type Unsupported,
 } from "@langwatch/trace-contract";
-import {
-  MAX_NODE_COUNT,
-  ClickHouseTraceQueryRepository,
-} from "./clickhouse.trace-query.repository.ts";
+
 import { FIELD_DEF_BY_NAME } from "./clickhouse.trace-query-fields.repository.ts";
 import { ClickHouseTraceQueryMetaFieldsRepository } from "./clickhouse.trace-query-meta-fields.repository.ts";
 import {
@@ -25,6 +22,10 @@ import {
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   ClickHouseTraceQueryValuesRepository,
 } from "./clickhouse.trace-query-values.repository.ts";
+import {
+  MAX_NODE_COUNT,
+  ClickHouseTraceQueryRepository,
+} from "./clickhouse.trace-query.repository.ts";
 
 const logger = createLogger("langwatch:traces:filter-evaluate");
 const traceQueryRepository = ClickHouseTraceQueryRepository.create();

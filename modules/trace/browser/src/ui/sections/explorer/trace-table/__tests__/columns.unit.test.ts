@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { timeColumnSizing } from "../../../../../behavior/time-format.store.ts";
 import { getTraceColumnDef } from "../columns.ts";
 

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { Trace } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { NO_TRACE_EVENTS } from "../../types/trace.ts";
 import { legacyTraceToTurn } from "../legacy-trace-to-turn.ts";
 

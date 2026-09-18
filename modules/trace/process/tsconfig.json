@@ -2,16 +2,19 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": ["es2023"],
+    "lib": [
+      "es2023"
+    ],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "rootDir": "src",
     "outDir": "dist",
-
     "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "references": [
     {
       "path": "tsconfig.build.json"
@@ -44,7 +47,7 @@
       "path": "../../data-retention/contract/tsconfig.build.json"
     },
     {
-      "path": "../../data-retention/server/tsconfig.build.json"
+      "path": "../../data-retention/process/tsconfig.build.json"
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"
@@ -128,10 +131,13 @@
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
-      "path": "../../data-privacy/server/tsconfig.build.json"
+      "path": "../../data-privacy/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../presence/contract/tsconfig.build.json"
     }
   ]
 }

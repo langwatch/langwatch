@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { simulationAllSuitesRunDataSchema, simulationRunDataSchema } from "../index.ts";
 
 describe("Simulation contract", () => {

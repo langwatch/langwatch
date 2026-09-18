@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { CompactStreamingEvent } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 export interface StreamingMessage {
   messageId: string;

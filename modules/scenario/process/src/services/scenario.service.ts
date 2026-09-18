@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   isCancellableStatus,
   ScenarioNotFoundError,
@@ -41,11 +42,17 @@ import {
   type CancelScenarioBatchInput,
   type CancelScenarioRunInput,
   resolveRunParameters,
+  readScenarioFieldValues,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import { createLogger } from "@langwatch/observability";
+
+import type {
+  ScenarioClock,
+  ScenarioTestSuiteId,
+  ScenarioId,
+  ScenarioSecretCipher,
+} from "../app/scenario.app.ts";
 import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
-import type { ScenarioClock,ScenarioTestSuiteId,ScenarioId,ScenarioSecretCipher } from "../app/scenario.app.ts";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 
 const logger = createLogger("langwatch:scenarios");
@@ -89,9 +96,15 @@ export class ScenarioService {
     // project's Default, which is created here on the first such write.
     const testSuiteId =
       parsed.testSuiteId ?? (await this.ensureDefaultTestSuiteId(parsed.projectId));
+    const fields = await this.validatedFields({
+      projectId: parsed.projectId,
+      testSuiteId,
+      fields: parsed.fields,
+    });
 
     return this.options.repository.create({
       ...parsed,
+      ...(fields !== undefined ? { fields } : {}),
       testSuiteId,
       id: this.options.ids.next(),
       actor: parsed.actor ?? actorFor(parsed.lastUpdatedById),
@@ -159,10 +172,41 @@ export class ScenarioService {
 
   async update(input: ScenarioUpdateInput): Promise<Scenario> {
     const parsed = await this.withResolvedTestSuite(scenarioUpdateInputSchema.parse(input));
+    let fields = parsed.fields;
+    if (fields !== undefined) {
+      const scenario = await this.options.repository.findById({
+        id: parsed.id,
+        projectId: parsed.projectId,
+      });
+      fields = await this.validatedFields({
+        projectId: parsed.projectId,
+        testSuiteId: parsed.testSuiteId ?? scenario.testSuiteId,
+        fields,
+      });
+    }
 
     return this.options.repository.update({
       ...parsed,
+      ...(fields !== undefined ? { fields } : {}),
       actor: parsed.actor ?? actorFor(parsed.lastUpdatedById),
+    });
+  }
+
+  private async validatedFields(input: {
+    projectId: string;
+    testSuiteId: string | null;
+    fields: ScenarioCreateInput["fields"];
+  }): Promise<ScenarioCreateInput["fields"]> {
+    if (input.fields === undefined) return undefined;
+    const suite = input.testSuiteId
+      ? await this.options.repository.findTestSuite({
+          projectId: input.projectId,
+          testSuiteId: input.testSuiteId,
+        })
+      : null;
+    return readScenarioFieldValues({
+      values: input.fields,
+      definitions: suite?.fields ?? [],
     });
   }
 

@@ -5,10 +5,11 @@
  */
 
 import { Button } from "@chakra-ui/react";
-import { MoreVertical } from "lucide-react";
-import { Menu } from "@langwatch/design-system/menu";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import { Menu } from "@langwatch/design-system/menu";
+import { MoreVertical } from "lucide-react";
+
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import { MenuActionLabel, type MenuActionName } from "./menu-action-label.tsx";
 import { RecentRunsSubmenu } from "./recent-runs-menu.tsx";
 
@@ -113,11 +114,7 @@ export function SuiteRailMenu({
           </SuiteMenuItem>
         )}
         {canManage && (
-          <SuiteMenuItem
-            value="edit-suite"
-            action="edit"
-            onChoose={() => onEditSuite(suite.id)}
-          >
+          <SuiteMenuItem value="edit-suite" action="edit" onChoose={() => onEditSuite(suite.id)}>
             Edit
           </SuiteMenuItem>
         )}

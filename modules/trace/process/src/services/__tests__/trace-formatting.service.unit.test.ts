@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Trace } from "@langwatch/trace-contract";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { toLLMModeTrace } from "../../rules/trace-formatting.rules.ts";
 

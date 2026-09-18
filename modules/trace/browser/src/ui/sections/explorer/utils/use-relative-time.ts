@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { formatRelativeTime, formatVerboseRelative } from "../../../../model/display-formatters.ts";
 import { nowInstant } from "@langwatch/time";
+import { useEffect, useState } from "react";
+
+import { formatRelativeTime, formatVerboseRelative } from "../../../../model/display-formatters.ts";
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;

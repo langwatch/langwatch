@@ -1,5 +1,6 @@
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Extension } from "@tiptap/react";
+
 import { PARAGRAPH_OFFSET } from "./editor-document.ts";
 
 // Auto-uppercase `and`/`or`/`not` when the user types a separator after

@@ -1,21 +1,21 @@
-import type { Instant } from "@langwatch/time";
-/**
- * The window the Results tab reads, in the two forms the surface uses.
- * @see specs/features/agent-testing/results-tabs.feature
- */
-
-import { differenceInCalendarDays, fromDate } from "@langwatch/time";
 import type {
   Period,
   RelativePresetKey,
   PeriodMode,
 } from "@langwatch/analytics-browser-kit/period-selector";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+/**
+ * The window the Results tab reads, in the two forms the surface uses.
+ * @see specs/features/agent-testing/results-tabs.feature
+ */
 import {
   describePeriod,
   matchPeriodPreset,
   PeriodSelector,
 } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Instant } from "@langwatch/time";
+import { differenceInCalendarDays, fromDate } from "@langwatch/time";
+
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 /**
  * How many days the window spans, counted the way the shared period control

@@ -8,6 +8,7 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { createTenantId } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import type { SimulationRunState } from "../../../eventing/simulation-run-state.projection.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
 

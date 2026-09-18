@@ -1,9 +1,9 @@
+import { ChildProcessJobDataSchema, type LiteLLMParams } from "@langwatch/scenario-contract";
 /** @vitest-environment node
  * Child-process serialization boundary (issue #6634): model params optional
  * per field but payload must yield a model for each role (real parse/selection).
  */
 import { describe, expect, it } from "vitest";
-import { ChildProcessJobDataSchema, type LiteLLMParams } from "@langwatch/scenario-contract";
 
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 

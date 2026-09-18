@@ -25,3 +25,7 @@ export const scenarioGenerateRequestSchema = z.object({
     .nullable(),
   projectId: z.string().min(1, "Project ID is required"),
 });
+export type ScenarioGenerateRequest = z.infer<typeof scenarioGenerateRequestSchema>;
+
+export const scenarioGenerateResponseSchema = z.object({ scenario: scenarioGenerateResultSchema });
+export type ScenarioGenerateResponse = z.infer<typeof scenarioGenerateResponseSchema>;

@@ -1,5 +1,7 @@
 import type { CanonicalEvent } from "@langwatch/trace-contract";
 import { ATTR_KEYS, SPAN_TYPE_TO_GEN_AI_OP } from "@langwatch/trace-contract";
+
+import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
 import { asNumber, isNonEmptyString, isRecord } from "./canonical-guard.rules.ts";
 import {
   decodeMessagesPayload,
@@ -7,7 +9,6 @@ import {
   normalizeToMessages,
   stripSystemMessages,
 } from "./canonical-message.rules.ts";
-import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
 
 export type MessageSource =
   | { type: "attr"; keys: readonly string[] }

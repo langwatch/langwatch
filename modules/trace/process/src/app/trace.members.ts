@@ -1,13 +1,46 @@
-import type { EventingTracePipelineAdapter } from "../services/eventing.trace-pipeline.service.ts";
+import type { Readable } from "node:stream";
+
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EventSourcing, QueueSendOptions, TenantId } from "@langwatch/eventing";
 import type { ModelCost } from "@langwatch/model-provider-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
-import type { OrgAdminResolution, Project, UpdateProjectMetadataInput } from "@langwatch/project-contract";
+import type {
+  OrgAdminResolution,
+  Project,
+  UpdateProjectMetadataInput,
+} from "@langwatch/project-contract";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
-import type { AnnotationAddedEventData, AnnotationRemovedEventData, AssignTopicCommandData, CustomersAndLabelsResult, DerivedTraceEvent, DistinctFieldNamesResult, Evaluation, NormalizedAttributes, NormalizedSpan, OtlpInstrumentationScope, OtlpResource, OtlpSpan, PIIRedactionLevel, PromptStudioSpanResult, RecordSpanCommandData, TopicCountsResult, Trace, TraceDerivedEventsInput, TraceLegacyFilterInput, TraceLegacyListInput, TraceNameChangedEventData, TraceQueryClassification, TraceRecordValue, TraceTopicAssignment, TracesForProjectResult } from "@langwatch/trace-contract";
-import type { Readable } from "node:stream";
-export interface TraceInfrastructure {  traceEdgeMediaTelemetry: TraceEdgeMediaTelemetry;
+import type {
+  AnnotationAddedEventData,
+  AnnotationRemovedEventData,
+  AssignTopicCommandData,
+  CustomersAndLabelsResult,
+  DerivedTraceEvent,
+  DistinctFieldNamesResult,
+  Evaluation,
+  NormalizedAttributes,
+  NormalizedSpan,
+  OtlpInstrumentationScope,
+  OtlpResource,
+  OtlpSpan,
+  PIIRedactionLevel,
+  PromptStudioSpanResult,
+  RecordSpanCommandData,
+  TopicCountsResult,
+  Trace,
+  TraceDerivedEventsInput,
+  TraceLegacyFilterInput,
+  TraceLegacyListInput,
+  TraceNameChangedEventData,
+  TraceQueryClassification,
+  TraceRecordValue,
+  TraceTopicAssignment,
+  TracesForProjectResult,
+} from "@langwatch/trace-contract";
+
+import type { EventingTracePipelineAdapter } from "../services/eventing.trace-pipeline.service.ts";
+export interface TraceInfrastructure {
+  traceEdgeMediaTelemetry: TraceEdgeMediaTelemetry;
   traceEvaluationDispatch: TraceEvaluationDispatch;
   traceEvaluationLoopMetrics: TraceEvaluationLoopMetrics;
   traceEvaluationMonitor: TraceEvaluationMonitor;
@@ -76,11 +109,9 @@ export interface TraceEvaluationMonitor {
   getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]>;
 }
 
-
 export interface TraceEventDerivation {
   derive(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]>;
 }
-
 
 export interface TraceFullIo {
   recompute(spans: NormalizedSpan[]): {
@@ -97,14 +128,10 @@ export type TraceIoValue = {
   source: "gen_ai" | "langwatch";
 };
 
-
 export interface TraceIoExtraction {
   extractRichIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null;
 
-  extractFallbackIOFromSpan(
-    span: NormalizedSpan,
-    side: TraceIoSide,
-  ): TraceIoValue | null;
+  extractFallbackIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null;
 }
 
 /** The legacy trace read, as tRPC transports use it. Declared here to let
@@ -202,7 +229,6 @@ export type TraceMediaReference = {
   role?: string;
 };
 
-
 export const TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE = "langwatch.reserved.media_refs.input";
 export const TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE = "langwatch.reserved.media_refs.output";
 
@@ -255,7 +281,6 @@ export interface TraceEdgeMediaTelemetry {
 export interface TraceModelCostCatalog {
   listCosts(input: { projectId: string }): Promise<ModelCost[]>;
 }
-
 
 export interface TraceModelCost {
   estimate(input: {
@@ -329,11 +354,9 @@ export interface TraceQueryClassifier {
   classify(query: string): TraceQueryClassification;
 }
 
-
 export interface TraceSpanIngest {
   recordSpan(data: RecordSpanCommandData): Promise<void>;
 }
-
 
 export interface TraceSpanNormalization {
   normalizeSpanReceived(
@@ -346,7 +369,6 @@ export interface TraceSpanNormalization {
   enrichRagContextIds(span: NormalizedSpan): void;
 }
 
-
 export interface TraceSpanPiiRedaction {
   redact(
     span: OtlpSpan,
@@ -356,11 +378,9 @@ export interface TraceSpanPiiRedaction {
   ): Promise<void>;
 }
 
-
 export interface TraceSpanCostEnrichment {
   enrich(span: OtlpSpan, tenantId: string): Promise<void>;
 }
-
 
 export interface TraceSpanTokenEstimation {
   estimate(span: OtlpSpan, tenantId: string): Promise<void>;
@@ -370,7 +390,6 @@ export type TraceSpanContentDropResult = {
   droppedCount: number;
   droppedCategories: string[];
 };
-
 
 export interface TraceSpanContentDrop {
   drop(span: OtlpSpan, projectId: string): Promise<TraceSpanContentDropResult>;
@@ -455,4 +474,3 @@ export interface TraceTenantBroadcast {
 
 /** The one channel the trace path publishes on, as the far side spells it. */
 export const TRACE_TENANT_BROADCAST_EVENT_TYPE = "trace_updated" as const;
-

@@ -1,7 +1,4 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import { api } from "../../../../../behavior/trace-api.ts";
 import {
   deriveSessionBanner,
   indexToolSpansBySpanId,
@@ -9,6 +6,10 @@ import {
   TerminalSkeleton,
   TerminalView,
 } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { useMemo } from "react";
+
+import { api } from "../../../../../behavior/trace-api.ts";
 import { useSessionScrollback } from "./use-session-scrollback.ts";
 
 /** Stable identity while the transcript is still in flight. */

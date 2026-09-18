@@ -1,11 +1,3 @@
-import type { Protections } from "@langwatch/trace-contract";
-/**
- * @vitest-environment node
- * API-key callers resolve as public viewers subject to data-privacy gates.
- * Covers every agent wire shape (claude, codex, gemini) with different event names.
- */
-
-import { beforeEach, describe, expect, it } from "vitest";
 import {
   CONTENT_CATEGORIES,
   describeAudience,
@@ -16,6 +8,13 @@ import {
   type DataPrivacyScopeFacts,
   type ResolvedCategory,
 } from "@langwatch/data-privacy-contract";
+/**
+ * @vitest-environment node
+ * API-key callers resolve as public viewers subject to data-privacy gates.
+ * Covers every agent wire shape (claude, codex, gemini) with different event names.
+ */
+import type { Protections } from "@langwatch/trace-contract";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
 import { TraceTranscriptReadService } from "../../../services/trace-transcript-read.service.ts";

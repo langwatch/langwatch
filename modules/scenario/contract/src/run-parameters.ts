@@ -2,6 +2,7 @@
  * whole if any parameter invalid, not partially.
  */
 
+import { renderScenarioContent } from "./scenario-content-template.ts";
 import {
   ScenarioParameterMissingError,
   ScenarioParameterOptionInvalidError,
@@ -12,7 +13,6 @@ import {
   ScenarioSecretParameterInTextError,
   ScenarioSecretParameterMissingError,
 } from "./scenario-run-parameter.error.ts";
-import { renderScenarioContent } from "./scenario-content-template.ts";
 import {
   findUnknownParameterKeys,
   mergeRunParameters,

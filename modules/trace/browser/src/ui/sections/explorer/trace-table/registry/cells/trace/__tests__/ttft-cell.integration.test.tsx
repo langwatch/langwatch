@@ -5,9 +5,13 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+
 import type { TraceListItem } from "../../../../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../../../../types/trace.ts";
-import { TraceStatisticsProvider, useTraceStatistics } from "../../../../trace-statistics-context.tsx";
+import {
+  TraceStatisticsProvider,
+  useTraceStatistics,
+} from "../../../../trace-statistics-context.tsx";
 import type { CellRenderContext } from "../../../types.ts";
 import { TtftCell } from "../ttft-cell.tsx";
 

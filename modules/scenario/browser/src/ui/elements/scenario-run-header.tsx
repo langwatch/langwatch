@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-
 import type { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
+
 import { CopyIdChip } from "./copy-id-chip.tsx";
 import { ScenarioRunStatusIcon } from "./scenario-run-status-icon.tsx";
 
@@ -17,12 +17,7 @@ interface ScenarioRunHeaderProps {
   caller?: "Simulated" | "You" | null;
 }
 
-export function ScenarioRunHeader({
-  status,
-  name,
-  copyableIds,
-  caller,
-}: ScenarioRunHeaderProps) {
+export function ScenarioRunHeader({ status, name, copyableIds, caller }: ScenarioRunHeaderProps) {
   return (
     <Box p={5} borderBottom="1px" borderColor="border" w="100%">
       <HStack justify="space-between" align="center">

@@ -1,4 +1,5 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
+
 import {
   type TraceEdgeMediaFailOpenReason,
   type TraceEdgeMediaTelemetry,
@@ -20,8 +21,7 @@ export class OtelTraceEdgeMediaTelemetryAdapter implements TraceEdgeMediaTelemet
     );
   }
 
-  private constructor(private readonly failOpenTotal: CounterHandle) {
-  }
+  private constructor(private readonly failOpenTotal: CounterHandle) {}
 
   failOpen(reason: TraceEdgeMediaFailOpenReason, count = 1): void {
     this.failOpenTotal.inc({ reason }, count);

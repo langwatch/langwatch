@@ -4,12 +4,10 @@
  */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
+
 import { inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
 import { isNonEmptyString } from "../rules/canonical-guard.rules.ts";
-import type {
-  AttributeCanonicaliser,
-  ExtractorContext,
-} from "./canonical-attributes.service.ts";
+import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 

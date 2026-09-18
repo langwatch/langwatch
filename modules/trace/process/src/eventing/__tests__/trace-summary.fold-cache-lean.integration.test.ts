@@ -15,11 +15,12 @@ import {
 } from "@langwatch/eventing";
 import type { SpanReceivedEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+
 import {
   IO_PREVIEW_BYTES,
   TraceProjectionLeanService,
 } from "../../services/projection/trace-projection-lean.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 

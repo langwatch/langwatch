@@ -9,14 +9,18 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { type TraceEvaluationDispatch,
+
+import {
+  type TraceEvaluationDispatch,
   type TraceEvaluationLoopMetrics,
-  type TraceEvaluationLoopBlockReason,type TraceEvaluationMonitor } from "../../app/trace.members.ts";
-import { MAX_PROCESSED_SPANS } from "../trace-summary.projection.ts";
+  type TraceEvaluationLoopBlockReason,
+  type TraceEvaluationMonitor,
+} from "../../app/trace.members.ts";
 import {
   createEvaluationTriggerSubscriber,
   detectCausalityLoop,
 } from "../evaluation-trigger.subscriber.ts";
+import { MAX_PROCESSED_SPANS } from "../trace-summary.projection.ts";
 
 /**
  * Spec: modules/trace/specs/evaluation-trigger.feature
@@ -115,8 +119,7 @@ class Dispatch implements TraceEvaluationDispatch {
     options?: QueueSendOptions<ExecuteEvaluationCommandData>;
   }[] = [];
 
-  constructor(private readonly behaviour: { throwsFor?: string } = {}) {
-  }
+  constructor(private readonly behaviour: { throwsFor?: string } = {}) {}
 
   makeDedupId(data: ExecuteEvaluationCommandData): string {
     return `exec:${data.tenantId}:${data.traceId}:${data.evaluatorId}`;

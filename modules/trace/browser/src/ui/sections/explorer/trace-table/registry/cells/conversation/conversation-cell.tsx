@@ -1,6 +1,7 @@
 import { Box, Circle, chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { AlertTriangle, ChevronDown, ChevronRight, Zap } from "lucide-react";
 import type React from "react";
+
 import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
 import { useViewStore } from "../../../../../../../behavior/view.store.ts";
 import { truncateId } from "../../../../../../../model/display-formatters.ts";

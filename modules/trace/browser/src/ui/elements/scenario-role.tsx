@@ -12,10 +12,7 @@ interface ScenarioRoleState {
    *  call (a voice "Call it myself" run), not an LLM user-simulator. Their
    *  turns read as "You" rather than "User Simulator" (#8020). */
   isHumanCaller: boolean;
-  setScenarioRole: (value: {
-    isScenario: boolean;
-    isHumanCaller: boolean;
-  }) => void;
+  setScenarioRole: (value: { isScenario: boolean; isHumanCaller: boolean }) => void;
 }
 
 const useScenarioRoleStore = create<ScenarioRoleState>((set) => ({
@@ -70,10 +67,7 @@ export interface DisplayRoleVisuals {
 
 export function getDisplayRoleVisuals(
   role: SourceRole,
-  {
-    isScenario,
-    isHumanCaller = false,
-  }: { isScenario: boolean; isHumanCaller?: boolean },
+  { isScenario, isHumanCaller = false }: { isScenario: boolean; isHumanCaller?: boolean },
 ): DisplayRoleVisuals {
   if (!isScenario) {
     return role === "user"

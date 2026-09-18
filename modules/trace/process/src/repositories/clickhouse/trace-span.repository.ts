@@ -1,10 +1,11 @@
+import { EventUtils } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
 import type {
   EvaluationTraceEvent,
   EvaluationTraceReadInput,
   EvaluationTraceSpan,
   SpanTreeCursor,
 } from "@langwatch/trace-contract";
-import { EventUtils } from "@langwatch/eventing";
 
 import type { TraceClickHouse } from "../trace-clickhouse-client.repository.ts";
 import {
@@ -13,7 +14,6 @@ import {
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../trace-projected-read.repository.ts";
-import { nowInstant } from "@langwatch/time";
 
 const STORED_SPANS_TABLE = "stored_spans";
 const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;

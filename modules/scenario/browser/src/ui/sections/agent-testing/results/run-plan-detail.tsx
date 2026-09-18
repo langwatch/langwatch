@@ -1,25 +1,25 @@
-import type { Instant } from "@langwatch/time";
+import { HStack } from "@chakra-ui/react";
 /**
  * One run plan: its runs in a rail on the left, the results of the selected
  * run filling the rest of the page.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */
-
-import { HStack } from "@chakra-ui/react";
 import type {
   Period,
   PeriodMode,
   RelativePresetKey,
 } from "@langwatch/analytics-browser-kit/period-selector";
-import { useAgentTestingStore } from "../use-agent-testing-store.ts";
-import { RunPlanResultsColumn } from "./run-plan-results-column.tsx";
-import { RunsSidebar } from "./runs-sidebar.tsx";
+import type { Instant } from "@langwatch/time";
+
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import {
   useRunPlanBatches,
   useSelectedBatch,
 } from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
+import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import { RunPlanResultsColumn } from "./run-plan-results-column.tsx";
+import { RunsSidebar } from "./runs-sidebar.tsx";
 
 export type RunPlanDetailProps = {
   plan: RunPlan;

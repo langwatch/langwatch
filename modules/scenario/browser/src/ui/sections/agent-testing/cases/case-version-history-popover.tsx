@@ -5,11 +5,12 @@
  */
 
 import { Button, useDisclosure } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
 import { History } from "lucide-react";
 import { useEffect } from "react";
-import { Popover } from "@langwatch/design-system/popover";
-import { ScenarioVersionList } from "../drawers/scenario-version-list.tsx";
+
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { ScenarioVersionList } from "../drawers/scenario-version-list.tsx";
 
 export function CaseVersionHistoryPopover({
   scenarioId,

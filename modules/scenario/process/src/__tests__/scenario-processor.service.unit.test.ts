@@ -1,9 +1,12 @@
 import { ChildProcess } from "node:child_process";
+
 import {
   ScenarioExecutionService,
   type ScenarioExecutionPrefetchResult,
 } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { CancellationSubscriber } from "../app/scenario.app.ts";
 import {
   NodeScenarioChildProcessAdapter,
   ScenarioExecutionPoolService,
@@ -16,7 +19,6 @@ import {
   type ScenarioExecutionRunner,
   type ScenarioProcessorServiceMetrics,
 } from "../index.ts";
-import type { CancellationSubscriber } from "../app/scenario.app.ts";
 
 const job = (id: string): ExecutionJobData => ({
   projectId: "project-1",
@@ -56,8 +58,7 @@ class HoldingExecutionRunner implements ScenarioExecutionRunner {
   constructor(
     private readonly pool: ScenarioExecutionPoolService,
     private readonly child: ChildProcess,
-  ) {
-  }
+  ) {}
 
   execute(jobData: ExecutionJobData): Promise<void> {
     this.pool.registerChild(jobData.scenarioRunId, this.child);

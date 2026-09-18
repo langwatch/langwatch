@@ -1,12 +1,13 @@
 import { Box, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatDuration } from "../../../model/display-formatters.ts";
-import { BlockLabel } from "./block-label.tsx";
-import { MIN_BLOCK_PX, ROW_HEIGHT, TINY_BLOCK_PCT } from "../../../model/flame/constants.ts";
-import { flameBlockVisuals } from "../../../model/flame/block-visuals.ts";
-import { getSpanColor } from "../../../model/flame/colors.ts";
+
 import { formatPercent } from "../../../behavior/flame/tree.ts";
 import type { FlameNode, Viewport } from "../../../behavior/flame/types.ts";
+import { formatDuration } from "../../../model/display-formatters.ts";
+import { flameBlockVisuals } from "../../../model/flame/block-visuals.ts";
+import { getSpanColor } from "../../../model/flame/colors.ts";
+import { MIN_BLOCK_PX, ROW_HEIGHT, TINY_BLOCK_PCT } from "../../../model/flame/constants.ts";
+import { BlockLabel } from "./block-label.tsx";
 
 interface RelatedSpanIds {
   ancestors: Set<string>;

@@ -72,6 +72,7 @@ vi.mock("../../../../simulations/media-part.tsx", () => ({
 }));
 
 import type { TraceMediaRef } from "@langwatch/trace-contract";
+
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { ConversationView } from "../conversation-view.tsx";
 

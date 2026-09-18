@@ -1,6 +1,7 @@
 import { Box, Flex } from "@chakra-ui/react";
-import { memo, useCallback } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
+import { memo, useCallback } from "react";
+
 import { useSpanHoverStore } from "../../../../../behavior/span-hover.store.ts";
 import {
   BAR_HEIGHT,

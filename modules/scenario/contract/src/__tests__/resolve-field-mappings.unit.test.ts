@@ -4,6 +4,7 @@
 
 import type { FieldMapping, ScenarioInput } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   computeBestMatchMappings,
   resolveFieldMappings,

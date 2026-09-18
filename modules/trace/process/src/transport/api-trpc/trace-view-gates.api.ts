@@ -1,8 +1,14 @@
-import type { Protections,Evaluation,SpanTreeNode,TraceHeader,TraceResourceInfoDto } from "@langwatch/trace-contract";
-import { TraceViewerProtectionsService } from "../../services/trace-viewer-protections.service.ts";
+import type {
+  Protections,
+  Evaluation,
+  SpanTreeNode,
+  TraceHeader,
+  TraceResourceInfoDto,
+} from "@langwatch/trace-contract";
 import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
-import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service.ts";
 
+import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service.ts";
+import { TraceViewerProtectionsService } from "../../services/trace-viewer-protections.service.ts";
 
 /**
  * Gates for v2 trace read DTOs: enforces same Protections on both transports

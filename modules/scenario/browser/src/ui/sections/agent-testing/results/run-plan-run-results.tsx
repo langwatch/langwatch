@@ -5,11 +5,17 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
+import { VStack } from "@chakra-ui/react";
+import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { ScenarioRunContent } from "@langwatch/suite-browser/run-cards";
 import { type BatchRun, targetKeyOfRun } from "@langwatch/suite-browser/run-formatters";
+
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import type {
+  RunPlanBatches,
+  RunPlanSelection,
+} from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
-import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { VStack } from "@chakra-ui/react";
 import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot.tsx";
 import { ComparisonChartsBlock } from "./comparison-charts-block.tsx";
 import { ComparisonResultsTable } from "./comparison-results-table.tsx";
@@ -21,12 +27,7 @@ import {
   WaitingForFirstRun,
 } from "./run-plan-results-states.tsx";
 import { RunResultsTable } from "./run-results-table.tsx";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { type BatchTarget, isComparison, runsOfTarget } from "./use-batch-targets.ts";
-import type {
-  RunPlanBatches,
-  RunPlanSelection,
-} from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
 import type { useRunPlanCancel } from "./use-run-plan-cancel.ts";
 import type { useRunPlanViewMode } from "./use-run-plan-view-mode.ts";
 import { useRunRowHandlers } from "./use-run-row-handlers.ts";

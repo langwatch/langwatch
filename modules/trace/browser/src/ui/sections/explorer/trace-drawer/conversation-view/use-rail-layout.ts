@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import type { Mode } from "./types.ts";
 
 /** How wide the reading column gets before the rail is taken into account. */

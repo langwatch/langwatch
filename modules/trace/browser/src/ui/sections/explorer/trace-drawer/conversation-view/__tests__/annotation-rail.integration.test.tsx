@@ -108,12 +108,12 @@ vi.mock("../chat-turn-row.tsx", () => ({
   ),
 }));
 
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store.ts";
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
 } from "../../../../../../behavior/annotation-queue-session.store.ts";
+import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { AnnotatedTurnRow } from "../annotated-turn-row.tsx";
 import type { ParsedTurn, TurnLayout } from "../types.ts";

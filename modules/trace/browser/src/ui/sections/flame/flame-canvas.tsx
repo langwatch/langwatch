@@ -1,16 +1,17 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import type { VirtualItem } from "@tanstack/react-virtual";
 import type { MouseEvent, PointerEvent, RefObject } from "react";
-import { formatDuration } from "../../../model/display-formatters.ts";
-import { FlameAxis } from "./flame-axis.tsx";
-import { FlameRow } from "./flame-row.tsx";
-import { Minimap } from "./minimap.tsx";
+
 import type {
   FlameNode,
   FlameRelatedSpanIds,
   FlameTick,
   Viewport,
 } from "../../../behavior/flame/types.ts";
+import { formatDuration } from "../../../model/display-formatters.ts";
+import { FlameAxis } from "./flame-axis.tsx";
+import { FlameRow } from "./flame-row.tsx";
+import { Minimap } from "./minimap.tsx";
 
 export interface FlameCanvasProps {
   flameAreaRef: RefObject<HTMLDivElement | null>;
@@ -256,8 +257,8 @@ export function FlameCanvas({
         {hiddenSpanCount > 0 && (
           <Flex justify="center" paddingY={1}>
             <Text textStyle="xs" color="fg.subtle">
-              {hiddenSpanCount} span{hiddenSpanCount !== 1 ? "s" : ""} too small to display: zoom
-              in to see
+              {hiddenSpanCount} span{hiddenSpanCount !== 1 ? "s" : ""} too small to display: zoom in
+              to see
             </Text>
           </Flex>
         )}

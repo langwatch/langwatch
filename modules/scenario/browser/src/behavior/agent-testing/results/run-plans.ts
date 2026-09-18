@@ -3,15 +3,16 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { RunGroupSummary } from "@langwatch/suite-browser/run-formatters";
-import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "../../suites/use-suite-routing.ts";
 import { isOnPlatformSet } from "@langwatch/scenario-contract";
 import type {
   ExternalSetSummary,
   ScenarioRunData,
   SuiteRunSummary,
 } from "@langwatch/scenario-contract";
+import type { RunGroupSummary } from "@langwatch/suite-browser/run-formatters";
 import { parseSuiteScope, getSuiteSetId } from "@langwatch/suite-contract";
+
+import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "../../suites/use-suite-routing.ts";
 import { RESULTS_SEGMENT } from "../use-agent-testing-routing.ts";
 
 /**

@@ -4,15 +4,16 @@
  */
 
 import { Box, chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import type { Instant } from "@langwatch/time";
+import { ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
 } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 /** One line of the dropdown. */
 export type RunNameOption = {

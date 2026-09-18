@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { resolveChildTlsEnv } from "../index.ts";
 
 describe("resolveChildTlsEnv", () => {

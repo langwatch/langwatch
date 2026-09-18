@@ -3,6 +3,7 @@
  */
 
 import { isMediaPartRole, type MediaPartRole, type TraceMediaRef } from "@langwatch/trace-contract";
+
 import { type CollectedMediaPart, collectAnnotatedMediaParts } from "./media-parts.ts";
 
 /** Which summary strip a ref belongs on. */

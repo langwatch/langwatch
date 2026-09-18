@@ -12,20 +12,21 @@ import {
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
-import { ClickHouseSimulationRunMetricsRepository } from "./clickhouse.simulation-run-metrics.repository.ts";
-import { ClickHouseSimulationRunStateRepository } from "./clickhouse.simulation-run-state.repository.ts";
-import { ClickHouseStalledSimulationRunRepository } from "./clickhouse.stalled-simulation-run.repository.ts";
-import { MemorySimulationRunStateRepository } from "../memory/memory.simulation-run-state.repository.ts";
+
 import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
+import { SimulationRunMetricsAppendStore } from "../../eventing/simulation-run-metrics.store.ts";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunStateData,
 } from "../../eventing/simulation-run-state.projection.ts";
+import { MemorySimulationRunStateRepository } from "../memory/memory.simulation-run-state.repository.ts";
 import {
   BACKFILL_STALE_THRESHOLD_MS,
   type StalledHistoricalRun,
 } from "../stalled-simulation-run.repository.ts";
-import { SimulationRunMetricsAppendStore } from "../../eventing/simulation-run-metrics.store.ts";
+import { ClickHouseSimulationRunMetricsRepository } from "./clickhouse.simulation-run-metrics.repository.ts";
+import { ClickHouseSimulationRunStateRepository } from "./clickhouse.simulation-run-state.repository.ts";
+import { ClickHouseStalledSimulationRunRepository } from "./clickhouse.stalled-simulation-run.repository.ts";
 
 const logger = createLogger("scenario:simulation-run-state-fold-store");
 

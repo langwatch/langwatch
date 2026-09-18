@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+
 import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   type LensConfig,
   setLensSyncBridge,

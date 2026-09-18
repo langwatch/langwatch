@@ -4,8 +4,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { SessionGroupsClickHouseRepository } from "../session-groups.repository.ts";
+
 import type { SessionGroupsQuery } from "../../session-groups.repository.ts";
+import { SessionGroupsClickHouseRepository } from "../session-groups.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,

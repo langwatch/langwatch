@@ -9,9 +9,11 @@ import {
   MANAGEMENT_API_VERSION,
   type RestRawResult,
 } from "@langwatch/api/rest";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   applyOtlpReceiverPolicy,
+  canonicalOtlpPath,
   type OtlpReceiverPolicy,
   type OtlpReceiverRequest,
   decodeBase64OpenTelemetryId,
@@ -22,17 +24,16 @@ import {
   parseOtlpTraces,
   readCorrectedPath,
   readOtlpBody,
+  stampCorrectedPath,
 } from "@langwatch/otlp";
+import { resolveRequestBound } from "@langwatch/plans";
+import { nowInstant } from "@langwatch/time";
+import { OtlpIngestSourceBillingUnavailableError } from "@langwatch/trace-contract";
 import { SpanKind, SpanStatusCode, type Span } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-import { getLangWatchTracer } from "langwatch";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPException } from "hono/http-exception";
-import { moduleApi } from "@langwatch/kernel";
-
-import { OtlpIngestSourceBillingUnavailableError } from "@langwatch/trace-contract";
-import { nowInstant } from "@langwatch/time";
-import { resolveRequestBound } from "@langwatch/plans";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { getLangWatchTracer } from "langwatch";
 
 /** The project a receiver writes into. */
 export type OtlpIngestProject = Readonly<{
@@ -217,7 +218,9 @@ function logCorrectedPath({
   projectId: string;
   logger: Logger;
 }): void {
-  const originalPath = readCorrectedPath(request.headers.get(OTLP_CORRECTED_PATH_HEADER) ?? undefined);
+  const originalPath = readCorrectedPath(
+    request.headers.get(OTLP_CORRECTED_PATH_HEADER) ?? undefined,
+  );
   if (!originalPath) return;
   // A NUL joins the pair because it cannot appear in a URL pathname, so no
   // project and path can collide with a different pair.
@@ -363,6 +366,24 @@ function requestForDecompression(request: Request, bytes: Uint8Array): Request {
   });
 }
 
+/**
+ * The older exporter bases resolve to a canonical signal without re-entering
+ * the HTTP host. The marker is stamped in-process, so a customer header cannot
+ * impersonate a corrected request in the receiver's diagnostic log.
+ */
+function correctedOtlpRequest(request: Request): Request | null {
+  const url = new URL(request.url);
+  const originalPath = url.pathname;
+  const canonicalPath = canonicalOtlpPath(originalPath);
+  if (!canonicalPath || canonicalPath === originalPath) return null;
+
+  url.pathname = canonicalPath;
+  const headers = new Headers(request.headers);
+  stampCorrectedPath({ headers, originalPath });
+
+  return new Request(url, { method: request.method, headers });
+}
+
 const jsonAnswer = (body: unknown, status: ContentfulStatusCode): RestRawResult => ({
   status,
   headers: { "content-type": "application/json" },
@@ -424,7 +445,12 @@ async function handleTracesRequest(
   // Body successfully parsed - only now is the key marked used.
   markUsed();
 
-  applyReceiverProvenance({ request: parsed.request, identity, signal: "traces", logger: loggerTraces });
+  applyReceiverProvenance({
+    request: parsed.request,
+    identity,
+    signal: "traces",
+    logger: loggerTraces,
+  });
 
   const result = await ports.otlpTraces({ tenantId: project.id, traceRequest: parsed.request });
 
@@ -473,7 +499,12 @@ async function handleLogsRequest(
 
   markUsed();
 
-  applyReceiverProvenance({ request: parsed.request, identity, signal: "logs", logger: loggerLogs });
+  applyReceiverProvenance({
+    request: parsed.request,
+    identity,
+    signal: "logs",
+    logger: loggerLogs,
+  });
 
   const result = await ports.otlpLogs({
     tenantId: project.id,
@@ -544,7 +575,12 @@ async function handleMetricsRequest(
     return jsonAnswer({ error: "Failed to parse metrics" }, 400);
   }
 
-  applyReceiverProvenance({ request: parsed.request, identity, signal: "metrics", logger: loggerMetrics });
+  applyReceiverProvenance({
+    request: parsed.request,
+    identity,
+    signal: "metrics",
+    logger: loggerMetrics,
+  });
 
   markUsed();
 
@@ -587,12 +623,53 @@ const payloadTooLarge = (): Error =>
 /** Wire-body cap for all three receivers; the decompressed cap is separate. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
+/** Dispatches a recognised legacy exporter URL through the canonical receiver. */
+async function handleOtlpPathAlias({
+  app,
+  raw,
+  request,
+}: {
+  app: OtlpIngestRestMembers;
+  raw: Uint8Array;
+  request: Request;
+}): Promise<RestRawResult> {
+  const corrected = correctedOtlpRequest(request);
+  if (!corrected) return jsonAnswer({ error: "Not Found" }, 404);
+
+  switch (new URL(corrected.url).pathname) {
+    case "/api/otel/v1/traces": {
+      const tracer = getLangWatchTracer("langwatch.otel.traces");
+      return tracer.withActiveSpan(
+        "TracesV1.handleTracesRequest",
+        { kind: SpanKind.SERVER },
+        (span) => handleTracesRequest(corrected, span, raw, app),
+      );
+    }
+    case "/api/otel/v1/logs": {
+      const tracer = getLangWatchTracer("langwatch.otel.logs");
+      return tracer.withActiveSpan("[POST] /api/otel/v1/logs", { kind: SpanKind.SERVER }, (span) =>
+        handleLogsRequest(corrected, span, raw, app),
+      );
+    }
+    case "/api/otel/v1/metrics": {
+      const tracer = getLangWatchTracer("langwatch.otel.metrics");
+      return tracer.withActiveSpan(
+        "[POST] /api/otel/v1/metrics",
+        { kind: SpanKind.SERVER },
+        (span) => handleMetricsRequest(corrected, span, raw, app),
+      );
+    }
+    default:
+      return jsonAnswer({ error: "Not Found" }, 404);
+  }
+}
+
 export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .withNamespace("otel")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withAddressing("v1-in-path")
+  .withAddressing("literal", { v1Twin: false })
 
-  .post("/traces", "ingestOtlpTraces")
+  .post("/api/otel/v1/traces", "ingestOtlpTraces")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
@@ -601,12 +678,14 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .handle(async ({ app, raw, request }) => {
     const tracer = getLangWatchTracer("langwatch.otel.traces");
 
-    return tracer.withActiveSpan("TracesV1.handleTracesRequest", { kind: SpanKind.SERVER }, (span) =>
-      handleTracesRequest(request, span, raw as Uint8Array, app),
+    return tracer.withActiveSpan(
+      "TracesV1.handleTracesRequest",
+      { kind: SpanKind.SERVER },
+      (span) => handleTracesRequest(request, span, raw as Uint8Array, app),
     );
   })
 
-  .post("/logs", "ingestOtlpLogs")
+  .post("/api/otel/v1/logs", "ingestOtlpLogs")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
@@ -620,7 +699,7 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
     );
   })
 
-  .post("/metrics", "ingestOtlpMetrics")
+  .post("/api/otel/v1/metrics", "ingestOtlpMetrics")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
@@ -633,5 +712,48 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
       handleMetricsRequest(request, span, raw as Uint8Array, app),
     );
   })
+
+  // Exporters append `/v1/{signal}` to their configured base. Keep each
+  // released base in this one canonical declaration so it shares byte parsing,
+  // limits, credentials and response statuses with the receiver above.
+  .post("/api/otel/*", "ingestOtlpAliasOtel")
+  .withRawBody("bytes")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withAccess(PUBLIC_ACCESS)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ hide: true })
+  .handle(({ app, raw, request }) =>
+    handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }),
+  )
+
+  .post("/api/collector/*", "ingestOtlpAliasCollector")
+  .withRawBody("bytes")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withAccess(PUBLIC_ACCESS)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ hide: true })
+  .handle(({ app, raw, request }) =>
+    handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }),
+  )
+
+  .post("/api/v1/*", "ingestOtlpAliasApiV1")
+  .withRawBody("bytes")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withAccess(PUBLIC_ACCESS)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ hide: true })
+  .handle(({ app, raw, request }) =>
+    handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }),
+  )
+
+  .post("/v1/*", "ingestOtlpAliasRootV1")
+  .withRawBody("bytes")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withAccess(PUBLIC_ACCESS)
+  .withRawResponse({ produces: "application/json" })
+  .withDocs({ hide: true })
+  .handle(({ app, raw, request }) =>
+    handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }),
+  )
 
   .build();

@@ -2,21 +2,21 @@ import { HandledError } from "@langwatch/handled-error";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRunModels } from "@langwatch/scenario-contract";
-import type { TraceApi } from "@langwatch/trace-contract";
-
-import type { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
 import type {
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
   TargetAdapterData,
   TargetConfig,
 } from "@langwatch/scenario-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
+
+import type { ScenarioExecutionPrefetchConfig } from "../services/scenario-execution-prefetcher.service.ts";
+import type { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
 import {
   type ModelParamsResult,
   ScenarioModelParametersService,
 } from "./scenario-model-parameters.service.ts";
 import type { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
-import type { ScenarioExecutionPrefetchConfig } from "../services/scenario-execution-prefetcher.service.ts";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
@@ -390,6 +390,7 @@ export class ScenarioPrefetchCompletionService {
         judgeModelParams: prepared.judge.params,
         nlpServiceUrl: this.options.config.nlpServiceUrl,
         target,
+        ...(target.type === "voice" ? { callerVoice: validated.scenario.callerVoice } : {}),
         ...(traceWaitTimeoutMs !== void 0 ? { traceWaitTimeoutMs } : {}),
       },
       telemetry: {

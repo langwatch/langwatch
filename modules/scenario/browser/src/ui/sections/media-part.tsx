@@ -11,11 +11,12 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { MediaProbing, MediaUnavailable } from "../elements/media-part-placeholder.tsx";
-import { resolveMediaPart } from "../../model/media-part-source.ts";
-import { resolveRawPcmFormat, wrapRawPcmToWav, type RawPcmFormat } from "../../model/pcm-to-wav.ts";
-import type { MediaPartData } from "../../model/media-parts.ts";
+
 import type { AudioPlaybackProps } from "../../behavior/use-sequential-audio-playback.ts";
+import { resolveMediaPart } from "../../model/media-part-source.ts";
+import type { MediaPartData } from "../../model/media-parts.ts";
+import { resolveRawPcmFormat, wrapRawPcmToWav, type RawPcmFormat } from "../../model/pcm-to-wav.ts";
+import { MediaProbing, MediaUnavailable } from "../elements/media-part-placeholder.tsx";
 
 type LoadStatus = "loading" | "ok" | "probing" | "missing" | "error";
 

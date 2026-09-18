@@ -1,12 +1,11 @@
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Spec: modules/trace/specs/partial-trace-id-resolution.feature — an
  * exact id skips the scan, a unique prefix resolves, an ambiguous one refuses.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 const { mockGetTracesWithSpans, mockResolveTraceIdByPrefix } = vi.hoisted(() => ({
   mockGetTracesWithSpans: vi.fn(),
@@ -23,12 +22,12 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
+import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 import {
   AmbiguousTraceIdPrefixError,
   TraceLegacyReadService,
 } from "../trace-legacy-read.service.ts";
-import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
-import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 
 const PROJECT_ID = "project_test";
 const FULL_TRACE_ID = "63dc535cea6335c506bc81ef3543a07d";

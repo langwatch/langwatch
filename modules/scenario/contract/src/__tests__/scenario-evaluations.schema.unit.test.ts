@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { Verdict } from "../scenario-run.ts";
 import {
   SCENARIO_EVALUATION_STATUSES,
@@ -39,23 +40,20 @@ describe("scenarioEvaluationResultSchema", () => {
   describe("given an evaluation result with every field set", () => {
     /** @scenario "The evaluation result schema round-trips every field" */
     it("reads back every field as given", () => {
-      const parsed = scenarioEvaluationResultSchema.parse(
-        FULL_EVALUATION_RESULT_JSON,
-      );
+      const parsed = scenarioEvaluationResultSchema.parse(FULL_EVALUATION_RESULT_JSON);
 
       expect(parsed).toEqual(FULL_EVALUATION_RESULT_JSON);
-      expect(
-        scenarioEvaluationResultSchema.parse(
-          JSON.parse(JSON.stringify(parsed)),
-        ),
-      ).toEqual(FULL_EVALUATION_RESULT_JSON);
+      expect(scenarioEvaluationResultSchema.parse(JSON.parse(JSON.stringify(parsed)))).toEqual(
+        FULL_EVALUATION_RESULT_JSON,
+      );
     });
   });
 
   describe("given a result that carries only the required fields", () => {
     it("parses and leaves the optional fields absent", () => {
-      const parsed: ScenarioEvaluationResult =
-        scenarioEvaluationResultSchema.parse(MINIMAL_EVALUATION_RESULT_JSON);
+      const parsed: ScenarioEvaluationResult = scenarioEvaluationResultSchema.parse(
+        MINIMAL_EVALUATION_RESULT_JSON,
+      );
 
       expect(parsed).toEqual(MINIMAL_EVALUATION_RESULT_JSON);
       expect(parsed.passed).toBeUndefined();
@@ -67,8 +65,7 @@ describe("scenarioEvaluationResultSchema", () => {
   describe("given every status the schema names", () => {
     it("accepts each one, with a passed value that agrees with it, and refuses any other status", () => {
       for (const status of SCENARIO_EVALUATION_STATUSES) {
-        const passed =
-          status === "passed" ? true : status === "failed" ? false : undefined;
+        const passed = status === "passed" ? true : status === "failed" ? false : undefined;
         expect(
           scenarioEvaluationResultSchema.safeParse({
             ...MINIMAL_EVALUATION_RESULT_JSON,
@@ -88,11 +85,8 @@ describe("scenarioEvaluationResultSchema", () => {
 
   describe("given a result missing a required field", () => {
     it("refuses it", () => {
-      const { required: _required, ...withoutRequired } =
-        MINIMAL_EVALUATION_RESULT_JSON;
-      expect(
-        scenarioEvaluationResultSchema.safeParse(withoutRequired).success,
-      ).toBe(false);
+      const { required: _required, ...withoutRequired } = MINIMAL_EVALUATION_RESULT_JSON;
+      expect(scenarioEvaluationResultSchema.safeParse(withoutRequired).success).toBe(false);
     });
   });
 
@@ -146,10 +140,7 @@ describe("scenarioResultsSchema", () => {
         reasoning: "The SQL check failed.",
         metCriteria: ["Answers politely"],
         unmetCriteria: [],
-        evaluations: [
-          FULL_EVALUATION_RESULT_JSON,
-          MINIMAL_EVALUATION_RESULT_JSON,
-        ],
+        evaluations: [FULL_EVALUATION_RESULT_JSON, MINIMAL_EVALUATION_RESULT_JSON],
       });
 
       expect(parsed.evaluations).toEqual([

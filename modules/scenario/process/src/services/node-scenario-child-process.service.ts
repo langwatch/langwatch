@@ -1,28 +1,33 @@
-import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 import { spawn, type ChildProcess } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import type { ExecutionJobData,ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
+
+import { createLogger } from "@langwatch/observability";
 import {
   CHILD_PROCESS,
   ScenarioAgentInstanceSchema,
   type ChildProcessJobData,
   type ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
-import {
-  encodeScenarioEgressPolicy,
-  SCENARIO_EGRESS_POLICY_ENV,
-  type ScenarioEgressPolicy,
-} from "../rules/child-egress-policy.rules.ts";
-import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "./child-logger.service.ts";
-import { resolveChildProcessSpawn } from "./child-process-spawn.service.ts";
-import { resolveChildTlsEnv } from "../rules/child-tls-env.rules.ts";
+import { nowInstant } from "@langwatch/time";
+
 import {
   type ScenarioChildBootstrap,
   type ScenarioChildExecutionSession,
   type ScenarioChildEnvironment,
 } from "../app/scenario.app.ts";
+import {
+  encodeScenarioEgressPolicy,
+  SCENARIO_EGRESS_POLICY_ENV,
+  type ScenarioEgressPolicy,
+} from "../rules/child-egress-policy.rules.ts";
+import { resolveChildTlsEnv } from "../rules/child-tls-env.rules.ts";
+import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "./child-logger.service.ts";
+import { resolveChildProcessSpawn } from "./child-process-spawn.service.ts";
+import type {
+  ExecutionJobData,
+  ScenarioExecutionPoolService,
+} from "./scenario-execution-pool.service.ts";
 
 const logger = createLogger("langwatch:scenarios:child-process");
 

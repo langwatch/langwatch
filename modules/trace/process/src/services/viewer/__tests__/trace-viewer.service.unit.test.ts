@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Trace, Protections } from "@langwatch/trace-contract";
-import { TraceViewerReadService } from "../../trace-viewer.service.ts";
-import { TraceViewerProtectionService } from "../../trace-viewer-protection.service.ts";
+import { describe, expect, it, vi } from "vitest";
+
 import type { TraceLegacyRead } from "../../../app/trace.members.ts";
+import { TraceViewerProtectionService } from "../../trace-viewer-protection.service.ts";
+import { TraceViewerReadService } from "../../trace-viewer.service.ts";
 
 const protections: Protections = {
   canSeeCosts: true,

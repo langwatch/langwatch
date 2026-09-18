@@ -1,10 +1,11 @@
+import type { SimulationRunData } from "@langwatch/scenario-contract";
 /**
  * @vitest-environment node
  *
  * @see specs/scenarios/simulation-runs-api.feature
  */
 import { describe, expect, it } from "vitest";
-import type { SimulationRunData } from "@langwatch/scenario-contract";
+
 import {
   SimulationClickHouseRepository,
   FULL_MESSAGES_PAGE_LIMIT,

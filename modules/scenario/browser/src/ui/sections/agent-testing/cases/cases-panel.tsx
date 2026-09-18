@@ -5,16 +5,17 @@
  */
 
 import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+
+import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import {
   CONTENT_COLUMN_GUTTER,
   ContentColumn,
 } from "../../../elements/agent-testing/shared/content-column.tsx";
-import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { CasesPanelBody } from "./cases-panel-body.tsx";
 import { CasesPanelHeader } from "./cases-panel-header.tsx";
 import type { CaseLastResult } from "./cases-table.tsx";
 import { SUITE_RAIL_WIDTH } from "./suite-rail.tsx";
-import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 
 export type ExternalCaseRow = {
   scenarioId: string;

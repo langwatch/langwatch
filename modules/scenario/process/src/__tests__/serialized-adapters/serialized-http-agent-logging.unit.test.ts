@@ -3,10 +3,11 @@
  * at appropriate level with CloudWatch-friendly fields (lw#3593).
  */
 
-import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   createMockHttpAgentAdapter,
   mockScenarioHttpFetch,

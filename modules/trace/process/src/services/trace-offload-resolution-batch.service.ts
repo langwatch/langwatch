@@ -1,3 +1,7 @@
+import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
+
+import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
+
 /**
  * Bulk read-path resolution of offloaded trace event refs (ADR-022). Resolving each trace of a
  * result set independently fans out an unbounded burst of `event_log` SELECTs, so this dedupes
@@ -6,8 +10,6 @@
 import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
-import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
-import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
 import type { ResolvedTraceSpans, WarnLogger } from "./trace-offload-resolution.service.ts";
 
 /**

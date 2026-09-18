@@ -1,5 +1,6 @@
-import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
 import { type FieldDef, UNSUPPORTED } from "@langwatch/trace-contract";
+
+import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
 import { ClickHouseTraceQueryValuesRepository } from "./clickhouse.trace-query-values.repository.ts";
 
 const traceQuerySubqueryRepository = ClickHouseTraceQuerySubqueryRepository.create();

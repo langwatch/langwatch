@@ -1,16 +1,17 @@
-import { describe, expect, it } from "vitest";
-import type { TraceListItem } from "@langwatch/trace-contract";
-import {
-  toConversationContextTurn as toConversationContextTurnWithPorts,
-  type TraceContentPrivacy,
-  type V2Protections,
-} from "../trace-read-mappers.api.ts";
 import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
   stripRolesFromChatArrayJson,
 } from "@langwatch/data-privacy-contract";
+import type { TraceListItem } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import {
+  toConversationContextTurn as toConversationContextTurnWithPorts,
+  type TraceContentPrivacy,
+  type V2Protections,
+} from "../trace-read-mappers.api.ts";
 
 /** The real data-privacy vocabulary, wired as the port the mapper now takes. */
 const contentPrivacy: TraceContentPrivacy = {

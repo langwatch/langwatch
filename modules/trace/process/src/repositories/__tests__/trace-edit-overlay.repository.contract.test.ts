@@ -1,10 +1,11 @@
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * The reviewer-correction contract, run against every backend the package
  * can reach: the memory twin always runs; Postgres joins per vitest config.
  */
 import { describe, expect, it } from "vitest";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+
 import { MemoryTraceEditOverlayRepository } from "../memory/memory.trace-edit-overlay.repository.ts";
 import type { TraceEditOverlayRepository } from "../trace-edit-overlay.repository.ts";
 

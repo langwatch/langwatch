@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { TraceLogRecordDto } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { groupLogsBySpanId } from "../use-span-logs.ts";
 
 function log(spanId: string, timeUnixMs: number): TraceLogRecordDto {

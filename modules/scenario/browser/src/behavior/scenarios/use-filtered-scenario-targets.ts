@@ -5,11 +5,12 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { useMemo } from "react";
 import { connectedAgentSelectability, ownerOnlyCopy } from "@langwatch/agent-contract";
 import { targetLabelOf } from "@langwatch/suite-contract";
-import type { TargetValue } from "../../model/scenario-target.ts";
 import { toEpochMs, type Instant } from "@langwatch/time";
+import { useMemo } from "react";
+
+import type { TargetValue } from "../../model/scenario-target.ts";
 
 /**
  * Read where the action is choosing a run target: the run dialog target

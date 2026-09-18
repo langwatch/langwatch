@@ -6,6 +6,7 @@
 
 import type { EvaluatorAttachment, RunParameterValues } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
+
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { RunScope } from "./run-configuration.ts";
 

@@ -1,4 +1,5 @@
 import type { LogApi } from "@langwatch/log-contract";
+
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,

@@ -1,31 +1,31 @@
-import type { Instant } from "@langwatch/time";
+import { Box, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 /**
  * The Results tab list: the filter row, the charts it drives, and the table.
  * @see specs/features/agent-testing/results-tabs.feature
  */
-
-import { Box, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { FlaskConical, Plus } from "lucide-react";
 import type {
   Period,
   PeriodMode,
   RelativePresetKey,
 } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Instant } from "@langwatch/time";
+import { FlaskConical, Plus } from "lucide-react";
+
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import type { AgentTestingRoutingState } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   CONTENT_COLUMN_WIDE_MAX_WIDTH,
   ContentColumn,
 } from "../../../elements/agent-testing/shared/content-column.tsx";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { periodDays } from "../../../elements/agent-testing/shared/period-picker.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
-import type { AgentTestingRoutingState } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { FlatRowsTable, GroupedRowsTable } from "./grouped-rows-table.tsx";
 import { PlanRowsTable } from "./plan-rows-table.tsx";
+import type { ResultGrouping, ResultRow } from "./result-atoms.ts";
 import { ResultsChartsBlock } from "./results-charts-block.tsx";
 import { ResultsFilterRow } from "./results-filter-row.tsx";
 import { nextWiderWindow } from "./run-plan-results-states.tsx";
-import type { ResultGrouping, ResultRow } from "./result-atoms.ts";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { type UseResultGroupsResult, useResultGroups } from "./use-result-groups.ts";
 import { useResultsView } from "./use-results-view.ts";
 import { useRunPlanArchive } from "./use-run-plan-archive.ts";

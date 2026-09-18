@@ -8,18 +8,19 @@ import {
   TOPIC_ASSIGNED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/projection/trace-analytics-projection.repository.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { TraceAnalyticsStore } from "../trace-derived.store.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
 } from "../trace-derived.projection.ts";
+import { TraceAnalyticsStore } from "../trace-derived.store.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**

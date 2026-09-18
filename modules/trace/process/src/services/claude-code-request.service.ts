@@ -1,7 +1,8 @@
 import { z } from "zod";
+
 import { contentToText, toolDefinitionsMessage } from "../rules/claude-code-content.rules.ts";
-import { ClaudeCodeTruncatedRequestService } from "./claude-code-truncated-request.service.ts";
 import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
+import { ClaudeCodeTruncatedRequestService } from "./claude-code-truncated-request.service.ts";
 
 const claudeCodeTruncatedRequestService = ClaudeCodeTruncatedRequestService.create();
 
@@ -123,9 +124,7 @@ export class ClaudeCodeRequestService {
    * Returns null when unparseable, no messages array, or every turn empty.
    * @internal exported for ingest-time body derivation + unit testing
    */
-  buildInputMessagesFromRequestBody(
-    raw: unknown,
-  ): { role: string; content: string }[] | null {
+  buildInputMessagesFromRequestBody(raw: unknown): { role: string; content: string }[] | null {
     const parsed = this.tryParseRequestBody(raw);
     if (parsed !== null) {
       return this.buildInputMessages(parsed);

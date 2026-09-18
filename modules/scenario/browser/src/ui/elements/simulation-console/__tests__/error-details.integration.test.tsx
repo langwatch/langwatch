@@ -4,9 +4,10 @@
  * @see specs/scenarios/scenario-infra-error-surfacing.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { classifyScenarioInfraError, encodeScenarioError } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { classifyScenarioInfraError, encodeScenarioError } from "@langwatch/scenario-contract";
+
 import { ErrorDetails } from "../error-details.tsx";
 
 function renderError(error: string) {
@@ -48,9 +49,7 @@ describe("<ErrorDetails />", () => {
         "    httpx.TimeoutException: The read operation timed out",
       ].join("\n");
 
-      renderError(
-        encodeScenarioError(classifyScenarioInfraError(adapterMessage)),
-      );
+      renderError(encodeScenarioError(classifyScenarioInfraError(adapterMessage)));
 
       expect(screen.getByText(/The agent's code failed/)).toBeTruthy();
       expect(screen.getByText(/TimeoutException/)).toBeTruthy();

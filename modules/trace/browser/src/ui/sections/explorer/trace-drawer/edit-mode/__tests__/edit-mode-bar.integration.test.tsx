@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const mutate = vi.fn();
 const invalidate = vi.fn();

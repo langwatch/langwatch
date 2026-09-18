@@ -1,3 +1,4 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -6,18 +7,19 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { FoldProjectionStore } from "@langwatch/eventing";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
-import type { ClickHouseClient } from "@clickhouse/client";
-import type { FoldProjectionStore } from "@langwatch/eventing";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
-import type { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
+
 import type { TraceLegacyFilterConditions } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
-import type { TraceProcessingCommands } from "./trace.members.ts";
+import type { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import type { TracesTrpcEmitters } from "./trace.app.ts";
+import type { TraceProcessingCommands } from "./trace.members.ts";
 
 export const traceDependencies = {
   annotations: AnnotationApi,
@@ -35,6 +37,7 @@ export const traceDependencies = {
   evaluations: EvaluationApi,
   logs: LogApi,
   modelProviders: ModelProviderApi,
+  presence: PresenceApi,
   projects: ProjectApi,
   share: ShareApi,
   topics: TopicApi,

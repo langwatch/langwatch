@@ -5,8 +5,8 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useState, type MouseEvent } from "react";
 
 import { api } from "../../../../behavior/trace-api.ts";

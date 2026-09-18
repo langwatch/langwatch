@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+
 import type { BuiltTree, Viewport } from "./types.ts";
 
 /**

@@ -4,12 +4,13 @@
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { StreamingMessage } from "../../../../../behavior/use-simulation-streaming-state.ts";
-import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { TestCasesTab } from "../../../../sections/agent-testing/cases/test-cases-tab.tsx";
 import { AgentTestingRunDrawer } from "../../../../sections/agent-testing/drawers/agent-testing-run-drawer.tsx";
 import { RunDialog } from "../../../../sections/agent-testing/run/run-dialog.tsx";

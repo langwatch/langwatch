@@ -1,6 +1,7 @@
 import { Icon, type IconProps } from "@chakra-ui/react";
-import type { LucideIcon } from "lucide-react";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
+import type { LucideIcon } from "lucide-react";
+
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,

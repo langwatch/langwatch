@@ -1,9 +1,6 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { SpanKind } from "@opentelemetry/api";
-import { getLangWatchTracer } from "langwatch";
-import { z } from "zod";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   instrumentationScopeSchema,
@@ -18,12 +15,16 @@ import {
   type RecordSpanCommandData,
   type SpanReceivedEvent,
 } from "@langwatch/trace-contract";
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
+import { z } from "zod";
 
 import type {
   TraceSpanContentDrop,
   TraceSpanCostEnrichment,
   TraceSpanPiiRedaction,
-  TraceSpanTokenEstimation,TraceSpanSpool
+  TraceSpanTokenEstimation,
+  TraceSpanSpool,
 } from "../app/trace.members.ts";
 import { clonePayload } from "../rules/payload-clone.rules.ts";
 import { TraceAttributeCapService } from "./trace-attribute-cap.service.ts";

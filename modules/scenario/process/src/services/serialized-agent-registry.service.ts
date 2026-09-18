@@ -5,12 +5,13 @@
  */
 
 import type { AgentAdapter } from "@langwatch/scenario";
+
 import { type AgentAdapterFactory, type AgentAdapterBuildInput } from "../app/scenario.app.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.service.ts";
 import { SerializedCodeAgentAdapter } from "./serialized-code-agent.service.ts";
+import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.service.ts";
 import { SerializedHttpAgentAdapter } from "./serialized-http-agent.service.ts";
 import { SerializedPromptConfigAdapter } from "./serialized-prompt-config.service.ts";
-import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.service.ts";
 import { SerializedWorkflowAgentAdapter } from "./serialized-workflow-agent.service.ts";
 
 /**
@@ -30,8 +31,7 @@ export class SerializedAgentRegistryAdapter implements AgentAdapterFactory {
     return new SerializedAgentRegistryAdapter(nlpTimeouts ?? {});
   }
 
-  private constructor(private readonly nlpTimeouts: NlpFetchTimeouts) {
-  }
+  private constructor(private readonly nlpTimeouts: NlpFetchTimeouts) {}
 
   build(input: AgentAdapterBuildInput): AgentAdapter {
     const { adapterData } = input;

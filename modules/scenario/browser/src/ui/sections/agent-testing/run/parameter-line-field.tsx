@@ -4,9 +4,10 @@
  */
 
 import { Badge, Box, chakra, HStack, Input, Text } from "@chakra-ui/react";
-import { useId, useRef } from "react";
-import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import { SuggestionPanel } from "@langwatch/trace-browser/surfaces/suggestion-dropdown";
+import { useId, useRef } from "react";
+
+import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import {
   DIALOG_FIELD_STYLE,
   FieldError,

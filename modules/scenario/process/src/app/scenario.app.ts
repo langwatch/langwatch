@@ -1,4 +1,16 @@
-import { type RunConfigurationEntryResponse,
+import { on, type EventEmitter } from "node:events";
+
+import { AgentApi } from "@langwatch/agent-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
+import type { Logger } from "@langwatch/observability";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { PresenceApi } from "@langwatch/presence-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import type { AgentAdapter } from "@langwatch/scenario";
+import {
+  type RunConfigurationEntryResponse,
   startScenarioTabPresence,
   ScenarioApi,
   type CancelScenarioBatchInput,
@@ -23,6 +35,10 @@ import { type RunConfigurationEntryResponse,
   type ScenarioIdInput,
   type ScenarioMoveInput,
   type ScenarioRunConfig,
+  type ScenarioGenerateRequest,
+  type ScenarioGenerateResponse,
+  type ScenarioRunExportDownload,
+  type ScenarioRunExportDownloadInput,
   type ScenarioTestSuite,
   type ScenarioTestSuiteCreateInput,
   type ScenarioTestSuiteIdInput,
@@ -60,35 +76,39 @@ import { type RunConfigurationEntryResponse,
   ScenarioSimulationsUnavailableError,
   withActor,
   withNote,
-  withResolvedModels,type SimulationStreamFrame,type ChildProcessJobData,type ScenarioExecutionJob,type ScenarioExecutionResult,type TestAgentRunInput,type TestAgentTurnInput,type TargetAdapterData,type LiteLLMParams } from "@langwatch/scenario-contract";
+  withResolvedModels,
+  type SimulationStreamFrame,
+  type ChildProcessJobData,
+  type ScenarioExecutionJob,
+  type ScenarioExecutionResult,
+  type TestAgentRunInput,
+  type TestAgentTurnInput,
+  type TargetAdapterData,
+  type LiteLLMParams,
+} from "@langwatch/scenario-contract";
 /**
  * The scenario feature's application: what all of its doors call.
  */
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { AgentApi } from "@langwatch/agent-contract";
-import { z } from "zod";
-import { on, type EventEmitter } from "node:events";
-import type { AgentAdapter } from "@langwatch/scenario";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { buildScenarioComposition } from "./scenario-composition.build.ts";
-import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
-import type { AgentTestService } from "../services/agent-test.service.ts";
-import type { RunConfigurationsService } from "../services/run-configurations.service.ts";
-import type { ResultAtomsService } from "../services/result-atoms.service.ts";
-import { ScenarioService } from "../services/scenario.service.ts";
+
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
-import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { scenarioPlatformUrl } from "../rules/scenario-platform-url.rules.ts";
-import type { Logger } from "@langwatch/observability";
+import type { AgentTestService } from "../services/agent-test.service.ts";
+import { ConnectedTargetService } from "../services/connected-target.service.ts";
+import type { ResultAtomsService } from "../services/result-atoms.service.ts";
+import type { RunConfigurationsService } from "../services/run-configurations.service.ts";
 import {
   SilentScenarioActivity,
   type ScenarioActivity,
 } from "../services/scenario-activity.service.ts";
-import { ConnectedTargetService } from "../services/connected-target.service.ts";
+import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
+import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
+import { ScenarioRunExportDownloadService } from "../services/scenario-run-export-download.service.ts";
+import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
+import { ScenarioService } from "../services/scenario.service.ts";
+import { buildScenarioComposition } from "./scenario-composition.build.ts";
 
 /**
  * The process's per-tenant fan-out, as this feature uses it: one emitter per project that relays
@@ -116,6 +136,8 @@ export interface ScenarioAppDependencies {
   activity: ScenarioActivity;
   /** The author-assist door's tier-effective generation window. */
   generateBounds: ScenarioGenerateBoundsService;
+  generation: ScenarioGenerationService;
+  runExportDownloads: ScenarioRunExportDownloadService;
   connectedTargets: ConnectedTargetService;
 }
 
@@ -152,14 +174,6 @@ export interface ScenarioAppInfrastructure {
   scenarioTabStore: ScenarioTabStore;
 }
 
-/**
- * This App's own config: the deployment's public origin, for `platformUrl`.
- * Optional, since not every install serves REST, and defaulted to `{}` so a
- * config naming no `scenario` slice still boots.
- */
-const scenarioAppConfigSchema = z.object({ publicBaseUrl: z.string().optional() }).default({});
-export type ScenarioAppConfig = z.infer<typeof scenarioAppConfigSchema>;
-
 /** The peer APIs this feature reads directly. */
 export const scenarioAppDependencyTokens = {
   agents: AgentApi,
@@ -168,27 +182,46 @@ export const scenarioAppDependencyTokens = {
   projects: ProjectApi,
   /** The plan the author-assist's generation window resolves through. */
   plans: EntitlementApi,
+  modelProviders: ModelProviderApi,
+  presence: PresenceApi,
+  auditLog: AuditLogApi,
 };
 
 /**
- * What `ScenarioApp.create` is handed as `setup.members`: the one platform
- * member read directly, plus the collaborators still handed over whole from
+ * Shapes restated rather than imported from `@langwatch/process-stores`: a
+ * module depends on contracts. `publicBaseUrl` is the process's own fact,
+ * absent where the deployment named no `BASE_HOST`.
+ */
+type ScenarioProcessMembers = Readonly<{
+  encryption: Readonly<{ encrypt(plaintext: string): string; decrypt(ciphertext: string): string }>;
+  rateLimiter: Readonly<{
+    check(
+      key: string,
+      limit?: { requests: number; seconds: number },
+    ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number }>>;
+  }>;
+  publicBaseUrl: string | undefined;
+}>;
+
+/**
+ * What `ScenarioApp.create` is handed as `setup.members`: the platform
+ * members read directly, plus the collaborators still handed over whole from
  * the deleted `scenario.composition.ts` (scenario-composition-green handover).
  */
-type ScenarioAppMembers = MembersRead<typeof ScenarioApp.reads> &
+type ScenarioAppMembers = ScenarioProcessMembers &
   Omit<ScenarioAppInfrastructure, "ids" | "testSuiteIds" | "clock" | "secretCipher">;
 
 export class ScenarioApp implements ScenarioApi {
   static readonly contract = ScenarioApi;
   static readonly dependencies = scenarioAppDependencyTokens;
-  static readonly reads = reads("encryption", "rateLimiter");
-  static readonly configSchema = scenarioAppConfigSchema;
+  /** All three names are from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["encryption", "rateLimiter", "publicBaseUrl"] as const;
 
   static create(
     setup: FeatureSetup<
       typeof scenarioAppDependencyTokens,
       ScenarioAppMembers,
-      ScenarioAppConfig,
+      undefined,
       ScenarioRepositories
     >,
   ): ScenarioApp {
@@ -203,6 +236,12 @@ export class ScenarioApp implements ScenarioApi {
       clock,
       secretCipher,
     });
+    const generateBounds = ScenarioGenerateBoundsService.create({
+      entitlement: setup.dependencies.plans,
+      projects: setup.dependencies.projects,
+      rateLimiter: setup.members.rateLimiter,
+    });
+    const exports = ScenarioRunExportService.create(setup.members.simulations);
 
     return new ScenarioApp({
       agentTesting: setup.members.agentTesting,
@@ -216,12 +255,17 @@ export class ScenarioApp implements ScenarioApi {
       resultAtoms: setup.members.resultAtoms,
       runConfigurations: setup.members.runConfigurations,
       activity: setup.members.activity ?? new SilentScenarioActivity(),
-      generateBounds: ScenarioGenerateBoundsService.create({
-        entitlement: setup.dependencies.plans,
-        projects: setup.dependencies.projects,
-        rateLimiter: setup.members.rateLimiter,
+      generateBounds,
+      generation: ScenarioGenerationService.create({
+        bounds: generateBounds,
+        modelProviders: setup.dependencies.modelProviders,
       }),
-      publicBaseUrl: setup.config.publicBaseUrl,
+      runExportDownloads: ScenarioRunExportDownloadService.create({
+        auditLog: setup.dependencies.auditLog,
+        exports,
+        presence: setup.dependencies.presence,
+      }),
+      publicBaseUrl: setup.members.publicBaseUrl,
     });
   }
 
@@ -238,6 +282,16 @@ export class ScenarioApp implements ScenarioApi {
 
   testAgentTurn(input: TestAgentTurnInput) {
     return this.#dependencies.agentTesting.sendTurn(input);
+  }
+
+  generateScenario(input: ScenarioGenerateRequest): Promise<ScenarioGenerateResponse> {
+    return this.#dependencies.generation.generate(input);
+  }
+
+  downloadScenarioRunExport(
+    input: ScenarioRunExportDownloadInput,
+  ): Promise<ScenarioRunExportDownload> {
+    return this.#dependencies.runExportDownloads.download(input);
   }
 
   testAgentRun(input: TestAgentRunInput) {

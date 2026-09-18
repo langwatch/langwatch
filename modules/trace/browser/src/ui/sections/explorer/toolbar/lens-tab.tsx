@@ -1,14 +1,4 @@
 import { Box, Button, HStack, Input, Stack, Tabs, Text } from "@chakra-ui/react";
-import type React from "react";
-import { useState } from "react";
-import { LuCopy, LuFilePlus, LuPencil, LuTrash2, LuUndo2 } from "react-icons/lu";
-import {
-  PopoverBody,
-  PopoverContent,
-  PopoverRoot,
-  PopoverTrigger,
-} from "@langwatch/design-system/popover";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   MenuContent,
   MenuContextTrigger,
@@ -16,6 +6,17 @@ import {
   MenuRoot,
   MenuSeparator,
 } from "@langwatch/design-system/menu";
+import {
+  PopoverBody,
+  PopoverContent,
+  PopoverRoot,
+  PopoverTrigger,
+} from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type React from "react";
+import { useState } from "react";
+import { LuCopy, LuFilePlus, LuPencil, LuTrash2, LuUndo2 } from "react-icons/lu";
+
 import type { LensConfig } from "../../../../behavior/view.store.ts";
 import { useViewStore } from "../../../../behavior/view.store.ts";
 import { LensNameDialog } from "./lens-name-dialog.tsx";
@@ -281,7 +282,6 @@ const RenameInput: React.FC<{
 
   return (
     <Input
-      
       size="xs"
       value={value}
       onChange={(e) => setValue(e.target.value)}

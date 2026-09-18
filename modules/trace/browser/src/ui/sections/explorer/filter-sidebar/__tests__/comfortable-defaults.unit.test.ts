@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { DEFAULT_DENSITY } from "../../../../../behavior/density.store.ts";
 import {
   COMFORTABLE_DEFAULT_SECTIONS,
@@ -20,15 +21,11 @@ describe("comfortable density defaults", () => {
   /** @scenario "Event name and Event attributes sections show on the comfortable default" */
   it("includes the event facet and the event-attributes section", () => {
     expect(COMFORTABLE_DEFAULT_SECTIONS).toContain("event");
-    expect(COMFORTABLE_DEFAULT_SECTIONS).toContain(
-      EVENT_ATTRIBUTES_SECTION_KEY,
-    );
+    expect(COMFORTABLE_DEFAULT_SECTIONS).toContain(EVENT_ATTRIBUTES_SECTION_KEY);
   });
 
   /** @scenario "Span attributes stays behind the facet picker on comfortable density" */
   it("keeps span attributes behind the facet picker", () => {
-    expect(COMFORTABLE_DEFAULT_SECTIONS).not.toContain(
-      SPAN_ATTRIBUTES_SECTION_KEY,
-    );
+    expect(COMFORTABLE_DEFAULT_SECTIONS).not.toContain(SPAN_ATTRIBUTES_SECTION_KEY);
   });
 });

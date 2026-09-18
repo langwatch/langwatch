@@ -1,12 +1,13 @@
-import { describe, expect, it } from "vitest";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
-import { SpanCostService } from "../span-cost.service.ts";
+import { describe, expect, it } from "vitest";
+
 import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.service.ts";
+import { SpanCostService } from "../span-cost.service.ts";
+import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 
 /** Per-span cost computation: matches trace-summary fold accumulation and
  * non-billable cost split. */

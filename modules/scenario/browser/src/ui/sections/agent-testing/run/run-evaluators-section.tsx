@@ -7,10 +7,11 @@
 
 import { Text, VStack } from "@chakra-ui/react";
 import type { EvaluatorAttachment, EvaluatorInputSpec } from "@langwatch/scenario-contract";
+
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { EvaluatorPillRow } from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
-import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { EvaluatorPillRow } from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
 import {
   AttachmentPills,

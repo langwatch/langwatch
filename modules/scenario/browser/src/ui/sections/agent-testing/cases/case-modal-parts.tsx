@@ -17,13 +17,10 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Play, X } from "lucide-react";
-import { UNFILED_OPTION_LABEL } from "../../../elements/scenario-form.tsx";
-import { SimulationModelSelect } from "../../scenarios/simulation-model-select.tsx";
-import { CallerVoiceModelSelect } from "../../scenarios/caller-voice-model-select.tsx";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { Switch } from "@langwatch/design-system/switch";
 import { SimpleSlider } from "@langwatch/design-system/slider";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Switch } from "@langwatch/design-system/switch";
 import {
   CALLER_VOICE_EFFECTS,
   DEFAULT_CALLER_VOICE,
@@ -31,24 +28,28 @@ import {
   type ScenarioFieldValue,
   type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
-import { TagList } from "../../../elements/tag-list.tsx";
+import { Play, X } from "lucide-react";
+
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import {
   DIALOG_FIELD_STYLE,
   FieldError,
   FieldLabel,
 } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
-import { CaseVersionHistoryPopover } from "./case-version-history-popover.tsx";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { strayFieldValues, type CaseDraft, type CaseEditorState } from "./use-case-editor.ts";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { UNFILED_OPTION_LABEL } from "../../../elements/scenario-form.tsx";
+import { TagList } from "../../../elements/tag-list.tsx";
+import { CallerVoiceModelSelect } from "../../scenarios/caller-voice-model-select.tsx";
+import { SimulationModelSelect } from "../../scenarios/simulation-model-select.tsx";
 import { ParameterLineField } from "../run/parameter-line-field.tsx";
 import { parameterPlaceholder } from "../run/parameter-suggestions.ts";
 import { useAgentDeclaredParameters } from "../run/use-agent-declared-parameters.ts";
 import { CaseRecentRunsButton } from "./case-recent-runs-button.tsx";
+import { CaseVersionHistoryPopover } from "./case-version-history-popover.tsx";
+import { strayFieldValues, type CaseDraft, type CaseEditorState } from "./use-case-editor.ts";
 
 const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
 
@@ -142,7 +143,7 @@ function TitleAndSuiteRow({
         <FieldLabel>Title</FieldLabel>
         <Input
           {...DIALOG_FIELD_STYLE}
-          
+
           aria-label="Title"
           placeholder="Angry customer threatens a chargeback"
           value={draft.title}

@@ -1,5 +1,6 @@
-import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { TagToken } from "liqe";
+
+import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
 
 export interface TraceQueryEvaluationRun {

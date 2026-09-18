@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
+
+import type { ScenarioExecutionRunner } from "../app/scenario.app.ts";
 import {
   type ExecutionJobData,
-  ScenarioExecutionPool,
-} from "./execution-pool.unit.test.ts";
-import { VoiceConcurrencyGate } from "../voice-concurrency-gate";
+  ScenarioExecutionPoolService,
+} from "../services/scenario-execution-pool.service.ts";
+import { VoiceConcurrencyGate } from "../voice-concurrency-gate.ts";
+
+function poolRunning(
+  execute: ScenarioExecutionRunner["execute"],
+  max: number,
+): ScenarioExecutionPoolService {
+  const pool = ScenarioExecutionPoolService.create({
+    concurrency: 10,
+    voiceGate: new VoiceConcurrencyGate({ max }),
+  });
+  pool.connect({ execute, skipCancelled: () => undefined });
+  return pool;
+}
 
 function voiceJob({
   n,
@@ -28,16 +42,12 @@ describe("ScenarioExecutionPool with a voice concurrency cap", () => {
       /** @scenario At most the concurrency cap of voice runs execute at once */
       it("runs 2 and queues 2, then admits a queued one as a slot frees", () => {
         // A generous global concurrency so ONLY the voice cap can block a run.
-        const pool = new ScenarioExecutionPool({
-          concurrency: 10,
-          voiceGate: new VoiceConcurrencyGate({ max: 2 }),
-        });
         const started: string[] = [];
         // Started children never resolve here — they represent live calls.
-        pool.setSpawnFunction((job) => {
+        const pool = poolRunning((job) => {
           started.push(job.scenarioRunId);
           return new Promise<void>(() => {});
-        });
+        }, 2);
 
         for (let n = 1; n <= 4; n++) pool.submit(voiceJob({ n }));
 
@@ -54,15 +64,11 @@ describe("ScenarioExecutionPool with a voice concurrency cap", () => {
 
     describe("when a text run is queued behind blocked voice runs", () => {
       it("does not let the voice cap starve the text run", () => {
-        const pool = new ScenarioExecutionPool({
-          concurrency: 10,
-          voiceGate: new VoiceConcurrencyGate({ max: 1 }),
-        });
         const started: string[] = [];
-        pool.setSpawnFunction((job) => {
+        const pool = poolRunning((job) => {
           started.push(job.scenarioRunId);
           return new Promise<void>(() => {});
-        });
+        }, 1);
 
         pool.submit(voiceJob({ n: 1 })); // starts, holds the only voice slot
         pool.submit(voiceJob({ n: 2 })); // blocked by the voice cap → queued
@@ -81,19 +87,15 @@ describe("ScenarioExecutionPool with a voice concurrency cap", () => {
     describe("when a voice job's executor exits without ever registering a child", () => {
       /** @scenario A voice run that fails before its call starts frees its concurrency slot */
       it("releases the voice slot and starts the next buffered voice job", async () => {
-        const pool = new ScenarioExecutionPool({
-          concurrency: 10,
-          voiceGate: new VoiceConcurrencyGate({ max: 1 }),
-        });
         const started: string[] = [];
-        pool.setSpawnFunction((job) => {
+        const pool = poolRunning((job) => {
           started.push(job.scenarioRunId);
           // Mirrors executeScenarioRun's early-return paths (prefetch failure,
           // cancellation during prefetch): resolves without ever calling
           // registerChild/deregisterChild on the pool.
           if (job.scenarioRunId === "run-1") return Promise.resolve();
           return new Promise<void>(() => {});
-        });
+        }, 1);
 
         pool.submit(voiceJob({ n: 1 })); // starts, resolves immediately without a child
         pool.submit(voiceJob({ n: 2 })); // buffered by the voice cap
@@ -113,18 +115,14 @@ describe("ScenarioExecutionPool with a voice concurrency cap", () => {
     describe("when a voice job's executor rejects without ever registering a child", () => {
       /** @scenario A voice run that fails before its call starts frees its concurrency slot */
       it("releases the voice slot and starts the next buffered voice job", async () => {
-        const pool = new ScenarioExecutionPool({
-          concurrency: 10,
-          voiceGate: new VoiceConcurrencyGate({ max: 1 }),
-        });
         const started: string[] = [];
-        pool.setSpawnFunction((job) => {
+        const pool = poolRunning((job) => {
           started.push(job.scenarioRunId);
           if (job.scenarioRunId === "run-1") {
             return Promise.reject(new Error("prefetch blew up"));
           }
           return new Promise<void>(() => {});
-        });
+        }, 1);
 
         pool.submit(voiceJob({ n: 1 }));
         pool.submit(voiceJob({ n: 2 }));
@@ -142,13 +140,9 @@ describe("ScenarioExecutionPool with a voice concurrency cap", () => {
 
     describe("when a voice job's child was already deregistered normally", () => {
       it("does not double-release the slot once the spawn promise settles", async () => {
-        const pool = new ScenarioExecutionPool({
-          concurrency: 10,
-          voiceGate: new VoiceConcurrencyGate({ max: 1 }),
-        });
         const started: string[] = [];
         let resolveRun1: () => void = () => {};
-        pool.setSpawnFunction((job) => {
+        const pool = poolRunning((job) => {
           started.push(job.scenarioRunId);
           if (job.scenarioRunId === "run-1") {
             return new Promise<void>((resolve) => {
@@ -156,7 +150,7 @@ describe("ScenarioExecutionPool with a voice concurrency cap", () => {
             });
           }
           return new Promise<void>(() => {});
-        });
+        }, 1);
 
         pool.submit(voiceJob({ n: 1 }));
         pool.submit(voiceJob({ n: 2 })); // buffered by the voice cap

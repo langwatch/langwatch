@@ -1,7 +1,14 @@
-import type { Protections,DerivedTraceEvent,Evaluation,SpanTreeNode,TraceHeader,TraceResourceInfoDto } from "@langwatch/trace-contract";
-import { TraceReadRedactionService } from "../../../services/trace-read-redaction.service.ts";
+import type {
+  Protections,
+  DerivedTraceEvent,
+  Evaluation,
+  SpanTreeNode,
+  TraceHeader,
+  TraceResourceInfoDto,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { TraceReadRedactionService } from "../../../services/trace-read-redaction.service.ts";
 import {
   gateEvaluations,
   gateHeaderCost,

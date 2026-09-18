@@ -6,13 +6,14 @@ import {
   type ResultsOverview,
   type RunTarget,
 } from "@langwatch/scenario-contract";
+import { MAX_TREND_POINTS } from "@langwatch/scenario-contract";
 import { extractSuiteId, getSuiteSetId } from "@langwatch/suite-contract";
 import { Temporal, nowInstant } from "@langwatch/time";
+
 import {
   type RawGroupRow,
   type ResultAtomsRepository,
 } from "../repositories/result-atoms.repository.ts";
-import { MAX_TREND_POINTS } from "@langwatch/scenario-contract";
 import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
 import {
   fillSeries,

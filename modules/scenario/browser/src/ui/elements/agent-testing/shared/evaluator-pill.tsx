@@ -8,17 +8,14 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { formatScore } from "@langwatch/design-system/metric-value-formatters";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import type {
   EvaluatorSummary,
   RunEvaluation,
 } from "../../../sections/agent-testing/results/evaluation-summaries.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import {
-  formatPassRate,
-  PASS_RATE_AMBER_COLOR,
-  passRateColor,
-} from "./pass-rate-color";
+import { formatPassRate, PASS_RATE_AMBER_COLOR, passRateColor } from "./pass-rate-color";
 
 /** What a pill reads: one verdict, a rate over many, a number, or nothing. */
 export type EvaluatorPillReading =
@@ -29,9 +26,7 @@ export type EvaluatorPillReading =
   | { kind: "error" };
 
 /** The reading of one result on one scenario run. */
-export function readingOfEvaluation(
-  evaluation: RunEvaluation,
-): EvaluatorPillReading {
+export function readingOfEvaluation(evaluation: RunEvaluation): EvaluatorPillReading {
   switch (evaluation.status) {
     case "passed":
       return { kind: "verdict", passed: true };
@@ -47,9 +42,7 @@ export function readingOfEvaluation(
 }
 
 /** The reading of one evaluator over every scenario run of a run. */
-export function readingOfSummary(
-  summary: EvaluatorSummary,
-): EvaluatorPillReading {
+export function readingOfSummary(summary: EvaluatorSummary): EvaluatorPillReading {
   if (summary.kind === "passfail" && summary.passRate !== null) {
     return { kind: "rate", passRate: summary.passRate };
   }
@@ -59,10 +52,8 @@ export function readingOfSummary(
   return { kind: "skipped" };
 }
 
-const PASSED_COLOR =
-  SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor;
-const FAILED_COLOR =
-  SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor;
+const PASSED_COLOR = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor;
+const FAILED_COLOR = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED].fgColor;
 
 /**
  * How big the pill is drawn. "md" matches the 32px pass block of a header
@@ -114,13 +105,7 @@ function readingText(reading: EvaluatorPillReading): {
 }
 
 /** What the hover says about a reading. */
-function pillTitle({
-  name,
-  reading,
-}: {
-  name: string;
-  reading: EvaluatorPillReading;
-}): string {
+function pillTitle({ name, reading }: { name: string; reading: EvaluatorPillReading }): string {
   switch (reading.kind) {
     case "skipped":
       return `${name}: nothing to read on this scenario`;
@@ -142,12 +127,7 @@ export type EvaluatorPillProps = {
   size?: keyof typeof PILL_SIZES;
 };
 
-export function EvaluatorPill({
-  evaluatorId,
-  name,
-  reading,
-  size = "sm",
-}: EvaluatorPillProps) {
+export function EvaluatorPill({ evaluatorId, name, reading, size = "sm" }: EvaluatorPillProps) {
   const sizes = PILL_SIZES[size];
   const { text, dotColor, muted } = readingText(reading);
   const title = pillTitle({ name, reading });

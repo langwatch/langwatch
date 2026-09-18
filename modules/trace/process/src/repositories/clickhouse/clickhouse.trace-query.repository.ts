@@ -1,4 +1,3 @@
-import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
 import {
   FilterFieldUnknownError,
   FilterParseError,
@@ -7,9 +6,12 @@ import {
   type ParenthesizedExpressionToken,
   parseTraceQuerySyntax,
   type TagToken,
-  type UnaryOperatorToken,type TranslationContext
+  type UnaryOperatorToken,
+  type TranslationContext,
 } from "@langwatch/trace-contract";
+
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./clickhouse.trace-query-fields.repository.ts";
+import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,

@@ -3,9 +3,11 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import {
   startMigratedTraceClickHouse,
@@ -72,129 +74,135 @@ const occurredAtRange = { from: now - 60_000, to: now + 60_000 };
 let ch: ClickHouseClient;
 let service: TraceLegacyReadClickHouseRepository;
 
-describe.skipIf(!clickHouseConfigured)("TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix (integration)", () => {
-  beforeAll(async () => {
-    ch = await startMigratedTraceClickHouse();
-    service = TraceLegacyReadClickHouseRepository.create({
-      resolveClickHouseClient: async () => ch,
-      traceCanonicalisation: TraceCanonicalisationService.create(),
-    });
-  }, 60_000);
-
-  afterAll(async () => {
-    if (ch) {
-      await ch.exec({
-        query: `ALTER TABLE trace_summaries DELETE WHERE TenantId IN ({a:String}, {b:String})`,
-        query_params: { a: tenantId, b: otherTenantId },
-      });
-    }
-  });
-
-  describe("when exactly one trace matches the prefix within the project", () => {
-    const fullId = "63dc535cea6335c506bc81ef3543a07d";
-
+describe.skipIf(!clickHouseConfigured)(
+  "TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix (integration)",
+  () => {
     beforeAll(async () => {
-      await insertTraceSummary(ch, makeTraceSummaryRow({ TraceId: fullId }));
+      ch = await startMigratedTraceClickHouse();
+      service = TraceLegacyReadClickHouseRepository.create({
+        resolveClickHouseClient: async () => ch,
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+      });
+    }, 60_000);
+
+    afterAll(async () => {
+      if (ch) {
+        await ch.exec({
+          query: `ALTER TABLE trace_summaries DELETE WHERE TenantId IN ({a:String}, {b:String})`,
+          query_params: { a: tenantId, b: otherTenantId },
+        });
+      }
     });
 
-    it("returns the single full trace ID", async () => {
-      const result = await service.resolveTraceIdByPrefix({
-        projectId: tenantId,
-        prefix: fullId.slice(0, 20),
-        occurredAt: occurredAtRange,
+    describe("when exactly one trace matches the prefix within the project", () => {
+      const fullId = "63dc535cea6335c506bc81ef3543a07d";
+
+      beforeAll(async () => {
+        await insertTraceSummary(ch, makeTraceSummaryRow({ TraceId: fullId }));
       });
 
-      expect(result).toEqual([fullId]);
-    });
+      it("returns the single full trace ID", async () => {
+        const result = await service.resolveTraceIdByPrefix({
+          projectId: tenantId,
+          prefix: fullId.slice(0, 20),
+          occurredAt: occurredAtRange,
+        });
 
-    it("still resolves when the caller passes the full ID", async () => {
-      const result = await service.resolveTraceIdByPrefix({
-        projectId: tenantId,
-        prefix: fullId,
-        occurredAt: occurredAtRange,
+        expect(result).toEqual([fullId]);
       });
 
-      expect(result).toEqual([fullId]);
-    });
-  });
+      it("still resolves when the caller passes the full ID", async () => {
+        const result = await service.resolveTraceIdByPrefix({
+          projectId: tenantId,
+          prefix: fullId,
+          occurredAt: occurredAtRange,
+        });
 
-  describe("when the prefix matches multiple traces in the project", () => {
-    const traceA = "abc123de00000000000000000000aaaa";
-    const traceB = "abc123de00000000000000000000bbbb";
-
-    beforeAll(async () => {
-      await insertTraceSummary(ch, makeTraceSummaryRow({ TraceId: traceA }));
-      await insertTraceSummary(ch, makeTraceSummaryRow({ TraceId: traceB }));
+        expect(result).toEqual([fullId]);
+      });
     });
 
-    it("returns multiple IDs up to the limit so callers can detect ambiguity", async () => {
-      const result = await service.resolveTraceIdByPrefix({
-        projectId: tenantId,
-        prefix: "abc123de",
-        occurredAt: occurredAtRange,
-        limit: 2,
+    describe("when the prefix matches multiple traces in the project", () => {
+      const traceA = "abc123de00000000000000000000aaaa";
+      const traceB = "abc123de00000000000000000000bbbb";
+
+      beforeAll(async () => {
+        await insertTraceSummary(ch, makeTraceSummaryRow({ TraceId: traceA }));
+        await insertTraceSummary(ch, makeTraceSummaryRow({ TraceId: traceB }));
       });
 
-      expect(result).not.toBeNull();
-      expect(result).toHaveLength(2);
-      expect([...result].toSorted()).toEqual([traceA, traceB].toSorted());
-    });
-  });
+      it("returns multiple IDs up to the limit so callers can detect ambiguity", async () => {
+        const result = await service.resolveTraceIdByPrefix({
+          projectId: tenantId,
+          prefix: "abc123de",
+          occurredAt: occurredAtRange,
+          limit: 2,
+        });
 
-  describe("when no trace matches", () => {
-    it("returns an empty array", async () => {
-      const result = await service.resolveTraceIdByPrefix({
-        projectId: tenantId,
-        prefix: "deadbeefno-match",
-        occurredAt: occurredAtRange,
+        expect(result).not.toBeNull();
+        expect(result).toHaveLength(2);
+        expect([...result].toSorted()).toEqual([traceA, traceB].toSorted());
+      });
+    });
+
+    describe("when no trace matches", () => {
+      it("returns an empty array", async () => {
+        const result = await service.resolveTraceIdByPrefix({
+          projectId: tenantId,
+          prefix: "deadbeefno-match",
+          occurredAt: occurredAtRange,
+        });
+
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe("when the trace falls outside the OccurredAt window", () => {
+      const outOfWindowTraceId = "fedcba9876543210fedcba9876543210";
+
+      beforeAll(async () => {
+        // Insert with OccurredAt far in the past — outside the test's window.
+        await insertTraceSummary(
+          ch,
+          makeTraceSummaryRow({
+            TraceId: outOfWindowTraceId,
+            OccurredAt: new Date(now - 1_000_000),
+          }),
+        );
       });
 
-      expect(result).toEqual([]);
-    });
-  });
+      it("does not return traces outside the partition window", async () => {
+        const result = await service.resolveTraceIdByPrefix({
+          projectId: tenantId,
+          prefix: outOfWindowTraceId.slice(0, 16),
+          occurredAt: occurredAtRange,
+        });
 
-  describe("when the trace falls outside the OccurredAt window", () => {
-    const outOfWindowTraceId = "fedcba9876543210fedcba9876543210";
-
-    beforeAll(async () => {
-      // Insert with OccurredAt far in the past — outside the test's window.
-      await insertTraceSummary(
-        ch,
-        makeTraceSummaryRow({ TraceId: outOfWindowTraceId, OccurredAt: new Date(now - 1_000_000) }),
-      );
+        expect(result).toEqual([]);
+      });
     });
 
-    it("does not return traces outside the partition window", async () => {
-      const result = await service.resolveTraceIdByPrefix({
-        projectId: tenantId,
-        prefix: outOfWindowTraceId.slice(0, 16),
-        occurredAt: occurredAtRange,
+    describe("when another project has a matching trace ID", () => {
+      const otherTraceId = "ffee112233445566778899aabbccddee";
+
+      beforeAll(async () => {
+        // Insert under a DIFFERENT tenant — MUST NOT leak across projects.
+        await insertTraceSummary(
+          ch,
+          makeTraceSummaryRow({ TraceId: otherTraceId, TenantId: otherTenantId }),
+        );
       });
 
-      expect(result).toEqual([]);
-    });
-  });
+      /** @scenario Prefix match is scoped to the current project */
+      it("does not return it for a different project", async () => {
+        const result = await service.resolveTraceIdByPrefix({
+          projectId: tenantId,
+          prefix: otherTraceId.slice(0, 20),
+          occurredAt: occurredAtRange,
+        });
 
-  describe("when another project has a matching trace ID", () => {
-    const otherTraceId = "ffee112233445566778899aabbccddee";
-
-    beforeAll(async () => {
-      // Insert under a DIFFERENT tenant — MUST NOT leak across projects.
-      await insertTraceSummary(
-        ch,
-        makeTraceSummaryRow({ TraceId: otherTraceId, TenantId: otherTenantId }),
-      );
-    });
-
-    /** @scenario Prefix match is scoped to the current project */
-    it("does not return it for a different project", async () => {
-      const result = await service.resolveTraceIdByPrefix({
-        projectId: tenantId,
-        prefix: otherTraceId.slice(0, 20),
-        occurredAt: occurredAtRange,
+        expect(result).toEqual([]);
       });
-
-      expect(result).toEqual([]);
     });
-  });
-});
+  },
+);

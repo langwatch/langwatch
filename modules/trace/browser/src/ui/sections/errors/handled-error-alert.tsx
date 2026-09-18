@@ -1,10 +1,8 @@
 import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { AlertCircle } from "lucide-react";
 
-import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
-
 import { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
-
 import { ErrorActions } from "../../elements/errors/error-actions.tsx";
 
 /**

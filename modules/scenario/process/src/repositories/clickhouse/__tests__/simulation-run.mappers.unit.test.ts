@@ -1,13 +1,11 @@
-import { describe, expect, it } from "vitest";
 import {
   ScenarioRunStatus,
   Verdict,
   type ScenarioEvaluationResult,
 } from "@langwatch/scenario-contract";
-import {
-  columnsToEvaluations,
-  evaluationsToColumns,
-} from "../simulation-evaluations.columns.ts";
+import { describe, expect, it } from "vitest";
+
+import { columnsToEvaluations, evaluationsToColumns } from "../simulation-evaluations.columns.ts";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -33,9 +31,7 @@ const MINIMAL: ScenarioEvaluationResult = {
   required: false,
 };
 
-function makeRow(
-  overrides: Partial<ClickHouseSimulationRunRow> = {},
-): ClickHouseSimulationRunRow {
+function makeRow(overrides: Partial<ClickHouseSimulationRunRow> = {}): ClickHouseSimulationRunRow {
   return {
     ScenarioRunId: "run-1",
     ScenarioId: "scenario-1",
@@ -76,10 +72,7 @@ describe("evaluation columns", () => {
 
       expect(columns["Evaluations.Required"]).toEqual([1, 0]);
       expect(columns["Evaluations.Passed"]).toEqual([0, null]);
-      expect(columns["Evaluations.InputsJson"]).toEqual([
-        JSON.stringify(FULL.inputs),
-        "",
-      ]);
+      expect(columns["Evaluations.InputsJson"]).toEqual([JSON.stringify(FULL.inputs), ""]);
       expect(columnsToEvaluations(columns)).toEqual([FULL, MINIMAL]);
     });
   });

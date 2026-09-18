@@ -1,15 +1,20 @@
 import type { TraceMediaRef } from "@langwatch/trace-contract";
+
+import {
+  collectAnnotatedMediaParts,
+  type MediaPartData,
+  mediaRefToMediaData,
+} from "../../../../../behavior/shared/traces/media-parts.ts";
 import {
   mediaRefBelongsToSide,
   mediaRoleBelongsToSide,
   type TraceMediaSide,
 } from "../../../../../behavior/shared/traces/media-refs.ts";
 import {
-  collectAnnotatedMediaParts,
-  type MediaPartData,
-  mediaRefToMediaData,
-} from "../../../../../behavior/shared/traces/media-parts.ts";
-import { formatDuration, formatRelativeTime,readableDate } from "../../../../../model/display-formatters.ts";
+  formatDuration,
+  formatRelativeTime,
+  readableDate,
+} from "../../../../../model/display-formatters.ts";
 import { extractSystemText } from "../transcript/parsing.ts";
 import type { ParsedTurn } from "./types.ts";
 

@@ -2,6 +2,7 @@
 // (spans + evaluations)
 
 import type { LLMSpan, RAGSpan, Span, Trace } from "@langwatch/trace-contract";
+
 import { RESERVED_METADATA_KEYS } from "./trace-export-columns.rules.ts";
 
 // ---------------------------------------------------------------------------

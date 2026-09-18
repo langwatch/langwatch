@@ -1,8 +1,18 @@
-import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
+import {
+  type AppendStore,
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "@langwatch/eventing";
 import { Temporal, type Instant } from "@langwatch/time";
-import { ATTR_KEYS,type SpanReceivedEvent,spanReceivedEventSchema,NormalizedStatusCode } from "@langwatch/trace-contract";
-import { SpanCostService } from "../services/span-cost.service.ts";
+import {
+  ATTR_KEYS,
+  type SpanReceivedEvent,
+  spanReceivedEventSchema,
+  NormalizedStatusCode,
+} from "@langwatch/trace-contract";
+
 import { type TraceSpanNormalization } from "../app/trace.members.ts";
+import { SpanCostService } from "../services/span-cost.service.ts";
 
 /**
  * One row emitted to `trace_analytics_rollup` per SpanReceivedEvent. Field

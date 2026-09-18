@@ -1,5 +1,5 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "./canonical-attributes.service.ts";
+
 import {
   coerceStringNumberAttrs,
   extractInputMessages,
@@ -19,6 +19,7 @@ import {
   extractSystemInstructionFromMessages,
   stripSystemMessages,
 } from "../rules/canonical-message.rules.ts";
+import type { ExtractorContext } from "./canonical-attributes.service.ts";
 
 const GEN_AI_RULE_PREFIX = "genai";
 

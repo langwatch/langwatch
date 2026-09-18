@@ -1,10 +1,10 @@
-import { nowInstant, Temporal } from "@langwatch/time";
 /**
  * @vitest-environment node
  * Archiving a test suite over real rows: its scenarios and its run-plan row go
  * together. @see specs/suites/test-suites.feature
  */
 import { randomUUID } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -15,7 +15,9 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { nowInstant, Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import { PrismaScenarioRepository } from "../scenario.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {

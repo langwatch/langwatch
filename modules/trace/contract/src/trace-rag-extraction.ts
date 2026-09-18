@@ -1,13 +1,12 @@
 import { nowInstant } from "@langwatch/time";
+
 import { safeUnflatten } from "./trace-attribute-unflatten.ts";
 import {
   flattenSpanTree,
   organizeSpansIntoTree,
   typedValueToText,
 } from "./trace-collector-common.ts";
-import { extractRAGTextualContext } from "./trace-rag-chunks.ts";
 import { spanInputOutputSchema } from "./trace-format.schemas.ts";
-import { fixed64Schema } from "./trace.otlp.ts";
 import type {
   ElasticSearchEvaluation,
   ElasticSearchEvent,
@@ -19,6 +18,8 @@ import type {
   Span,
   SpanInputOutput,
 } from "./trace-format.schemas.ts";
+import { extractRAGTextualContext } from "./trace-rag-chunks.ts";
+import { fixed64Schema } from "./trace.otlp.ts";
 
 export const getRAGChunks = (spans: (ElasticSearchSpan | Span)[]): RAGChunk[] => {
   const sortedSpans = [

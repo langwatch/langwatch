@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 
 /**

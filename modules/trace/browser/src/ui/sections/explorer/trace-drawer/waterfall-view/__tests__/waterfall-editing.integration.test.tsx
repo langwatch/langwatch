@@ -1,9 +1,9 @@
+import type { SpanTreeNode, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 // Waterfall during edit: prior corrections remain marked, row removal closes
 // detail pane.
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SpanTreeNode,TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const mocks = vi.hoisted(() => ({
   storedPatch: null as TraceEditOverlayPatch | null,

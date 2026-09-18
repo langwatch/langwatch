@@ -6,19 +6,20 @@
  */
 
 import { Box, Button, Checkbox, chakra, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import { Menu } from "@langwatch/design-system/menu";
+import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
 import { format } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";
-import { Menu } from "@langwatch/design-system/menu";
-import { TagList } from "../../../elements/tag-list.tsx";
-import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
+
+import { type TestCase } from "../../../../model/agent-testing/cases/test-cases.ts";
 import {
   FG_MUTED,
   ROW_HOVER_BG,
   TABLE_HEADER_BG,
 } from "../../../../model/agent-testing/shared/design.ts";
 import { RunCaseButton } from "../../../elements/agent-testing/cases/run-case-button.tsx";
-import { type TestCase } from "../../../../model/agent-testing/cases/test-cases.ts";
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import { TagList } from "../../../elements/tag-list.tsx";
 import { MenuActionLabel } from "./menu-action-label.tsx";
 import { RecentRunsSubmenu } from "./recent-runs-menu.tsx";
 

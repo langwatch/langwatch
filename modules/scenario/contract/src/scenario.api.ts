@@ -1,10 +1,29 @@
-import { moduleApi } from "@langwatch/kernel";
 import type {
   AgentTestRunResult,
   AgentTestTurnResult,
   AgentWithFields,
 } from "@langwatch/agent-contract";
+import { moduleApi } from "@langwatch/kernel/module-api";
+import type { UserFullProfile, UserProfilesInput } from "@langwatch/user-contract";
+
+import type {
+  CodeScenario,
+  ResultAtom,
+  ResultsFilter,
+  ResultsGroupBy,
+  ResultsOverview,
+  RunTarget,
+} from "./result-atoms.ts";
 import type { RunActor } from "./run-actor.ts";
+import type { ResolvedRunModels } from "./run-models.ts";
+import type { RunSecretCiphertext } from "./run-secret-ciphertext.ts";
+import type {
+  ScenarioExecutionPrefetchInput,
+  ScenarioExecutionPrefetchResult,
+} from "./scenario-execution.service.ts";
+import type { ScenarioTabPresence, ScenarioTabRegistration } from "./scenario-tab-presence.ts";
+import type { RunParameterValues } from "./scenario.parameters.ts";
+import type { RunConfigurationEntryResponse } from "./scenario.responses.ts";
 import type {
   Scenario,
   ScenarioAuthorLabel,
@@ -20,21 +39,21 @@ import type {
   ScenarioTestSuiteUpdateInput,
   ScenarioRunConfig,
 } from "./scenario.ts";
-import type { RunParameterValues } from "./scenario.parameters.ts";
-import type { RunSecretCiphertext } from "./run-secret-ciphertext.ts";
-import type { ResolvedRunModels } from "./run-models.ts";
-import type { SimulationQueueRun } from "./simulation.commands.ts";
 import type {
-  SimulationAllSuitesRunData,
-  SimulationBatchHistory,
-  SimulationBatchRunData,
-  SimulationBatchSummary,
-  SimulationExternalSetSummary,
-  SimulationLastResultSummary,
-  SimulationRunData,
-  SimulationStreamFrame,
-  SimulationSetData,
-} from "./simulation.ts";
+  ScenarioDuplicateInput,
+  ScenarioMoveInput,
+  ScenarioVersionDetail,
+  ScenarioVersionInput,
+  ScenarioVersionListInput,
+  ScenarioVersionRestoreInput,
+  ScenarioVersionSummary,
+} from "./scenario.version.ts";
+import type { SimulationQueueRun } from "./simulation.commands.ts";
+import type { ScenarioGenerateRequest, ScenarioGenerateResponse } from "./scenario-generate.schemas.ts";
+import type {
+  ScenarioRunExportDownload,
+  ScenarioRunExportDownloadInput,
+} from "./scenario-run-export.ts";
 import type {
   SimulationAllSuitesInput,
   SimulationBatchHistoryInput,
@@ -47,29 +66,16 @@ import type {
   SimulationScenarioSetRunsInput,
 } from "./simulation.service.ts";
 import type {
-  ScenarioExecutionPrefetchInput,
-  ScenarioExecutionPrefetchResult,
-} from "./scenario-execution.service.ts";
-import type {
-  ScenarioDuplicateInput,
-  ScenarioMoveInput,
-  ScenarioVersionDetail,
-  ScenarioVersionInput,
-  ScenarioVersionListInput,
-  ScenarioVersionRestoreInput,
-  ScenarioVersionSummary,
-} from "./scenario.version.ts";
-import type { ScenarioTabPresence, ScenarioTabRegistration } from "./scenario-tab-presence.ts";
-import type {
-  CodeScenario,
-  ResultAtom,
-  ResultsFilter,
-  ResultsGroupBy,
-  ResultsOverview,
-  RunTarget,
-} from "./result-atoms.ts";
-import type { RunConfigurationEntryResponse } from "./scenario.responses.ts";
-import type { UserFullProfile, UserProfilesInput } from "@langwatch/user-contract";
+  SimulationAllSuitesRunData,
+  SimulationBatchHistory,
+  SimulationBatchRunData,
+  SimulationBatchSummary,
+  SimulationExternalSetSummary,
+  SimulationLastResultSummary,
+  SimulationRunData,
+  SimulationStreamFrame,
+  SimulationSetData,
+} from "./simulation.ts";
 
 export interface TestAgentRunInput {
   projectId: string;
@@ -146,6 +152,10 @@ export interface QueueSimulationRunInput {
 /** The scenario application: what every scenario door calls, and what peer
  * features such as Suite reach it by. */
 export interface ScenarioApi {
+  generateScenario(input: ScenarioGenerateRequest): Promise<ScenarioGenerateResponse>;
+  downloadScenarioRunExport(
+    input: ScenarioRunExportDownloadInput,
+  ): Promise<ScenarioRunExportDownload>;
   testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult>;
   testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult>;
   list(input: { projectId: string }): Promise<Scenario[]>;

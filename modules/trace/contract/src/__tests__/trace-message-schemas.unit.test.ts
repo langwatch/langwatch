@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   AnthropicMessage,
   AnyProviderMessage,
@@ -10,6 +9,7 @@ import {
   OpenAIMessage,
   OpenTelemetryGenAIMessage,
 } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
 
 describe("messageSchemas", () => {
   describe("OpenTelemetryGenAIMessage", () => {

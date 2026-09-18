@@ -1,15 +1,19 @@
-import type { Protections,DerivedTraceEvent,
+import { PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
+import type {
+  Protections,
+  DerivedTraceEvent,
   Event,
   Span,
   SpanInputOutput,
   SpanMetrics,
   Trace,
   TraceInput,
-  TraceOutput } from "@langwatch/trace-contract";
-import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
-import { PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
-import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
+  TraceOutput,
+} from "@langwatch/trace-contract";
 import { parsePythonInsideJson } from "@langwatch/trace-contract";
+
+import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 
 // Stable display order for the content categories a drop policy can strip, so
 // the trace-view marker always lists them the same way ("input, output").
@@ -145,7 +149,7 @@ export class TraceReadRedactionService {
    * static method) so a test fixture can assign it as a value without an
    * unbound extraction; no subclass extends this class.
    */
-  static redactObject = <T,>(object: T, redactions: Set<string>): T => {
+  static redactObject = <T>(object: T, redactions: Set<string>): T => {
     if (redactions.size === 0) {
       return object;
     }

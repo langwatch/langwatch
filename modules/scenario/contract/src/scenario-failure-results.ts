@@ -2,7 +2,6 @@
  * Builds terminal results envelope for members failures (not judge verdicts).
  */
 
-import { Verdict } from "./scenario-run.ts";
 import { AgentDevTunnelUnreachableError } from "./scenario-dev-tunnel-error.ts";
 import {
   classifyScenarioInfraError,
@@ -10,6 +9,7 @@ import {
   isTransportLevelScenarioFailure,
   ScenarioInfraErrorCode,
 } from "./scenario-infra-error.ts";
+import { Verdict } from "./scenario-run.ts";
 
 export interface ScenarioFailureResults {
   verdict: Verdict;

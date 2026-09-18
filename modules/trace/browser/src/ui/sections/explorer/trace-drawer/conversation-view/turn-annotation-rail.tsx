@@ -1,15 +1,16 @@
 import { Button, Icon, Text, VStack } from "@chakra-ui/react";
 import { Edit3 } from "lucide-react";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { useRequiredSession } from "../../../../../behavior/auth-session.ts";
-import { useScoreNamesById } from "../../../use-score-names-by-id.ts";
+
 import {
   type AnnotationDraft,
   isTurnRailDraft,
   type OpenAnnotationDraftParams,
   useAnnotationDraftStore,
 } from "../../../../../behavior/annotation-draft.store.ts";
+import { useRequiredSession } from "../../../../../behavior/auth-session.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import { useScoreNamesById } from "../../../use-score-names-by-id.ts";
 import { AnnotationCard } from "./annotation-card.tsx";
 import { AnnotationEditorCard } from "./annotation-editor-card.tsx";
 

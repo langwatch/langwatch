@@ -1,5 +1,5 @@
-import { useFilterParams } from "../../../behavior/use-filter-params.ts";
 import { api } from "../../../behavior/trace-api.ts";
+import { useFilterParams } from "../../../behavior/use-filter-params.ts";
 import { TracesMapping } from "../traces/traces-mapping.tsx";
 
 /**

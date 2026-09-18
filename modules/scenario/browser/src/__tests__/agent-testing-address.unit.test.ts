@@ -4,6 +4,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { toAgentTestingAddress } from "../behavior/suites/use-suite-routing.ts";
 
 const address = (segments: string[], query: Record<string, unknown> = {}) =>

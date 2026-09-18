@@ -1,9 +1,10 @@
 import { Button } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { ChevronDown, Columns3 } from "lucide-react";
 import type React from "react";
-import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Popover } from "@langwatch/design-system/popover";
+
 import { ColumnPickerContent } from "./column-picker-content.tsx";
 
 /**

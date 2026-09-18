@@ -15,7 +15,5 @@ export const MAX_STORED_INPUT_LENGTH = 2_000;
 
 /** The delay before the attempt after the given one, doubling per attempt. */
 export function backoffDelayMs(attempt: number): number {
-  return (
-    SCENARIO_EVALUATIONS_JOB.BACKOFF_DELAY_MS * 2 ** Math.max(attempt - 1, 0)
-  );
+  return SCENARIO_EVALUATIONS_JOB.BACKOFF_DELAY_MS * 2 ** Math.max(attempt - 1, 0);
 }

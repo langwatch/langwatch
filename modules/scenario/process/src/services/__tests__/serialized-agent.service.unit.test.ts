@@ -4,9 +4,10 @@
  * @see specs/agents/agent-session-echo.feature
  */
 
+import { SESSION_MAX_BYTES } from "@langwatch/agent-contract";
 import { AgentRole } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
-import { SESSION_MAX_BYTES } from "@langwatch/agent-contract";
+
 import {
   AgentSessionTooLargeError,
   SESSION_TOO_LARGE_PREFIX,

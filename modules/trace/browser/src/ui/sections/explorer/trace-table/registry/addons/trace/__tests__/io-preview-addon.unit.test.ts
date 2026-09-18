@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { TraceListItem } from "../../../../../types/trace.ts";
 import {
   ioPreviewContentBoundary,

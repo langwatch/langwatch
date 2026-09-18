@@ -5,6 +5,7 @@
  */
 
 import type { LiqeQuery } from "liqe";
+
 import { walkAST } from "./trace-query-ast.ts";
 import type { FacetState } from "./trace-query-metadata.ts";
 

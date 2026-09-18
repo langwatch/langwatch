@@ -1,4 +1,13 @@
-import type { CategoryVisibility, Protections,
+import type { CodingAgentApi, LogContentCategory } from "@langwatch/coding-agent-contract";
+/**
+ * Shared mapping/redaction layer for both trace-view transports (authenticated
+ * and anonymous). Single implementation ensures a redaction cannot drift between
+ * surfaces. Three capabilities injected to avoid cross-feature dependencies.
+ */
+import { CONTENT_CATEGORIES, type ContentCategory } from "@langwatch/data-privacy-contract";
+import type {
+  CategoryVisibility,
+  Protections,
   ContentPrivacy,
   DerivedTraceEvent,
   Span,
@@ -9,13 +18,8 @@ import type { CategoryVisibility, Protections,
   TraceHeader,
   TraceListItem,
   TraceLogRecordDto,
-  TraceSummaryData } from "@langwatch/trace-contract";
-/**
- * Shared mapping/redaction layer for both trace-view transports (authenticated
- * and anonymous). Single implementation ensures a redaction cannot drift between
- * surfaces. Three capabilities injected to avoid cross-feature dependencies.
- */
-import { CONTENT_CATEGORIES, type ContentCategory } from "@langwatch/data-privacy-contract";
+  TraceSummaryData,
+} from "@langwatch/trace-contract";
 import {
   deriveTraceStatus,
   deriveTraceTimestamp,
@@ -23,7 +27,7 @@ import {
   RESERVED_OUTPUT_MEDIA_REFS,
   resolveNonBilledCost,
 } from "@langwatch/trace-contract";
-import type { CodingAgentApi, LogContentCategory } from "@langwatch/coding-agent-contract";
+
 import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service.ts";
 
 // ---------------------------------------------------------------------------

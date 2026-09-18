@@ -1,3 +1,5 @@
+import { isReplyTextPart } from "@langwatch/trace-contract";
+
 import {
   isMessageLike,
   isRecord,
@@ -5,7 +7,6 @@ import {
   type MessageLike,
   safeStringify,
 } from "./canonical-guard.rules.ts";
-import { isReplyTextPart } from "@langwatch/trace-contract";
 
 /**
  * Extracts text content from a single message object.

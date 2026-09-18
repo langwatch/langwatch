@@ -20,7 +20,7 @@ import type {
   SimulationProjectIdsInput,
   SimulationScenarioRunInput,
   SimulationScenarioSetInput,
-  SimulationScenarioSetRunsInput
+  SimulationScenarioSetRunsInput,
 } from "@langwatch/scenario-contract";
 
 /** A run carrying the stored columns an export needs beyond the display model. */

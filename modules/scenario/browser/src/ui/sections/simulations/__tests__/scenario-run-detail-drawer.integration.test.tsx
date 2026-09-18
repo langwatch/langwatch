@@ -5,14 +5,15 @@
  *   specs/features/agent-testing/case-version-history.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
+import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-browser/run-formatters";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
-import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-browser/run-formatters";
-import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
+
 import { AgentTestingRunDrawer } from "../../agent-testing/drawers/agent-testing-run-drawer.tsx";
+import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
 
 const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());

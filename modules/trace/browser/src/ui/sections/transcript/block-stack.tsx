@@ -1,20 +1,21 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuWrench } from "react-icons/lu";
-import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
-import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown.tsx";
+
 import { asMarkdownBody, withBlockKeys } from "../../../behavior/transcript/parsing.ts";
-import { ContextDisclosure } from "../../blocks/transcript/context-disclosure.tsx";
+import { reparseTextBlock } from "../../../behavior/transcript/reparse-text-block.ts";
 import {
   itemBlockKey,
   pairToolBlocks,
   type StackItem,
 } from "../../../model/transcript/block-stack-items.ts";
-import { reparseTextBlock } from "../../../behavior/transcript/reparse-text-block.ts";
-import { ReasoningBlock } from "../../blocks/transcript/reasoning-block.tsx";
-import { OpenAIToolCallCard, ToolPairCard } from "./tool-blocks.tsx";
 import type { ChatMessage, ContentBlock } from "../../../model/transcript/types.ts";
+import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown.tsx";
+import { ContextDisclosure } from "../../blocks/transcript/context-disclosure.tsx";
+import { ReasoningBlock } from "../../blocks/transcript/reasoning-block.tsx";
 import { useTranscriptRenderPorts } from "../../elements/transcript-render-ports.tsx";
+import { OpenAIToolCallCard, ToolPairCard } from "./tool-blocks.tsx";
 
 export interface BlockStackProps {
   blocks: ContentBlock[];

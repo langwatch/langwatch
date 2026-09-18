@@ -1,6 +1,7 @@
 import { Circle, HStack, Icon, Text } from "@chakra-ui/react";
 import { AlertTriangle, GitBranch, Zap } from "lucide-react";
 import type React from "react";
+
 import {
   formatCost,
   formatTokens,

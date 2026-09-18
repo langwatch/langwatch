@@ -5,6 +5,7 @@
 
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { TrendPoint } from "@langwatch/scenario-contract";
+
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { formatPassRate, PASS_RATE_BAR_OPACITY, passRateColor } from "./pass-rate-color.ts";
 

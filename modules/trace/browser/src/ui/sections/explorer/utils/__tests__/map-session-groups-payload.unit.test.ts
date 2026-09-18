@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
 import {
   mapSessionGroupsPayload,

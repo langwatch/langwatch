@@ -1,5 +1,6 @@
 import { Box, Heading, Link, Table, Text } from "@chakra-ui/react";
 import type React from "react";
+
 import { ShikiCodeBlock } from "../../elements/markdown/shiki-highlight.tsx";
 import { stripThinkingMarker, ThinkingText } from "../../elements/markdown/thinking.tsx";
 

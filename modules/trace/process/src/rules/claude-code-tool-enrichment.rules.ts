@@ -5,6 +5,7 @@
  */
 
 import type { SpanInputOutput, TraceCanonicalisationService } from "@langwatch/trace-contract";
+
 import { INPUT_BODY_EVENT, type ClaudeContentLog } from "./claude-code-message-index.rules.ts";
 import { capPayloadString } from "./trace-payload-cap.rules.ts";
 

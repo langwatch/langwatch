@@ -1,15 +1,3 @@
-/**
- * Deprecated trace family (v0): GET /api/trace/:id, share/unshare/search, thread.
- * Declared public, resolves own credential, checks permissions in handler. Literal
- * paths (no versioning) that released SDKs dial.
- */
-import { TraceReadableSpanService } from "#services/trace-readable-span.service";
-import {
-  formatTraceSummaryDigest,
-  generateAsciiTree,
-  toLLMModeTrace,
-} from "#rules/trace-formatting.rules";
-import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestRouter,
@@ -17,9 +5,9 @@ import {
   type RestCredentialPrincipal,
   type RestRawResult,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { resolveRequestBound } from "@langwatch/plans";
-import { HTTPException } from "hono/http-exception";
+import { toEpochMs } from "@langwatch/time";
 import {
   traceFormatQuerySchema,
   traceLegacyIdParamsSchema,
@@ -29,9 +17,22 @@ import {
   type TraceLegacyListInput,
   type TracesForProjectResult,
 } from "@langwatch/trace-contract";
+import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod";
-import { toEpochMs } from "@langwatch/time";
+
+import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
+import {
+  formatTraceSummaryDigest,
+  generateAsciiTree,
+  toLLMModeTrace,
+} from "#rules/trace-formatting.rules";
+/**
+ * Deprecated trace family (v0): GET /api/trace/:id, share/unshare/search, thread.
+ * Declared public, resolves own credential, checks permissions in handler. Literal
+ * paths (no versioning) that released SDKs dial.
+ */
+import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 
 const PRODUCES_JSON = "application/json";
 

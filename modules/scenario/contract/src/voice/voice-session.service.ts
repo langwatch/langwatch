@@ -1,11 +1,10 @@
 // Service for "Talk to it": mint browser call sessions and ingest finished calls as runs.
 // Infrastructure injection enables unit testing with fakes; transports plugged via registry.
 
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 
-import { VOICE_AGENTS_DISABLED_MESSAGE } from "@langwatch/feature-flag-contract";
 import { ScenarioRunStatus } from "../scenario-run.ts";
-import type { VoiceTransport } from "./voice-transport.ts";
 import {
   type BrowserTranscriptTurn,
   browserTranscriptToCallRecord,
@@ -19,6 +18,7 @@ import {
   type VoiceTransportRunner,
   voiceTransportRegistry,
 } from "./voice-transport.registry.ts";
+import type { VoiceTransport } from "./voice-transport.ts";
 
 /** The project has no key for this transport, so no session can be minted. */
 export class VoiceKeyMissingError extends HandledError {
@@ -140,13 +140,9 @@ export class VoiceAgentsGateDisabledError extends HandledError {
 export class VoiceRecordingUnavailableError extends HandledError {
   declare readonly code: "voice_recording_unavailable";
   constructor() {
-    super(
-      "voice_recording_unavailable",
-      "The call recording is not available",
-      {
-        httpStatus: 404,
-      },
-    );
+    super("voice_recording_unavailable", "The call recording is not available", {
+      httpStatus: 404,
+    });
     this.name = "VoiceRecordingUnavailableError";
   }
 }
@@ -155,11 +151,9 @@ export class VoiceRecordingUnavailableError extends HandledError {
 export class VoiceRecordingKeyMissingError extends HandledError {
   declare readonly code: "voice_recording_key_missing";
   constructor() {
-    super(
-      "voice_recording_key_missing",
-      "The call recording is not available",
-      { httpStatus: 404 },
-    );
+    super("voice_recording_key_missing", "The call recording is not available", {
+      httpStatus: 404,
+    });
     this.name = "VoiceRecordingKeyMissingError";
   }
 }
@@ -190,10 +184,7 @@ export interface VoiceSessionInfrastructure {
    *  finish short-circuits on a written run but re-drives a half-written one
    *  (#7973). Also returns the persisted scenario and set so a re-drive reuses
    *  them rather than re-resolving a scenario that may since be archived. */
-  findExistingRun(input: {
-    projectId: string;
-    scenarioRunId: string;
-  }): Promise<{
+  findExistingRun(input: { projectId: string; scenarioRunId: string }): Promise<{
     agentId: string | null;
     status: ScenarioRunStatus;
     source: CallRecord["source"] | null;
@@ -295,9 +286,7 @@ export async function mintVoiceSession({
   agentRowId?: string;
   maxDurationSeconds: number;
 }): Promise<MintResult> {
-  const row = agentRowId
-    ? await ports.resolveVoiceAgentRow({ projectId, agentRowId })
-    : null;
+  const row = agentRowId ? await ports.resolveVoiceAgentRow({ projectId, agentRowId }) : null;
   if (agentRowId && !row) throw new VoiceAgentRowNotFoundError();
   const agentId = row?.agentExternalId ?? bodyAgentId;
 
@@ -310,9 +299,7 @@ export async function mintVoiceSession({
   try {
     connect = await runner.mintSession({ agentId, credential });
   } catch (error) {
-    throw new VoiceMintFailedError(
-      error instanceof Error ? error.message : String(error),
-    );
+    throw new VoiceMintFailedError(error instanceof Error ? error.message : String(error));
   }
 
   // The token binds the call to its project, the row (when one exists) and
@@ -442,9 +429,7 @@ async function resolveScenarioContext(
   return { scenarioId, scenarioSetId: scenario.scenarioSetId };
 }
 
-type ExistingRun = NonNullable<
-  Awaited<ReturnType<VoiceSessionInfrastructure["findExistingRun"]>>
->;
+type ExistingRun = NonNullable<Awaited<ReturnType<VoiceSessionInfrastructure["findExistingRun"]>>>;
 
 /**
  * The result for a terminal run returned untouched: a duplicate finish
@@ -480,10 +465,7 @@ function assertProviderRecordMatchesToken(
   providerRecord: CallRecord | null,
   token: VoiceSessionTokenPayload,
 ): void {
-  if (
-    providerRecord &&
-    providerRecord.agentExternalId !== token.agentExternalId
-  ) {
+  if (providerRecord && providerRecord.agentExternalId !== token.agentExternalId) {
     throw new VoiceConversationMismatchError();
   }
 }
@@ -526,9 +508,7 @@ function selectCallRecord({
   if (transcript.length > 0) {
     return {
       ...browserRecord,
-      ...(providerRecord?.audioUrl
-        ? { audioUrl: providerRecord.audioUrl }
-        : {}),
+      ...(providerRecord?.audioUrl ? { audioUrl: providerRecord.audioUrl } : {}),
     };
   }
   // Neither side has turns: keep the (empty) provider record when one came
@@ -583,10 +563,11 @@ async function ingestFinishedCall(
   // Prefer the provider's record; fall back to the live transcript when it is
   // not ready or the fetch fails. Fetched BEFORE the agent row is created so a
   // mismatched conversation is rejected without leaving an orphan agent behind.
-  const { record: providerRecord, hasFetchFailed } = await fetchProviderRecord(
-    ports,
-    { transport, conversationId, projectId: input.projectId },
-  );
+  const { record: providerRecord, hasFetchFailed } = await fetchProviderRecord(ports, {
+    transport,
+    conversationId,
+    projectId: input.projectId,
+  });
 
   assertProviderRecordMatchesToken(providerRecord, token);
 
@@ -645,10 +626,11 @@ async function finishDrawerCall(
     scenarioRunId: string;
   },
 ): Promise<FinishResult> {
-  const { record, hasFetchFailed, agentRowId } = await ingestFinishedCall(
-    input,
-    { transport, conversationId, scenarioRunId },
-  );
+  const { record, hasFetchFailed, agentRowId } = await ingestFinishedCall(input, {
+    transport,
+    conversationId,
+    scenarioRunId,
+  });
 
   return {
     // No run: a drawer call is not persisted as one (#8020). The agent id is
@@ -814,9 +796,7 @@ export async function authorizeRecordingPlayback({
   // of another kind reaching here is a wiring bug (transport is hardcoded
   // above), not a customer-facing failure.
   if (credential.kind !== "elevenlabs") {
-    throw new Error(
-      "Recording playback is only available for ElevenLabs conversations",
-    );
+    throw new Error("Recording playback is only available for ElevenLabs conversations");
   }
 
   // A scenario run authorizes playback directly; no provider call needed.

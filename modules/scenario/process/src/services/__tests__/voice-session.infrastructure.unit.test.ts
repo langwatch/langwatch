@@ -5,6 +5,7 @@
  */
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   createVoiceSessionInfrastructureFromServices as composeVoiceSessionInfrastructure,
   type VoiceSessionServices,
@@ -52,10 +53,7 @@ function createVoiceSessionInfrastructureFromServices(
 }
 
 function fakeAgentService(over: {
-  getById?: (input: {
-    id: string;
-    projectId: string;
-  }) => Promise<AgentRow | null>;
+  getById?: (input: { id: string; projectId: string }) => Promise<AgentRow | null>;
   createVoiceAgent?: (input: unknown) => Promise<{ id: string }>;
   hasVoiceAgentForExternalId?: (input: unknown) => Promise<boolean>;
 }) {
@@ -66,16 +64,12 @@ function fakeAgentService(over: {
       vi.fn(async () => {
         throw new Error("not stubbed");
       }),
-    hasVoiceAgentForExternalId:
-      over.hasVoiceAgentForExternalId ?? vi.fn(async () => false),
+    hasVoiceAgentForExternalId: over.hasVoiceAgentForExternalId ?? vi.fn(async () => false),
   };
 }
 
 function fakeScenarioService(over: {
-  getById?: (input: {
-    id: string;
-    projectId: string;
-  }) => Promise<ScenarioRow | null>;
+  getById?: (input: { id: string; projectId: string }) => Promise<ScenarioRow | null>;
 }) {
   return {
     getById: over.getById ?? vi.fn(async () => null),
@@ -227,8 +221,7 @@ describe("Feature: voice-session infrastructure composition", () => {
           agentService: fakeAgentService({}),
           scenarioService: fakeScenarioService({
             getById: vi.fn(
-              async () =>
-                ({ id: "scenario_1", testSuiteId: "suite_1" }) as ScenarioRow,
+              async () => ({ id: "scenario_1", testSuiteId: "suite_1" }) as ScenarioRow,
             ),
           }),
         });
@@ -247,9 +240,7 @@ describe("Feature: voice-session infrastructure composition", () => {
         const ports = createVoiceSessionInfrastructureFromServices({
           agentService: fakeAgentService({}),
           scenarioService: fakeScenarioService({
-            getById: vi.fn(
-              async () => ({ id: "scenario_1", testSuiteId: null }) as ScenarioRow,
-            ),
+            getById: vi.fn(async () => ({ id: "scenario_1", testSuiteId: null }) as ScenarioRow),
           }),
         });
 
@@ -375,9 +366,9 @@ describe("Feature: voice-session infrastructure composition", () => {
           scenarioService: fakeScenarioService({}),
         });
 
-        expect(
-          ports.audioProxyUrl({ conversationId: "conv 1", projectId: "p1" }),
-        ).toBe("/api/voice/session/conv%201/audio?projectId=p1");
+        expect(ports.audioProxyUrl({ conversationId: "conv 1", projectId: "p1" })).toBe(
+          "/api/voice/session/conv%201/audio?projectId=p1",
+        );
       });
     });
   });

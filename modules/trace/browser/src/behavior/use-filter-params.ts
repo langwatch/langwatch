@@ -2,10 +2,9 @@
  * The trace-list filter, as the evaluator's mapping preview asks for it.
  */
 
-import { useMemo } from "react";
-
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { nowInstant } from "@langwatch/time";
+import { useMemo } from "react";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 

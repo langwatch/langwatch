@@ -101,10 +101,7 @@ export const CALENDAR_PRESETS: readonly TimeRangePreset[] = [
   },
 ];
 
-export const ALL_PRESETS: readonly TimeRangePreset[] = [
-  ...ROLLING_PRESETS,
-  ...CALENDAR_PRESETS,
-];
+export const ALL_PRESETS: readonly TimeRangePreset[] = [...ROLLING_PRESETS, ...CALENDAR_PRESETS];
 
 export const PRESET_GROUPS: readonly {
   label: string;

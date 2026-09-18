@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { describe, expect, it } from "vitest";
+
 import { SpanNormalizationPipelineService } from "#services/span-normalization.service";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 const service = SpanNormalizationPipelineService.create(TraceCanonicalisationService.create());
 

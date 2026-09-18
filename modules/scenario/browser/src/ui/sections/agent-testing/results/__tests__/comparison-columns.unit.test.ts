@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import {
   comparisonColumns,
   TARGET_COLUMN_MAX_WIDTH,

@@ -1,8 +1,6 @@
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import {
-  TraceSummaryRepository,
-  type FindByTraceIdOptions,
-} from "../trace-summary.repository.ts";
+
+import { TraceSummaryRepository, type FindByTraceIdOptions } from "../trace-summary.repository.ts";
 
 function summaryKey(tenantId: string, traceId: string): string {
   return `${tenantId} ${traceId}`;

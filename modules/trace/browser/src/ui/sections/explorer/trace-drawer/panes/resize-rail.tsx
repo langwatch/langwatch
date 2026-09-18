@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef } from "react";
+
 import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MAXIMIZE_EDGE_PX,

@@ -1,14 +1,14 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import { type TraceTokenCounter } from "../../app/trace.members.ts";
 import { OtlpSpanTokenEstimationService } from "../span-token-estimation.service.ts";
 
 class CountingTokenizer implements TraceTokenCounter {
   readonly calls: { model: string; text: string | undefined }[] = [];
 
-  constructor(private readonly answer: number | undefined) {
-  }
+  constructor(private readonly answer: number | undefined) {}
 
   async countTokens(model: string, text: string | undefined): Promise<number | undefined> {
     this.calls.push({ model, text });

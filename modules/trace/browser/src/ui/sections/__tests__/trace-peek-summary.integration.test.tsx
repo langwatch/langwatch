@@ -2,8 +2,8 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { TRPCClientError, type TRPCLink } from "@trpc/client";
 import { render, screen, waitFor } from "@testing-library/react";
+import { TRPCClientError, type TRPCLink } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";

@@ -4,7 +4,6 @@
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
 
-import { describe, expect, it } from "vitest";
 import {
   configurationKey,
   getSuiteSetId,
@@ -12,8 +11,10 @@ import {
   targetKeyOf,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
-import type { ScenarioPlanRecord } from "../../repositories/scenario.repository.ts";
+import { describe, expect, it } from "vitest";
+
 import type { RawRunConfigurationRow } from "../../repositories/run-configurations.repository.ts";
+import type { ScenarioPlanRecord } from "../../repositories/scenario.repository.ts";
 import { __testing } from "../run-configurations.service.ts";
 
 const { toEntry, toTarget, collapse } = __testing;

@@ -7,6 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
@@ -37,6 +38,7 @@ import posthog from "posthog-js";
 // that carries it as a plain function property instead.
 const mockedPosthog = posthog as unknown as { capture: ReturnType<typeof vi.fn> };
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
+
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference.ts";
 import { ReturnToNewSimulationsBanner } from "../../../sections/suites/return-to-new-simulations-banner.tsx";
 

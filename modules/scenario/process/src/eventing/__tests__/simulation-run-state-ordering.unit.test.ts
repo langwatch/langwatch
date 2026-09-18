@@ -5,7 +5,6 @@
 
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
@@ -18,6 +17,8 @@ import type {
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
 } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
@@ -216,7 +217,9 @@ async function processFold(
     const eventOccurredAt = event.occurredAt ?? 0;
     if (eventOccurredAt > 0 && eventOccurredAt < prevLastOccurred) {
       // Re-fold from scratch in occurredAt order
-      const sorted = [...allEventsSoFar].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
+      const sorted = [...allEventsSoFar].toSorted(
+        (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
+      );
       let refolded = projection.init();
       for (const e of sorted) {
         refolded = projection.apply(refolded, e);

@@ -4,7 +4,11 @@ import type {
   ModelUsageStatsRow,
   SpanResourceInfo,
   SpanSummaryRow,
-  TraceEventRollup,NormalizedSpan,ElasticSearchEvent,Span,SpanInsertData
+  TraceEventRollup,
+  NormalizedSpan,
+  ElasticSearchEvent,
+  Span,
+  SpanInsertData,
 } from "@langwatch/trace-contract";
 
 export type { ModelSpanSampleRow, ModelUsageStatsRow } from "@langwatch/trace-contract";
@@ -111,9 +115,7 @@ export abstract class SpanStorageRepository {
    * with no unbounded fallback — a miss stays cheap via queue retry.
    * Derivation-shaped: empty events/links; use findSpanByIds for a whole span.
    */
-  abstract findNormalizedSpanById(
-    params: NormalizedSpanByIdParams,
-  ): Promise<NormalizedSpan | null>;
+  abstract findNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null>;
   /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the
    * trace-detail read, derived from spans' OTel events (ARRAY JOIN over
@@ -229,9 +231,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async findNormalizedSpanById(
-    _params: NormalizedSpanByIdParams,
-  ): Promise<NormalizedSpan | null> {
+  async findNormalizedSpanById(_params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     return null;
   }
 

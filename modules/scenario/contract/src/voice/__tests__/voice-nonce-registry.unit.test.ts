@@ -3,7 +3,9 @@
  */
 
 import type { ChildProcess } from "node:child_process";
+
 import { describe, expect, it } from "vitest";
+
 import { VoiceNonceRegistry } from "../voice-nonce-registry";
 
 /** A stand-in child; the registry only stores and returns the reference. */

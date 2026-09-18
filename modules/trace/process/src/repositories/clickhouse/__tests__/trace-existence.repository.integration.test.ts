@@ -4,6 +4,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { ClickHouseTraceExistenceRepository } from "../trace-existence.repository.ts";
 import {
   startMigratedTraceClickHouse,
@@ -90,40 +91,43 @@ afterAll(async () => {
   }
 });
 
-describe.skipIf(!clickHouseConfigured)("ClickHouseTraceExistenceRepository.findExistingTraceIds (integration)", () => {
-  describe("when some of the candidates exist", () => {
-    /** @scenario Sending traces for annotation skips ids that resolve to no trace */
-    it("returns only the ids that resolve to a real trace", async () => {
-      const result = await repo.findExistingTraceIds({
-        projectId: tenantId,
-        traceIds: [liveTraceId, "trace-does-not-exist"],
+describe.skipIf(!clickHouseConfigured)(
+  "ClickHouseTraceExistenceRepository.findExistingTraceIds (integration)",
+  () => {
+    describe("when some of the candidates exist", () => {
+      /** @scenario Sending traces for annotation skips ids that resolve to no trace */
+      it("returns only the ids that resolve to a real trace", async () => {
+        const result = await repo.findExistingTraceIds({
+          projectId: tenantId,
+          traceIds: [liveTraceId, "trace-does-not-exist"],
+        });
+
+        expect(result).toEqual([liveTraceId]);
       });
-
-      expect(result).toEqual([liveTraceId]);
     });
-  });
 
-  describe("when the candidate belongs to another project", () => {
-    /** @scenario Sending traces for annotation skips ids that resolve to no trace */
-    it("is excluded even though the id exists in ClickHouse", async () => {
-      const result = await repo.findExistingTraceIds({
-        projectId: tenantId,
-        traceIds: [otherTenantTraceId],
+    describe("when the candidate belongs to another project", () => {
+      /** @scenario Sending traces for annotation skips ids that resolve to no trace */
+      it("is excluded even though the id exists in ClickHouse", async () => {
+        const result = await repo.findExistingTraceIds({
+          projectId: tenantId,
+          traceIds: [otherTenantTraceId],
+        });
+
+        expect(result).toEqual([]);
       });
-
-      expect(result).toEqual([]);
     });
-  });
 
-  describe("when there is nothing to check", () => {
-    /** @scenario Blank ids are dropped before anything is queued */
-    it("returns empty without querying ClickHouse", async () => {
-      const result = await repo.findExistingTraceIds({
-        projectId: tenantId,
-        traceIds: [],
+    describe("when there is nothing to check", () => {
+      /** @scenario Blank ids are dropped before anything is queued */
+      it("returns empty without querying ClickHouse", async () => {
+        const result = await repo.findExistingTraceIds({
+          projectId: tenantId,
+          traceIds: [],
+        });
+
+        expect(result).toEqual([]);
       });
-
-      expect(result).toEqual([]);
     });
-  });
-});
+  },
+);

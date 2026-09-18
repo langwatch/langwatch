@@ -1,7 +1,10 @@
-import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 import type { SubscriberSpec } from "@langwatch/eventing";
-import { SIMULATION_RUN_EVENT_TYPES, UNGRADED_RUN_STATUSES,isSimulationRunFinishedEvent } from "@langwatch/scenario-contract";
+import { createLogger } from "@langwatch/observability";
+import {
+  SIMULATION_RUN_EVENT_TYPES,
+  UNGRADED_RUN_STATUSES,
+  isSimulationRunFinishedEvent,
+} from "@langwatch/scenario-contract";
 import type {
   RunEvaluators,
   ScenarioEvaluationsJobPayload,
@@ -9,10 +12,9 @@ import type {
   SimulationRunFinishedEventData,
 } from "@langwatch/scenario-contract";
 import { extractSuiteId } from "@langwatch/suite-contract";
+import { nowInstant } from "@langwatch/time";
 
-const logger = createLogger(
-  "langwatch:simulation-processing:scenario-evaluations",
-);
+const logger = createLogger("langwatch:simulation-processing:scenario-evaluations");
 
 export interface ScenarioEvaluationsSubscriberDeps {
   /** The attachments the run's suite and plan carry, and the suite id. */

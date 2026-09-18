@@ -1,4 +1,10 @@
-import type { z } from "zod";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  projectRestFacts,
+  resolver,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 /**
  * `/api/simulation-runs`: individual runs and batch summaries read from ScenarioApi.
  */
@@ -19,13 +25,7 @@ import {
   simulationRunListResponseSchema,
   simulationBatchListResponseSchema,
 } from "@langwatch/scenario-contract";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  projectRestFacts,
-  resolver,
-  type RestTransportDeclaration,
-} from "@langwatch/api/rest";
+import type { z } from "zod";
 
 const logger = createLogger("langwatch:api:simulation-runs");
 

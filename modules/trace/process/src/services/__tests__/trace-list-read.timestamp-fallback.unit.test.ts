@@ -1,12 +1,12 @@
+import type { TraceSummaryData } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 /**
  * Feature: specs/traces/trace-summary-storage-anchor.feature
  * Storage anchor provides the trace timestamp for log-only traces (not the
  * raw span baseline of 0).
  */
 import { mapToTraceListItem } from "../../rules/trace-list-row.rules.ts";
-import { describe, expect, it } from "vitest";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-
 import { mapTraceSummaryToHeader } from "../../transport/api-trpc/trace-read-mappers.api.ts";
 
 const ANCHOR_MS = 1_787_122_009_599;

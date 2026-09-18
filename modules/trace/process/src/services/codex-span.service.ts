@@ -1,5 +1,5 @@
 import { ATTR_KEYS, CODEX_TURN_SPAN_NAME } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "./canonical-attributes.service.ts";
+
 import {
   applyCanonicalLifts,
   asNumber,
@@ -14,6 +14,7 @@ import {
   positiveOrNull,
   type CanonicalLift,
 } from "../rules/codex-canonical-value.rules.ts";
+import type { ExtractorContext } from "./canonical-attributes.service.ts";
 
 export class CodexSpanCanonicaliserService {
   private constructor() {}

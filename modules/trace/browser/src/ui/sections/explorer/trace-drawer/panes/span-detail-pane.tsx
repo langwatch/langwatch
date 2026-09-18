@@ -1,8 +1,9 @@
 import { Box } from "@chakra-ui/react";
-import { memo } from "react";
-import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import { memo } from "react";
+
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
 import { SpanTabBar } from "../span-tab-bar.tsx";
 import { TraceAccordions } from "../trace-accordions/index.ts";
 

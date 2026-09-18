@@ -4,9 +4,10 @@
  * @see specs/agents/agent-test-run.feature
  */
 import { type AgentApi, type AgentWithFields } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { AgentTestService } from "../services/agent-test.service.ts";
 
 const prefetchAgentTestData = vi.fn();

@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   createTraceMetricsSyncSubscriber,
   type TraceMetricsSyncSubscriberDeps,

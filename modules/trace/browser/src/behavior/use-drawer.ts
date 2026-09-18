@@ -2,9 +2,8 @@
  * The overlay address, as this package writes it.
  */
 
-import { useCallback, useMemo } from "react";
-
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useCallback, useMemo } from "react";
 
 /** Any overlay the application registers (registry untyped: not this package's). */
 export type DrawerType = string;

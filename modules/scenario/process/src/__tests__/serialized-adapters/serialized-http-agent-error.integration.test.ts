@@ -4,10 +4,12 @@
  */
 
 import http from "node:http";
-import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { createLogger, type Logger } from "@langwatch/observability";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { createNativeHttpAgentAdapter } from "../support/test-scenario-http.port.ts";
 
 // ---------------------------------------------------------------------------

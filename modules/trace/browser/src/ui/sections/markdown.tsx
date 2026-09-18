@@ -1,15 +1,16 @@
 import { chakra } from "@chakra-ui/react";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { createLogger } from "@langwatch/observability/browser";
 import { Children, isValidElement, memo, type ReactNode, useState } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useRouter } from "@langwatch/browser-host/use-router";
+
 import { stringifyIfObject } from "../../model/stringify-if-object.ts";
 import { RenderCode } from "../blocks/code/render-code.tsx";
-import { getProxiedImageUrl } from "./external-image.tsx";
-import { ConfirmDialog } from "./gateway/confirm-dialog.tsx";
 import { Link as UiLink } from "../blocks/link.tsx";
 import { Prose } from "../elements/prose.tsx";
+import { getProxiedImageUrl } from "./external-image.tsx";
+import { ConfirmDialog } from "./gateway/confirm-dialog.tsx";
 
 const logger = createLogger("langwatch:components:Markdown");
 

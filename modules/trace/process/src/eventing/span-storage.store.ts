@@ -1,5 +1,6 @@
 import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
-import type { SpanInsertData,NormalizedSpan } from "@langwatch/trace-contract";
+import type { SpanInsertData, NormalizedSpan } from "@langwatch/trace-contract";
+
 import { TraceSpanStorageRepository } from "../repositories/span-storage-write.repository.ts";
 
 /**

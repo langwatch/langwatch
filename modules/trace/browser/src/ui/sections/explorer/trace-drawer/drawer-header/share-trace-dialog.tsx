@@ -1,9 +1,10 @@
 import { VStack } from "@chakra-ui/react";
+import { toaster } from "@langwatch/design-system/toaster";
 import { ShareTraceDialogBody } from "@langwatch/share-browser/share-link-views";
 import { copyShareLink } from "@langwatch/share-browser/share-links";
 import { useRef } from "react";
+
 import { Dialog } from "../../../dialog.tsx";
-import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../../../errors/index.ts";
 import { useShareTrace } from "../../hooks/use-share-trace.ts";
 

@@ -4,9 +4,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { TraceMediaRef } from "@langwatch/trace-contract";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { TraceMediaRef } from "@langwatch/trace-contract";
+
 import { IOPreview } from "../io-preview.tsx";
 
 // Compact vs comfortable is gated by the density store; force compact so

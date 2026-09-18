@@ -6,8 +6,9 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { useEffect, useState } from "react";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
+import { useEffect, useState } from "react";
+
 import type { CompareRow } from "./compare-rows.ts";
 import type { RunScope } from "./run-configuration.ts";
 import type { RunDialogSubject } from "./run-dialog-types.ts";

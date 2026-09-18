@@ -2,11 +2,12 @@
  * Catch-all route for the unified simulations page.
  */
 
-import { useEffect } from "react";
-import SimulationsPage from "../../../ui/sections/suites/simulations-page.tsx";
-import { resolveSimulationsRedirect } from "../../../behavior/suites/use-suite-routing.ts";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useEffect } from "react";
+
 import { useAgentTestingRedirect } from "../../../behavior/suites/use-agent-testing-redirect.ts";
+import { resolveSimulationsRedirect } from "../../../behavior/suites/use-suite-routing.ts";
+import SimulationsPage from "../../../ui/sections/suites/simulations-page.tsx";
 
 function SimulationsRoutePage() {
   const router = useRouter();

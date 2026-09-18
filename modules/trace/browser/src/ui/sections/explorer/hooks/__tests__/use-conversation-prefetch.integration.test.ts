@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { useConversationPrefetch } from "../use-conversation-prefetch.ts";
 
 const prefetchMock = vi.fn();

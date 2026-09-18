@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import { useDrawerStore } from "../drawer.store.ts";
 import {
   buildTraceEditPatch,

@@ -1,17 +1,17 @@
-import type { ScenarioTarget } from "../../model/scenario-target.ts";
 import { Badge, Box, Button, chakra, HStack, Input, Text } from "@chakra-ui/react";
-import { toEpochMs, type Instant } from "@langwatch/time";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { toEpochMs, type Instant } from "@langwatch/time";
 import { BookText, ChevronDown, Code, Globe, Plug, Plus, Workflow } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import {
   agentTargetLabel,
   isAgentTarget,
+  notRunnableCopy,
   scenarioAgentsOf,
   type ScenarioAgent,
 } from "../../behavior/scenarios/use-filtered-scenario-targets.ts";
+import type { ScenarioTarget } from "../../model/scenario-target.ts";
 
 export type ScenarioTargetSelection = {
   type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
@@ -405,7 +405,7 @@ function ScenarioTargetAgentOption({
   const row = <ScenarioTargetAgentRow agent={agent} isSelected={isSelected} onSelect={onSelect} />;
   if (agent.isRunnable) return row;
   return (
-    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+    <Tooltip content={notRunnableCopy(agent)}>
       <Box>{row}</Box>
     </Tooltip>
   );

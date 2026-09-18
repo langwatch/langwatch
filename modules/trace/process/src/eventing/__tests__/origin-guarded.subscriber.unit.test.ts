@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData,TraceProcessingEvent } from "@langwatch/trace-contract";
+import type { TraceSummaryData, TraceProcessingEvent } from "@langwatch/trace-contract";
 import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { passesTraceOriginGuards } from "../origin-guarded.subscriber.ts";
 
 const NOW = new Date("2026-07-18T12:00:00.000Z").getTime();

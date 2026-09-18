@@ -1,7 +1,11 @@
 import type { IntentExecutor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type {
+  ScenarioExecutionService,
+  SimulationService,
+  ScenarioEvaluationResult,
+} from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
-import type { ScenarioExecutionService,SimulationService,ScenarioEvaluationResult } from "@langwatch/scenario-contract";
 
 import type {
   CancelExecutionIntent,

@@ -6,11 +6,12 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Temporal } from "@langwatch/time";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Temporal } from "@langwatch/time";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import {
   OFFLINE_AGENT_SELECT_COPY,
   scenarioAgentsOf,

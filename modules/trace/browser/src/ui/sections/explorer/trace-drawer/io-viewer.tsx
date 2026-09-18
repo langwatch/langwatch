@@ -1,13 +1,17 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { TerminalOutput } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronDown, LuChevronRight } from "react-icons/lu";
+
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
+import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
+import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
+import { TraceMediaPart } from "../../traces/trace-media-part.tsx";
 import type { TraceAnchor } from "../hooks/use-anchored-annotations.ts";
 import { useTextTranslation } from "../hooks/use-text-translation.ts";
-import { IOViewerBody } from "./io-viewer-body.tsx";
 import { AnnotationExpectedOutputs } from "./annotation-expected-outputs.tsx";
+import { IOViewerBody } from "./io-viewer-body.tsx";
 import { IOViewerToolbar } from "./io-viewer-toolbar.tsx";
-import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 import {
   applyChatTextLeaves,
   asMarkdownBody,
@@ -22,9 +26,6 @@ import {
   VIRTUALIZE_AT,
 } from "./transcript/index.ts";
 import { MessageCommentScope } from "./transcript/message-comments.tsx";
-import { TraceMediaPart } from "../../traces/trace-media-part.tsx";
-import { TerminalOutput } from "@langwatch/coding-agent-browser/surfaces/agent-traces";
-import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
 import { type MarkdownSubmode, useIOViewerState, type ViewFormat } from "./use-io-viewer-state.ts";
 
 /**

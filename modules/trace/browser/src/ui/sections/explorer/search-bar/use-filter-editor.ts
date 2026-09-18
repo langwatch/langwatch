@@ -1,3 +1,4 @@
+import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
 import Document from "@tiptap/extension-document";
 import History from "@tiptap/extension-history";
 import Paragraph from "@tiptap/extension-paragraph";
@@ -7,7 +8,12 @@ import { TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import { type Editor, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
+
+import { FilterHighlight } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
+import { useLatestRef } from "../../../../behavior/use-latest-ref.ts";
+import type { SuggestionState } from "../../../../model/get-suggestion-state.ts";
+import { getSuggestionState } from "../../../../model/get-suggestion-state.ts";
+import { handleKey } from "../../../../model/handle-key.ts";
 import { AutoUppercaseOperators } from "./auto-uppercase-operators.ts";
 import {
   applyAcceptToEditor,
@@ -15,11 +21,6 @@ import {
   PARAGRAPH_OFFSET,
   readEditorContext,
 } from "./editor-document.ts";
-import { FilterHighlight } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
-import type { SuggestionState } from "../../../../model/get-suggestion-state.ts";
-import { useLatestRef } from "../../../../behavior/use-latest-ref.ts";
-import { getSuggestionState } from "../../../../model/get-suggestion-state.ts";
-import { handleKey } from "../../../../model/handle-key.ts";
 import { searchBarPlaceholder } from "./placeholder-editor.tsx";
 
 /** The chip sub-controls a click may land on inside the filter editor. */

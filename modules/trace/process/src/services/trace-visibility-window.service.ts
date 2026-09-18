@@ -1,6 +1,6 @@
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { ErrorCapture, Span, SpanInputOutput, Trace } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
+import type { ErrorCapture, Span, SpanInputOutput, Trace } from "@langwatch/trace-contract";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

@@ -28,8 +28,7 @@ export class OtelScenarioProcessorMetricsAdapter implements ScenarioProcessorSer
     description: "Wall-clock duration of a processed job",
   });
 
-  private constructor() {
-  }
+  private constructor() {}
 
   started(): void {
     this.jobs.inc({ job_type: JOB_TYPE, status: "started" });

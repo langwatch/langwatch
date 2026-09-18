@@ -5,17 +5,9 @@
 import { evaluationRunDataSchema } from "@langwatch/evaluation-contract";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
-import { traceEditOverlayPatchSchema } from "./trace-edit-overlay.contract.ts";
-import {
-  sessionGroupCodingAgentDtoSchema,
-  sessionGroupDtoSchema,
-  sessionGroupsResultSchema,
-} from "./trace-session-group.ts";
+
 import { derivedTraceEventSchema } from "./trace-derived-event.ts";
-import { spanTreeNodeSchema } from "./trace.ts";
-import { spanDetailSchema, spanLangwatchSignalsSchema } from "./trace-view.contract.ts";
-import { traceEventRollupSchema, traceLogRecordDtoSchema } from "./trace-span-read-model.ts";
-import { traceListPageSchema, traceListViewItemSchema } from "./trace-list-view.ts";
+import { traceEditOverlayPatchSchema } from "./trace-edit-overlay.contract.ts";
 import {
   chatMessageSchema,
   errorCaptureSchema,
@@ -23,6 +15,15 @@ import {
   spanMetricsSchema,
   spanTimestampsSchema,
 } from "./trace-format.schemas.ts";
+import { traceListPageSchema, traceListViewItemSchema } from "./trace-list-view.ts";
+import {
+  sessionGroupCodingAgentDtoSchema,
+  sessionGroupDtoSchema,
+  sessionGroupsResultSchema,
+} from "./trace-session-group.ts";
+import { traceEventRollupSchema, traceLogRecordDtoSchema } from "./trace-span-read-model.ts";
+import { spanDetailSchema, spanLangwatchSignalsSchema } from "./trace-view.contract.ts";
+import { spanTreeNodeSchema } from "./trace.ts";
 
 const traceEditOverlayAuthorSchema = z
   .object({ id: z.string(), name: z.string().nullable(), image: z.string().nullable() })

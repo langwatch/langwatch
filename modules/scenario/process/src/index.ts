@@ -97,9 +97,7 @@ export {
   type RunOrdinalRow,
 } from "./repositories/result-atoms.repository.ts";
 export { RunConfigurationsClickHouseRepository } from "./repositories/clickhouse/clickhouse.run-configurations.repository.ts";
-export {
-  type RawRunConfigurationRow,
-} from "./repositories/run-configurations.repository.ts";
+export { type RawRunConfigurationRow } from "./repositories/run-configurations.repository.ts";
 export {
   SimulationClickHouseRepository,
   type SimulationClickHouseClient as SimulationReadClient,
@@ -151,16 +149,10 @@ export {
 export {
   SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
   SCENARIO_GENERATE_FEATURE_KEY,
-  createScenarioGenerateRest,
-  type ScenarioGenerateRestPorts,
-  type ScenarioGenerateRestSession,
-} from "./transport/scenario-generate.rest.ts";
-export {
-  createScenarioRunExportRest,
-  type ScenarioRunExport,
-  type ScenarioRunExportRequestFields,
-  type ScenarioRunExportRestPorts,
-} from "./transport/scenario-run-export.rest.ts";
+  type ScenarioGenerationDependencies,
+} from "./services/scenario-generation.service.ts";
+export { scenarioGenerateRest } from "./transport/scenario-generate.rest.ts";
+export { scenarioRunExportRest } from "./transport/scenario-run-export.rest.ts";
 export { createScenarioRest, scenarioRestSurface } from "./transport/scenario.rest.ts";
 export { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
 export {
@@ -178,8 +170,5 @@ export {
   nlpgoHandledErrorFrom,
 } from "./rules/scenario-generate-nlpgo-error.rules.ts";
 export { ScenarioRunExportCsvService } from "./services/scenario-run-export-csv.service.ts";
+export { ScenarioRunExportDownloadService } from "./services/scenario-run-export-download.service.ts";
 export { ScenarioRunExportService } from "./services/scenario-run-export.service.ts";
-export {
-  ScenarioRunExportForbiddenError,
-  ScenarioRunExportUnauthenticatedError,
-} from "@langwatch/scenario-contract";

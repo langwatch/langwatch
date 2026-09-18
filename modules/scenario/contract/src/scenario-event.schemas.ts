@@ -25,7 +25,6 @@ export const scenarioEventArchiveQuerySchema = z
     scenarioSetId: z.string().min(1).optional(),
     scenarioRunId: z.string().min(1).optional(),
   })
-  .refine(
-    (query) => (query.scenarioSetId === undefined) !== (query.scenarioRunId === undefined),
-    { message: "Pass exactly one of scenarioSetId or scenarioRunId as a query parameter" },
-  );
+  .refine((query) => (query.scenarioSetId === undefined) !== (query.scenarioRunId === undefined), {
+    message: "Pass exactly one of scenarioSetId or scenarioRunId as a query parameter",
+  });

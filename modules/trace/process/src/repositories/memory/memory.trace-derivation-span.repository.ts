@@ -1,4 +1,5 @@
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
+
 import { TraceDerivationSpanReaderRepository } from "../read/trace-derivation-span-reader.repository.ts";
 import type { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
 

@@ -1,16 +1,30 @@
 import { Box, HStack, Icon, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
+
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
+import {
+  logEventTone,
+  summarizeLogEvent,
+} from "../../../../../model/explorer/trace-drawer/trace-accordions/log-summary.ts";
+import { countFlatLeaves } from "../../../../../model/explorer/trace-drawer/trace-accordions/utils.ts";
+import {
+  EmptyEventsState,
+  EmptyHint,
+} from "../../../../blocks/explorer/trace-drawer/trace-accordions/empty-states.tsx";
+import { ScopeBlock } from "../../../../elements/explorer/trace-drawer/scope-chip.tsx";
+import { SectionFocusGlow } from "../../../../elements/explorer/trace-drawer/trace-accordions/section-focus-glow.tsx";
+import { UnmappedCostSuggestion } from "../../../../elements/explorer/trace-drawer/trace-accordions/unmapped-cost-suggestion.tsx";
 import { ContentPrivacyMarkers, PiiIncompleteNotice } from "../../../content-privacy-markers.tsx";
 import { RedactedField } from "../../../redacted-field.tsx";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
 import { useSpanDetail } from "../../hooks/use-span-detail.ts";
 import { useSpanLogs } from "../../hooks/use-span-logs.ts";
 import { useTraceResources } from "../../hooks/use-trace-resources.ts";
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
-import { type AttributeComments, AttributeTable } from "../attribute-table.tsx";
 import { commentCountsBySection } from "../anchored-comments/section-comments.ts";
+import { type AttributeComments, AttributeTable } from "../attribute-table.tsx";
 import { CorrectedFieldFrame } from "../edit-mode/corrected-field.tsx";
 import { CorrectedSpanScalars } from "../edit-mode/corrected-span-scalars.tsx";
 import { SpanEditableIO } from "../edit-mode/span-editable-io.tsx";
@@ -19,22 +33,9 @@ import { useSpanAttributeEditing } from "../edit-mode/use-span-attribute-editing
 import { useSpanCorrection } from "../edit-mode/use-span-correction.ts";
 import { IOViewer } from "../io-viewer.tsx";
 import { hasPromptMetadata, PromptAccordion } from "../prompt-accordion.tsx";
-import { ScopeBlock } from "../../../../elements/explorer/trace-drawer/scope-chip.tsx";
 import { AccordionShell, Section } from "./accordion-shell.tsx";
-import {
-  EmptyEventsState,
-  EmptyHint,
-} from "../../../../blocks/explorer/trace-drawer/trace-accordions/empty-states.tsx";
 import { EventCard } from "./event-card.tsx";
-import {
-  logEventTone,
-  summarizeLogEvent,
-} from "../../../../../model/explorer/trace-drawer/trace-accordions/log-summary.ts";
-import { SectionFocusGlow } from "../../../../elements/explorer/trace-drawer/trace-accordions/section-focus-glow.tsx";
-import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
-import { UnmappedCostSuggestion } from "../../../../elements/explorer/trace-drawer/trace-accordions/unmapped-cost-suggestion.tsx";
 import { useSectionFocusGlow } from "./use-section-focus-glow.ts";
-import { countFlatLeaves } from "../../../../../model/explorer/trace-drawer/trace-accordions/utils.ts";
 
 /**
  * Frames a field the correction changed, and leaves every other field exactly

@@ -1,4 +1,10 @@
-import type { Protections,TraceCanonicalisationService,Evaluation,Trace,
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { createLogger } from "@langwatch/observability";
+import type {
+  Protections,
+  TraceCanonicalisationService,
+  Evaluation,
+  Trace,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
   PromptStudioSpanResult,
@@ -6,16 +12,16 @@ import type { Protections,TraceCanonicalisationService,Evaluation,Trace,
   TracesForProjectResult,
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
-  GetAllTracesForProjectOptions } from "@langwatch/trace-contract";
-import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import { createLogger } from "@langwatch/observability";
+  GetAllTracesForProjectOptions,
+} from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
-import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
-import { type TraceLogRecordReader } from "./claude-code-log-enrichment.service.ts";
+
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
+import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
+import { type TraceLogRecordReader } from "./claude-code-log-enrichment.service.ts";
+import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { TraceEditOverlayService } from "./trace-edit-overlay.service.ts";
 import { TraceReadEnrichmentService } from "./trace-read-enrichment.service.ts";
 

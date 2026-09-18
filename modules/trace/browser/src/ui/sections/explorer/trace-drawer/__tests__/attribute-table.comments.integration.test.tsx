@@ -4,11 +4,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import "@testing-library/jest-dom/vitest";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import type { RestrictedAttribute } from "@langwatch/trace-contract";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 
 const mocks = vi.hoisted(() => ({
   canManage: true,
@@ -61,7 +62,11 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-import { type AttributeComments, type AttributeEditing, AttributeTable } from "../attribute-table.tsx";
+import {
+  type AttributeComments,
+  type AttributeEditing,
+  AttributeTable,
+} from "../attribute-table.tsx";
 
 const TRACE_ID = "trace-1";
 const SPAN_ID = "span-7";

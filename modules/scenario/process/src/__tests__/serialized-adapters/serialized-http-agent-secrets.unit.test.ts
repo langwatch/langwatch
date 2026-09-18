@@ -3,8 +3,9 @@
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   createMockHttpAgentAdapter,
   mockScenarioHttpFetch,

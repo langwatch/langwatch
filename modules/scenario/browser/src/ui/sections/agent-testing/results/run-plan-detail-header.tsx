@@ -5,21 +5,22 @@
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { Download, MoreVertical, Pencil, Play, Square, Settings2 } from "lucide-react";
+import { Menu } from "@langwatch/design-system/menu";
 import { RunMetricsSummary } from "@langwatch/suite-browser/run-cards";
 import { type RunGroupSummary } from "@langwatch/suite-browser/run-formatters";
-import { Menu } from "@langwatch/design-system/menu";
+import { Download, MoreVertical, Pencil, Play, Square, Settings2 } from "lucide-react";
+
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   EvaluatorPill,
   readingOfSummary,
 } from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
 import type { AgentTestingViewMode } from "../use-agent-testing-store.ts";
 import type { EvaluatorSummary } from "./evaluation-summaries.ts";
-import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { ViewModeToggle } from "./view-mode-toggle.tsx";
-import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
 
 /**
  * What the run control reads.

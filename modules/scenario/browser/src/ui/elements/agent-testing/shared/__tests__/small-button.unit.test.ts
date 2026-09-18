@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { smallButtonChrome } from "../small-button.tsx";
 
 describe("smallButtonChrome", () => {

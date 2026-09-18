@@ -1,5 +1,5 @@
-import { useMemo, useRef } from "react";
 import type { TraceHeader } from "@langwatch/trace-contract";
+import { useMemo, useRef } from "react";
 
 interface RetainedFields {
   traceId: string;

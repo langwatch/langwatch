@@ -7,6 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 
 const mocks = vi.hoisted(() => ({

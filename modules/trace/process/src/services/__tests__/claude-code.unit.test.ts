@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ClaudeCodeCanonicaliserService } from "../claude-code-canonicaliser.service.ts";
 import { isConversationalQuerySource } from "../../rules/claude-code-call-policy.rules.ts";
+import { ClaudeCodeCanonicaliserService } from "../claude-code-canonicaliser.service.ts";
 import { ClaudeCodeRequestService } from "../claude-code-request.service.ts";
 import { ClaudeCodeResponseService } from "../claude-code-response.service.ts";
 import { createExtractorContext, createLogExtractorContext } from "./test-helpers.ts";
@@ -338,9 +338,7 @@ describe("extractAssistantOutputFromResponseBody", () => {
     const body = JSON.stringify({
       content: [{ type: "text", text: "PONG-Z" }],
     });
-    expect(claudeCodeResponseService.extractAssistantOutputFromResponseBody(body)).toBe(
-      "PONG-Z",
-    );
+    expect(claudeCodeResponseService.extractAssistantOutputFromResponseBody(body)).toBe("PONG-Z");
     expect(claudeCodeResponseService.extractAssistantTextFromResponseBody(body)).toBe("PONG-Z");
   });
 
@@ -379,9 +377,7 @@ describe("extractSessionTitleFromResponseBody", () => {
     /** @scenario An unparseable title body sets no title */
     it("answers null for every deviation instead of guessing", () => {
       // Unparseable body, and the truncation claude applies past its inline cap.
-      expect(
-        claudeCodeResponseService.extractSessionTitleFromResponseBody("{not json"),
-      ).toBeNull();
+      expect(claudeCodeResponseService.extractSessionTitleFromResponseBody("{not json")).toBeNull();
       expect(
         claudeCodeResponseService.extractSessionTitleFromResponseBody(
           '{"content":[{"type":"text","text":"{\\"title\\": \\"Fix the fl',
@@ -389,9 +385,7 @@ describe("extractSessionTitleFromResponseBody", () => {
       ).toBeNull();
       // Parseable body whose text is prose, not the title JSON.
       expect(
-        claudeCodeResponseService.extractSessionTitleFromResponseBody(
-          titleBody("Done, pushed."),
-        ),
+        claudeCodeResponseService.extractSessionTitleFromResponseBody(titleBody("Done, pushed.")),
       ).toBeNull();
       // Right shape, wrong type or empty.
       expect(

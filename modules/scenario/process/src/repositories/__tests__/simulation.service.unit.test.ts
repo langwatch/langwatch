@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import type {
   SimulationCancelRun,
   SimulationDeleteRun,
@@ -10,9 +9,11 @@ import type {
   SimulationTextMessageStart,
   RecordEvaluationsCommandData,
 } from "@langwatch/scenario-contract";
+import { describe, expect, it } from "vitest";
+
+import { SimulationService } from "../../services/simulation.service.ts";
 import { SimulationExecutionRepository } from "../simulation-execution.repository.ts";
 import { NullSimulationRepository } from "../simulation.repository.ts";
-import { SimulationService } from "../../services/simulation.service.ts";
 
 class RecordingExecution extends SimulationExecutionRepository {
   queue: SimulationQueueRun | undefined;

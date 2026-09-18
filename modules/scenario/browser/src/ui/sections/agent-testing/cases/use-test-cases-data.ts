@@ -4,22 +4,23 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { useMemo } from "react";
 import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
-import { fromDate } from "@langwatch/time";
 import {
   parseEvaluatorAttachments,
   parseSuiteFieldDefinitions,
 } from "@langwatch/scenario-contract";
+import { fromDate } from "@langwatch/time";
+import { useMemo } from "react";
+
 import { api, type RouterOutputs } from "../../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import type { CaseLastResult } from "./cases-table.tsx";
 import {
   type ExternalSetEntry,
   orderSuitesDefaultFirst,
   type TestCase,
   type TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
+import type { CaseLastResult } from "./cases-table.tsx";
 
 type ScenarioRows = RouterOutputs["scenarios"]["getAll"];
 type TestSuiteRows = RouterOutputs["suites"]["testSuites"]["getAll"];

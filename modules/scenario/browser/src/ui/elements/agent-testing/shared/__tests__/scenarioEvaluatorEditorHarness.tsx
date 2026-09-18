@@ -4,22 +4,19 @@
  * wired form. `vi.mock` calls stay per test file, needing to hoist above its imports.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type React from "react";
-import { type FieldValues, useForm } from "react-hook-form";
-import { vi } from "vitest";
-
 import {
   EvaluatorEditorBody,
   type EvaluatorEditorController,
   EvaluatorEditorFooter,
   type EvaluatorGateConfig,
 } from "@langwatch/evaluator-browser/surfaces/evaluator-editor-shared";
-import {
-  type EvaluatorAttachment,
-  scenarioMappingSources,
-} from "@langwatch/scenario-contract";
-import type { AttachableEvaluator } from "../../../../../model/agent-testing/evaluators/attachment-rules.ts";
+import { type EvaluatorAttachment, scenarioMappingSources } from "@langwatch/scenario-contract";
+import type React from "react";
+import { type FieldValues, useForm } from "react-hook-form";
+import { vi } from "vitest";
+
 import { useOpenScenarioEvaluatorEditor } from "../../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
+import type { AttachableEvaluator } from "../../../../../model/agent-testing/evaluators/attachment-rules.ts";
 
 export const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

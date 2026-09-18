@@ -4,16 +4,17 @@
  */
 import { EventType } from "@ag-ui/core";
 import { z } from "zod";
-import { runParameterValuesSchema } from "../scenario.parameters.ts";
+
 import { runActorLabelSchema } from "../run-actor.ts";
-import { scenarioMessageSchema } from "../scenario-message.schema.ts";
-import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-run.ts";
 import {
   SCENARIO_EVALUATION_STATUSES,
   scenarioEvaluationResultSchema,
   type ScenarioEvaluationStatus,
   type ScenarioEvaluationResult,
 } from "../scenario-evaluation-result.ts";
+import { scenarioMessageSchema } from "../scenario-message.schema.ts";
+import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-run.ts";
+import { runParameterValuesSchema } from "../scenario.parameters.ts";
 
 /**
  * AG-UI Base Event Schema
@@ -64,14 +65,7 @@ const baseScenarioEventSchema = z.object({
  */
 export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
-  targetType: z.enum([
-    "prompt",
-    "http",
-    "code",
-    "workflow",
-    "connected",
-    "voice",
-  ]),
+  targetType: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   /**
    * The key the target folds under: the reference id alone, or with a hash
    * of its parameter overrides when it carries any. Absent on runs recorded
@@ -114,9 +108,7 @@ export const langwatchMetadataSchema = z.object({
    * before instances existed.
    * @see specs/scenarios/served-agent-instance-on-runs.feature
    */
-  agentInstance: z
-    .object({ hostname: z.string(), label: z.string().nullable() })
-    .optional(),
+  agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
   /**
    * Who phoned a voice agent: "simulated" for a pool run's simulated caller,
    * "human" for a panel run someone spoke on themselves (slice 3). Absent

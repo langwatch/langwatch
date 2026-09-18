@@ -1,6 +1,7 @@
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
-import { describe, expect, it } from "vitest";
 import { FIELD_VALUES } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
 
 /** Regression contract: the verdict facet expression must route Status='error'
  * rows to a dedicated 'error' value (precedence over Passed), so the sidebar's

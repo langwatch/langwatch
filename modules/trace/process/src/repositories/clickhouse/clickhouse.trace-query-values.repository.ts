@@ -1,4 +1,8 @@
-import { FilterParseError, type TagToken,type TranslationContext } from "@langwatch/trace-contract";
+import {
+  FilterParseError,
+  type TagToken,
+  type TranslationContext,
+} from "@langwatch/trace-contract";
 
 export const MAX_VALUE_LENGTH = 500;
 export const MAX_ATTRIBUTE_KEY_LENGTH = 256;

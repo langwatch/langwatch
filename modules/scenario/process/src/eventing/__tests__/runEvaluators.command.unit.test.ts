@@ -1,15 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Command } from "@langwatch/eventing";
-import type { FinishRunCommandData,
+import type {
+  FinishRunCommandData,
   EvaluatorAttachment,
   RunEvaluatorDefinition,
   RunEvaluators,
-  SimulationProcessingEvent } from "@langwatch/scenario-contract";
+  SimulationProcessingEvent,
+} from "@langwatch/scenario-contract";
 import {
   SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_RUN_EVENT_TYPES,
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import type { FinishRunDeps } from "../finish-run.commands.ts";
 import { FinishRunCommand } from "../finish-run.commands.ts";
 import type { QueueRunCommandData } from "../queueRun.command";
@@ -104,9 +107,7 @@ describe("the evaluators a run is graded with", () => {
     it("records the attachments its suite and plan carry on the queued event", async () => {
       const loadRunAttachments = vi.fn(async () => evaluators());
 
-      const events = await new QueueRunCommand({ loadRunAttachments }).handle(
-        queueCommand(),
-      );
+      const events = await new QueueRunCommand({ loadRunAttachments }).handle(queueCommand());
 
       expect(loadRunAttachments).toHaveBeenCalledWith({
         projectId: "tenant-1",
@@ -121,12 +122,9 @@ describe("the evaluators a run is graded with", () => {
     it("records the scenario's field values and the evaluator definitions next to the attachments", async () => {
       const loadRunAttachments = vi.fn(async () => evaluators());
 
-      const events = await new QueueRunCommand({ loadRunAttachments }).handle(
-        queueCommand(),
-      );
+      const events = await new QueueRunCommand({ loadRunAttachments }).handle(queueCommand());
 
-      const carried = (events[0]?.data as { evaluators: RunEvaluators })
-        .evaluators;
+      const carried = (events[0]?.data as { evaluators: RunEvaluators }).evaluators;
       expect(carried.fieldValues).toEqual({ golden_sql: "SELECT 1" });
       expect(carried.definitions).toEqual([DEFINITION]);
     });
@@ -148,9 +146,7 @@ describe("the evaluators a run is graded with", () => {
         throw new Error("postgres is down");
       });
 
-      const events = await new QueueRunCommand({ loadRunAttachments }).handle(
-        queueCommand(),
-      );
+      const events = await new QueueRunCommand({ loadRunAttachments }).handle(queueCommand());
 
       expect(events).toHaveLength(1);
       expect(events[0]?.data).not.toHaveProperty("evaluators");
@@ -163,9 +159,7 @@ describe("the evaluators a run is graded with", () => {
       const queued = evaluators({ suiteId: "suite-at-queue-time" });
       const deps: FinishRunDeps = {
         loadPriorEvents: vi.fn(async () => [queuedEvent(queued)]),
-        loadRunAttachments: vi.fn(async () =>
-          evaluators({ suiteId: "suite-edited-since" }),
-        ),
+        loadRunAttachments: vi.fn(async () => evaluators({ suiteId: "suite-edited-since" })),
       };
 
       const events = await new FinishRunCommand(deps).handle(finishCommand());
@@ -185,9 +179,7 @@ describe("the evaluators a run is graded with", () => {
         loadRunAttachments: vi.fn(async () =>
           evaluators({
             fieldValues: { golden_sql: "SELECT 2" },
-            definitions: [
-              { ...DEFINITION, settings: { case_sensitive: false } },
-            ],
+            definitions: [{ ...DEFINITION, settings: { case_sensitive: false } }],
           }),
         ),
       };
@@ -195,8 +187,7 @@ describe("the evaluators a run is graded with", () => {
       const events = await new FinishRunCommand(deps).handle(finishCommand());
 
       expect(deps.loadRunAttachments).not.toHaveBeenCalled();
-      const carried = (events[0]?.data as { evaluators: RunEvaluators })
-        .evaluators;
+      const carried = (events[0]?.data as { evaluators: RunEvaluators }).evaluators;
       expect(carried.fieldValues).toEqual({ golden_sql: "SELECT 1" });
       expect(carried.definitions).toEqual([DEFINITION]);
     });

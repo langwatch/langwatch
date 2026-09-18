@@ -1,9 +1,9 @@
+import type { SpanTreeNode, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 /**
  * @vitest-environment jsdom
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SpanTreeNode,TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const spans = vi.hoisted(() => ({ current: [] as SpanTreeNode[] }));
 const overlay = vi.hoisted(() => ({

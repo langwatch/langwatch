@@ -4,10 +4,11 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { useMemo } from "react";
 import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
-import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
+import { useMemo } from "react";
+
 import { api } from "../../scenario-api.ts";
+import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
 import { buildRunPlans, type RunPlan, toRunPlanSuites } from "./run-plans.ts";
 
 export type UseRunPlansResult = {

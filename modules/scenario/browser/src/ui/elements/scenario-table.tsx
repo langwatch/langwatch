@@ -1,6 +1,7 @@
 import { HStack, IconButton, Table, Text } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Menu } from "@langwatch/design-system/menu";
+import type { Instant } from "@langwatch/time";
 import {
   type ColumnFiltersState,
   createColumnHelper,
@@ -15,7 +16,7 @@ import {
 } from "@tanstack/react-table";
 import { Archive, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
-import type { Instant } from "@langwatch/time";
+
 import type { ScenarioListItem } from "../../model/scenario-list.types.ts";
 
 export type ScenarioTableProps = {

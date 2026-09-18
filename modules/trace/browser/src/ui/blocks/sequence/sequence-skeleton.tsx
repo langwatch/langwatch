@@ -1,4 +1,5 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
+
 import { SkeletonHeader } from "../../elements/sequence/skeleton-header.tsx";
 
 /**

@@ -1,5 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { LuLayers } from "react-icons/lu";
+
 import { Chip } from "../../../../elements/explorer/trace-drawer/chip.tsx";
 
 /**

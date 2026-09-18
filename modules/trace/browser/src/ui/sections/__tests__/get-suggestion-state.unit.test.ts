@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   getSuggestionState,
   PARAMETER_LINE_GRAMMAR,

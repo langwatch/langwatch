@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { dedupeByValue } from "../../../model/dedupe-by-value.ts";
 
 // Backs the SUPPLEMENT (not replace) merge of preloaded facet items with

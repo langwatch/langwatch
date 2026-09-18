@@ -4,15 +4,24 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
-import { createLogger } from "@langwatch/observability";
 import type { ChildProcess } from "child_process";
+
+import { createLogger } from "@langwatch/observability";
 import type { ScenarioExecutionJob } from "@langwatch/scenario-contract";
-import type { ScenarioExecutionRunner,ScenarioExecutionPool } from "../app/scenario.app.ts";
+
+import type { ScenarioExecutionRunner, ScenarioExecutionPool } from "../app/scenario.app.ts";
 import type { VoiceConcurrencyGate } from "../voice-concurrency-gate.ts";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 
 export type ExecutionJobData = ScenarioExecutionJob;
+
+export class JobNotAcceptedByPoolError extends Error {
+  constructor(readonly job: ExecutionJobData) {
+    super(`Scenario execution pool does not accept target type ${job.target.type}`);
+    this.name = "JobNotAcceptedByPoolError";
+  }
+}
 
 type ActiveExecution = {
   job: ExecutionJobData;
@@ -35,11 +44,13 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
    * without one behaves exactly as it did before the cap existed.
    */
   private readonly _voiceGate: VoiceConcurrencyGate | null;
+  private readonly acceptJob: ((job: ExecutionJobData) => boolean) | undefined;
   private runner: ScenarioExecutionRunner | undefined = void 0;
 
   static create(options: {
     concurrency: number;
     voiceGate?: VoiceConcurrencyGate;
+    acceptJob?: (job: ExecutionJobData) => boolean;
   }): ScenarioExecutionPoolService {
     return new ScenarioExecutionPoolService(options);
   }
@@ -47,12 +58,15 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
   private constructor({
     concurrency,
     voiceGate,
+    acceptJob,
   }: {
     concurrency: number;
     voiceGate?: VoiceConcurrencyGate;
+    acceptJob?: (job: ExecutionJobData) => boolean;
   }) {
     this._concurrency = concurrency;
     this._voiceGate = voiceGate ?? null;
+    this.acceptJob = acceptJob;
   }
 
   connect(runner: ScenarioExecutionRunner): void {
@@ -166,6 +180,9 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
    * Starts immediately if capacity available, buffers if full.
    */
   submit(jobData: ExecutionJobData): void {
+    if (this.acceptJob && !this.acceptJob(jobData)) {
+      throw new JobNotAcceptedByPoolError(jobData);
+    }
     if (
       this._active.has(jobData.scenarioRunId) ||
       this._pending.some((pending) => pending.scenarioRunId === jobData.scenarioRunId)
@@ -346,8 +363,7 @@ export class UnavailableScenarioExecutionPoolService implements ScenarioExecutio
     return new UnavailableScenarioExecutionPoolService();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   submit(input: ScenarioExecutionJob): void {
     throw new Error(

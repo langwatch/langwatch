@@ -1,5 +1,5 @@
-import { useCallback } from "react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useCallback } from "react";
 
 /**
  * Convenience hook for opening a trace's details.

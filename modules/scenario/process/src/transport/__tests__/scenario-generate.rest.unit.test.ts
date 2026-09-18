@@ -1,115 +1,94 @@
 /**
- * `POST /api/scenario/generate` — the author-assist door's per-project
- * generation window: counted after the permission probe, refused before the
- * model is resolved.
+ * `POST /api/scenario/generate` binds body projectId to the declared permission target.
  * @vitest-environment node
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { ScenarioGenerateRateLimitedError } from "@langwatch/scenario-contract";
+import {
+  ScenarioApi,
+  type ScenarioGenerateResponse,
+} from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createScenarioGenerateRest,
-  type ScenarioGenerateRestSession,
-} from "../scenario-generate.rest.ts";
-
-const SESSION: ScenarioGenerateRestSession = { user: { id: "user_1" } };
-
-/** The door's collaborator bag, derived so the test never names the port shape. */
-type GenerateRestCollaborators = Parameters<typeof createScenarioGenerateRest>[0];
+import { scenarioGenerateRest } from "../scenario-generate.rest.ts";
 
 const boundaryErrorHandler: RestErrorHandler = (error, context) => {
   if (HandledError.isHandled(error)) {
-    return context.json(
-      { code: error.code },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
+    return context.json({ code: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode);
   }
+
   return context.json({ error: "internal_server_error" }, 500);
 };
 
-function buildApi(overrides: Partial<GenerateRestCollaborators> = {}) {
-  const resolveModel = vi.fn(async () => {
-    throw new Error("the test never resolves a real model");
-  });
-  const assertGenerateWithinBounds = vi.fn(async () => {});
-
-  const ports: GenerateRestCollaborators = {
-    resolveSession: async () => SESSION,
-    probeProjectPermission: async () => true,
-    assertGenerateWithinBounds,
-    resolveModel,
-    timeoutMs: () => 1_000,
-    ...overrides,
-  };
-
+function buildApi(permitted = true) {
+  const generateScenario = vi.fn<ScenarioApi["generateScenario"]>(async () => ({
+    scenario: {
+      name: "Refund request",
+      situation: "A customer needs a refund.",
+      criteria: ["The agent confirms the request."],
+    },
+  }));
+  const app = createApiFixture<ScenarioApi>({ generateScenario });
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
-      identify: () => ({ actor: null, scope: null }),
+      identify: () => ({ actor: { type: "user", id: "user_1" }, scope: null }),
+      authorize: () => ({ permitted, organizationRole: null }),
     },
   });
-
-  const hono = runtime.mount(createScenarioGenerateRest(ports).router(), {
-    app: () => ({}) as never,
+  const hono = runtime.mount(scenarioGenerateRest.router(), {
+    app: () => app,
     onError: boundaryErrorHandler,
   });
-
-  const generate = (body: Record<string, unknown> = {}) =>
+  const generate = (projectId = "project_1") =>
     hono.request("http://api.test/api/scenario/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // `currentScenario` is nullable but not optional on the wire schema.
       body: JSON.stringify({
         prompt: "a grumpy refund requester",
         currentScenario: null,
-        projectId: "project_1",
-        ...body,
+        projectId,
       }),
     });
 
-  return { generate, resolveModel, assertGenerateWithinBounds };
+  return { generate, generateScenario };
 }
 
 describe("POST /api/scenario/generate", () => {
-  describe("given the project has spent its generation window", () => {
-    it("refuses 429 and never resolves the model", async () => {
-      const { generate, resolveModel } = buildApi({
-        assertGenerateWithinBounds: async () => {
-          throw new ScenarioGenerateRateLimitedError({ retryAfterSeconds: 42 });
+  describe("given the caller may manage the body project", () => {
+    /** @scenario "Generate scenario with AI using custom description" */
+    it("forwards the parsed request to the composed Scenario API", async () => {
+      const { generate, generateScenario } = buildApi();
+
+      const response = await generate("project_other");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual<ScenarioGenerateResponse>({
+        scenario: {
+          name: "Refund request",
+          situation: "A customer needs a refund.",
+          criteria: ["The agent confirms the request."],
         },
       });
-
-      const response = await generate();
-
-      expect(response.status).toBe(429);
-      expect(await response.json()).toMatchObject({ code: "scenario_generate_rate_limited" });
-      expect(resolveModel).not.toHaveBeenCalled();
+      expect(generateScenario).toHaveBeenCalledWith({
+        prompt: "a grumpy refund requester",
+        currentScenario: null,
+        projectId: "project_other",
+      });
     });
   });
 
-  describe("given the caller lacks scenarios:manage on the project", () => {
-    it("refuses before the budget is counted", async () => {
-      const { generate, assertGenerateWithinBounds } = buildApi({
-        probeProjectPermission: async () => false,
-      });
+  describe("given the caller lacks scenarios:manage on the body project", () => {
+    /** @scenario "Generate scenario with AI using custom description" */
+    it("refuses before calling the composed application", async () => {
+      const { generate, generateScenario } = buildApi(false);
 
       const response = await generate();
 
       expect(response.status).toBe(403);
-      expect(assertGenerateWithinBounds).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("given the budget check passes", () => {
-    it("counts the generation against the project the body names", async () => {
-      const { generate, assertGenerateWithinBounds } = buildApi();
-
-      await generate({ projectId: "project_other" });
-
-      expect(assertGenerateWithinBounds).toHaveBeenCalledWith({ projectId: "project_other" });
+      expect(generateScenario).not.toHaveBeenCalled();
     });
   });
 });

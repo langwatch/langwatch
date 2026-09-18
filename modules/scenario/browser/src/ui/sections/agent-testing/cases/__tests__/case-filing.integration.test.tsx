@@ -9,6 +9,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ScenarioForm, UNFILED_OPTION_LABEL } from "../../../../elements/scenario-form.tsx";
 import { TestCasesTab } from "../test-cases-tab.tsx";
 

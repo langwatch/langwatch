@@ -1,9 +1,10 @@
+import { describe, expect, it } from "vitest";
+
 /**
  * @vitest-environment node
  * Audio members of chatRichContentSchema (#5304); see the audio-player-in-traces feature.
  */
 import { chatRichContentSchema } from "../index.ts";
-import { describe, expect, it } from "vitest";
 
 describe("chatRichContentSchema", () => {
   describe("given an OpenAI input_audio part", () => {

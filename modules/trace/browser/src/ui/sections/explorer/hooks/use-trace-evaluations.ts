@@ -1,10 +1,11 @@
-import { useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { Evaluation } from "@langwatch/trace-contract";
-import { api } from "../../../../behavior/trace-api.ts";
-import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useMemo } from "react";
+
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
+import { useSharedTrace } from "../context/shared-trace-context.tsx";
 import type { EvalSummary } from "../types/trace.ts";
 
 export type RichEval = EvalSummary & {

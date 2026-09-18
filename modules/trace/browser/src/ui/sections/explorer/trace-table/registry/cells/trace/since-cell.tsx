@@ -1,5 +1,6 @@
 import { Text } from "@chakra-ui/react";
 import type React from "react";
+
 import type { TraceListItem } from "../../../../types/trace.ts";
 import { useVerboseRelativeTime } from "../../../../utils/use-relative-time.ts";
 import type { CellDef } from "../../types.ts";

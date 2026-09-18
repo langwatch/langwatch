@@ -1,13 +1,23 @@
-import { TraceDeferredOriginEventingAdapter,DEFERRED_ORIGIN_CHECK_DELAY_MS } from "./eventing.deferred-origin.service.ts";
-import { EventSourcing, mapCommands, type EventSourcedQueueProcessor } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
 import {
   DatasetNormalizationWorker,
   type DatasetNormalizePayload,
 } from "@langwatch/dataset-contract";
+import { EventSourcing, mapCommands, type EventSourcedQueueProcessor } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import type { AssignTopicCommandData, ResolveOriginCommandData } from "@langwatch/trace-contract";
+
+import {
+  type DeferredOriginPayload,
+  type TraceDeferredOriginScheduler,
+  type TraceProcessingPipeline,
+  type TraceProcessingInstaller,
+  type TraceTopicAssignmentCommand,
+} from "../app/trace.members.ts";
+import {
+  TraceDeferredOriginEventingAdapter,
+  DEFERRED_ORIGIN_CHECK_DELAY_MS,
+} from "./eventing.deferred-origin.service.ts";
 import { EventingTraceTopicAssignment } from "./eventing.trace-topic-assignment.service.ts";
-import { type DeferredOriginPayload, type TraceDeferredOriginScheduler,type TraceProcessingPipeline,type TraceProcessingInstaller,type TraceTopicAssignmentCommand } from "../app/trace.members.ts";
 
 const logger = createLogger("langwatch:trace-processing:installer");
 
@@ -35,8 +45,7 @@ class RegisteredTraceTopicCommand implements TraceTopicAssignmentCommand {
 
   private constructor(
     private readonly command: EventSourcedQueueProcessor<AssignTopicCommandData>,
-  ) {
-  }
+  ) {}
 
   async sendAssignTopic(input: AssignTopicCommandData): Promise<void> {
     await this.command.send(input);
@@ -64,8 +73,7 @@ export class TraceProcessingServerInstallerAdapter implements TraceProcessingIns
   private constructor(
     private readonly pipelineDefinition: TraceProcessingPipeline,
     private readonly datasetNormalization: DatasetNormalizationWorker,
-  ) {
-  }
+  ) {}
 
   install(eventSourcing: EventSourcing) {
     if (this.installed) {

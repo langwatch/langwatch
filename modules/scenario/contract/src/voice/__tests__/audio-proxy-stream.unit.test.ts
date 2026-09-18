@@ -3,6 +3,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { proxyAudioStream } from "../audio-proxy-stream";
 import { VoiceRecordingUnavailableError } from "../voice-session.service";
 
@@ -16,8 +17,7 @@ const okUpstream = (contentType: string | null) => ({
     },
   }),
   headers: {
-    get: (name: string) =>
-      name.toLowerCase() === "content-type" ? contentType : null,
+    get: (name: string) => (name.toLowerCase() === "content-type" ? contentType : null),
   },
 });
 

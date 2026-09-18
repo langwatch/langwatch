@@ -37,8 +37,7 @@ function isVoiceMediaSocketHeaders(
     (headerValue) =>
       typeof headerValue === "string" ||
       headerValue === undefined ||
-      (Array.isArray(headerValue) &&
-        headerValue.every((entry) => typeof entry === "string")),
+      (Array.isArray(headerValue) && headerValue.every((entry) => typeof entry === "string")),
   );
 }
 
@@ -47,9 +46,7 @@ function isVoiceMediaSocketHeaders(
  * every field, not just the discriminator — a malformed `headBase64` would
  * otherwise reach `Buffer.from`, which throws and can kill the child.
  */
-export function isVoiceMediaSocketMessage(
-  message: unknown,
-): message is VoiceMediaSocketMessage {
+export function isVoiceMediaSocketMessage(message: unknown): message is VoiceMediaSocketMessage {
   if (typeof message !== "object" || message === null) return false;
   const candidate = message as Record<string, unknown>;
   return (
@@ -112,14 +109,8 @@ export interface VoiceSocketReceiver {
 
 /** IPC-bearing subset of `process` the receiver needs; eases testing. */
 export interface VoiceSocketProcess {
-  on(
-    event: "message",
-    listener: (message: unknown, handle: unknown) => void,
-  ): unknown;
-  off(
-    event: "message",
-    listener: (message: unknown, handle: unknown) => void,
-  ): unknown;
+  on(event: "message", listener: (message: unknown, handle: unknown) => void): unknown;
+  off(event: "message", listener: (message: unknown, handle: unknown) => void): unknown;
 }
 
 /**
@@ -127,9 +118,7 @@ export interface VoiceSocketProcess {
  * `process`). The handler fires only for the voice handoff message and only
  * when a socket handle actually arrived.
  */
-export function createVoiceSocketReceiver(
-  proc: VoiceSocketProcess = process,
-): VoiceSocketReceiver {
+export function createVoiceSocketReceiver(proc: VoiceSocketProcess = process): VoiceSocketReceiver {
   return {
     onVoiceSocket(handler) {
       const listener = (message: unknown, handle: unknown): void => {

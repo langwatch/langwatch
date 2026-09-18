@@ -1,8 +1,4 @@
 import { Box, Button, Text } from "@chakra-ui/react";
-import { ChevronDown, Layers } from "lucide-react";
-import type React from "react";
-import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   MenuContent,
   MenuRadioItem,
@@ -10,6 +6,11 @@ import {
   MenuRoot,
   MenuTrigger,
 } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { ChevronDown, Layers } from "lucide-react";
+import type React from "react";
+
 import type { GroupingMode } from "../../../../behavior/view.store.ts";
 import { useViewStore } from "../../../../behavior/view.store.ts";
 

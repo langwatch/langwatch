@@ -1,13 +1,14 @@
+import type { CategoricalRead, FieldDef, FieldNeeds, RangeRead } from "@langwatch/trace-contract";
+import { UNSUPPORTED } from "@langwatch/trace-contract";
+
 import { ClickHouseFacetRegistryAdapter } from "./clickhouse.trace-facet-registry.repository.ts";
-import { ClickHouseTraceQueryCustomFieldsAdapter } from "./clickhouse.trace-query-custom-fields.repository.ts";
 import {
   type ExpressionCategoricalDef,
   type RangeFacetDef,
 } from "./clickhouse.trace-facet-registry.repository.ts";
-import type { CategoricalRead, FieldDef, FieldNeeds, RangeRead } from "@langwatch/trace-contract";
-import { UNSUPPORTED } from "@langwatch/trace-contract";
-import { ClickHouseTraceQueryTranslatorsRepository } from "./clickhouse.trace-query-translators.repository.ts";
+import { ClickHouseTraceQueryCustomFieldsAdapter } from "./clickhouse.trace-query-custom-fields.repository.ts";
 import { META_FIELD_DEFS } from "./clickhouse.trace-query-meta-fields.repository.ts";
+import { ClickHouseTraceQueryTranslatorsRepository } from "./clickhouse.trace-query-translators.repository.ts";
 
 // ---------------------------------------------------------------------------
 // Registry lookup — single-sources SQL expressions from the facet registry.

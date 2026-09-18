@@ -1,7 +1,7 @@
 import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "react-feather";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 export type RelatedEntity = {
   id: string;
@@ -161,7 +161,7 @@ export function CascadeArchiveDialog({
               <Input
                 placeholder="Type 'delete' to confirm"
                 value={confirmationText}
-                
+
                 onChange={(e) => {
                   e.stopPropagation();
                   setConfirmationText(e.target.value);

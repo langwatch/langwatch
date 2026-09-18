@@ -1,4 +1,5 @@
 import { ATTR_KEYS, type NormalizedSpan, type TraceSummaryData } from "@langwatch/trace-contract";
+
 import { parseJsonStringArray } from "../rules/trace-summary-attributes.rules.ts";
 
 function nonEmptyString(value: unknown): string | undefined {

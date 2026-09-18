@@ -8,8 +8,9 @@
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  */
 import { createHash } from "node:crypto";
-import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
+
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceMediaStore } from "../../../app/trace.members.ts";

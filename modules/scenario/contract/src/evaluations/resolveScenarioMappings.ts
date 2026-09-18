@@ -1,10 +1,7 @@
 /** Resolves mapped inputs from scenario runs, messages, and traces. */
 
-import {
-  extractChunkTextualContent,
-  stringifySpanIO,
-  type Span,
-} from "@langwatch/trace-contract";
+import { extractChunkTextualContent, stringifySpanIO, type Span } from "@langwatch/trace-contract";
+
 import type {
   EvaluatorAttachment,
   EvaluatorInputSpec,
@@ -86,22 +83,14 @@ export function resolveConversationMapping({
   switch (path[0]) {
     case "first_user_message": {
       const message = messages.find((entry) => entry.role === USER_ROLE);
-      return message
-        ? value(message.content)
-        : failed("no user message in the conversation");
+      return message ? value(message.content) : failed("no user message in the conversation");
     }
     case "last_agent_message": {
-      const message = [...messages]
-        .reverse()
-        .find((entry) => entry.role === AGENT_ROLE);
-      return message
-        ? value(message.content)
-        : failed("no agent message in the conversation");
+      const message = [...messages].reverse().find((entry) => entry.role === AGENT_ROLE);
+      return message ? value(message.content) : failed("no agent message in the conversation");
     }
     case "transcript":
-      return value(
-        messages.map((entry) => `${entry.role}: ${entry.content}`).join("\n"),
-      );
+      return value(messages.map((entry) => `${entry.role}: ${entry.content}`).join("\n"));
     case "messages":
       return value(JSON.stringify(messages));
     default:
@@ -145,21 +134,12 @@ export function toolNameOf(span: Span): string | null {
   return span.name ?? null;
 }
 
-const startedAtOf = (span: Span): number =>
-  span.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
+const startedAtOf = (span: Span): number => span.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
 
 /** The tool spans called by the given name, in the order they started. */
-export function toolCallsNamed({
-  spans,
-  toolName,
-}: {
-  spans: Span[];
-  toolName: string;
-}): Span[] {
+export function toolCallsNamed({ spans, toolName }: { spans: Span[]; toolName: string }): Span[] {
   return spans
-    .filter(
-      (span) => span.type === TOOL_SPAN_TYPE && toolNameOf(span) === toolName,
-    )
+    .filter((span) => span.type === TOOL_SPAN_TYPE && toolNameOf(span) === toolName)
     .toSorted((a, b) => startedAtOf(a) - startedAtOf(b));
 }
 
@@ -244,8 +224,7 @@ export function resolveTraceMapping({
   // A trace arrives span by span, so the root span can land before the tool
   // span an evaluator reads. A required input waits while any attempt is
   // left; an optional one is left out instead of held to the last attempt.
-  const notYet =
-    hasTraces && (isRequired || spans.length === 0) ? pending : failed;
+  const notYet = hasTraces && (isRequired || spans.length === 0) ? pending : failed;
 
   if (head === TRACE_CONTEXTS_PATH) {
     return resolveTraceContextsMapping({ spans, notYet });
@@ -426,16 +405,11 @@ export function attachmentsReadTrace(
 }
 
 /** The resolved inputs as the result stores them: text, cut for the UI. */
-export function storedInputsOf(
-  data: Record<string, ResolvedValue>,
-): Record<string, string> {
+export function storedInputsOf(data: Record<string, ResolvedValue>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(data).map(([key, entry]) => [
       key,
-      (Array.isArray(entry) ? entry.join("\n") : entry).slice(
-        0,
-        MAX_STORED_INPUT_LENGTH,
-      ),
+      (Array.isArray(entry) ? entry.join("\n") : entry).slice(0, MAX_STORED_INPUT_LENGTH),
     ]),
   );
 }

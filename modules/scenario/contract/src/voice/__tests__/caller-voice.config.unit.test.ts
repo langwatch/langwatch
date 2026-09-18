@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   callerVoiceConfigSchema,
   DEFAULT_CALLER_VOICE,
@@ -36,9 +37,7 @@ describe("parseCallerVoiceConfig", () => {
 
   describe("when the stored value is malformed", () => {
     it("falls back to defaults instead of throwing", () => {
-      expect(parseCallerVoiceConfig({ effects: "not_an_effect" })).toEqual(
-        DEFAULT_CALLER_VOICE,
-      );
+      expect(parseCallerVoiceConfig({ effects: "not_an_effect" })).toEqual(DEFAULT_CALLER_VOICE);
       expect(parseCallerVoiceConfig("garbage")).toEqual(DEFAULT_CALLER_VOICE);
     });
   });
@@ -59,12 +58,8 @@ describe("callerVoiceConfigSchema voiceModel shape", () => {
   describe("when the value is not a provider slash voice string", () => {
     /** @scenario The caller voice value validates the provider slash voice shape */
     it("rejects a bare name and a value with no voice segment", () => {
-      expect(
-        callerVoiceConfigSchema.safeParse({ voiceModel: "nova" }).success,
-      ).toBe(false);
-      expect(
-        callerVoiceConfigSchema.safeParse({ voiceModel: "openai/" }).success,
-      ).toBe(false);
+      expect(callerVoiceConfigSchema.safeParse({ voiceModel: "nova" }).success).toBe(false);
+      expect(callerVoiceConfigSchema.safeParse({ voiceModel: "openai/" }).success).toBe(false);
     });
   });
 

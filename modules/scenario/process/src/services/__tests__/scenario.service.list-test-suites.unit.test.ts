@@ -1,5 +1,6 @@
 /** Spec: specs/suites/test-suites.feature */
 import { describe, expect, it, vi } from "vitest";
+
 import { ScenarioService, type ScenarioServiceOptions } from "../scenario.service.ts";
 
 describe("ScenarioService.listTestSuites", () => {
@@ -20,7 +21,10 @@ describe("ScenarioService.listTestSuites", () => {
         service.listTestSuites({ projectId: "project_1", includeArchived: true }),
       ).resolves.toEqual([]);
 
-      expect(findTestSuites).toHaveBeenCalledWith({ projectId: "project_1", includeArchived: true });
+      expect(findTestSuites).toHaveBeenCalledWith({
+        projectId: "project_1",
+        includeArchived: true,
+      });
     });
   });
 });

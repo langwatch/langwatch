@@ -1,10 +1,10 @@
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 /**
  * The Vercel AI SDK flattens `experimental_telemetry.metadata` as
  * `ai.telemetry.metadata.<key>`. The trace summary read only
  * `langwatch.*`/`gen_ai.*`/`tag.tags`, missing Vercel's own channel entirely.
  */
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 import { TraceAttributeExtractionService } from "../trace-attribute-extraction.service.ts";
 

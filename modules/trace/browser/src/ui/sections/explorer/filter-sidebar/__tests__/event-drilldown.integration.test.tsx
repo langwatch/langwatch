@@ -5,14 +5,14 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import "@testing-library/jest-dom/vitest";
-
 import { EMPTY_AST, parse } from "@langwatch/trace-contract";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import { useFilterStore } from "../../../../../behavior/filter.store.ts";
 import { EventDrilldown } from "../event-drilldown.tsx";
-import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 
 const buildItem = ({
   eventMetrics = [
@@ -33,11 +33,7 @@ const buildItem = ({
   eventMetrics,
 });
 
-const renderDrilldown = ({
-  item = buildItem(),
-  ast = EMPTY_AST,
-  toggleFacet = vi.fn(),
-} = {}) => {
+const renderDrilldown = ({ item = buildItem(), ast = EMPTY_AST, toggleFacet = vi.fn() } = {}) => {
   render(
     <ChakraProvider value={defaultSystem}>
       <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />
@@ -111,9 +107,10 @@ describe("EventDrilldown", () => {
           ast: parse("event.attribute.event.metrics.vote:-1"),
         });
 
-        expect(
-          screen.getByRole("button", { name: /thumbs down/ }),
-        ).toHaveAttribute("data-state", "include");
+        expect(screen.getByRole("button", { name: /thumbs down/ })).toHaveAttribute(
+          "data-state",
+          "include",
+        );
       });
 
       it("names the row included, distinctly from an excluded one", () => {
@@ -242,13 +239,8 @@ describe("EventDrilldown", () => {
     const renderAgainstStore = () => {
       useFilterStore.getState().applyQueryText("");
       const item = buildItem();
-      const toggleFacet = ({
-        field,
-        value,
-      }: {
-        field: string;
-        value: string;
-      }) => useFilterStore.getState().toggleFacet(field, value);
+      const toggleFacet = ({ field, value }: { field: string; value: string }) =>
+        useFilterStore.getState().toggleFacet(field, value);
       const tree = () => (
         <ChakraProvider value={defaultSystem}>
           <EventDrilldown
@@ -263,9 +255,7 @@ describe("EventDrilldown", () => {
       // be handed the store's new AST after each click the way the sidebar
       // does when it re-renders.
       const clickThumbsDown = () => {
-        fireEvent.click(
-          screen.getByRole("button", { name: /^vote thumbs down/ }),
-        );
+        fireEvent.click(screen.getByRole("button", { name: /^vote thumbs down/ }));
         view.rerender(tree());
       };
       return { clickThumbsDown };
@@ -289,9 +279,7 @@ describe("EventDrilldown", () => {
         clickThumbsDown(); // neutral -> include
         clickThumbsDown(); // include -> exclude
         clickThumbsDown(); // exclude -> neutral
-        expect(useFilterStore.getState().queryText).toBe(
-          "event:thumbs_up_down",
-        );
+        expect(useFilterStore.getState().queryText).toBe("event:thumbs_up_down");
       });
     });
   });

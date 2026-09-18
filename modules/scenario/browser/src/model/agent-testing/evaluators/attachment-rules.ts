@@ -5,8 +5,8 @@
  * @see specs/features/agent-testing/suite-editor.feature
  */
 
-import { generate } from "@langwatch/ksuid";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import { generate } from "@langwatch/ksuid";
 import {
   attachmentMissingInputs,
   attachmentOpensOnAttach,

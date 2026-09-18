@@ -1,28 +1,28 @@
-import type { Instant } from "@langwatch/time";
+import { Box, Button, HStack, NativeSelect } from "@chakra-ui/react";
 /**
  * The filter row of the Results tab: how the list is grouped, what is cut from it, and
  * the window it all sits in.
  * @see specs/features/agent-testing/results-tabs.feature
  */
-
-import { Box, Button, HStack, NativeSelect } from "@chakra-ui/react";
-import { ChartColumn } from "lucide-react";
 import type {
   Period,
   PeriodMode,
   RelativePresetKey,
 } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Instant } from "@langwatch/time";
+import { ChartColumn } from "lucide-react";
+
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
 import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
 import { GroupByTabs } from "./group-by-tabs.tsx";
-import { ResultsFilterMenu, type ResultsFilterOption } from "./results-filter-menu.tsx";
 import {
   EMPTY_RESULT_FILTERS,
   isNarrowed,
   type ResultFilters,
   type ResultGrouping,
 } from "./result-atoms.ts";
+import { ResultsFilterMenu, type ResultsFilterOption } from "./results-filter-menu.tsx";
 
 /**
  * The height and the type size every control of the row shares. The filter

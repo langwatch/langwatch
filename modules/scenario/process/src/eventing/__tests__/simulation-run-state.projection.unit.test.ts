@@ -1,6 +1,5 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
@@ -17,6 +16,8 @@ import type {
   SimulationTextMessageEndEvent,
   SimulationTextMessageStartEvent,
 } from "@langwatch/scenario-contract";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,

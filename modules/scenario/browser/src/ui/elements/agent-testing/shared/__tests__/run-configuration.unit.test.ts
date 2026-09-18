@@ -5,8 +5,9 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { describe, expect, it } from "vitest";
 import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
 import {
   configurationKeyOf,
   configurationsForScope,

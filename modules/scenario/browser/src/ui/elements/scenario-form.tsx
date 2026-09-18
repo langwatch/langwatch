@@ -9,6 +9,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  callerVoiceConfigSchema,
+  DEFAULT_CALLER_VOICE,
+  scenarioParameterDefinitionsSchema,
+} from "@langwatch/scenario-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -24,12 +29,8 @@ import {
   type UseFormSetError,
   useForm,
 } from "react-hook-form";
-import {
-  callerVoiceConfigSchema,
-  DEFAULT_CALLER_VOICE,
-  scenarioParameterDefinitionsSchema,
-} from "@langwatch/scenario-contract";
 import { z } from "zod";
+
 import { ScenarioCriteriaInput } from "./scenario-criteria-input.tsx";
 import { ScenarioSectionHeader } from "./scenario-section-header.tsx";
 

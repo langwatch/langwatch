@@ -34,16 +34,11 @@ const publicBaseUrlSchema = z
  * on but VOICE_PUBLIC_BASE_URL is missing or malformed, so the worker fails
  * loud at boot rather than coming up with a listener Twilio can never reach.
  */
-export function readVoiceWorkerEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): VoiceWorkerEnv {
-  const voiceWorkerOnly =
-    (env.VOICE_WORKER_ONLY ?? "").trim().toLowerCase() === "true";
+export function readVoiceWorkerEnv(env: NodeJS.ProcessEnv = process.env): VoiceWorkerEnv {
+  const voiceWorkerOnly = (env.VOICE_WORKER_ONLY ?? "").trim().toLowerCase() === "true";
   const voiceWsPort = portSchema.parse(env.VOICE_WS_PORT);
   const rawPublicBaseUrl =
-    env.VOICE_PUBLIC_BASE_URL?.trim() === ""
-      ? undefined
-      : env.VOICE_PUBLIC_BASE_URL;
+    env.VOICE_PUBLIC_BASE_URL?.trim() === "" ? undefined : env.VOICE_PUBLIC_BASE_URL;
   const voicePublicBaseUrl = publicBaseUrlSchema.parse(rawPublicBaseUrl);
 
   if (voiceWorkerOnly && voicePublicBaseUrl === undefined) {

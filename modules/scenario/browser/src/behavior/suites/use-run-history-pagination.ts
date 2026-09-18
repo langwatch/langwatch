@@ -4,10 +4,11 @@
  * Manages cursor, accumulated pages, period resets, and data fetching.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { api } from "../scenario-api.ts";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import { useSuiteRunFreshness } from "./use-suite-run-freshness.ts";
 
 type PageData = {

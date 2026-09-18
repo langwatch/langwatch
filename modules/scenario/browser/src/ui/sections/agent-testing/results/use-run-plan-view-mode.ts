@@ -4,8 +4,9 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { useCallback } from "react";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useCallback } from "react";
+
 import { useAgentTestingStore } from "../use-agent-testing-store.ts";
 
 export function useRunPlanViewMode() {

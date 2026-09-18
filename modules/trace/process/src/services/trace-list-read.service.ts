@@ -1,18 +1,10 @@
-import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
-import { TraceDiscoverService, type DiscoverBroadcaster } from "./trace-discover.service.ts";
-import { TraceFacetValuesService } from "./trace-facet-values.service.ts";
-import { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
-import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
-import {
-  cursorForTraceRow,
-  mapToTraceListItem,
-  SORT_COLUMN_MAP,
-} from "../rules/trace-list-row.rules.ts";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
-  TRACE_STATUS_CLICKHOUSE_EXPRESSION,TRACE_LIST_MAX_OFFSET_ROWS,PageTooDeepError
+  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
+  TRACE_LIST_MAX_OFFSET_ROWS,
+  PageTooDeepError,
 } from "@langwatch/trace-contract";
 import type {
   DiscoverResult,
@@ -23,6 +15,17 @@ import type {
   TraceListPage,
   TraceListRead,
 } from "@langwatch/trace-contract";
+
+import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
+import {
+  cursorForTraceRow,
+  mapToTraceListItem,
+  SORT_COLUMN_MAP,
+} from "../rules/trace-list-row.rules.ts";
+import { TraceDiscoverService, type DiscoverBroadcaster } from "./trace-discover.service.ts";
+import { TraceFacetValuesService } from "./trace-facet-values.service.ts";
+import { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 
 interface ListParams {
   tenantId: string;

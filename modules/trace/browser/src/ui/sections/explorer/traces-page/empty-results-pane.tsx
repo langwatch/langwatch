@@ -1,10 +1,11 @@
 import { Box, Flex } from "@chakra-ui/react";
 import React from "react";
-import { EmptyStateOverlay } from "../onboarding/empty-state-overlay.tsx";
+
+import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { SampleDataBanner } from "../../../elements/explorer/onboarding/sample-data-banner.tsx";
 import { OnboardingAurora } from "../onboarding/effects/onboarding-aurora.tsx";
-import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
-import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { EmptyStateOverlay } from "../onboarding/empty-state-overlay.tsx";
 import { Toolbar } from "../toolbar/toolbar.tsx";
 import { TraceTable } from "../trace-table/trace-table.tsx";
 

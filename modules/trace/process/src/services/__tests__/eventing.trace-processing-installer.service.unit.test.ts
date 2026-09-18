@@ -1,17 +1,20 @@
-import { defineAggregate, defineEvents, definePipeline, EventSourcing } from "@langwatch/eventing";
-import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
   type DatasetNormalizePayload,
   DatasetNormalizationWorker,
 } from "@langwatch/dataset-contract";
+import { defineAggregate, defineEvents, definePipeline, EventSourcing } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { TRACE_PROCESSING_EVENT_TYPES, type TraceProcessingEvent } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EventingTraceOriginAdapter } from "../eventing.trace-origin.service.ts";
-import { type TraceDeferredOriginScheduler,
+
+import {
+  type TraceDeferredOriginScheduler,
   type TraceProcessingPipeline,
-  type TraceProcessingPipelineDefinition } from "../../app/trace.members.ts";
-import { EventingTraceTopicAdapter } from "../eventing.trace-topic-assignment.service.ts";
+  type TraceProcessingPipelineDefinition,
+} from "../../app/trace.members.ts";
+import { EventingTraceOriginAdapter } from "../eventing.trace-origin.service.ts";
 import { TraceProcessingServerInstallerAdapter } from "../eventing.trace-processing-installer.service.ts";
+import { EventingTraceTopicAdapter } from "../eventing.trace-topic-assignment.service.ts";
 
 class TestDatasetNormalization extends DatasetNormalizationWorker {
   readonly process = vi.fn(async (_payload: DatasetNormalizePayload) => {});

@@ -55,6 +55,7 @@ import type {
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
+
 import type { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
 import type { SimulationRepository } from "../repositories/simulation.repository.ts";
 

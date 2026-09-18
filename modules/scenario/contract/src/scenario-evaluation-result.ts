@@ -13,8 +13,7 @@ export const SCENARIO_EVALUATION_STATUSES = [
   "skipped",
   "error",
 ] as const;
-export type ScenarioEvaluationStatus =
-  (typeof SCENARIO_EVALUATION_STATUSES)[number];
+export type ScenarioEvaluationStatus = (typeof SCENARIO_EVALUATION_STATUSES)[number];
 
 /** Wire shape for `results.evaluations` on finished event; required evaluators
  * with failed/error status fail the run.
@@ -51,6 +50,4 @@ export const scenarioEvaluationResultSchema = z
     message: "A result with status failed needs passed: false",
     path: ["passed"],
   });
-export type ScenarioEvaluationResult = z.infer<
-  typeof scenarioEvaluationResultSchema
->;
+export type ScenarioEvaluationResult = z.infer<typeof scenarioEvaluationResultSchema>;

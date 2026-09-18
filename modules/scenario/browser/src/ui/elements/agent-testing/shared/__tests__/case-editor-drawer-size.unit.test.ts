@@ -4,8 +4,9 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { describe, expect, it } from "vitest";
 import { drawerSlotRecipe } from "@langwatch/design-system/system";
+import { describe, expect, it } from "vitest";
+
 import { CASE_EDITOR_DRAWER_SIZE } from "../../../../sections/agent-testing/cases/drawer-keys.ts";
 
 /** What Chakra's own drawer recipe gives the two steps either side of ours. */

@@ -4,6 +4,7 @@
  * which of the two the rows below it are (specs/traces-v2/sessions-lens.feature).
  */
 import { describe, expect, it } from "vitest";
+
 import type { TraceListItem } from "../../../../../types/trace.ts";
 import type { ConversationGroup } from "../../../../conversation-groups.ts";
 import { traceCountLabel } from "../conversation-summary.tsx";

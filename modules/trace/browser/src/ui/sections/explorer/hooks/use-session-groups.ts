@@ -1,15 +1,16 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
+import { useSamplePreview } from "../onboarding/index.ts";
 import type { ConversationGroup } from "../trace-table/conversation-groups.ts";
 import {
   groupTracesByConversation,
   sortConversationGroups,
 } from "../trace-table/conversation-groups.ts";
-import { useSamplePreview } from "../onboarding/index.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 import { mapSessionGroupsPayload } from "../utils/map-session-groups-payload.ts";
 
 export interface SessionGroupsResult {

@@ -1,5 +1,6 @@
 import { Ksuid } from "@langwatch/ksuid";
 import { z } from "zod";
+
 import {
   TraceClickHouse,
   type TraceClickHouseClient,

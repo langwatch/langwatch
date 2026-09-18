@@ -4,25 +4,30 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type {
+  ResultGroup,
+  ExternalSetSummary,
+  SuiteRunSummary,
+} from "@langwatch/scenario-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ResultGroup,ExternalSetSummary,SuiteRunSummary } from "@langwatch/scenario-contract";
-import {
-  PLAN_ARCHIVE_DESCRIPTION,
-  PLAN_ARCHIVE_TITLE,
-  type PlanRowModel,
-  PlanRowsTable,
-} from "../plan-rows-table.tsx";
+
 import {
   buildRunPlans,
   CLI_EPHEMERAL_LABEL,
   type RunPlan,
   type RunPlanSuite,
 } from "../../../../../behavior/agent-testing/results/run-plans.ts";
-import { PASS_RATE_BAR_OPACITY } from "../../../../elements/agent-testing/shared/pass-rate-color.ts";
 import type { TargetKind } from "../../../../../model/target-kind.ts";
+import { PASS_RATE_BAR_OPACITY } from "../../../../elements/agent-testing/shared/pass-rate-color.ts";
+import {
+  PLAN_ARCHIVE_DESCRIPTION,
+  PLAN_ARCHIVE_TITLE,
+  type PlanRowModel,
+  PlanRowsTable,
+} from "../plan-rows-table.tsx";
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),

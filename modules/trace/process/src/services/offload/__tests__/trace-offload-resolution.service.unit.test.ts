@@ -1,11 +1,13 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+
 /**
  * @see ADR-022
  * Per-trace resolution: eventref resolution and TraceIO recomputation for
  * read paths.
  */
 import { TraceOffloadResolutionService } from "../../trace-offload-resolution.service.ts";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 // Mock langwatch so the tracer's withActiveSpan is a passthrough in tests.
@@ -19,12 +21,15 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
-import { EVENTREF_ATTR_PREFIX,
+import {
+  EVENTREF_ATTR_PREFIX,
   type NormalizedSpan,
   NormalizedSpanKind,
-  NormalizedStatusCode } from "@langwatch/trace-contract";
+  NormalizedStatusCode,
+} from "@langwatch/trace-contract";
+
+import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------

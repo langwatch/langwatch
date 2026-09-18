@@ -1,12 +1,13 @@
+import { nowInstant } from "@langwatch/time";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { usePageVisibility } from "../../../../behavior/use-page-visibility.ts";
-import { api } from "../../../../behavior/trace-api.ts";
+
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { usePageVisibility } from "../../../../behavior/use-page-visibility.ts";
 import { useTraceListRefresh } from "./use-trace-list-refresh.ts";
-import { nowInstant } from "@langwatch/time";
 
 const FAST_MS = 5_000;
 const SLOW_MS = 30_000;

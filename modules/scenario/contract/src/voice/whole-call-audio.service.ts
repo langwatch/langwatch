@@ -4,8 +4,7 @@
 /** The span attribute a phone run stamps its Twilio call SID on. */
 export const TWILIO_CALL_SID_ATTR = "voice.twilio.call_sid";
 /** The span attribute an ElevenLabs run stamps its conversation id on. */
-export const ELEVENLABS_CONVERSATION_ID_ATTR =
-  "voice.elevenlabs.conversation_id";
+export const ELEVENLABS_CONVERSATION_ID_ATTR = "voice.elevenlabs.conversation_id";
 
 /**
  * The vendor handle a run's whole-call audio is fetched by. A discriminated
@@ -20,10 +19,7 @@ export type WholeCallAudioHandle =
  *  span reader rather than a live ClickHouse. */
 export interface WholeCallAudioInfrastructure {
   /** The trace ids of this run, in the order the scan should visit them. */
-  loadRunTraceIds(input: {
-    projectId: string;
-    scenarioRunId: string;
-  }): Promise<readonly string[]>;
+  loadRunTraceIds(input: { projectId: string; scenarioRunId: string }): Promise<readonly string[]>;
   /** The span attribute maps of one trace, one entry per span. */
   readSpanAttributes(input: {
     projectId: string;
@@ -33,10 +29,7 @@ export interface WholeCallAudioInfrastructure {
 
 /** A non-empty string attribute, or null. Guards against the empty string a
  *  half-written span can carry, which is not a usable handle. */
-function stringAttr(
-  attributes: Readonly<Record<string, unknown>>,
-  key: string,
-): string | null {
+function stringAttr(attributes: Readonly<Record<string, unknown>>, key: string): string | null {
   const value = attributes[key];
   return typeof value === "string" && value.length > 0 ? value : null;
 }
@@ -48,10 +41,7 @@ function handleFromAttributes(
 ): WholeCallAudioHandle | null {
   const callSid = stringAttr(attributes, TWILIO_CALL_SID_ATTR);
   if (callSid) return { kind: "twilio", callSid };
-  const conversationId = stringAttr(
-    attributes,
-    ELEVENLABS_CONVERSATION_ID_ATTR,
-  );
+  const conversationId = stringAttr(attributes, ELEVENLABS_CONVERSATION_ID_ATTR);
   if (conversationId) return { kind: "elevenlabs", conversationId };
   return null;
 }

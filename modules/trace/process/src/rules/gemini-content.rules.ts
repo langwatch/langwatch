@@ -5,6 +5,7 @@
  */
 
 import { isReplyTextPart } from "@langwatch/trace-contract";
+
 import { isNonEmptyString, isRecord, safeStringify } from "./canonical-guard.rules.ts";
 
 /**

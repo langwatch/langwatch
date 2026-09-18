@@ -1,10 +1,6 @@
 // Collector body stages: retrocompatibility rewrites and 4xx refusals.
 // Pure functions over already-read bodies, not transport-specific
 import { createLogger, validationMeta } from "@langwatch/observability";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { ZodError } from "zod";
-import { fromZodError } from "zod-validation-error";
-
 import {
   customMetadataSchema,
   langWatchSpanSchema,
@@ -17,6 +13,9 @@ import {
   type ReservedTraceMetadata,
   type Span,
 } from "@langwatch/trace-contract";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type { ZodError } from "zod";
+import { fromZodError } from "zod-validation-error";
 
 const logger = createLogger("langwatch.collector");
 

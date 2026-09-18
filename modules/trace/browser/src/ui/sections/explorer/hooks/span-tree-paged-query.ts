@@ -1,7 +1,8 @@
+import type { SpanTreeCursor, SpanTreeNode } from "@langwatch/trace-contract";
 import type { QueryClient } from "@tanstack/react-query";
 import { getUntypedClient } from "@trpc/client";
 import { getQueryKey } from "@trpc/react-query";
-import type { SpanTreeCursor,SpanTreeNode } from "@langwatch/trace-contract";
+
 import { api, type RouterOutputs } from "../../../../behavior/trace-api.ts";
 
 /*

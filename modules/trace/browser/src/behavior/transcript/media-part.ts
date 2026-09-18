@@ -1,5 +1,5 @@
-import type { MediaPartData } from "../../model/transcript/types.ts";
 import { isRecord } from "../../model/transcript/record.ts";
+import type { MediaPartData } from "../../model/transcript/types.ts";
 
 function source(
   value: unknown,

@@ -1,6 +1,7 @@
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
-import type { TraceAnalyticsRollupRow } from "./trace-rollup.projection.ts";
+
 import { TraceAnalyticsRollupRepository } from "../repositories/projection/trace-analytics-rollup.repository.ts";
+import type { TraceAnalyticsRollupRow } from "./trace-rollup.projection.ts";
 
 /**
  * Thin AppendStore adapter for the trace_analytics_rollup map projection

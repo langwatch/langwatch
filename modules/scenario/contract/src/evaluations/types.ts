@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { evaluatorAttachmentsSchema } from "../evaluator-attachments.ts";
 import { runEvaluatorDefinitionSchema } from "../scenario-run-evaluators.ts";
 import { scenarioFieldValuesSchema } from "../suite-fields.ts";
@@ -34,6 +35,4 @@ export const scenarioEvaluationsJobPayloadSchema = z.object({
   attempt: z.number().int().min(1),
   occurredAt: z.number(),
 });
-export type ScenarioEvaluationsJobPayload = z.infer<
-  typeof scenarioEvaluationsJobPayloadSchema
->;
+export type ScenarioEvaluationsJobPayload = z.infer<typeof scenarioEvaluationsJobPayloadSchema>;

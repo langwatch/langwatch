@@ -1,4 +1,3 @@
-import type { Instant } from "@langwatch/time";
 import type {
   Scenario,
   ScenarioCreateInput,
@@ -18,6 +17,7 @@ import type {
   ScenarioVersionRestoreInput,
   ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
+import type { Instant } from "@langwatch/time";
 
 /**
  * One run plan row, read for the results tab and the run-configuration history — a

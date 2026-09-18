@@ -8,8 +8,7 @@ import type { Evaluation, TracesForProjectResult } from "@langwatch/trace-contra
 import { TraceIdsTooManyError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceLegacyRead } from "../trace.members.ts";
-import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
+import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
@@ -18,7 +17,8 @@ import {
   type TracesV2SessionGroupsReader,
   type TracesV2SpanReader,
 } from "../trace.app.ts";
-import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
+import type { TraceLegacyRead } from "../trace.members.ts";
+import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 
 const PROTECTIONS = { canSeeCosts: true };
 const QUERY = { projectId: "project-1", startDate: 1_000, endDate: 2_000 };

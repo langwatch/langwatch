@@ -5,9 +5,10 @@
  */
 
 import { Drawer } from "@langwatch/design-system/studio-drawer";
+
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import { CaseModalFields, CaseModalFooter, CaseModalHeader } from "./case-modal-parts.tsx";
 import { CASE_EDITOR_DRAWER_SIZE } from "./drawer-keys.ts";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import type { CaseEditorState } from "./use-case-editor.ts";
 
 export type CaseModalProps = {

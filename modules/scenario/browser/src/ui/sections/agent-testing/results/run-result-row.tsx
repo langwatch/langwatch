@@ -5,12 +5,13 @@
  */
 
 import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
-import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
-import { buildDisplayTitle } from "@langwatch/suite-browser/run-formatters";
-import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { Menu } from "@langwatch/design-system/menu";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
+import { buildDisplayTitle } from "@langwatch/suite-browser/run-formatters";
+import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
+
+import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { FG_MUTED, ROW_HOVER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import {
   EvaluatorPill,
