@@ -10,13 +10,13 @@ from ...models.put_api_model_defaults_by_id_response_400 import PutApiModelDefau
 from ...models.put_api_model_defaults_by_id_response_401 import PutApiModelDefaultsByIdResponse401
 from ...models.put_api_model_defaults_by_id_response_422 import PutApiModelDefaultsByIdResponse422
 from ...models.put_api_model_defaults_by_id_response_500 import PutApiModelDefaultsByIdResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PutApiModelDefaultsByIdBody,
+    body: PutApiModelDefaultsByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -27,7 +27,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -98,8 +99,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PutApiModelDefaultsByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiModelDefaultsByIdBody | Unset = UNSET,
 ) -> Response[
     Any
     | PutApiModelDefaultsByIdResponse400
@@ -112,7 +113,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (PutApiModelDefaultsByIdBody):
+        body (PutApiModelDefaultsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -137,8 +138,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PutApiModelDefaultsByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiModelDefaultsByIdBody | Unset = UNSET,
 ) -> (
     Any
     | PutApiModelDefaultsByIdResponse400
@@ -152,7 +153,7 @@ def sync(
 
     Args:
         id (str):
-        body (PutApiModelDefaultsByIdBody):
+        body (PutApiModelDefaultsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -172,8 +173,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PutApiModelDefaultsByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiModelDefaultsByIdBody | Unset = UNSET,
 ) -> Response[
     Any
     | PutApiModelDefaultsByIdResponse400
@@ -186,7 +187,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (PutApiModelDefaultsByIdBody):
+        body (PutApiModelDefaultsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -209,8 +210,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PutApiModelDefaultsByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiModelDefaultsByIdBody | Unset = UNSET,
 ) -> (
     Any
     | PutApiModelDefaultsByIdResponse400
@@ -224,7 +225,7 @@ async def asyncio(
 
     Args:
         id (str):
-        body (PutApiModelDefaultsByIdBody):
+        body (PutApiModelDefaultsByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

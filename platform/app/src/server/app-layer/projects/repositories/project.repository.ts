@@ -138,12 +138,6 @@ export interface ProjectRepository {
     organizationId: string;
     page: number;
     limit: number;
-    /**
-     * When set, restricts the listing (and its total) to these project ids —
-     * the filtered listing a credential without organization-wide
-     * `project:view` receives. An empty array lists nothing.
-     */
-    projectIds?: string[];
   }): Promise<PaginatedResult<Project>>;
   findBySlugInTeam(params: {
     slug: string;
@@ -232,7 +226,6 @@ export class NullProjectRepository implements ProjectRepository {
     organizationId: string;
     page: number;
     limit: number;
-    projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
     return { data: [], pagination: { page: 1, limit: 50, total: 0 } };
   }

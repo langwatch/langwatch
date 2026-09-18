@@ -5,6 +5,7 @@ import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { getApp } from "../../../app-layer/app";
 import { availableFilters } from "../../../filters/registry";
 import { type FilterField, filterFieldsEnum } from "../../../filters/types";
+import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 
 export const dataForFilter = protectedProcedure
@@ -16,7 +17,7 @@ export const dataForFilter = protectedProcedure
       query: z.string().optional(),
     }),
   )
-  .permission("analytics:view")
+  .use(checkProjectPermission("analytics:view"))
   .query(async ({ input }) => {
     const { field, key, subkey } = input;
 

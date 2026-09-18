@@ -12,54 +12,23 @@ import { PrismaAuthzReadRepository } from "../authz-read.prisma.repository";
  * key it was minted for.
  */
 describe("PrismaAuthzReadRepository", () => {
-  describe("when reading organization membership", () => {
-    describe("when the user is an active member of the organization", () => {
+  describe("findOrganizationRole", () => {
+    describe("when the user is a member of the organization", () => {
       it("reads the membership row for this user in this organization", async () => {
-        const findFirst = vi
-          .fn()
-          .mockResolvedValue({ role: "ADMIN", disabledAt: null });
+        const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
         const prisma = {
           organizationUser: { findFirst },
         } as unknown as Prisma.TransactionClient;
 
-        const membership = await new PrismaAuthzReadRepository(
+        const role = await new PrismaAuthzReadRepository(
           prisma,
-        ).findOrganizationMembership({
-          userId: "alice",
-          organizationId: "org-1",
-        });
+        ).findOrganizationRole({ userId: "alice", organizationId: "org-1" });
 
-        // `disabledAt` is SELECTED and not filtered on purpose: the row is a
-        // fact and the collector applies the policy. This assertion is the
-        // one that used to pin the opposite - a select without `disabledAt` -
-        // which is how a disabled member kept every permission.
         expect(findFirst).toHaveBeenCalledWith({
           where: { userId: "alice", organizationId: "org-1" },
-          select: { role: true, disabledAt: true },
+          select: { role: true },
         });
-        expect(membership).toEqual({ role: "ADMIN", disabled: false });
-      });
-    });
-
-    describe("when the membership has been disabled to free its seat", () => {
-      it("reports the row as disabled rather than hiding it, so the denial can say so", async () => {
-        const prisma = {
-          organizationUser: {
-            findFirst: vi.fn().mockResolvedValue({
-              role: "ADMIN",
-              disabledAt: new Date("2026-01-01"),
-            }),
-          },
-        } as unknown as Prisma.TransactionClient;
-
-        expect(
-          await new PrismaAuthzReadRepository(
-            prisma,
-          ).findOrganizationMembership({
-            userId: "alice",
-            organizationId: "org-1",
-          }),
-        ).toEqual({ role: "ADMIN", disabled: true });
+        expect(role).toBe("ADMIN");
       });
     });
 
@@ -70,9 +39,7 @@ describe("PrismaAuthzReadRepository", () => {
         } as unknown as Prisma.TransactionClient;
 
         expect(
-          await new PrismaAuthzReadRepository(
-            prisma,
-          ).findOrganizationMembership({
+          await new PrismaAuthzReadRepository(prisma).findOrganizationRole({
             userId: "alice",
             organizationId: "org-1",
           }),
@@ -106,11 +73,7 @@ describe("PrismaAuthzReadRepository", () => {
         where: {
           organizationId: "org-1",
           userId: "alice",
-          user: {
-            orgMemberships: {
-              some: { organizationId: "org-1", disabledAt: null },
-            },
-          },
+          user: { orgMemberships: { some: { organizationId: "org-1" } } },
         },
         select: {
           role: true,
@@ -160,11 +123,7 @@ describe("PrismaAuthzReadRepository", () => {
             members: {
               some: {
                 userId: "alice",
-                user: {
-                  orgMemberships: {
-                    some: { organizationId: "org-1", disabledAt: null },
-                  },
-                },
+                user: { orgMemberships: { some: { organizationId: "org-1" } } },
               },
             },
           },
@@ -415,9 +374,7 @@ describe("PrismaAuthzReadRepository", () => {
           userId: "alice",
           team: {
             organizationId: "org-1",
-            organization: {
-              members: { some: { userId: "alice", disabledAt: null } },
-            },
+            organization: { members: { some: { userId: "alice" } } },
           },
         },
         select: {

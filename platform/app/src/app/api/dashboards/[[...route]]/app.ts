@@ -60,11 +60,7 @@ secured.access(requires("analytics:view")).get(
     const project = c.get("project");
     const service = c.get("dashboardService");
 
-    // Builder-only: matches the detail read below, which hardcodes the same
-    // narrowing to keep a workbench chart's stored SQL out of the response.
-    const dashboards = await service.getAll(project.id, {
-      builderCountOnly: true,
-    });
+    const dashboards = await service.getAll(project.id);
 
     return c.json({
       data: dashboards.map((d) => ({

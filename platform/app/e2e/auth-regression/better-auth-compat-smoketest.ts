@@ -64,10 +64,6 @@ async function main() {
       userId,
       type: "credential",
       provider: "credential",
-      // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
-      // credential provider's issuer is `local:credential`, not
-      // `local:oauth:credential`. Without it sign-in cannot find this row.
-      issuer: "local:credential",
       providerAccountId: userId,
       password: pw,
     },
@@ -80,7 +76,6 @@ async function main() {
       userId: adminId,
       type: "credential",
       provider: "credential",
-      issuer: "local:credential",
       providerAccountId: adminId,
       password: pw,
     },

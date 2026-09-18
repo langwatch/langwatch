@@ -11,7 +11,7 @@
  * self-hosted distributions) there is no terraform, and this task owns the
  * whole model: it additionally converges the PostgreSQL reader role, the
  * restricted identity, the named collection, and the PostgreSQL-engine
- * tables, from `../server/analytics/lwql/provisioning/selfProvisioning.ts`'s composition.
+ * tables, from `../server/analytics/lwql/selfProvisioning.ts`'s composition.
  * That path is deliberately non-fatal — a default-on feature must never turn
  * a server-side provisioning failure into a boot crashloop; the endpoint
  * simply stays fail-closed ("unavailable") until the next boot converges.
@@ -23,9 +23,9 @@
  * generator emits `IF NOT EXISTS`/`OR REPLACE`/`CREATE OR REPLACE` DDL, and
  * the key-map backfill only inserts rows missing from the table.
  *
- * @see ../server/analytics/lwql/provisioning/productionProvisioning.ts — the pure
+ * @see ../server/analytics/lwql/productionProvisioning.ts — the pure
  *   composition this orchestrates
- * @see ../server/analytics/lwql/provisioning/selfProvisioning.ts — the self-hosted extras
+ * @see ../server/analytics/lwql/selfProvisioning.ts — the self-hosted extras
  * @see ../server/clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
  * @see specs/analytics/lwql-api.feature
  */
@@ -35,24 +35,27 @@ import { createLogger } from "@langwatch/observability";
 import { lwqlConnectionFromEnv } from "../server/analytics/lwql/executor";
 import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../server/analytics/lwql/lwqlKeyMap.repository";
 import {
-  KEY_MAP_COLUMNS,
-  type LangWatchQLNames,
   type LwqlKeyMapBackfillPlan,
-  type LwqlSelfProvisionEnv,
   lwqlKeyMapTableQualifiedName,
-  lwqlPostgresEndpointFromDatabaseUrl,
-  lwqlPostgresReaderModeFromEnv,
   lwqlPostgresSchemaFromDatabaseUrl,
-  lwqlSelfProvisionFromEnv,
   planLwqlKeyMapBackfill,
-  postgresReaderStatementsFor,
   productionClickHouseObjectStatements,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
-  selfHostedClickHouseProvisioningStatements,
-  withLwqlSelfProvisionLock,
+  productionPostgresReaderGrantStatements,
   withTenancyOptOut,
+} from "../server/analytics/lwql/productionProvisioning";
+import {
+  KEY_MAP_COLUMNS,
+  type LangWatchQLNames,
 } from "../server/analytics/lwql/provisioning";
+import {
+  type LwqlSelfProvisionEnv,
+  lwqlPostgresEndpointFromDatabaseUrl,
+  lwqlSelfProvisionFromEnv,
+  selfHostedClickHouseProvisioningStatements,
+  selfHostedPostgresReaderStatements,
+} from "../server/analytics/lwql/selfProvisioning";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
 
@@ -236,54 +239,42 @@ async function selfProvisionAll({
   }
 
   try {
-    // Serialize the destructive convergence across concurrently-booting pods:
-    // the advisory lock is held for the whole transaction, so any other pod
-    // running this task blocks until we release, then re-runs the (idempotent)
-    // convergence itself. The PostgreSQL statements and ClickHouse DDL below
-    // run on their own connections, not `tx` — that is fine, because every pod
-    // gates ENTRY on the same lock, so the sequence is serialized machine-wide.
-    // See selfProvisionLock.ts. A throw here (lock acquisition or body) leaves
-    // the transaction and is caught by the non-fatal handler below, preserving
-    // the boot-never-crashes contract.
-    await withLwqlSelfProvisionLock({ prisma }, async () => {
-      await runPostgresStatements([
-        ...productionPostgresApprovedViewStatements({
-          schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
+    await runPostgresStatements([
+      ...productionPostgresApprovedViewStatements({
+        schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
+      }),
+      // After the views: the reader role's grants name them.
+      ...selfHostedPostgresReaderStatements({
+        schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
+        readerPassword: selfProvision.postgresReaderPassword,
+      }),
+    ]);
+
+    await withAdminClickHouseClient(async (client) => {
+      await runClickHouseStatements({
+        client,
+        statements: selfHostedClickHouseProvisioningStatements({
+          names,
+          restrictedPassword: selfProvision.connection.password,
+          sourceDatabase,
+          postgres: {
+            endpoint,
+            readerPassword: selfProvision.postgresReaderPassword,
+          },
         }),
-        // After the views: the reader role's grants name them.
-        ...postgresReaderStatementsFor({
-          mode: "manage-role",
-          schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
-          readerPassword: selfProvision.postgresReaderPassword,
-        }).statements,
-      ]);
-
-      await withAdminClickHouseClient(async (client) => {
-        await runClickHouseStatements({
-          client,
-          statements: selfHostedClickHouseProvisioningStatements({
-            names,
-            restrictedPassword: selfProvision.connection.password,
-            sourceDatabase,
-            postgres: {
-              endpoint,
-              readerPassword: selfProvision.postgresReaderPassword,
-            },
-          }),
-        });
-
-        // Same non-fatal contract as the explicit path: the backfill is
-        // convergent, so a slow key-map table must not undo the provisioning
-        // above (which this run already committed).
-        try {
-          await backfillKeyMap({ client, names, sourceDatabase });
-        } catch (error) {
-          logger.error(
-            { error: errorMessage(error) },
-            "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
-          );
-        }
       });
+
+      // Same non-fatal contract as the explicit path: the backfill is
+      // convergent, so a slow key-map table must not undo the provisioning
+      // above (which this run already committed).
+      try {
+        await backfillKeyMap({ client, names, sourceDatabase });
+      } catch (error) {
+        logger.error(
+          { error: errorMessage(error) },
+          "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
+        );
+      }
     });
     logger.info("LangWatchQL self-provisioning complete");
   } catch (error) {
@@ -341,53 +332,18 @@ export default async function execute() {
     await runPostgresStatements(
       productionPostgresApprovedViewStatements({ schema: postgresSchema }),
     );
-    // The reader role the named collection dials PostgreSQL as. Two ownership
-    // models on the non-self-provision path, told apart by the EXPLICIT
-    // LWQL_MANAGE_POSTGRES_READER flag (see lwqlPostgresReaderModeFromEnv) —
-    // never by "a password arrived", which the mode selection at the top of this
-    // task forbids and which SaaS/terraform (it may set the reader password for
-    // its own uses) would otherwise trip:
-    //   - "manage-role" — chart-managed ClickHouse PAIRED WITH chart-managed
-    //     PostgreSQL (Helm, issue #6635): nothing else creates the reader, so
-    //     the chart hands us LWQL_MANAGE_POSTGRES_READER=true plus the reader
-    //     password and the app converges lwql_ro here (the same Secret key the
-    //     subchart mounts the collection's password from) before ClickHouse
-    //     dials it. Shares selfProvisioning's builder so the role's isolation
-    //     (read-only, statement timeout, connection budget, approved-view-only
-    //     grants) is identical to the self-provisioned server's.
-    //   - "grants-only" — SaaS/terraform, or an operator-owned external
-    //     PostgreSQL: the reader role is owned out of band and the app holds no
-    //     mandate to touch it, so it only re-issues the view grants against
-    //     whatever views exist now (a view added by this deploy would otherwise
-    //     have no grant until someone re-ran the out-of-band job). A no-op where
-    //     the role is absent. Running CREATE/ALTER ROLE here would either
-    //     crashloop a default-on feature (a non-superuser DATABASE_URL) or
-    //     silently rotate the operator's own reader password.
-    const readerMode = lwqlPostgresReaderModeFromEnv();
-    // The two modes take different inputs (manage-role converges the dedicated
-    // lwql_ro reader from the password alone; grants-only re-grants a
-    // caller-named role), so dispatch per arm rather than passing a role that
-    // the manage-role arm would ignore. On manage-role WITH a password, role is
-    // simply not passed (the app always converges lwql_ro there). On manage-role
-    // WITHOUT a password, the grants-only fallback grants the DEFAULT lwql_ro
-    // role, not LWQL_POSTGRES_READER_ROLE — the chart never sets that env var on
-    // this path, so passing it through would silently grant nothing.
-    const readerResult =
-      readerMode === "manage-role"
-        ? postgresReaderStatementsFor({
-            mode: "manage-role",
-            readerPassword: process.env.LWQL_POSTGRES_READER_PASSWORD,
-            schema: postgresSchema,
-          })
-        : postgresReaderStatementsFor({
-            mode: "grants-only",
-            schema: postgresSchema,
-            role: process.env.LWQL_POSTGRES_READER_ROLE,
-          });
-    if (readerResult.warningMessage) {
-      logger.warn(readerResult.warningMessage);
-    }
-    await runPostgresStatements(readerResult.statements);
+    // Immediately after creation, in the same step: the reader role is
+    // provisioned out of band and its grants were issued against whatever
+    // views existed then, so a view added by this deploy would otherwise have
+    // no grant on it and every query touching it would fail ACCESS_DENIED
+    // until someone re-ran the out-of-band job by hand. A no-op where the
+    // role does not exist.
+    await runPostgresStatements(
+      productionPostgresReaderGrantStatements({
+        schema: postgresSchema,
+        role: process.env.LWQL_POSTGRES_READER_ROLE,
+      }),
+    );
   } catch (error) {
     logger.error(
       { error },

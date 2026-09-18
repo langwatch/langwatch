@@ -195,11 +195,24 @@ const blankComposer = (): ComposerState => ({
 
 function AnomalyRulesHeader() {
   return (
-    <HStack gap={2}>
-      <Heading size="md">Anomaly Rules</Heading>
-      <Badge colorPalette="purple" size="sm" variant="surface">
-        Preview
-      </Badge>
+    <HStack alignItems="end">
+      <VStack align="start" gap={1}>
+        <HStack gap={2}>
+          <Heading size="md">Anomaly Rules</Heading>
+          <Badge colorPalette="purple" size="sm" variant="surface">
+            Preview
+          </Badge>
+        </HStack>
+        <Text color="fg.muted" fontSize="sm" maxW="3xl">
+          Define thresholds that page on-call when activity drifts. Rules
+          surface on the{" "}
+          <Link href="/governance" color="blue.600">
+            governance overview
+          </Link>{" "}
+          once they fire.
+        </Text>
+      </VStack>
+      <Spacer />
     </HStack>
   );
 }
@@ -662,13 +675,9 @@ function RuleRow({
 
 const SOURCE_TYPE_PICKER_OPTIONS = [
   { value: "otel_generic", label: "Generic OTel (otel_generic)" },
-  { value: "claude_code", label: "Claude Code (claude_code)" },
   { value: "claude_cowork", label: "Claude Cowork (claude_cowork)" },
   { value: "workato", label: "Workato (workato)" },
-  {
-    value: "copilot_studio_dataverse",
-    label: "Microsoft Copilot Studio (copilot_studio_dataverse)",
-  },
+  { value: "copilot_studio", label: "Copilot Studio (copilot_studio)" },
   {
     value: "openai_compliance",
     label: "OpenAI Compliance (openai_compliance)",
@@ -677,16 +686,7 @@ const SOURCE_TYPE_PICKER_OPTIONS = [
     value: "claude_compliance",
     label: "Claude Compliance (claude_compliance)",
   },
-  {
-    value: "anthropic_admin",
-    label: "Anthropic Admin (anthropic_admin)",
-  },
-  {
-    value: "databricks_genie",
-    label: "Databricks Genie (databricks_genie)",
-  },
   { value: "s3_custom", label: "S3 Custom (s3_custom)" },
-  { value: "http_custom", label: "Custom HTTP (http_custom)" },
 ];
 
 function RuleComposer({

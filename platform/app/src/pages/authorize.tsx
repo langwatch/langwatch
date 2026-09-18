@@ -8,8 +8,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { CopyInput } from "../components/CopyInput";
-import { DashboardLayout } from "../components/DashboardLayout";
-import { ProjectSelector } from "../components/ProjectSelector";
+import {
+  DashboardLayout,
+  ProjectSelector,
+} from "../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { trackEvent } from "../utils/tracking";
 

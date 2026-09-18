@@ -30,6 +30,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
+import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const enterpriseGate = requireEnterprisePlan(
@@ -136,7 +137,7 @@ function toDto(row: {
 export const anomalyRulesRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .permission("anomalyRules:view")
+    .use(checkOrganizationPermission("anomalyRules:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
@@ -146,7 +147,7 @@ export const anomalyRulesRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .permission("anomalyRules:view")
+    .use(checkOrganizationPermission("anomalyRules:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
@@ -172,7 +173,7 @@ export const anomalyRulesRouter = createTRPCRouter({
         status: statusSchema.optional(),
       }),
     )
-    .permission("anomalyRules:manage")
+    .use(checkOrganizationPermission("anomalyRules:manage"))
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
@@ -212,7 +213,7 @@ export const anomalyRulesRouter = createTRPCRouter({
         status: statusSchema.optional(),
       }),
     )
-    .permission("anomalyRules:manage")
+    .use(checkOrganizationPermission("anomalyRules:manage"))
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
@@ -240,7 +241,7 @@ export const anomalyRulesRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .permission("anomalyRules:manage")
+    .use(checkOrganizationPermission("anomalyRules:manage"))
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);

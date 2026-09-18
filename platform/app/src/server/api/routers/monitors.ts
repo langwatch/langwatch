@@ -4,9 +4,7 @@ import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";
 import { EvaluationExecutionMode, Prisma } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer";
-import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
 import { MonitorEvaluatorRequiredError } from "~/server/app-layer/monitors/errors";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import {
@@ -17,6 +15,7 @@ import {
 import { getEvaluatorDefinitions } from "../../evaluations/getEvaluator";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { currentVsPreviousDates } from "./analytics/common";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
@@ -95,7 +94,7 @@ const findUniqueMonitorName = async (
 export const monitorsRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("evaluations:view")
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -115,12 +114,8 @@ export const monitorsRouter = createTRPCRouter({
         timeZone: z.string().min(1).max(100).optional(),
       }),
     )
-    .permission("evaluations:view")
-    // BOTH permissions are required: the declared check above satisfies the
-    // builder, and this second one stacks the same middleware by hand — the
-    // one AND-composition site in the codebase.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    .use(checkDeclaredPermission({ permission: "analytics:view" }) as any)
+    .use(checkProjectPermission("evaluations:view"))
+    .use(checkProjectPermission("analytics:view"))
     .query(async ({ input, ctx }) => {
       const monitors = await ctx.prisma.monitor.findMany({
         where: { projectId: input.projectId },
@@ -159,7 +154,7 @@ export const monitorsRouter = createTRPCRouter({
     .input(
       z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() }),
     )
-    .permission("evaluations:update")
+    .use(checkProjectPermission("evaluations:update"))
     .mutation(async ({ input, ctx }) => {
       const { id, enabled, projectId } = input;
       const prisma = ctx.prisma;
@@ -191,7 +186,7 @@ export const monitorsRouter = createTRPCRouter({
         threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
       }),
     )
-    .permission("evaluations:create")
+    .use(checkProjectPermission("evaluations:create"))
     .mutation(async ({ input, ctx }) => {
       const {
         projectId,
@@ -262,12 +257,12 @@ export const monitorsRouter = createTRPCRouter({
         sourceProjectId: z.string(),
       }),
     )
-    .permission("evaluations:manage")
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ input, ctx }) => {
       const { monitorId, projectId, sourceProjectId } = input;
       const prisma = ctx.prisma;
 
-      const hasSourcePermission = await probeProjectPermission(
+      const hasSourcePermission = await hasProjectPermission(
         ctx,
         sourceProjectId,
         "evaluations:manage",
@@ -378,7 +373,7 @@ export const monitorsRouter = createTRPCRouter({
         threadIdleTimeout: z.number().int().positive().nullable().optional(), // Seconds to wait after last message before evaluating thread
       }),
     )
-    .permission("evaluations:update")
+    .use(checkProjectPermission("evaluations:update"))
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -442,7 +437,7 @@ export const monitorsRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .permission("evaluations:view")
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;
@@ -463,7 +458,7 @@ export const monitorsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .permission("evaluations:delete")
+    .use(checkProjectPermission("evaluations:delete"))
     .mutation(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;
@@ -482,7 +477,7 @@ export const monitorsRouter = createTRPCRouter({
         name: z.string(),
       }),
     )
-    .permission("evaluations:view")
+    .use(checkProjectPermission("evaluations:view"))
     .mutation(async ({ input, ctx }) => {
       const { projectId, name } = input;
       const prisma = ctx.prisma;

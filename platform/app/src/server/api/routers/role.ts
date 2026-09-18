@@ -1,73 +1,17 @@
-import { ledgerActorFor } from "@langwatch/actor";
-import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
-import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
-import type { Session } from "~/server/auth";
+import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { permissionFormatSchema } from "../../rbac/custom-role-permissions";
 import { RoleService } from "../../role";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
+import {
+  checkOrganizationPermission,
+  checkTeamPermission,
+  hasOrganizationPermission,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const permissionSchema = permissionFormatSchema;
-
-type RoleMiddlewareCtx = {
-  prisma: PrismaClient;
-  session: Session;
-  permissionChecked: boolean;
-};
-
-/**
- * The role's organization is data loaded by the role id, so the check runs
- * there — one declared middleware instead of four inline copies. The
- * permission check runs BEFORE any plan assertion so a denial never reveals
- * plan details.
- */
-const roleOrganizationPermission = ({
-  permission,
-  enterprise = false,
-}: {
-  permission: "organization:view" | "organization:manage";
-  enterprise?: boolean;
-}) =>
-  declareAuthzMiddleware(
-    {
-      kind: "custom",
-      reason:
-        "the role's organization is loaded by its id; the check runs there",
-      permissions: [permission],
-    },
-    async ({
-      ctx,
-      input,
-      next,
-    }: {
-      ctx: RoleMiddlewareCtx;
-      input: { roleId: string };
-      next: () => Promise<unknown>;
-    }) => {
-      const role = await new RoleService(ctx.prisma).getRoleById(input.roleId);
-      if (
-        !(await probeOrganizationPermission(
-          ctx,
-          role.organizationId,
-          permission,
-        ))
-      ) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
-      if (enterprise) {
-        await assertEnterprisePlan({
-          organizationId: role.organizationId,
-          user: ctx.session.user,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-        });
-      }
-      ctx.permissionChecked = true;
-      return next();
-    },
-  );
 
 export const roleRouter = createTRPCRouter({
   getAll: protectedProcedure
@@ -78,7 +22,7 @@ export const roleRouter = createTRPCRouter({
     // GroupBindingInputRow) live in admin-context flows that already
     // require manage anyway, so the bump is invisible to legitimate UX
     // and closes a member-session direct-curl exfil path.
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
       return roleService.getAllRoles(input.organizationId);
@@ -86,7 +30,25 @@ export const roleRouter = createTRPCRouter({
 
   getById: protectedProcedure
     .input(z.object({ roleId: z.string() }))
-    .use(roleOrganizationPermission({ permission: "organization:view" }))
+    .use(async ({ ctx, input, next }) => {
+      // Need to fetch role first to check organization permission
+      const roleService = new RoleService(ctx.prisma);
+      const role = await roleService.getRoleById(input.roleId);
+
+      // Check if user has permission for this organization
+      const hasPermission = await hasOrganizationPermission(
+        ctx,
+        role.organizationId,
+        "organization:view",
+      );
+
+      if (!hasPermission) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
+      ctx.permissionChecked = true;
+      return next();
+    })
     .query(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
       return await roleService.getRoleById(input.roleId);
@@ -101,7 +63,7 @@ export const roleRouter = createTRPCRouter({
         permissions: z.array(permissionSchema),
       }),
     )
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,
@@ -133,12 +95,31 @@ export const roleRouter = createTRPCRouter({
         permissions: z.array(permissionSchema).optional(),
       }),
     )
-    .use(
-      roleOrganizationPermission({
-        permission: "organization:manage",
-        enterprise: true,
-      }),
-    )
+    .use(async ({ ctx, input, next }) => {
+      // Fetch role to get organizationId for permission check
+      const roleService = new RoleService(ctx.prisma);
+      const role = await roleService.getRoleById(input.roleId);
+
+      // Check permission before revealing plan details
+      const hasPermission = await hasOrganizationPermission(
+        ctx,
+        role.organizationId,
+        "organization:manage",
+      );
+
+      if (!hasPermission) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
+      await assertEnterprisePlan({
+        organizationId: role.organizationId,
+        user: ctx.session.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
+
+      ctx.permissionChecked = true;
+      return next();
+    })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
       return await roleService.updateRole({
@@ -157,7 +138,25 @@ export const roleRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ roleId: z.string() }))
-    .use(roleOrganizationPermission({ permission: "organization:manage" }))
+    .use(async ({ ctx, input, next }) => {
+      // Fetch role to get organizationId for permission check
+      const roleService = new RoleService(ctx.prisma);
+      const role = await roleService.getRoleById(input.roleId);
+
+      // Check if user has permission for this organization
+      const hasPermission = await hasOrganizationPermission(
+        ctx,
+        role.organizationId,
+        "organization:manage",
+      );
+
+      if (!hasPermission) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
+      ctx.permissionChecked = true;
+      return next();
+    })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
       return await roleService.deleteRole({
@@ -177,25 +176,37 @@ export const roleRouter = createTRPCRouter({
         customRoleId: z.string(),
       }),
     )
-    // The declared form of the check the old custom middleware hand-rolled:
-    // resolve the team's organization from its id and require
-    // organization:manage there. The permission runs before the plan gate,
-    // so plan detail is never revealed to a caller who couldn't manage.
-    .permission("organization:manage", { via: "teamId" })
-    .mutation(async ({ ctx, input }) => {
+    .use(async ({ ctx, input, next }) => {
       const team = await ctx.prisma.team.findUnique({
         where: { id: input.teamId },
         select: { organizationId: true },
       });
+
       if (!team) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
       }
+
+      // Check permission before revealing plan details
+      const hasPermission = await hasOrganizationPermission(
+        ctx,
+        team.organizationId,
+        "organization:manage",
+      );
+
+      if (!hasPermission) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
       await assertEnterprisePlan({
         organizationId: team.organizationId,
         user: ctx.session.user,
         errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
       });
 
+      ctx.permissionChecked = true;
+      return next();
+    })
+    .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
       return await roleService.assignRoleToUser({
         userId: input.userId,
@@ -216,7 +227,7 @@ export const roleRouter = createTRPCRouter({
         customRoleId: z.string(),
       }),
     )
-    .permission("organization:manage", { via: "teamId" })
+    .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
       return await roleService.removeRoleFromUser({

@@ -5,7 +5,6 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { evaluatorsRouter } from "../evaluators";
 
@@ -43,10 +42,7 @@ const prisma = {
     }),
   },
   organizationUser: {
-    findFirst: vi.fn().mockResolvedValue({
-      role: OrganizationUserRole.ADMIN,
-      disabledAt: null,
-    }),
+    findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.ADMIN }),
   },
   groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
   roleBinding: {
@@ -66,7 +62,6 @@ const createCaller = () => {
     permissionChecked: true,
   });
   ctx.prisma = prisma;
-  ctx.app = { permissions: permissionsServiceFor(prisma) } as never;
   return evaluatorsRouter.createCaller(ctx);
 };
 

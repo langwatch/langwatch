@@ -44,29 +44,25 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    hasOrganizationPermission: vi.fn(
-      async (_ctx: unknown, _organizationId: string, permission: string) => {
+    checkOrganizationPermission:
+      (permission: string) =>
+      async ({ ctx, next }: any) => {
         seenPermissions.push(permission);
-        return !denied.has(permission);
+        if (denied.has(permission)) {
+          throw Object.assign(new Error("denied"), { code: "UNAUTHORIZED" });
+        }
+        ctx.permissionChecked = true;
+        return next();
       },
-    ),
   };
 });
 
 const getActivePlan = vi.fn();
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return {
-    // Consumers that degrade without Redis read through this one.
-    tryGetApp: () => null,
-    getApp: () => ({
-      permissions: appPermissionsService(),
-      planProvider: { getActivePlan },
-    }),
-  };
-});
+vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
+  getApp: () => ({ planProvider: { getActivePlan } }),
+}));
 
 const ENDPOINT_ROW = {
   id: "whep_1",
@@ -140,7 +136,7 @@ describe("webhookEndpointsRouter", () => {
         url: "https://example.com/hook",
         enabledEvents: ["gateway.request.completed"],
       }),
-    ).rejects.toThrow("You do not have permission");
+    ).rejects.toThrow("denied");
     expect((prisma as any).webhookEndpoint.create).not.toHaveBeenCalled();
   });
 

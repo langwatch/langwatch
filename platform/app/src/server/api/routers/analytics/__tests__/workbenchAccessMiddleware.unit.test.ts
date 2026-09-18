@@ -57,7 +57,6 @@ describe("the workbench feature gate", () => {
         "delete",
         "getAll",
         "getById",
-        "run",
         "update",
       ]);
       // And the closure: a sixth procedure added without the gate fails here.

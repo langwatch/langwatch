@@ -10,7 +10,7 @@ import {
   type RawOutputFlags,
 } from "../../utils/output";
 import { createCommandEvents } from "../../telemetry/events";
-import { cliAuthHeaders } from "../../utils/authHeaders";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 /** Bound each page request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -127,7 +127,7 @@ const fetchAllSessionEvents = async ({
     const response = await fetch(
       `${endpoint}/api/coding-agent/sessions/${encodeURIComponent(sessionId)}/events?${params}`,
       {
-        headers: cliAuthHeaders({ apiKey }),
+        headers: buildAuthHeaders({ apiKey }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       },
     );
@@ -163,12 +163,9 @@ export const sessionEventsCommand = async (
     limit?: string;
     from?: string;
     to?: string;
-    project?: string;
   } & RawOutputFlags,
 ): Promise<void> => {
-  const { apiKey, endpoint } = await resolveCredentials({
-    project: options.project,
-  });
+  const { apiKey, endpoint } = await resolveCredentials();
 
   const limit = parseLimitOption(options.limit);
   const fromMs = parseTimeOption(options.from, "--from");

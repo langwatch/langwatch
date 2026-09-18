@@ -1,5 +1,4 @@
 import { featureFlagService } from "~/server/featureFlag";
-import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { LANGY_RELEASE_FLAG } from "~/utils/langyReleaseFlag";
 
 type LangyAccessUser = {
@@ -40,7 +39,7 @@ export async function hasLangyAccess({
 }): Promise<boolean> {
   return flags.isEnabled(LANGY_RELEASE_FLAG, {
     distinctId: user.id,
-    projectId: projectId ?? NOT_TARGETED,
-    organizationId: organizationId ?? NOT_TARGETED,
+    ...(projectId ? { projectId } : {}),
+    ...(organizationId ? { organizationId } : {}),
   });
 }

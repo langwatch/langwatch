@@ -2,25 +2,21 @@ import type {
   ModelDefaultScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
-import {
-  probeOrganizationPermission,
-  probeProjectPermission,
-  probeTeamPermission,
-} from "~/server/app-layer/permissions/imperative";
 
 import type { Session } from "~/server/auth";
-import { batchScopePermissions } from "../api/rbac";
+import {
+  batchScopePermissions,
+  hasOrganizationPermission,
+  hasProjectPermission,
+  hasTeamPermission,
+} from "../api/rbac";
 import {
   allFeatures,
   featureByKey,
   MODEL_ROLES,
   type ModelRole,
 } from "./featureRegistry";
-import {
-  type ResolutionScope,
-  type ResolutionSource,
-  resolveModelForFeature,
-} from "./resolveModelForFeature";
+import { resolveModelForFeature } from "./resolveModelForFeature";
 import { buildSeedPlanForProvider } from "./seedOnboardingDefaults";
 
 export type ReadCtx = {
@@ -35,16 +31,10 @@ export type ScopeRef = {
   scopeId: string;
 };
 
-/**
- * What the cascade resolved for one feature key. `source` and `scope` carry
- * the resolver's own literals, so a caller that branches on them (the
- * make-default offer, for one) fails to compile if the resolver ever renames
- * a slug, instead of quietly going dead.
- */
 export type DefaultModelEffective = {
   model: string;
-  source: ResolutionSource;
-  scope: ResolutionScope;
+  source: string;
+  scope: string | null;
 };
 
 export type ConfigSnapshotScope = {
@@ -191,7 +181,7 @@ export async function getDefaultModelsSnapshot(
   let writableTeams: { id: string; name: string }[] = [];
   let writableProjects: { id: string; name: string; teamId: string }[] = [];
   if (organizationId) {
-    canWriteOrg = await probeOrganizationPermission(
+    canWriteOrg = await hasOrganizationPermission(
       ctx as { prisma: PrismaClient; session: Session },
       organizationId,
       "organization:manage",
@@ -232,7 +222,7 @@ export async function getDefaultModelsSnapshot(
       .map(({ id, name, teamId: tid }) => ({ id, name, teamId: tid }));
   } else {
     // Personal-account project (no org/team): only project scope.
-    const writable = await probeProjectPermission(
+    const writable = await hasProjectPermission(
       ctx,
       projectId,
       "project:update",
@@ -265,7 +255,7 @@ export async function getDefaultModelsSnapshot(
   // permission on — that would leak the org-wide policy landscape.
   const canReadOrg =
     !!organizationId &&
-    (await probeOrganizationPermission(
+    (await hasOrganizationPermission(
       ctx as { prisma: PrismaClient; session: Session },
       organizationId,
       "organization:view",
@@ -308,7 +298,7 @@ export async function getDefaultModelsSnapshot(
       .filter((p) => projectReadBatch.projects.get(p.id))
       .map((p) => p.id);
   } else if (teamId) {
-    const teamReadable = await probeTeamPermission(ctx, teamId, "team:view");
+    const teamReadable = await hasTeamPermission(ctx, teamId, "team:view");
     if (teamReadable) readableTeamIds = [teamId];
   }
 

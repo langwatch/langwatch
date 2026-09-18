@@ -149,31 +149,12 @@ export const DrawerCloseTrigger = React.forwardRef<
  *
  * All defaults can be overridden by passing props explicitly.
  */
-/**
- * The width steps this product adds on top of Chakra's own, named in
- * `src/theme/recipes/drawer.ts`.
- *
- * Chakra generates the type of `size` from its own recipe, so a step the
- * product adds is unknown to it. The wrapper carries the product's list and
- * hands the name down, which is why a drawer sets a width by name here and
- * never with a maxWidth of its own.
- */
-export type AppDrawerSize = NonNullable<ChakraDrawer.RootProps["size"]> | "2xl";
-
-export interface DrawerRootProps extends Omit<ChakraDrawer.RootProps, "size"> {
-  size?: AppDrawerSize;
-}
-
-export const DrawerRoot = function DrawerRoot({
-  size,
-  ...props
-}: DrawerRootProps) {
+export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
   return (
     <ChakraDrawer.Root
       modal={false}
       closeOnInteractOutside={false}
       preventScroll={false}
-      size={size as ChakraDrawer.RootProps["size"]}
       {...props}
     />
   );

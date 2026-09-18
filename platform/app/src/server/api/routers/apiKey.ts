@@ -10,6 +10,7 @@ import {
   refineRestrictedPermissions,
 } from "~/server/api-key/restricted-permissions";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+import { skipPermissionCheck } from "../rbac";
 
 function mapApiKeyHandledError(error: unknown): never {
   if (HandledError.isHandled(error)) {
@@ -69,7 +70,7 @@ const roleBindingSchema = z.object({
   scopeId: z.string(),
 });
 
-// RBAC is intentionally bypassed via .noPermission() on all endpoints.
+// RBAC is intentionally bypassed via skipPermissionCheck on all endpoints.
 // Authorization is handled at the service layer: ensureCallerIsOrgMember + isOrgAdmin.
 export const apiKeyRouter = createTRPCRouter({
   /**
@@ -78,11 +79,11 @@ export const apiKeyRouter = createTRPCRouter({
    */
   myBindings: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .noPermission({
-      reason:
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself",
-      allow: { organizationId: "listing caller's own role bindings" },
-    })
+    .use(
+      skipPermissionCheck({
+        allow: { organizationId: "listing caller's own role bindings" },
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(
@@ -140,13 +141,13 @@ export const apiKeyRouter = createTRPCRouter({
    */
   nameById: protectedProcedure
     .input(z.object({ organizationId: z.string(), apiKeyId: z.string() }))
-    .noPermission({
-      reason:
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself",
-      allow: {
-        organizationId: "naming an API key the caller can already see",
-      },
-    })
+    .use(
+      skipPermissionCheck({
+        allow: {
+          organizationId: "naming an API key the caller can already see",
+        },
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(
@@ -165,11 +166,11 @@ export const apiKeyRouter = createTRPCRouter({
    */
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .noPermission({
-      reason:
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself",
-      allow: { organizationId: "listing API keys" },
-    })
+    .use(
+      skipPermissionCheck({
+        allow: { organizationId: "listing API keys" },
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(
@@ -277,11 +278,11 @@ export const apiKeyRouter = createTRPCRouter({
         })
         .superRefine(refineRestrictedPermissions),
     )
-    .noPermission({
-      reason:
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself",
-      allow: { organizationId: "creating API key for user's own org" },
-    })
+    .use(
+      skipPermissionCheck({
+        allow: { organizationId: "creating API key for user's own org" },
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(
@@ -368,11 +369,11 @@ export const apiKeyRouter = createTRPCRouter({
         })
         .superRefine(refineRestrictedPermissions),
     )
-    .noPermission({
-      reason:
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself",
-      allow: { organizationId: "updating API key" },
-    })
+    .use(
+      skipPermissionCheck({
+        allow: { organizationId: "updating API key" },
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(
@@ -426,11 +427,11 @@ export const apiKeyRouter = createTRPCRouter({
         apiKeyId: z.string(),
       }),
     )
-    .noPermission({
-      reason:
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself",
-      allow: { organizationId: "revoking API key" },
-    })
+    .use(
+      skipPermissionCheck({
+        allow: { organizationId: "revoking API key" },
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(
@@ -468,11 +469,11 @@ export const apiKeyRouter = createTRPCRouter({
    */
   orgProjects: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .noPermission({
-      reason:
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself",
-      allow: { organizationId: "listing org projects for permission picker" },
-    })
+    .use(
+      skipPermissionCheck({
+        allow: { organizationId: "listing org projects for permission picker" },
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(
@@ -487,11 +488,11 @@ export const apiKeyRouter = createTRPCRouter({
 
   orgTeams: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .noPermission({
-      reason:
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself",
-      allow: { organizationId: "listing org teams for scope picker" },
-    })
+    .use(
+      skipPermissionCheck({
+        allow: { organizationId: "listing org teams for scope picker" },
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(
@@ -506,11 +507,11 @@ export const apiKeyRouter = createTRPCRouter({
 
   orgMembers: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .noPermission({
-      reason:
-        "personal API keys are the caller's own; the handler proves organization membership and ownership itself",
-      allow: { organizationId: "listing org members for key assignment" },
-    })
+    .use(
+      skipPermissionCheck({
+        allow: { organizationId: "listing org members for key assignment" },
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       await ensureCallerIsOrgMember(

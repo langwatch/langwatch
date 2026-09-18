@@ -20,7 +20,6 @@
 
 import { type Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { createLogger } from "@langwatch/observability";
 import { createReadStream, createWriteStream } from "fs";
 import fs from "fs/promises";
 import { nanoid } from "nanoid";
@@ -46,8 +45,6 @@ import {
   UploadTooLargeError,
 } from "./errors";
 import { localStagingUploadPath, stagingUploadKey } from "./presigned-upload";
-
-const logger = createLogger("langwatch:datasets:local-storage");
 
 export class LocalDatasetStorage implements DatasetStorage {
   /**
@@ -86,17 +83,12 @@ export class LocalDatasetStorage implements DatasetStorage {
   }
 
   /**
-   * Turn a raw FS permission failure (EACCES/EROFS/EPERM) into the handled
-   * `storage_not_writable` refusal; rethrow anything else. Born-on-storage made
-   * a writable backend mandatory, so an unwritable root (e.g. the default
-   * `/var/lib/langwatch/objects` on an install that never provisioned it) is a
-   * deployment-config error, not a transient failure. Shared by `writeChunks`
-   * and `putStaged`.
-   *
-   * The root and the two environment variables that set it go in this log line
-   * and in the error's tips, where an operator reads them. They must not ride
-   * the error message: the REST boundary ships that message in the response
-   * body.
+   * Turn a raw FS permission failure (EACCES/EROFS/EPERM) into an actionable
+   * error pointing at the two ways to fix it; rethrow anything else. Born-on-
+   * storage made a writable backend mandatory, so an unwritable root (e.g. the
+   * default `/var/lib/langwatch/objects` on an install that never provisioned
+   * it) must surface a clear message, not a cryptic 500 on every write. Shared
+   * by `writeChunks` and `putStaged`.
    */
   private rethrowWritable(error: unknown): never {
     if (
@@ -104,11 +96,11 @@ export class LocalDatasetStorage implements DatasetStorage {
       errorHasProp(error, "code", "EROFS") ||
       errorHasProp(error, "code", "EPERM")
     ) {
-      logger.error(
-        { root: this.root, error },
-        `Dataset storage path "${this.root}" is not writable. Configure object storage (set S3_BUCKET_NAME) or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.`,
+      throw new StorageNotWritableError(
+        `Dataset storage path "${this.root}" is not writable. ` +
+          "Configure object storage (set S3_BUCKET_NAME) or point " +
+          "LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.",
       );
-      throw new StorageNotWritableError();
     }
     throw error;
   }

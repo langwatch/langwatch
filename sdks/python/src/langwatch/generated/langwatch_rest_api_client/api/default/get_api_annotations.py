@@ -6,29 +6,14 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.annotation import Annotation
 from ...models.error import Error
-from ...models.get_api_annotations_anchor import GetApiAnnotationsAnchor
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
-def _get_kwargs(
-    *,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
-) -> dict[str, Any]:
-
-    params: dict[str, Any] = {}
-
-    json_anchor: str | Unset = UNSET
-    if not isinstance(anchor, Unset):
-        json_anchor = anchor.value
-
-    params["anchor"] = json_anchor
-
-    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+def _get_kwargs() -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/api/annotations",
-        "params": params,
     }
 
     return _kwargs
@@ -75,12 +60,8 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
 ) -> Response[Error | list[Annotation]]:
     """Returns all annotations for project
-
-    Args:
-        anchor (GetApiAnnotationsAnchor | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -90,9 +71,7 @@ def sync_detailed(
         Response[Error | list[Annotation]]
     """
 
-    kwargs = _get_kwargs(
-        anchor=anchor,
-    )
+    kwargs = _get_kwargs()
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -104,12 +83,8 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
 ) -> Error | list[Annotation] | None:
     """Returns all annotations for project
-
-    Args:
-        anchor (GetApiAnnotationsAnchor | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -121,19 +96,14 @@ def sync(
 
     return sync_detailed(
         client=client,
-        anchor=anchor,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
 ) -> Response[Error | list[Annotation]]:
     """Returns all annotations for project
-
-    Args:
-        anchor (GetApiAnnotationsAnchor | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -143,9 +113,7 @@ async def asyncio_detailed(
         Response[Error | list[Annotation]]
     """
 
-    kwargs = _get_kwargs(
-        anchor=anchor,
-    )
+    kwargs = _get_kwargs()
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -155,12 +123,8 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
 ) -> Error | list[Annotation] | None:
     """Returns all annotations for project
-
-    Args:
-        anchor (GetApiAnnotationsAnchor | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -173,6 +137,5 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
-            anchor=anchor,
         )
     ).parsed

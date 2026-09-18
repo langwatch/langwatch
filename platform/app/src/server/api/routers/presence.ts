@@ -12,6 +12,7 @@ import {
   presenceCursorPayloadSchema,
   presenceLocationSchema,
 } from "~/server/app-layer/presence/types";
+import { checkProjectPermission } from "../rbac";
 
 const logger = createLogger("langwatch:api:presence");
 
@@ -31,7 +32,7 @@ export const presenceRouter = createTRPCRouter({
         location: presenceLocationSchema,
       }),
     )
-    .permission("traces:view")
+    .use(checkProjectPermission("traces:view"))
     .mutation(async ({ input, ctx }) => {
       if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
         return { ok: true as const };
@@ -53,7 +54,7 @@ export const presenceRouter = createTRPCRouter({
   /** Remove a session immediately and notify peers. */
   leave: protectedProcedure
     .input(sessionInput)
-    .permission("traces:view")
+    .use(checkProjectPermission("traces:view"))
     .mutation(async ({ input, ctx }) => {
       if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
         return { ok: true as const };
@@ -72,7 +73,7 @@ export const presenceRouter = createTRPCRouter({
    */
   onPresenceUpdate: protectedProcedure
     .input(projectInput)
-    .permission("traces:view")
+    .use(checkProjectPermission("traces:view"))
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
       const app = getApp();
@@ -141,7 +142,7 @@ export const presenceRouter = createTRPCRouter({
         payload: presenceCursorPayloadSchema,
       }),
     )
-    .permission("traces:view")
+    .use(checkProjectPermission("traces:view"))
     .mutation(async ({ input, ctx }) => {
       if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
         return { ok: true as const };
@@ -173,7 +174,7 @@ export const presenceRouter = createTRPCRouter({
         sessionId: z.string().min(1),
       }),
     )
-    .permission("traces:view")
+    .use(checkProjectPermission("traces:view"))
     .subscription(async function* (opts) {
       const { projectId, anchor, sessionId } = opts.input;
 

@@ -114,7 +114,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     window: GetApiGatewayV1EndUsersByIdSpendWindow | Unset = GetApiGatewayV1EndUsersByIdSpendWindow.MONTH,
     from_: int | Unset = UNSET,
     to: int | Unset = UNSET,
@@ -129,9 +129,8 @@ def sync_detailed(
     """Read one end user's spend
 
      Windowed spend rollup for one external end user across the organization (the /customer/info-style
-    read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this
-    end user, each with its limit and the spend against it. It is an empty array until such a budget
-    template applies, never null.
+    read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its
+    remaining headroom once such a budget template applies; null until then.
 
     Args:
         id (str):
@@ -167,7 +166,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     window: GetApiGatewayV1EndUsersByIdSpendWindow | Unset = GetApiGatewayV1EndUsersByIdSpendWindow.MONTH,
     from_: int | Unset = UNSET,
     to: int | Unset = UNSET,
@@ -183,9 +182,8 @@ def sync(
     """Read one end user's spend
 
      Windowed spend rollup for one external end user across the organization (the /customer/info-style
-    read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this
-    end user, each with its limit and the spend against it. It is an empty array until such a budget
-    template applies, never null.
+    read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its
+    remaining headroom once such a budget template applies; null until then.
 
     Args:
         id (str):
@@ -216,7 +214,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     window: GetApiGatewayV1EndUsersByIdSpendWindow | Unset = GetApiGatewayV1EndUsersByIdSpendWindow.MONTH,
     from_: int | Unset = UNSET,
     to: int | Unset = UNSET,
@@ -231,9 +229,8 @@ async def asyncio_detailed(
     """Read one end user's spend
 
      Windowed spend rollup for one external end user across the organization (the /customer/info-style
-    read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this
-    end user, each with its limit and the spend against it. It is an empty array until such a budget
-    template applies, never null.
+    read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its
+    remaining headroom once such a budget template applies; null until then.
 
     Args:
         id (str):
@@ -267,7 +264,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     window: GetApiGatewayV1EndUsersByIdSpendWindow | Unset = GetApiGatewayV1EndUsersByIdSpendWindow.MONTH,
     from_: int | Unset = UNSET,
     to: int | Unset = UNSET,
@@ -283,9 +280,8 @@ async def asyncio(
     """Read one end user's spend
 
      Windowed spend rollup for one external end user across the organization (the /customer/info-style
-    read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this
-    end user, each with its limit and the spend against it. It is an empty array until such a budget
-    template applies, never null.
+    read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its
+    remaining headroom once such a budget template applies; null until then.
 
     Args:
         id (str):

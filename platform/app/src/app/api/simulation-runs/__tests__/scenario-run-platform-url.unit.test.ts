@@ -12,13 +12,12 @@ describe("scenarioRunPlatformUrl", () => {
     mockEnv.BASE_HOST = "https://app.langwatch.ai";
   });
 
-  describe("given a project that reads the Simulations pages", () => {
+  describe("given a scenario run", () => {
     /** @scenario "A simulation run's address opens the run's own detail drawer" */
     it("addresses the run via the scenarioRunDetail drawer on the simulations route", () => {
       const url = scenarioRunPlatformUrl({
         projectSlug: "demo",
         scenarioRunId: "run_1",
-        ui: "simulations",
       });
 
       expect(url).toBe(
@@ -30,7 +29,6 @@ describe("scenarioRunPlatformUrl", () => {
       const url = scenarioRunPlatformUrl({
         projectSlug: "demo",
         scenarioRunId: "run?1&2",
-        ui: "simulations",
       });
 
       expect(url).toBe(
@@ -39,29 +37,17 @@ describe("scenarioRunPlatformUrl", () => {
     });
   });
 
-  describe("given a project that reads Agent Testing", () => {
-    it("addresses the run via the same drawer over the Agent Testing results", () => {
-      const url = scenarioRunPlatformUrl({
-        projectSlug: "demo",
-        scenarioRunId: "run_1",
-        ui: "agent_testing",
-      });
-
-      expect(url).toBe(
-        "https://app.langwatch.ai/demo/agent-testing/results?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1",
-      );
-    });
-  });
-
   describe("given a run whose set is not resolved", () => {
     /** @scenario "Every run gets a precise address, even when its set is unknown" */
-    // The drawer address needs only the run id, so a missing set does not
-    // degrade to the bare index: every run still gets its own precise link.
+    // The drawer address needs only the run id, so a missing set no longer
+    // degrades to the bare index — every run still gets its own precise link.
     it("still returns the run's own drawer address, not the index", () => {
+      // The set is no longer even an input — the drawer address is run-id
+      // only — so every run gets its own precise link with nothing else to
+      // resolve.
       const url = scenarioRunPlatformUrl({
         projectSlug: "demo",
         scenarioRunId: "run_1",
-        ui: "simulations",
       });
 
       expect(url).toBe(

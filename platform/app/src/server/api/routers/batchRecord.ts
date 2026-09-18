@@ -2,12 +2,13 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { ExperimentService } from "../../experiments/experiment.service";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const batchRecordRouter = createTRPCRouter({
   getAllByexperimentIdGroup: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("workflows:view")
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -30,12 +31,12 @@ export const batchRecordRouter = createTRPCRouter({
     }),
   getAllByexperimentSlug: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
-    .permission("workflows:view")
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, experimentSlug } = input;
       const prisma = ctx.prisma;
 
-      const experiment = await ExperimentService.create({ prisma }).findBySlug({
+      const experiment = await ExperimentService.create(prisma).findBySlug({
         projectId,
         slug: experimentSlug,
       });

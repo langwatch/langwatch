@@ -16,7 +16,7 @@ from ...types import UNSET, Response, Unset, safe_http_status
 
 def _get_kwargs(
     *,
-    body: PostApiWebhooksV1EndpointsBody,
+    body: PostApiWebhooksV1EndpointsBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
@@ -28,7 +28,8 @@ def _get_kwargs(
         "url": "/api/webhooks/v1/endpoints",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -106,8 +107,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiWebhooksV1EndpointsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiWebhooksV1EndpointsBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiWebhooksV1EndpointsResponse201
@@ -119,16 +120,14 @@ def sync_detailed(
 ]:
     """Create a webhook endpoint
 
-     Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for
-    `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not
-    belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means
-    `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new
-    one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including
-    its `secret`, which is the only way to recover a secret whose response was lost in transit.
+     Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
+    roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original
+    response including its `secret`, which is the only way to recover a secret whose response was lost
+    in transit.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiWebhooksV1EndpointsBody):
+        body (PostApiWebhooksV1EndpointsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -152,8 +151,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    body: PostApiWebhooksV1EndpointsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiWebhooksV1EndpointsBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiWebhooksV1EndpointsResponse201
@@ -166,16 +165,14 @@ def sync(
 ):
     """Create a webhook endpoint
 
-     Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for
-    `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not
-    belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means
-    `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new
-    one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including
-    its `secret`, which is the only way to recover a secret whose response was lost in transit.
+     Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
+    roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original
+    response including its `secret`, which is the only way to recover a secret whose response was lost
+    in transit.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiWebhooksV1EndpointsBody):
+        body (PostApiWebhooksV1EndpointsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -194,8 +191,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiWebhooksV1EndpointsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiWebhooksV1EndpointsBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiWebhooksV1EndpointsResponse201
@@ -207,16 +204,14 @@ async def asyncio_detailed(
 ]:
     """Create a webhook endpoint
 
-     Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for
-    `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not
-    belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means
-    `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new
-    one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including
-    its `secret`, which is the only way to recover a secret whose response was lost in transit.
+     Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
+    roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original
+    response including its `secret`, which is the only way to recover a secret whose response was lost
+    in transit.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiWebhooksV1EndpointsBody):
+        body (PostApiWebhooksV1EndpointsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -238,8 +233,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    body: PostApiWebhooksV1EndpointsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiWebhooksV1EndpointsBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiWebhooksV1EndpointsResponse201
@@ -252,16 +247,14 @@ async def asyncio(
 ):
     """Create a webhook endpoint
 
-     Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for
-    `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not
-    belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means
-    `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new
-    one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including
-    its `secret`, which is the only way to recover a secret whose response was lost in transit.
+     Create a webhook endpoint. The signing secret is returned ONCE in this response and never again;
+    roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original
+    response including its `secret`, which is the only way to recover a secret whose response was lost
+    in transit.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiWebhooksV1EndpointsBody):
+        body (PostApiWebhooksV1EndpointsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -2,29 +2,19 @@ import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
-  type AgentInstanceView,
-  type AgentPresenceStatus,
-  agentPresenceView,
-  readAgentPresence,
-} from "~/server/connected-agents/presence.read";
-import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+  codeComponentSchema,
+  customComponentSchema,
+  httpComponentSchema,
+  signatureComponentSchema,
+} from "~/optimization_studio/types/dsl";
 import {
   type AgentComponentConfig,
+  type AgentType,
   agentTypeSchema,
-  getConfigSchemaForType,
 } from "../../agents/agent.repository";
-import {
-  AgentService,
-  declaredAgentParameters,
-} from "../../agents/agent.service";
-import type { AgentWithFields } from "../../agents/agent-fields";
-import { sendAgentTestTurn } from "../../agents/agent-test-turn";
-import {
-  AgentNotFoundError,
-  AgentRegisterOnlyError,
-} from "../../agents/errors";
+import { AgentService } from "../../agents/agent.service";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   copyWorkflowWithDatasets,
@@ -32,36 +22,24 @@ import {
 } from "./workflows";
 
 /**
- * What every agent read carries beside the row (ADR-128): the parameters a
- * connected agent declares, the owner of a personal one, and its presence.
- * Other kinds read as offline with no instances and no owner.
+ * Get config schema based on agent type for validation
  */
-async function withConnectedAgentViews<T extends AgentWithFields>({
-  agents,
-  projectId,
-  agentService,
-}: {
-  agents: T[];
-  projectId: string;
-  agentService: AgentService;
-}): Promise<
-  (T & {
-    parameters: ScenarioParameterDefinition[];
-    owner: { userId: string; name: string | null } | null;
-    status: AgentPresenceStatus;
-    instances: AgentInstanceView[];
-  })[]
-> {
-  const [owners, presence] = await Promise.all([
-    agentService.ownersOf(agents),
-    readAgentPresence({ projectId, agents }),
-  ]);
-  return agents.map((agent) => ({
-    ...agent,
-    parameters: declaredAgentParameters(agent),
-    ...agentPresenceView({ agent, owners, presence }),
-  }));
-}
+const getConfigInputSchema = (type: AgentType) => {
+  switch (type) {
+    case "signature":
+      return signatureComponentSchema;
+    case "code":
+      return codeComponentSchema;
+    case "workflow":
+      return customComponentSchema;
+    case "http":
+      return httpComponentSchema;
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unknown agent type: ${_exhaustive}`);
+    }
+  }
+};
 
 /**
  * Agent Router - Manages agent CRUD operations
@@ -81,15 +59,10 @@ export const agentsRouter = createTRPCRouter({
    */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("evaluations:view")
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
-      const agents = await agentService.getAll({ projectId: input.projectId });
-      return withConnectedAgentViews({
-        agents,
-        projectId: input.projectId,
-        agentService,
-      });
+      return await agentService.getAll({ projectId: input.projectId });
     }),
 
   /**
@@ -98,20 +71,13 @@ export const agentsRouter = createTRPCRouter({
    */
   getById: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .permission("evaluations:view")
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
-      const agent = await agentService.getById({
+      return await agentService.getById({
         id: input.id,
         projectId: input.projectId,
       });
-      if (!agent) return null;
-      const [view] = await withConnectedAgentViews({
-        agents: [agent],
-        projectId: input.projectId,
-        agentService,
-      });
-      return view ?? null;
     }),
 
   /**
@@ -134,7 +100,7 @@ export const agentsRouter = createTRPCRouter({
         .refine(
           (data) => {
             // Validate config matches the specified type's DSL schema
-            const schema = getConfigSchemaForType(data.type);
+            const schema = getConfigInputSchema(data.type);
             const result = schema.safeParse(data.config);
             return result.success;
           },
@@ -145,11 +111,8 @@ export const agentsRouter = createTRPCRouter({
           },
         ),
     )
-    .permission("evaluations:manage")
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-      // A connected agent is registered by the SDK from the process that runs
-      // it; there is nothing a form could fill in for one.
-      if (input.type === "connected") throw new AgentRegisterOnlyError();
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
       return await agentService.create({
@@ -178,7 +141,7 @@ export const agentsRouter = createTRPCRouter({
         workflowId: z.string().nullable().optional(),
       }),
     )
-    .permission("evaluations:manage")
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
 
@@ -205,7 +168,7 @@ export const agentsRouter = createTRPCRouter({
    */
   getRelatedEntities: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .permission("evaluations:view")
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ ctx, input }) => {
       const agent = await ctx.prisma.agent.findFirst({
         where: {
@@ -236,7 +199,7 @@ export const agentsRouter = createTRPCRouter({
    */
   cascadeArchive: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .permission("evaluations:manage")
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.$transaction(async (tx) => {
         // 1. Get the agent to find linked workflow
@@ -283,7 +246,7 @@ export const agentsRouter = createTRPCRouter({
    */
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .permission("evaluations:manage")
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       return await agentService.softDelete({
@@ -302,7 +265,7 @@ export const agentsRouter = createTRPCRouter({
         agentId: z.string(),
       }),
     )
-    .permission("evaluations:view")
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       const source = await agentService.getById({
@@ -320,7 +283,7 @@ export const agentsRouter = createTRPCRouter({
       const authorizedCopies = await Promise.all(
         copies.map(async (c) => ({
           copy: c,
-          hasPermission: await probeProjectPermission(
+          hasPermission: await hasProjectPermission(
             ctx,
             c.projectId,
             "evaluations:view",
@@ -351,9 +314,9 @@ export const agentsRouter = createTRPCRouter({
         newAgentId: z.string().default(() => `agent_${nanoid()}`),
       }),
     )
-    .permission("evaluations:manage")
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-      const hasSourcePermission = await probeProjectPermission(
+      const hasSourcePermission = await hasProjectPermission(
         ctx,
         input.sourceProjectId,
         "evaluations:manage",
@@ -427,7 +390,7 @@ export const agentsRouter = createTRPCRouter({
         copyIds: z.array(z.string()).optional(),
       }),
     )
-    .permission("evaluations:manage")
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       const copies = await agentService.getCopies(input.agentId);
@@ -435,7 +398,7 @@ export const agentsRouter = createTRPCRouter({
         await Promise.all(
           copies.map(async (c) => ({
             id: c.id,
-            hasPermission: await probeProjectPermission(
+            hasPermission: await hasProjectPermission(
               ctx,
               c.projectId,
               "evaluations:manage",
@@ -488,7 +451,7 @@ export const agentsRouter = createTRPCRouter({
         agentId: z.string(),
       }),
     )
-    .permission("evaluations:manage")
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       const copy = await agentService.getById({
@@ -508,7 +471,7 @@ export const agentsRouter = createTRPCRouter({
           message: "Source agent has been deleted",
         });
       }
-      const hasSourcePermission = await probeProjectPermission(
+      const hasSourcePermission = await hasProjectPermission(
         ctx,
         source.projectId,
         "evaluations:manage",
@@ -545,84 +508,12 @@ export const agentsRouter = createTRPCRouter({
     }),
 
   /**
-   * Sends one turn to an agent and answers what it returned.
-   *
-   * The Test panel of the agent drawers. It walks the same path a simulation
-   * turn walks, so what a person sees here is what a run will see: the same
-   * dispatcher and instance choice for a connected agent, the same adapter
-   * for the others, the same handled errors. A personal development agent of
-   * another person is refused before anything is sent.
-   */
-  testTurn: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        projectId: z.string(),
-        message: z.string().min(1),
-        params: z
-          .record(z.union([z.string(), z.number(), z.boolean()]))
-          .optional(),
-      }),
-    )
-    .permission("evaluations:manage")
-    .mutation(async ({ ctx, input }) => {
-      try {
-        return await sendAgentTestTurn({
-          projectId: input.projectId,
-          agentId: input.id,
-          message: input.message,
-          params: input.params,
-          actor: { id: ctx.session.user.id, label: "user" },
-          deps: {
-            readAgent: (params) =>
-              AgentService.create(ctx.prisma).getById(params),
-            users: ctx.prisma,
-          },
-        });
-      } catch (error) {
-        if (error instanceof AgentNotFoundError) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Agent not found",
-          });
-        }
-        throw error;
-      }
-    }),
-
-  /**
-   * Runs one scripted scenario against the agent, saving nothing, and answers
-   * with the run's ids so the caller can open the run drawer on it.
-   * The "Test agent" item of the agent card menu.
-   */
-  testRun: protectedProcedure
-    .input(z.object({ projectId: z.string(), agentId: z.string() }))
-    .permission("scenarios:create")
-    .mutation(async ({ ctx, input }) => {
-      try {
-        return await AgentService.create(ctx.prisma).testRun({
-          projectId: input.projectId,
-          agentId: input.agentId,
-          actor: { id: ctx.session.user.id, label: "user" },
-        });
-      } catch (error) {
-        if (error instanceof AgentNotFoundError) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Agent not found",
-          });
-        }
-        throw error;
-      }
-    }),
-
-  /**
    * Returns the audit log history for a specific agent.
    * Used by the "View History" drawer on the agents page.
    */
   getHistory: protectedProcedure
     .input(z.object({ agentId: z.string(), projectId: z.string() }))
-    .permission("evaluations:view")
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ ctx, input }) => {
       const service = AgentService.create(ctx.prisma);
       return service.getHistory(input.agentId, input.projectId);

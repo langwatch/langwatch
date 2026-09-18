@@ -104,7 +104,7 @@ describe("SCIM group PATCH membership", () => {
 
   const patchGroup = async (operations: unknown[]) =>
     ScimGroupService.create({ prisma }).updateGroup({
-      scimResourceId: "group-1",
+      externalScimId: "group-1",
       organizationId: "org-1",
       patchRequest: parsePatch(operations),
     });

@@ -44,7 +44,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[Any]:
     """Delete a dashboard and its graphs (hard delete, cascade)
 
@@ -73,7 +73,7 @@ def sync_detailed(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[Any]:
     """Delete a dashboard and its graphs (hard delete, cascade)
 

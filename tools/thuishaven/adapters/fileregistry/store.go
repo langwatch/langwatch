@@ -111,7 +111,6 @@ type selectionFields struct {
 	Gateway *bool `json:"gateway"`
 	NLP     *bool `json:"nlp"`
 	Langy   *bool `json:"langy"`
-	IDP     *bool `json:"idp"`
 }
 
 // applyTo overlays the services this file actually states onto sel.
@@ -121,7 +120,6 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Gateway, &sel.Gateway},
 		{f.NLP, &sel.NLP},
 		{f.Langy, &sel.Langy},
-		{f.IDP, &sel.IDP},
 	} {
 		if field.stated != nil {
 			*field.target = *field.stated
@@ -165,7 +163,6 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Gateway: &sel.Gateway,
 		NLP:     &sel.NLP,
 		Langy:   &sel.Langy,
-		IDP:     &sel.IDP,
 	}}, "", "  ")
 	if err != nil {
 		return err

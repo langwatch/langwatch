@@ -6,12 +6,9 @@ import {
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
-  collectMediaRefs,
-  mergeMediaRefs,
-  parseMediaRefs,
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
-  serializeMediaRefList,
+  serializeMediaRefs,
 } from "~/shared/traces/media-refs";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
 import type { NormalizedSpan } from "../../schemas/spans";
@@ -135,7 +132,7 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
         return { input: null, output: responseText };
       }
     }
-    // LIGHT path: without OTEL_LOG_RAW_API_BODIES the reply text arrives on an
+    // LIGHT path: without OTEL_LOG_RAW_API_BODIES the reply text rides an
     // `assistant_response` event (attribute `response`) and no
     // api_response_body exists in the session — the two events are
     // per-session alternatives carrying the same reply text, so accepting
@@ -175,53 +172,6 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
   }
 
   return { input: null, output: null };
-}
-
-/**
- * The attributes a side's media can ride on. Both are read for every span,
- * because the two carry different things: the provider instrumentation writes
- * the request the customer sent to `langwatch.*`, while `gen_ai.*.messages`
- * holds what that instrumentation chose to report, which is often the text
- * alone. Reading only whichever one named the trace loses the picture whenever
- * the other one is the one holding it.
- */
-const MEDIA_SOURCE_ATTRS = {
-  input: [ATTR_KEYS.LANGWATCH_INPUT, ATTR_KEYS.GEN_AI_INPUT_MESSAGES],
-  output: [ATTR_KEYS.LANGWATCH_OUTPUT, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES],
-} as const;
-
-/**
- * Fold one span's media into the trace's running refs for a side.
- *
- * A span with no media leaves the refs alone, which is the whole point: the
- * span that names the trace is usually not the span that holds the picture, so
- * winning the headline text must not wipe what another span contributed. The
- * winning span's media goes first, so the list thumbnail still prefers the
- * media of the headline message.
- */
-function accumulateMediaRefs({
-  serialized,
-  span,
-  side,
-  winning,
-}: {
-  serialized: string | null;
-  span: NormalizedSpan;
-  side: "input" | "output";
-  winning: boolean;
-}): string | null {
-  const incoming = MEDIA_SOURCE_ATTRS[side].flatMap((key) => {
-    const value = span.spanAttributes[key];
-    return value === undefined || value === null ? [] : collectMediaRefs(value);
-  });
-  if (incoming.length === 0) return serialized;
-  return serializeMediaRefList(
-    mergeMediaRefs({
-      existing: parseMediaRefs(serialized),
-      incoming,
-      precedence: winning ? "prepend" : "append",
-    }),
-  );
 }
 
 /**
@@ -269,21 +219,15 @@ export class TraceIOAccumulationService {
     let blockedByGuardrail = state.blockedByGuardrail;
     let inputIsFallback = currentInputIsFallback;
     let outputIsFallback = currentOutputIsFallback;
-    // Media refs accumulate across EVERY span of the trace, unlike the computed
-    // text, which belongs to one winning span. Those are two different
-    // questions (which span names the trace, and where its media is), and
-    // tying the refs to the text's winner answered only the first. A wrapper
-    // span that sets the headline text almost never holds the picture; the
-    // model call underneath it does. That is the shape every framework
-    // integration produces, and it left the trace list and the drawer summary
-    // with nothing to draw, since ComputedInput is flattened text and these
-    // refs are the only way either surface learns the trace has media at all.
-    //
-    // The winning span keeps precedence, so when it does carry media that media
-    // is the trace's thumbnail. Each ref keeps the role of the chat message it
-    // was found under (one payload can hold both the caller's recording and the
-    // agent's reply), which is what lets the summary strips show each side only
-    // its own media.
+    // Media refs follow the same winner as the computed text: whenever a
+    // span's IO becomes the trace's headline input/output, its media parts
+    // (already externalized to /api/files references) become the trace-level
+    // media refs — ComputedInput is flattened text, so this is the only place
+    // the list and drawer summary can learn about the trace's media. Each ref
+    // keeps the role of the chat message it was found under (the winning
+    // payload is the whole transcript, so one side's payload can hold both the
+    // caller's recording and the agent's reply), which is what lets the
+    // summary strips show each side only its own media.
     let inputMediaRefs = state.attributes[RESERVED_INPUT_MEDIA_REFS] ?? null;
     let outputMediaRefs = state.attributes[RESERVED_OUTPUT_MEDIA_REFS] ?? null;
 
@@ -342,21 +286,21 @@ export class TraceIOAccumulationService {
       span,
       "input",
     );
-    let inputWins = false;
-    if (inputResult) {
-      inputWins = isRoot || computedInput === null || currentInputIsFallback;
-      if (inputWins) {
-        // Use the EXTRACTED text: extractRichIOFromSpan already runs
-        // messagesToText / extractTextFromPlainJson to pull the clean
-        // human-readable string out of common wrappers (e.g. unwrap
-        // `{"output":"Hey there"}` → `"Hey there"`). Discarding that and
-        // re-stringifying `raw` is what caused the 2026-05-14 prod UX
-        // regression where trace summaries showed the wrapper JSON
-        // instead of the actual text.
-        computedInput = preferText(inputResult.text, inputResult.raw);
-        inputIsFallback = false;
-      }
-    } else if (computedInput === null) {
+    if (
+      inputResult &&
+      (isRoot || computedInput === null || currentInputIsFallback)
+    ) {
+      // Use the EXTRACTED text — extractRichIOFromSpan already runs
+      // messagesToText / extractTextFromPlainJson to pull the clean
+      // human-readable string out of common wrappers (e.g. unwrap
+      // `{"output":"Hey there"}` → `"Hey there"`). Discarding that and
+      // re-stringifying `raw` is what caused the 2026-05-14 prod UX
+      // regression where trace summaries showed the wrapper JSON
+      // instead of the actual text.
+      computedInput = preferText(inputResult.text, inputResult.raw);
+      inputIsFallback = false;
+      inputMediaRefs = serializeMediaRefs(inputResult.raw);
+    } else if (!inputResult && computedInput === null) {
       // Semantic heuristics didn't find anything. Fall back to the
       // service's `text` (best-effort stringification of the wrapper)
       // so ComputedInput is non-null when the span has real data,
@@ -366,28 +310,21 @@ export class TraceIOAccumulationService {
       if (inputFallback) {
         computedInput = preferText(inputFallback.text, inputFallback.raw);
         inputIsFallback = true;
-        inputWins = true;
+        inputMediaRefs = serializeMediaRefs(inputFallback.raw);
       }
     }
-    inputMediaRefs = accumulateMediaRefs({
-      serialized: inputMediaRefs,
-      span,
-      side: "input",
-      winning: inputWins,
-    });
 
     const outputResult = this.traceIOExtractionService.extractRichIOFromSpan(
       span,
       "output",
     );
-    let outputWins = false;
     if (outputResult) {
       const isExplicit = outputResult.source === "langwatch";
       // Semantic output must always override a prior fallback, regardless of
       // end-time ordering. The fallback span's endTime can be later than a
       // real semantic gen_ai span that arrives afterward; without this bypass,
       // `shouldOverrideOutput`'s endTime comparison would keep the fallback.
-      outputWins =
+      const shouldOverride =
         currentOutputIsFallback ||
         shouldOverrideOutput({
           isRoot,
@@ -397,7 +334,7 @@ export class TraceIOAccumulationService {
           endTime: span.endTimeUnixMs,
           currentEndTime: outputSpanEndTimeMs,
         });
-      if (outputWins) {
+      if (shouldOverride) {
         // Use the extracted text (unwrapped from common JSON wrappers
         // like `{"output":"..."}`), not the raw payload. See input
         // branch above for the full rationale.
@@ -408,6 +345,7 @@ export class TraceIOAccumulationService {
           ? OUTPUT_SOURCE.EXPLICIT
           : OUTPUT_SOURCE.INFERRED;
         outputIsFallback = false;
+        outputMediaRefs = serializeMediaRefs(outputResult.raw);
       }
     } else if (computedOutput === null) {
       // No semantic match on any span so far. A stringified-payload fallback
@@ -421,15 +359,9 @@ export class TraceIOAccumulationService {
         computedOutput = preferText(outputFallback.text, outputFallback.raw);
         outputSpanEndTimeMs = span.endTimeUnixMs;
         outputIsFallback = true;
-        outputWins = true;
+        outputMediaRefs = serializeMediaRefs(outputFallback.raw);
       }
     }
-    outputMediaRefs = accumulateMediaRefs({
-      serialized: outputMediaRefs,
-      span,
-      side: "output",
-      winning: outputWins,
-    });
 
     return {
       computedInput,

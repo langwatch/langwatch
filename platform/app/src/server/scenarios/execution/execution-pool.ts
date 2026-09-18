@@ -14,7 +14,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { ChildProcess } from "child_process";
 import type { RunParameterValues } from "../parameters";
-import type { RunSecretCiphertext } from "../run-secret-values";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 
@@ -27,7 +26,7 @@ export interface ExecutionJobData {
   setId: string;
   scenarioName?: string;
   target: {
-    type: "prompt" | "http" | "code" | "workflow" | "connected";
+    type: "prompt" | "http" | "code" | "workflow";
     referenceId: string;
   };
   /**
@@ -36,11 +35,6 @@ export interface ExecutionJobData {
    * before parameters existed.
    */
   parameters?: RunParameterValues;
-  /**
-   * The run's secret parameter values, still encrypted. The prefetch decrypts
-   * them once and merges them over the project's own secrets.
-   */
-  secretParameters?: RunSecretCiphertext;
 }
 
 /** Function that spawns a child process for a scenario job. Returns when child exits. */

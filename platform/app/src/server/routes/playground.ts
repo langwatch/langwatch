@@ -9,13 +9,14 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { env } from "~/env.mjs";
+import { hasProjectPermission } from "~/server/api/rbac";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "~/server/api/routers/modelProviders.utils";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
+import { prisma } from "~/server/db";
 import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
 
 const errorCache: Record<string, any> = {};
@@ -44,8 +45,8 @@ secured
       return c.json({ error: "Missing projectId header" }, { status: 400 });
     }
 
-    const hasPermission = await probeProjectPermission(
-      { session },
+    const hasPermission = await hasProjectPermission(
+      { prisma, session },
       projectId,
       "playground:manage",
     );

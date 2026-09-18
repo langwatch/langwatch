@@ -25,8 +25,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 )
 
 // WorkflowRunner runs an agent node configured with `agent_type=workflow`
@@ -40,11 +38,8 @@ type WorkflowRunner struct {
 
 // WorkflowRunnerOptions configures a WorkflowRunner.
 type WorkflowRunnerOptions struct {
-	Client *http.Client // nil → default client
-	// DefaultTimeout is both the budget for a call that names none and the
-	// ceiling a call's own TimeoutMS is clamped to. 0 → 12 min (Lambda max
-	// is 15 min; we leave a 3-min margin).
-	DefaultTimeout time.Duration
+	Client         *http.Client  // nil → default client
+	DefaultTimeout time.Duration // 0 → 12 min (Lambda max is 15 min; we leave a 3-min margin)
 }
 
 // NewWorkflowRunner builds a runner.
@@ -88,15 +83,8 @@ type WorkflowRunRequest struct {
 	// ThreadID groups Studio runs into a single conversation in trace
 	// metadata. Mirrors langwatch_nlp commit ac986cc3c. Optional.
 	ThreadID string
-	// TimeoutMS asks for LESS time than the operator allows; it can never
-	// buy more. 0 (and any negative) means the runner's own ceiling.
+	// TimeoutMS overrides the runner's default. 0 → default.
 	TimeoutMS int
-}
-
-// DefaultTimeout reports the wall-clock ceiling this runner applies. Exported
-// so the wiring that feeds it an operator knob is observable from a test.
-func (r *WorkflowRunner) DefaultTimeout() time.Duration {
-	return r.defaultTime
 }
 
 // WorkflowRunResult is the parsed response.
@@ -170,12 +158,10 @@ func (r *WorkflowRunner) Execute(ctx context.Context, req WorkflowRunRequest) (*
 		return nil, fmt.Errorf("agentblock: marshal body: %w", err)
 	}
 
-	// The operator's ceiling wins. A node's TimeoutMS only ever shortens the
-	// budget: a workflow author must not be able to escape
-	// NLPGO_ENGINE_AGENT_WORKFLOW_TIMEOUT_SECONDS — the bound on how long one
-	// sub-workflow call may hold a worker — by writing a bigger number into
-	// their own node.
-	timeout := blocktimeout.Clamp(r.defaultTime, req.TimeoutMS)
+	timeout := r.defaultTime
+	if req.TimeoutMS > 0 {
+		timeout = time.Duration(req.TimeoutMS) * time.Millisecond
+	}
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 

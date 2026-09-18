@@ -41,11 +41,6 @@ export const recordTargetResultCommandDataSchema = z.object({
     .optional(),
   traceId: z.string().nullable().optional(),
   targets: z.array(targetSchema).optional(),
-  /**
-   * True when the cell was copied into the run from the board rather than
-   * produced by it. See `targetResultEventDataSchema`, which this mirrors.
-   */
-  carriedOver: z.boolean().optional(),
   occurredAt: z.number(),
 });
 
@@ -69,11 +64,6 @@ export const recordEvaluatorResultCommandDataSchema = z.object({
   cost: z.number().nullable().optional(),
   inputs: z.record(z.unknown()).nullable().optional(),
   duration: z.number().nullable().optional(),
-  /**
-   * True when the verdict was copied into the run from the board rather than
-   * produced by it. See `evaluatorResultEventDataSchema`, which this mirrors.
-   */
-  carriedOver: z.boolean().optional(),
   occurredAt: z.number(),
 });
 

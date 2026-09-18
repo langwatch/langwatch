@@ -1,9 +1,7 @@
 import type {
   BatchHistoryResult,
   BatchRunDataResult,
-  BatchSummary,
   ExternalSetSummary,
-  ScenarioLastResultSummary,
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
@@ -60,15 +58,6 @@ export interface SimulationRepository {
     endDate?: number;
   }): Promise<BatchHistoryResult>;
 
-  /**
-   * Counts for one batch, addressed by its batch run id alone. Returns null
-   * when the project holds no run for that batch.
-   */
-  getBatchSummary(params: {
-    projectId: string;
-    batchRunId: string;
-  }): Promise<BatchSummary | null>;
-
   getRunDataForBatchRun(params: {
     projectId: string;
     scenarioSetId?: string;
@@ -83,12 +72,6 @@ export interface SimulationRepository {
     cursor?: string;
     startDate?: number;
     endDate?: number;
-    /**
-     * Reads whole conversations instead of the trimmed list projection. The
-     * page size is capped lower when set, because the heavy message arrays
-     * are exactly what the trim protects against.
-     */
-    shouldIncludeMessages?: boolean;
   }): Promise<{
     runs: ScenarioRunData[];
     nextCursor?: string;
@@ -119,17 +102,6 @@ export interface SimulationRepository {
     endDate?: number;
   }): Promise<ExternalSetSummary[]>;
 
-  /**
-   * The latest run result per scenario inside the window. A scenario with no
-   * run in the window is simply absent from the result.
-   */
-  getLastResultSummaries(params: {
-    projectId: string;
-    scenarioIds?: string[];
-    startDate?: number;
-    endDate?: number;
-  }): Promise<ScenarioLastResultSummary[]>;
-
   getRunDataForAllSuites(params: {
     projectId: string;
     limit?: number;
@@ -137,7 +109,6 @@ export interface SimulationRepository {
     startDate?: number;
     endDate?: number;
     sinceTimestamp?: number;
-    shouldIncludeMessages?: boolean;
   }): Promise<AllSuitesRunDataResult>;
 
   /**
@@ -216,10 +187,6 @@ export class NullSimulationRepository implements SimulationRepository {
     return { batches: [], hasMore: false, lastUpdatedAt: 0, totalCount: 0 };
   }
 
-  async getBatchSummary(): Promise<BatchSummary | null> {
-    return null;
-  }
-
   async getRunDataForBatchRun(): Promise<BatchRunDataResult> {
     return { changed: true, lastUpdatedAt: 0, runs: [] };
   }
@@ -245,10 +212,6 @@ export class NullSimulationRepository implements SimulationRepository {
   }
 
   async getInternalSuiteSummaries(): Promise<ExternalSetSummary[]> {
-    return [];
-  }
-
-  async getLastResultSummaries(): Promise<ScenarioLastResultSummary[]> {
     return [];
   }
 

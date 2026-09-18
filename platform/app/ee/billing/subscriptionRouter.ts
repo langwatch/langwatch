@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Currency } from "~/generated/prisma/client";
+import { checkOrganizationPermission } from "../../src/server/api/rbac";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -40,7 +41,7 @@ export const createSubscriptionRouterFactory = ({
           quotedAt: z.number().int().positive().optional(),
         }),
       )
-      .permission("organization:manage")
+      .use(checkOrganizationPermission("organization:manage"))
       .mutation(async ({ input }) => {
         return await subscriptionService.updateSubscriptionItems({
           organizationId: input.organizationId,
@@ -65,7 +66,7 @@ export const createSubscriptionRouterFactory = ({
           billingInterval: z.enum(["monthly", "annual"]).optional(),
         }),
       )
-      .permission("organization:manage")
+      .use(checkOrganizationPermission("organization:manage"))
       .mutation(async ({ input, ctx }) => {
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
@@ -86,7 +87,7 @@ export const createSubscriptionRouterFactory = ({
 
     manage: protectedProcedure
       .input(z.object({ organizationId: z.string(), baseUrl: z.string() }))
-      .permission("organization:manage")
+      .use(checkOrganizationPermission("organization:manage"))
       .mutation(async ({ input, ctx }) => {
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
@@ -107,7 +108,7 @@ export const createSubscriptionRouterFactory = ({
           newTotalSeats: z.number().min(1),
         }),
       )
-      .permission("organization:manage")
+      .use(checkOrganizationPermission("organization:manage"))
       .query(async ({ input }) => {
         return await subscriptionService.previewProration({
           organizationId: input.organizationId,
@@ -117,7 +118,7 @@ export const createSubscriptionRouterFactory = ({
 
     getLastSubscription: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
-      .permission("organization:view")
+      .use(checkOrganizationPermission("organization:view"))
       .query(async ({ input }) => {
         return await subscriptionService.getLastNonCancelledSubscription(
           input.organizationId,
@@ -140,7 +141,7 @@ export const createSubscriptionRouterFactory = ({
           ),
         }),
       )
-      .permission("organization:manage")
+      .use(checkOrganizationPermission("organization:manage"))
       .mutation(async ({ input, ctx }) => {
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
@@ -168,7 +169,7 @@ export const createSubscriptionRouterFactory = ({
           note: z.string().optional(),
         }),
       )
-      .permission("organization:manage")
+      .use(checkOrganizationPermission("organization:manage"))
       .mutation(async ({ input, ctx }) => {
         const actorEmail = ctx.session.user.email;
         if (!actorEmail) {
@@ -187,7 +188,7 @@ export const createSubscriptionRouterFactory = ({
 
     listInvoices: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
-      .permission("organization:view")
+      .use(checkOrganizationPermission("organization:view"))
       .query(async ({ input }) => {
         return await subscriptionService.listInvoices({
           organizationId: input.organizationId,

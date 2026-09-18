@@ -175,19 +175,6 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "experiment", plural: "experiments" },
   },
-  // Agent-driven page control (specs/langy/langy-ui-actions.feature): the
-  // result is the dispatch outcome (status, executed via, action kind), which
-  // the card shows as facts while the page changes in front of the user.
-  ui: {
-    surface: "experiments",
-    digestStrategy: "text",
-    noun: { singular: "UI action", plural: "UI actions" },
-  },
-  workbench: {
-    surface: "experiments",
-    digestStrategy: "text",
-    noun: { singular: "workbench", plural: "workbenches" },
-  },
   monitor: {
     surface: "evaluations",
     digestStrategy: "id-ref",
@@ -203,15 +190,10 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "simulation run", plural: "simulation runs" },
   },
-  "test-suite": {
+  suite: {
     surface: "simulations",
     digestStrategy: "id-ref",
-    noun: { singular: "test suite", plural: "test suites" },
-  },
-  "run-plan": {
-    surface: "simulations",
-    digestStrategy: "id-ref",
-    noun: { singular: "run plan", plural: "run plans" },
+    noun: { singular: "suite", plural: "suites" },
   },
   prompt: {
     surface: "prompts",
@@ -247,11 +229,6 @@ export const CAPABILITY_CATALOG = {
     surface: "dashboards",
     digestStrategy: "id-ref",
     noun: { singular: "graph", plural: "graphs" },
-  },
-  chart: {
-    surface: "dashboards",
-    digestStrategy: "id-ref",
-    noun: { singular: "chart", plural: "charts" },
   },
   trigger: {
     surface: "automations",

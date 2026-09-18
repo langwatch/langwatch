@@ -20,9 +20,19 @@ import { SideMenuItem } from "./SideMenuLink";
 
 export type SupportMenuProps = {
   showLabel?: boolean;
+  /**
+   * Where the human-chat entry lives. The current chrome keeps it as a
+   * standalone sidebar item above the Support menu; the navigation-v2
+   * sidebars fold it into the Support menu as "Chat (with a human)".
+   * Spec: specs/navigation/product-sidebars.feature
+   */
+  chatPlacement?: "standalone" | "in-menu";
 };
 
-export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
+export const SupportMenu = ({
+  showLabel = true,
+  chatPlacement = "standalone",
+}: SupportMenuProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const publicEnv = usePublicEnv();
 
@@ -55,6 +65,30 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
 
   return (
     <VStack width="full" align="start" gap={0.5}>
+      {/* Chat button */}
+      {publicEnv.data?.IS_SAAS && chatPlacement === "standalone" && (
+        <Box
+          as="button"
+          width={showLabel ? "full" : "auto"}
+          textAlign="left"
+          cursor="pointer"
+          aria-label="Chat"
+          onClick={(e) => {
+            e.preventDefault();
+            // Lifts the bubble suppression before toggling, so the policy's
+            // CSS backstop never hides a deliberately opened chat.
+            toggleSupportChat();
+          }}
+        >
+          <SideMenuItem
+            icon={LuMessageCircle}
+            label="Chat"
+            showLabel={showLabel}
+          />
+        </Box>
+      )}
+
+      {/* Support menu */}
       <Menu.Root
         positioning={{ placement: "right-start" }}
         open={isOpen}
@@ -107,7 +141,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
             onMouseEnter={cancelClose}
             onMouseLeave={scheduleClose}
           >
-            {publicEnv.data?.IS_SAAS && (
+            {publicEnv.data?.IS_SAAS && chatPlacement === "in-menu" && (
               <>
                 <Menu.Item value="chat">
                   <LuMessageCircle /> Chat (with a human)

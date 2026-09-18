@@ -17,7 +17,6 @@ function toRow(row: Row): LangyConversationRow {
     status: row.Status,
     currentTurnId: row.CurrentTurnId,
     lastError: row.LastError,
-    lastModel: row.LastModel,
     messageCount: row.MessageCount,
     lastActivityAtMs: row.LastActivityAt ?? 0,
     cursorActivityAtMs: row.LastActivityAt,
@@ -82,7 +81,7 @@ export class PrismaLangyConversationRepository
     id: string;
     projectId: string;
     userId: string;
-  }): Promise<"owned" | "other" | "archived" | "missing"> {
+  }): Promise<"owned" | "other" | "missing"> {
     const row = await this.prisma.langyConversationProjection.findUnique({
       // The compound key identifies the row to Prisma, while the explicit
       // tenant predicate is what the tenancy middleware can verify before the
@@ -94,12 +93,7 @@ export class PrismaLangyConversationRepository
       },
       select: { UserId: true, ArchivedAt: true },
     });
-    if (!row) return "missing";
-    // Archived is its own answer, not "missing": most callers treat the two
-    // alike (a stale id legitimately yields a fresh conversation), but id
-    // ADOPTION must refuse an archived collision rather than silently append
-    // to a closed aggregate — see `ensureConversation`.
-    if (row.ArchivedAt !== null) return "archived";
+    if (!row || row.ArchivedAt !== null) return "missing";
     return row.UserId === userId ? "owned" : "other";
   }
 

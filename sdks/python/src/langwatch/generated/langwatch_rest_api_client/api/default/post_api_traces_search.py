@@ -10,12 +10,12 @@ from ...models.post_api_traces_search_response_400 import PostApiTracesSearchRes
 from ...models.post_api_traces_search_response_401 import PostApiTracesSearchResponse401
 from ...models.post_api_traces_search_response_422 import PostApiTracesSearchResponse422
 from ...models.post_api_traces_search_response_500 import PostApiTracesSearchResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiTracesSearchBody,
+    body: PostApiTracesSearchBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         "url": "/api/traces/search",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -95,8 +96,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiTracesSearchBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiTracesSearchBody | Unset = UNSET,
 ) -> Response[
     PostApiTracesSearchResponse200
     | PostApiTracesSearchResponse400
@@ -107,7 +108,7 @@ def sync_detailed(
     """Search traces for a project
 
     Args:
-        body (PostApiTracesSearchBody):
+        body (PostApiTracesSearchBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -130,8 +131,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    body: PostApiTracesSearchBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiTracesSearchBody | Unset = UNSET,
 ) -> (
     PostApiTracesSearchResponse200
     | PostApiTracesSearchResponse400
@@ -143,7 +144,7 @@ def sync(
     """Search traces for a project
 
     Args:
-        body (PostApiTracesSearchBody):
+        body (PostApiTracesSearchBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,8 +162,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiTracesSearchBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiTracesSearchBody | Unset = UNSET,
 ) -> Response[
     PostApiTracesSearchResponse200
     | PostApiTracesSearchResponse400
@@ -173,7 +174,7 @@ async def asyncio_detailed(
     """Search traces for a project
 
     Args:
-        body (PostApiTracesSearchBody):
+        body (PostApiTracesSearchBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -194,8 +195,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    body: PostApiTracesSearchBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiTracesSearchBody | Unset = UNSET,
 ) -> (
     PostApiTracesSearchResponse200
     | PostApiTracesSearchResponse400
@@ -207,7 +208,7 @@ async def asyncio(
     """Search traces for a project
 
     Args:
-        body (PostApiTracesSearchBody):
+        body (PostApiTracesSearchBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

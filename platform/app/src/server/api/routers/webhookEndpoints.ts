@@ -24,6 +24,7 @@ import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
+import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const orgInput = z.object({ organizationId: z.string() });
@@ -93,13 +94,13 @@ export const webhookEndpointsRouter = createTRPCRouter({
   /** The event catalog the drawer renders its checkboxes from. */
   eventTypes: protectedProcedure
     .input(orgInput)
-    .permission("webhookEndpoints:view")
+    .use(checkOrganizationPermission("webhookEndpoints:view"))
     .use(requireWebhooksPlan)
     .query(() => WEBHOOK_EVENT_TYPES),
 
   list: protectedProcedure
     .input(orgInput)
-    .permission("webhookEndpoints:view")
+    .use(checkOrganizationPermission("webhookEndpoints:view"))
     .use(requireWebhooksPlan)
     .query(({ ctx, input }) =>
       service(ctx.prisma).getAll({ organizationId: input.organizationId }),
@@ -114,7 +115,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
           .optional(),
       }),
     )
-    .permission("webhookEndpoints:view")
+    .use(checkOrganizationPermission("webhookEndpoints:view"))
     .use(requireWebhooksPlan)
     .query(({ ctx, input }) =>
       translating(() =>
@@ -139,7 +140,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
         maxInFlight: z.number().int().optional(),
       }),
     )
-    .permission("webhookEndpoints:manage")
+    .use(checkOrganizationPermission("webhookEndpoints:manage"))
     .use(requireWebhooksPlan)
     .mutation(({ ctx, input }) =>
       translating(() =>
@@ -158,7 +159,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
 
   health: protectedProcedure
     .input(endpointInput)
-    .permission("webhookEndpoints:view")
+    .use(checkOrganizationPermission("webhookEndpoints:view"))
     .use(requireWebhooksPlan)
     .query(({ ctx, input }) =>
       translating(() =>
@@ -188,7 +189,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
         maxInFlight: z.number().int().optional(),
       }),
     )
-    .permission("webhookEndpoints:manage")
+    .use(checkOrganizationPermission("webhookEndpoints:manage"))
     .use(requireWebhooksPlan)
     .mutation(({ ctx, input }) =>
       translating(() =>
@@ -208,7 +209,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
 
   rollSecret: protectedProcedure
     .input(endpointInput)
-    .permission("webhookEndpoints:manage")
+    .use(checkOrganizationPermission("webhookEndpoints:manage"))
     .use(requireWebhooksPlan)
     .mutation(({ ctx, input }) =>
       translating(() =>
@@ -221,7 +222,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
 
   enable: protectedProcedure
     .input(endpointInput)
-    .permission("webhookEndpoints:manage")
+    .use(checkOrganizationPermission("webhookEndpoints:manage"))
     .use(requireWebhooksPlan)
     .mutation(({ ctx, input }) =>
       translating(() =>
@@ -234,7 +235,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
 
   disable: protectedProcedure
     .input(endpointInput)
-    .permission("webhookEndpoints:manage")
+    .use(checkOrganizationPermission("webhookEndpoints:manage"))
     .use(requireWebhooksPlan)
     .mutation(({ ctx, input }) =>
       translating(() =>
@@ -247,7 +248,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(endpointInput)
-    .permission("webhookEndpoints:manage")
+    .use(checkOrganizationPermission("webhookEndpoints:manage"))
     .use(requireWebhooksPlan)
     .mutation(({ ctx, input }) =>
       translating(() =>

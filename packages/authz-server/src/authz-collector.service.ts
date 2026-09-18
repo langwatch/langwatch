@@ -153,7 +153,6 @@ export class AuthzCollectorService {
           organizationId,
           organizationRole: null,
           isOrgMember: false,
-          membershipDisabled: false,
           bindings: [],
           legacyTeamMemberships: [],
           customRolePermissions: new Map(),
@@ -272,10 +271,6 @@ export class AuthzCollectorService {
       // as the §9 ceiling, never as an addition.
       organizationRole: null,
       isOrgMember: false,
-      // A key holds no membership of its own, so it is never "disabled" -
-      // a disabled OWNER bites through the §9 ceiling instead, where the
-      // owner's own snapshot reports it.
-      membershipDisabled: false,
       bindings,
       legacyTeamMemberships: [],
       customRolePermissions: await this.prefetchCustomRolePermissions({
@@ -296,9 +291,9 @@ export class AuthzCollectorService {
     organizationId: string;
     reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const [membership, directBindings, groupBindings, legacyRows] =
+    const [organizationRole, directBindings, groupBindings, legacyRows] =
       await Promise.all([
-        reader.findOrganizationMembership({
+        reader.findOrganizationRole({
           userId: principal.id,
           organizationId,
         }),
@@ -319,24 +314,11 @@ export class AuthzCollectorService {
       ]);
 
     const bindings = [...directBindings, ...groupBindings];
-    // A seat-disabled membership is NOT a membership: the person keeps their
-    // row, their role and everything they did, and holds no access until an
-    // admin re-enables them (seat-reconciliation.feature). Reporting it as a
-    // membership is what let a disabled member keep every permission - only
-    // the org switcher hid the organization, and a direct call still worked.
-    //
-    // `organizationRole` follows `isOrgMember` rather than the stored role:
-    // the engine reads it to apply the EXTERNAL cap, and a role that outlived
-    // its membership would be answering for a principal who has none.
-    // `membershipDisabled` is carried separately so the denial can say WHICH
-    // gate closed instead of claiming they were never here.
-    const isOrgMember = membership != null && !membership.disabled;
     return {
       principal,
       organizationId,
-      organizationRole: isOrgMember ? membership.role : null,
-      isOrgMember,
-      membershipDisabled: membership?.disabled ?? false,
+      organizationRole,
+      isOrgMember: organizationRole != null,
       bindings,
       legacyTeamMemberships: legacyRows,
       customRolePermissions: await this.prefetchCustomRolePermissions({

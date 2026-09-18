@@ -25,7 +25,6 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   startTestContainers,
@@ -34,8 +33,6 @@ import {
 import type { Permission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-
-wireDefaultTestApp();
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 
@@ -169,7 +166,7 @@ describe("storedObjects.headById: who may probe", () => {
         }),
       ).rejects.toMatchObject({
         cause: {
-          code: "permission_denied",
+          code: "project_permission_denied",
           meta: { permission: "traces:view" },
         },
       });

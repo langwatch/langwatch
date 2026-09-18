@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import type { OrganizationIntent } from "~/generated/prisma/client";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { readAttribution } from "~/utils/attribution";
 import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
 import {
@@ -44,12 +43,7 @@ export const useOnboardingFlow = () => {
   // pre-fork flow. User-level evaluation — there is no org yet during
   // onboarding.
   const { enabled: intentForkEnabled, isLoading: intentForkLoading } =
-    useFeatureFlag("release_ui_ai_governance_enabled", {
-      // Onboarding runs before the person has either an organization or a
-      // project, so neither scope can target this read.
-      projectId: NOT_TARGETED,
-      organizationId: NOT_TARGETED,
-    });
+    useFeatureFlag("release_ui_ai_governance_enabled");
 
   // Flow configuration — recomputed when the intent changes (ADR-038 fork).
   // Safe mid-flow: intent only changes while ON the INTENT screen, whose

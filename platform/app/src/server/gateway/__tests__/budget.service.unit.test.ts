@@ -312,60 +312,38 @@ describe("GatewayBudgetService.getDetail", () => {
     findUnique: unknown;
     findMany: unknown;
   };
-  // Scope-target resolution goes through the shared batch resolver
-  // (scopeTargets.ts), which reads one findMany per scope kind. The row
-  // for the budget's own scope kind carries the budget's scopeId so the
-  // resolver can key it; every other kind resolves empty.
   function mockPrismaWithDetail(
     budget: GatewayBudget | null,
-    scopeRow: Record<string, unknown> | null,
+    scopeRow: unknown,
+    ledger: unknown[] = [],
   ): PrismaClient {
-    const targetRows =
-      budget && scopeRow ? [{ id: budget.scopeId, ...scopeRow }] : [];
-    const rowsFor = (kind: string) =>
-      budget?.scopeType === kind ? targetRows : [];
     return {
       gatewayBudget: {
         findFirst: vi.fn(async () => budget),
       },
+      gatewayBudgetLedger: {
+        findMany: vi.fn(async () => ledger),
+      },
       organization: {
-        findMany: vi.fn(async () => rowsFor("ORGANIZATION")),
+        findUnique: vi.fn(async () => scopeRow),
       },
       team: {
-        findMany: vi.fn(async () => rowsFor("TEAM")),
+        findUnique: vi.fn(async () => scopeRow),
       },
       project: {
-        // Serves three reads: the PROJECT scope-target lookup, the VK
-        // slug map, and the org-tenant fan-out for spend + ledger.
-        findMany: vi.fn(async () =>
-          budget?.scopeType === "PROJECT"
-            ? targetRows
-            : [{ id: "project_01", name: "Proj", slug: "proj" }],
-        ),
+        findUnique: vi.fn(async () => scopeRow),
+        findMany: vi.fn(async () => [{ id: "project_01" }]),
       },
       virtualKey: {
         findUnique: vi.fn(async () => scopeRow),
-        // The scope-target read selects the VK's PROJECT scopes; the
-        // ledger VK-name join and scope-reach do not. Discriminate on
-        // that so only the target read sees the row.
-        findMany: vi.fn(async (args?: { select?: { scopes?: unknown } }) =>
-          args?.select?.scopes
-            ? rowsFor("VIRTUAL_KEY").map((r) => ({
-                ...r,
-                scopes: [{ scopeId: "project_01" }],
-              }))
-            : [],
-        ),
+        findMany: vi.fn(async () => []),
       },
       virtualKeyScope: {
         findFirst: vi.fn(async () => ({ scopeId: "project_01" })),
         findMany: vi.fn(async () => []),
       },
       user: {
-        findMany: vi.fn(async () => rowsFor("PRINCIPAL")),
-      },
-      group: {
-        findMany: vi.fn(async () => rowsFor("GROUP")),
+        findUnique: vi.fn(async () => scopeRow),
       },
     } as unknown as PrismaClient & Record<string, Findable>;
   }
@@ -398,14 +376,16 @@ describe("GatewayBudgetService.getDetail", () => {
 
   describe("when scope is VIRTUAL_KEY", () => {
     it("includes the display prefix + project slug for linkback", async () => {
-      // The VK's PROJECT scope points at project_01, whose slug comes
-      // back from the batch resolver's slug map.
-      const sut = GatewayBudgetService.create(
-        mockPrismaWithDetail(
-          stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }),
-          { name: "prod-openai", displayPrefix: "lw_live_abc" },
-        ),
+      const baseMock = mockPrismaWithDetail(
+        stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }),
+        { name: "prod-openai", displayPrefix: "lw_live_abc" },
       );
+      // VIRTUAL_KEY resolveScopeTarget chains vk → virtualKeyScope → project.
+      // Override project.findUnique to return the linkback slug.
+      (
+        baseMock as unknown as { project: { findUnique: unknown } }
+      ).project.findUnique = vi.fn(async () => ({ slug: "proj" }));
+      const sut = GatewayBudgetService.create(baseMock);
       const detail = await sut.getDetail("b_01", "org_01");
       expect(detail?.scopeTarget).toEqual({
         kind: "VIRTUAL_KEY",

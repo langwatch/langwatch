@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import type { JsonObject } from "@prisma/client/runtime/client";
 import numeral from "numeral";
+import Parse from "papaparse";
 import { Download } from "react-feather";
 import type {
   BatchEvaluation,
@@ -21,7 +22,6 @@ import type {
   Project,
 } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
-import { downloadCsv } from "~/utils/downloadCsv";
 import { Tooltip } from "../../components/ui/tooltip";
 import { formatMoney } from "../../utils/formatMoney";
 
@@ -91,11 +91,20 @@ export default function BatchEvaluation({
       ]);
     });
 
-    downloadCsv({
-      fields,
-      rows: csvData,
-      fileName: `${experiment?.slug}.csv`,
+    const csv = Parse.unparse({
+      fields: fields,
+      data: csvData,
     });
+
+    const url = window.URL.createObjectURL(new Blob([csv]));
+
+    const link = document.createElement("a");
+    link.href = url;
+    const fileName = `${experiment?.slug}.csv`;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   const totalCost = evaluations.data?.reduce((acc, curr) => acc + curr.cost, 0);

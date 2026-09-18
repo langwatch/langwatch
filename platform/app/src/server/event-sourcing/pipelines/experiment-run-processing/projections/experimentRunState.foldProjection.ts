@@ -173,28 +173,10 @@ export class ExperimentRunStateFoldProjection
     };
   }
 
-  /**
-   * A cell the run produced moves every counter. A cell the run CARRIED from
-   * the board moves none of them.
-   *
-   * Money and time belong to the run that spent them, and the carried cell was
-   * paid for by an earlier run, so adding it here reports spend that did not
-   * happen. `Total` counts the cells this run dispatched, so a carried cell
-   * that incremented `CompletedCount` would report the run as more than
-   * finished. The carried cell is still stored, and the results page draws it;
-   * it just is not this run's work.
-   */
   handleExperimentRunTargetResult(
     event: TargetResultEvent,
     state: ExperimentRunStateData,
   ): ExperimentRunStateData {
-    if (event.data.carriedOver) {
-      return {
-        ...state,
-        Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
-      };
-    }
-
     let completedCount = state.CompletedCount;
     let failedCount = state.FailedCount;
 
@@ -228,11 +210,6 @@ export class ExperimentRunStateFoldProjection
     };
   }
 
-  /**
-   * A verdict counts toward what the run scored whether the run produced it or
-   * carried it, because the run stands for the whole board. Its cost counts
-   * only when the run produced it.
-   */
   handleExperimentRunEvaluatorResult(
     event: EvaluatorResultEvent,
     state: ExperimentRunStateData,
@@ -256,10 +233,7 @@ export class ExperimentRunStateFoldProjection
       }
     }
 
-    // The verdict counts, its money does not. A carried verdict describes the
-    // board the run stands for, so a reader comparing two columns sees both
-    // sides; the money was spent by the run that produced it.
-    if (event.data.cost != null && !event.data.carriedOver) {
+    if (event.data.cost != null) {
       totalCost = (totalCost ?? 0) + event.data.cost;
     }
 

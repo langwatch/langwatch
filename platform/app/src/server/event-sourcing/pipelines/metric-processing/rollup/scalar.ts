@@ -1,11 +1,9 @@
-import type { MetricRollupRow } from "../schemas/metricDataPoint";
+import type {
+  CanonicalMetricDataPoint,
+  MetricRollupRow,
+} from "../schemas/metricDataPoint";
 import { addStats, type BucketEntry, resetOrGap } from "./row";
-import {
-  type MetricRollupSourcePoint,
-  numberValue,
-  previousPoint,
-  startsNewSequence,
-} from "./sequence";
+import { numberValue, previousPoint, startsNewSequence } from "./sequence";
 
 export function buildGaugeRow({
   row,
@@ -29,7 +27,7 @@ export function buildSumRow({
 }: {
   row: MetricRollupRow;
   entries: BucketEntry[];
-  all: MetricRollupSourcePoint[];
+  all: CanonicalMetricDataPoint[];
 }): void {
   for (const { point, index } of entries) {
     const current = numberValue(point);

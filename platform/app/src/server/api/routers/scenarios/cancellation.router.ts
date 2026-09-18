@@ -15,6 +15,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import type { CancellationServiceDeps } from "~/server/scenarios/cancellation";
 import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
+import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:scenarios:cancellation");
@@ -64,7 +65,7 @@ function getService(): ScenarioCancellationService {
 export const cancellationRouter = createTRPCRouter({
   cancelJob: protectedProcedure
     .input(cancelJobSchema)
-    .permission("scenarios:manage")
+    .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
       logger.info(
         {
@@ -80,7 +81,7 @@ export const cancellationRouter = createTRPCRouter({
 
   cancelBatchRun: protectedProcedure
     .input(cancelBatchRunSchema)
-    .permission("scenarios:manage")
+    .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
       logger.info(
         {

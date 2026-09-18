@@ -87,9 +87,6 @@ export function createExecuteRunHandler(
       ...(payload.parameters !== undefined
         ? { parameters: payload.parameters }
         : {}),
-      ...(payload.secretParameters !== undefined
-        ? { secretParameters: payload.secretParameters }
-        : {}),
     });
     logger.info(
       { scenarioRunId: payload.scenarioRunId },

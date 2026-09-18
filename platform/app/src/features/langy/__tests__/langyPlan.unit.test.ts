@@ -64,38 +64,46 @@ describe("langyPlan", () => {
   });
 
   describe("given tool calls interleaved with plan updates", () => {
-    // The calls themselves are the transcript's (logic/langyTranscript.ts), so
-    // the plan reads the steps out of the snapshots and leaves the work alone.
-    /** @scenario "The checklist is the steps, and the work stays in the transcript" */
-    it("reads the steps and carries none of the work", () => {
+    it("attributes each call to the step that was current when it started", () => {
       const message = {
         parts: [
-          tool("bash", "warmup"),
+          tool("bash", "warmup"), // before any plan → preamble
           todo([
             { content: "Find slow traces", status: "in_progress" },
             { content: "Summarise them", status: "pending" },
           ]),
-          tool("bash", "search"),
+          tool("bash", "search"), // step 1 running
           todo([
             { content: "Find slow traces", status: "completed" },
             { content: "Summarise them", status: "in_progress" },
           ]),
-          tool("bash", "read"),
+          tool("bash", "read"), // step 2 running
         ],
       };
 
       const plan = langyPlan(message)!;
-      expect(plan.items.map((item) => item.status)).toEqual([
-        "completed",
-        "in_progress",
-      ]);
-      expect(plan.currentIndex).toBe(1);
-      expect(Object.keys(plan)).toEqual([
-        "items",
-        "currentIndex",
-        "completedCount",
-        "totalCount",
-      ]);
+      expect(plan.preamble).toHaveLength(1);
+      expect((plan.preamble[0] as { toolCallId: string }).toolCallId).toBe(
+        "warmup",
+      );
+      expect(
+        plan.itemParts[0]!.map((p) => (p as { toolCallId: string }).toolCallId),
+      ).toEqual(["search"]);
+      expect(
+        plan.itemParts[1]!.map((p) => (p as { toolCallId: string }).toolCallId),
+      ).toEqual(["read"]);
+    });
+
+    it("does not attribute a preamble call to a later step", () => {
+      const message = {
+        parts: [
+          tool("bash", "early"),
+          todo([{ content: "Do the thing", status: "in_progress" }]),
+        ],
+      };
+      const plan = langyPlan(message)!;
+      expect(plan.itemParts[0]).toEqual([]);
+      expect(plan.preamble).toHaveLength(1);
     });
   });
 
@@ -199,7 +207,7 @@ describe("langyPlan", () => {
       ]);
     });
 
-    it("takes the override's items whatever the parts also ran", () => {
+    it("still attributes tool calls from the message's snapshot history", () => {
       const message = {
         parts: [
           todo([{ content: "Do the thing", status: "in_progress" }]),
@@ -209,10 +217,10 @@ describe("langyPlan", () => {
       const plan = langyPlan(message, {
         overrideItems: [{ content: "Do the thing", status: "in_progress" }],
       })!;
-      expect(plan.items).toEqual([
-        { content: "Do the thing", status: "in_progress" },
-      ]);
-      expect(plan.currentIndex).toBe(0);
+      // The override supplies the items; attribution still comes from the parts.
+      expect(
+        plan.itemParts[0]!.map((p) => (p as { toolCallId: string }).toolCallId),
+      ).toEqual(["c1"]);
     });
 
     it("normalises an unknown override status to pending", () => {

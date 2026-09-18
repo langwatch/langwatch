@@ -107,7 +107,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     type_: str | Unset = UNSET,
     from_: int,
     to: int,
@@ -123,14 +123,13 @@ def sync_detailed(
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
-    by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
-    must not be later than `to` — a range that ends before it starts is rejected rather than answered
-    with an empty page. They are required because the log is a ranged read over the 13-month spend table
-    and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
-    copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
-    families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained
-    in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page
-    rather than an error, so a client can probe forward-compatibly.
+    by type. `from` and `to` bound the created range in epoch milliseconds and are REQUIRED, because the
+    log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every
+    page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed`
+    and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`,
+    `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they
+    cannot be listed or replayed here; any other type returns an empty page rather than an error, so a
+    client can probe forward-compatibly.
 
     Args:
         type_ (str | Unset):
@@ -164,7 +163,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     type_: str | Unset = UNSET,
     from_: int,
     to: int,
@@ -181,14 +180,13 @@ def sync(
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
-    by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
-    must not be later than `to` — a range that ends before it starts is rejected rather than answered
-    with an empty page. They are required because the log is a ranged read over the 13-month spend table
-    and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
-    copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
-    families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained
-    in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page
-    rather than an error, so a client can probe forward-compatibly.
+    by type. `from` and `to` bound the created range in epoch milliseconds and are REQUIRED, because the
+    log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every
+    page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed`
+    and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`,
+    `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they
+    cannot be listed or replayed here; any other type returns an empty page rather than an error, so a
+    client can probe forward-compatibly.
 
     Args:
         type_ (str | Unset):
@@ -217,7 +215,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     type_: str | Unset = UNSET,
     from_: int,
     to: int,
@@ -233,14 +231,13 @@ async def asyncio_detailed(
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
-    by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
-    must not be later than `to` — a range that ends before it starts is rejected rather than answered
-    with an empty page. They are required because the log is a ranged read over the 13-month spend table
-    and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
-    copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
-    families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained
-    in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page
-    rather than an error, so a client can probe forward-compatibly.
+    by type. `from` and `to` bound the created range in epoch milliseconds and are REQUIRED, because the
+    log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every
+    page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed`
+    and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`,
+    `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they
+    cannot be listed or replayed here; any other type returns an empty page rather than an error, so a
+    client can probe forward-compatibly.
 
     Args:
         type_ (str | Unset):
@@ -272,7 +269,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     type_: str | Unset = UNSET,
     from_: int,
     to: int,
@@ -289,14 +286,13 @@ async def asyncio(
     """List emitted events
 
      The organization's emitted-events log for the request families: cursor-paged, newest first, filter
-    by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from`
-    must not be later than `to` — a range that ends before it starts is rejected rather than answered
-    with an empty page. They are required because the log is a ranged read over the 13-month spend table
-    and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only
-    copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance
-    families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained
-    in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page
-    rather than an error, so a client can probe forward-compatibly.
+    by type. `from` and `to` bound the created range in epoch milliseconds and are REQUIRED, because the
+    log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every
+    page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed`
+    and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`,
+    `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they
+    cannot be listed or replayed here; any other type returns an empty page rather than an error, so a
+    client can probe forward-compatibly.
 
     Args:
         type_ (str | Unset):

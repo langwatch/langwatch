@@ -7,6 +7,7 @@
  * fragility of a native HEAD probe.
  */
 import { z } from "zod";
+import { checkProjectPermissionAny } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 
@@ -41,7 +42,7 @@ export const storedObjectsRouter = createTRPCRouter({
         id: z.string(),
       }),
     )
-    .permissionAny("traces:view", "scenarios:view")
+    .use(checkProjectPermissionAny("traces:view", "scenarios:view"))
     .query(async ({ input }) => {
       const { projectId, id } = input;
       const service = createStoredObjectsService({ projectId });

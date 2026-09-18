@@ -5,12 +5,12 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_groups_body import PostApiGroupsBody
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiGroupsBody,
+    body: PostApiGroupsBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -19,7 +19,8 @@ def _get_kwargs(
         "url": "/api/groups",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -48,13 +49,13 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGroupsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGroupsBody | Unset = UNSET,
 ) -> Response[Any]:
     """Create a new group
 
     Args:
-        body (PostApiGroupsBody):
+        body (PostApiGroupsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -77,13 +78,13 @@ def sync_detailed(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGroupsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGroupsBody | Unset = UNSET,
 ) -> Response[Any]:
     """Create a new group
 
     Args:
-        body (PostApiGroupsBody):
+        body (PostApiGroupsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

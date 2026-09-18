@@ -81,6 +81,11 @@ import {
   lwqlPostgresViews,
 } from "../catalog/types";
 import {
+  DEFAULT_POSTGRES_READER_LIMITS,
+  postgresNamedCollectionStatements,
+  postgresReaderRoleStatements,
+} from "../postgresMapping";
+import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
@@ -89,18 +94,13 @@ import {
   type LangWatchQLTable,
   lwqlClickHouseSetupStatements,
   lwqlRowPolicyStatement,
-} from "../provisioning/accessModel";
+} from "../provisioning";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
   lwqlPostgresEngineTableStatements,
   lwqlPostgresReaderConnectionLimit,
-} from "../provisioning/catalogStatements";
-import {
-  DEFAULT_POSTGRES_READER_LIMITS,
-  postgresNamedCollectionStatements,
-  postgresReaderRoleStatements,
-} from "../provisioning/postgresMapping";
+} from "../views";
 
 /** PostgreSQL image the PG-engine half of the proof runs against. */
 export const TEST_POSTGRES_IMAGE = "postgres:17";
@@ -1807,7 +1807,7 @@ const PG_BASE_TABLE_DDL: Record<string, string> = {
     '"evaluation" text not null, "status" text not null, "score" double precision not null, ' +
     '"label" text, "passed" boolean not null, "cost" double precision not null, ' +
     '"datasetId" text not null, "datasetSlug" text not null, "details" text not null, ' +
-    '"data" jsonb not null, "createdAt" timestamptz not null, "updatedAt" timestamptz not null)',
+    '"data" jsonb not null, "createdAt" timestamptz not null)',
   LlmPromptConfig:
     '("id" text primary key, "projectId" text not null, "name" text not null, ' +
     '"handle" text, "createdAt" timestamptz not null, "deletedAt" timestamptz)',
@@ -1942,7 +1942,7 @@ export function postgresTenantSeedStatements({
           `('${tenantId}-run-${index + 1}', '${tenantId}', '${tenantId}-experiment', ` +
           `'exact_match', 'finished', ${score}, 'label-${index + 1}', ` +
           `${score >= 0.8}, ${index + 1}.25, 'dataset-${index + 1}', 'dataset-slug-${index + 1}', ` +
-          `'excluded-details-of-${tenantId}', '{"excluded":"rows"}'::jsonb, ${at}, ${at})`,
+          `'excluded-details-of-${tenantId}', '{"excluded":"rows"}'::jsonb, ${at})`,
       ),
     ),
     rows("LlmPromptConfig", [

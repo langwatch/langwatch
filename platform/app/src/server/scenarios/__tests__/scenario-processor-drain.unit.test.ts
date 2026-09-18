@@ -61,9 +61,6 @@ describe("drainInFlightRuns", () => {
         ensureFailureEventsEmitted:
           mockEnsureFailureEventsEmitted as ProcessorDependencies["failureEmitter"]["ensureFailureEventsEmitted"],
       },
-      agentInstanceRecorder: {
-        recordAgentInstance: vi.fn().mockResolvedValue(undefined),
-      },
     };
   });
 

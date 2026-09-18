@@ -1,9 +1,11 @@
 /**
  * Unit tests for InviteService.
  *
- * Tests the service in isolation with mocked dependencies. The invitation
- * lifecycle scenarios live in specs/identity/resilient-invitations.feature
- * (D11); the resilience-specific claims are in invite-resilience.unit.test.ts.
+ * Covers the @unit scenarios from specs/members/update-pending-invitation.feature:
+ * - Pending invites query returns both PENDING and WAITING_APPROVAL invites
+ * - createAdminInviteRecord creates record without sending email
+ *
+ * Tests the service in isolation with mocked dependencies.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -150,20 +152,15 @@ describe("InviteService", () => {
     mockPrisma = {
       // The membership row and the invite's acceptance are one transaction:
       // a PENDING invite must never be one that has already granted access.
-      // The stub runs the batch it is handed — or, for the claim's callback
-      // form, hands itself back as `tx` — and `$connect` is what marks it
+      // The stub runs the batch it is handed, and `$connect` is what marks it
       // as a root client rather than somebody else's transaction.
       $connect: vi.fn(),
-      $transaction: (arg: unknown) =>
-        typeof arg === "function"
-          ? (arg as (tx: unknown) => unknown)(mockPrisma)
-          : Promise.all(arg as Promise<unknown>[]),
+      $transaction: (writes: Promise<unknown>[]) => Promise.all(writes),
       organizationInvite: {
         findFirst: vi.fn(),
         findMany: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
-        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       organization: {
         findFirst: vi.fn(),
@@ -416,7 +413,7 @@ describe("InviteService", () => {
       });
     });
 
-    describe("when a PAYMENT_PENDING invite exists for the email", () => {
+    describe("when a WAITING_APPROVAL invite exists for the email", () => {
       it("returns the existing invite", async () => {
         const existingInvite = { id: "inv-2", email: "test@example.com" };
         mockPrisma.organizationInvite.findFirst.mockResolvedValue(
@@ -621,37 +618,39 @@ describe("InviteService", () => {
     });
   });
 
-  describe("resendInvite()", () => {
-    describe("when the email service fails", () => {
+  describe("approveInvite()", () => {
+    describe("when email service fails", () => {
       const mockOrganization = { id: "org-1", name: "Test Org" };
       const mockInvite = {
         id: "inv-1",
         email: "user@example.com",
         inviteCode: "abc123",
-        status: "PENDING",
-        expiration: new Date(Date.now() - 1000),
+        status: "WAITING_APPROVAL",
         organization: mockOrganization,
+      };
+      const updatedInvite = {
+        ...mockInvite,
+        status: "PENDING",
+        organization: undefined,
       };
 
       beforeEach(() => {
         mockPrisma.organizationInvite.findFirst.mockResolvedValue(mockInvite);
-        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
-          count: 1,
-        });
+        mockPrisma.organizationInvite.update.mockResolvedValue(updatedInvite);
         mockSendInviteEmail.mockRejectedValue(new Error("SMTP failure"));
       });
 
-      it("still resends the invitation with a fresh code", async () => {
-        const result = await service.resendInvite({
+      it("still approves the invitation", async () => {
+        const result = await service.approveInvite({
           inviteId: "inv-1",
           organizationId: "org-1",
         });
 
-        expect(result.invite.inviteCode).not.toBe("abc123");
+        expect(result.invite.status).toBe("PENDING");
       });
 
-      it("returns emailNotSent as true so the fresh link is shown instead", async () => {
-        const result = await service.resendInvite({
+      it("returns emailNotSent as true", async () => {
+        const result = await service.approveInvite({
           inviteId: "inv-1",
           organizationId: "org-1",
         });
@@ -925,15 +924,10 @@ describe("InviteService", () => {
         expect(teamBinding!.principal).toEqual({ userId: "user-flow-1" });
         expect(teamBinding!.scopeId).toBe("team-1");
 
-        // Verify: invite was claimed ACCEPTED — a conditional update on the
-        // PENDING status, recording who accepted.
-        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith(
+        // Verify: invite was marked ACCEPTED
+        expect(mockPrisma.organizationInvite.update).toHaveBeenCalledWith(
           expect.objectContaining({
-            where: expect.objectContaining({ status: "PENDING" }),
-            data: expect.objectContaining({
-              status: "ACCEPTED",
-              acceptedByUserId: "user-flow-1",
-            }),
+            data: { status: "ACCEPTED" },
           }),
         );
       });
@@ -954,9 +948,7 @@ describe("InviteService", () => {
 
       beforeEach(() => {
         (mockPrisma as any).organizationUser = { createMany: vi.fn() };
-        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
-          count: 1,
-        });
+        mockPrisma.organizationInvite.update.mockResolvedValue({});
         // The writer is module-level and shared, so what the previous test
         // sent it would otherwise be counted as this one's.
         ledger.attachBindings.mockClear();
@@ -971,9 +963,9 @@ describe("InviteService", () => {
       describe("when it is applied", () => {
         it("accepts the invite before granting anything, so a pending invite never carries access", async () => {
           const order: string[] = [];
-          mockPrisma.organizationInvite.updateMany.mockImplementation(() => {
+          mockPrisma.organizationInvite.update.mockImplementation(() => {
             order.push("accepted");
-            return Promise.resolve({ count: 1 });
+            return Promise.resolve({});
           });
           ledger.attachBindings.mockImplementation(() => {
             order.push("granted");

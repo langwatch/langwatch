@@ -26,10 +26,8 @@ import {
 } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { registerGovernanceMcpTools } from "../governance-tools";
 
-wireDefaultTestApp();
+import { registerGovernanceMcpTools } from "../governance-tools";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-mcp-${suffix}`;

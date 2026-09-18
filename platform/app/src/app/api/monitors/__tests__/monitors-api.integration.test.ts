@@ -9,10 +9,7 @@ import type {
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
-
-wireDefaultTestApp();
 
 describe("Monitors API", () => {
   let testApiKey: string;

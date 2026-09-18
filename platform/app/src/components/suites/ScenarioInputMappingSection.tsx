@@ -22,26 +22,18 @@ import type {
 } from "~/components/variables/VariableMappingInput";
 import type { Variable } from "~/components/variables/VariablesSection";
 import { VariablesSection } from "~/components/variables/VariablesSection";
-import {
-  fromOutputFieldState,
-  resolveOutputField,
-  toOutputFieldState,
-} from "./outputFieldState";
 
-/** The scenario fields shown as input mapping rows. */
+/** The three scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [
   { identifier: "input", type: "str" },
   { identifier: "messages", type: "str" },
   { identifier: "threadId", type: "str" },
-  { identifier: "session", type: "str" },
 ];
 
 const SCENARIO_INPUT_INFO: Record<string, string> = {
   input: "The latest message from the simulated user",
   messages: "Full conversation history as a JSON string",
   threadId: "Unique identifier for the conversation thread",
-  session:
-    "The value the agent returned as session on the previous turn of this conversation, empty on the first turn",
 };
 
 /** The single scenario output field. */
@@ -175,15 +167,15 @@ export function ScenarioInputMappingSection({
   );
 
   const hasOutputs = (outputs ?? []).length > 0;
-  const selectedOutput = resolveOutputField({
-    state: toOutputFieldState(outputField),
-    firstDeclaredOutput: outputs?.[0]?.identifier,
-  });
-  const hasOutputMapping = selectedOutput !== null && hasOutputs;
+  const autoOutputLabel = outputs?.[0]?.identifier ?? "output";
+  // undefined = not yet set (auto-populate), "" = explicitly cleared, string = user selection
+  const selectedOutput =
+    outputField === undefined ? autoOutputLabel : outputField;
+  const hasOutputMapping = selectedOutput !== "" && hasOutputs;
 
   const outputDisplayMappings = useMemo<Record<string, FieldMapping>>(
     () =>
-      hasOutputMapping && selectedOutput !== null
+      hasOutputMapping
         ? {
             output: {
               type: "source",
@@ -212,13 +204,12 @@ export function ScenarioInputMappingSection({
     _scenarioField: string,
     displayMapping: FieldMapping | undefined,
   ) => {
-    const selected =
-      displayMapping?.type === "source" && displayMapping.path[0];
-    onOutputFieldChange?.(
-      fromOutputFieldState(
-        selected ? { kind: "set", value: selected } : { kind: "cleared" },
-      ),
-    );
+    if (displayMapping?.type === "source" && displayMapping.path[0]) {
+      onOutputFieldChange?.(displayMapping.path[0]);
+    } else {
+      // Empty string signals "explicitly cleared" vs undefined which means "not yet set"
+      onOutputFieldChange?.("");
+    }
   };
 
   const handleDisplayMappingChange = (

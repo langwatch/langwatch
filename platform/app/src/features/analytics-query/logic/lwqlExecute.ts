@@ -13,7 +13,6 @@
 import { getUntypedClient } from "@trpc/client";
 
 import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import type { api, RouterInputs } from "~/utils/api";
 
 import type { LangWatchQLExecute } from "./lwqlRequestController";
@@ -36,7 +35,6 @@ type LangWatchQLQueryInput = {
   sql: string;
   parameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
   timeWindow?: { start: Date; end: Date };
-  granularitySeconds?: LangWatchQLGranularityStep;
 };
 
 /**

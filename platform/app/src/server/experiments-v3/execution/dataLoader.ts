@@ -281,20 +281,6 @@ export const workflowLoadKey = (target: {
 }): string =>
   `${target.workflowId ?? ""}::${target.workflowVersionId ?? "published"}`;
 
-/**
- * Cache key for a loaded prompt. Two targets that pin the same prompt to
- * different versions must not share a loaded prompt, so the key includes the
- * requested version (or "latest" when the target follows the newest one).
- *
- * Every reader goes through this helper: keying a lookup on the bare promptId
- * reads whichever version was loaded last.
- */
-export const promptLoadKey = (target: {
-  promptId?: string;
-  promptVersionNumber?: number;
-}): string =>
-  `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
-
 export type LoadedExecutionData = {
   datasetRows: Array<Record<string, unknown>>;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
@@ -339,19 +325,13 @@ export type ExecutionDataInputs = {
   parameters?: Record<string, string | number | boolean>;
 };
 
-export const loadExecutionData = async ({
-  projectId,
-  dataset,
-  targets,
-  evaluators,
-  inputs,
-}: {
-  projectId: string;
-  dataset: DatasetInput;
-  targets: TargetForLoading[];
-  evaluators: EvaluatorForLoading[];
-  inputs?: ExecutionDataInputs;
-}): Promise<LoadedExecutionData | { error: string; status: number }> => {
+export const loadExecutionData = async (
+  projectId: string,
+  dataset: DatasetInput,
+  targets: TargetForLoading[],
+  evaluators: EvaluatorForLoading[],
+  inputs?: ExecutionDataInputs,
+): Promise<LoadedExecutionData | { error: string; status: number }> => {
   // Resolve the base rows + columns: inline data, a saved dataset id, or the
   // attached dataset reference, in that precedence.
   let baseDataset: LoadedDataset;
@@ -410,7 +390,6 @@ export const loadExecutionData = async ({
 
   for (const target of targets) {
     if (target.type === "prompt" && target.promptId) {
-      if (loadedPrompts.has(promptLoadKey(target))) continue;
       try {
         const prompt = await promptService.getPromptByIdOrHandle({
           idOrHandle: target.promptId,
@@ -418,7 +397,7 @@ export const loadExecutionData = async ({
           version: target.promptVersionNumber ?? undefined,
         });
         if (prompt) {
-          loadedPrompts.set(promptLoadKey(target), prompt);
+          loadedPrompts.set(target.promptId, prompt);
         } else {
           const versionInfo = target.promptVersionNumber
             ? ` version ${target.promptVersionNumber}`
@@ -458,14 +437,9 @@ export const loadExecutionData = async ({
         id: target.dbAgentId,
         projectId,
       });
-      // A missing agent used to leave the map short and the run continued
-      // against nothing, reporting an empty column rather than the deletion
-      // that caused it. Same answer as a missing prompt or workflow: say what
-      // is gone and stop.
-      if (!agent) {
-        return { error: `Agent "${target.dbAgentId}" not found`, status: 404 };
+      if (agent) {
+        loadedAgents.set(target.dbAgentId, agent);
       }
-      loadedAgents.set(target.dbAgentId, agent);
     }
   }
 
@@ -571,17 +545,15 @@ export const loadExecutionData = async ({
     }
   }
 
-  // Load all evaluators. A missing one stops the run for the same reason a
-  // missing agent does: the alternative is a run that quietly scores nothing.
+  // Load all evaluators
   for (const evaluatorId of evaluatorIdsToLoad) {
     const dbEvaluator = await evaluatorService.getById({
       id: evaluatorId,
       projectId,
     });
-    if (!dbEvaluator) {
-      return { error: `Evaluator "${evaluatorId}" not found`, status: 404 };
+    if (dbEvaluator) {
+      loadedEvaluators.set(evaluatorId, dbEvaluator);
     }
-    loadedEvaluators.set(evaluatorId, dbEvaluator);
   }
 
   return {

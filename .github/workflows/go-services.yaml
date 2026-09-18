@@ -40,7 +40,6 @@ on:
       - "charts/gateway/**"
       # from `langyagent`
       - "services/langyagent/**"
-      - "services/langyworker/**"
       - "sdks/go/**"
       - "infra/docker/Dockerfile.langyagent"
       - "sdks/typescript/**"
@@ -115,7 +114,6 @@ jobs:
               # (a new copy-types.sh input was never COPYed into the image).
               # Validate the image build whenever any build input moves.
               - 'services/langyagent/**'
-              - 'services/langyworker/**'
               - 'pkg/**'
               - 'cmd/**'
               - 'sdks/go/**'

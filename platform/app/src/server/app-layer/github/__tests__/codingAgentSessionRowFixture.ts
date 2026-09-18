@@ -63,7 +63,6 @@ export function codingAgentSessionRow(
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     costUsd: 0,
-    agentReportedCostUsd: 0,
 
     modelCallMs: 0,
     toolMs: 0,

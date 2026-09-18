@@ -11,13 +11,13 @@ from ...models.patch_api_gateway_v1_virtual_keys_by_id_response_400 import Patch
 from ...models.patch_api_gateway_v1_virtual_keys_by_id_response_401 import PatchApiGatewayV1VirtualKeysByIdResponse401
 from ...models.patch_api_gateway_v1_virtual_keys_by_id_response_403 import PatchApiGatewayV1VirtualKeysByIdResponse403
 from ...models.patch_api_gateway_v1_virtual_keys_by_id_response_500 import PatchApiGatewayV1VirtualKeysByIdResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiGatewayV1VirtualKeysByIdBody,
+    body: PatchApiGatewayV1VirtualKeysByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -28,7 +28,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -100,8 +101,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiGatewayV1VirtualKeysByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiGatewayV1VirtualKeysByIdBody | Unset = UNSET,
 ) -> Response[
     PatchApiGatewayV1VirtualKeysByIdResponse200
     | PatchApiGatewayV1VirtualKeysByIdResponse400
@@ -112,14 +113,12 @@ def sync_detailed(
     """Update virtual key
 
      Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
-    and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and
-    costs land: send `trace_project_id` for that, validated the way create validates it; explicit null
-    re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged.
-    `budget` upserts the key's own cap; explicit null archives it.
+    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
+    key's own cap; explicit null archives it.
 
     Args:
         id (str):
-        body (PatchApiGatewayV1VirtualKeysByIdBody):
+        body (PatchApiGatewayV1VirtualKeysByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -144,8 +143,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiGatewayV1VirtualKeysByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiGatewayV1VirtualKeysByIdBody | Unset = UNSET,
 ) -> (
     PatchApiGatewayV1VirtualKeysByIdResponse200
     | PatchApiGatewayV1VirtualKeysByIdResponse400
@@ -157,14 +156,12 @@ def sync(
     """Update virtual key
 
      Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
-    and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and
-    costs land: send `trace_project_id` for that, validated the way create validates it; explicit null
-    re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged.
-    `budget` upserts the key's own cap; explicit null archives it.
+    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
+    key's own cap; explicit null archives it.
 
     Args:
         id (str):
-        body (PatchApiGatewayV1VirtualKeysByIdBody):
+        body (PatchApiGatewayV1VirtualKeysByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -184,8 +181,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiGatewayV1VirtualKeysByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiGatewayV1VirtualKeysByIdBody | Unset = UNSET,
 ) -> Response[
     PatchApiGatewayV1VirtualKeysByIdResponse200
     | PatchApiGatewayV1VirtualKeysByIdResponse400
@@ -196,14 +193,12 @@ async def asyncio_detailed(
     """Update virtual key
 
      Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
-    and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and
-    costs land: send `trace_project_id` for that, validated the way create validates it; explicit null
-    re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged.
-    `budget` upserts the key's own cap; explicit null archives it.
+    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
+    key's own cap; explicit null archives it.
 
     Args:
         id (str):
-        body (PatchApiGatewayV1VirtualKeysByIdBody):
+        body (PatchApiGatewayV1VirtualKeysByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -226,8 +221,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiGatewayV1VirtualKeysByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiGatewayV1VirtualKeysByIdBody | Unset = UNSET,
 ) -> (
     PatchApiGatewayV1VirtualKeysByIdResponse200
     | PatchApiGatewayV1VirtualKeysByIdResponse400
@@ -239,14 +234,12 @@ async def asyncio(
     """Update virtual key
 
      Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set
-    and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and
-    costs land: send `trace_project_id` for that, validated the way create validates it; explicit null
-    re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged.
-    `budget` upserts the key's own cap; explicit null archives it.
+    and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the
+    key's own cap; explicit null archives it.
 
     Args:
         id (str):
-        body (PatchApiGatewayV1VirtualKeysByIdBody):
+        body (PatchApiGatewayV1VirtualKeysByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

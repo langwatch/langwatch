@@ -70,7 +70,6 @@ func Root(ctx context.Context, _ []string) error {
 		SessionsRoot:       cfg.SessionsRoot,
 		WorkspaceRoot:      cfg.WorkspaceRoot,
 		OpenCodeBinaryPath: cfg.OpenCodeBinaryPath,
-		PiBinaryPath:       cfg.PiWorkerBinaryPath,
 		Runner:             runner,
 		Telemetry:          deps.Telemetry,
 		Egress:             mgr.EgressGuard(),

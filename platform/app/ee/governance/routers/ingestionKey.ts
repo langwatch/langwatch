@@ -20,6 +20,7 @@
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import { z } from "zod";
 
+import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const mintInput = z.object({
@@ -36,7 +37,7 @@ export const ingestionKeyRouter = createTRPCRouter({
    */
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       const service = IngestionKeyService.create(ctx.prisma);
       return await service.listForPersonalProject({
@@ -52,7 +53,7 @@ export const ingestionKeyRouter = createTRPCRouter({
    */
   install: protectedProcedure
     .input(mintInput)
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionKeyService.create(ctx.prisma);
       return await service.ensureForPersonalProject({
@@ -70,7 +71,7 @@ export const ingestionKeyRouter = createTRPCRouter({
    */
   rotate: protectedProcedure
     .input(mintInput)
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionKeyService.create(ctx.prisma);
       return await service.ensureForPersonalProject({

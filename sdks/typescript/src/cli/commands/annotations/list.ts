@@ -23,9 +23,14 @@ export const listAnnotationsCommand = async (options: {
   const spinner = createSpinner(label).start();
 
   try {
-    const annotations = options.traceId
+    const result = options.traceId
       ? await service.getByTrace(options.traceId)
       : await service.getAll();
+
+    // Handle both array and {data: [...]} response shapes
+    const annotations = Array.isArray(result)
+      ? result
+      : (result as unknown as { data: typeof result }).data ?? [];
 
     spinner.succeed(
       `Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`,
@@ -40,7 +45,7 @@ export const listAnnotationsCommand = async (options: {
           console.log(chalk.gray("Create one with:"));
           console.log(
             chalk.cyan(
-              '  langwatch annotation create <traceId> --comment "Great response!" --thumbs-up',
+              '  langwatch annotation create <traceId> --comment "Great response!"',
             ),
           );
           return;

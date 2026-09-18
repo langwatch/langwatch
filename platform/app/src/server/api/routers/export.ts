@@ -12,6 +12,7 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { checkProjectPermission, type Permission } from "../rbac";
 
 const logger = createLogger("langwatch:api:export");
 
@@ -65,12 +66,10 @@ function readProgressEvent({
  * `scenarios:view` and a trace export by `traces:view`. Factored rather than
  * copied so the two cannot drift on filtering or teardown.
  */
-function exportProgressSubscription(
-  permission: "traces:view" | "scenarios:view",
-) {
+function exportProgressSubscription(permission: Permission) {
   return protectedProcedure
     .input(z.object({ projectId: z.string(), exportId: z.string() }))
-    .permission(permission)
+    .use(checkProjectPermission(permission))
     .subscription(async function* (opts) {
       const { projectId, exportId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);

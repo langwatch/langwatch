@@ -1,8 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
-import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   SCOPE_TIERS,
   type ScopeAssignment,
@@ -40,10 +38,11 @@ import {
   validateProviderApiKey,
 } from "../../modelProviders/providerValidation";
 import {
-  ROUTING_HANDLE_MAX_LENGTH,
-  ROUTING_HANDLE_RULE,
-} from "../../modelProviders/routingHandle";
-import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
+  checkOrganizationPermission,
+  checkProjectPermission,
+  hasProjectPermission,
+  type Permission,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   getProjectModelProviders,
@@ -86,41 +85,17 @@ function requireTenantAnchor(
   }
 }
 
-// The declarations for the three hoisted custom permission middlewares
-// below. Consts here, above the router literal, so `.use()` can brand each
-// hoisted function inline (declareAuthzMiddleware returns the branded type
-// the pending builder's `.use()` requires; a bare function no longer
-// compiles there).
-const SCOPE_AWARE_WRITE_DECLARATION = {
-  kind: "custom",
-  reason:
-    "each scope in the write demands its own tier's manage permission, resolved from the input's scopeType",
-  permissions: ["organization:manage", "team:manage", "project:update"],
-} as const;
-const SAVE_CONFIG_DECLARATION = {
-  kind: "custom",
-  reason:
-    "every desired and removed scope attachment is asserted writable before the config write",
-  permissions: ["organization:manage", "team:manage", "project:update"],
-} as const;
-const DELETE_CONFIG_DECLARATION = {
-  kind: "custom",
-  reason:
-    "the config's current scope attachments are loaded by its id and each asserted writable before the delete",
-  permissions: ["organization:manage", "team:manage", "project:update"],
-} as const;
-
 export const modelProviderRouter = createTRPCRouter({
   // tRPC responses land in the browser, so every query here must go
   // through the masking service method — decrypted customKeys are only
   // for server-internal callers of `getProjectModelProviders`.
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
 
-      const hasSetupPermission = await probeProjectPermission(
+      const hasSetupPermission = await hasProjectPermission(
         ctx,
         projectId,
         "project:update",
@@ -134,10 +109,10 @@ export const modelProviderRouter = createTRPCRouter({
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
-      const hasSetupPermission = await probeProjectPermission(
+      const hasSetupPermission = await hasProjectPermission(
         ctx,
         projectId,
         "project:update",
@@ -157,7 +132,7 @@ export const modelProviderRouter = createTRPCRouter({
    */
   listAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input }) => {
       return await listProjectModelProvidersForFrontend(input.projectId);
     }),
@@ -170,7 +145,7 @@ export const modelProviderRouter = createTRPCRouter({
    */
   listAllForOrganizationForFrontend: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input }) => {
       return await listOrgModelProvidersForFrontend(input.organizationId);
     }),
@@ -199,18 +174,6 @@ export const modelProviderRouter = createTRPCRouter({
             .optional()
             .nullable(),
           defaultModel: z.string().optional(),
-          // The slug that addresses THIS instance in a gateway model string
-          // ("eu/claude-sonnet-5"). Omitted leaves the stored handle alone;
-          // an empty string clears it. The length and the message both come
-          // from the same module the service validates against, so the schema
-          // cannot start accepting a handle the service will refuse. The shape
-          // and the reserved names are checked in the service, which owns the
-          // rule the gateway reads.
-          routingHandle: z
-            .string()
-            .max(ROUTING_HANDLE_MAX_LENGTH, ROUTING_HANDLE_RULE)
-            .optional()
-            .nullable(),
           // Multi-scope writes (iter 109). `scopes` is the canonical shape;
           // `scopeType`/`scopeId` remain for the transition period so older
           // callers still compile. When both arrive, `scopes` wins. The
@@ -252,7 +215,6 @@ export const modelProviderRouter = createTRPCRouter({
           customEmbeddingsModels: input.customEmbeddingsModels,
           extraHeaders: input.extraHeaders,
           defaultModel: input.defaultModel,
-          routingHandle: input.routingHandle,
           scopes: input.scopes,
           scopeType: input.scopeType,
           scopeId: input.scopeId,
@@ -355,7 +317,7 @@ export const modelProviderRouter = createTRPCRouter({
    */
   codexSignInStart: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:update")
+    .use(checkProjectPermission("project:update"))
     .mutation(async () => {
       const codex = new CodexAccountService();
       return await codex.startDeviceSignIn();
@@ -382,7 +344,7 @@ export const modelProviderRouter = createTRPCRouter({
         setAsCodingDefaults: z.boolean().default(false),
       }),
     )
-    .permission("project:update")
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const codex = new CodexAccountService();
       const poll = await codex.pollDeviceSignIn({
@@ -472,7 +434,7 @@ export const modelProviderRouter = createTRPCRouter({
         scopes: z.array(scopeAssignmentSchema).min(1),
       }),
     )
-    .permission("project:update")
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       for (const scope of input.scopes) {
         await assertCanWriteScope(
@@ -513,7 +475,7 @@ export const modelProviderRouter = createTRPCRouter({
    */
   codexStatus: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input }) => {
       const providers = await getProjectModelProviders(input.projectId);
       const row = providers.openai_codex;
@@ -533,7 +495,7 @@ export const modelProviderRouter = createTRPCRouter({
         provider: z.string(),
       }),
     )
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .query(({ input }) => {
       return {
         managed: isManagedProvider(input.organizationId, input.provider),
@@ -552,7 +514,7 @@ export const modelProviderRouter = createTRPCRouter({
         customBaseUrl: z.string().optional(),
       }),
     )
-    .permission("project:update")
+    .use(checkProjectPermission("project:update"))
     .query(async ({ input, ctx }) => {
       const { projectId, provider, customBaseUrl } = input;
       return validateKeyWithCustomUrl({
@@ -601,7 +563,7 @@ export const modelProviderRouter = createTRPCRouter({
         featureKey: z.string(),
       }),
     )
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       return getResolvedDefaultForFeature(ctx, {
         projectId: input.projectId,
@@ -611,7 +573,7 @@ export const modelProviderRouter = createTRPCRouter({
 
   getDefaultModelsForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       return getDefaultModelsSnapshot(ctx, { projectId: input.projectId });
     }),
@@ -636,12 +598,7 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
-    .use(
-      declareAuthzMiddleware(
-        SCOPE_AWARE_WRITE_DECLARATION,
-        scopeAwarePermissionMiddleware,
-      ),
-    )
+    .use(scopeAwarePermissionMiddleware)
     .mutation(async ({ input, ctx }) => {
       await setRoleAtScope(
         { prisma: ctx.prisma },
@@ -665,12 +622,7 @@ export const modelProviderRouter = createTRPCRouter({
         model: z.string().nullable(),
       }),
     )
-    .use(
-      declareAuthzMiddleware(
-        SCOPE_AWARE_WRITE_DECLARATION,
-        scopeAwarePermissionMiddleware,
-      ),
-    )
+    .use(scopeAwarePermissionMiddleware)
     .mutation(async ({ input, ctx }) => {
       if (!featureByKey(input.featureKey)) {
         throw new Error(`Unknown feature key: "${input.featureKey}".`);
@@ -721,12 +673,7 @@ export const modelProviderRouter = createTRPCRouter({
           .min(1, "Pick at least one scope."),
       }),
     )
-    .use(
-      declareAuthzMiddleware(
-        SAVE_CONFIG_DECLARATION,
-        saveConfigPermissionMiddleware,
-      ),
-    )
+    .use(saveConfigPermissionMiddleware)
     .mutation(async ({ input, ctx }) => {
       if (input.id) {
         await updateConfig(
@@ -758,12 +705,7 @@ export const modelProviderRouter = createTRPCRouter({
    */
   deleteDefaultModelsConfig: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .use(
-      declareAuthzMiddleware(
-        DELETE_CONFIG_DECLARATION,
-        deleteConfigPermissionMiddleware,
-      ),
-    )
+    .use(deleteConfigPermissionMiddleware)
     .mutation(async ({ input, ctx }) => {
       await deleteConfig({ prisma: ctx.prisma }, input.id);
       return { ok: true };
@@ -805,7 +747,7 @@ export const modelProviderRouter = createTRPCRouter({
         excludeConfigId: z.string().optional(),
       }),
     )
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       return getInheritedValuesForScopes(ctx, {
         projectId: input.projectId,
@@ -832,41 +774,31 @@ export const modelProviderRouter = createTRPCRouter({
  * project demands `project:manage`. Same division of labour as
  * `scopeAwarePermissionMiddleware` below.
  */
-function checkProjectOrOrganizationPermission(
-  projectPermission: "project:update" | "project:delete",
-) {
+function checkProjectOrOrganizationPermission(projectPermission: Permission) {
   const projectCheck = checkProjectPermission(projectPermission);
   const organizationCheck = checkOrganizationPermission("organization:view");
-  return declareAuthzMiddleware(
-    {
-      kind: "custom",
-      reason:
-        "the tenant anchor is data-dependent: a project when one is named, otherwise the organization",
-      permissions: [projectPermission, "organization:view"],
-    },
-    async (params: {
-      ctx: any;
-      input: { projectId?: string; organizationId?: string };
-      next: () => any;
-    }) => {
-      if (params.input.projectId) {
-        return projectCheck({
-          ...params,
-          input: { ...params.input, projectId: params.input.projectId },
-        });
-      }
-      if (!params.input.organizationId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Either a project or an organization is required.",
-        });
-      }
-      return organizationCheck({
+  return async (params: {
+    ctx: any;
+    input: { projectId?: string; organizationId?: string };
+    next: () => any;
+  }) => {
+    if (params.input.projectId) {
+      return projectCheck({
         ...params,
-        input: { ...params.input, organizationId: params.input.organizationId },
+        input: { ...params.input, projectId: params.input.projectId },
       });
-    },
-  );
+    }
+    if (!params.input.organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Either a project or an organization is required.",
+      });
+    }
+    return organizationCheck({
+      ...params,
+      input: { ...params.input, organizationId: params.input.organizationId },
+    });
+  };
 }
 
 /**
@@ -887,52 +819,36 @@ function checkProjectOrOrganizationPermission(
  */
 function checkProviderValidationPermission() {
   const projectCheck = checkProjectPermission("project:update");
-  return declareAuthzMiddleware(
-    {
-      kind: "custom",
-      reason:
-        "the credential probe authorizes against the scopes it is being set up for when no project is named",
-      // Both paths the body can take: project:update when a project is named,
-      // and the per-scope manage permissions assertCanManageAllScopes probes
-      // when it is not (canManageScope in modelProvider.authz.ts).
-      permissions: [
-        "project:update",
-        "project:manage",
-        "team:manage",
-        "organization:manage",
-      ],
-    },
-    async (params: {
-      ctx: any;
-      input: {
-        projectId?: string;
-        organizationId?: string;
-        scopes?: ScopeAssignment[];
-      };
-      next: () => any;
-    }) => {
-      if (params.input.projectId) {
-        return projectCheck({
-          ...params,
-          input: { ...params.input, projectId: params.input.projectId },
-        });
-      }
-      const scopes = params.input.scopes;
-      if (!scopes || scopes.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "Validating a credential without a project needs the scopes it is being set up for.",
-        });
-      }
-      await assertCanManageAllScopes(
-        { prisma: params.ctx.prisma, session: params.ctx.session },
-        scopes,
-      );
-      params.ctx.permissionChecked = true;
-      return params.next();
-    },
-  );
+  return async (params: {
+    ctx: any;
+    input: {
+      projectId?: string;
+      organizationId?: string;
+      scopes?: ScopeAssignment[];
+    };
+    next: () => any;
+  }) => {
+    if (params.input.projectId) {
+      return projectCheck({
+        ...params,
+        input: { ...params.input, projectId: params.input.projectId },
+      });
+    }
+    const scopes = params.input.scopes;
+    if (!scopes || scopes.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Validating a credential without a project needs the scopes it is being set up for.",
+      });
+    }
+    await assertCanManageAllScopes(
+      { prisma: params.ctx.prisma, session: params.ctx.session },
+      scopes,
+    );
+    params.ctx.permissionChecked = true;
+    return params.next();
+  };
 }
 
 /**

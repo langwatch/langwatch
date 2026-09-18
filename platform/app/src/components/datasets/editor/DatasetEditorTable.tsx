@@ -33,6 +33,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import Parse from "papaparse";
 import {
   type ReactNode,
   useCallback,
@@ -56,7 +57,6 @@ import type {
   DatasetRecordEntry,
 } from "~/server/datasets/types";
 import { api } from "~/utils/api";
-import { downloadCsv } from "~/utils/downloadCsv";
 import { AddRowsFromCSVModal } from "../AddRowsFromCSVModal";
 import {
   type AutosaveState,
@@ -617,15 +617,24 @@ export function DatasetEditorTable({
       }
     }
 
-    downloadCsv({
+    const csv = Parse.unparse({
       fields: exportColumns.map((col) => col.name),
-      rows: exportRecords.map((record) =>
+      data: exportRecords.map((record) =>
         exportColumns.map((col) => record[col.name] ?? ""),
       ),
-      fileName: `${
-        datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"
-      }.csv`,
     });
+
+    const url = window.URL.createObjectURL(new Blob([csv]));
+    const link = document.createElement("a");
+    link.href = url;
+    const fileName = `${
+      datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"
+    }.csv`;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   }, [columns, datasetId, datasetName, downloadDataset, project?.id, store]);
 
   // "Add row" only appends an empty row at the bottom. It must not steal focus

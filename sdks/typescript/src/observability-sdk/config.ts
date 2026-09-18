@@ -116,9 +116,10 @@ export function getObservabilitySdkConfig(options?: {
     const message =
       "[LangWatch Observability SDK] Please call setupObservability() before using the Observability SDK";
 
-    const shouldThrow =
-      options?.throwOnUninitialized ?? process.env.NODE_ENV === "development";
-    if (shouldThrow) {
+    if (
+      options?.throwOnUninitialized ||
+      process.env.NODE_ENV === "development"
+    ) {
       throw new Error(message);
     }
 
@@ -159,10 +160,7 @@ export function getObservabilitySdkLogger(): Logger {
  * ```
  */
 export function getDataCaptureMode(): DataCaptureMode {
-  // A passive read on the tracing path: code that only asks "may I record
-  // this value?" must never crash the operation it decorates, so an
-  // uninitialized SDK falls back to the default config even in development.
-  const config = getObservabilitySdkConfig({ throwOnUninitialized: false });
+  const config = getObservabilitySdkConfig();
 
   if (!config.dataCapture) {
     return "all"; // Default: capture both input and output

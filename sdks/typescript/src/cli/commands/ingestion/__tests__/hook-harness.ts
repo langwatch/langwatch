@@ -96,8 +96,6 @@ export interface RunHookOptions {
   readInput?: () => Promise<string>;
   env?: NodeJS.ProcessEnv;
   git?: Record<string, string>;
-  /** Full control over git answers, for runs where the directory matters. */
-  runGit?: GitRunner;
   fetchImpl?: typeof fetch;
   now?: number;
   tool?: string;
@@ -187,7 +185,6 @@ export const installHookHarness = (): HookHarness => {
       readInput,
       env = {},
       git = WORKTREE_GIT,
-      runGit,
       fetchImpl = collector(),
       now = NOW,
       tool = "claude-code",
@@ -206,7 +203,7 @@ export const installHookHarness = (): HookHarness => {
             Promise.resolve(
               typeof input === "string" ? input : JSON.stringify(input),
             )),
-        runGit: runGit ?? gitRunner(git),
+        runGit: gitRunner(git),
         fetchImpl,
         now: () => now,
         stateDir,

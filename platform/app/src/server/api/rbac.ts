@@ -1,37 +1,3 @@
-/**
- * The legacy authorization surface, kept alive as the ADR-110 fork seam.
- *
- * Almost everything exported here is `@deprecated`, and the tags are the point
- * — this module answered every permission question before ADR-092, so it is
- * still what autocomplete offers and what a nearby file imports from out of
- * habit. Three kinds of thing live here now:
- *
- *   - **Role bags and permission maths** (`teamRoleHasPermission`,
- *     `getTeamRolePermissions`, `hasPermissionWithHierarchy`,
- *     `EXTERNAL_MEMBER_PERMISSIONS`, `canView` and friends). These are second
- *     copies of what `@langwatch/authz` owns. They agree today because
- *     `roles-parity.unit.test.ts` holds them cell-for-cell against the
- *     engine's, which is a guard, not a reason to read them.
- *   - **The `.use()`d tRPC middlewares**, replaced by declaring
- *     `.permission("…")` on the procedure (ADR-092 decision 25).
- *   - **The fork resolvers** (`resolveProjectPermission`,
- *     `hasOrganizationPermission`, the `batch*` helpers). These still RUN:
- *     they ask the engine for a migrated organization and walk the legacy
- *     tables for one that is not. They are not dead code, they are the thing
- *     the contract PR deletes.
- *
- * What is NOT deprecated: `authorizeInResolver`, the ops-scope surface, the
- * demo-project predicates and `organizationDenialReason` — those are current.
- *
- * New code decides through `getApp().permissions`, or the `probe*Permission` /
- * `require*Permission` helpers in `~/server/app-layer/permissions/imperative`.
- */
-import type {
-  AuthzDenialReason,
-  AuthzPermission,
-  EnforcedScopeFields,
-} from "@langwatch/authz";
-import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import {
@@ -40,15 +6,14 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { authzChecksFor } from "~/server/app-layer/authz/checks";
-import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
+import { cutoverOnEngine } from "~/server/app-layer/authz/cutover-gate";
+import { authzForkFor } from "~/server/app-layer/authz/fork";
+import { authzShadowFor } from "~/server/app-layer/authz/shadow";
 import {
   LiteMemberRestrictedError,
-  MembershipDisabledError,
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
-import { type Resource, Resources } from "~/utils/rbacVocabulary";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
@@ -57,16 +22,131 @@ import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 // ============================================================================
 
 /**
- * ADR-092 decision 25: the legacy cross-product type is retired — Permission
- * IS the registry vocabulary now. Sites that legitimately handle unregistered
- * legacy custom-role strings do so as plain strings, never as Permission.
- *
- * @deprecated Import `AuthzPermission` from `@langwatch/authz` instead. This
- * is a bare alias of it kept so the legacy call sites still read, and it puts
- * the permission vocabulary behind an rbac import that nothing else about a
- * new call site needs.
+ * Core actions that can be performed on resources
  */
-export type Permission = AuthzPermission;
+export const Actions = {
+  VIEW: "view",
+  CREATE: "create",
+  UPDATE: "update",
+  DELETE: "delete",
+  MANAGE: "manage", // Full CRUD + settings
+  SHARE: "share",
+  // Gateway-specific actions: `rotate` is a sub-action of `update` for virtual
+  // keys but callers may want to grant it independently. `attach`/`detach`
+  // apply to guardrails — these are also treated as sub-actions of `update`
+  // by the hierarchy helper below.
+  ROTATE: "rotate",
+  ATTACH: "attach",
+  DETACH: "detach",
+  // Resource-specific cross-principal audit action. Used today by
+  // `virtualKeys:viewOtherPersonal` so org admins can see every member's
+  // personal VKs during off-boarding sweeps. Personal-VK self-view stays
+  // implicit on principalUserId match (no perm needed for "see my own").
+  VIEW_OTHER_PERSONAL: "viewOtherPersonal",
+} as const;
+
+export type Action = (typeof Actions)[keyof typeof Actions];
+
+/**
+ * Resources in the system that can have permissions
+ */
+export const Resources = {
+  ORGANIZATION: "organization",
+  PROJECT: "project",
+  TEAM: "team",
+  ANALYTICS: "analytics",
+  COST: "cost",
+  TRACES: "traces",
+  SCENARIOS: "scenarios",
+  ANNOTATIONS: "annotations",
+  EVALUATIONS: "evaluations",
+  DATASETS: "datasets",
+  TRIGGERS: "triggers",
+  WORKFLOWS: "workflows",
+  // Experiments are their own capability: a user can run experiments on
+  // prompts or agents without touching the workflow studio. Historically they
+  // inherited `workflows:view`; this dedicated permission decouples them.
+  EXPERIMENTS: "experiments",
+  PROMPTS: "prompts",
+  SECRETS: "secrets",
+  PLAYGROUND: "playground",
+  OPS: "ops",
+  // Platform audit log — covers both the legacy AuditLog stream AND the
+  // gateway-resource rows folded into it by the audit consolidation.
+  // Lives outside the gateway permission family because it gates a
+  // platform settings page (/settings/audit-log), not a gateway sub-page.
+  AUDIT_LOG: "auditLog",
+  // AI Gateway resources — see specs/ai-gateway/_shared/contract.md §10
+  VIRTUAL_KEYS: "virtualKeys",
+  GATEWAY_BUDGETS: "gatewayBudgets",
+  GATEWAY_PROVIDERS: "gatewayProviders",
+  // RoutingPolicies are Enterprise-tier gateway primitives (provider
+  // chain + fallback + per-model rules). Granular permission lets
+  // custom roles delegate routing-policy mgmt without granting
+  // organization:manage. Mirrors gatewayProviders:* shape.
+  ROUTING_POLICIES: "routingPolicies",
+  GATEWAY_GUARDRAILS: "gatewayGuardrails",
+  // Deprecated (kept for backwards-compat): pre-consolidation perm that
+  // gated /[project]/gateway/audit. The page is gone; auditLog:view is
+  // the live permission. Safe to drop in a future breaking-change pass.
+  GATEWAY_LOGS: "gatewayLogs",
+  GATEWAY_USAGE: "gatewayUsage",
+  GATEWAY_CACHE_RULES: "gatewayCacheRules",
+  // AI Governance resources — see specs/ai-gateway/governance/. These are
+  // org-level (not project/team-level), so they live in
+  // ORGANIZATION_ROLE_PERMISSIONS rather than the team role bags. Custom
+  // roles can grant any subset via the existing CustomRolePermissions JSON
+  // column without requiring a Prisma enum change.
+  GOVERNANCE: "governance",
+  INGESTION_SOURCES: "ingestionSources",
+  ANOMALY_RULES: "anomalyRules",
+  COMPLIANCE_EXPORT: "complianceExport",
+  ACTIVITY_MONITOR: "activityMonitor",
+  // AI Tools Portal (Phase 7) — the customizable per-org card grid on
+  // /me. Two permissions:
+  //   - aiTools:view → ALL org roles. Portal must work for every member
+  //     so they can discover what's available + click through to setup.
+  //   - aiTools:manage → org ADMIN only. Catalog editor surface at
+  //     /governance/tool-catalog (CRUD + reorder + enable).
+  AI_TOOLS: "aiTools",
+  // Outbound webhook endpoints (the webhook platform). Org-tier only:
+  // endpoints are org-anchored, carry signing secrets, and stream every
+  // enabled event family out of the platform, so granting them below the
+  // org tier would let a project-scoped role exfiltrate org-wide data.
+  // Enterprise-gated at the plan layer on top of the permission.
+  WEBHOOK_ENDPOINTS: "webhookEndpoints",
+  // The spend reconciliation surface (spend-events pull + per-end-user
+  // rollups). Org-tier and separate from webhookEndpoints: reading the
+  // metered ledger is a strictly weaker capability than managing outbound
+  // delivery, and billing consumers get keys that can ONLY read. Same
+  // enterprise plan gate as the webhook platform.
+  GATEWAY_SPEND: "gatewaySpend",
+  // The Langy in-product assistant. Its own resource rather than riding on
+  // `evaluations:view`, because starting a turn is not a read: it provisions
+  // credentials, spawns an OpenCode worker and spends the project's model
+  // budget. `langy:view` reads conversations; `langy:create` starts or
+  // continues a turn (and forks, which creates one); `langy:update` renames;
+  // `langy:delete` archives. Project-scoped, since conversations belong to a
+  // project — except `langy:manage`, which also appears in the ORG role bag
+  // for the Langy surfaces an admin configures. The organization's GitHub
+  // connection is not one of them: it belongs to the organization, so
+  // `organization:manage` gates it
+  // (specs/integrations/github-connection.feature).
+  //
+  // Granted from MEMBER upward, and to org admins; VIEWER and EXTERNAL get
+  // nothing. The permission grain is not what keeps Langy scarce — the
+  // `release_langy_enabled` flag is — so it draws the line at "can this person
+  // act on the project at all" rather than trying to be finer than that.
+  LANGY: "langy",
+} as const;
+
+export type Resource = (typeof Resources)[keyof typeof Resources];
+
+/**
+ * Permission is a combination of resource and action
+ * Format: "resource:action" (e.g., "analytics:view", "datasets:manage")
+ */
+export type Permission = `${Resource}:${Action}`;
 
 /**
  * Resources that only exist at the organization tier — there is no team- or
@@ -94,13 +174,7 @@ const ORG_EXCLUSIVE_RESOURCES: ReadonlySet<Resource> = new Set<Resource>([
   Resources.GATEWAY_SPEND,
 ]);
 
-/**
- * True when the permission targets an organization-tier-only resource.
- *
- * @deprecated Use `permissionGrantTiers` from `@langwatch/authz` instead —
- * the registry records which tiers each permission is grantable at, so it
- * cannot fall behind a new resource the way this hand-kept set can.
- */
+/** True when the permission targets an organization-tier-only resource. */
 export function isOrgExclusivePermission(permission: Permission): boolean {
   const resource = permission.split(":")[0] as Resource;
   return ORG_EXCLUSIVE_RESOURCES.has(resource);
@@ -112,10 +186,6 @@ export function isOrgExclusivePermission(permission: Permission): boolean {
  * grantable at any scope. Both the tRPC resolver (`checkPermissionFromBindings`)
  * and the gateway resolver (`checkRoleBindingPermission`) gate on this so the
  * rule holds no matter which path evaluates the binding.
- *
- * @deprecated Use `bindingScopeCanGrantPermission` from `@langwatch/authz`
- * instead — the ADR-021 fence is the engine's, and this is a second copy of
- * it standing in front of the legacy walk.
  */
 export function bindingScopeCanGrant(
   scopeType: RoleBindingScopeType,
@@ -181,9 +251,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Secrets
     "secrets:view",
     "secrets:manage",
-    // Agent cache
-    "agentCache:view",
-    "agentCache:manage",
     // Team
     "team:view",
     "team:manage",
@@ -269,9 +336,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Secrets
     "secrets:view",
     "secrets:manage",
-    // Agent cache
-    "agentCache:view",
-    "agentCache:manage",
     // Team
     "team:view",
     // AI Gateway (member: can manage own VKs + see budgets, cannot delete budgets)
@@ -443,12 +507,6 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
  *
  * Custom roles, when assigned to EXTERNAL users, override these defaults
  * (see resolveProjectPermission).
- *
- * @deprecated Use `builtinRolePermissions("lite-member")` from
- * `@langwatch/authz` instead — the engine owns the role bags now, and these
- * two are kept cell-for-cell identical by `roles-parity.unit.test.ts`. Reading
- * the bag from here is how a caller ends up disagreeing with the engine that
- * decides the request.
  */
 export const EXTERNAL_MEMBER_PERMISSIONS: Permission[] = [
   "project:view",
@@ -474,10 +532,6 @@ export const EXTERNAL_MEMBER_PERMISSIONS: Permission[] = [
 /**
  * Check if a permission list includes a requested permission, with hierarchy rules
  * manage permissions automatically include view, create, update, and delete permissions
- *
- * @deprecated Use `permissionSatisfiedBy` from `@langwatch/authz` instead —
- * the hierarchy rule belongs to the permission registry, and a second copy of
- * it can only drift from the one the engine applies.
  */
 export function hasPermissionWithHierarchy(
   permissions: string[],
@@ -513,10 +567,6 @@ export function hasPermissionWithHierarchy(
 
 /**
  * Check if a team role has a specific permission
- *
- * @deprecated Use `builtinRoleGrants({ role: roleKeyForTeamRole(role),
- * permission })` from `@langwatch/authz` instead — the engine owns the role
- * bags, and this reads a second copy of them.
  */
 export function teamRoleHasPermission(
   role: TeamUserRole,
@@ -527,12 +577,6 @@ export function teamRoleHasPermission(
 
 /**
  * Check if an organization role has a specific permission
- *
- * @deprecated Use `builtinRoleGrants` from `@langwatch/authz` with the
- * `org-admin` or `org-member` role key instead. Note that an answer from here
- * is NOT an access decision: at organization scope the engine also applies the
- * membership gate and the org-member floor, so a caller wanting "may they do
- * this" wants `getApp().permissions`, not a role bag.
  */
 export function organizationRoleHasPermission(
   role: OrganizationUserRole,
@@ -544,9 +588,6 @@ export function organizationRoleHasPermission(
 
 /**
  * Get all permissions for a team role
- *
- * @deprecated Use `builtinRolePermissions(roleKeyForTeamRole(role))` from
- * `@langwatch/authz` instead.
  */
 export function getTeamRolePermissions(role: TeamUserRole): Permission[] {
   return TEAM_ROLE_PERMISSIONS[role];
@@ -554,9 +595,6 @@ export function getTeamRolePermissions(role: TeamUserRole): Permission[] {
 
 /**
  * Get all permissions for an organization role
- *
- * @deprecated Use `builtinRolePermissions` from `@langwatch/authz` with the
- * `org-admin`, `org-member` or `lite-member` role key instead.
  */
 export function getOrganizationRolePermissions(
   role: OrganizationUserRole,
@@ -569,60 +607,35 @@ export function getOrganizationRolePermissions(
 // ============================================================================
 
 /**
- * Check if user can view a resource *
- * @deprecated Use `builtinRoleGrants` from `@langwatch/authz` instead, or
- * `getApp().permissions` when the question is really "may this caller do
- * this". A team role alone has never been the whole answer — bindings, custom
- * roles and the lite-member cap all sit on top of it — so these read as an
- * access check and are not one.
+ * Check if user can view a resource
  */
 export function canView(role: TeamUserRole, resource: Resource): boolean {
   return teamRoleHasPermission(role, `${resource}:view` as Permission);
 }
 
 /**
- * Check if user can manage a resource (full CRUD) *
- * @deprecated Use `builtinRoleGrants` from `@langwatch/authz` instead, or
- * `getApp().permissions` when the question is really "may this caller do
- * this". A team role alone has never been the whole answer — bindings, custom
- * roles and the lite-member cap all sit on top of it — so these read as an
- * access check and are not one.
+ * Check if user can manage a resource (full CRUD)
  */
 export function canManage(role: TeamUserRole, resource: Resource): boolean {
   return teamRoleHasPermission(role, `${resource}:manage` as Permission);
 }
 
 /**
- * Check if user can create a resource *
- * @deprecated Use `builtinRoleGrants` from `@langwatch/authz` instead, or
- * `getApp().permissions` when the question is really "may this caller do
- * this". A team role alone has never been the whole answer — bindings, custom
- * roles and the lite-member cap all sit on top of it — so these read as an
- * access check and are not one.
+ * Check if user can create a resource
  */
 export function canCreate(role: TeamUserRole, resource: Resource): boolean {
   return teamRoleHasPermission(role, `${resource}:create` as Permission);
 }
 
 /**
- * Check if user can update a resource *
- * @deprecated Use `builtinRoleGrants` from `@langwatch/authz` instead, or
- * `getApp().permissions` when the question is really "may this caller do
- * this". A team role alone has never been the whole answer — bindings, custom
- * roles and the lite-member cap all sit on top of it — so these read as an
- * access check and are not one.
+ * Check if user can update a resource
  */
 export function canUpdate(role: TeamUserRole, resource: Resource): boolean {
   return teamRoleHasPermission(role, `${resource}:update` as Permission);
 }
 
 /**
- * Check if user can delete a resource *
- * @deprecated Use `builtinRoleGrants` from `@langwatch/authz` instead, or
- * `getApp().permissions` when the question is really "may this caller do
- * this". A team role alone has never been the whole answer — bindings, custom
- * roles and the lite-member cap all sit on top of it — so these read as an
- * access check and are not one.
+ * Check if user can delete a resource
  */
 export function canDelete(role: TeamUserRole, resource: Resource): boolean {
   return teamRoleHasPermission(role, `${resource}:delete` as Permission);
@@ -636,35 +649,16 @@ export function canDelete(role: TeamUserRole, resource: Resource): boolean {
  * Result of resolving a permission check, including the user's organization role.
  * Used by resolve* functions to provide richer context than a simple boolean.
  */
-/**
- * @deprecated The answer shape of the fork-seam resolvers below, deprecated
- * with them. A caller that wants a decision wants `PermissionDecision` from
- * `~/server/app-layer/permissions/permission-decision.repository`.
- */
 export type PermissionResult = {
   permitted: boolean;
   organizationRole: OrganizationUserRole | null;
-  /**
-   * Why the check failed, when there is something a caller can act on — the
-   * boundary needs it to raise that error rather than a generic refusal.
-   *
-   * Set by the engine, and by the membership gate both heads share, which
-   * names a disabled seat before either walk reads a binding. Absent from the
-   * legacy binding walk itself, which never produced one and is being deleted
-   * (ADR-110).
-   */
-  denialReason?: AuthzDenialReason;
 };
 
 // ============================================================================
 // MIDDLEWARE & CONTEXT HELPERS
 // ============================================================================
 
-/**
- * @deprecated The parameter shape of the hand-`.use()`d middlewares below,
- * deprecated with them — see `checkProjectPermission`.
- */
-export type PermissionMiddlewareParams<InputType> = {
+type PermissionMiddlewareParams<InputType> = {
   ctx: {
     prisma: PrismaClient;
     session: Session;
@@ -677,41 +671,12 @@ export type PermissionMiddlewareParams<InputType> = {
   next: () => any;
 };
 
-/**
- * @deprecated The shape of the hand-`.use()`d middlewares, deprecated with
- * them — see `checkProjectPermission`.
- */
 export type PermissionMiddleware<InputType> = (
   params: PermissionMiddlewareParams<InputType>,
 ) => Promise<any>;
 
 /**
- * A disabled seat outranks the role-shaped denials that follow it: the person
- * HAS a role, so the lite-member modal and the "ask an admin for this
- * permission" copy would both point them at something nobody can grant while
- * the seat is off.
- */
-function membershipDisabledDenial(): TRPCError {
-  const disabled = new MembershipDisabledError();
-  return new TRPCError({
-    code: "UNAUTHORIZED",
-    message: disabled.message,
-    cause: disabled,
-  });
-}
-
-/**
- * Check if user has permission for a project.
- *
- * ADR-092 decision 25: procedures declare `.permission("…")` now — this
- * middleware survives only as a building block for the declared-custom
- * compositions that branch on their input (modelProviders' tenant anchor,
- * project creation). Do not `.use()` it on a new procedure.
- *
- * @deprecated Declare `.permission("…")` on the procedure instead
- * (ADR-092 decision 25). The declared surface is checked at compile time
- * against the input's scope ids and is what the router sweep audits; a
- * hand-`.use()`d middleware is invisible to both.
+ * Check if user has permission for a project
  */
 export const checkProjectPermission =
   (permission: Permission) =>
@@ -720,13 +685,13 @@ export const checkProjectPermission =
     input,
     next,
   }: PermissionMiddlewareParams<{ projectId: string }>) => {
-    const { permitted, organizationRole, denialReason } =
-      await resolveProjectPermission(ctx, input.projectId, permission);
+    const { permitted, organizationRole } = await resolveProjectPermission(
+      ctx,
+      input.projectId,
+      permission,
+    );
 
     if (!permitted) {
-      if (denialReason === "membership-disabled") {
-        throw membershipDisabledDenial();
-      }
       if (organizationRole === OrganizationUserRole.EXTERNAL) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
@@ -760,12 +725,54 @@ export const checkProjectPermission =
   };
 
 /**
- * Check if user has permission for a team
+ * Permit when the caller holds ANY ONE of `permissions` on the project.
  *
- * @deprecated Declare `.permission("…")` on the procedure instead
- * (ADR-092 decision 25). The declared surface is checked at compile time
- * against the input's scope ids and is what the router sweep audits; a
- * hand-`.use()`d middleware is invisible to both.
+ * For resources a caller can legitimately reach from more than one feature.
+ * Stored objects are the case in point: the same object is trace media for one
+ * viewer and scenario media for another, `traces:view` and `scenarios:view`
+ * are separate categories a custom role can hold one of, and the file route
+ * itself already accepts either. A single-permission gate on a sibling
+ * surface (the existence probe) refuses viewers the bytes are served to.
+ *
+ * The refusal names the FIRST permission, so list the one the surface is
+ * primarily reached through first: granting it resolves the denial whichever
+ * feature the caller came from.
+ */
+export const checkProjectPermissionAny =
+  (...permissions: [Permission, ...Permission[]]) =>
+  async ({
+    ctx,
+    input,
+    next,
+  }: PermissionMiddlewareParams<{ projectId: string }>) => {
+    const { permitted, organizationRole } = await resolveProjectPermissionAny(
+      ctx,
+      input.projectId,
+      permissions,
+    );
+    if (permitted) {
+      ctx.organizationRole = organizationRole;
+      ctx.permissionChecked = true;
+      return next();
+    }
+
+    const named = permissions[0];
+    if (organizationRole === OrganizationUserRole.EXTERNAL) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "This feature is not available for your account",
+        cause: new LiteMemberRestrictedError(named.split(":")[0] ?? "unknown"),
+      });
+    }
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "You do not have permission to access this project resource",
+      cause: new ProjectPermissionDeniedError(named),
+    });
+  };
+
+/**
+ * Check if user has permission for a team
  */
 export const checkTeamPermission =
   (permission: Permission) =>
@@ -774,13 +781,13 @@ export const checkTeamPermission =
     input,
     next,
   }: PermissionMiddlewareParams<{ teamId: string }>) => {
-    const { permitted, organizationRole, denialReason } =
-      await resolveTeamPermission(ctx, input.teamId, permission);
+    const { permitted, organizationRole } = await resolveTeamPermission(
+      ctx,
+      input.teamId,
+      permission,
+    );
 
     if (!permitted) {
-      if (denialReason === "membership-disabled") {
-        throw membershipDisabledDenial();
-      }
       if (organizationRole === OrganizationUserRole.EXTERNAL) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
@@ -803,11 +810,6 @@ export const checkTeamPermission =
 
 /**
  * Check if user has permission for an organization
- *
- * @deprecated Declare `.permission("…")` on the procedure instead
- * (ADR-092 decision 25). The declared surface is checked at compile time
- * against the input's scope ids and is what the router sweep audits; a
- * hand-`.use()`d middleware is invisible to both.
  */
 export const checkOrganizationPermission =
   (permission: Permission) =>
@@ -879,12 +881,7 @@ async function checkPermissionFromBindings({
       organizationId,
       scopeId: { in: scopeIds },
       OR: [
-        {
-          userId,
-          user: {
-            orgMemberships: { some: { organizationId, disabledAt: null } },
-          },
-        },
+        { userId, user: { orgMemberships: { some: { organizationId } } } },
         ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
       ],
     },
@@ -906,14 +903,11 @@ async function checkPermissionFromBindings({
 
     const teamUser = await prisma.teamUser.findFirst({
       // Gate the legacy fallback on org membership too: a stale cross-org
-      // TeamUser row must not confer access any more than a stale RoleBinding,
-      // and neither does a seat an admin disabled.
+      // TeamUser row must not confer access any more than a stale RoleBinding.
       where: {
         userId,
         teamId: teamScope.scopeId,
-        team: {
-          organization: { members: { some: { userId, disabledAt: null } } },
-        },
+        team: { organization: { members: { some: { userId } } } },
       },
       select: { role: true, assignedRoleId: true },
     });
@@ -1027,17 +1021,15 @@ async function resolveBindingPermission({
 }
 
 /**
- * The membership row as stored: the role, and whether an admin disabled the
- * seat. Both are facts. The policy that a disabled membership is not a
- * current one lives in `currentRoleOf`, the same split the AuthZ read port
- * makes, so a refusal can still say WHICH gate closed.
+ * The single source of truth for "is this user a CURRENT member of this org,
+ * and with what role". `null` means no `OrganizationUser` row — the caller must
+ * fail closed rather than fall through to bindings, because a stale cross-org
+ * RoleBinding can still name a non-member at a project/team scope.
+ *
+ * Every scoped permission path derives membership through here so a future
+ * tenancy fix lands once instead of in each resolver.
  */
-type CurrentMembership = {
-  role: OrganizationUserRole;
-  disabled: boolean;
-};
-
-async function getCurrentMembership({
+async function getCurrentOrganizationRole({
   prisma,
   userId,
   organizationId,
@@ -1045,90 +1037,19 @@ async function getCurrentMembership({
   prisma: PrismaClient;
   userId: string;
   organizationId: string;
-}): Promise<CurrentMembership | null> {
+}): Promise<OrganizationUserRole | null> {
   const member = await prisma.organizationUser?.findFirst({
     where: { userId, organizationId },
-    select: { role: true, disabledAt: true },
+    select: { role: true },
   });
-  if (!member) return null;
-  // `!== null`, not `!= null`: a row arriving without the column reads as
-  // DISABLED, the same loud-lockout choice the read repository makes.
-  return { role: member.role, disabled: member.disabledAt !== null };
+  return member?.role ?? null;
 }
-
-/**
- * A membership an admin disabled to reclaim its seat is not a current one: it
- * keeps its role and its history and confers no access until it is re-enabled
- * (seat-reconciliation.feature). Matches the policy the AuthZ collector
- * applies to the same row.
- */
-function currentRoleOf(
-  membership: CurrentMembership | null,
-): OrganizationUserRole | null {
-  return membership && !membership.disabled ? membership.role : null;
-}
-
-/**
- * Why a membership read refused, when there is something to say. A disabled
- * seat is named so the boundary can tell the person their access was turned
- * off rather than that they are not a member. An absent row says nothing
- * here: the generic denial is already the right answer for it.
- */
-function membershipDenialReason(
-  membership: CurrentMembership | null,
-): AuthzDenialReason | undefined {
-  return membership?.disabled ? "membership-disabled" : undefined;
-}
-
-/**
- * The single source of truth for "is this user a CURRENT member of this org,
- * and with what role". `null` means no active `OrganizationUser` row — the
- * caller must fail closed rather than fall through to bindings, because a
- * stale cross-org RoleBinding can still name a non-member at a project/team
- * scope.
- *
- * Every scoped permission path derives membership through here so a future
- * tenancy fix lands once instead of in each resolver.
- */
-async function getCurrentOrganizationRole(args: {
-  prisma: PrismaClient;
-  userId: string;
-  organizationId: string;
-}): Promise<OrganizationUserRole | null> {
-  return currentRoleOf(await getCurrentMembership(args));
-}
-
-/** A denial reached before any binding was read. */
-function refused(denialReason?: AuthzDenialReason): PermissionResult {
-  return {
-    permitted: false,
-    organizationRole: null,
-    ...(denialReason ? { denialReason } : {}),
-  };
-}
-
-type ProjectPermissionContext = {
-  userId: string;
-  teamId: string;
-  organizationId: string;
-  organizationRole: OrganizationUserRole;
-};
-
-/**
- * The context resolved to a denial before any binding was read, carrying
- * the reason when there is one a caller can act on.
- */
-type ProjectPermissionRefusal = {
-  refused: true;
-  denialReason?: AuthzDenialReason;
-};
 
 /**
  * Where a project sits and where the caller stands in it: everything a
- * permission check needs before it looks at a single binding. A refusal when
- * the answer is already a denial, either because the project has no team or
- * organization or because the caller is not an active member of that
- * organization.
+ * permission check needs before it looks at a single binding. Null when the
+ * answer is already a denial, either because the project has no team or
+ * organization or because the caller is not a member of that organization.
  *
  * Resolved on its own so a gate that tests several permissions pays for it
  * once: only the binding check below differs from permission to permission.
@@ -1136,9 +1057,14 @@ type ProjectPermissionRefusal = {
 async function resolveProjectPermissionContext(
   ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
-): Promise<ProjectPermissionContext | ProjectPermissionRefusal> {
+): Promise<{
+  userId: string;
+  teamId: string;
+  organizationId: string;
+  organizationRole: OrganizationUserRole;
+} | null> {
   const userId = ctx.session?.user?.id;
-  if (!userId) return { refused: true };
+  if (!userId) return null;
 
   const projectTeam = await ctx.prisma.project.findUnique?.({
     where: { id: projectId },
@@ -1148,26 +1074,21 @@ async function resolveProjectPermissionContext(
   const teamId = projectTeam?.team.id;
   const organizationId = projectTeam?.team.organizationId;
 
-  if (!teamId || !organizationId) return { refused: true };
+  if (!teamId || !organizationId) return null;
 
-  const membership = await getCurrentMembership({
+  const organizationRole = await getCurrentOrganizationRole({
     prisma: ctx.prisma,
     userId,
     organizationId,
   });
-  const organizationRole = currentRoleOf(membership);
 
   // Fail closed on current organization membership. A user who is not an
-  // active OrganizationUser of the owning org is denied outright, even if a
-  // stale RoleBinding (created through a since-closed cross-org path) still
-  // names them at this project/team scope. The membership check — not the
-  // binding row — is the authoritative tenancy boundary. See the same gate in
-  // resolveTeamPermission and batchScopePermissions, and the direct-binding
-  // predicate below. A disabled seat is refused here too, before either head
-  // runs, and named so the boundary can say so.
-  if (organizationRole === null) {
-    return { refused: true, denialReason: membershipDenialReason(membership) };
-  }
+  // OrganizationUser of the owning org is denied outright, even if a stale
+  // RoleBinding (created through a since-closed cross-org path) still names them
+  // at this project/team scope. The membership check — not the binding row — is
+  // the authoritative tenancy boundary. See the same gate in resolveTeamPermission
+  // and batchScopePermissions, and the direct-binding predicate below.
+  if (organizationRole === null) return null;
 
   return { userId, teamId, organizationId, organizationRole };
 }
@@ -1192,14 +1113,6 @@ function projectPermissionScopes({
  * Resolve a project permission check, returning the permission decision
  * along with the user's organization role.
  */
-/**
- * @deprecated Not for new callers. This is the ADR-110 fork seam: it asks
- * the engine for a migrated organization and runs the legacy walk for one
- * that is not, and it goes away with the walk. New code decides through
- * `getApp().permissions` (or `probe*Permission` /
- * `require*Permission` in `~/server/app-layer/permissions/imperative`),
- * which reaches the same engine without depending on the fork surviving.
- */
 export async function resolveProjectPermission(
   ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
@@ -1209,17 +1122,29 @@ export async function resolveProjectPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  // The demo project grants its view permissions to everyone, before
-  // anything is read. The engine carries the same rule.
+  // Check demo project access. The comparison fires BEFORE the return: the
+  // engine carries its own demo-project rule, and an early return here used
+  // to hide the entire demo surface from shadow mode. The legacy answer is
+  // unchanged by it.
   if (isDemoProject(projectId, permission)) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission,
+      legacyAllowed: true,
+      projectId,
+      caller: "trpc.project",
+    });
     return { permitted: true, organizationRole: null };
   }
 
   const context = await resolveProjectPermissionContext(ctx, projectId);
-  if ("refused" in context) return refused(context.denialReason);
+  if (!context) return { permitted: false, organizationRole: null };
 
-  /** The legacy binding walk, run only while this organization is still
-   *  waiting for its migration. */
+  /**
+   * The legacy binding walk, as ONE implementation both paths run: the
+   * answering path below when the organization is still on legacy, and the
+   * fork's reverse-shadow thunk when it is not.
+   */
   const legacyPermitted = () =>
     checkPermissionFromBindings({
       prisma: ctx.prisma,
@@ -1234,19 +1159,21 @@ export async function resolveProjectPermission(
       permission,
     });
 
-  // ADR-110: finishing the migration IS the switch. An organization that
-  // finished is decided by the engine; one that has not is decided by the
-  // legacy walk.
+  // ADR-092 delivery-plan PR 3: the fork. A cut-over organization is DECIDED
+  // by the engine and legacy runs behind it as the reverse-shadow comparison;
+  // everyone else keeps the legacy answer with the stage-A4 shadow behind IT.
   if (
-    await organizationOnAuthzEngine({
+    await cutoverOnEngine({
       prisma: ctx.prisma,
       organizationId: context.organizationId,
     })
   ) {
-    const decision = await authzChecksFor(ctx.prisma).checkByIds({
-      principal: { type: "user", id: context.userId },
+    const decision = await authzForkFor(ctx.prisma).decideUserPermission({
+      userId: context.userId,
       permission,
       projectId,
+      caller: "trpc.project",
+      legacy: legacyPermitted,
     });
     return {
       permitted: decision.allowed,
@@ -1254,14 +1181,22 @@ export async function resolveProjectPermission(
       // above did, so these agree; the context's is the fallback for the
       // unresolved-scope answer, which carries no snapshot at all.
       organizationRole: decision.organizationRole ?? context.organizationRole,
-      denialReason: decision.denialReason,
     };
   }
 
-  return {
-    permitted: await legacyPermitted(),
-    organizationRole: context.organizationRole,
-  };
+  const permitted = await legacyPermitted();
+
+  // ADR-092 stage A4: engine shadow comparison — async, never affects the
+  // legacy answer.
+  authzShadowFor(ctx.prisma).userPermissionCheck({
+    userId: context.userId,
+    permission,
+    legacyAllowed: permitted,
+    projectId,
+    caller: "trpc.project",
+  });
+
+  return { permitted, organizationRole: context.organizationRole };
 }
 
 /**
@@ -1270,15 +1205,7 @@ export async function resolveProjectPermission(
  * same for every permission, so they are read once and only the binding check
  * repeats.
  */
-/**
- * @deprecated Not for new callers. This is the ADR-110 fork seam: it asks
- * the engine for a migrated organization and runs the legacy walk for one
- * that is not, and it goes away with the walk. New code decides through
- * `getApp().permissions` (or `probe*Permission` /
- * `require*Permission` in `~/server/app-layer/permissions/imperative`),
- * which reaches the same engine without depending on the fork surviving.
- */
-export async function resolveProjectPermissionAny(
+async function resolveProjectPermissionAny(
   ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
   permissions: readonly Permission[],
@@ -1288,13 +1215,27 @@ export async function resolveProjectPermissionAny(
   }
 
   // The demo project grants its view permissions to everyone, so one of them
-  // being enough settles the question before anything is read.
-  if (permissions.some((permission) => isDemoProject(projectId, permission))) {
+  // being enough settles the question before anything is read. The comparison
+  // fires BEFORE the return, as in resolveProjectPermission: the engine
+  // carries its own demo-project rule, and an early return here used to hide
+  // the entire demo surface from shadow mode. Only the permission that
+  // matched is shadowed, because that is the only one legacy answered.
+  const demoPermission = permissions.find((permission) =>
+    isDemoProject(projectId, permission),
+  );
+  if (demoPermission !== undefined) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission: demoPermission,
+      legacyAllowed: true,
+      projectId,
+      caller: "trpc.projectAny",
+    });
     return { permitted: true, organizationRole: null };
   }
 
   const context = await resolveProjectPermissionContext(ctx, projectId);
-  if ("refused" in context) return refused(context.denialReason);
+  if (!context) return { permitted: false, organizationRole: null };
 
   const scopes = projectPermissionScopes({
     projectId,
@@ -1302,53 +1243,79 @@ export async function resolveProjectPermissionAny(
     organizationId: context.organizationId,
   });
 
-  // ADR-110: the engine answers every candidate off one collected snapshot,
-  // in the same order, stopping at the same first allow the legacy loop
-  // below would have stopped at.
+  /**
+   * The legacy loop, as ONE implementation both paths run.
+   *
+   * `onCandidate` is where stage A4's per-candidate shadow comparison hangs,
+   * rather than inside the loop unconditionally: it fires only on the
+   * legacy-answering path, because a cut-over organization's comparison is the
+   * fork's own (engine-primary) one and running both would log every check
+   * twice, in two directions, for one question.
+   */
+  const legacyAny = async (
+    onCandidate?: (args: {
+      permission: Permission;
+      permitted: boolean;
+    }) => void,
+  ): Promise<PermissionResult> => {
+    for (const permission of permissions) {
+      const permitted = await checkPermissionFromBindings({
+        prisma: ctx.prisma,
+        userId: context.userId,
+        organizationId: context.organizationId,
+        scopes,
+        organizationRole: context.organizationRole,
+        permission,
+      });
+
+      // One comparison per candidate the legacy path actually evaluated - the
+      // loop stops at the first grant, so the shadowed set is exactly the set
+      // legacy answered.
+      onCandidate?.({ permission, permitted });
+
+      if (permitted) {
+        return { permitted: true, organizationRole: context.organizationRole };
+      }
+    }
+
+    return { permitted: false, organizationRole: context.organizationRole };
+  };
+
+  // ADR-092 delivery-plan PR 3: the fork, around the WHOLE loop - the engine
+  // answers every candidate off one collected snapshot, in the same order,
+  // stopping at the same first allow.
   if (
-    await organizationOnAuthzEngine({
+    await cutoverOnEngine({
       prisma: ctx.prisma,
       organizationId: context.organizationId,
     })
   ) {
-    const decision = await authzChecksFor(ctx.prisma).canAnyByIds({
-      principal: { type: "user", id: context.userId },
+    const decision = await authzForkFor(ctx.prisma).decideUserPermissionsAny({
+      userId: context.userId,
       permissions,
       projectId,
+      caller: "trpc.projectAny",
+      legacy: async () => ({ allowed: (await legacyAny()).permitted }),
     });
     return {
       permitted: decision.allowed,
       organizationRole: decision.organizationRole ?? context.organizationRole,
-      denialReason: decision.denialReason,
     };
   }
 
-  for (const permission of permissions) {
-    const permitted = await checkPermissionFromBindings({
-      prisma: ctx.prisma,
+  return legacyAny(({ permission, permitted }) => {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
       userId: context.userId,
-      organizationId: context.organizationId,
-      scopes,
-      organizationRole: context.organizationRole,
       permission,
+      legacyAllowed: permitted,
+      projectId,
+      caller: "trpc.projectAny",
     });
-    if (permitted) {
-      return { permitted: true, organizationRole: context.organizationRole };
-    }
-  }
-
-  return { permitted: false, organizationRole: context.organizationRole };
+  });
 }
 
 /**
- * Check if user has a specific permission for a project.
- *
- * @deprecated Production callers use the App-routed helpers in
- * `~/server/app-layer/permissions/imperative` (`probe*Permission` for a
- * boolean, `require*Permission` for the throwing form that returns the
- * Authorized witness) — this stays only as the legacy walk's own test
- * surface until the contract PR deletes the walk. The names no longer
- * collide, so a mock can no longer bind the wrong module silently.
+ * Check if user has a specific permission for a project
  */
 export async function hasProjectPermission(
   ctx: { prisma: PrismaClient; session: Session | null },
@@ -1362,14 +1329,6 @@ export async function hasProjectPermission(
 /**
  * Resolve a team permission check, returning the permission decision
  * along with the user's organization role.
- */
-/**
- * @deprecated Not for new callers. This is the ADR-110 fork seam: it asks
- * the engine for a migrated organization and runs the legacy walk for one
- * that is not, and it goes away with the walk. New code decides through
- * `getApp().permissions` (or `probe*Permission` /
- * `require*Permission` in `~/server/app-layer/permissions/imperative`),
- * which reaches the same engine without depending on the fork surviving.
  */
 export async function resolveTeamPermission(
   ctx: { prisma: PrismaClient; session: Session | null },
@@ -1389,19 +1348,17 @@ export async function resolveTeamPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  const membership = await getCurrentMembership({
+  const organizationRole = await getCurrentOrganizationRole({
     prisma: ctx.prisma,
     userId: ctx.session.user.id,
     organizationId: team.organizationId,
   });
-  const organizationRole = currentRoleOf(membership);
 
-  // Fail closed on current organization membership — a non-member is denied
-  // even if a stale cross-org binding names them at this team scope, and a
-  // disabled seat is refused by name. See the matching gate in
-  // resolveProjectPermission.
+  // Fail closed on current organization membership — a non-member is denied even
+  // if a stale cross-org binding names them at this team scope. See the matching
+  // gate in resolveProjectPermission.
   if (organizationRole === null) {
-    return refused(membershipDenialReason(membership));
+    return { permitted: false, organizationRole: null };
   }
 
   const userId = ctx.session.user.id;
@@ -1423,37 +1380,43 @@ export async function resolveTeamPermission(
       permission,
     });
 
-  // The organization is the one the team read above already resolved.
+  // ADR-092 delivery-plan PR 3: the fork. The organization is the one the team
+  // read above already resolved.
   if (
-    await organizationOnAuthzEngine({
+    await cutoverOnEngine({
       prisma: ctx.prisma,
       organizationId: team.organizationId,
     })
   ) {
-    const decision = await authzChecksFor(ctx.prisma).checkByIds({
-      principal: { type: "user", id: userId },
+    const decision = await authzForkFor(ctx.prisma).decideUserPermission({
+      userId,
       permission,
       teamId,
+      caller: "trpc.team",
+      legacy: legacyPermitted,
     });
     return {
       permitted: decision.allowed,
       organizationRole: decision.organizationRole ?? organizationRole,
-      denialReason: decision.denialReason,
     };
   }
 
-  return { permitted: await legacyPermitted(), organizationRole };
+  const permitted = await legacyPermitted();
+
+  // ADR-092 stage A4: engine shadow comparison.
+  authzShadowFor(ctx.prisma).userPermissionCheck({
+    userId,
+    permission,
+    legacyAllowed: permitted,
+    teamId,
+    caller: "trpc.team",
+  });
+
+  return { permitted, organizationRole };
 }
 
 /**
- * Check if user has a specific permission for a team.
- *
- * @deprecated Production callers use the App-routed helpers in
- * `~/server/app-layer/permissions/imperative` (`probe*Permission` for a
- * boolean, `require*Permission` for the throwing form that returns the
- * Authorized witness) — this stays only as the legacy walk's own test
- * surface until the contract PR deletes the walk. The names no longer
- * collide, so a mock can no longer bind the wrong module silently.
+ * Check if user has a specific permission for a team
  */
 export async function hasTeamPermission(
   ctx: { prisma: PrismaClient; session: Session | null },
@@ -1467,14 +1430,6 @@ export async function hasTeamPermission(
 /**
  * Check if user has a specific permission for an organization
  */
-/**
- * @deprecated Not for new callers. This is the ADR-110 fork seam: it asks
- * the engine for a migrated organization and runs the legacy walk for one
- * that is not, and it goes away with the walk. New code decides through
- * `getApp().permissions` (or `probe*Permission` /
- * `require*Permission` in `~/server/app-layer/permissions/imperative`),
- * which reaches the same engine without depending on the fork surviving.
- */
 export async function hasOrganizationPermission(
   ctx: { prisma: PrismaClient; session: Session },
   organizationId: string,
@@ -1482,39 +1437,40 @@ export async function hasOrganizationPermission(
 ): Promise<boolean> {
   const userId = ctx.session?.user?.id;
 
+  // ADR-092 delivery-plan PR 3: the fork. `hasOrganizationPermissionLegacy` IS
+  // the reverse-shadow thunk - the wrapper was already the seam, so nothing
+  // below it moved.
   if (
     userId &&
-    (await organizationOnAuthzEngine({ prisma: ctx.prisma, organizationId }))
+    (await cutoverOnEngine({ prisma: ctx.prisma, organizationId }))
   ) {
-    const decision = await authzChecksFor(ctx.prisma).checkByIds({
-      principal: { type: "user", id: userId },
+    const decision = await authzForkFor(ctx.prisma).decideUserPermission({
+      userId,
       permission,
       organizationId,
+      caller: "trpc.organization",
+      legacy: () =>
+        hasOrganizationPermissionLegacy(ctx, organizationId, permission),
     });
     return decision.allowed;
   }
 
-  return hasOrganizationPermissionLegacy(ctx, organizationId, permission);
-}
-
-/**
- * Why an organization-scope check refused, asked only after it did: one
- * indexed read on the refusal path rather than a second walk, so the
- * permitted path pays nothing. Undefined when there is nothing more useful
- * to say than the generic denial.
- */
-export async function organizationDenialReason({
-  ctx,
-  organizationId,
-}: {
-  ctx: { prisma: PrismaClient; session: Session };
-  organizationId: string;
-}): Promise<AuthzDenialReason | undefined> {
-  const userId = ctx.session?.user?.id;
-  if (!userId) return undefined;
-  return membershipDenialReason(
-    await getCurrentMembership({ prisma: ctx.prisma, userId, organizationId }),
+  const permitted = await hasOrganizationPermissionLegacy(
+    ctx,
+    organizationId,
+    permission,
   );
+  // ADR-092 stage A4: engine shadow comparison.
+  if (ctx.session?.user) {
+    authzShadowFor(ctx.prisma).userPermissionCheck({
+      userId: ctx.session.user.id,
+      permission,
+      legacyAllowed: permitted,
+      organizationId,
+      caller: "trpc.organization",
+    });
+  }
+  return permitted;
 }
 
 async function hasOrganizationPermissionLegacy(
@@ -1529,9 +1485,7 @@ async function hasOrganizationPermissionLegacy(
   const userId = ctx.session.user.id;
 
   const orgMember = await ctx.prisma.organizationUser?.findFirst({
-    // A seat-disabled membership confers nothing, exactly as an absent one
-    // does — see getCurrentOrganizationRole above.
-    where: { userId, organizationId, disabledAt: null },
+    where: { userId, organizationId },
     select: { role: true },
   });
 
@@ -1733,10 +1687,7 @@ async function loadScopeResolution(
                 userId,
                 user: {
                   orgMemberships: {
-                    some: {
-                      organizationId: args.organizationId,
-                      disabledAt: null,
-                    },
+                    some: { organizationId: args.organizationId },
                   },
                 },
               },
@@ -1947,12 +1898,6 @@ function teamGrants(
  * Returns the held subset, in the order given, so callers can use it directly as
  * a least-privilege grant list.
  */
-/**
- * @deprecated Not for new callers. Same ADR-110 fork seam as the single
- * checks above, and it goes away with the legacy walk. New code batches
- * through `getApp().permissions` , which reaches
- * the engine's `canBatchByIds` directly.
- */
 export async function batchProjectPermissions(
   ctx: { prisma: PrismaClient; session: Session | null },
   args: {
@@ -1982,66 +1927,11 @@ export async function batchProjectPermissions(
 }
 
 /**
- * MANY permissions, MANY team scopes — the team-scope counterpart of
- * `batchProjectPermissions`, resolved with one `loadScopeResolution` round
- * for the whole team set.
- *
- * Exists for the CLI login-key default selection: the minted key carries one
- * permission list asserted at every stamped team scope, so the default list
- * has to be narrowed to what the user really holds per team BEFORE the mint
- * asserts it — and asking per permission per team is the pool-starving
- * fan-out `batchProjectPermissions` documents. Like that function, this is
- * the legacy resolution on purpose: it feeds a mint whose ceiling is
- * re-asserted (and forked on cut-over organizations) by
- * `ApiKeyService.create`, so a divergence can only narrow the result, never
- * widen it.
- *
- * Returns the held subset per team, in the order given.
- */
-/**
- * @deprecated Not for new callers. Same ADR-110 fork seam as the single
- * checks above, and it goes away with the legacy walk. New code batches
- * through `getApp().permissions` , which reaches
- * the engine's `canBatchByIds` directly.
- */
-export async function batchTeamsPermissions(
-  ctx: { prisma: PrismaClient; session: Session | null },
-  args: {
-    organizationId: string;
-    teamIds: string[];
-    permissions: Permission[];
-  },
-): Promise<Map<string, Permission[]>> {
-  const result = new Map<string, Permission[]>();
-  const resolution = await loadScopeResolution(ctx, {
-    organizationId: args.organizationId,
-    scopeIds: args.teamIds,
-  });
-  for (const teamId of args.teamIds) {
-    if (!resolution) {
-      result.set(teamId, []);
-      continue;
-    }
-    result.set(
-      teamId,
-      args.permissions.filter((permission) =>
-        teamGrants(
-          resolution,
-          { organizationId: args.organizationId, teamId },
-          permission,
-        ),
-      ),
-    );
-  }
-  return result;
-}
-
-/**
- * The legacy batch resolution — the answering path in `batchScopePermissions`
- * when the organization is still on legacy. (It was also the fork's
- * reverse-shadow thunk before the shadow comparison was removed; the engine
- * now answers a migrated organization outright.) It builds its own maps per
- * call, so no two callers can hand out the same mutable pair.
+ * The legacy batch resolution, as ONE implementation both paths run: the
+ * answering path in `batchScopePermissions` when the organization is still on
+ * legacy, and the fork's reverse-shadow thunk when it is not. It builds its
+ * own maps per call, so the two paths can never hand out the same mutable
+ * pair.
  */
 async function legacyBatchScopePermissions(
   ctx: { prisma: PrismaClient; session: Session | null },
@@ -2126,12 +2016,6 @@ async function legacyBatchScopePermissions(
  * team-scoped binding inherits to its projects. Callers pass the
  * project→teamId map alongside the project ids.
  */
-/**
- * @deprecated Not for new callers. Same ADR-110 fork seam as the single
- * checks above, and it goes away with the legacy walk. New code batches
- * through `getApp().permissions` , which reaches
- * the engine's `canBatchByIds` directly.
- */
 export async function batchScopePermissions(
   ctx: { prisma: PrismaClient; session: Session | null },
   args: {
@@ -2146,18 +2030,19 @@ export async function batchScopePermissions(
 
   const userId = ctx.session?.user?.id;
 
-  // One collected snapshot answers every scope in the batch. Deciding per
-  // scope would fan the legacy batch's four flat queries into a collect per
-  // scope — the pool-starving fan-out api-key.service.ts documents.
+  // ADR-092 delivery-plan PR 3: the fork. One collected snapshot answers every
+  // scope in the batch, and the legacy batch runs once behind it — the same
+  // fan-out arithmetic the shadow call below is shaped by, on the answering
+  // side now.
   if (
     userId &&
-    (await organizationOnAuthzEngine({
+    (await cutoverOnEngine({
       prisma: ctx.prisma,
       organizationId: args.organizationId,
     }))
   ) {
-    const decision = await authzChecksFor(ctx.prisma).canBatchByIds({
-      principal: { type: "user", id: userId },
+    const decision = await authzForkFor(ctx.prisma).decideUserBatchPermissions({
+      userId,
       permission: args.permission,
       organizationId: args.organizationId,
       teams: args.teamIds.map((teamId) => ({ teamId })),
@@ -2165,11 +2050,38 @@ export async function batchScopePermissions(
         projectId,
         teamId: args.projectTeamId[projectId],
       })),
+      caller: "trpc.batch",
+      legacy: legacyBatch,
     });
     return { teams: decision.teams, projects: decision.projects };
   }
 
   const { teams: teamsMap, projects: projectsMap } = await legacyBatch();
+
+  // ADR-092 stage A4: every verdict this batch produced is a real
+  // authorization answer, so each one is compared — through the batch entry
+  // point, which draws the sample once and collects grants once for the
+  // whole batch. Per-scope userPermissionCheck calls here would fan legacy's
+  // four flat queries into a detached collect per scope (the pool-starving
+  // fan-out api-key.service.ts documents), with the whole batch as the
+  // worst case at sample rate 1.
+  if (userId) {
+    authzShadowFor(ctx.prisma).userBatchPermissionCheck({
+      userId,
+      permission: args.permission,
+      organizationId: args.organizationId,
+      teams: [...teamsMap].map(([teamId, legacyAllowed]) => ({
+        teamId,
+        legacyAllowed,
+      })),
+      projects: [...projectsMap].map(([projectId, legacyAllowed]) => ({
+        projectId,
+        teamId: args.projectTeamId[projectId],
+        legacyAllowed,
+      })),
+      caller: "trpc.batch",
+    });
+  }
 
   return { teams: teamsMap, projects: projectsMap };
 }
@@ -2217,44 +2129,103 @@ export function isDemoProject(
   );
 }
 
+// ============================================================================
+// SKIP PERMISSION CHECK (for public/special routes)
+// ============================================================================
+
+const SENSITIVE_KEYS = ["organizationId", "teamId", "projectId"] as const;
+type SensitiveKey = (typeof SENSITIVE_KEYS)[number];
+type SkipPermissionCheckOptions = {
+  allow?: Partial<Record<SensitiveKey, string>>;
+};
+
+function isMiddlewareParams(
+  value: unknown,
+): value is PermissionMiddlewareParams<object> {
+  return typeof value === "object" && value !== null && "ctx" in value;
+}
+
+/**
+ * Permission middleware for endpoints that need authentication but not resource-level access.
+ *
+ * Use this when:
+ * - User must be logged in (via `protectedProcedure`)
+ * - No project/team/org-scoped data is accessed
+ * - Examples: user preferences, feature flags, global settings
+ *
+ * By default, blocks `projectId`, `organizationId`, and `teamId` in the input
+ * to prevent accidental resource access without permission checks.
+ *
+ * @param options.allow - Map of keys to reasons explaining why they're allowed
+ */
+export function skipPermissionCheck(
+  options?: SkipPermissionCheckOptions,
+): (
+  params: PermissionMiddlewareParams<object>,
+) => ReturnType<typeof params.next>;
+export function skipPermissionCheck(
+  params: PermissionMiddlewareParams<object>,
+): ReturnType<typeof params.next>;
+export function skipPermissionCheck(
+  paramsOrOptions?:
+    | PermissionMiddlewareParams<object>
+    | SkipPermissionCheckOptions,
+) {
+  if (isMiddlewareParams(paramsOrOptions)) {
+    const { ctx, next, input } = paramsOrOptions;
+    ctx.permissionChecked = true;
+
+    for (const key of SENSITIVE_KEYS) {
+      if (key in input) {
+        throw new Error(
+          `${key} is not allowed to be used without permission check`,
+        );
+      }
+    }
+
+    return next();
+  }
+
+  const allowedKeys = Object.keys(paramsOrOptions?.allow ?? {});
+  return ({ ctx, next, input }: PermissionMiddlewareParams<object>) => {
+    ctx.permissionChecked = true;
+
+    for (const key of SENSITIVE_KEYS) {
+      if (key in input && !allowedKeys.includes(key)) {
+        throw new Error(
+          `${key} is not allowed to be used without permission check`,
+        );
+      }
+    }
+
+    return next();
+  };
+}
+
+export const skipPermissionCheckProjectCreation = ({
+  ctx,
+  next,
+}: PermissionMiddlewareParams<object>) => {
+  ctx.permissionChecked = true;
+  return next();
+};
+
 /**
  * For procedures that authorize against data-dependent scopes resolved at
  * runtime (e.g. a row's own scope set, loaded by id) rather than a fixed
- * input scope a declared `.permission()` could read. It satisfies the
- * builder's fail-closed `enforcePermissionCheck` while keeping
- * `protectedProcedure`'s auth + audit + domain-error handling. The
- * resolver/service MUST perform the real authorization — this only defers
- * WHERE the check happens, never whether it happens.
- *
- * Declared generically for the sweep; new procedures prefer
- * `.authorizeInService({ reason, permissions })`, which names what the
- * service enforces at the call site.
+ * input scope a `checkXxxPermission` could read. It satisfies the builder's
+ * fail-closed `enforcePermissionCheck` while keeping `protectedProcedure`'s
+ * auth + audit + domain-error handling. The resolver/service MUST perform
+ * the real authorization — this only defers WHERE the check happens, never
+ * whether it happens.
  */
-/**
- * For procedures whose authorization is data-dependent and runs inside the
- * resolver (a membership filter, a scope loaded from the row being acted
- * on). The declaration must CLAIM, per scope field the input carries, what
- * enforces it — the sweep counts a claimed field as covered and fails on an
- * unclaimed one, so an input growing a new scope id turns CI red until the
- * resolver's enforcement is named. The claims are prose, but they are
- * per-field and reviewable; the predecessor of this factory claimed nothing
- * and stamped every input covered, which is how 23 endpoints went unchecked.
- */
-export function authorizeInResolver(enforces: EnforcedScopeFields) {
-  return declareAuthzMiddleware(
-    {
-      kind: "service-authorized",
-      reason:
-        "the scope is data the resolver loads at runtime; the resolver enforces each claimed field (see `enforces`)",
-      permissions: [],
-      enforces,
-    },
-    ({ ctx, next }: PermissionMiddlewareParams<object>) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-  );
-}
+export const authorizeInResolver = ({
+  ctx,
+  next,
+}: PermissionMiddlewareParams<object>) => {
+  ctx.permissionChecked = true;
+  return next();
+};
 
 // ============================================================================
 // OPS PERMISSION
@@ -2302,48 +2273,41 @@ export function resolveOpsScope({
   return { kind: "none" };
 }
 
-export const checkOpsPermission = ({
-  permission,
-  throwOnDeny = true,
-}: {
-  permission: Permission;
-  throwOnDeny?: boolean;
-}) =>
-  declareAuthzMiddleware(
-    {
-      kind: "custom",
-      reason:
-        "platform-tier operator check: resolves the admin allow-list into an ops scope no procedure input carries",
-      permissions: [permission],
-    },
-    async ({ ctx, next }: PermissionMiddlewareParams<unknown>) => {
-      const user = ctx.session?.user;
-      if (!user) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
+export const checkOpsPermission =
+  ({
+    permission,
+    throwOnDeny = true,
+  }: {
+    permission: Permission;
+    throwOnDeny?: boolean;
+  }) =>
+  async ({ ctx, next }: PermissionMiddlewareParams<unknown>) => {
+    const user = ctx.session?.user;
+    if (!user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
 
-      const opsScope = await resolveOpsScope({
-        userId: user.id,
-        userEmail: user.email,
-        impersonatorEmail: user.impersonator?.email,
-        permission,
-        prisma: ctx.prisma,
+    const opsScope = await resolveOpsScope({
+      userId: user.id,
+      userEmail: user.email,
+      impersonatorEmail: user.impersonator?.email,
+      permission,
+      prisma: ctx.prisma,
+    });
+
+    // For mutating endpoints, `kind: "none"` is a hard FORBIDDEN. For status
+    // probes that want to *report* "no access" without throwing (lw#3584
+    // — see ops.getScope), pass `{ throwOnDeny: false }` so the middleware
+    // populates `ctx.opsScope = { kind: "none" }` and the procedure handler
+    // can branch on it.
+    if (opsScope.kind === "none" && throwOnDeny) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You do not have permission to access ops resources",
       });
+    }
 
-      // For mutating endpoints, `kind: "none"` is a hard FORBIDDEN. For status
-      // probes that want to *report* "no access" without throwing (lw#3584
-      // — see ops.getScope), pass `{ throwOnDeny: false }` so the middleware
-      // populates `ctx.opsScope = { kind: "none" }` and the procedure handler
-      // can branch on it.
-      if (opsScope.kind === "none" && throwOnDeny) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You do not have permission to access ops resources",
-        });
-      }
-
-      ctx.opsScope = opsScope;
-      ctx.permissionChecked = true;
-      return next();
-    },
-  );
+    ctx.opsScope = opsScope;
+    ctx.permissionChecked = true;
+    return next();
+  };

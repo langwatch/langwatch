@@ -1,9 +1,8 @@
-import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { describe, expect, it } from "vitest";
 import {
-  attachGrantCommandDataSchema,
-  defineRoleCommandDataSchema,
-  revokeGrantCommandDataSchema,
+  attachGrantsCommandDataSchema,
+  defineRolesCommandDataSchema,
+  revokeGrantsCommandDataSchema,
 } from "../schemas/commands";
 
 /**
@@ -41,17 +40,17 @@ const SHARE_TERMS = {
 } as const;
 
 function parse(overrides: Record<string, unknown> = {}, entryOverrides = {}) {
-  return attachGrantCommandDataSchema.safeParse({
+  return attachGrantsCommandDataSchema.safeParse({
     tenantId: ORG,
     organizationId: ORG,
     commandId: "cmd_1",
-    grant: entry(entryOverrides),
+    grants: [entry(entryOverrides)],
     ...overrides,
   });
 }
 
 describe("the grants ledger's wire boundary", () => {
-  describe("given a well-formed grant", () => {
+  describe("given a well-formed batch", () => {
     it("accepts it", () => {
       expect(parse().success).toBe(true);
     });
@@ -225,7 +224,7 @@ describe("the grants ledger's wire boundary", () => {
             principal: { type: "project", id: "proj_chatbot" },
             roleKey: "admin",
             scope: { type: "PROJECT", id: "proj_chatbot" },
-            source: "migration",
+            source: "cutover-import",
           },
         ).success,
       ).toBe(true);
@@ -243,52 +242,35 @@ describe("the grants ledger's wire boundary", () => {
 
     it("refuses a role whose permission list holds an empty entry", () => {
       expect(
-        defineRoleCommandDataSchema.safeParse({
+        defineRolesCommandDataSchema.safeParse({
           tenantId: ORG,
           organizationId: ORG,
           commandId: "cmd_1",
           actor: { type: "user", id: "user_admin" },
-          role: {
-            roleId: "role_1",
-            name: "Auditor",
-            permissions: ["traces:read", ""],
-            kind: "custom",
-            occurredAtMs: 1_755_000_000_000,
-          },
+          roles: [
+            {
+              roleId: "role_1",
+              name: "Auditor",
+              permissions: ["traces:read", ""],
+              kind: "custom",
+              occurredAtMs: 1_755_000_000_000,
+            },
+          ],
         }).success,
       ).toBe(false);
-    });
-  });
-
-  describe("when the grant names where it came from", () => {
-    /** The wire derives its enum from `GRANT_EVENT_SOURCES` rather than
-     *  restating it, so adding a source to the vocabulary is the whole
-     *  change. Driving the vocabulary itself is what pins that: a restated
-     *  union would pass for the sources it copied and fail for the new one.
-     *  @scenario "The wire accepts every source the vocabulary names" */
-    it("accepts every source the vocabulary names", () => {
-      for (const source of GRANT_EVENT_SOURCES) {
-        expect(parse({}, { source }).success).toBe(true);
-      }
-    });
-
-    it("refuses a source the vocabulary does not name", () => {
-      expect(parse({}, { source: "a-surface-nobody-declared" }).success).toBe(
-        false,
-      );
     });
   });
 });
 
 describe("the revocation wire boundary", () => {
   function revoke(entry: Record<string, unknown>) {
-    return revokeGrantCommandDataSchema.safeParse({
+    return revokeGrantsCommandDataSchema.safeParse({
       tenantId: ORG,
       organizationId: ORG,
       commandId: "cmd_1",
+      revocations: [entry],
       actor: { type: "user", id: "user_admin" },
       occurredAtMs: 1_755_000_000_000,
-      ...entry,
     });
   }
 
@@ -298,20 +280,35 @@ describe("the revocation wire boundary", () => {
     });
   });
 
-  describe("given a revocation naming no grant", () => {
-    /**
-     * A revoke used to be able to name an IDENTITY instead of an id, and the
-     * fold swept every grant matching it. The aggregate is the grant now, so
-     * an event cannot address a set of them: resolving "every grant this
-     * principal holds" into ids is the caller's job, and the synchronous deny
-     * is what makes that safe.
-     */
-    it("refuses it rather than appending a fact that removes nothing", () => {
-      expect(revoke({ reason: "seat removed" }).success).toBe(false);
+  describe("given a revocation naming an identity instead", () => {
+    it("accepts a principal with no scope, meaning every scope", () => {
+      expect(
+        revoke({ selector: { principal: { type: "api_key", id: "key_1" } } })
+          .success,
+      ).toBe(true);
     });
 
-    it("refuses an empty grant id", () => {
-      expect(revoke({ grantId: "" }).success).toBe(false);
+    it("accepts a principal narrowed to one scope", () => {
+      expect(
+        revoke({
+          selector: {
+            principal: { type: "user", id: "user_alice" },
+            scope: { type: "TEAM", id: "team_client_a" },
+          },
+        }).success,
+      ).toBe(true);
+    });
+
+    it("refuses a subject-less selector, which would revoke by nothing", () => {
+      expect(
+        revoke({ selector: { principal: { type: "user", id: null } } }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe("given a revocation naming neither", () => {
+    it("refuses it rather than appending a fact that removes nothing", () => {
+      expect(revoke({ reason: "seat removed" }).success).toBe(false);
     });
   });
 });

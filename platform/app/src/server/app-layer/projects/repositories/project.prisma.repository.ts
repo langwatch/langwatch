@@ -228,18 +228,12 @@ export class PrismaProjectRepository implements ProjectRepository {
     organizationId,
     page,
     limit,
-    projectIds,
   }: {
     organizationId: string;
     page: number;
     limit: number;
-    projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
-    const where = {
-      archivedAt: null,
-      team: { organizationId },
-      ...(projectIds ? { id: { in: projectIds } } : {}),
-    };
+    const where = { archivedAt: null, team: { organizationId } };
     const [data, total] = await Promise.all([
       this.prisma.project.findMany({
         where,

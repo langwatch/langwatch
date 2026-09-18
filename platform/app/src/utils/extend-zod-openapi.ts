@@ -1,7 +1,6 @@
 import {
   ZodArray,
   ZodBoolean,
-  ZodDate,
   ZodEnum,
   ZodLazy,
   ZodNumber,
@@ -32,10 +31,6 @@ export const patchZodOpenapi = () => {
     };
 
     ZodBoolean.prototype.openapi = function () {
-      return this;
-    };
-
-    ZodDate.prototype.openapi = function () {
       return this;
     };
 

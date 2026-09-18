@@ -5,12 +5,14 @@ import { buildGaugeRow, buildSumRow } from "./rollup/scalar";
 import {
   comparePoints,
   floorBucket,
-  type MetricRollupSourcePoint,
   type MetricSequencePoint,
   usesPredecessor,
 } from "./rollup/sequence";
 import { buildSummaryRow } from "./rollup/summary";
-import type { MetricRollupRow } from "./schemas/metricDataPoint";
+import type {
+  CanonicalMetricDataPoint,
+  MetricRollupRow,
+} from "./schemas/metricDataPoint";
 
 const BUILDERS = {
   gauge: buildGaugeRow,
@@ -29,7 +31,7 @@ export function buildMetricRollups({
   points,
   affectedBuckets,
 }: {
-  points: MetricRollupSourcePoint[];
+  points: CanonicalMetricDataPoint[];
   affectedBuckets?: ReadonlySet<number>;
 }): MetricRollupRow[] {
   const all = [...points].sort(comparePoints);

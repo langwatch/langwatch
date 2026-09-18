@@ -2,20 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Hoisted mocks for rbac helpers used by getRetentionPolicySnapshot.
 const rbacMocks = vi.hoisted(() => ({
-  probeOrganizationPermission: vi.fn(),
-  probeProjectPermission: vi.fn(),
+  hasOrganizationPermission: vi.fn(),
+  hasProjectPermission: vi.fn(),
   batchScopePermissions: vi.fn(),
 }));
 
-vi.mock("~/server/app-layer/permissions/imperative", () => ({
-  probeOrganizationPermission: rbacMocks.probeOrganizationPermission,
-  probeProjectPermission: rbacMocks.probeProjectPermission,
-}));
-
-// batchScopePermissions stays a legacy rbac read (it is the seam itself).
-vi.mock("~/server/api/rbac", () => ({
-  batchScopePermissions: rbacMocks.batchScopePermissions,
-}));
+vi.mock("~/server/api/rbac", () => rbacMocks);
 
 const appMocks = vi.hoisted(() => ({
   getResolvedForProject: vi.fn(),
@@ -131,8 +123,8 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
     ]);
 
     // Caller is a project-only user, no org/team management.
-    rbacMocks.probeOrganizationPermission.mockResolvedValue(false);
-    rbacMocks.probeProjectPermission.mockResolvedValue(true);
+    rbacMocks.hasOrganizationPermission.mockResolvedValue(false);
+    rbacMocks.hasProjectPermission.mockResolvedValue(true);
     rbacMocks.batchScopePermissions.mockImplementation(
       async (_ctx: any, args: any) => {
         const teams = new Map<string, boolean>();
@@ -170,7 +162,7 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
     });
 
     it("exposes the org rule once caller also holds organization:manage", async () => {
-      rbacMocks.probeOrganizationPermission.mockResolvedValue(true);
+      rbacMocks.hasOrganizationPermission.mockResolvedValue(true);
 
       const snapshot = await getRetentionPolicySnapshot(
         { prisma, session },

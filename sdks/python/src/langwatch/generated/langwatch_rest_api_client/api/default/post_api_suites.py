@@ -10,12 +10,12 @@ from ...models.post_api_suites_response_400 import PostApiSuitesResponse400
 from ...models.post_api_suites_response_401 import PostApiSuitesResponse401
 from ...models.post_api_suites_response_422 import PostApiSuitesResponse422
 from ...models.post_api_suites_response_500 import PostApiSuitesResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiSuitesBody,
+    body: PostApiSuitesBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         "url": "/api/suites",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -95,8 +96,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiSuitesBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiSuitesBody | Unset = UNSET,
 ) -> Response[
     PostApiSuitesResponse201
     | PostApiSuitesResponse400
@@ -104,10 +105,10 @@ def sync_detailed(
     | PostApiSuitesResponse422
     | PostApiSuitesResponse500
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+    """Create a new suite (run plan)
 
     Args:
-        body (PostApiSuitesBody):
+        body (PostApiSuitesBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -130,8 +131,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    body: PostApiSuitesBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiSuitesBody | Unset = UNSET,
 ) -> (
     PostApiSuitesResponse201
     | PostApiSuitesResponse400
@@ -140,10 +141,10 @@ def sync(
     | PostApiSuitesResponse500
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+    """Create a new suite (run plan)
 
     Args:
-        body (PostApiSuitesBody):
+        body (PostApiSuitesBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,8 +162,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiSuitesBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiSuitesBody | Unset = UNSET,
 ) -> Response[
     PostApiSuitesResponse201
     | PostApiSuitesResponse400
@@ -170,10 +171,10 @@ async def asyncio_detailed(
     | PostApiSuitesResponse422
     | PostApiSuitesResponse500
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+    """Create a new suite (run plan)
 
     Args:
-        body (PostApiSuitesBody):
+        body (PostApiSuitesBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -194,8 +195,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    body: PostApiSuitesBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiSuitesBody | Unset = UNSET,
 ) -> (
     PostApiSuitesResponse201
     | PostApiSuitesResponse400
@@ -204,10 +205,10 @@ async def asyncio(
     | PostApiSuitesResponse500
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+    """Create a new suite (run plan)
 
     Args:
-        body (PostApiSuitesBody):
+        body (PostApiSuitesBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

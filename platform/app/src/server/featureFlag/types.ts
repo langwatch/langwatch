@@ -1,15 +1,11 @@
 import type { FeatureFlagKey } from "./registry";
-import type { FeatureFlagTargetId } from "./targeting";
 
 /**
  * Options for evaluating a single feature flag.
  *
- * `distinctId` identifies the caller (audit log, cache key salting).
- * `projectId` and `organizationId` are the targeting identity of the
- * read and are both required: a targeting rule that names a scope the
- * read left out can never match, so leaving one out turns a rollout
- * into a silent no-op. A caller with no such scope passes
- * `NOT_TARGETED`.
+ * `distinctId` is the only required field — every flag resolution
+ * needs an identity to evaluate against (audit log, cache key
+ * salting). The rest are optional knobs.
  */
 export interface FeatureFlagEvaluateOptions {
   distinctId: string;
@@ -18,10 +14,8 @@ export interface FeatureFlagEvaluateOptions {
    * flags always use their `defaultValue` from `registry.ts`).
    */
   defaultValue?: boolean;
-  /** The project this read is about, or `NOT_TARGETED`. */
-  projectId: FeatureFlagTargetId;
-  /** The organization this read is about, or `NOT_TARGETED`. */
-  organizationId: FeatureFlagTargetId;
+  projectId?: string;
+  organizationId?: string;
   /**
    * Override the cache TTL (ms) for this evaluation. Used by hot-path
    * callers (kill switches checked per span/event) to control how

@@ -1,5 +1,5 @@
-import type { Action, Resource } from "~/utils/rbacVocabulary";
-import { Actions, Resources } from "~/utils/rbacVocabulary";
+import type { Action, Resource } from "../server/api/rbac";
+import { Actions, Resources } from "../server/api/rbac";
 
 /**
  * Permissions configuration utilities

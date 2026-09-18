@@ -1,9 +1,9 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import { batchScopePermissions } from "~/server/api/rbac";
 import {
-  probeOrganizationPermission,
-  probeProjectPermission,
-} from "~/server/app-layer/permissions/imperative";
+  batchScopePermissions,
+  hasOrganizationPermission,
+  hasProjectPermission,
+} from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
 import {
   type DataPrivacyConfig,
@@ -16,7 +16,7 @@ import { type DataPrivacyRow, resolveDataPrivacy } from "./resolveDataPrivacy";
 
 export type ReadCtx = { prisma: PrismaClient; session: Session | null };
 
-// probeOrganizationPermission / probeProjectPermission narrow their ctx to a
+// hasOrganizationPermission / hasProjectPermission narrow their ctx to a
 // non-null session (they early-return false when absent). protectedProcedure
 // guarantees a session at runtime; mirror the model-defaults read cast.
 type AuthedCtx = { prisma: PrismaClient; session: Session };
@@ -100,7 +100,7 @@ export async function getDataPrivacySnapshot(
 
   if (!organizationId) {
     // Personal-account project (no org/team): only its own PROJECT scope.
-    const canWrite = await probeProjectPermission(
+    const canWrite = await hasProjectPermission(
       ctx as AuthedCtx,
       projectId,
       "project:update",
@@ -153,7 +153,7 @@ export async function getDataPrivacySnapshot(
         orderBy: { name: "asc" },
       }),
       service.listOrganizationRules({ organizationId }),
-      probeOrganizationPermission(
+      hasOrganizationPermission(
         ctx as AuthedCtx,
         organizationId,
         "organization:manage",

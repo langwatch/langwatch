@@ -218,6 +218,7 @@ describe("the scope reset's coverage", () => {
     "panelMode",
     "panelEffect",
     "devMode",
+    "contextHintDismissed",
     // What is mounted right now — a live count, not data.
     "dockShellClaims",
     "dockShifted",
@@ -288,12 +289,14 @@ describe("the scope reset's coverage", () => {
         langy().resetForScope(scopeA);
         langy().setPanelMode("floating");
         langy().setDevMode(true);
+        langy().dismissContextHint();
         langy().openPanel();
 
         langy().resetForScope({ ...scopeA, projectId: "project-b" });
 
         expect(langy().panelMode).toBe("floating");
         expect(langy().devMode).toBe(true);
+        expect(langy().contextHintDismissed).toBe(true);
         expect(langy().isOpen).toBe(true);
       });
     });

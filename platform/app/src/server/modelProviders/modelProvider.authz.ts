@@ -1,10 +1,10 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import {
-  probeOrganizationPermission,
-  probeProjectPermission,
-  probeTeamPermission,
-} from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
+import {
+  hasOrganizationPermission,
+  hasProjectPermission,
+  hasTeamPermission,
+} from "../api/rbac";
 import { ModelProviderScopeForbiddenError } from "./errors";
 
 /**
@@ -53,16 +53,16 @@ async function canManageScope(
 ): Promise<boolean> {
   if (!ctx.session) return false;
   if (scope.scopeType === "ORGANIZATION") {
-    return probeOrganizationPermission(
-      { session: ctx.session },
+    return hasOrganizationPermission(
+      { prisma: ctx.prisma, session: ctx.session },
       scope.scopeId,
       "organization:manage",
     );
   }
   if (scope.scopeType === "TEAM") {
-    return probeTeamPermission(ctx, scope.scopeId, "team:manage");
+    return hasTeamPermission(ctx, scope.scopeId, "team:manage");
   }
-  return probeProjectPermission(ctx, scope.scopeId, "project:manage");
+  return hasProjectPermission(ctx, scope.scopeId, "project:manage");
 }
 
 /**
@@ -104,16 +104,16 @@ async function canReadScope(ctx: RBACContext, scope: Scope): Promise<boolean> {
   // invisible — getById surfaces NOT_FOUND instead of FORBIDDEN.
   if (!ctx.session) return false;
   if (scope.scopeType === "ORGANIZATION") {
-    return probeOrganizationPermission(
-      { session: ctx.session },
+    return hasOrganizationPermission(
+      { prisma: ctx.prisma, session: ctx.session },
       scope.scopeId,
       "organization:view",
     );
   }
   if (scope.scopeType === "TEAM") {
-    return probeTeamPermission(ctx, scope.scopeId, "team:view");
+    return hasTeamPermission(ctx, scope.scopeId, "team:view");
   }
-  return probeProjectPermission(ctx, scope.scopeId, "project:view");
+  return hasProjectPermission(ctx, scope.scopeId, "project:view");
 }
 
 /**

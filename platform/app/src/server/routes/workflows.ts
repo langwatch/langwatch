@@ -24,11 +24,12 @@ import {
   type StudioServerEvent,
   studioClientEventSchema,
 } from "~/optimization_studio/types/events";
+import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { DatasetNotReadyError } from "~/server/datasets/errors";
+import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
@@ -62,8 +63,8 @@ secured
       return c.json({ error: "Project ID is required." }, { status: 400 });
     }
 
-    const hasPermission = await probeProjectPermission(
-      { session },
+    const hasPermission = await hasProjectPermission(
+      { prisma, session },
       projectId,
       "workflows:manage",
     );
@@ -155,8 +156,8 @@ secured
         );
       }
 
-      const hasPermission = await probeProjectPermission(
-        { session },
+      const hasPermission = await hasProjectPermission(
+        { prisma, session },
         projectId,
         "workflows:manage",
       );

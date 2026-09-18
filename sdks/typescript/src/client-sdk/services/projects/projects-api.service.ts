@@ -56,13 +56,6 @@ export class ProjectsApiError extends Error {
     message: string,
     public readonly operation: string,
     public readonly originalError?: unknown,
-    /**
-     * The status the platform answered with. Callers that resolve a
-     * `--project` selector through the listing branch on it: a 401/403 means
-     * the credential cannot see the listing at all, which is a different
-     * answer to the user than "no project of yours matches this name".
-     */
-    public readonly status?: number,
   ) {
     super(message);
     this.name = "ProjectsApiError";
@@ -78,13 +71,6 @@ export class ProjectsApiService {
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
-  /**
-   * Bearer, never the project-pinned Basic shape the data routes use. The
-   * listing is the question "which projects can this credential see?", so
-   * naming one project in the header would scope the answer to that project
-   * and defeat the call — including the `--project <slug>` lookup, which reads
-   * the listing precisely because it does not know the id yet.
-   */
   private headers(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.apiKey}`,
@@ -115,12 +101,7 @@ export class ProjectsApiService {
         status: response.status,
         message,
       });
-      throw new ProjectsApiError(
-        message,
-        operation,
-        parsedBody,
-        response.status,
-      );
+      throw new ProjectsApiError(message, operation, parsedBody);
     }
     return (await response.json()) as T;
   }

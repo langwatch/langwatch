@@ -1,46 +1,17 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import { createCliScenariosService } from "./cli-scenarios-service";
-import {
-  resolveSuiteReference,
-  SuiteReferenceError,
-} from "../test-suites/resolveSuite";
 
 export const createScenarioCommand = async (
   name: string,
-  options: {
-    situation: string;
-    criteria?: string;
-    labels?: string;
-    testSuite?: string;
-  },
+  options: { situation: string; criteria?: string; labels?: string },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  // The test suite is resolved before anything is created, so a reference that
-  // names nothing leaves no half-filed scenario behind.
-  let testSuiteId: string | undefined;
-  let testSuiteName: string | undefined;
-  if (options.testSuite !== undefined) {
-    try {
-      const testSuite = await resolveSuiteReference({
-        reference: options.testSuite,
-      });
-      testSuiteId = testSuite.id;
-      testSuiteName = testSuite.name;
-    } catch (error) {
-      if (error instanceof SuiteReferenceError) {
-        console.error(chalk.red(`Error: ${error.message}`));
-        process.exit(1);
-      }
-      throw error;
-    }
-  }
-
-  const service = createCliScenariosService();
+  const service = new ScenariosApiService();
   const spinner = createSpinner(`Creating scenario "${name}"...`).start();
 
   try {
@@ -56,13 +27,10 @@ export const createScenarioCommand = async (
       situation: options.situation,
       criteria,
       labels,
-      ...(testSuiteId !== undefined && { testSuiteId }),
     });
 
     spinner.succeed(
-      testSuiteName
-        ? `Created scenario "${chalk.cyan(scenario.name)}" in test suite "${chalk.cyan(testSuiteName)}" ${chalk.gray(`(id: ${scenario.id})`)}`
-        : `Created scenario "${chalk.cyan(scenario.name)}" ${chalk.gray(`(id: ${scenario.id})`)}`,
+      `Created scenario "${chalk.cyan(scenario.name)}" ${chalk.gray(`(id: ${scenario.id})`)}`,
     );
 
     return {

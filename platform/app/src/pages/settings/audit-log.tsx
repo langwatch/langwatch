@@ -14,18 +14,18 @@ import {
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, Download, Search } from "lucide-react";
+import Parse from "papaparse";
 import { useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { useRouter } from "~/utils/compat/next-router";
-import { downloadCsv } from "~/utils/downloadCsv";
+import { ProjectSelector } from "../../components/DashboardLayout";
 import { NavigationFooter } from "../../components/NavigationFooter";
 import {
   PeriodSelector,
   usePeriodSelector,
 } from "../../components/PeriodSelector";
-import { ProjectSelector } from "../../components/ProjectSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { InputGroup } from "../../components/ui/input-group";
@@ -341,12 +341,24 @@ function AuditLogPage() {
         truncateJsonForCsv(log.after),
       ]);
 
-      const formattedDate = new Date().toISOString().split("T")[0];
-      downloadCsv({
+      // Generate CSV
+      const csvBlob = Parse.unparse({
         fields,
-        rows: csvData,
-        fileName: `audit_logs_${formattedDate}.csv`,
+        data: csvData,
       });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([csvBlob]));
+      const link = document.createElement("a");
+      link.href = url;
+      const today = new Date();
+      const formattedDate = today.toISOString().split("T")[0];
+      const fileName = `audit_logs_${formattedDate}.csv`;
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to export audit logs:", error);
     } finally {

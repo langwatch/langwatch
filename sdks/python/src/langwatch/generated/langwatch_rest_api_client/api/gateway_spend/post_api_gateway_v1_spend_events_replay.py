@@ -10,12 +10,12 @@ from ...models.post_api_gateway_v1_spend_events_replay_response_400 import PostA
 from ...models.post_api_gateway_v1_spend_events_replay_response_401 import PostApiGatewayV1SpendEventsReplayResponse401
 from ...models.post_api_gateway_v1_spend_events_replay_response_403 import PostApiGatewayV1SpendEventsReplayResponse403
 from ...models.post_api_gateway_v1_spend_events_replay_response_500 import PostApiGatewayV1SpendEventsReplayResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiGatewayV1SpendEventsReplayBody,
+    body: PostApiGatewayV1SpendEventsReplayBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         "url": "/api/gateway/v1/spend-events/replay",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -95,8 +96,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1SpendEventsReplayBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1SpendEventsReplayBody | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1SpendEventsReplayResponse200
     | PostApiGatewayV1SpendEventsReplayResponse400
@@ -115,7 +116,7 @@ def sync_detailed(
     so a refused replay ships nothing.
 
     Args:
-        body (PostApiGatewayV1SpendEventsReplayBody):
+        body (PostApiGatewayV1SpendEventsReplayBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -138,8 +139,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1SpendEventsReplayBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1SpendEventsReplayBody | Unset = UNSET,
 ) -> (
     PostApiGatewayV1SpendEventsReplayResponse200
     | PostApiGatewayV1SpendEventsReplayResponse400
@@ -159,7 +160,7 @@ def sync(
     so a refused replay ships nothing.
 
     Args:
-        body (PostApiGatewayV1SpendEventsReplayBody):
+        body (PostApiGatewayV1SpendEventsReplayBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -177,8 +178,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1SpendEventsReplayBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1SpendEventsReplayBody | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1SpendEventsReplayResponse200
     | PostApiGatewayV1SpendEventsReplayResponse400
@@ -197,7 +198,7 @@ async def asyncio_detailed(
     so a refused replay ships nothing.
 
     Args:
-        body (PostApiGatewayV1SpendEventsReplayBody):
+        body (PostApiGatewayV1SpendEventsReplayBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -218,8 +219,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1SpendEventsReplayBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1SpendEventsReplayBody | Unset = UNSET,
 ) -> (
     PostApiGatewayV1SpendEventsReplayResponse200
     | PostApiGatewayV1SpendEventsReplayResponse400
@@ -239,7 +240,7 @@ async def asyncio(
     so a refused replay ships nothing.
 
     Args:
-        body (PostApiGatewayV1SpendEventsReplayBody):
+        body (PostApiGatewayV1SpendEventsReplayBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -1,22 +1,20 @@
 import {
   AlertTriangle,
   Brain,
-  Coins,
   Eye,
   Gauge,
   KeyRound,
   LineChart,
   type LucideIcon,
   PackageOpen,
+  PlugZap,
   ReceiptText,
   Route,
   Shield,
-  Users,
+  Wallet,
   Webhook,
   Zap,
 } from "lucide-react";
-
-import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 
 /**
  * The Gateway and Governance section navigations as data. The legacy
@@ -29,12 +27,8 @@ export interface SectionNavItemData {
   href: string;
   includePath?: string;
   icon: LucideIcon;
-  /**
-   * Listed only while this frontend flag is enabled. Every renderer of
-   * these lists must filter through useVisibleSectionNavItems so the two
-   * presentations agree on what exists.
-   */
-  featureFlag?: FrontendFeatureFlag;
+  /** Opens in a new tab with an external-link marker. */
+  isExternal?: boolean;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -49,6 +43,7 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     href: "/settings/model-providers",
     includePath: "/settings/model-providers",
     icon: Brain,
+    isExternal: true,
   },
   {
     label: "Budgets",
@@ -101,24 +96,10 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: Eye,
   },
   {
-    label: "Costs",
-    href: "/governance/costs",
-    includePath: "/governance/costs",
-    icon: Coins,
-    featureFlag: "release_ui_governance_billed_cost_enabled",
-  },
-  {
-    label: "Billed",
-    href: "/governance/billed",
-    includePath: "/governance/billed",
-    icon: ReceiptText,
-    featureFlag: "release_ui_governance_billed_cost_enabled",
-  },
-  {
-    label: "Inventory",
-    href: "/governance/inventory",
-    includePath: "/governance/inventory",
-    icon: PackageOpen,
+    label: "Ingestion Sources",
+    href: "/governance/ingestion-sources",
+    includePath: "/governance/ingestion-sources",
+    icon: PlugZap,
   },
   {
     label: "Anomaly Rules",
@@ -127,9 +108,15 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: AlertTriangle,
   },
   {
-    label: "People",
-    href: "/governance/people",
-    includePath: "/governance/people",
-    icon: Users,
+    label: "Tool Catalog",
+    href: "/governance/tool-catalog",
+    includePath: "/governance/tool-catalog",
+    icon: PackageOpen,
+  },
+  {
+    label: "Departments",
+    href: "/governance/departments",
+    includePath: "/governance/departments",
+    icon: Wallet,
   },
 ];

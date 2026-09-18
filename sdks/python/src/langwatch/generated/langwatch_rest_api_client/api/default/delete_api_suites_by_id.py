@@ -99,7 +99,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     DeleteApiSuitesByIdResponse200
     | DeleteApiSuitesByIdResponse400
@@ -108,8 +108,7 @@ def sync_detailed(
     | DeleteApiSuitesByIdResponse422
     | DeleteApiSuitesByIdResponse500
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Archive (soft-delete) a suite. Archiving
-    a folder also archives every scenario filed in it, in one transaction.
+    """Archive (soft-delete) a suite (run plan)
 
     Args:
         id (str):
@@ -136,7 +135,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> (
     DeleteApiSuitesByIdResponse200
     | DeleteApiSuitesByIdResponse400
@@ -146,8 +145,7 @@ def sync(
     | DeleteApiSuitesByIdResponse500
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Archive (soft-delete) a suite. Archiving
-    a folder also archives every scenario filed in it, in one transaction.
+    """Archive (soft-delete) a suite (run plan)
 
     Args:
         id (str):
@@ -169,7 +167,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     DeleteApiSuitesByIdResponse200
     | DeleteApiSuitesByIdResponse400
@@ -178,8 +176,7 @@ async def asyncio_detailed(
     | DeleteApiSuitesByIdResponse422
     | DeleteApiSuitesByIdResponse500
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Archive (soft-delete) a suite. Archiving
-    a folder also archives every scenario filed in it, in one transaction.
+    """Archive (soft-delete) a suite (run plan)
 
     Args:
         id (str):
@@ -204,7 +201,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> (
     DeleteApiSuitesByIdResponse200
     | DeleteApiSuitesByIdResponse400
@@ -214,8 +211,7 @@ async def asyncio(
     | DeleteApiSuitesByIdResponse500
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Archive (soft-delete) a suite. Archiving
-    a folder also archives every scenario filed in it, in one transaction.
+    """Archive (soft-delete) a suite (run plan)
 
     Args:
         id (str):

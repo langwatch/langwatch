@@ -9,23 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   DialogActionTrigger,
@@ -49,16 +33,14 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import type { FeatureFlagRules } from "~/server/featureFlag";
 import { api } from "~/utils/api";
-import {
-  findUnfillableRule,
-  newRule,
-  rulesToUI,
-  type ScopeKind,
-  type UIRule,
-  uiToRules,
-  withRuleAdded,
-  withRuleMoved,
-} from "./ruleEditing";
+
+type ScopeKind = "EVERYONE" | "ORGANIZATION" | "PROJECT";
+
+interface UIRule {
+  scopeKind: ScopeKind;
+  scopeId: string;
+  enabled: boolean;
+}
 
 const SCOPE_COLLECTION = createListCollection<{
   value: ScopeKind;
@@ -68,30 +50,50 @@ const SCOPE_COLLECTION = createListCollection<{
     { value: "EVERYONE", label: "Everyone (default)" },
     { value: "ORGANIZATION", label: "Organization" },
     { value: "PROJECT", label: "Project" },
-    { value: "NEW_USERS", label: "New users" },
   ],
 });
 
-const SCOPE_FIELD_LABEL: Record<ScopeKind, string> = {
-  EVERYONE: "Applies to every context",
-  ORGANIZATION: "Organization id",
-  PROJECT: "Project id",
-  NEW_USERS: "Organization created on or after",
+const DEFAULT_NEW_RULE: UIRule = {
+  scopeKind: "ORGANIZATION",
+  scopeId: "",
+  enabled: true,
 };
 
-const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
-  EVERYONE: "",
-  ORGANIZATION: "organization_xxxx",
-  PROJECT: "project_xxxx",
-  NEW_USERS: "",
-};
+function rulesToUI(rules: FeatureFlagRules): UIRule[] {
+  // Empty input → seed the dialog with one org-scoped rule so operators
+  // see the shape they're about to fill in instead of an empty pane.
+  if (rules.length === 0) return [DEFAULT_NEW_RULE];
+  return rules.map((r) => {
+    if (r.match.organizationId) {
+      return {
+        scopeKind: "ORGANIZATION",
+        scopeId: r.match.organizationId,
+        enabled: r.enabled,
+      };
+    }
+    if (r.match.projectId) {
+      return {
+        scopeKind: "PROJECT",
+        scopeId: r.match.projectId,
+        enabled: r.enabled,
+      };
+    }
+    return { scopeKind: "EVERYONE", scopeId: "", enabled: r.enabled };
+  });
+}
 
-const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
-  EVERYONE: "",
-  ORGANIZATION: "Every organization rule needs an organization id.",
-  PROJECT: "Every project rule needs a project id.",
-  NEW_USERS: "Every new users rule needs a date.",
-};
+function uiToRules(rules: UIRule[]): FeatureFlagRules {
+  return rules.map((r) => {
+    const scopeId = r.scopeId.trim();
+    if (r.scopeKind === "ORGANIZATION") {
+      return { match: { organizationId: scopeId }, enabled: r.enabled };
+    }
+    if (r.scopeKind === "PROJECT") {
+      return { match: { projectId: scopeId }, enabled: r.enabled };
+    }
+    return { match: {}, enabled: r.enabled };
+  });
+}
 
 export function FeatureFlagRulesDialog({
   open,
@@ -118,17 +120,6 @@ export function FeatureFlagRulesDialog({
       }),
   });
 
-  // A small distance threshold on the pointer, so the grip still accepts an
-  // ordinary click without the row starting to drag under it. The keyboard
-  // sensor is not optional here: rule order decides which rule wins, so an
-  // operator who cannot drag would be unable to say what the flag does.
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
-
   // Re-seed the draft only when the dialog transitions from closed to
   // open, so a "Cancel" + reopen always starts from the saved server
   // state and doesn't leak unsaved edits between sessions. We don't
@@ -141,37 +132,31 @@ export function FeatureFlagRulesDialog({
     wasOpenRef.current = open;
   }, [open, initialRules]);
 
-  const updateRule = (id: string, patch: Partial<UIRule>) => {
+  const updateRule = (index: number, patch: Partial<UIRule>) => {
     setDraft((current) =>
-      current.map((rule) => (rule.id === id ? { ...rule, ...patch } : rule)),
+      current.map((r, i) => (i === index ? { ...r, ...patch } : r)),
     );
   };
 
   const addRule = () => {
-    setDraft((current) => withRuleAdded(current, newRule()));
+    setDraft((current) => [
+      ...current,
+      { scopeKind: "ORGANIZATION", scopeId: "", enabled: true },
+    ]);
   };
 
-  const removeRule = (id: string) => {
-    setDraft((current) => current.filter((rule) => rule.id !== id));
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setDraft((current) =>
-      withRuleMoved(current, {
-        fromId: String(active.id),
-        toId: String(over.id),
-      }),
-    );
+  const removeRule = (index: number) => {
+    setDraft((current) => current.filter((_, i) => i !== index));
   };
 
   const handleSave = () => {
-    const unfillable = findUnfillableRule(draft);
-    if (unfillable) {
+    const invalid = draft.find(
+      (r) => r.scopeKind !== "EVERYONE" && r.scopeId.trim() === "",
+    );
+    if (invalid) {
       toaster.create({
         title: "Missing target",
-        description: MISSING_TARGET_MESSAGE[unfillable.scopeKind],
+        description: `Every ${invalid.scopeKind.toLowerCase()} rule needs an ID.`,
         type: "error",
       });
       return;
@@ -195,11 +180,10 @@ export function FeatureFlagRulesDialog({
         <DialogBody>
           <VStack align="stretch" gap={3}>
             <Text fontSize="sm" color="fg.muted">
-              Rules are evaluated top-to-bottom; the first match wins, and you
-              can drag a rule by its handle to change that order. When no rule
-              matches, the row-level toggle is used as the fallback. A per-flag
-              env override, where one is allowed, still wins over everything
-              here.
+              Rules are evaluated top-to-bottom; the first match wins. When no
+              rule matches, the row-level toggle is used as the fallback. Once a
+              row exists in postgres, PostHog is no longer consulted for this
+              flag.
             </Text>
             <Box>
               <Text fontFamily="mono" fontSize="xs" color="fg.muted">
@@ -221,27 +205,16 @@ export function FeatureFlagRulesDialog({
                 </Text>
               </Box>
             ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={draft.map((rule) => rule.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <VStack align="stretch" gap={2}>
-                    {draft.map((rule) => (
-                      <RuleRow
-                        key={rule.id}
-                        rule={rule}
-                        onChange={(patch) => updateRule(rule.id, patch)}
-                        onRemove={() => removeRule(rule.id)}
-                      />
-                    ))}
-                  </VStack>
-                </SortableContext>
-              </DndContext>
+              <VStack align="stretch" gap={2}>
+                {draft.map((rule, index) => (
+                  <RuleRow
+                    key={index}
+                    rule={rule}
+                    onChange={(patch) => updateRule(index, patch)}
+                    onRemove={() => removeRule(index)}
+                  />
+                ))}
+              </VStack>
             )}
             <Button
               variant="ghost"
@@ -282,44 +255,64 @@ function RuleRow({
   onChange: (patch: Partial<UIRule>) => void;
   onRemove: () => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: rule.id });
   return (
     <HStack
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Translate.toString(transform),
-        transition,
-        opacity: isDragging ? 0.6 : 1,
-      }}
       align="flex-end"
       gap={2}
       padding={2}
       borderRadius="md"
       borderWidth="1px"
       borderColor="border.muted"
-      background="bg.panel"
-      zIndex={isDragging ? 1 : undefined}
     >
-      <IconButton
-        aria-label="Reorder rule"
-        size="sm"
-        variant="ghost"
-        color="fg.subtle"
-        cursor="grab"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical size={14} />
-      </IconButton>
-      <ScopeField rule={rule} onChange={onChange} />
-      <TargetField rule={rule} onChange={onChange} />
+      <Field.Root flexBasis="180px" flexShrink={0}>
+        <Field.Label fontSize="xs">Scope</Field.Label>
+        <SelectRoot
+          collection={SCOPE_COLLECTION}
+          value={[rule.scopeKind]}
+          onValueChange={(details) => {
+            const next = details.value[0] as ScopeKind | undefined;
+            if (!next) return;
+            onChange({
+              scopeKind: next,
+              scopeId: next === "EVERYONE" ? "" : rule.scopeId,
+            });
+          }}
+          size="sm"
+        >
+          <SelectTrigger>
+            <SelectValueText placeholder="Pick scope" />
+          </SelectTrigger>
+          <SelectContent>
+            {SCOPE_COLLECTION.items.map((item) => (
+              <SelectItem key={item.value} item={item}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </SelectRoot>
+      </Field.Root>
+      <Field.Root flex={1}>
+        <Field.Label fontSize="xs">
+          {rule.scopeKind === "EVERYONE"
+            ? "Applies to every context"
+            : `${rule.scopeKind === "ORGANIZATION" ? "Organization" : "Project"} id`}
+        </Field.Label>
+        <Input
+          size="sm"
+          fontFamily="mono"
+          fontSize="xs"
+          placeholder={
+            rule.scopeKind === "ORGANIZATION"
+              ? "organization_xxxx"
+              : rule.scopeKind === "PROJECT"
+                ? "project_xxxx"
+                : ""
+          }
+          value={rule.scopeId}
+          disabled={rule.scopeKind === "EVERYONE"}
+          onChange={(e) => onChange({ scopeId: e.target.value })}
+        />
+      </Field.Root>
       <Field.Root flexBasis="120px" flexShrink={0}>
         <Field.Label fontSize="xs">Enabled</Field.Label>
         <HStack height="32px" alignItems="center">
@@ -341,81 +334,5 @@ function RuleRow({
         <Trash2 size={14} />
       </IconButton>
     </HStack>
-  );
-}
-
-function ScopeField({
-  rule,
-  onChange,
-}: {
-  rule: UIRule;
-  onChange: (patch: Partial<UIRule>) => void;
-}) {
-  return (
-    <Field.Root flexBasis="180px" flexShrink={0}>
-      <Field.Label fontSize="xs">Scope</Field.Label>
-      <SelectRoot
-        collection={SCOPE_COLLECTION}
-        value={[rule.scopeKind]}
-        onValueChange={(details) => {
-          const next = details.value[0] as ScopeKind | undefined;
-          if (!next) return;
-          onChange({
-            scopeKind: next,
-            // The field beside the picker means something different per
-            // scope — an id, a date, nothing — so a leftover value from the
-            // previous scope would be a rule that cannot match.
-            target: next === rule.scopeKind ? rule.target : "",
-          });
-        }}
-        size="sm"
-      >
-        <SelectTrigger>
-          <SelectValueText placeholder="Pick scope" />
-        </SelectTrigger>
-        <SelectContent>
-          {SCOPE_COLLECTION.items.map((item) => (
-            <SelectItem key={item.value} item={item}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </SelectRoot>
-    </Field.Root>
-  );
-}
-
-/** What the chosen scope needs beside it: an id, a date, or nothing. */
-function TargetField({
-  rule,
-  onChange,
-}: {
-  rule: UIRule;
-  onChange: (patch: Partial<UIRule>) => void;
-}) {
-  const isNewUsers = rule.scopeKind === "NEW_USERS";
-
-  return (
-    <Field.Root flex={1}>
-      <Field.Label fontSize="xs">
-        {SCOPE_FIELD_LABEL[rule.scopeKind]}
-      </Field.Label>
-      <Input
-        size="sm"
-        type={isNewUsers ? "date" : "text"}
-        fontFamily={isNewUsers ? undefined : "mono"}
-        fontSize="xs"
-        placeholder={SCOPE_FIELD_PLACEHOLDER[rule.scopeKind]}
-        value={rule.target}
-        disabled={rule.scopeKind === "EVERYONE"}
-        onChange={(event) => onChange({ target: event.target.value })}
-      />
-      {isNewUsers && (
-        <Field.HelperText fontSize="xs">
-          Matches organizations created on this date or later, so customers who
-          signed up before it keep the value they already had.
-        </Field.HelperText>
-      )}
-    </Field.Root>
   );
 }

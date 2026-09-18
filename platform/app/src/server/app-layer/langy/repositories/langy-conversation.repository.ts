@@ -14,11 +14,6 @@ export interface LangyConversationRow {
    */
   currentTurnId: string | null;
   lastError: string | null;
-  /**
-   * The model the latest accepted turn ran on, or null before any turn
-   * recorded one. Reopening the conversation seeds the composer from it.
-   */
-  lastModel: string | null;
   messageCount: number;
   lastActivityAtMs: number;
   /** Raw nullable sort value; unlike lastActivityAtMs, this never falls back. */
@@ -49,7 +44,7 @@ export interface LangyConversationRepository {
     id: string;
     projectId: string;
     userId: string;
-  }): Promise<"owned" | "other" | "archived" | "missing">;
+  }): Promise<"owned" | "other" | "missing">;
 
   findAllForUser(params: {
     projectId: string;

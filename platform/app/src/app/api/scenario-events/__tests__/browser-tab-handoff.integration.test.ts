@@ -14,7 +14,6 @@
 import { nanoid } from "nanoid";
 import {
   afterAll,
-  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -213,7 +212,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toEqual({
         delivered: true,
-        url: `${BASE_HOST}/${projectSlug}/agent-testing/results/external:checkout-flow/batch-7`,
+        url: `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-7`,
       });
 
       expect(mockBroadcastToTenant).toHaveBeenCalledTimes(1);
@@ -227,7 +226,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
       expect(parsed).toEqual({
         event: SCENARIO_TAB_NAVIGATE_EVENT,
         tabKey,
-        url: `${BASE_HOST}/${projectSlug}/agent-testing/results/external:checkout-flow/batch-7`,
+        url: `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-7`,
       });
     });
 
@@ -248,7 +247,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
         mockBroadcastToTenant.mock.calls[0]![1] as string,
       ) as { url: string };
       expect(payload.url).toBe(
-        `${BASE_HOST}/${projectSlug}/agent-testing/results/external:checkout-flow/batch-8`,
+        `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-8`,
       );
     });
 
@@ -266,7 +265,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
       await expect(
         scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
       ).resolves.toBe(
-        `${BASE_HOST}/${projectSlug}/agent-testing/results/external:checkout-flow/batch-parked`,
+        `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-parked`,
       );
     });
 
@@ -278,7 +277,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
 
       await expect(res.json()).resolves.toMatchObject({
         delivered: true,
-        url: `${BASE_HOST}/${projectSlug}/agent-testing/results/external:default/batch-9`,
+        url: `${BASE_HOST}/${projectSlug}/simulations/default/batch-9`,
       });
     });
   });
@@ -306,42 +305,6 @@ describe("POST /api/scenario-events/browser-tab", () => {
 
       await expect(res.json()).resolves.toMatchObject({ delivered: false });
       expect(mockBroadcastToTenant).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the project reads the Simulations pages", () => {
-    const ENV_OVERRIDE = "RELEASE_UI_AGENT_TESTING_V2_ENABLED";
-    let previous: string | undefined;
-
-    beforeEach(() => {
-      previous = process.env[ENV_OVERRIDE];
-      process.env[ENV_OVERRIDE] = "0";
-    });
-
-    afterEach(() => {
-      if (previous === undefined) {
-        delete process.env[ENV_OVERRIDE];
-      } else {
-        process.env[ENV_OVERRIDE] = previous;
-      }
-    });
-
-    /** @scenario "The addresses the platform hands out name the interface the project reads" */
-    it("hands the tab the run's address on the simulations page", async () => {
-      const tabKey = `tab-${nanoid(8)}`;
-      await registerTab({ projectId, tabKey });
-
-      const res = await handoff({
-        tabKey,
-        batchRunId: "batch-v1",
-        scenarioSetId: "checkout-flow",
-      });
-
-      expect(res.status).toBe(200);
-      await expect(res.json()).resolves.toEqual({
-        delivered: true,
-        url: `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-v1`,
-      });
     });
   });
 

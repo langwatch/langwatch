@@ -1,7 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { slugify } from "~/utils/slugify";
 import { DatasetService } from "../../datasets/dataset.service";
 import { attachDatasetRecordCounts } from "../../datasets/dataset-record-counts";
@@ -11,6 +10,7 @@ import {
   datasetRecordFormSchema,
   datasetRecordInputSchema,
 } from "../../datasets/types";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -53,7 +53,7 @@ export const datasetRouter = createTRPCRouter({
         ]),
       ),
     )
-    .permission("datasets:manage")
+    .use(checkProjectPermission("datasets:manage"))
     .use(datasetErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const datasetService = DatasetService.create(ctx.prisma);
@@ -81,7 +81,7 @@ export const datasetRouter = createTRPCRouter({
         excludeDatasetId: z.string().optional(),
       }),
     )
-    .permission("datasets:view")
+    .use(checkProjectPermission("datasets:view"))
     .use(datasetErrorHandler)
     .query(async ({ input, ctx }) => {
       const datasetService = DatasetService.create(ctx.prisma);
@@ -94,7 +94,7 @@ export const datasetRouter = createTRPCRouter({
    */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("datasets:view")
+    .use(checkProjectPermission("datasets:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -125,7 +125,7 @@ export const datasetRouter = createTRPCRouter({
    */
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
-    .permission("datasets:view")
+    .use(checkProjectPermission("datasets:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, datasetId } = input;
       const dataset = await ctx.prisma.dataset.findFirst({
@@ -148,7 +148,7 @@ export const datasetRouter = createTRPCRouter({
         undo: z.boolean().optional(),
       }),
     )
-    .permission("datasets:delete")
+    .use(checkProjectPermission("datasets:delete"))
     .mutation(async ({ ctx, input }) => {
       const datasetName = (
         await ctx.prisma.dataset.findFirst({
@@ -191,7 +191,7 @@ export const datasetRouter = createTRPCRouter({
           .optional(),
       }),
     )
-    .permission("datasets:update")
+    .use(checkProjectPermission("datasets:update"))
     .mutation(async ({ ctx, input }) => {
       const { projectId, datasetId, mapping, threadMapping } = input;
 
@@ -220,7 +220,7 @@ export const datasetRouter = createTRPCRouter({
    */
   findNextName: protectedProcedure
     .input(z.object({ projectId: z.string(), proposedName: z.string() }))
-    .permission("datasets:view")
+    .use(checkProjectPermission("datasets:view"))
     .use(datasetErrorHandler)
     .query(async ({ input, ctx }) => {
       const datasetService = DatasetService.create(ctx.prisma);
@@ -242,12 +242,12 @@ export const datasetRouter = createTRPCRouter({
         projectId: z.string(),
       }),
     )
-    .permission("datasets:create")
+    .use(checkProjectPermission("datasets:create"))
     .use(datasetErrorHandler)
     .mutation(async ({ ctx, input }) => {
       // Check that the user has at least datasets:create permission on the source project
       // (having create permission implies you can view/copy from that project)
-      const hasSourcePermission = await probeProjectPermission(
+      const hasSourcePermission = await hasProjectPermission(
         ctx,
         input.sourceProjectId,
         "datasets:create",

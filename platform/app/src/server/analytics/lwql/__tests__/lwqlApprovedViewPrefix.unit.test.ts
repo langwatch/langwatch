@@ -14,7 +14,7 @@
  * for that reason: this guard has to be able to disagree with the catalog, and
  * one that read the name from the catalog never could.
  *
- * @see ../provisioning/catalogStatements.ts — the statements under test
+ * @see ../views.ts — the statements under test
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -25,7 +25,7 @@ import { lwqlPostgresViews } from "../catalog/types";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
-} from "../provisioning/catalogStatements";
+} from "../views";
 
 /**
  * The prefix the infrastructure bootstrap's grant predicate matches

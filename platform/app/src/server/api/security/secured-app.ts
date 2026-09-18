@@ -1,7 +1,6 @@
 import { type Env, Hono, type MiddlewareHandler } from "hono";
 import { mergePath } from "hono/utils/url";
 
-import { appContextMiddleware } from "~/app/api/middleware/app-context";
 import {
   type AuthMiddlewareVariables,
   authMiddleware,
@@ -23,6 +22,7 @@ import {
   canonicalErrorResponse,
 } from "~/app/api/shared/canonical-error";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
+import { prisma } from "~/server/db";
 
 import {
   type AccessPolicy,
@@ -143,7 +143,6 @@ export class SecuredApp<E extends Env> {
     this.hono = new Hono<E>().basePath(args.basePath);
     this.hono.use(tracerMiddleware({ name: this.family }));
     this.hono.use(loggerMiddleware());
-    this.hono.use(appContextMiddleware);
     // One shape per family, whichever layer refuses. A family can still
     // install its own onError to name its domain errors more precisely.
     this.hono.onError(
@@ -269,6 +268,7 @@ const projectStrategy: AuthStrategy = {
         return [
           auth,
           requireApiKeyPermission({
+            prisma,
             permission: policy.permission,
             errorEnvelope,
           }),

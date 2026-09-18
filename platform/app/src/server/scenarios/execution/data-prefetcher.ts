@@ -10,43 +10,26 @@
  * - Tests can inject mocks without vi.mock
  */
 
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
-import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
-import {
-  DEFAULT_CALL_TIMEOUT_MS,
-  MAX_CALL_TIMEOUT_MS,
-} from "~/server/connected-agents/constants";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
-import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
-import { isAgentTestScenarioId } from "../agent-test-scenario";
 import {
   mergeRunParameters,
   parseScenarioParameterDefinitions,
-  partitionParameterDefinitions,
   type RunParameterValues,
-  withoutParameterNames,
 } from "../parameters";
-import { type ResolvedRunModels, resolveRunModels } from "../run-models";
-import {
-  decryptRunSecretValues,
-  type RunSecretCiphertext,
-} from "../run-secret-values";
-import { prefetchAgentTestData } from "./agent-test-prefetch";
 import { renderScenarioContent } from "./scenario-content-template";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
-import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { decrypt } from "~/utils/encryption";
 import {
   AgentRepository,
@@ -68,7 +51,6 @@ import {
   AuthConfigSchema,
   type ChildProcessJobData,
   type CodeAgentData,
-  type ConnectedAgentData,
   type ExecutionContext,
   type HttpAgentData,
   type LiteLLMParams,
@@ -157,29 +139,11 @@ export interface WorkflowVersionFetcher {
   }): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
 }
 
-/**
- * Minimal interface for project lookup.
- *
- * The organization comes along because minting a run's sandbox key needs it,
- * and the project row is already being read.
- */
+/** Minimal interface for project lookup */
 export interface ProjectFetcher {
   findUnique(projectId: string): Promise<{
     apiKey: string | null;
-    team: { organizationId: string } | null;
   } | null>;
-}
-
-/**
- * Mints the short-lived credential a code agent's sandbox authenticates with.
- * Answers undefined when the platform could not mint one, which leaves the run
- * to do its work once per row.
- */
-export interface SandboxKeyMinter {
-  mint(params: {
-    projectId: string;
-    organizationId: string;
-  }): Promise<string | undefined>;
 }
 
 /**
@@ -207,7 +171,6 @@ export type ModelParamsFailureReason =
   | "provider_not_found"
   | "provider_not_enabled"
   | "missing_params"
-  | "model_not_configured"
   | "preparation_error";
 
 /** Structured result from model params preparation */
@@ -244,7 +207,6 @@ export interface DataPrefetcherDependencies {
   modelResolver: ModelResolver;
   projectSecretsFetcher: ProjectSecretsFetcher;
   traceWaitBudgetResolver: TraceWaitBudgetResolver;
-  sandboxKeyMinter: SandboxKeyMinter;
 }
 
 // ============================================================================
@@ -256,13 +218,6 @@ export type PrefetchResult =
       success: true;
       data: ChildProcessJobData;
       telemetry: { endpoint: string; apiKey: string };
-      /**
-       * The models this run resolved. A sibling of `data` rather than a member
-       * of it: the child process builds its models from the prepared params,
-       * so it needs no name, while the caller that queues the run records the
-       * names on it. Null for a scripted run, which resolves no model.
-       */
-      resolvedModels: ResolvedRunModels | null;
     }
   | {
       success: false;
@@ -300,50 +255,6 @@ export type PrefetchContext = ExecutionContext & {
    * same answer twice.
    */
   parameters?: RunParameterValues;
-  /**
-   * The run's secret parameter values, encrypted, as recorded on the queued
-   * event. Decrypted once here and merged over the project's own secrets, so
-   * the target reads them as `secrets.NAME` like any other secret.
-   */
-  secretParameters?: RunSecretCiphertext;
-};
-
-/**
- * Merges the run's own secrets over the project's.
- *
- * One wrapper rather than a merge in each of the three fetch functions that
- * load secrets: they then keep one source of secrets, and a fourth target type
- * cannot be added that reads the project's set alone.
- *
- * The run's value wins on a name collision. Overriding a project secret for one
- * run is the point: the same scenario runs against staging with the staging
- * credential without a second project set up for it.
- */
-function withRunSecrets({
-  fetcher,
-  runSecrets,
-}: {
-  fetcher: ProjectSecretsFetcher;
-  runSecrets: Record<string, string>;
-}): ProjectSecretsFetcher {
-  return {
-    getSecrets: async (projectId: string) => ({
-      ...(await fetcher.getSecrets(projectId)),
-      ...runSecrets,
-    }),
-  };
-}
-
-/**
- * How a target reads in the failure a run reports when its row is gone, one
- * label per target type so the run names the kind the customer picked.
- */
-const MISSING_TARGET_LABELS: Record<TargetConfig["type"], string> = {
-  prompt: "Prompt",
-  code: "Code agent",
-  workflow: "Workflow agent",
-  connected: "Connected agent",
-  http: "HTTP agent",
 };
 
 /**
@@ -384,52 +295,6 @@ export async function prefetchScenarioData({
     "Prefetching scenario data",
   );
 
-  // An agent test has no scenario row and no model: it reads the project and
-  // the agent the way every run does, and nothing else.
-  if (isAgentTestScenarioId(context.scenarioId)) {
-    return prefetchAgentTestData({
-      context,
-      target,
-      reads: {
-        project: () => fetchProject(context.projectId, deps.projectFetcher),
-        adapter: () => fetchAgentData(context.projectId, target, deps),
-        agentName: async () =>
-          (
-            await deps.agentFetcher.findById({
-              projectId: context.projectId,
-              id: target.referenceId,
-            })
-          )?.name ?? null,
-      },
-      onChildEnvReady,
-    });
-  }
-
-  // Decrypted once, before anything is fetched. A key that no longer opens the
-  // values fails the run here rather than sending the target a request with a
-  // credential missing from it, which would report a result about the
-  // credential instead of about the scenario.
-  let secretDeps = deps;
-  if (
-    context.secretParameters &&
-    Object.keys(context.secretParameters).length > 0
-  ) {
-    try {
-      secretDeps = {
-        ...deps,
-        projectSecretsFetcher: withRunSecrets({
-          fetcher: deps.projectSecretsFetcher,
-          runSecrets: decryptRunSecretValues(context.secretParameters),
-        }),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
-
   // The scenario, the project, the target adapter and the suite config are
   // independent lookups keyed off ids we already hold, so they go out together
   // rather than one await at a time. This runs on the path between a run being
@@ -445,7 +310,7 @@ export async function prefetchScenarioData({
     suppliedParameters: context.parameters,
   });
   const projectPromise = fetchProject(context.projectId, deps.projectFetcher);
-  const adapterPromise = fetchAgentData(context.projectId, target, secretDeps);
+  const adapterPromise = fetchAgentData(context.projectId, target, deps);
   const suitePromise = deps.suiteConfigFetcher.getBySetId(
     context.setId,
     context.projectId,
@@ -535,9 +400,17 @@ export async function prefetchScenarioData({
       },
       "Target adapter not found",
     );
+    const targetLabel =
+      target.type === "prompt"
+        ? "Prompt"
+        : target.type === "code"
+          ? "Code agent"
+          : target.type === "workflow"
+            ? "Workflow agent"
+            : "HTTP agent";
     return {
       success: false,
-      error: `${MISSING_TARGET_LABELS[target.type]} ${target.referenceId} not found`,
+      error: `${targetLabel} ${target.referenceId} not found`,
     };
   }
 
@@ -561,17 +434,6 @@ export async function prefetchScenarioData({
   // prompt with this run plan, so they arrive with the suite rather than with
   // the prompt. Agents carry their own on the agent record, already loaded
   // above.
-  // One key for the whole run, and the same key the project's other runs
-  // hold: every turn of this run shares the cache entries it writes, and a key
-  // per turn or per run would leave a ledger of live credentials behind. A
-  // run that cannot get one still runs, and every turn does its own work.
-  if (adapterData.type === "code" && project.organizationId) {
-    adapterData.sandboxApiKey = await deps.sandboxKeyMinter.mint({
-      projectId: context.projectId,
-      organizationId: project.organizationId,
-    });
-  }
-
   if (adapterData.type === "prompt") {
     adapterData.scenarioMappings = suiteOverrides?.targets?.find(
       (candidate) =>
@@ -592,43 +454,23 @@ export async function prefetchScenarioData({
             context.projectId,
           );
     }
-    ({ simulatorModel, judgeModel } = await resolveRunModels({
-      plan: {
-        simulatorModel: suiteOverrides?.simulatorModel,
-        judgeModel: suiteOverrides?.judgeModel,
-      },
-      scenario: {
-        simulatorModel: scenarioResult.simulatorModel,
-        judgeModel: scenarioResult.judgeModel,
-      },
-      resolveFeatureModel: (featureKey) =>
-        deps.modelResolver.resolve(featureKey, context.projectId),
-    }));
+    simulatorModel =
+      suiteOverrides?.simulatorModel ??
+      scenarioResult.simulatorModel ??
+      (await deps.modelResolver.resolve(
+        "scenarios.user_simulator",
+        context.projectId,
+      ));
+    judgeModel =
+      suiteOverrides?.judgeModel ??
+      scenarioResult.judgeModel ??
+      (await deps.modelResolver.resolve("scenarios.judge", context.projectId));
   } catch (err) {
-    // A project with no model set for scenarios is the customer's to fix and
-    // carries its own remediation message, so it is named rather than left
-    // reasonless — otherwise the caller cannot tell it from a fault of ours.
-    //
-    // Any other failure here is ours. `error` reaches the customer as the
-    // reason a run or an agent test was refused, so only a message LangWatch
-    // authored may go in it. A HandledError carries a customer-safe message by
-    // contract; everything else is logged and named in one sentence.
-    if (!(err instanceof HandledError)) {
-      logger.error(
-        { projectId: context.projectId, error: err },
-        "Model resolution failed for a scenario run",
-      );
-    }
-    return {
-      success: false,
-      error:
-        err instanceof HandledError
-          ? err.message
-          : "The models this run needs could not be resolved",
-      ...(err instanceof ModelNotConfiguredError
-        ? { reason: "model_not_configured" as const }
-        : {}),
-    };
+    const message =
+      err instanceof Error
+        ? err.message
+        : "No default model configured for this project";
+    return { success: false, error: message };
   }
 
   const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
@@ -702,11 +544,11 @@ export async function prefetchScenarioData({
     ? modelParamsResult.params
     : undefined;
 
-  // Only an http or a connected target's judge fetches remote traces, so
-  // only those need a wait budget. The resolver degrades to a default on any failure, so this
+  // Only an http target's judge fetches remote traces, so only it needs a
+  // wait budget. The resolver degrades to a default on any failure, so this
   // never fails the prefetch.
   const traceWaitTimeoutMs =
-    target.type === "http" || target.type === "connected"
+    target.type === "http"
       ? await deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs({
           projectId: context.projectId,
         })
@@ -730,7 +572,6 @@ export async function prefetchScenarioData({
       endpoint: env.LANGWATCH_ENDPOINT,
       apiKey: project.apiKey,
     },
-    resolvedModels: { simulatorModel, judgeModel },
   };
 }
 
@@ -758,17 +599,9 @@ async function fetchScenario({
   if (!scenario) return null;
 
   const definitions = parseScenarioParameterDefinitions(scenario.parameters);
-  // The secret declarations are taken out before the merge, so no secret value
-  // can reach `params` or the scenario's own text. They stay in
-  // `declaredNames`, which is what makes a `params.SECRET` reference fail here
-  // as a backstop, the same way the run request already refused it.
-  const { plain, secret } = partitionParameterDefinitions(definitions);
   const parameters = mergeRunParameters({
-    definitions: plain,
-    values: withoutParameterNames({
-      values: suppliedParameters,
-      names: new Set(secret.map((definition) => definition.name)),
-    }),
+    definitions,
+    values: suppliedParameters,
   });
 
   const rendered = await renderScenarioContent({
@@ -804,10 +637,7 @@ async function fetchScenario({
 }
 
 type FetchProjectResult =
-  | {
-      success: true;
-      data: { apiKey: string; organizationId: string | null };
-    }
+  | { success: true; data: { apiKey: string } }
   | { success: false; error: string };
 
 async function fetchProject(
@@ -821,13 +651,7 @@ async function fetchProject(
   if (!project.apiKey) {
     return { success: false, error: `Project ${projectId} missing API key` };
   }
-  return {
-    success: true,
-    data: {
-      apiKey: project.apiKey,
-      organizationId: project.team?.organizationId ?? null,
-    },
-  };
+  return { success: true, data: { apiKey: project.apiKey } };
 }
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
@@ -856,13 +680,6 @@ async function fetchAgentData(
       deps.agentFetcher,
       deps.projectSecretsFetcher,
     );
-  }
-  if (target.type === "connected") {
-    return fetchConnectedAgentData({
-      projectId,
-      agentId: target.referenceId,
-      fetcher: deps.agentFetcher,
-    });
   }
   if (target.type === "workflow") {
     return fetchWorkflowAgentData({
@@ -922,7 +739,6 @@ const HttpAgentConfigSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
-  sessionPath: z.string().optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 
@@ -960,37 +776,8 @@ async function fetchHttpAgentData({
     auth: config.auth,
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
-    sessionPath: config.sessionPath,
     scenarioMappings: config.scenarioMappings,
     secrets,
-  };
-}
-
-/**
- * The child reaches a connected agent through the relay route, so the job
- * carries the agent id, where the platform is, and the per-call budget the
- * agent declared, capped by the platform.
- */
-async function fetchConnectedAgentData({
-  projectId,
-  agentId,
-  fetcher,
-}: {
-  projectId: string;
-  agentId: string;
-  fetcher: AgentFetcher;
-}): Promise<ConnectedAgentData | null> {
-  const agent = await fetcher.findById({ projectId, id: agentId });
-  if (agent?.type !== "connected") return null;
-  const config = agent.config as ConnectedComponentConfig;
-  return {
-    type: "connected",
-    agentId: agent.id,
-    endpoint: env.LANGWATCH_ENDPOINT,
-    timeoutMs: Math.min(
-      config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
-      MAX_CALL_TIMEOUT_MS,
-    ),
   };
 }
 
@@ -1024,8 +811,6 @@ const RawCodeAgentConfigSchema = z.object({
     .optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   scenarioOutputField: z.string().optional(),
-  /** Per-agent code budget in ms; the engine clamps it to the operator ceiling. */
-  timeoutMs: z.number().int().positive().optional(),
 });
 
 async function fetchCodeAgentData(
@@ -1061,7 +846,6 @@ async function fetchCodeAgentData(
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
     secrets,
-    timeoutMs: config.timeoutMs,
   };
 }
 
@@ -1429,11 +1213,8 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       findUnique: async (projectId) =>
         prisma.project.findUnique({
           where: { id: projectId },
-          select: { apiKey: true, team: { select: { organizationId: true } } },
+          select: { apiKey: true },
         }),
-    },
-    sandboxKeyMinter: {
-      mint: (params) => tryGetAgentSandboxApiKey({ prisma, ...params }),
     },
     modelResolver: {
       resolve: async (featureKey, projectId) => {

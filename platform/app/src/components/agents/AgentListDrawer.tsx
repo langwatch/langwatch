@@ -31,7 +31,7 @@ import {
   useDrawer,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AgentType, TypedAgent } from "~/server/agents/agent.repository";
+import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 
@@ -301,25 +301,18 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
 // Agent Card Component
 // ============================================================================
 
-/**
- * The icon and the label per agent type. Both maps are keyed by the whole
- * enum, so a new agent type does not compile until it names its icon and its
- * word here, and no fallback stands in for it in silence.
- */
-const agentTypeIcons: Record<AgentType, typeof MessageSquare> = {
+const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,
   code: Code,
   workflow: Workflow,
   http: Globe,
-  connected: Bot,
 };
 
-const agentTypeLabels: Record<AgentType, string> = {
+const agentTypeLabels: Record<string, string> = {
   signature: "Prompt",
   code: "Code",
   workflow: "Workflow",
   http: "HTTP",
-  connected: "Connected",
 };
 
 type AgentCardProps = {
@@ -330,8 +323,8 @@ type AgentCardProps = {
 };
 
 function AgentCard({ agent, onClick, onEdit, onDelete }: AgentCardProps) {
-  const Icon = agentTypeIcons[agent.type];
-  const typeLabel = agentTypeLabels[agent.type];
+  const Icon = agentTypeIcons[agent.type] ?? Bot;
+  const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (

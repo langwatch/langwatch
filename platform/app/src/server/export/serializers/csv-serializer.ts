@@ -5,11 +5,6 @@
  * Full mode: one row per span with trace fields denormalized (repeated per row).
  *
  * Uses PapaParse for RFC 4180-compliant CSV generation.
- *
- * Every heading and every cell goes through the shared formula guard on the way
- * out. Trace input and output are whatever the instrumented application sent,
- * and an evaluator's display name is chosen in the project and lands in the
- * header row — so both halves of the file are somebody's typing.
  */
 
 import Parse from "papaparse";
@@ -22,7 +17,6 @@ import type {
   SpanInputOutput,
   Trace,
 } from "~/server/tracer/types";
-import { neutralizeFormula, neutralizeRows } from "~/utils/csvFormulaGuard";
 import { RESERVED_METADATA_KEYS } from "./constants";
 
 /**
@@ -81,10 +75,8 @@ export function serializeTracesToSummaryCsv({
   );
 
   return (
-    Parse.unparse(
-      { fields: headers.map(neutralizeFormula), data: neutralizeRows(rows) },
-      { newline: CSV_NEWLINE },
-    ) + CSV_NEWLINE
+    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) +
+    CSV_NEWLINE
   );
 }
 
@@ -206,10 +198,8 @@ export function serializeTracesToFullCsv({
   }
 
   return (
-    Parse.unparse(
-      { fields: headers.map(neutralizeFormula), data: neutralizeRows(rows) },
-      { newline: CSV_NEWLINE },
-    ) + CSV_NEWLINE
+    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) +
+    CSV_NEWLINE
   );
 }
 

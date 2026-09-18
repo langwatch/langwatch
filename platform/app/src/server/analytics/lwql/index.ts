@@ -11,7 +11,6 @@
 export { lwqlTenantCapability } from "./capability";
 export type { LangWatchQLColumnUnit } from "./catalog/types";
 export { LWQL_COLUMN_UNITS } from "./catalog/types";
-export type { LangWatchQLConnection } from "./connection";
 export type {
   LangWatchQLDiagnostic,
   LangWatchQLDiagnosticCode,
@@ -29,6 +28,7 @@ export {
 } from "./errors";
 export type {
   LangWatchQLColumn,
+  LangWatchQLConnection,
   LangWatchQLExecutor,
   LangWatchQLResultLimits,
   LangWatchQLStatistics,
@@ -39,7 +39,6 @@ export {
   DEFAULT_LWQL_RESULT_LIMITS,
   lwqlConnectionFromEnv,
 } from "./executor";
-export { MAX_LWQL_LENGTH } from "./limits";
 export type {
   LangWatchQLQueryResult,
   ValidatedLangWatchQL,
@@ -52,20 +51,15 @@ export {
   LangWatchQLService,
   setLangWatchQLService,
 } from "./lwql.service";
-export type {
-  LangWatchQLGranularityResolution,
-  LangWatchQLTimeWindowResolution,
-} from "./resolveTimeWindow";
-export {
-  resolveLangWatchQLGranularity,
-  resolveLangWatchQLTimeWindow,
-} from "./resolveTimeWindow";
+export type { LangWatchQLTimeWindowResolution } from "./resolveTimeWindow";
+export { resolveLangWatchQLTimeWindow } from "./resolveTimeWindow";
 export type {
   LangWatchQLSchema,
   LangWatchQLSchemaColumn,
   LangWatchQLSchemaDataset,
 } from "./schema";
 export { describeLangWatchQLSchema, lwqlExampleSql } from "./schema";
+export { MAX_LWQL_LENGTH } from "./sqlText";
 export type { LangWatchQLTimeWindow } from "./timeWindow";
 export {
   formatLangWatchQLDateTimeParameter,

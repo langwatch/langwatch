@@ -10,14 +10,6 @@ const { mockGetAllTracesForProject } = vi.hoisted(() => ({
   mockGetAllTracesForProject: vi.fn(),
 }));
 
-// The declared permission seam resolves its service from the App.
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return appPermissionsMock();
-});
-
 vi.mock("~/server/traces/trace.service", () => ({
   TraceService: {
     create: () => ({
@@ -31,9 +23,18 @@ vi.mock("../../rbac", async (importOriginal) => {
   return {
     ...actual,
     hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    checkProjectPermission:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    checkPermissionOrPubliclyShared:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
   };
 });
 

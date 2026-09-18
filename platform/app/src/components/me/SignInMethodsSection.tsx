@@ -75,12 +75,6 @@ export function SignInMethodsSection() {
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const apiContext = api.useUtils();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  // Which of two offers this section makes. Assumed true until the answer
-  // arrives: "Change Password" is what almost every account wants, and
-  // flickering "Set a password" in front of somebody who has one reads as
-  // their password having been lost.
-  const passwordStatus = api.user.hasPassword.useQuery({});
-  const hasPassword = passwordStatus.data?.hasPassword ?? true;
 
   const hasSSOProvider = !!organization?.ssoProvider;
 
@@ -132,13 +126,9 @@ export function SignInMethodsSection() {
     return (
       <HStack width="full">
         <VStack align="start" gap={0}>
-          <Text fontSize="sm">
-            {hasPassword ? "Email + password" : "Password"}
-          </Text>
+          <Text fontSize="sm">Email + password</Text>
           <Text fontSize="xs" color="fg.muted">
-            {hasPassword
-              ? "Update the password used to sign in to LangWatch."
-              : "You sign in without a password. Set one to get in from a device that does not hold your passkey."}
+            Update the password used to sign in to LangWatch.
           </Text>
         </VStack>
         <Spacer />
@@ -146,14 +136,12 @@ export function SignInMethodsSection() {
           size="sm"
           colorPalette="orange"
           onClick={() => setChangePasswordOpen(true)}
-          data-testid="password-action"
         >
-          {hasPassword ? "Change Password" : "Set a password"}
+          Change Password
         </Button>
         <ChangePasswordDialog
           open={changePasswordOpen}
           onClose={() => setChangePasswordOpen(false)}
-          mode={hasPassword ? "change" : "set"}
         />
       </HStack>
     );

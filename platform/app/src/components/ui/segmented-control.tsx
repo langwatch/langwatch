@@ -34,7 +34,6 @@ export const SegmentedControl = React.forwardRef<
           key={item.value}
           value={item.value}
           disabled={item.disabled}
-          cursor={item.disabled ? "not-allowed" : "pointer"}
         >
           <SegmentGroup.ItemText>{item.label}</SegmentGroup.ItemText>
           <SegmentGroup.ItemHiddenInput />

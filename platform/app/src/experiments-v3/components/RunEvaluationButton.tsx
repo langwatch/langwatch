@@ -21,7 +21,6 @@ import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import { useOpenComparisonEditor } from "../hooks/useOpenEvaluatorEditor";
 import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
-import { usePromptTemplateFields } from "../hooks/usePromptTemplateFields";
 import { useResolveTargetName } from "../hooks/useResolveTargetName";
 import { isComparisonEvaluator } from "../types";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -43,7 +42,6 @@ export const RunEvaluationButton = ({
   const { openTargetEditor } = useOpenTargetEditor();
   const openComparisonEditor = useOpenComparisonEditor();
   const resolveTargetName = useResolveTargetName();
-  const promptTemplateFields = usePromptTemplateFields();
   const { status, progress, execute, abort, isAborting } =
     useExecuteEvaluation();
 
@@ -85,12 +83,7 @@ export const RunEvaluationButton = ({
     }
 
     // Validate all targets and evaluators
-    const validation = validateWorkbench({
-      targets,
-      evaluators,
-      activeDatasetId,
-      promptTemplateFields,
-    });
+    const validation = validateWorkbench(targets, evaluators, activeDatasetId);
 
     if (!validation.isValid) {
       // Open the drawer for the first entity with missing mappings
@@ -211,12 +204,7 @@ export const RunEvaluationButton = ({
     if (!hasTargets) {
       return "Click to add a target";
     }
-    const validation = validateWorkbench({
-      targets,
-      evaluators,
-      activeDatasetId,
-      promptTemplateFields,
-    });
+    const validation = validateWorkbench(targets, evaluators, activeDatasetId);
     if (!validation.isValid) {
       if (validation.firstInvalidTarget) {
         return `Configure missing mappings for target`;

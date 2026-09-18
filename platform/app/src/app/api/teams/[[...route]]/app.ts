@@ -87,32 +87,26 @@ secured.access(requires("team:view")).get(
   },
 );
 
-secured
-  .access(
-    /* no bag grants team:create; only team:manage implies it (registry vocabulary) */ requires(
-      "team:manage",
-    ),
-  )
-  .post(
-    "/",
-    teamServiceMiddleware,
-    describeRoute({
-      description: "Create a new team that can group projects and members",
-    }),
-    zValidator("json", createTeamSchema),
-    async (c) => {
-      const organization = c.get("organization") as Organization;
-      const body = c.req.valid("json");
-      const service = c.get("teamService") as TeamRestService;
+secured.access(requires("team:create")).post(
+  "/",
+  teamServiceMiddleware,
+  describeRoute({
+    description: "Create a new team that can group projects and members",
+  }),
+  zValidator("json", createTeamSchema),
+  async (c) => {
+    const organization = c.get("organization") as Organization;
+    const body = c.req.valid("json");
+    const service = c.get("teamService") as TeamRestService;
 
-      const team = await service.create({
-        organizationId: organization.id,
-        name: body.name,
-      });
+    const team = await service.create({
+      organizationId: organization.id,
+      name: body.name,
+    });
 
-      return c.json(teamResponse(team), 201);
-    },
-  );
+    return c.json(teamResponse(team), 201);
+  },
+);
 
 secured.access(requires("team:view")).get(
   "/:id",
@@ -137,7 +131,7 @@ secured.access(requires("team:view")).get(
   },
 );
 
-secured.access(requires("team:manage")).patch(
+secured.access(requires("team:update")).patch(
   "/:id",
   teamServiceMiddleware,
   describeRoute({
@@ -162,7 +156,7 @@ secured.access(requires("team:manage")).patch(
   },
 );
 
-secured.access(requires("team:manage")).delete(
+secured.access(requires("team:delete")).delete(
   "/:id",
   teamServiceMiddleware,
   describeRoute({

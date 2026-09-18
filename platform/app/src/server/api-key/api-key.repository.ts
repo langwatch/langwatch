@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import type {
   ApiKey,

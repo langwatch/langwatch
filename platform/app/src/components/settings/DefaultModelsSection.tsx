@@ -46,7 +46,6 @@ import type React from "react";
 import { useMemo, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
-import { syncLangyAfterDefaultModelWrite } from "~/features/langy/logic/codingDefaultSync";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -160,15 +159,10 @@ export function DefaultModelsSection({
   const handleDelete = async (c: ConfigRow) => {
     try {
       await deleteMutation.mutateAsync({ id: c.id });
-      // Refresh every default-model cache AND snap Langy's model pill to
-      // whatever the cascade resolves now, when the pill was following the
-      // removed default.
-      if (project?.id) {
-        await syncLangyAfterDefaultModelWrite({
-          utils,
-          projectId: project.id,
-        });
-      }
+      await Promise.all([
+        utils.modelProvider.getDefaultModelsForProject.invalidate(),
+        utils.modelProvider.getResolvedDefault.invalidate(),
+      ]);
       toaster.create({
         title: "Config deleted",
         type: "success",

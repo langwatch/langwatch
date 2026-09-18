@@ -30,7 +30,6 @@ import {
   isCustomRole,
 } from "../../api/enterprise";
 import { getApp } from "../app";
-import { grantsService } from "../authz/runtime";
 import type { PlanProviderUser } from "../subscription/plan-provider";
 import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
 import {
@@ -41,11 +40,11 @@ import {
 } from "./errors";
 import type {
   AuditLogFilters,
-  BillingOrganizationLookup,
   CreateAndAssignResult,
   EnrichedAuditLog,
   FullyLoadedOrganization,
   MemberTeamBinding,
+  OrganizationForBilling,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
@@ -309,7 +308,7 @@ export class OrganizationService {
 
   async getOrganizationForBilling(
     organizationId: string,
-  ): Promise<BillingOrganizationLookup> {
+  ): Promise<OrganizationForBilling | null> {
     return this.repo.getOrganizationForBilling(organizationId);
   }
 
@@ -686,14 +685,7 @@ export class OrganizationService {
       }
     }
 
-    await this.repo.setMemberDisabled({ organizationId, userId, disabled });
-
-    // Disabling is a plain column write, not a grant write, so nothing else
-    // retires the authorization snapshots cached for this organization. An
-    // admin who has just revoked someone's access must not have to wait for a
-    // cache to age out before it is true, and re-enabling must not leave the
-    // person locked out for the same window.
-    await grantsService().invalidateOrganization({ organizationId });
+    return this.repo.setMemberDisabled({ organizationId, userId, disabled });
   }
 
   /**

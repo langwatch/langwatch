@@ -10,12 +10,12 @@ from ...models.post_api_model_defaults_response_400 import PostApiModelDefaultsR
 from ...models.post_api_model_defaults_response_401 import PostApiModelDefaultsResponse401
 from ...models.post_api_model_defaults_response_422 import PostApiModelDefaultsResponse422
 from ...models.post_api_model_defaults_response_500 import PostApiModelDefaultsResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiModelDefaultsBody,
+    body: PostApiModelDefaultsBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         "url": "/api/model-defaults",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -95,8 +96,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiModelDefaultsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiModelDefaultsBody | Unset = UNSET,
 ) -> Response[
     PostApiModelDefaultsResponse200
     | PostApiModelDefaultsResponse400
@@ -108,7 +109,7 @@ def sync_detailed(
     LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
 
     Args:
-        body (PostApiModelDefaultsBody):
+        body (PostApiModelDefaultsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -131,8 +132,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    body: PostApiModelDefaultsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiModelDefaultsBody | Unset = UNSET,
 ) -> (
     PostApiModelDefaultsResponse200
     | PostApiModelDefaultsResponse400
@@ -145,7 +146,7 @@ def sync(
     LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
 
     Args:
-        body (PostApiModelDefaultsBody):
+        body (PostApiModelDefaultsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -163,8 +164,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiModelDefaultsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiModelDefaultsBody | Unset = UNSET,
 ) -> Response[
     PostApiModelDefaultsResponse200
     | PostApiModelDefaultsResponse400
@@ -176,7 +177,7 @@ async def asyncio_detailed(
     LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
 
     Args:
-        body (PostApiModelDefaultsBody):
+        body (PostApiModelDefaultsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -197,8 +198,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    body: PostApiModelDefaultsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiModelDefaultsBody | Unset = UNSET,
 ) -> (
     PostApiModelDefaultsResponse200
     | PostApiModelDefaultsResponse400
@@ -211,7 +212,7 @@ async def asyncio(
     LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.
 
     Args:
-        body (PostApiModelDefaultsBody):
+        body (PostApiModelDefaultsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

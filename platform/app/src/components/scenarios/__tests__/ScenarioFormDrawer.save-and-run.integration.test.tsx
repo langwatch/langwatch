@@ -169,7 +169,7 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn(), setData: vi.fn() },
+        getById: { invalidate: vi.fn() },
       },
       agents: {
         getById: { fetch: vi.fn() },
@@ -286,7 +286,6 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
         mocks.mockRunScenario.mockResolvedValue(undefined);
       });
 
-      /** @scenario "The v1 page still sends the person to the run after a single run" */
       it("calls update mutation and navigates to simulations page", async () => {
         const user = userEvent.setup();
         renderEditModeDrawer();

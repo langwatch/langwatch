@@ -116,10 +116,6 @@ class FakeRepo implements CodingAgentSessionRepository {
   async listByRepositoryBranch(): Promise<CodingAgentBranchSessionRow[]> {
     return [];
   }
-
-  async listBySessionIds(): Promise<CodingAgentBranchSessionRow[]> {
-    return [];
-  }
 }
 
 const context = (

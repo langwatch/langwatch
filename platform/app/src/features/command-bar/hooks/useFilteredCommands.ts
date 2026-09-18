@@ -11,7 +11,6 @@ import { useRouter } from "~/utils/compat/next-router";
 import {
   actionCommands,
   filterCommands,
-  filterCommandsByFeatureFlags,
   navigationCommands,
   supportCommands,
   themeCommands,
@@ -22,7 +21,6 @@ import {
 } from "../constants";
 import { getPageCommands } from "../pageCommands";
 import type { Command } from "../types";
-import { useCommandFeatureFlags } from "./useCommandFeatureFlags";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -43,17 +41,13 @@ export function useFilteredCommands(
   isDevMode: boolean,
 ): FilteredCommands {
   const { hasAccess: hasOpsAccess } = useOpsPermission();
-  const commandFeatureFlags = useCommandFeatureFlags();
 
   const availableNavCommands = useMemo(() => {
     const commands = hasOpsAccess
       ? navigationCommands
       : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"));
-    return filterCommandsByFeatureFlags({
-      commands,
-      flags: commandFeatureFlags,
-    });
-  }, [hasOpsAccess, commandFeatureFlags]);
+    return commands;
+  }, [hasOpsAccess]);
 
   const filteredNavigation = useMemo(() => {
     if (!query.trim()) return [];

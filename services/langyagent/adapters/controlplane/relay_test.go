@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -155,7 +154,7 @@ func TestRelayClient_OpenDisabledWithoutSecretEndpointOrToken(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := NewRelayClient(tc.secret).Open(context.Background(), tc.endpoint, tc.runToken, testIdentity.ProjectID, testIdentity.UserID, testIdentity.ConversationID, testIdentity.TurnID)
-			if !errors.Is(err, app.ErrRelayDisabled) {
+			if err != app.ErrRelayDisabled {
 				t.Fatalf("Open err = %v, want app.ErrRelayDisabled", err)
 			}
 		})
@@ -174,7 +173,7 @@ func TestRelayStream_EmitAfterCloseDropped(t *testing.T) {
 	if err := stream.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if err := stream.Emit(frame(frames.Delta("late"))); !errors.Is(err, errStreamClosed) {
+	if err := stream.Emit(frame(frames.Delta("late"))); err != errStreamClosed {
 		t.Fatalf("Emit after Close = %v, want errStreamClosed", err)
 	}
 }

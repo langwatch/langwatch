@@ -1,11 +1,13 @@
 import { z } from "zod";
 import {
   grantEventSourceSchema,
+  grantRevocationSelectorSchema,
   grantShapeRefinement,
   grantsLedgerActorSchema,
   ledgerPrincipalSchema,
   ledgerScopeSchema,
   legacyBindingRoleSchema,
+  migrationTenantStatusSchema,
   resourceGrantTermsSchema,
 } from "./events";
 
@@ -32,13 +34,12 @@ const commandIdentitySchema = z.object({
  * Every command payload in this ledger carries the identity block AND the
  * invariant that makes it one ledger: `tenantId === organizationId`.
  *
- * The organization is the TENANT of both aggregates (ADR-110) — the stream
- * an event is persisted under and the routing key that places it. It is the
- * AGGREGATE of only `authz_org_policy`; a grant command's aggregate is its
- * own grant id. A caller that wired tenantId and organizationId to different
- * values would persist the event under one tenant's stream and fold it into
- * a different organization's projection, and nothing later in the pipeline
- * can detect that, which is why it is refused at the wire boundary.
+ * The two are not interchangeable downstream — the emitted event takes its
+ * `tenantId` from the command envelope and its `aggregateId` from
+ * `organizationId` — so a caller that wired them to different values would
+ * persist the event under one tenant's stream and fold it into a different
+ * organization's projection. Nothing later in the pipeline can detect that,
+ * which is why it is refused at the wire boundary.
  */
 function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
   return commandIdentitySchema
@@ -75,18 +76,11 @@ export const attachGrantEntrySchema = z
   });
 export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 
-/**
- * One command, one grant, one aggregate (ADR-110). The batched form this
- * replaces emitted an event per entry onto a single organization-wide
- * aggregate; with the grant as the aggregate a batch would have to straddle
- * hundreds of them, so the import sends one of these per grant instead. They
- * are independent and fold concurrently, which is the point.
- */
-export const attachGrantCommandDataSchema = commandDataSchema({
-  grant: attachGrantEntrySchema,
+export const attachGrantsCommandDataSchema = commandDataSchema({
+  grants: z.array(attachGrantEntrySchema).min(1),
 });
-export type AttachGrantCommandData = z.infer<
-  typeof attachGrantCommandDataSchema
+export type AttachGrantsCommandData = z.infer<
+  typeof attachGrantsCommandDataSchema
 >;
 
 export const changeGrantRoleCommandDataSchema = commandDataSchema({
@@ -101,26 +95,37 @@ export type ChangeGrantRoleCommandData = z.infer<
 >;
 
 /**
- * One revocation, one aggregate (ADR-110). A revoke names its grant id and
- * nothing else: a selector cannot address an aggregate, so resolving "every
- * grant this principal holds at this scope" into ids is the caller's job now.
+ * One revocation: a grant id, an identity selector, or both.
  *
- * Two things make that safe rather than a hole. Grant ids are derived from
- * content, so a caller that knows the fact can derive its id without reading
- * the lagging projection at all. And where the set genuinely is not known —
- * offboarding — the deny is enforced synchronously against the projection
- * before the call returns (the sanctioned direct write, ADR-092 decision 7),
- * so access ends immediately and these events are the durable record rather
- * than the mechanism.
+ * The selector is what makes a revoke-by-filter honest. Its ids come from the
+ * compat projection, which lags the ledger by a fold, so a grant appended a
+ * moment earlier is missing from the list; carrying the identity lets the fold
+ * sweep it (see `grantRevocationSelectorSchema`). A revocation naming neither
+ * is a no-op the caller cannot have meant, so the wire refuses it.
  */
-export const revokeGrantCommandDataSchema = commandDataSchema({
-  grantId: z.string().min(1),
-  reason: z.string().min(1).optional(),
+export const revokeGrantEntrySchema = z
+  .object({
+    grantId: z.string().min(1).optional(),
+    selector: grantRevocationSelectorSchema.optional(),
+    reason: z.string().min(1).optional(),
+  })
+  .refine(
+    (entry) => entry.grantId !== undefined || entry.selector !== undefined,
+    {
+      message:
+        "a revocation names a grant id, an identity selector, or both — never neither",
+      path: ["grantId"],
+    },
+  );
+export type RevokeGrantEntry = z.infer<typeof revokeGrantEntrySchema>;
+
+export const revokeGrantsCommandDataSchema = commandDataSchema({
+  revocations: z.array(revokeGrantEntrySchema).min(1),
   actor: grantsLedgerActorSchema,
   occurredAtMs: z.number().int().nonnegative(),
 });
-export type RevokeGrantCommandData = z.infer<
-  typeof revokeGrantCommandDataSchema
+export type RevokeGrantsCommandData = z.infer<
+  typeof revokeGrantsCommandDataSchema
 >;
 
 export const defineRoleEntrySchema = z.object({
@@ -137,22 +142,12 @@ export const defineRoleEntrySchema = z.object({
 });
 export type DefineRoleEntry = z.infer<typeof defineRoleEntrySchema>;
 
-/** One command, one role, one aggregate (ADR-110) — the same rule the
- *  grant commands follow, for the same reason. */
-export const defineRoleCommandDataSchema = commandDataSchema({
-  role: defineRoleEntrySchema,
+export const defineRolesCommandDataSchema = commandDataSchema({
+  roles: z.array(defineRoleEntrySchema).min(1),
   actor: grantsLedgerActorSchema,
 });
-export type DefineRoleCommandData = z.infer<typeof defineRoleCommandDataSchema>;
-
-export const changeRolePermissionsCommandDataSchema = commandDataSchema({
-  roleId: z.string().min(1),
-  permissions: z.array(z.string().min(1)),
-  actor: grantsLedgerActorSchema,
-  occurredAtMs: z.number().int().nonnegative(),
-});
-export type ChangeRolePermissionsCommandData = z.infer<
-  typeof changeRolePermissionsCommandDataSchema
+export type DefineRolesCommandData = z.infer<
+  typeof defineRolesCommandDataSchema
 >;
 
 export const deleteRoleCommandDataSchema = commandDataSchema({
@@ -161,3 +156,51 @@ export const deleteRoleCommandDataSchema = commandDataSchema({
   occurredAtMs: z.number().int().nonnegative(),
 });
 export type DeleteRoleCommandData = z.infer<typeof deleteRoleCommandDataSchema>;
+
+export const offboardMemberCommandDataSchema = commandDataSchema({
+  userId: z.string().min(1),
+  /** What the writer could see. The fold sweeps by principal, so an
+   *  incomplete list cannot leave the member holding access. */
+  revokedGrantIds: z.array(z.string().min(1)),
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type OffboardMemberCommandData = z.infer<
+  typeof offboardMemberCommandDataSchema
+>;
+
+export const proveMigrationParityCommandDataSchema = commandDataSchema({
+  diffs: z.array(z.string().min(1)),
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type ProveMigrationParityCommandData = z.infer<
+  typeof proveMigrationParityCommandDataSchema
+>;
+
+export const completeCutoverCommandDataSchema = commandDataSchema({
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type CompleteCutoverCommandData = z.infer<
+  typeof completeCutoverCommandDataSchema
+>;
+
+export const rollBackCutoverCommandDataSchema = commandDataSchema({
+  actor: grantsLedgerActorSchema,
+  reason: z.string().min(1).optional(),
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type RollBackCutoverCommandData = z.infer<
+  typeof rollBackCutoverCommandDataSchema
+>;
+
+export const recordMigrationTenantStateCommandDataSchema = commandDataSchema({
+  migrationName: z.string().min(1),
+  status: migrationTenantStatusSchema,
+  report: z.unknown().nullish(),
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type RecordMigrationTenantStateCommandData = z.infer<
+  typeof recordMigrationTenantStateCommandDataSchema
+>;

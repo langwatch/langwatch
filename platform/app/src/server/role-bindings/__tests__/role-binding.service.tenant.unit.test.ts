@@ -4,7 +4,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
+import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import type { RoleService } from "~/server/role/role.service";
@@ -30,8 +30,8 @@ const prisma = {
   // The listing reads go through the per-organization fork, which asks the
   // gate first. Answering it keeps these tests on the legacy head by choice;
   // without it the gate's read throws and they pass on the fail-safe.
-  systemMigrationTenantState: {
-    findUnique: vi.fn().mockResolvedValue(null),
+  authzCutoverProjection: {
+    findUnique: vi.fn().mockResolvedValue({ onEngine: false }),
   },
   $transaction: vi.fn(),
 } as unknown as PrismaClient;
@@ -54,7 +54,7 @@ let service: RoleBindingService;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetAuthzEngineGateForTesting();
+  resetCutoverGateForTesting();
   validateScopeInOrg.mockResolvedValue(undefined);
   validateRolesAssignable.mockResolvedValue(undefined);
   organizationUserFindFirst.mockResolvedValue({ role: "MEMBER" });

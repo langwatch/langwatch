@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
+import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const planRouter = createTRPCRouter({
@@ -9,7 +10,7 @@ export const planRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       return await getApp().planProvider.getActivePlan({
         organizationId: input.organizationId,

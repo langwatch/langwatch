@@ -7,7 +7,6 @@ package procsupervisor
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -41,13 +40,12 @@ func New(isAgent bool) Supervisor {
 func (s Supervisor) RunOnce(ctx context.Context, name, dir, shell string, env []string) error {
 	c := proc{name: name, dir: dir, shell: shell, env: env, color: "90", isPlain: s.isPlain}
 	cmd := c.command(ctx)
-	waitStreams := c.pipe(cmd)
+	c.pipe(cmd)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 	done := make(chan struct{})
 	go killOnCancel(ctx, cmd, done)
-	waitStreams()
 	err := cmd.Wait()
 	close(done)
 	return err
@@ -71,7 +69,7 @@ func (s Supervisor) WaitReady(ctx context.Context, name, url string) bool {
 func (s Supervisor) RunOnceBounded(ctx context.Context, name, dir, shell string, env []string, limits app.ReapLimits) error {
 	c := proc{name: name, dir: dir, shell: shell, env: env, color: "90", isPlain: s.isPlain}
 	cmd := c.command(ctx)
-	waitStreams := c.pipe(cmd)
+	c.pipe(cmd)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -85,7 +83,6 @@ func (s Supervisor) RunOnceBounded(ctx context.Context, name, dir, shell string,
 		go reap(reapCtx, cmd.Process.Pid, limits, reaped)
 	}
 
-	waitStreams()
 	err := cmd.Wait()
 	close(done)
 	select {
@@ -253,18 +250,13 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 	}
 	for ctx.Err() == nil {
 		cmd := c.command(ctx)
-		waitStreams := c.pipe(cmd)
+		c.pipe(cmd)
 		if err := cmd.Start(); err != nil {
 			c.logln(fmt.Sprintf("failed to start: %v", err))
 			return
 		}
 		done := make(chan struct{})
-		go func() {
-			// Drain both pipes to EOF before Wait, which closes them.
-			waitStreams()
-			_ = cmd.Wait()
-			close(done)
-		}()
+		go func() { _ = cmd.Wait(); close(done) }()
 		select {
 		case <-ctx.Done():
 			if cmd.Process != nil {
@@ -336,85 +328,23 @@ func (c proc) command(ctx context.Context) *exec.Cmd {
 	return cmd
 }
 
-// pipe attaches a reader to each of the child's output streams and returns a
-// function that blocks until both readers have seen EOF. The caller MUST call
-// it before cmd.Wait(): Wait closes the pipes, and os/exec documents that as
-// incorrect while goroutines are still reading them. The readers then lose
-// whatever is still buffered, which is how a lane's log file goes quiet while
-// the process keeps talking.
-func (c proc) pipe(cmd *exec.Cmd) (waitStreams func()) {
-	stdout, outErr := cmd.StdoutPipe()
-	stderr, errErr := cmd.StderrPipe()
-	var wg sync.WaitGroup
-	for _, r := range []io.Reader{stdout, stderr} {
-		if r == nil {
-			continue
-		}
-		wg.Add(1)
-		go func(r io.Reader) {
-			defer wg.Done()
-			c.stream(r)
-		}(r)
-	}
-	if outErr != nil {
-		c.logln(fmt.Sprintf("could not capture stdout: %v", outErr))
-	}
-	if errErr != nil {
-		c.logln(fmt.Sprintf("could not capture stderr: %v", errErr))
-	}
-	return wg.Wait
+func (c proc) pipe(cmd *exec.Cmd) {
+	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
+	go c.stream(stdout)
+	go c.stream(stderr)
 }
 
-// streamMaxLine is the longest single line captured as one line. Longer output
-// is split across several captured lines rather than dropped: the api lane
-// prints its errors as one-line JSON (pino-pretty singleLine), so a stack dump
-// arrives as a single line that can run to megabytes. A reader that gives up on
-// such a line stops draining the pipe, the kernel buffer fills, and the child
-// blocks on its next write. The process is then wedged, not just unlogged.
-const streamMaxLine = 1 << 20
-
-// streamReadBuffer is the read-ahead size. Lines longer than this are assembled
-// across reads, so it bounds a syscall, not a line.
-const streamReadBuffer = 64 << 10
-
-// stream captures one output stream line by line for the life of the pipe. It
-// returns only at EOF, or when the pipe cannot be read at all, never on a
-// single bad line.
 func (c proc) stream(r io.Reader) {
-	br := bufio.NewReaderSize(r, streamReadBuffer)
-	var line []byte
-	for {
-		chunk, err := br.ReadSlice('\n')
-		line = append(line, chunk...)
-		switch {
-		case err == nil:
-			c.logln(string(line))
-			line = line[:0]
-		case errors.Is(err, bufio.ErrBufferFull):
-			// No newline yet. Emit a segment once the line is over the cap and
-			// keep reading the rest of it, so memory stays bounded and the pipe
-			// stays drained.
-			if len(line) >= streamMaxLine {
-				c.logln(string(line))
-				line = line[:0]
-			}
-		default:
-			if len(line) > 0 {
-				c.logln(string(line))
-			}
-			if !errors.Is(err, io.EOF) {
-				c.logln(fmt.Sprintf("log capture read error: %v", err))
-				// Keep draining: if the error was transient the child stays
-				// unblocked, and if it was not this returns at once.
-				_, _ = io.Copy(io.Discard, br)
-			}
-			return
-		}
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 1024*1024), 1024*1024)
+	for sc.Scan() {
+		c.logln(sc.Text())
 	}
 }
 
 func (c proc) logln(line string) {
-	line = strings.TrimRight(line, "\r\n")
+	line = strings.TrimRight(line, "\n")
 	c.sink.writeLine(line)
 	if c.preview != nil {
 		c.preview.Lock()

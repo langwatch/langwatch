@@ -16,8 +16,6 @@ import {
   ScenarioWelcomeModal,
   ScenarioWelcomeScreen,
 } from "~/components/scenarios/ScenarioWelcomeScreen";
-import { ReturnToNewSimulationsBanner } from "~/components/suites/ReturnToNewSimulationsBanner";
-import { useAgentTestingRedirect } from "~/components/suites/useAgentTestingRedirect";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -34,8 +32,6 @@ import { api } from "~/utils/api";
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  // A project that reads Agent Testing keeps its scenarios there.
-  const { deciding } = useAgentTestingRedirect({ segments: ["scenarios"] });
   // Every row here opens the scenario editor, which is a separate download.
   // Fetch it while the person reads the list, so the click opens the editor
   // rather than a spinner.
@@ -165,20 +161,16 @@ function ScenarioLibraryPage() {
       .map((s) => ({ id: s.id, name: s.name }));
   }, [archiveTarget, scenarios, selectedIds]);
 
-  if (deciding) return null;
-
   return (
     <DashboardLayout>
       <PageLayout.Header>
         <HStack justify="space-between" align="center" w="full">
           <PageLayout.Heading>Scenario Library</PageLayout.Heading>
           <Spacer />
-          <ReturnToNewSimulationsBanner target="scenarios" />
           <LabelFilterDropdown
             allLabels={allLabels}
             activeLabels={activeLabels}
             onToggle={handleLabelToggle}
-            triggerSize="header"
           />
           <PageLayout.HeaderButton onClick={handleNewScenario}>
             <Plus size={16} /> New Scenario

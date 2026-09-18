@@ -3,23 +3,20 @@ import type {
   ModelDefaultScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
-import {
-  probeOrganizationPermission,
-  probeProjectPermission,
-  probeTeamPermission,
-} from "~/server/app-layer/permissions/imperative";
 
 import type { Session } from "~/server/auth";
+import {
+  hasOrganizationPermission,
+  hasProjectPermission,
+  hasTeamPermission,
+} from "../api/rbac";
 import { isRootPrismaClient } from "../db";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./codexRefusalMessage";
 import {
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
 } from "./codexRestrictions";
-import {
-  ModelDefaultScopeForbiddenError,
-  ModelDefaultUserKeyRequiredError,
-} from "./errors";
+import { ModelDefaultScopeForbiddenError } from "./errors";
 import {
   allFeatures,
   featureByKey,
@@ -56,11 +53,11 @@ export async function assertCanWriteScope(
   scopeId: string,
 ): Promise<void> {
   if (!ctx.session?.user?.id) {
-    throw new ModelDefaultUserKeyRequiredError();
+    throw new Error("Not authenticated");
   }
   if (scopeType === "ORGANIZATION") {
     if (
-      !(await probeOrganizationPermission(
+      !(await hasOrganizationPermission(
         ctx as { prisma: PrismaClient; session: Session },
         scopeId,
         "organization:manage",
@@ -74,7 +71,7 @@ export async function assertCanWriteScope(
     return;
   }
   if (scopeType === "TEAM") {
-    if (!(await probeTeamPermission(ctx, scopeId, "team:manage"))) {
+    if (!(await hasTeamPermission(ctx, scopeId, "team:manage"))) {
       throw new ModelDefaultScopeForbiddenError({
         scopeType,
         requiredPermission: "team:manage",
@@ -82,7 +79,7 @@ export async function assertCanWriteScope(
     }
     return;
   }
-  if (!(await probeProjectPermission(ctx, scopeId, "project:update"))) {
+  if (!(await hasProjectPermission(ctx, scopeId, "project:update"))) {
     throw new ModelDefaultScopeForbiddenError({
       scopeType,
       requiredPermission: "project:update",

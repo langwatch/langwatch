@@ -6,7 +6,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 import httpx
 
@@ -55,19 +55,6 @@ def _raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
 def _quote(value: str) -> str:
     """URL-quote a path segment."""
     return urllib.parse.quote(value, safe="")
-
-
-class _Unset:
-    """The type of the marker below."""
-
-
-_UNSET = _Unset()
-"""Marks a field the caller did not give. ``None`` is a value of its own on
-``testSuiteId``: it clears the test suite the scenario names, so it cannot
-double as the default."""
-
-
-TestSuiteId = Union[str, None, _Unset]
 
 
 class ScenariosFacade:
@@ -124,7 +111,6 @@ class ScenariosFacade:
         *,
         name: str,
         description: Optional[str] = None,
-        test_suite_id: TestSuiteId = _UNSET,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """
@@ -133,9 +119,6 @@ class ScenariosFacade:
         Args:
             name: Name for the scenario.
             description: Optional description.
-            test_suite_id: The test suite to file the scenario in. It must name
-                a live test suite of the same project. ``None`` files the
-                scenario into the project's Default test suite.
             **kwargs: Additional fields to include in the request body.
 
         Returns:
@@ -144,8 +127,6 @@ class ScenariosFacade:
         body: Dict[str, Any] = {"name": name}
         if description is not None:
             body["description"] = description
-        if not isinstance(test_suite_id, _Unset):
-            body["testSuiteId"] = test_suite_id
         body.update(kwargs)
 
         response = self._http().post("/api/scenarios", json=body)
@@ -157,7 +138,6 @@ class ScenariosFacade:
         scenario_id: str,
         *,
         params: Optional[Dict[str, Any]] = None,
-        test_suite_id: TestSuiteId = _UNSET,
     ) -> Dict[str, Any]:
         """
         Update an existing scenario.
@@ -165,16 +145,11 @@ class ScenariosFacade:
         Args:
             scenario_id: The scenario ID to update.
             params: Dictionary of fields to update.
-            test_suite_id: The test suite to file the scenario in. Left out,
-                the scenario keeps the test suite it is in. ``None`` files it
-                into the project's Default test suite.
 
         Returns:
             Dictionary containing the updated scenario data.
         """
-        body = dict(params or {})
-        if not isinstance(test_suite_id, _Unset):
-            body["testSuiteId"] = test_suite_id
+        body = params or {}
         response = self._http().put(
             f"/api/scenarios/{_quote(scenario_id)}", json=body
         )

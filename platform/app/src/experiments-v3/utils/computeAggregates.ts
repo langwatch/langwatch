@@ -1,7 +1,7 @@
 import {
   computeMetricStats,
   type MetricStats,
-} from "~/components/shared/metricStats";
+} from "~/components/shared/MetricStatsTooltip";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
 import type {
   EvaluationResults,
@@ -9,6 +9,8 @@ import type {
   TargetConfig,
 } from "../types";
 import { resolveVerdictLabel, toComparisonConfig } from "./normalizeComparison";
+
+export { computeMetricStats, type MetricStats };
 
 /**
  * Aggregate statistics for a target's evaluator results.

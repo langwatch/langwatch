@@ -11,12 +11,12 @@ from ...models.post_api_prompts_response_401 import PostApiPromptsResponse401
 from ...models.post_api_prompts_response_409 import PostApiPromptsResponse409
 from ...models.post_api_prompts_response_422 import PostApiPromptsResponse422
 from ...models.post_api_prompts_response_500 import PostApiPromptsResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiPromptsBody,
+    body: PostApiPromptsBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -25,7 +25,8 @@ def _get_kwargs(
         "url": "/api/prompts",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -103,8 +104,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiPromptsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiPromptsBody | Unset = UNSET,
 ) -> Response[
     PostApiPromptsResponse200
     | PostApiPromptsResponse400
@@ -116,7 +117,7 @@ def sync_detailed(
     """Create a new prompt with default initial version
 
     Args:
-        body (PostApiPromptsBody):
+        body (PostApiPromptsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -139,8 +140,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    body: PostApiPromptsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiPromptsBody | Unset = UNSET,
 ) -> (
     PostApiPromptsResponse200
     | PostApiPromptsResponse400
@@ -153,7 +154,7 @@ def sync(
     """Create a new prompt with default initial version
 
     Args:
-        body (PostApiPromptsBody):
+        body (PostApiPromptsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -171,8 +172,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiPromptsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiPromptsBody | Unset = UNSET,
 ) -> Response[
     PostApiPromptsResponse200
     | PostApiPromptsResponse400
@@ -184,7 +185,7 @@ async def asyncio_detailed(
     """Create a new prompt with default initial version
 
     Args:
-        body (PostApiPromptsBody):
+        body (PostApiPromptsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -205,8 +206,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    body: PostApiPromptsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiPromptsBody | Unset = UNSET,
 ) -> (
     PostApiPromptsResponse200
     | PostApiPromptsResponse400
@@ -219,7 +220,7 @@ async def asyncio(
     """Create a new prompt with default initial version
 
     Args:
-        body (PostApiPromptsBody):
+        body (PostApiPromptsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

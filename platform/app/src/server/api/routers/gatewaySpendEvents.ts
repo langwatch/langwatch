@@ -11,6 +11,7 @@ import { getApp } from "~/server/app-layer/app";
 import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
 import { spendFiltersSchema } from "~/server/gateway/spendFilters";
 
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const gatewaySpendEventsRouter = createTRPCRouter({
@@ -34,7 +35,7 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).optional(),
       }),
     )
-    .permission("gatewayUsage:view")
+    .use(checkProjectPermission("gatewayUsage:view"))
     .query(async ({ ctx, input }) => {
       const repository = getApp().gateway.spendEvents;
       if (!repository) {

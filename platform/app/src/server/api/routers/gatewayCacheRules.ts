@@ -14,6 +14,7 @@ import { z } from "zod";
 
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 
+import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const matchersSchema = z
@@ -53,7 +54,7 @@ async function requireOrgAccess(
 export const gatewayCacheRulesRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .permission("gatewayCacheRules:view")
+    .use(checkOrganizationPermission("gatewayCacheRules:view"))
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayCacheRuleService.create(ctx.prisma);
@@ -63,7 +64,7 @@ export const gatewayCacheRulesRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .permission("gatewayCacheRules:view")
+    .use(checkOrganizationPermission("gatewayCacheRules:view"))
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayCacheRuleService.create(ctx.prisma);
@@ -89,7 +90,7 @@ export const gatewayCacheRulesRouter = createTRPCRouter({
         action: actionSchema,
       }),
     )
-    .permission("gatewayCacheRules:create")
+    .use(checkOrganizationPermission("gatewayCacheRules:create"))
     .mutation(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayCacheRuleService.create(ctx.prisma);
@@ -119,7 +120,7 @@ export const gatewayCacheRulesRouter = createTRPCRouter({
         action: actionSchema.optional(),
       }),
     )
-    .permission("gatewayCacheRules:update")
+    .use(checkOrganizationPermission("gatewayCacheRules:update"))
     .mutation(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayCacheRuleService.create(ctx.prisma);
@@ -139,7 +140,7 @@ export const gatewayCacheRulesRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .permission("gatewayCacheRules:delete")
+    .use(checkOrganizationPermission("gatewayCacheRules:delete"))
     .mutation(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayCacheRuleService.create(ctx.prisma);

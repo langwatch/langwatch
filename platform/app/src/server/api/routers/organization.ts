@@ -1,5 +1,4 @@
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
@@ -12,15 +11,10 @@ import {
 } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import {
-  identityEmail,
-  joinRequestsService,
-} from "~/server/app-layer/identity/runtime";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
-import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { trackServerEvent } from "~/server/posthog";
 import { RoleService } from "~/server/role/role.service";
@@ -29,25 +23,18 @@ import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { decrypt } from "~/utils/encryption";
 import {
   isTeamRoleAllowedForOrganizationRole,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
+  DuplicateInviteError,
   INVITE_ALREADY_ACCEPTED_MESSAGE,
   INVITE_NOT_READY_MESSAGE,
-  InviteExpiredError,
   InviteNotFoundError,
-  InviteWrongAccountError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
-import {
-  InviteService,
-  maskInvitedAddress,
-  matchInviteToAcceptor,
-  resolveInviteDisplayStatus,
-} from "../../invites/invite.service";
-import { buildInviteAcceptUrl } from "../../invites/invite-link";
-import { assertInviteSendAllowed } from "../../invites/invite-send-throttle";
+import { InviteService } from "../../invites/invite.service";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 import {
@@ -63,8 +50,9 @@ import {
 import {
   batchScopePermissions,
   checkOrganizationPermission,
-  checkProjectPermission,
-  type PermissionMiddlewareParams,
+  checkTeamPermission,
+  hasOrganizationPermission,
+  skipPermissionCheck,
 } from "../rbac";
 
 const customTeamRoleInputSchema = z
@@ -83,47 +71,6 @@ const teamRoleInputSchema = z.union([
   customTeamRoleInputSchema,
 ]);
 
-/**
- * The audit-log read authorizes at the ORGANIZATION tier, always.
- *
- * A bare `.permission("auditLog:view")` cannot express this: `auditLog` is
- * grantable at project/team/organization, and the declared check resolves to
- * the narrowest tier whose id the input carries. Because `projectId` is an
- * optional filter here, supplying it would move the whole check to the
- * project tier and leave `input.organizationId` — the id the query is
- * anchored on — unauthorized. A caller holding `auditLog:view` on any one
- * project could then read a different organization's org-scoped audit trail.
- *
- * So the org id is checked unconditionally, and when a project filter is
- * present it is additionally checked at the project tier, so a project-scoped
- * grant cannot widen a read to rows outside that project either.
- */
-function checkAuditLogPermission() {
-  const organizationCheck = checkOrganizationPermission("auditLog:view");
-  const projectCheck = checkProjectPermission("auditLog:view");
-  return declareAuthzMiddleware(
-    {
-      kind: "custom",
-      reason:
-        "the audit-log read is authorized at the organization tier the query is anchored on, never the optional project filter",
-      permissions: ["auditLog:view"],
-    },
-    async (
-      params: PermissionMiddlewareParams<{
-        organizationId: string;
-        projectId?: string;
-      }>,
-    ) => {
-      const { projectId } = params.input;
-      if (!projectId) return organizationCheck(params);
-      return organizationCheck({
-        ...params,
-        next: () => projectCheck({ ...params, input: { projectId } }),
-      });
-    },
-  );
-}
-
 export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
     .input(
@@ -134,10 +81,7 @@ export const organizationRouter = createTRPCRouter({
         primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).optional(),
       }),
     )
-    .noPermission({
-      reason:
-        "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
-    })
+    .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
       const result = await getApp().organizations.createAndAssign({
         userId: ctx.session.user.id,
@@ -157,7 +101,7 @@ export const organizationRouter = createTRPCRouter({
 
   deleteMember: protectedProcedure
     .input(z.object({ userId: z.string(), organizationId: z.string() }))
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       // The self-removal guard lives in the service now; it refuses with
       // `cannot_remove_self`, which the handled-error middleware puts on the
@@ -183,7 +127,7 @@ export const organizationRouter = createTRPCRouter({
         disabled: z.boolean(),
       }),
     )
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       try {
         await getApp().organizations.setMemberDisabled({
@@ -220,10 +164,7 @@ export const organizationRouter = createTRPCRouter({
         isDemo: z.boolean().optional(),
       }),
     )
-    .noPermission({
-      reason:
-        "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
-    })
+    .use(skipPermissionCheck)
     .query(async ({ ctx, input }) => {
       const isDemo = input?.isDemo ?? false;
       const userId = ctx.session.user.id;
@@ -258,7 +199,7 @@ export const organizationRouter = createTRPCRouter({
       // per-project fan-out would scale with the org's project count.
       const updatableProjectsByOrg = new Map<string, Map<string, boolean>>();
       for (const organization of organizations) {
-        const canManage = await probeOrganizationPermission(
+        const canManage = await hasOrganizationPermission(
           ctx,
           organization.id,
           "organization:manage",
@@ -473,7 +414,7 @@ export const organizationRouter = createTRPCRouter({
           },
         ),
     )
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
       // The settings form round-trips every S3 field on save, so an absent
       // credential means "clear it". `updateSettings` is a partial update
@@ -509,7 +450,7 @@ export const organizationRouter = createTRPCRouter({
     // need to enumerate org members by name. The full record contains
     // member emails, which are admin-surface PII — we redact them on
     // the way out for non-admin callers below.
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const organization =
         await getApp().organizations.getOrganizationWithMembers({
@@ -530,7 +471,7 @@ export const organizationRouter = createTRPCRouter({
       // strip their personal-workspace teamMemberships (existence of
       // someone else's personal workspace is itself private). The
       // caller's own email + own personal workspace stay visible.
-      const callerHasManage = await probeOrganizationPermission(
+      const callerHasManage = await hasOrganizationPermission(
         ctx,
         input.organizationId,
         "organization:manage",
@@ -568,7 +509,7 @@ export const organizationRouter = createTRPCRouter({
     // member's full record (role assignments, team memberships) is an
     // admin-surface read, not a peer-context read. No TS callers
     // currently depend on member-role access to this procedure.
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
       const member = await getApp().organizations.getMemberById({
         organizationId: input.organizationId,
@@ -608,7 +549,7 @@ export const organizationRouter = createTRPCRouter({
         ),
       }),
     )
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const hasCustomRoleInvite = input.invites.some((invite) =>
         (invite.teams ?? []).some(
@@ -662,33 +603,6 @@ export const organizationRouter = createTRPCRouter({
       }
 
       if (created.invites.length > 0) {
-        // D11 x D12, invitation -> request: a formal invitation sent to
-        // somebody with an open request ANSWERS it. The invitation carries
-        // the role and the teams, which is the flow that owns them, so the
-        // request resolves as approved-by-invitation rather than staying
-        // open beside it. Silent when nothing is open, and never fatal — the
-        // invitation is the durable outcome here.
-        await Promise.all(
-          created.invites.map(async (record) => {
-            const invited = await ctx.prisma.user.findFirst({
-              where: { email: record.invite.email },
-              select: { id: true },
-            });
-            if (!invited) return;
-            try {
-              await joinRequestsService().resolveByInvitation({
-                userId: invited.id,
-                organizationId: record.invite.organizationId,
-                inviteId: record.invite.id,
-              });
-            } catch (error) {
-              captureException(toError(error), {
-                tags: { organizationId: record.invite.organizationId },
-              });
-            }
-          }),
-        );
-
         trackServerEvent({
           userId: ctx.session.user.id,
           event: "team_member_invited",
@@ -710,36 +624,13 @@ export const organizationRouter = createTRPCRouter({
     }),
   deleteInvite: protectedProcedure
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const inviteService = InviteService.create(ctx.prisma);
       await inviteService.revokeInvite({
         organizationId: input.organizationId,
         inviteId: input.inviteId,
       });
-    }),
-  resendInvite: protectedProcedure
-    .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
-    .permission("organization:manage")
-    .mutation(async ({ input, ctx }) => {
-      // Throttled per INVITATION, because the thing being protected is the
-      // recipient's inbox rather than this server: an admin with three
-      // invitations out may resend all three, and none of the three gets
-      // mailed repeatedly. Checked before the resend so a refused attempt
-      // leaves the live code alone — rotation is the old link's revocation,
-      // and a throttled click must not quietly break the link already sent.
-      await assertInviteSendAllowed({ inviteId: input.inviteId });
-
-      const inviteService = InviteService.create(ctx.prisma);
-      const { invite, emailNotSent } = await inviteService.resendInvite({
-        organizationId: input.organizationId,
-        inviteId: input.inviteId,
-      });
-      return {
-        invite,
-        emailNotSent,
-        inviteUrl: buildInviteAcceptUrl(invite.inviteCode),
-      };
     }),
   getOrganizationPendingInvites: protectedProcedure
     .input(
@@ -751,12 +642,303 @@ export const organizationRouter = createTRPCRouter({
     // expose admin intent (who's being added, with what role / to
     // which teams). MEMBER reading this is a leak. Both TS callers
     // (settings/members, SubscriptionPage) are admin-only surfaces.
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
       const inviteService = InviteService.create(ctx.prisma);
       return inviteService.listInvites({
         organizationId: input.organizationId,
       });
+    }),
+  createInviteRequest: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        invites: z.array(
+          z.object({
+            email: z.string().email(),
+            role: z.enum(["MEMBER", "EXTERNAL"]),
+            teamIds: z.string().optional(),
+            teams: z
+              .array(
+                z.object({
+                  teamId: z.string(),
+                  role: z.union([
+                    z.nativeEnum(TeamUserRole),
+                    z
+                      .string()
+                      .regex(
+                        /^custom:[a-zA-Z0-9_-]+$/,
+                        "Custom role must be in format 'custom:{roleId}'",
+                      ),
+                  ]),
+                  customRoleId: z.string().optional(),
+                }),
+              )
+              .optional(),
+          }),
+        ),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .mutation(async ({ input, ctx }) => {
+      const hasCustomRoleInvite = input.invites.some((invite) =>
+        (invite.teams ?? []).some(
+          (t) => typeof t.role === "string" && isCustomRole(t.role),
+        ),
+      );
+      if (hasCustomRoleInvite) {
+        await assertEnterprisePlan({
+          organizationId: input.organizationId,
+          user: ctx.session.user,
+          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        });
+      }
+
+      const prisma = ctx.prisma;
+      const inviteService = InviteService.create(prisma);
+
+      try {
+        // Check license limits for all invites at once
+        await inviteService.checkLicenseLimits({
+          organizationId: input.organizationId,
+          newInvites: input.invites.map((invite) => ({
+            role: invite.role as OrganizationUserRole,
+            teams: invite.teams,
+          })),
+          user: ctx.session.user,
+        });
+
+        const normalizedPayloadEmails = input.invites.map((invite) =>
+          invite.email.trim().toLowerCase(),
+        );
+        const duplicatePayloadEmails = normalizedPayloadEmails.filter(
+          (email, index) => normalizedPayloadEmails.indexOf(email) !== index,
+        );
+
+        if (duplicatePayloadEmails.length > 0) {
+          const uniqueDuplicatePayloadEmails = [
+            ...new Set(duplicatePayloadEmails),
+          ];
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Duplicate emails in request payload: ${uniqueDuplicatePayloadEmails.join(", ")}`,
+          });
+        }
+
+        const preparedInvites = await Promise.all(
+          input.invites.map(async (invite) => {
+            const normalizedEmail = invite.email.trim().toLowerCase();
+
+            // Validate team IDs
+            let teamIdsString = "";
+            let teamAssignments: Array<{
+              teamId: string;
+              role: TeamUserRole;
+              customRoleId?: string;
+            }> = [];
+
+            if (invite.teams && invite.teams.length > 0) {
+              const teamIds = invite.teams.map((t) => t.teamId);
+              const validTeamIds = await inviteService.validateTeamIds({
+                teamIds,
+                organizationId: input.organizationId,
+              });
+
+              if (validTeamIds.length === 0) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: "No valid teams provided",
+                });
+              }
+
+              teamAssignments = invite.teams
+                .filter((t) => validTeamIds.includes(t.teamId))
+                .map((t) => {
+                  const hasCustom =
+                    typeof t.role === "string" && isCustomRole(t.role);
+                  return {
+                    teamId: t.teamId,
+                    role: hasCustom
+                      ? ("CUSTOM" as TeamUserRole)
+                      : (t.role as TeamUserRole),
+                    customRoleId:
+                      hasCustom && t.customRoleId ? t.customRoleId : undefined,
+                  };
+                });
+
+              // Validate custom role IDs belong to this organization and are user-assignable
+              const customRoleIds = teamAssignments
+                .filter((t) => t.customRoleId)
+                .map((t) => t.customRoleId!);
+              if (customRoleIds.length > 0) {
+                const validCustomRoles = await prisma.customRole.findMany({
+                  where: {
+                    id: { in: customRoleIds },
+                    organizationId: input.organizationId,
+                    kind: "custom",
+                  },
+                  select: { id: true },
+                });
+                const validCustomRoleIds = new Set(
+                  validCustomRoles.map((r) => r.id),
+                );
+                const invalidRoleIds = customRoleIds.filter(
+                  (id) => !validCustomRoleIds.has(id),
+                );
+                if (invalidRoleIds.length > 0) {
+                  throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: `Custom role(s) ${invalidRoleIds.join(", ")} not found in this organization`,
+                  });
+                }
+              }
+
+              teamIdsString = validTeamIds.join(",");
+            } else if (invite.teamIds?.trim()) {
+              const teamIdArray = invite.teamIds
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
+
+              const validTeamIds = await inviteService.validateTeamIds({
+                teamIds: teamIdArray,
+                organizationId: input.organizationId,
+              });
+
+              if (validTeamIds.length === 0) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: "No valid teams provided",
+                });
+              }
+
+              teamAssignments = validTeamIds.map((teamId) => ({
+                teamId,
+                role: ORGANIZATION_TO_TEAM_ROLE_MAP[
+                  invite.role as OrganizationUserRole
+                ],
+              }));
+
+              teamIdsString = validTeamIds.join(",");
+            } else {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "At least one team must be provided",
+              });
+            }
+
+            return {
+              email: normalizedEmail,
+              role: invite.role as OrganizationUserRole,
+              organizationId: input.organizationId,
+              teamIds: teamIdsString,
+              teamAssignments:
+                teamAssignments.length > 0 ? teamAssignments : undefined,
+              requestedBy: ctx.session.user.id,
+            };
+          }),
+        );
+
+        const results = await prisma.$transaction(async (tx) => {
+          const transactionalInviteService = InviteService.create(tx);
+          return Promise.all(
+            preparedInvites.map((invite) =>
+              transactionalInviteService.createMemberInviteRequest(invite),
+            ),
+          );
+        });
+
+        return results;
+      } catch (error) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
+
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: error.message,
+          });
+        }
+        if (error instanceof DuplicateInviteError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
+    }),
+  approveInvite: protectedProcedure
+    .input(
+      z.object({
+        inviteId: z.string(),
+        organizationId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const inviteService = InviteService.create(prisma);
+
+      try {
+        // Re-validate license limits before approving (org may have reached cap since request)
+        const invite = await prisma.organizationInvite.findFirst({
+          where: {
+            id: input.inviteId,
+            organizationId: input.organizationId,
+            status: "WAITING_APPROVAL",
+          },
+        });
+
+        if (!invite) {
+          throw new InviteNotFoundError();
+        }
+
+        const teamAssignments =
+          (invite.teamAssignments as Array<{ customRoleId?: string }>) ?? [];
+        await inviteService.checkLicenseLimits({
+          organizationId: input.organizationId,
+          newInvites: [{ role: invite.role, teams: teamAssignments }],
+          user: ctx.session.user,
+        });
+
+        return await inviteService.approveInvite({
+          inviteId: input.inviteId,
+          organizationId: input.organizationId,
+        });
+      } catch (error) {
+        if (
+          error instanceof InviteNotFoundError ||
+          error instanceof OrganizationNotFoundError
+        ) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: error.message,
+          });
+        }
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
+
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
     }),
   acceptInvite: protectedProcedure
     .input(
@@ -764,10 +946,7 @@ export const organizationRouter = createTRPCRouter({
         inviteCode: z.string(),
       }),
     )
-    .noPermission({
-      reason:
-        "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
-    })
+    .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const session = ctx.session;
@@ -776,12 +955,14 @@ export const organizationRouter = createTRPCRouter({
         include: { organization: true },
       });
 
-      // A revoked invitation reads exactly like a missing one on purpose:
-      // the journey ends quietly, revealing nothing about the organization
-      // or the inviter. Expired is different — it is recoverable (the
-      // inviter resends in one click), so it gets its own named refusal.
-      if (!invite || invite.status === "REVOKED") {
-        throw new InviteNotFoundError("Invitation not found");
+      if (
+        !invite ||
+        (invite.expiration !== null && invite.expiration < new Date())
+      ) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Invite not found or has expired",
+        });
       }
 
       if (!session?.user?.email) {
@@ -798,10 +979,6 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      if (resolveInviteDisplayStatus(invite) === "EXPIRED") {
-        throw new InviteExpiredError();
-      }
-
       if (invite.status !== "PENDING") {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -809,27 +986,21 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      // Identifier-aware acceptance (D11): an invitation targets an address,
-      // and ANY of the signed-in user's VERIFIED identifiers holding that
-      // address vouches for them — password, Google, or the org's SSO. The
-      // person invited by email who signed in with their Google account is
-      // no longer a support ticket. A user not yet on identifiers answers
-      // `null` and keeps the legacy session-email comparison byte-for-byte.
-      const { matches: inviteEmailMatches, viaIdentifierId } =
-        matchInviteToAcceptor({
-          inviteEmail: invite.email,
-          sessionEmail: session.user.email,
-          matchable: await identityEmail().verifiedEmailsOf({
-            userId: session.user.id,
-          }),
+      // Case-insensitive email comparison: BetterAuth lowercases emails
+      // during signup/signin (see `findUserByEmail` in
+      // node_modules/better-auth/dist/db/internal-adapter.mjs) so
+      // `session.user.email` is always lowercase, but `invite.email`
+      // preserves the admin's original casing. A strict `!==` would
+      // reject an "Alice@Acme.com" invite for an "alice@acme.com" user.
+      // The old NextAuth flow worked accidentally because it didn't
+      // lowercase emails either — this is now a real mismatch post-migration.
+      if (
+        session.user.email.toLowerCase() !== invite.email.trim().toLowerCase()
+      ) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `The invite was sent to ${invite.email}, but you are signed in as ${session.user.email}`,
         });
-      // Signed in as somebody else is a wrong turn, not a refusal: the screen
-      // names which account is wanted and offers the way back. The hint is
-      // masked because an invite code is a bearer token — the landing already
-      // declines to name the invited address, and a mismatch is not a hole to
-      // read it through.
-      if (!inviteEmailMatches) {
-        throw new InviteWrongAccountError(maskInvitedAddress(invite.email));
       }
 
       // No transaction: the invite's grants are ledger commands, so the
@@ -839,24 +1010,7 @@ export const organizationRouter = createTRPCRouter({
       await InviteService.create(prisma).applyInvite({
         userId: session.user.id,
         invite,
-        viaIdentifierId,
       });
-
-      // D11 x D12, acceptance -> request: accepting an invitation withdraws
-      // the same person's open request for this organization, so the
-      // membership lands exactly once and the admins' panel empties itself.
-      // Never fatal — the membership is the durable outcome, and a request
-      // left open is answered by the next approval or by the expiry.
-      try {
-        await joinRequestsService().withdrawOnInvitationAccepted({
-          userId: session.user.id,
-          organizationId: invite.organizationId,
-        });
-      } catch (error) {
-        captureException(toError(error), {
-          tags: { organizationId: invite.organizationId },
-        });
-      }
 
       // Provision the user's Personal Workspace (Team.isPersonal +
       // Project.isPersonal) for this org. Idempotent — safe if a prior
@@ -944,7 +1098,7 @@ export const organizationRouter = createTRPCRouter({
           }
         }),
     )
-    .permission("organization:manage", { via: "teamId" })
+    .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       await assertNoPersonalTeamScope({
@@ -1065,7 +1219,7 @@ export const organizationRouter = createTRPCRouter({
     // depend on this procedure; documented here so a future picker
     // UX that needs member names knows to use a basic-view variant
     // rather than re-loosening the permission.
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input }) => {
       return getApp().organizations.getAllMembers(input.organizationId);
     }),
@@ -1087,7 +1241,7 @@ export const organizationRouter = createTRPCRouter({
           .optional(),
       }),
     )
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       // The whole orchestration (personal-workspace assertion, shared-team
       // scoping, seat classification, Enterprise gate for custom roles)
@@ -1127,7 +1281,7 @@ export const organizationRouter = createTRPCRouter({
         targetId: z.string().optional(),
       }),
     )
-    .use(checkAuditLogPermission())
+    .use(checkOrganizationPermission("auditLog:view"))
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,

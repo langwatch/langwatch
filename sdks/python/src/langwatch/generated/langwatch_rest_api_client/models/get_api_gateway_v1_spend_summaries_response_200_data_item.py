@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -9,9 +9,6 @@ from attrs import field as _attrs_field
 if TYPE_CHECKING:
     from ..models.get_api_gateway_v1_spend_summaries_response_200_data_item_cost import (
         GetApiGatewayV1SpendSummariesResponse200DataItemCost,
-    )
-    from ..models.get_api_gateway_v1_spend_summaries_response_200_data_item_group import (
-        GetApiGatewayV1SpendSummariesResponse200DataItemGroup,
     )
     from ..models.get_api_gateway_v1_spend_summaries_response_200_data_item_usage import (
         GetApiGatewayV1SpendSummariesResponse200DataItemUsage,
@@ -26,8 +23,6 @@ class GetApiGatewayV1SpendSummariesResponse200DataItem:
     """
     Attributes:
         key (str):
-        group (GetApiGatewayV1SpendSummariesResponse200DataItemGroup):
-        bucket_start (None | str):
         event_count (int):
         settled_count (int):
         usage (GetApiGatewayV1SpendSummariesResponse200DataItemUsage):
@@ -35,8 +30,6 @@ class GetApiGatewayV1SpendSummariesResponse200DataItem:
     """
 
     key: str
-    group: GetApiGatewayV1SpendSummariesResponse200DataItemGroup
-    bucket_start: None | str
     event_count: int
     settled_count: int
     usage: GetApiGatewayV1SpendSummariesResponse200DataItemUsage
@@ -45,11 +38,6 @@ class GetApiGatewayV1SpendSummariesResponse200DataItem:
 
     def to_dict(self) -> dict[str, Any]:
         key = self.key
-
-        group = self.group.to_dict()
-
-        bucket_start: None | str
-        bucket_start = self.bucket_start
 
         event_count = self.event_count
 
@@ -64,8 +52,6 @@ class GetApiGatewayV1SpendSummariesResponse200DataItem:
         field_dict.update(
             {
                 "key": key,
-                "group": group,
-                "bucket_start": bucket_start,
                 "event_count": event_count,
                 "settled_count": settled_count,
                 "usage": usage,
@@ -80,24 +66,12 @@ class GetApiGatewayV1SpendSummariesResponse200DataItem:
         from ..models.get_api_gateway_v1_spend_summaries_response_200_data_item_cost import (
             GetApiGatewayV1SpendSummariesResponse200DataItemCost,
         )
-        from ..models.get_api_gateway_v1_spend_summaries_response_200_data_item_group import (
-            GetApiGatewayV1SpendSummariesResponse200DataItemGroup,
-        )
         from ..models.get_api_gateway_v1_spend_summaries_response_200_data_item_usage import (
             GetApiGatewayV1SpendSummariesResponse200DataItemUsage,
         )
 
         d = dict(src_dict)
         key = d.pop("key")
-
-        group = GetApiGatewayV1SpendSummariesResponse200DataItemGroup.from_dict(d.pop("group"))
-
-        def _parse_bucket_start(data: object) -> None | str:
-            if data is None:
-                return data
-            return cast(None | str, data)
-
-        bucket_start = _parse_bucket_start(d.pop("bucket_start"))
 
         event_count = d.pop("event_count")
 
@@ -109,8 +83,6 @@ class GetApiGatewayV1SpendSummariesResponse200DataItem:
 
         get_api_gateway_v1_spend_summaries_response_200_data_item = cls(
             key=key,
-            group=group,
-            bucket_start=bucket_start,
             event_count=event_count,
             settled_count=settled_count,
             usage=usage,

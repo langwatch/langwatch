@@ -22,12 +22,9 @@ import {
 } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-
-wireDefaultTestApp();
 
 const ns = `role-authz-${nanoid(8)}`;
 
@@ -155,7 +152,7 @@ describe("Feature: role router caller authorization", () => {
     it("refuses to list the organization's roles", async () => {
       await expect(
         memberCaller.role.getAll({ organizationId }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     /** A member who could mint roles could mint themselves any permission. */
@@ -166,7 +163,7 @@ describe("Feature: role router caller authorization", () => {
           name: `Escalated ${ns}`,
           permissions: ["organization:manage"],
         }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     it("refuses to delete a role", async () => {
@@ -176,17 +173,13 @@ describe("Feature: role router caller authorization", () => {
     });
 
     it("refuses to assign a role to a user", async () => {
-      // FORBIDDEN, not UNAUTHORIZED: the declared check
-      // (`.permission("organization:manage", { via: "teamId" })`) derives its
-      // wire code from the engine denial's 403, where the old hand-rolled
-      // middleware threw a bare UNAUTHORIZED.
       await expect(
         memberCaller.role.assignToUser({
           userId: memberUserId,
           teamId,
           customRoleId,
         }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     it("refuses to remove a role from a user", async () => {
@@ -196,7 +189,7 @@ describe("Feature: role router caller authorization", () => {
           teamId,
           customRoleId,
         }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     it("leaves the role untouched after the refused calls", async () => {
@@ -213,7 +206,7 @@ describe("Feature: role router caller authorization", () => {
     it("refuses to list this organization's roles", async () => {
       await expect(
         outsiderAdminCaller.role.getAll({ organizationId }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     it("refuses to read one of its roles by id", async () => {

@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Input,
-  Portal,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
 import {
   BookText,
   ChevronDown,
@@ -17,19 +9,12 @@ import {
   Save,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { useSession } from "~/utils/auth-client";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
-import { Tooltip } from "../ui/tooltip";
 import type { TargetValue } from "./TargetSelector";
-import {
-  isAgentTarget,
-  ownerOnlyCopy,
-  type ScenarioAgent,
-  useFilteredAgents,
-} from "./useFilteredScenarioTargets";
+import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
 
 interface SaveAndRunMenuProps {
   selectedTarget: TargetValue;
@@ -56,7 +41,6 @@ export function SaveAndRunMenu({
 }: SaveAndRunMenuProps) {
   const { project } = useOrganizationTeamProject();
   const { data: prompts } = useAllPromptsForProject();
-  const { data: session } = useSession();
 
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
@@ -83,11 +67,7 @@ export function SaveAndRunMenu({
     );
   }, [prompts, searchValue]);
 
-  const filteredAgents = useFilteredAgents({
-    agents,
-    searchValue,
-    viewerUserId: session?.user?.id ?? null,
-  });
+  const filteredAgents = useFilteredAgents(agents, searchValue);
 
   const handleSelectAndRun = (target: TargetValue) => {
     onTargetChange(target);
@@ -182,20 +162,35 @@ export function SaveAndRunMenu({
                 </Text>
               ) : (
                 filteredAgents.map((agent) => (
-                  <AgentRow
+                  <HStack
                     key={agent.id}
-                    agent={agent}
-                    isSelected={
+                    paddingX={3}
+                    paddingY={2}
+                    cursor="pointer"
+                    bg={
                       isAgentTarget(selectedTarget) &&
                       selectedTarget.id === agent.id
+                        ? "blue.subtle"
+                        : "transparent"
                     }
-                    onSelect={() =>
+                    _hover={{ bg: "bg.muted" }}
+                    onClick={() =>
                       handleSelectAndRun({
                         type: agent.type,
                         id: agent.id,
                       })
                     }
-                  />
+                  >
+                    {agent.type === "code" ? (
+                      <Code size={14} color="var(--chakra-colors-fg-muted)" />
+                    ) : (
+                      <Globe size={14} color="var(--chakra-colors-fg-muted)" />
+                    )}
+                    <Text fontSize="sm" flex={1}>
+                      {agent.name}
+                    </Text>
+                    <Play size={12} color="var(--chakra-colors-blue-500)" />
+                  </HStack>
                 ))
               )}
               {/* Add New Agent Button */}
@@ -293,61 +288,5 @@ export function SaveAndRunMenu({
         </Popover.Content>
       </Portal>
     </Popover.Root>
-  );
-}
-
-/**
- * One agent of the menu. A development agent of another person is drawn
- * disabled and says why on hover: the menu saves and runs in one click, and
- * a run against it would be refused.
- *
- * It is a button, so the keyboard reaches it and Enter or Space picks it. A
- * row that cannot be run keeps its focus, so the reason in its tooltip is
- * still readable, and only drops the handler.
- */
-function AgentRow({
-  agent,
-  isSelected,
-  onSelect,
-}: {
-  agent: ScenarioAgent;
-  isSelected: boolean;
-  onSelect: () => void;
-}) {
-  const row = (
-    <chakra.button
-      type="button"
-      display="flex"
-      alignItems="center"
-      gap={2}
-      width="full"
-      textAlign="left"
-      paddingX={3}
-      paddingY={2}
-      cursor={agent.isRunnable ? "pointer" : "not-allowed"}
-      opacity={agent.isRunnable ? 1 : 0.5}
-      bg={isSelected ? "blue.subtle" : "transparent"}
-      _hover={agent.isRunnable ? { bg: "bg.muted" } : undefined}
-      onClick={agent.isRunnable ? onSelect : undefined}
-      aria-disabled={!agent.isRunnable}
-      data-testid={`save-and-run-agent-${agent.id}`}
-    >
-      {agent.type === "code" ? (
-        <Code size={14} color="var(--chakra-colors-fg-muted)" />
-      ) : (
-        <Globe size={14} color="var(--chakra-colors-fg-muted)" />
-      )}
-      <Text fontSize="sm" flex={1}>
-        {agent.label}
-      </Text>
-      <Play size={12} color="var(--chakra-colors-blue-500)" />
-    </chakra.button>
-  );
-
-  if (agent.isRunnable) return row;
-  return (
-    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
-      <Box>{row}</Box>
-    </Tooltip>
   );
 }

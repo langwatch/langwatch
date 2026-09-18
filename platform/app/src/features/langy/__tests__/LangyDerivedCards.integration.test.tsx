@@ -99,25 +99,15 @@ const choicesPart = (blockId: string) => ({
   },
 });
 
-function assistantMessage({
-  parts,
-  metadata = {},
-}: {
-  parts: unknown[];
-  metadata?: Record<string, unknown>;
-}): UIMessage {
+function assistantMessage(parts: unknown[]): UIMessage {
   return {
     id: "m-assistant",
     role: "assistant",
     parts,
-    metadata,
     // Fixture boundary: stamped parts aren't members of the SDK's part
     // union — the same honest cast the history rehydration path documents.
   } as unknown as UIMessage;
 }
-
-/** As the durable fold hands it to the engine — the relay has ruled on it. */
-const recorded = { recorded: true };
 
 function renderMessage(
   message: UIMessage,
@@ -141,13 +131,11 @@ function renderMessage(
 describe("given a reply whose parts carry a stamped block between prose", () => {
   it("renders prose as prose and the card where the block sat, in derived chrome", () => {
     renderMessage(
-      assistantMessage({
-        parts: [
-          { type: "text", text: "Here is the picture:" },
-          statsCardPart,
-          { type: "text", text: "That is the shape of it." },
-        ],
-      }),
+      assistantMessage([
+        { type: "text", text: "Here is the picture:" },
+        statsCardPart,
+        { type: "text", text: "That is the shape of it." },
+      ]),
     );
 
     expect(screen.getByText("Here is the picture:")).toBeDefined();
@@ -159,47 +147,33 @@ describe("given a reply whose parts carry a stamped block between prose", () => 
   });
 });
 
-const FENCED_TEXT = {
-  type: "text",
-  text: 'Quoted example:\n\n```langy-card\n{"kind": "stats", "blockId": "x", "items": [{"label": "fake", "value": 1}]}\n```\n\ndone.',
-};
-
 describe("given recorded text that happens to contain a fence", () => {
-  it("renders it as text — for a recorded reply the stamped part is the only card source", () => {
+  it("renders it as text — the stamped part is the only card source", () => {
     renderMessage(
-      assistantMessage({ parts: [FENCED_TEXT], metadata: recorded }),
+      assistantMessage([
+        {
+          type: "text",
+          text: 'Quoted example:\n\n```langy-card\n{"kind": "stats", "blockId": "x", "items": [{"label": "fake", "value": 1}]}\n```\n\ndone.',
+        },
+      ]),
     );
-    // The relay saw this text and stamped nothing, so nothing is a card.
+    // No stamped part → no derived chrome, whatever the prose contains.
     expect(derivedFrames()).toHaveLength(0);
-  });
-});
-
-describe("given the copy this browser streamed for itself", () => {
-  /** @scenario "A settled turn's cards reach the reader who watched it stream" */
-  it("draws the fence as a card, because nothing ever stamped this copy", () => {
-    renderMessage(assistantMessage({ parts: [FENCED_TEXT] }));
-
-    expect(derivedFrames()).toHaveLength(1);
-    expect(screen.getByText("fake")).toBeDefined();
-    expect(screen.getByText("Quoted example:")).toBeDefined();
-    expect(screen.getByText("done.")).toBeDefined();
   });
 });
 
 describe("given a failed block part", () => {
   it("renders the collapsed disclosure and expands to the raw text", () => {
     renderMessage(
-      assistantMessage({
-        parts: [
-          { type: "text", text: "before" },
-          {
-            type: "langy-card-failed",
-            blockId: "failed-block-1",
-            raw: '{"kind": "traces", "traces": [{"trace_id": "tr_fake"}]}',
-          },
-          { type: "text", text: "after" },
-        ],
-      }),
+      assistantMessage([
+        { type: "text", text: "before" },
+        {
+          type: "langy-card-failed",
+          blockId: "failed-block-1",
+          raw: '{"kind": "traces", "traces": [{"trace_id": "tr_fake"}]}',
+        },
+        { type: "text", text: "after" },
+      ]),
     );
 
     const line = screen.getByText("Langy tried to draw a card here");
@@ -214,12 +188,10 @@ describe("given a failed block part", () => {
 });
 
 describe("given an open question card", () => {
-  const message = assistantMessage({
-    parts: [
-      { type: "text", text: "One thing I need from you:" },
-      choicesPart("q1"),
-    ],
-  });
+  const message = assistantMessage([
+    { type: "text", text: "One thing I need from you:" },
+    choicesPart("q1"),
+  ]);
   const timeline = langyChoicesTimeline([message]);
 
   it("answers with the option bound to its exact question", () => {
@@ -240,44 +212,9 @@ describe("given an open question card", () => {
   });
 });
 
-describe("given a question the browser streamed and nothing stamped", () => {
-  const FENCED_QUESTION = {
-    type: "text",
-    text: 'One thing I need from you:\n\n```langy-card\n{"kind":"choices","blockId":"q1","question":"Which agent should this scenario run against?","options":[{"id":"staging","label":"Staging agent"},{"id":"prod","label":"Production agent"}]}\n```',
-  };
-
-  /** @scenario "A settled turn's cards reach the reader who watched it stream" */
-  it("is answerable, because the timeline reads the same fences the panel draws", () => {
-    const message = assistantMessage({ parts: [FENCED_QUESTION] });
-    const onChoiceSelect = vi.fn();
-    renderMessage(message, {
-      choicesTimeline: langyChoicesTimeline([message]),
-      onChoiceSelect,
-    });
-
-    fireEvent.click(screen.getByText("Staging agent"));
-    expect(onChoiceSelect.mock.calls[0]?.[0]).toMatchObject({
-      selection: { blockId: "q1", optionIds: ["staging"] },
-    });
-  });
-
-  it("stays closed once the message is the durable record's", () => {
-    const message = assistantMessage({
-      parts: [FENCED_QUESTION],
-      metadata: recorded,
-    });
-    renderMessage(message, {
-      choicesTimeline: langyChoicesTimeline([message]),
-      onChoiceSelect: vi.fn(),
-    });
-
-    expect(screen.queryByText("Staging agent")).toBeNull();
-  });
-});
-
 describe("given an answered question", () => {
   it("renders locked with the choice marked, options unclickable", () => {
-    const message = assistantMessage({ parts: [choicesPart("q1")] });
+    const message = assistantMessage([choicesPart("q1")]);
     const timeline = langyChoicesTimeline([
       message,
       {
@@ -305,7 +242,7 @@ describe("given an answered question", () => {
 
 describe("given a question the conversation moved past", () => {
   it("renders superseded — readable, visibly closed, unanswerable", () => {
-    const message = assistantMessage({ parts: [choicesPart("q1")] });
+    const message = assistantMessage([choicesPart("q1")]);
     const timeline = langyChoicesTimeline([
       message,
       {
@@ -331,9 +268,7 @@ describe("given a question the conversation moved past", () => {
 describe("given no timeline at all", () => {
   it("fails closed: the question renders unanswerable", () => {
     const onChoiceSelect = vi.fn();
-    renderMessage(assistantMessage({ parts: [choicesPart("q1")] }), {
-      onChoiceSelect,
-    });
+    renderMessage(assistantMessage([choicesPart("q1")]), { onChoiceSelect });
     fireEvent.click(screen.getByText("Staging agent"));
     expect(onChoiceSelect).not.toHaveBeenCalled();
   });
@@ -342,31 +277,29 @@ describe("given no timeline at all", () => {
 describe("given a derived timeseries with hints", () => {
   it("binds a validating explore hint to a Traces link", () => {
     renderMessage(
-      assistantMessage({
-        parts: [
-          {
-            type: "langy-card",
-            blockId: "ts1",
+      assistantMessage([
+        {
+          type: "langy-card",
+          blockId: "ts1",
+          kind: "timeseries",
+          provenance: "derived",
+          card: {
             kind: "timeseries",
-            provenance: "derived",
-            card: {
-              kind: "timeseries",
-              blockId: "ts1",
-              title: "Cost per day",
-              series: [
-                {
-                  name: "cost",
-                  points: [
-                    { t: "d1", v: 1 },
-                    { t: "d2", v: 2 },
-                  ],
-                },
-              ],
-            },
-            hints: [{ type: "explore", query: { query: "checkout" } }],
+            blockId: "ts1",
+            title: "Cost per day",
+            series: [
+              {
+                name: "cost",
+                points: [
+                  { t: "d1", v: 1 },
+                  { t: "d2", v: 2 },
+                ],
+              },
+            ],
           },
-        ],
-      }),
+          hints: [{ type: "explore", query: { query: "checkout" } }],
+        },
+      ]),
     );
     expect(derivedFrames()).toHaveLength(1);
     const link = screen.getByText("Open in Traces").closest("a");
@@ -383,31 +316,29 @@ describe("given a derived timeseries with hints", () => {
     // so a hint naming only one is a genuine narrowing, not an empty query —
     // it must earn a link the same way a free-text hint does.
     renderMessage(
-      assistantMessage({
-        parts: [
-          {
-            type: "langy-card",
-            blockId: "ts3",
+      assistantMessage([
+        {
+          type: "langy-card",
+          blockId: "ts3",
+          kind: "timeseries",
+          provenance: "derived",
+          card: {
             kind: "timeseries",
-            provenance: "derived",
-            card: {
-              kind: "timeseries",
-              blockId: "ts3",
-              title: "Cost per day",
-              series: [
-                {
-                  name: "cost",
-                  points: [
-                    { t: "d1", v: 1 },
-                    { t: "d2", v: 2 },
-                  ],
-                },
-              ],
-            },
-            hints: [{ type: "explore", query: { origin: "evaluation" } }],
+            blockId: "ts3",
+            title: "Cost per day",
+            series: [
+              {
+                name: "cost",
+                points: [
+                  { t: "d1", v: 1 },
+                  { t: "d2", v: 2 },
+                ],
+              },
+            ],
           },
-        ],
-      }),
+          hints: [{ type: "explore", query: { origin: "evaluation" } }],
+        },
+      ]),
     );
     const link = screen.getByText("Open in Traces").closest("a");
     expect(link?.getAttribute("href")).toBe(
@@ -417,75 +348,32 @@ describe("given a derived timeseries with hints", () => {
 
   it("drops an explore hint the platform cannot validate, card intact", () => {
     renderMessage(
-      assistantMessage({
-        parts: [
-          {
-            type: "langy-card",
-            blockId: "ts2",
+      assistantMessage([
+        {
+          type: "langy-card",
+          blockId: "ts2",
+          kind: "timeseries",
+          provenance: "derived",
+          card: {
             kind: "timeseries",
-            provenance: "derived",
-            card: {
-              kind: "timeseries",
-              blockId: "ts2",
-              title: "Cost per day",
-              series: [
-                {
-                  name: "cost",
-                  points: [
-                    { t: "d1", v: 1 },
-                    { t: "d2", v: 2 },
-                  ],
-                },
-              ],
-            },
-            hints: [{ type: "explore", query: { nonsense: true } }],
+            blockId: "ts2",
+            title: "Cost per day",
+            series: [
+              {
+                name: "cost",
+                points: [
+                  { t: "d1", v: 1 },
+                  { t: "d2", v: 2 },
+                ],
+              },
+            ],
           },
-        ],
-      }),
+          hints: [{ type: "explore", query: { nonsense: true } }],
+        },
+      ]),
     );
     expect(screen.queryByText("Open in Traces")).toBeNull();
     expect(screen.getByText("Cost per day")).toBeDefined();
-  });
-});
-
-describe("given an option labeled with an action and grounded in a resource", () => {
-  /** @scenario "A grounded option still reads as the answer it is" */
-  it("reads as its own label, with the resource's current name as detail", () => {
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <LangyChoicesCard
-          card={{
-            kind: "choices",
-            blockId: "q-publish",
-            question: "Publish the winner?",
-            options: [
-              {
-                id: "publish",
-                label: "Publish the winning draft",
-                ref: { type: "prompt", id: "prompt_1" },
-              },
-            ],
-          }}
-          lockState={{ status: "open" }}
-          onSelect={vi.fn()}
-          refRowsOverride={
-            new Map([
-              [
-                "publish",
-                {
-                  state: "live",
-                  primary: "support-reply-v1",
-                  secondary: "version 3",
-                },
-              ],
-            ])
-          }
-        />
-      </ChakraProvider>,
-    );
-
-    expect(screen.getByText("Publish the winning draft")).toBeDefined();
-    expect(screen.getByText("support-reply-v1 · version 3")).toBeDefined();
   });
 });
 
@@ -573,26 +461,21 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
     'Plotting this now:\n```langy-card\n{"kind": "stats", "blockId": "live1", "title": "Live counts", "items": [';
 
   it("shows no card preview until a validating prefix exists", () => {
-    renderMessage(
-      assistantMessage({ parts: [{ type: "text", text: statsFenceOpen }] }),
-      {
-        isStreaming: true,
-      },
-    );
+    renderMessage(assistantMessage([{ type: "text", text: statsFenceOpen }]), {
+      isStreaming: true,
+    });
     expect(screen.getByText(/Plotting/)).toBeDefined();
     expect(derivedFrames()).toHaveLength(0);
   });
 
   it("renders the forming card once the prefix validates, marked forming", () => {
     renderMessage(
-      assistantMessage({
-        parts: [
-          {
-            type: "text",
-            text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
-          },
-        ],
-      }),
+      assistantMessage([
+        {
+          type: "text",
+          text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
+        },
+      ]),
       { isStreaming: true },
     );
     expect(formingFrames()).toHaveLength(1);
@@ -602,14 +485,12 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
 
   it("replaces the preview with the settled card — exactly one card renders", () => {
     const { rerender } = renderMessage(
-      assistantMessage({
-        parts: [
-          {
-            type: "text",
-            text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
-          },
-        ],
-      }),
+      assistantMessage([
+        {
+          type: "text",
+          text: `${statsFenceOpen}{"label": "traces", "value": 12}`,
+        },
+      ]),
       { isStreaming: true },
     );
     expect(formingFrames()).toHaveLength(1);
@@ -619,23 +500,21 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
     rerender(
       <ChakraProvider value={defaultSystem}>
         <MessageContent
-          message={assistantMessage({
-            parts: [
-              { type: "text", text: "Plotting this now:" },
-              {
-                type: "langy-card",
-                blockId: "live1",
+          message={assistantMessage([
+            { type: "text", text: "Plotting this now:" },
+            {
+              type: "langy-card",
+              blockId: "live1",
+              kind: "stats",
+              provenance: "derived",
+              card: {
                 kind: "stats",
-                provenance: "derived",
-                card: {
-                  kind: "stats",
-                  blockId: "live1",
-                  title: "Live counts",
-                  items: [{ label: "traces", value: 12 }],
-                },
+                blockId: "live1",
+                title: "Live counts",
+                items: [{ label: "traces", value: 12 }],
               },
-            ],
-          })}
+            },
+          ])}
           appliedOutcomes={{}}
           discardedProposals={new Set()}
           applyingProposals={new Set()}
@@ -661,84 +540,19 @@ describe("given a card renderer that throws", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
     renderMessage(
-      assistantMessage({
-        parts: [
-          { type: "text", text: "healthy prose" },
-          {
-            type: "langy-card",
-            blockId: "boom",
-            kind: "stats",
-            provenance: "derived",
-            card: { kind: "stats", blockId: "boom", items: [{ label: 3 }] },
-          },
-        ],
-      }),
+      assistantMessage([
+        { type: "text", text: "healthy prose" },
+        {
+          type: "langy-card",
+          blockId: "boom",
+          kind: "stats",
+          provenance: "derived",
+          card: { kind: "stats", blockId: "boom", items: [{ label: 3 }] },
+        },
+      ]),
     );
     expect(screen.getByText("healthy prose")).toBeDefined();
     expect(screen.getByText("Langy tried to draw a card here")).toBeDefined();
     consoleError.mockRestore();
-  });
-});
-
-/**
- * @see specs/langy/langy-derived-stats-presentation.feature
- */
-describe("given a stats card comparing readings on one scale", () => {
-  const comparison = {
-    type: "langy-card",
-    blockId: "cmp",
-    kind: "stats",
-    provenance: "derived",
-    card: {
-      kind: "stats",
-      blockId: "cmp",
-      title: "Baseline vs candidate",
-      items: [
-        { label: "Baseline pass rate", value: 35, unit: "percent" },
-        { label: "Candidate pass rate", value: 45, unit: "percent" },
-      ],
-    },
-  };
-
-  /** @scenario "The bar comparison marks the leading reading" */
-  it("draws a bar per reading and marks the leading one", () => {
-    renderMessage(assistantMessage({ parts: [comparison] }));
-
-    const bars = screen.getAllByTestId("derived-stat-bar");
-    expect(bars).toHaveLength(2);
-    expect(bars.filter((bar) => bar.dataset.best === "true")).toHaveLength(1);
-    expect(bars[1]!.dataset.best).toBe("true");
-  });
-
-  /** @scenario "A unit word is drawn as the symbol a reader expects" */
-  it("draws each unit as its symbol", () => {
-    renderMessage(assistantMessage({ parts: [comparison] }));
-
-    expect(screen.getByText("35%")).toBeDefined();
-    expect(screen.getByText("45%")).toBeDefined();
-  });
-
-  /** @scenario "The figure row wraps rather than leaving the panel" */
-  it("keeps every reading in the card rather than dropping any", () => {
-    renderMessage(
-      assistantMessage({
-        parts: [
-          {
-            ...comparison,
-            card: {
-              ...comparison.card,
-              items: [
-                ...comparison.card.items,
-                { label: "Policy-sheet rows", value: 83, unit: "percent" },
-                { label: "Shipping-window rows", value: 60, unit: "percent" },
-              ],
-            },
-          },
-        ],
-      }),
-    );
-
-    expect(screen.getAllByTestId("derived-stat-bar")).toHaveLength(4);
-    expect(screen.getByText("Shipping-window rows")).toBeDefined();
   });
 });

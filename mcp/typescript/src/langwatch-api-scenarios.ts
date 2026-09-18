@@ -8,8 +8,6 @@ export interface ScenarioSummary {
   situation: string;
   criteria: string[];
   labels: string[];
-  /** The test suite this scenario is filed in, null when it is unfiled. */
-  testSuiteId?: string | null;
 }
 
 export interface ScenarioArchiveResponse {
@@ -38,7 +36,6 @@ export async function createScenario(data: {
   situation: string;
   criteria?: string[];
   labels?: string[];
-  testSuiteId?: string | null;
 }): Promise<ScenarioSummary> {
   return makeRequest("POST", "/api/scenarios", data) as Promise<ScenarioSummary>;
 }
@@ -50,7 +47,6 @@ export async function updateScenario(params: {
   situation?: string;
   criteria?: string[];
   labels?: string[];
-  testSuiteId?: string | null;
 }): Promise<ScenarioSummary> {
   const { id, ...data } = params;
   return makeRequest(

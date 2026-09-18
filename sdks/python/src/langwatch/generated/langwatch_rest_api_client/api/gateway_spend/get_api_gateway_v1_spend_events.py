@@ -19,17 +19,10 @@ def _get_kwargs(
     to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
-    project_id: list[str] | str | Unset = UNSET,
-    team_id: list[str] | str | Unset = UNSET,
-    external_id: list[str] | str | Unset = UNSET,
-    virtual_key_id: list[str] | str | Unset = UNSET,
-    end_user_id: list[str] | str | Unset = UNSET,
-    principal_user_id: list[str] | str | Unset = UNSET,
-    model: list[str] | str | Unset = UNSET,
-    provider_key: list[str] | str | Unset = UNSET,
-    request_type: list[str] | str | Unset = UNSET,
-    label: list[str] | str | Unset = UNSET,
-    metadata: list[str] | str | Unset = UNSET,
+    virtual_key_id: str | Unset = UNSET,
+    end_user_id: str | Unset = UNSET,
+    project_id: str | Unset = UNSET,
+    model: str | Unset = UNSET,
     status: GetApiGatewayV1SpendEventsStatus | Unset = UNSET,
 ) -> dict[str, Any]:
 
@@ -43,115 +36,13 @@ def _get_kwargs(
 
     params["limit"] = limit
 
-    json_project_id: list[str] | str | Unset
-    if isinstance(project_id, Unset):
-        json_project_id = UNSET
-    elif isinstance(project_id, list):
-        json_project_id = project_id
+    params["virtual_key_id"] = virtual_key_id
 
-    else:
-        json_project_id = project_id
-    params["project_id"] = json_project_id
+    params["end_user_id"] = end_user_id
 
-    json_team_id: list[str] | str | Unset
-    if isinstance(team_id, Unset):
-        json_team_id = UNSET
-    elif isinstance(team_id, list):
-        json_team_id = team_id
+    params["project_id"] = project_id
 
-    else:
-        json_team_id = team_id
-    params["team_id"] = json_team_id
-
-    json_external_id: list[str] | str | Unset
-    if isinstance(external_id, Unset):
-        json_external_id = UNSET
-    elif isinstance(external_id, list):
-        json_external_id = external_id
-
-    else:
-        json_external_id = external_id
-    params["external_id"] = json_external_id
-
-    json_virtual_key_id: list[str] | str | Unset
-    if isinstance(virtual_key_id, Unset):
-        json_virtual_key_id = UNSET
-    elif isinstance(virtual_key_id, list):
-        json_virtual_key_id = virtual_key_id
-
-    else:
-        json_virtual_key_id = virtual_key_id
-    params["virtual_key_id"] = json_virtual_key_id
-
-    json_end_user_id: list[str] | str | Unset
-    if isinstance(end_user_id, Unset):
-        json_end_user_id = UNSET
-    elif isinstance(end_user_id, list):
-        json_end_user_id = end_user_id
-
-    else:
-        json_end_user_id = end_user_id
-    params["end_user_id"] = json_end_user_id
-
-    json_principal_user_id: list[str] | str | Unset
-    if isinstance(principal_user_id, Unset):
-        json_principal_user_id = UNSET
-    elif isinstance(principal_user_id, list):
-        json_principal_user_id = principal_user_id
-
-    else:
-        json_principal_user_id = principal_user_id
-    params["principal_user_id"] = json_principal_user_id
-
-    json_model: list[str] | str | Unset
-    if isinstance(model, Unset):
-        json_model = UNSET
-    elif isinstance(model, list):
-        json_model = model
-
-    else:
-        json_model = model
-    params["model"] = json_model
-
-    json_provider_key: list[str] | str | Unset
-    if isinstance(provider_key, Unset):
-        json_provider_key = UNSET
-    elif isinstance(provider_key, list):
-        json_provider_key = provider_key
-
-    else:
-        json_provider_key = provider_key
-    params["provider_key"] = json_provider_key
-
-    json_request_type: list[str] | str | Unset
-    if isinstance(request_type, Unset):
-        json_request_type = UNSET
-    elif isinstance(request_type, list):
-        json_request_type = request_type
-
-    else:
-        json_request_type = request_type
-    params["request_type"] = json_request_type
-
-    json_label: list[str] | str | Unset
-    if isinstance(label, Unset):
-        json_label = UNSET
-    elif isinstance(label, list):
-        json_label = label
-
-    else:
-        json_label = label
-    params["label"] = json_label
-
-    json_metadata: list[str] | str | Unset
-    if isinstance(metadata, Unset):
-        json_metadata = UNSET
-    elif isinstance(metadata, list):
-        json_metadata = metadata
-
-    else:
-        json_metadata = metadata
-    params["metadata"] = json_metadata
+    params["model"] = model
 
     json_status: str | Unset = UNSET
     if not isinstance(status, Unset):
@@ -233,22 +124,15 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     from_: int,
     to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
-    project_id: list[str] | str | Unset = UNSET,
-    team_id: list[str] | str | Unset = UNSET,
-    external_id: list[str] | str | Unset = UNSET,
-    virtual_key_id: list[str] | str | Unset = UNSET,
-    end_user_id: list[str] | str | Unset = UNSET,
-    principal_user_id: list[str] | str | Unset = UNSET,
-    model: list[str] | str | Unset = UNSET,
-    provider_key: list[str] | str | Unset = UNSET,
-    request_type: list[str] | str | Unset = UNSET,
-    label: list[str] | str | Unset = UNSET,
-    metadata: list[str] | str | Unset = UNSET,
+    virtual_key_id: str | Unset = UNSET,
+    end_user_id: str | Unset = UNSET,
+    project_id: str | Unset = UNSET,
+    model: str | Unset = UNSET,
     status: GetApiGatewayV1SpendEventsStatus | Unset = UNSET,
 ) -> Response[
     GetApiGatewayV1SpendEventsResponse200
@@ -262,33 +146,18 @@ def sync_detailed(
      Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
     are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries
     carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a
-    downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of
-    writing; both vendors own those numbers, so confirm the current one before you rely on it): re-
-    pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by
-    /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the
-    one difference is `status=admitted`, which only this read answers, because an admitted request is
-    still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b`
-    matches either); name two different filters to narrow. `metadata` is written `key:value`, split on
-    the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres
-    records and are resolved to the projects and keys they cover, so a team with no projects or an
-    external id nobody minted answers with no spend rather than with everything.
+    downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older
+    ranges into a biller past its window can double-bill.
 
     Args:
-        from_ (int):  Example: 1782864000000.
-        to (int):  Example: 1782864000000.
+        from_ (int):
+        to (int):
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        project_id (list[str] | str | Unset):
-        team_id (list[str] | str | Unset):
-        external_id (list[str] | str | Unset):
-        virtual_key_id (list[str] | str | Unset):
-        end_user_id (list[str] | str | Unset):
-        principal_user_id (list[str] | str | Unset):
-        model (list[str] | str | Unset):
-        provider_key (list[str] | str | Unset):
-        request_type (list[str] | str | Unset):
-        label (list[str] | str | Unset):
-        metadata (list[str] | str | Unset):
+        virtual_key_id (str | Unset):
+        end_user_id (str | Unset):
+        project_id (str | Unset):
+        model (str | Unset):
         status (GetApiGatewayV1SpendEventsStatus | Unset):
 
     Raises:
@@ -304,17 +173,10 @@ def sync_detailed(
         to=to,
         cursor=cursor,
         limit=limit,
-        project_id=project_id,
-        team_id=team_id,
-        external_id=external_id,
         virtual_key_id=virtual_key_id,
         end_user_id=end_user_id,
-        principal_user_id=principal_user_id,
+        project_id=project_id,
         model=model,
-        provider_key=provider_key,
-        request_type=request_type,
-        label=label,
-        metadata=metadata,
         status=status,
     )
 
@@ -327,22 +189,15 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     from_: int,
     to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
-    project_id: list[str] | str | Unset = UNSET,
-    team_id: list[str] | str | Unset = UNSET,
-    external_id: list[str] | str | Unset = UNSET,
-    virtual_key_id: list[str] | str | Unset = UNSET,
-    end_user_id: list[str] | str | Unset = UNSET,
-    principal_user_id: list[str] | str | Unset = UNSET,
-    model: list[str] | str | Unset = UNSET,
-    provider_key: list[str] | str | Unset = UNSET,
-    request_type: list[str] | str | Unset = UNSET,
-    label: list[str] | str | Unset = UNSET,
-    metadata: list[str] | str | Unset = UNSET,
+    virtual_key_id: str | Unset = UNSET,
+    end_user_id: str | Unset = UNSET,
+    project_id: str | Unset = UNSET,
+    model: str | Unset = UNSET,
     status: GetApiGatewayV1SpendEventsStatus | Unset = UNSET,
 ) -> (
     GetApiGatewayV1SpendEventsResponse200
@@ -357,33 +212,18 @@ def sync(
      Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
     are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries
     carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a
-    downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of
-    writing; both vendors own those numbers, so confirm the current one before you rely on it): re-
-    pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by
-    /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the
-    one difference is `status=admitted`, which only this read answers, because an admitted request is
-    still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b`
-    matches either); name two different filters to narrow. `metadata` is written `key:value`, split on
-    the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres
-    records and are resolved to the projects and keys they cover, so a team with no projects or an
-    external id nobody minted answers with no spend rather than with everything.
+    downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older
+    ranges into a biller past its window can double-bill.
 
     Args:
-        from_ (int):  Example: 1782864000000.
-        to (int):  Example: 1782864000000.
+        from_ (int):
+        to (int):
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        project_id (list[str] | str | Unset):
-        team_id (list[str] | str | Unset):
-        external_id (list[str] | str | Unset):
-        virtual_key_id (list[str] | str | Unset):
-        end_user_id (list[str] | str | Unset):
-        principal_user_id (list[str] | str | Unset):
-        model (list[str] | str | Unset):
-        provider_key (list[str] | str | Unset):
-        request_type (list[str] | str | Unset):
-        label (list[str] | str | Unset):
-        metadata (list[str] | str | Unset):
+        virtual_key_id (str | Unset):
+        end_user_id (str | Unset):
+        project_id (str | Unset):
+        model (str | Unset):
         status (GetApiGatewayV1SpendEventsStatus | Unset):
 
     Raises:
@@ -400,39 +240,25 @@ def sync(
         to=to,
         cursor=cursor,
         limit=limit,
-        project_id=project_id,
-        team_id=team_id,
-        external_id=external_id,
         virtual_key_id=virtual_key_id,
         end_user_id=end_user_id,
-        principal_user_id=principal_user_id,
+        project_id=project_id,
         model=model,
-        provider_key=provider_key,
-        request_type=request_type,
-        label=label,
-        metadata=metadata,
         status=status,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     from_: int,
     to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
-    project_id: list[str] | str | Unset = UNSET,
-    team_id: list[str] | str | Unset = UNSET,
-    external_id: list[str] | str | Unset = UNSET,
-    virtual_key_id: list[str] | str | Unset = UNSET,
-    end_user_id: list[str] | str | Unset = UNSET,
-    principal_user_id: list[str] | str | Unset = UNSET,
-    model: list[str] | str | Unset = UNSET,
-    provider_key: list[str] | str | Unset = UNSET,
-    request_type: list[str] | str | Unset = UNSET,
-    label: list[str] | str | Unset = UNSET,
-    metadata: list[str] | str | Unset = UNSET,
+    virtual_key_id: str | Unset = UNSET,
+    end_user_id: str | Unset = UNSET,
+    project_id: str | Unset = UNSET,
+    model: str | Unset = UNSET,
     status: GetApiGatewayV1SpendEventsStatus | Unset = UNSET,
 ) -> Response[
     GetApiGatewayV1SpendEventsResponse200
@@ -446,33 +272,18 @@ async def asyncio_detailed(
      Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
     are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries
     carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a
-    downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of
-    writing; both vendors own those numbers, so confirm the current one before you rely on it): re-
-    pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by
-    /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the
-    one difference is `status=admitted`, which only this read answers, because an admitted request is
-    still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b`
-    matches either); name two different filters to narrow. `metadata` is written `key:value`, split on
-    the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres
-    records and are resolved to the projects and keys they cover, so a team with no projects or an
-    external id nobody minted answers with no spend rather than with everything.
+    downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older
+    ranges into a biller past its window can double-bill.
 
     Args:
-        from_ (int):  Example: 1782864000000.
-        to (int):  Example: 1782864000000.
+        from_ (int):
+        to (int):
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        project_id (list[str] | str | Unset):
-        team_id (list[str] | str | Unset):
-        external_id (list[str] | str | Unset):
-        virtual_key_id (list[str] | str | Unset):
-        end_user_id (list[str] | str | Unset):
-        principal_user_id (list[str] | str | Unset):
-        model (list[str] | str | Unset):
-        provider_key (list[str] | str | Unset):
-        request_type (list[str] | str | Unset):
-        label (list[str] | str | Unset):
-        metadata (list[str] | str | Unset):
+        virtual_key_id (str | Unset):
+        end_user_id (str | Unset):
+        project_id (str | Unset):
+        model (str | Unset):
         status (GetApiGatewayV1SpendEventsStatus | Unset):
 
     Raises:
@@ -488,17 +299,10 @@ async def asyncio_detailed(
         to=to,
         cursor=cursor,
         limit=limit,
-        project_id=project_id,
-        team_id=team_id,
-        external_id=external_id,
         virtual_key_id=virtual_key_id,
         end_user_id=end_user_id,
-        principal_user_id=principal_user_id,
+        project_id=project_id,
         model=model,
-        provider_key=provider_key,
-        request_type=request_type,
-        label=label,
-        metadata=metadata,
         status=status,
     )
 
@@ -509,22 +313,15 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
     from_: int,
     to: int,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
-    project_id: list[str] | str | Unset = UNSET,
-    team_id: list[str] | str | Unset = UNSET,
-    external_id: list[str] | str | Unset = UNSET,
-    virtual_key_id: list[str] | str | Unset = UNSET,
-    end_user_id: list[str] | str | Unset = UNSET,
-    principal_user_id: list[str] | str | Unset = UNSET,
-    model: list[str] | str | Unset = UNSET,
-    provider_key: list[str] | str | Unset = UNSET,
-    request_type: list[str] | str | Unset = UNSET,
-    label: list[str] | str | Unset = UNSET,
-    metadata: list[str] | str | Unset = UNSET,
+    virtual_key_id: str | Unset = UNSET,
+    end_user_id: str | Unset = UNSET,
+    project_id: str | Unset = UNSET,
+    model: str | Unset = UNSET,
     status: GetApiGatewayV1SpendEventsStatus | Unset = UNSET,
 ) -> (
     GetApiGatewayV1SpendEventsResponse200
@@ -539,33 +336,18 @@ async def asyncio(
      Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late
     are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries
     carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a
-    downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of
-    writing; both vendors own those numbers, so confirm the current one before you rely on it): re-
-    pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by
-    /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the
-    one difference is `status=admitted`, which only this read answers, because an admitted request is
-    still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b`
-    matches either); name two different filters to narrow. `metadata` is written `key:value`, split on
-    the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres
-    records and are resolved to the projects and keys they cover, so a team with no projects or an
-    external id nobody minted answers with no spend rather than with everything.
+    downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older
+    ranges into a biller past its window can double-bill.
 
     Args:
-        from_ (int):  Example: 1782864000000.
-        to (int):  Example: 1782864000000.
+        from_ (int):
+        to (int):
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        project_id (list[str] | str | Unset):
-        team_id (list[str] | str | Unset):
-        external_id (list[str] | str | Unset):
-        virtual_key_id (list[str] | str | Unset):
-        end_user_id (list[str] | str | Unset):
-        principal_user_id (list[str] | str | Unset):
-        model (list[str] | str | Unset):
-        provider_key (list[str] | str | Unset):
-        request_type (list[str] | str | Unset):
-        label (list[str] | str | Unset):
-        metadata (list[str] | str | Unset):
+        virtual_key_id (str | Unset):
+        end_user_id (str | Unset):
+        project_id (str | Unset):
+        model (str | Unset):
         status (GetApiGatewayV1SpendEventsStatus | Unset):
 
     Raises:
@@ -583,17 +365,10 @@ async def asyncio(
             to=to,
             cursor=cursor,
             limit=limit,
-            project_id=project_id,
-            team_id=team_id,
-            external_id=external_id,
             virtual_key_id=virtual_key_id,
             end_user_id=end_user_id,
-            principal_user_id=principal_user_id,
+            project_id=project_id,
             model=model,
-            provider_key=provider_key,
-            request_type=request_type,
-            label=label,
-            metadata=metadata,
             status=status,
         )
     ).parsed

@@ -44,7 +44,8 @@ describe("useReachableProducts", () => {
     });
   });
 
-  describe("when the caller disables the hook", () => {
+  describe("when the caller is in legacy mode", () => {
+    /** @scenario "Legacy mode runs no navigation-v2 queries" */
     it("keeps the product flag queries disabled", () => {
       const { result } = renderHook(() =>
         useReachableProducts({ enabled: false }),

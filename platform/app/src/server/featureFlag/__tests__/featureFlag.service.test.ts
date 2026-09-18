@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeatureFlagService } from "../featureFlag.service";
 import type { FeatureFlagStorePostgres } from "../featureFlagStore.postgres";
-import { NOT_TARGETED } from "../targeting";
 import type { FeatureFlagServiceInterface } from "../types";
 
 vi.mock("../featureFlagService.memory", () => ({
@@ -54,16 +53,12 @@ describe("FeatureFlagService", () => {
 
         const result = await service.isEnabled("some-flag" as never, {
           distinctId: "user-1",
-          projectId: NOT_TARGETED,
-          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
 
         expect(result).toBe(true);
         expect(legacy.isEnabled).toHaveBeenCalledWith("some-flag", {
           distinctId: "user-1",
-          projectId: NOT_TARGETED,
-          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
       });
@@ -77,14 +72,12 @@ describe("FeatureFlagService", () => {
 
         await service.isEnabled("some-flag" as never, {
           distinctId: "user-1",
-          organizationId: NOT_TARGETED,
           defaultValue: true,
           projectId: "proj-123",
         });
 
         expect(legacy.isEnabled).toHaveBeenCalledWith("some-flag", {
           distinctId: "user-1",
-          organizationId: NOT_TARGETED,
           defaultValue: true,
           projectId: "proj-123",
         });
@@ -99,14 +92,12 @@ describe("FeatureFlagService", () => {
 
         await service.isEnabled("some-flag" as never, {
           distinctId: "user-1",
-          projectId: NOT_TARGETED,
           defaultValue: false,
           organizationId: "org-456",
         });
 
         expect(legacy.isEnabled).toHaveBeenCalledWith("some-flag", {
           distinctId: "user-1",
-          projectId: NOT_TARGETED,
           defaultValue: false,
           organizationId: "org-456",
         });
@@ -131,12 +122,7 @@ describe("FeatureFlagService", () => {
 
           const result = await service.isEnabled(
             "release_ui_simulations_menu_enabled" as never,
-            {
-              distinctId: "user-123",
-              defaultValue: false,
-              projectId: NOT_TARGETED,
-              organizationId: NOT_TARGETED,
-            },
+            { distinctId: "user-123", defaultValue: false },
           );
 
           expect(result).toBe(true);
@@ -150,12 +136,7 @@ describe("FeatureFlagService", () => {
 
           const result = await service.isEnabled(
             "release_ui_simulations_menu_enabled" as never,
-            {
-              distinctId: "user-123",
-              defaultValue: true,
-              projectId: NOT_TARGETED,
-              organizationId: NOT_TARGETED,
-            },
+            { distinctId: "user-123", defaultValue: true },
           );
 
           expect(result).toBe(false);
@@ -184,8 +165,6 @@ describe("FeatureFlagService", () => {
 
         const result = await service.isEnabled("some_flag" as never, {
           distinctId: "user-1",
-          projectId: NOT_TARGETED,
-          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
 
@@ -203,8 +182,6 @@ describe("FeatureFlagService", () => {
 
         const result = await service.isEnabled("different_flag" as never, {
           distinctId: "u",
-          projectId: NOT_TARGETED,
-          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
 
@@ -222,8 +199,6 @@ describe("FeatureFlagService", () => {
 
         const result = await service.isEnabled("spaced_flag" as never, {
           distinctId: "u",
-          projectId: NOT_TARGETED,
-          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
 
@@ -241,12 +216,7 @@ describe("FeatureFlagService", () => {
 
         const result = await service.isEnabled(
           "release_ui_ai_gateway_menu_enabled",
-          {
-            distinctId: "u",
-            defaultValue: false,
-            projectId: NOT_TARGETED,
-            organizationId: NOT_TARGETED,
-          },
+          { distinctId: "u", defaultValue: false },
         );
 
         expect(result).toBe(true);
@@ -261,12 +231,7 @@ describe("FeatureFlagService", () => {
 
         const result = await service.isEnabled(
           "release_ui_simulations_menu_enabled" as never,
-          {
-            distinctId: "u",
-            defaultValue: true,
-            projectId: NOT_TARGETED,
-            organizationId: NOT_TARGETED,
-          },
+          { distinctId: "u", defaultValue: true },
         );
 
         expect(result).toBe(false);

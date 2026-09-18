@@ -35,23 +35,6 @@ const entryFor = (tool: HookedTool) => ({
 
 const ourEntry = entryFor("claude_code");
 
-// Claude's SessionStart entry additionally carries the guidance hook, in the
-// same entry, so it stays one langwatch entry per event.
-const ourSessionStartEntry = {
-  hooks: [
-    {
-      type: "command",
-      command: sessionContextHookCommand("claude_code"),
-      timeout: 10,
-    },
-    {
-      type: "command",
-      command: "langwatch ingest guidance claude-code",
-      timeout: 10,
-    },
-  ],
-};
-
 const userEntry = {
   matcher: "startup",
   hooks: [{ type: "command", command: "./scripts/greet.sh", timeout: 5 }],
@@ -106,7 +89,7 @@ describe("installSessionContextHooks", () => {
       expect(result.path).toBe(settingsPath);
       expect(result.displayPath).toBe("~/.claude/settings.json");
       expect(readSettings()).toEqual({
-        hooks: { SessionStart: [ourSessionStartEntry], Stop: [ourEntry] },
+        hooks: { SessionStart: [ourEntry], Stop: [ourEntry] },
       });
     });
 
@@ -157,10 +140,7 @@ describe("installSessionContextHooks", () => {
     it("leaves the user's own entry first and adds ours beside it", () => {
       install();
 
-      expect(readSettings().hooks.SessionStart).toEqual([
-        userEntry,
-        ourSessionStartEntry,
-      ]);
+      expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourEntry]);
       expect(readSettings().hooks.Stop).toEqual([ourEntry]);
     });
   });
@@ -181,10 +161,7 @@ describe("installSessionContextHooks", () => {
       });
 
       expect(install().action).toBe("updated");
-      expect(readSettings().hooks.SessionStart).toEqual([
-        userEntry,
-        ourSessionStartEntry,
-      ]);
+      expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourEntry]);
     });
   });
 

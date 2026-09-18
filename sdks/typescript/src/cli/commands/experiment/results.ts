@@ -179,22 +179,14 @@ export const experimentResultsCommand = async ({
     }
 
     const totalMatching = rows.length;
+    const truncated = rows.length > limit;
+    rows = rows.slice(0, limit);
 
-    // `--limit` shortens what a person reads. It never shortens the answer.
-    //
-    // A caller that asks for JSON is usually an agent, and it does arithmetic
-    // on what it receives. While the limit sliced the payload too, such a
-    // caller got the first 20 rows with nothing in them saying rows were
-    // missing, and any rate it worked out was quietly wrong: one report of
-    // "70%" was 14 of 20 rows of a run whose real figure was 30 of 40.
-    const shownRows = rows.slice(0, limit);
-    const tableTruncated = rows.length > limit;
-
-    // Carry a row-independent evaluation only when its row is in the answer,
+    // Carry a row-independent evaluation only when its row is still on screen,
     // so a verdict never describes a row the caller cannot see.
-    const returnedIndices = new Set(rows.map((row) => row.entry.index));
-    const returnedRowIndependent = rowIndependentEvaluations.filter(
-      (evaluation) => returnedIndices.has(evaluation.index),
+    const shownIndices = new Set(rows.map((row) => row.entry.index));
+    const shownRowIndependent = rowIndependentEvaluations.filter((evaluation) =>
+      shownIndices.has(evaluation.index),
     );
 
     return {
@@ -203,27 +195,12 @@ export const experimentResultsCommand = async ({
         dataset: rows.map((row) => row.entry),
         evaluations: [
           ...rows.flatMap((row) => row.evaluations),
-          ...returnedRowIndependent,
+          ...shownRowIndependent,
         ],
         meta: {
           totalMatching,
-          /** Rows in `dataset`. Equal to `totalMatching`: the answer is whole. */
-          returned: rows.length,
-          /** `--limit` applies to the printed table only. */
-          tableLimit: limit,
-          tableTruncated,
-          /**
-           * Which run these rows came from, and whether the caller chose it.
-           *
-           * Without `--run-id` this resolves to whichever run is newest at the
-           * moment of the call. Every scoped execution mints its own run, so
-           * two calls made either side of one produce numbers from two
-           * different runs. A caller comparing a before against an after has
-           * to pin the run, and cannot know to unless it is told.
-           */
-          runSelection: options.runId?.trim()
-            ? "explicit"
-            : "latest-at-call-time",
+          truncated,
+          limit,
           filter,
           evaluator: evaluatorFilter ?? null,
         },
@@ -239,7 +216,7 @@ export const experimentResultsCommand = async ({
           );
         }
 
-        if (shownRows.length === 0) {
+        if (rows.length === 0) {
           if (filter === "failed") {
             console.log(chalk.gray("No rows matched the filter."));
           } else if (runStatus === "running") {
@@ -259,7 +236,7 @@ export const experimentResultsCommand = async ({
         }
 
         const headers = ["#", "Target", ...evaluatorNames, "Status"];
-        const tableData = shownRows.map(({ entry, evaluations }) => {
+        const tableData = rows.map(({ entry, evaluations }) => {
           const evaluatorCols: Record<string, string> = {};
           for (const name of evaluatorNames) {
             const e = evaluations.find((x) => x.evaluator === name);
@@ -305,11 +282,11 @@ export const experimentResultsCommand = async ({
 
         formatTable({ data: tableData, headers });
 
-        if (tableTruncated) {
+        if (truncated) {
           console.log();
           console.log(
             chalk.gray(
-              `Showing ${shownRows.length} of ${totalMatching} rows. Use --limit <n> to print more. The JSON answer already carries every row.`,
+              `Showing ${rows.length} of ${totalMatching} rows. Use --limit <n> or --format json for the full payload.`,
             ),
           );
         }

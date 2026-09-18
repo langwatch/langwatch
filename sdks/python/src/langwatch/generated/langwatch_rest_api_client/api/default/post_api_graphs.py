@@ -10,12 +10,12 @@ from ...models.post_api_graphs_response_400 import PostApiGraphsResponse400
 from ...models.post_api_graphs_response_401 import PostApiGraphsResponse401
 from ...models.post_api_graphs_response_422 import PostApiGraphsResponse422
 from ...models.post_api_graphs_response_500 import PostApiGraphsResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: PostApiGraphsBody,
+    body: PostApiGraphsBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         "url": "/api/graphs",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -95,8 +96,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGraphsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGraphsBody | Unset = UNSET,
 ) -> Response[
     PostApiGraphsResponse201
     | PostApiGraphsResponse400
@@ -107,7 +108,7 @@ def sync_detailed(
     """Create a custom graph on a dashboard
 
     Args:
-        body (PostApiGraphsBody):
+        body (PostApiGraphsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -130,8 +131,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGraphsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGraphsBody | Unset = UNSET,
 ) -> (
     PostApiGraphsResponse201
     | PostApiGraphsResponse400
@@ -143,7 +144,7 @@ def sync(
     """Create a custom graph on a dashboard
 
     Args:
-        body (PostApiGraphsBody):
+        body (PostApiGraphsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,8 +162,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGraphsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGraphsBody | Unset = UNSET,
 ) -> Response[
     PostApiGraphsResponse201
     | PostApiGraphsResponse400
@@ -173,7 +174,7 @@ async def asyncio_detailed(
     """Create a custom graph on a dashboard
 
     Args:
-        body (PostApiGraphsBody):
+        body (PostApiGraphsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -194,8 +195,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGraphsBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGraphsBody | Unset = UNSET,
 ) -> (
     PostApiGraphsResponse201
     | PostApiGraphsResponse400
@@ -207,7 +208,7 @@ async def asyncio(
     """Create a custom graph on a dashboard
 
     Args:
-        body (PostApiGraphsBody):
+        body (PostApiGraphsBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

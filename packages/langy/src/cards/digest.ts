@@ -131,23 +131,18 @@ function nameOf(document: unknown, omit?: string): string | undefined {
 }
 
 /**
- * The document's array exactly as it holds it: a top-level array, or the first
- * recognised collection key, markers and all. `total` is counted from this,
- * because the reduction's marker is the only record of the rows it removed.
+ * The rows in a document: a top-level array, or the first recognised collection
+ * key. `object` rows only — the in-band "… N more truncated" string marker a
+ * reduced result carries is not a row and never counts as one.
  */
-function rawCollectionOf(document: unknown): unknown[] | null {
-  return Array.isArray(document)
+function collectionRowsOf(document: unknown): unknown[] | null {
+  const raw = Array.isArray(document)
     ? document
     : document && typeof document === "object"
       ? COLLECTION_KEYS.map(
           (key) => (document as Record<string, unknown>)[key],
         ).find(Array.isArray) ?? null
       : null;
-}
-
-/** Only the rows that are results. `returned` counts these. */
-function collectionRowsOf(document: unknown): unknown[] | null {
-  const raw = rawCollectionOf(document);
   if (!raw) return null;
   return raw.filter((row) => !!row && typeof row === "object");
 }
@@ -218,10 +213,7 @@ export function extractDigest({
       .filter((id): id is string => id !== undefined);
     const counts = {
       returned: rows.length,
-      total: resolveTotal({
-        pagination: paginationOf(document),
-        rows: rawCollectionOf(document) ?? rows,
-      }),
+      total: resolveTotal({ pagination: paginationOf(document), rows }),
     };
     if (ids.length === 0) {
       return { ...base, strategy: "reduced", counts, reduced: document };

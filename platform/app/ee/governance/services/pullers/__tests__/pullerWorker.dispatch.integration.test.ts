@@ -256,11 +256,7 @@ describe("PullerAdapter framework — end-to-end with real CH + real fetch", () 
 
     // The effect reports its outcome; the event-sourced completion command
     // and projection own durable cursor/status updates.
-    expect(outcome).toEqual({
-      nextCursor: null,
-      eventCount: 3,
-      errorCount: 0,
-    });
+    expect(outcome).toEqual({ nextCursor: null, eventCount: 3 });
     const updated = await prisma.ingestionSource.findUnique({
       where: { id: ingestionSourceId },
     });

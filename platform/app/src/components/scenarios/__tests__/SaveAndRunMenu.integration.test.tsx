@@ -18,7 +18,6 @@ vi.mock("~/prompts/hooks/useAllPromptsForProject", () => ({
 vi.mock("../useFilteredScenarioTargets", () => ({
   isAgentTarget: () => false,
   useFilteredAgents: () => [],
-  ownerOnlyCopy: () => "",
 }));
 
 const { mockGetAll } = vi.hoisted(() => ({ mockGetAll: vi.fn() }));

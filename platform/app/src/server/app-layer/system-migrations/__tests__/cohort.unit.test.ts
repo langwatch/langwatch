@@ -4,40 +4,25 @@ import {
   organizationMigrates,
 } from "../cohort";
 
-/** The cohort question for a migration enrollment still paces. */
-function paced(
-  args: Partial<Parameters<typeof organizationMigrates>[0]>,
-): boolean {
-  return organizationMigrates({
-    isSaaS: true,
-    enrolledAutomatically: false,
-    enrolled: false,
-    ...args,
-  });
-}
-
 describe("organizationMigrates", () => {
   describe("when the installation is self-hosted", () => {
-    /** @scenario "A self-hosted installation migrates every organization" */
+    /** @scenario "A self-hosted installation migrates every organization automatically" */
     it("includes every organization, enrolled or not", () => {
-      expect(paced({ isSaaS: false, enrolled: false })).toBe(true);
-      expect(paced({ isSaaS: false, enrolled: true })).toBe(true);
+      expect(organizationMigrates({ isSaaS: false, enrolled: false })).toBe(
+        true,
+      );
+      expect(organizationMigrates({ isSaaS: false, enrolled: true })).toBe(
+        true,
+      );
     });
   });
 
-  describe("when the installation is cloud and the migration is paced by enrollment", () => {
+  describe("when the installation is cloud", () => {
     /** @scenario "Cloud rollout processes only enrolled organizations" */
     it("includes exactly the enrolled organizations", () => {
-      expect(paced({ enrolled: true })).toBe(true);
-      expect(paced({ enrolled: false })).toBe(false);
-    });
-  });
-
-  describe("when the installation is cloud and the migration is enrolled automatically", () => {
-    /** @scenario "A migration can declare that every organization is in its cohort" */
-    it("includes an organization nobody enrolled", () => {
-      expect(paced({ enrolledAutomatically: true, enrolled: false })).toBe(
-        true,
+      expect(organizationMigrates({ isSaaS: true, enrolled: true })).toBe(true);
+      expect(organizationMigrates({ isSaaS: true, enrolled: false })).toBe(
+        false,
       );
     });
   });

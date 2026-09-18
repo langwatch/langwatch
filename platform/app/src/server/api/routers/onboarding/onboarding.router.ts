@@ -11,6 +11,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
 
@@ -43,9 +44,7 @@ export const onboardingRouter = createTRPCRouter({
         framework: z.string().default("other"),
       }),
     )
-    .noPermission({
-      reason: "onboarding runs before the user belongs to any organization",
-    })
+    .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
       try {
         // Create and assign organization
@@ -201,9 +200,7 @@ export const onboardingRouter = createTRPCRouter({
         ]),
       }),
     )
-    .noPermission({
-      reason: "onboarding runs before the user belongs to any organization",
-    })
+    .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
       const traitValue = mapProductSelectionToIntegrationMethod(
         input.integrationMethod,

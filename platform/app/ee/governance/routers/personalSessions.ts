@@ -21,12 +21,13 @@ import { CliSessionInventoryService } from "@ee/governance/services/cliSessionIn
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
 import { z } from "zod";
 
+import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const personalSessionsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx }) => {
       const service = CliSessionInventoryService.create();
       const sessions = await service.listForUser({
@@ -50,7 +51,7 @@ export const personalSessionsRouter = createTRPCRouter({
         sessionStartedAtMs: z.number().int().nonnegative(),
       }),
     )
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
       const service = CliSessionInventoryService.create();
       const result = await service.revokeSession({
@@ -62,7 +63,7 @@ export const personalSessionsRouter = createTRPCRouter({
 
   revokeAll: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx }) => {
       // Reuse the user-wide revoke from Phase 1B.5 — that path also
       // clears the per-user token index in one shot.

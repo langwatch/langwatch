@@ -12,8 +12,10 @@ Feature: Shared section navigation layout
     And the content column uses only the space remaining beside the local navigation
 
     Examples:
-      | section     |
-      | Automations |
+      | section       |
+      | Automations   |
+      | AI Gateway    |
+      | AI Governance |
 
   # A fixed-width rail that never shrinks does not degrade on a phone, it
   # disappears: the content column is left with a handful of pixels and the
@@ -33,15 +35,17 @@ Feature: Shared section navigation layout
     Then the first local navigation item is named "Overview"
     And the page heading is named "Overview"
 
-  # The product sidebar already lists the Gateway and Governance pages, so
-  # their local rail would be the same list twice.
+  # Everything above describes the legacy chrome, which every device on the
+  # legacy navigation mode keeps unchanged. In the new navigation modes the
+  # product sidebar already lists the Gateway and Governance pages, so their
+  # local rail would be the same list twice.
   @integration
   Scenario: The rail stands down when the product sidebar carries the pages
-    Given I open a Gateway or Governance page
+    Given I open a Gateway or Governance page in a new navigation mode
     Then the local navigation rail is not there
     And the content takes the full width of the card
 
   @integration
-  Scenario: A rail of page-local destinations stays
-    Given I open the Automations workspace
-    Then its local navigation rail renders
+  Scenario: A rail of page-local destinations stays in the new modes
+    Given I open the Automations workspace in a new navigation mode
+    Then its local navigation rail renders as it does today

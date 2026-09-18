@@ -66,7 +66,7 @@ export function LangyHomeLantern() {
       });
 
   const modelOverride = useLangyStore((s) => s.modelOverride);
-  const pickModel = useLangyStore((s) => s.pickModel);
+  const setModelOverride = useLangyStore((s) => s.setModelOverride);
   const isOpen = useLangyStore((s) => s.isOpen);
   const openPanel = useLangyStore((s) => s.openPanel);
   const activeConversationId = useLangyStore((s) => s.activeConversationId);
@@ -137,7 +137,7 @@ export function LangyHomeLantern() {
                   cardRef={heroCardRef}
                   model={modelOverride}
                   modelOptions={[]}
-                  onModelChange={pickModel}
+                  onModelChange={setModelOverride}
                   onSend={ask}
                   onStop={() => undefined}
                   disabled={false}

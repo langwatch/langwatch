@@ -11,13 +11,13 @@ from ...models.put_api_model_providers_by_provider_response_400 import PutApiMod
 from ...models.put_api_model_providers_by_provider_response_401 import PutApiModelProvidersByProviderResponse401
 from ...models.put_api_model_providers_by_provider_response_422 import PutApiModelProvidersByProviderResponse422
 from ...models.put_api_model_providers_by_provider_response_500 import PutApiModelProvidersByProviderResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     provider: str,
     *,
-    body: PutApiModelProvidersByProviderBody,
+    body: PutApiModelProvidersByProviderBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -28,7 +28,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -100,8 +101,8 @@ def _build_response(
 def sync_detailed(
     provider: str,
     *,
-    client: AuthenticatedClient,
-    body: PutApiModelProvidersByProviderBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiModelProvidersByProviderBody | Unset = UNSET,
 ) -> Response[
     PutApiModelProvidersByProviderResponse200
     | PutApiModelProvidersByProviderResponse400
@@ -113,7 +114,7 @@ def sync_detailed(
 
     Args:
         provider (str):
-        body (PutApiModelProvidersByProviderBody):
+        body (PutApiModelProvidersByProviderBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -138,8 +139,8 @@ def sync_detailed(
 def sync(
     provider: str,
     *,
-    client: AuthenticatedClient,
-    body: PutApiModelProvidersByProviderBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiModelProvidersByProviderBody | Unset = UNSET,
 ) -> (
     PutApiModelProvidersByProviderResponse200
     | PutApiModelProvidersByProviderResponse400
@@ -152,7 +153,7 @@ def sync(
 
     Args:
         provider (str):
-        body (PutApiModelProvidersByProviderBody):
+        body (PutApiModelProvidersByProviderBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -172,8 +173,8 @@ def sync(
 async def asyncio_detailed(
     provider: str,
     *,
-    client: AuthenticatedClient,
-    body: PutApiModelProvidersByProviderBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiModelProvidersByProviderBody | Unset = UNSET,
 ) -> Response[
     PutApiModelProvidersByProviderResponse200
     | PutApiModelProvidersByProviderResponse400
@@ -185,7 +186,7 @@ async def asyncio_detailed(
 
     Args:
         provider (str):
-        body (PutApiModelProvidersByProviderBody):
+        body (PutApiModelProvidersByProviderBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -208,8 +209,8 @@ async def asyncio_detailed(
 async def asyncio(
     provider: str,
     *,
-    client: AuthenticatedClient,
-    body: PutApiModelProvidersByProviderBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiModelProvidersByProviderBody | Unset = UNSET,
 ) -> (
     PutApiModelProvidersByProviderResponse200
     | PutApiModelProvidersByProviderResponse400
@@ -222,7 +223,7 @@ async def asyncio(
 
     Args:
         provider (str):
-        body (PutApiModelProvidersByProviderBody):
+        body (PutApiModelProvidersByProviderBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

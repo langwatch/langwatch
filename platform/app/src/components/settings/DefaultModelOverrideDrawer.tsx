@@ -32,7 +32,6 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
-import { syncLangyAfterDefaultModelWrite } from "~/features/langy/logic/codingDefaultSync";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -356,15 +355,13 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
           scopeId: s.scopeId,
         })),
       });
-      // Refresh every default-model cache AND snap Langy's model pill to the
-      // new default when it was following the old one — an open panel used to
-      // keep offering the outgoing model until a full reload.
-      if (project?.id) {
-        await syncLangyAfterDefaultModelWrite({
-          utils,
-          projectId: project.id,
-        });
-      }
+      // Invalidate the local table query plus the resolved-default
+      // query so the prompts page, evaluation wizard, and other
+      // consumers of the cascaded default model pick up the change.
+      await Promise.all([
+        utils.modelProvider.getDefaultModelsForProject.invalidate(),
+        utils.modelProvider.getResolvedDefault.invalidate(),
+      ]);
       toaster.create({
         title: copy.successTitle,
         type: "success",

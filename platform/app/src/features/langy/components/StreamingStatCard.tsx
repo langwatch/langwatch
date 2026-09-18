@@ -1,6 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { LangyTurnMetric } from "../hooks/useLangyTurnSignals";
-import { formatStatNumber } from "./derived-cards/statFigure";
 import { NumberTicker } from "./NumberTicker";
 
 /**
@@ -16,13 +15,7 @@ export function StreamingStatCard({ metrics }: { metrics: LangyTurnMetric[] }) {
   return (
     <HStack
       gap={6}
-      // The panel is narrow and a metric label is as long as the model writes
-      // it, so the row wraps rather than running past the card edge.
-      flexWrap="wrap"
-      rowGap={4}
-      alignItems="flex-start"
       alignSelf="stretch"
-      maxWidth="full"
       borderWidth="1px"
       borderStyle="solid"
       borderColor="border.muted"
@@ -32,12 +25,7 @@ export function StreamingStatCard({ metrics }: { metrics: LangyTurnMetric[] }) {
       paddingY="13px"
     >
       {metrics.map((metric, index) => (
-        <VStack
-          key={`${metric.label}-${index}`}
-          align="start"
-          gap={0.5}
-          minWidth={0}
-        >
+        <VStack key={`${metric.label}-${index}`} align="start" gap={0.5}>
           <Box
             fontFamily="mono"
             fontVariantNumeric="tabular-nums"
@@ -52,12 +40,12 @@ export function StreamingStatCard({ metrics }: { metrics: LangyTurnMetric[] }) {
               format={
                 metric.format ??
                 (metric.suffix
-                  ? (n) => `${formatStatNumber(n)}${metric.suffix}`
+                  ? (n) => `${n.toLocaleString()}${metric.suffix}`
                   : undefined)
               }
             />
           </Box>
-          <Text textStyle="2xs" color="fg.muted" wordBreak="break-word">
+          <Text textStyle="2xs" color="fg.muted">
             {metric.label}
           </Text>
         </VStack>

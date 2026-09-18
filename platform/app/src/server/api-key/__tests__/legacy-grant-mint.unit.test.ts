@@ -328,29 +328,12 @@ describe("genesisImportMoment()", () => {
     findUnique.mockReset();
   });
 
-  describe("given an organization parked for weeks before it finalized", () => {
+  describe("given an organization parked for weeks before it migrated", () => {
     /** @scenario "A key born during a parked genesis import still mints once the organization migrates" */
-    it("uses the finalized transition's own time, not the parked row's first appearance", async () => {
+    it("uses the migrated transition's own time, not the parked row's first appearance", async () => {
       // The row first appeared weeks earlier as `parked`; `createdAt` still
       // reflects that, but `occurredAt` has since been overwritten with the
-      // `finalized` transition's own business time.
-      findUnique.mockResolvedValue({
-        status: "finalized",
-        createdAt: new Date("2024-05-01T00:00:00.000Z"),
-        occurredAt: new Date("2024-06-01T00:00:00.000Z"),
-      });
-
-      const moment = await genesisImportMoment({
-        organizationId: "org_1",
-        prisma,
-      });
-
-      expect(moment).toEqual(new Date("2024-06-01T00:00:00.000Z"));
-    });
-  });
-
-  describe("given an organization that is held rather than finalized", () => {
-    it("reports no cutover moment: a held organization's writes are still legacy", async () => {
+      // `migrated` transition's own business time.
       findUnique.mockResolvedValue({
         status: "migrated",
         createdAt: new Date("2024-05-01T00:00:00.000Z"),
@@ -362,7 +345,7 @@ describe("genesisImportMoment()", () => {
         prisma,
       });
 
-      expect(moment).toBeNull();
+      expect(moment).toEqual(new Date("2024-06-01T00:00:00.000Z"));
     });
   });
 

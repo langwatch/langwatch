@@ -3,9 +3,8 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { showErrorToast } from "~/features/errors";
-import { syncLangyAfterDefaultModelWrite } from "~/features/langy/logic/codingDefaultSync";
+import { syncLangyAfterCodingDefaultsWrite } from "~/features/langy/logic/codingDefaultSync";
 import {
-  CODEX_DEFAULT_MODEL,
   isCodexModel,
   LANGY_CHAT_FEATURE_KEY,
 } from "~/server/modelProviders/codexRestrictions";
@@ -113,7 +112,7 @@ async function acceptCodexCodingDefaults({
     projectId: string;
     scopes: ScopeAssignment[];
   }) => Promise<unknown>;
-  utils: Parameters<typeof syncLangyAfterDefaultModelWrite>[0]["utils"];
+  utils: Parameters<typeof syncLangyAfterCodingDefaultsWrite>[0]["utils"];
   projectId: string;
   scopes: ScopeAssignment[];
   onClose: () => void;
@@ -122,13 +121,8 @@ async function acceptCodexCodingDefaults({
     await applyDefaults({ projectId, scopes });
     // Refreshes every default-model cache AND snaps Langy's model pill to the
     // new default when it was following the old one, so the open panel
-    // updates without a reload. The codex model was just written as the
-    // default, so it is the right pill even if the resolver re-read fails.
-    await syncLangyAfterDefaultModelWrite({
-      utils,
-      projectId,
-      fallbackModel: CODEX_DEFAULT_MODEL,
-    });
+    // updates without a reload.
+    await syncLangyAfterCodingDefaultsWrite({ utils, projectId });
     toaster.create({
       title: "Codex set as the Langy and Fast default",
       type: "success",

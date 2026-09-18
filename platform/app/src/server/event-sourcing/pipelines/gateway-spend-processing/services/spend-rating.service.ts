@@ -42,19 +42,14 @@ export function currentRegistryRateVersion(): string {
 
 const logger = createLogger("langwatch:gateway-spend:rating");
 
-/** Quantities reported for display that no rate ever prices. A request that
- *  carried only these measured nothing billable. */
-const UNPRICED_QUANTITY_NAMES = new Set<string>(["image_count"]);
-
 /**
- * The billable quantities a request reported, with the zeroes dropped. Empty
- * means the request measured nothing at all, so a zero charge is the right
- * answer and there is nothing to warn about.
+ * The quantities a request reported, with the zeroes dropped. Empty means the
+ * request measured nothing at all, so a zero charge is the right answer and
+ * there is nothing to warn about.
  */
 function measuredQuantities(usage: SpendUsage): Record<string, number> {
   const measured: Record<string, number> = {};
   for (const [name, value] of Object.entries(usage)) {
-    if (UNPRICED_QUANTITY_NAMES.has(name)) continue;
     if (typeof value === "number" && value > 0) measured[name] = value;
   }
   return measured;
@@ -83,8 +78,6 @@ function pricesAnything(rule: MaybeStoredLLMModelCost): boolean {
     rule.cacheCreation1hCostPerToken,
     rule.inputAudioCostPerToken,
     rule.outputAudioCostPerToken,
-    rule.inputImageCostPerToken,
-    rule.outputImageCostPerToken,
     rule.inputCostPerCharacter,
     rule.inputCostPerSecond,
   ].some((rate) => (rate ?? 0) > 0);
@@ -156,8 +149,6 @@ export function rateSpendNanoUsd({
         cacheCreation1hTokens: usage.cache_creation_1h_tokens,
         inputAudioTokens: usage.input_audio_tokens,
         outputAudioTokens: usage.output_audio_tokens,
-        inputImageTokens: usage.input_image_tokens,
-        outputImageTokens: usage.output_image_tokens,
         inputCharacters: usage.input_chars,
         // The one conversion of the duration quantity: it is integer
         // milliseconds everywhere else, and per-second rates apply here.

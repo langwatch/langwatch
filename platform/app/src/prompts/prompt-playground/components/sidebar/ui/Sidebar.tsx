@@ -73,13 +73,11 @@ function SidebarSectionHeader({
 }: SidebarSectionHeaderProps) {
   return (
     <Box
-      paddingX="2.5"
-      paddingY="1.5"
-      fontSize="10px"
-      fontWeight="semibold"
-      textTransform="uppercase"
-      letterSpacing="0.025em"
-      color="fg.muted"
+      paddingX="3"
+      paddingY="2"
+      fontSize="sm"
+      fontWeight="medium"
+      color="fg"
       display="flex"
       alignItems="center"
       justifyContent="space-between"
@@ -147,13 +145,13 @@ function SidebarList({
   return (
     <VStack gap={0} align="stretch">
       <SidebarSectionHeader onClick={() => setIsOpen(!isOpen)} cursor="pointer">
-        <HStack gap={1.5}>
+        <HStack gap={2}>
           {collapsible && (
             <Box
               transform={isOpen ? "rotate(0deg)" : "rotate(-90deg)"}
               transition="transform 0.2s"
             >
-              <LuChevronDown size={12} />
+              <LuChevronDown size={14} />
             </Box>
           )}
           <Text>{title}</Text>
@@ -161,7 +159,7 @@ function SidebarList({
         {action && <Box onClick={(e) => e.stopPropagation()}>{action}</Box>}
       </SidebarSectionHeader>
       {(!collapsible || isOpen) && (
-        <VStack gap={0.5} align="stretch" paddingX={3}>
+        <VStack gap={0} align="stretch" paddingX={4}>
           {children}
         </VStack>
       )}
@@ -204,7 +202,7 @@ function SidebarItem({
 }: SidebarItemProps) {
   if (variant === "empty") {
     return (
-      <Box padding="2.5" fontSize="12px" color="fg.muted" textAlign="center">
+      <Box padding="3" fontSize="sm" color="fg.muted" textAlign="center">
         {children}
       </Box>
     );
@@ -212,10 +210,10 @@ function SidebarItem({
 
   return (
     <Box
-      fontSize="12.5px"
+      fontSize="sm"
       color={active ? "blue.fg" : "fg"}
       bg={active ? "blue.subtle" : "transparent"}
-      borderRadius="lg"
+      borderRadius="md"
       cursor="pointer"
       _hover={{ bg: active ? "blue.muted" : "bg.muted" }}
       onClick={onClick}
@@ -242,7 +240,7 @@ function SidebarItem({
         {children}
         {meta && (
           <Text
-            fontSize="10.5px"
+            fontSize="xs"
             color="fg.muted"
             overflow="hidden"
             textOverflow="ellipsis"

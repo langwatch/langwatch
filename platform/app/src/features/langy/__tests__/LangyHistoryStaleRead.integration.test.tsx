@@ -169,8 +169,9 @@ vi.mock("~/utils/api", async () => {
   const React = await import("react");
   // The inert default for every router this suite does not speak for; only the
   // stale-read `messages.useQuery` below is this file's own business.
-  const { createTrpcUtils, idleQuery, modelProviderRouter, withFallback } =
-    await import("./support/langyApiMock");
+  const { createTrpcUtils, idleQuery, withFallback } = await import(
+    "./support/langyApiMock"
+  );
 
   const useHistoryQuery = (enabled: boolean) => {
     React.useSyncExternalStore(
@@ -269,7 +270,17 @@ vi.mock("~/utils/api", async () => {
     }),
     useUtils: () => trpcUtils,
     useContext: () => trpcUtils,
-    modelProvider: modelProviderRouter(),
+    modelProvider: {
+      getResolvedDefault: {
+        useQuery: () => ({
+          data: { model: "openai/gpt-5-mini" },
+          isLoading: false,
+        }),
+      },
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: { providers: [] }, isLoading: false }),
+      },
+    },
     virtualKeys: {
       list: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },

@@ -28,7 +28,6 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
 });
 
 import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { blankTemplate } from "../../../../optimization_studio/templates/blank";
 import type {
   LLMConfig,
@@ -38,8 +37,6 @@ import { DEFAULT_MODEL } from "../../../../utils/constants";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-
-wireDefaultTestApp();
 
 describe("workflow.create node LLM materialization", () => {
   const testNamespace = `wf-node-llm-${nanoid(8)}`;

@@ -1,7 +1,6 @@
 import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
 import {
-  ArrowLeftRight,
   ChevronDown,
   Database,
   Download,
@@ -26,9 +25,7 @@ type DatasetTabsProps = {
 /**
  * Dataset tabs component for switching between multiple datasets.
  * - Clicking a tab switches to that dataset
- * - Dropdown menu only appears on the active/selected tab, offering
- *   Switch Dataset (the picker), Save as dataset (inline only) and
- *   Remove from workbench
+ * - Dropdown menu only appears on the active/selected tab
  * - Shows "Datasets" label with database icon
  */
 export function DatasetTabs({
@@ -114,7 +111,6 @@ export function DatasetTabs({
           dataset={dataset}
           isActive={dataset.id === activeDatasetId}
           onSelect={() => setActiveDataset(dataset.id)}
-          onSwitch={onSelectExisting}
           onRemove={() => handleRemoveDataset(dataset.id)}
           onSaveAs={() => onSaveAsDataset(dataset)}
           canRemove={datasets.length > 1}
@@ -181,7 +177,6 @@ type DatasetTabProps = {
   dataset: DatasetReference;
   isActive: boolean;
   onSelect: () => void;
-  onSwitch: () => void;
   onRemove: () => void;
   onSaveAs: () => void;
   canRemove: boolean;
@@ -191,7 +186,6 @@ function DatasetTab({
   dataset,
   isActive,
   onSelect,
-  onSwitch,
   onRemove,
   onSaveAs,
   canRemove,
@@ -252,12 +246,6 @@ function DatasetTab({
         </Button>
       </Menu.Trigger>
       <Menu.Content minWidth="180px">
-        <Menu.Item value="switch" onClick={onSwitch}>
-          <HStack gap={2}>
-            <ArrowLeftRight size={14} />
-            <Text>Switch Dataset</Text>
-          </HStack>
-        </Menu.Item>
         {dataset.type === "inline" && (
           <Menu.Item value="save" onClick={onSaveAs}>
             <HStack gap={2}>

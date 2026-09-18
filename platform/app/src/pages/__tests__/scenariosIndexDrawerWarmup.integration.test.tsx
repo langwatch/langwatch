@@ -20,17 +20,7 @@ const { preloadDrawer } = vi.hoisted(() => ({
 vi.mock("~/components/drawerRegistry", () => ({ preloadDrawer }));
 
 vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({
-    query: { project: "test-project" },
-    push: vi.fn(),
-    replace: vi.fn(),
-    back: vi.fn(),
-    isReady: true,
-  }),
-}));
-
-vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+  useRouter: () => ({ query: {}, push: vi.fn(), back: vi.fn() }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({

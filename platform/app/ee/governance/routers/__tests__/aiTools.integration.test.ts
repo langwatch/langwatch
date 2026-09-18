@@ -239,7 +239,7 @@ describe("aiToolsRouter integration", () => {
             linkUrl: "https://wiki.example.com",
           },
         }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     /** @scenario "External (lite) members can also list (portal must work for everyone)" */
@@ -851,7 +851,7 @@ describe("aiToolsRouter integration", () => {
         callerFor(memberPlatformUserId).aiTools.importStarterPack({
           organizationId,
         }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     it("merges iconAsset into pre-existing admin-created tiles by displayName", async () => {
@@ -1099,7 +1099,7 @@ describe("aiToolsRouter integration", () => {
         callerFor(memberPlatformUserId).aiTools.providerOptions({
           organizationId,
         }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
 
@@ -1359,7 +1359,7 @@ describe("aiToolsRouter integration", () => {
         callerFor(memberPlatformUserId).aiTools.routingPolicyOptions({
           organizationId,
         }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
 });

@@ -99,7 +99,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     GetApiSuitesByIdResponse200
     | GetApiSuitesByIdResponse400
@@ -108,7 +108,7 @@ def sync_detailed(
     | GetApiSuitesByIdResponse422
     | GetApiSuitesByIdResponse500
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Get a suite (run plan) by its ID.
+    """Get a suite (run plan) by its ID
 
     Args:
         id (str):
@@ -135,7 +135,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> (
     GetApiSuitesByIdResponse200
     | GetApiSuitesByIdResponse400
@@ -145,7 +145,7 @@ def sync(
     | GetApiSuitesByIdResponse500
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Get a suite (run plan) by its ID.
+    """Get a suite (run plan) by its ID
 
     Args:
         id (str):
@@ -167,7 +167,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     GetApiSuitesByIdResponse200
     | GetApiSuitesByIdResponse400
@@ -176,7 +176,7 @@ async def asyncio_detailed(
     | GetApiSuitesByIdResponse422
     | GetApiSuitesByIdResponse500
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Get a suite (run plan) by its ID.
+    """Get a suite (run plan) by its ID
 
     Args:
         id (str):
@@ -201,7 +201,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> (
     GetApiSuitesByIdResponse200
     | GetApiSuitesByIdResponse400
@@ -211,7 +211,7 @@ async def asyncio(
     | GetApiSuitesByIdResponse500
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Get a suite (run plan) by its ID.
+    """Get a suite (run plan) by its ID
 
     Args:
         id (str):

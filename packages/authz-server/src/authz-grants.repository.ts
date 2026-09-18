@@ -4,13 +4,11 @@
  * while validation, failure naming, and the offboarding proof stay in
  * GrantsService.
  */
-import type { LedgerActor } from "@langwatch/actor";
 import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz";
 import type {
   AuthzReadRepository,
   ScopeLineageRepository,
 } from "./authz-read.repository";
-import type { GrantEventSource } from "./ledger/facts";
 
 /** Which principal a binding row points at. Exactly one, by construction -
  *  the `?: never` exclusions are what make "two principals on one row"
@@ -78,6 +76,8 @@ export class BindingMissingError extends Error {
   }
 }
 
+/** Who performed a grant write — stamped onto the emitted ledger fact. */
+export type LedgerActor = { type: "user" | "system"; id: string | null };
 
 export type OffboardCounts = {
   bindings: number;
@@ -88,17 +88,10 @@ export type OffboardCounts = {
 };
 
 export interface AuthzGrantsRepository extends ScopeLineageRepository {
-  /**
-   * @throws DuplicateBindingError on a unique-index collision.
-   *
-   * `source` is the grant's provenance — which surface authored the fact,
-   * stamped onto it alongside the actor. Optional so every existing caller
-   * keeps its meaning; GrantsService fills it with `"grants-service"`.
-   */
+  /** @throws DuplicateBindingError on a unique-index collision. */
   createBinding(args: {
     row: RoleBindingWrite;
     actor: LedgerActor;
-    source?: GrantEventSource;
   }): Promise<void>;
   /**
    * @throws DuplicateBindingError on a unique-index collision.

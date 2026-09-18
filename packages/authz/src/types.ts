@@ -4,11 +4,6 @@
  * package (and the app's collector) can name them without importing the walk.
  */
 import type { ShareableResourceKind } from "./registry";
-import type {
-  CallerKind,
-  PrincipalKind,
-  StoredBindingScopeTier,
-} from "./vocabulary";
 
 /**
  * Mirror Prisma's enums as plain string unions so this package stays
@@ -17,10 +12,7 @@ import type {
  * error at that seam, never silently here.
  */
 export type TeamUserRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-
-/** The stored spelling of the tiers a binding may sit at. Derived from the
- *  vocabulary so it cannot drift from the event stream's or the table's. */
-export type RoleBindingScopeType = StoredBindingScopeTier;
+export type RoleBindingScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
 export type AuthzScopeRef =
   | { type: "project"; id: string; teamId: string; organizationId: string }
@@ -50,23 +42,26 @@ export type AuthzScopeRef =
       organizationId: string;
     };
 
-/**
- * Who is asking. `anonymous` is a caller with no session at all, resolvable
- * only by grants with the `anyone` audience (and the demo project), so it
- * alone carries no id.
- */
-export type AuthzPrincipalRef = {
-  [K in CallerKind]: K extends "anonymous" ? { type: K } : { type: K; id: string };
-}[CallerKind];
+export type AuthzPrincipalRef =
+  | { type: "user"; id: string }
+  | { type: "apiKey"; id: string }
+  /** A caller with no session at all — resolvable only by resource grants
+   *  with the `anyone` audience (and the demo project). */
+  | { type: "anonymous" };
 
 /**
  * ADR-092 §8 — who a resource grant is for. Principals as everywhere, plus
  * membership sets (no enumeration — matched against the caller's collected
  * grants) and `anyone`, which is the public share expressed as a row.
  */
-export type GrantAudience = {
-  [K in PrincipalKind]: K extends "anyone" ? { kind: K } : { kind: K; id: string };
-}[PrincipalKind];
+export type GrantAudience =
+  | { kind: "user"; id: string }
+  | { kind: "group"; id: string }
+  | { kind: "apiKey"; id: string }
+  | { kind: "project"; id: string }
+  | { kind: "team"; id: string }
+  | { kind: "organization"; id: string }
+  | { kind: "anyone" };
 
 /** A grant at the resource tier. Matched on (kind, id, projectId) — the
  *  project anchor prevents cross-project resource-id collisions. */
@@ -103,19 +98,8 @@ export type CollectedGrants = {
   organizationId: string;
   /** Null for api-key principals and for users with no OrganizationUser row. */
   organizationRole: "ADMIN" | "MEMBER" | "EXTERNAL" | null;
-  /**
-   * True when a user principal holds an ACTIVE OrganizationUser row. A row
-   * an admin disabled to free its seat is not one: see `membershipDisabled`.
-   */
+  /** True when an OrganizationUser row exists for a user principal. */
   isOrgMember: boolean;
-  /**
-   * The membership row exists but an admin disabled it to stay within the
-   * licensed seat count, so it confers nothing (`isOrgMember` is false).
-   * Carried apart from `isOrgMember` for one reason: the denial can then
-   * tell the person their access was disabled - which they can act on -
-   * instead of telling a member they are not a member.
-   */
-  membershipDisabled: boolean;
   bindings: CollectedBinding[];
   /**
    * LEGACY-QUIRK(B): TeamUser rows, consulted only when `bindings` is empty
@@ -128,7 +112,6 @@ export type CollectedGrants = {
 
 export type AuthzDenialReason =
   | "no-membership"
-  | "membership-disabled"
   | "no-binding"
   | "lite-member-restricted"
   | "owner-ceiling";

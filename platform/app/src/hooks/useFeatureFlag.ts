@@ -1,8 +1,4 @@
 import type { FrontendFeatureFlag } from "../server/featureFlag/frontendFeatureFlags";
-import {
-  type FeatureFlagTargetId,
-  NOT_TARGETED,
-} from "../server/featureFlag/targeting";
 import { api } from "../utils/api";
 import { useFeatureFlagOverrides } from "./useFeatureFlagOverrides";
 
@@ -14,41 +10,14 @@ import { useFeatureFlagOverrides } from "./useFeatureFlagOverrides";
 // re-fetch storm we observed on /traces.
 export const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
 
-/**
- * Targeting identity and query control for one flag read.
- *
- * `projectId` and `organizationId` are both required. A targeting rule that
- * names a scope the read left out can never match, so an omitted field turns
- * a per-organization or per-project rollout into a silent no-op. Requiring
- * both makes a forgotten field a compile error.
- *
- * Each id takes one of three values:
- * - a real id, so rules that name it can match.
- * - `NOT_TARGETED`, when the surface has no such id at all. Rules that name
- *   this scope never match, which is the point of saying it out loud.
- * - `undefined`, when the id is still loading. Write it out and pair it with
- *   `enabled: false`, so the read waits for the id instead of resolving
- *   against an empty context.
- */
 interface UseFeatureFlagOptions {
-  /** The project this read is about, or `NOT_TARGETED`. */
-  projectId: FeatureFlagTargetId;
-  /** The organization this read is about, or `NOT_TARGETED`. */
-  organizationId: FeatureFlagTargetId;
+  projectId?: string;
+  organizationId?: string;
   /**
    * Set to false to disable the query (e.g., while waiting for projectId).
    * Defaults to true.
    */
   enabled?: boolean;
-}
-
-/**
- * JSON carries no `undefined`, so both "no such scope" and "not known yet"
- * travel as `null`. The wire field itself stays required, so the request
- * always states what it targets.
- */
-function toWireTargetId(id: FeatureFlagTargetId): string | null {
-  return id === undefined || id === NOT_TARGETED ? null : id;
 }
 
 interface UseFeatureFlagResult {
@@ -61,25 +30,24 @@ interface UseFeatureFlagResult {
 /**
  * React hook to check if a feature flag is enabled for the current user.
  *
- * Makes a tRPC call that resolves the flag server-side, with the project and
- * the organization the read is about so targeting rules can match.
+ * Makes a tRPC call to check the flag server-side with PostHog, with optional
+ * project/organization context for targeted feature rollouts.
  *
  * ## Usage
  *
  * ```tsx
- * // The usual case: both ids are known, both are stated.
- * const { project, organization } = useOrganizationTeamProject();
+ * // Basic usage - user-level flag
+ * const { enabled } = useFeatureFlag("release_ui_ai_gateway_menu_enabled");
+ *
+ * // Project-level targeting
  * const { enabled } = useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
- *   projectId: project?.id,
- *   organizationId: organization?.id,
- *   enabled: !!project?.id && !!organization?.id,
+ *   projectId: project.id,
  * });
  *
- * // A surface with no project of its own opts that scope out by name.
+ * // Conditional fetching (e.g., wait for project to load)
  * const { enabled } = useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
- *   projectId: NOT_TARGETED,
- *   organizationId: organization?.id,
- *   enabled: !!organization?.id,
+ *   projectId: project?.id,
+ *   enabled: !!project,
  * });
  * ```
  *
@@ -99,9 +67,9 @@ interface UseFeatureFlagResult {
  */
 export function useFeatureFlag(
   flag: FrontendFeatureFlag,
-  options: UseFeatureFlagOptions,
+  options?: UseFeatureFlagOptions,
 ): UseFeatureFlagResult {
-  const queryEnabled = options.enabled ?? true;
+  const queryEnabled = options?.enabled ?? true;
 
   const overrides = useFeatureFlagOverrides();
   const override = overrides[flag];
@@ -109,8 +77,8 @@ export function useFeatureFlag(
   const { data, isLoading } = api.featureFlag.isEnabled.useQuery(
     {
       flag,
-      projectId: toWireTargetId(options.projectId),
-      organizationId: toWireTargetId(options.organizationId),
+      projectId: options?.projectId,
+      organizationId: options?.organizationId,
     },
     {
       staleTime: CLIENT_FLAG_STALE_TIME_MS,

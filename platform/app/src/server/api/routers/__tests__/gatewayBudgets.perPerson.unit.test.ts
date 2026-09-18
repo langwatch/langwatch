@@ -26,7 +26,12 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    checkOrganizationPermission:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
   };
 });
 
@@ -34,25 +39,19 @@ const breakdown = vi.hoisted(() => vi.fn());
 
 // The router takes the budget ledger from the App, so standing in for the
 // store means standing in for `getApp()`.
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return {
-    // Consumers that degrade without Redis read through this one.
-    tryGetApp: () => null,
-    getApp: () => ({
-      permissions: appPermissionsService(),
-      gateway: {
-        budgets: {
-          getSpendForBudgetsAcrossTenants: async () => [],
-          getBucketSpendBreakdownForBudget: breakdown,
-        },
-        virtualKeySpend: undefined,
+vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
+  getApp: () => ({
+    gateway: {
+      budgets: {
+        getSpendForBudgetsAcrossTenants: async () => [],
+        getBucketSpendBreakdownForBudget: breakdown,
       },
-    }),
-  };
-});
+      virtualKeySpend: undefined,
+    },
+  }),
+}));
 
 vi.mock("~/server/gateway/providerLabels", () => ({
   resolveProviderLabels: async () => new Map(),

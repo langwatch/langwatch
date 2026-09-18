@@ -14,6 +14,7 @@ import {
 } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { buildHttpNodeParameters } from "~/server/agents/http-node";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   buildTraceparentHeader,
@@ -80,7 +81,7 @@ export const httpProxyRouter = createTRPCRouter({
         timeoutMs: z.number().positive().optional(),
       }),
     )
-    .permission("evaluations:manage")
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ input, ctx }): Promise<HttpProxyResult> => {
       const {
         projectId,

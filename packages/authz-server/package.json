@@ -25,7 +25,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/actor": "workspace:*",
     "@langwatch/authz": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/handled-error": "workspace:*",

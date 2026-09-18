@@ -19,10 +19,7 @@ vi.mock(
 );
 
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
-
-wireDefaultTestApp();
 
 describe("Events API", () => {
   let testApiKey: string;

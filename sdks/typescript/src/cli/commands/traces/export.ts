@@ -6,7 +6,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
-import { cliAuthHeaders } from "../../utils/authHeaders";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { parseOriginOption } from "./origin-filter";
@@ -66,9 +66,8 @@ export const exportTracesCommand = async (options: {
   origin?: string;
   errorsOnly?: boolean;
   includeSpans?: boolean;
-  project?: string;
 }): Promise<void> => {
-  await resolveCredentials({ project: options.project });
+  await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
@@ -127,7 +126,7 @@ export const exportTracesCommand = async (options: {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: {
           "Content-Type": "application/json",
-          ...cliAuthHeaders({ apiKey }),
+          ...buildAuthHeaders({ apiKey }),
         },
         body: JSON.stringify({
           query: options.query,

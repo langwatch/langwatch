@@ -70,17 +70,7 @@ export function useLangyChatEngine({
   const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
     const uiMessages = history
       .filter((m) => m.role === "user" || m.role === "assistant")
-      // `recorded` marks a message that came from the durable fold rather than
-      // from this browser's own stream. The relay stamped its card fences into
-      // typed parts already, so a fence still sitting in its TEXT is one the
-      // relay decided was not a block, and the renderer must leave it alone
-      // (ADR-060 §1). A streamed message carries no such verdict.
-      .map((m) => ({
-        id: m.id,
-        role: m.role,
-        parts: m.parts,
-        metadata: { recorded: true },
-      }));
+      .map((m) => ({ id: m.id, role: m.role, parts: m.parts }));
     // `parts` is the part array the message projection stored VERBATIM off the
     // stream, typed on the wire as opaque records (see langyMessageSchema).
     // Re-entering the SDK's discriminated part union from that wire shape is

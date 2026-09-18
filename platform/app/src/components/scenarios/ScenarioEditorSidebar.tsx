@@ -12,29 +12,24 @@ import type { ScenarioFormData } from "./ScenarioForm";
 
 type ScenarioEditorSidebarProps = {
   form?: UseFormReturn<ScenarioFormData> | null;
-  /** Agent Testing calls the thing being written a scenario, not a scenario. */
-  variant?: "agent-testing";
 };
 
-export function ScenarioEditorSidebar({
-  form,
-  variant,
-}: ScenarioEditorSidebarProps) {
-  const isAgentTesting = variant === "agent-testing";
-
+/**
+ * Help sidebar for the scenario editor.
+ * Provides tips and best practices for writing scenarios.
+ */
+export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
   return (
     <VStack align="stretch" gap={4}>
       {/* AI Generation */}
       <ScenarioAIGeneration form={form ?? null} />
 
-      {/* Writing tips */}
+      {/* Writing Great Scenarios */}
       <Card.Root>
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <Text fontWeight="semibold" fontSize="sm">
-              {isAgentTesting
-                ? "Writing great scenarios"
-                : "Writing Great Scenarios"}
+              Writing Great Scenarios
             </Text>
 
             <VStack align="stretch" gap={3}>
@@ -112,9 +107,7 @@ export function ScenarioEditorSidebar({
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>
-                {isAgentTesting
-                  ? "Start with small scenarios to validate quickly"
-                  : "Start with small simulations to validate quickly"}
+                Start with small simulations to validate quickly
               </List.Item>
               <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">

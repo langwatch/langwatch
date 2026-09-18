@@ -16,7 +16,7 @@ from ...types import UNSET, Response, Unset, safe_http_status
 
 def _get_kwargs(
     *,
-    body: PostApiGatewayV1VirtualKeysBody,
+    body: PostApiGatewayV1VirtualKeysBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
@@ -28,7 +28,8 @@ def _get_kwargs(
         "url": "/api/gateway/v1/virtual-keys",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -106,8 +107,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1VirtualKeysBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1VirtualKeysBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1VirtualKeysResponse201
@@ -122,19 +123,15 @@ def sync_detailed(
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
     value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
     team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
-    org- or team-scoped key also needs a place for its traces and spend to land, and must say where:
-    pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without
-    exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`,
-    because the spend would be attributed to the organization's hidden governance project and counted by
-    no budget on the project you had in mind. An organization whose only project is the governance one
-    is exempt, since there is nothing else to name; one with no governance project either refuses with
-    `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original
-    response including its `secret`, which is the only way to recover a secret whose response was lost
-    in transit.
+    org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
+    (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and
+    creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a
+    retry safe: a replay returns the original response including its `secret`, which is the only way to
+    recover a secret whose response was lost in transit.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1VirtualKeysBody):
+        body (PostApiGatewayV1VirtualKeysBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -158,8 +155,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1VirtualKeysBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1VirtualKeysBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1VirtualKeysResponse201
@@ -175,19 +172,15 @@ def sync(
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
     value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
     team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
-    org- or team-scoped key also needs a place for its traces and spend to land, and must say where:
-    pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without
-    exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`,
-    because the spend would be attributed to the organization's hidden governance project and counted by
-    no budget on the project you had in mind. An organization whose only project is the governance one
-    is exempt, since there is nothing else to name; one with no governance project either refuses with
-    `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original
-    response including its `secret`, which is the only way to recover a secret whose response was lost
-    in transit.
+    org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
+    (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and
+    creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a
+    retry safe: a replay returns the original response including its `secret`, which is the only way to
+    recover a secret whose response was lost in transit.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1VirtualKeysBody):
+        body (PostApiGatewayV1VirtualKeysBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -206,8 +199,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1VirtualKeysBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1VirtualKeysBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1VirtualKeysResponse201
@@ -222,19 +215,15 @@ async def asyncio_detailed(
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
     value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
     team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
-    org- or team-scoped key also needs a place for its traces and spend to land, and must say where:
-    pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without
-    exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`,
-    because the spend would be attributed to the organization's hidden governance project and counted by
-    no budget on the project you had in mind. An organization whose only project is the governance one
-    is exempt, since there is nothing else to name; one with no governance project either refuses with
-    `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original
-    response including its `secret`, which is the only way to recover a secret whose response was lost
-    in transit.
+    org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
+    (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and
+    creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a
+    retry safe: a replay returns the original response including its `secret`, which is the only way to
+    recover a secret whose response was lost in transit.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1VirtualKeysBody):
+        body (PostApiGatewayV1VirtualKeysBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -256,8 +245,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1VirtualKeysBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1VirtualKeysBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1VirtualKeysResponse201
@@ -273,19 +262,15 @@ async def asyncio(
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
     value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
     team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
-    org- or team-scoped key also needs a place for its traces and spend to land, and must say where:
-    pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without
-    exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`,
-    because the spend would be attributed to the organization's hidden governance project and counted by
-    no budget on the project you had in mind. An organization whose only project is the governance one
-    is exempt, since there is nothing else to name; one with no governance project either refuses with
-    `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original
-    response including its `secret`, which is the only way to recover a secret whose response was lost
-    in transit.
+    org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id`
+    (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and
+    creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a
+    retry safe: a replay returns the original response including its `secret`, which is the only way to
+    recover a secret whose response was lost in transit.
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1VirtualKeysBody):
+        body (PostApiGatewayV1VirtualKeysBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -160,9 +160,6 @@ vi.mock("~/utils/api", () => ({
         }),
       },
       onConversationUpdate: { useSubscription: () => undefined },
-      warmWorker: {
-        useMutation: () => ({ mutate: () => undefined }),
-      },
       stopTurn: {
         useMutation: () => ({
           mutate: () => undefined,
@@ -198,12 +195,6 @@ vi.mock("~/utils/api", () => ({
       },
     },
     modelProvider: {
-      setRoleAssignmentForScope: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      setFeatureOverrideForScope: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
       getResolvedDefault: {
         useQuery: () => ({
           data: { model: "openai/gpt-5-mini" },

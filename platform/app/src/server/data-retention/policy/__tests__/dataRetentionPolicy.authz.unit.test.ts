@@ -2,12 +2,12 @@ import { TRPCError } from "@trpc/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rbacMocks = vi.hoisted(() => ({
-  probeOrganizationPermission: vi.fn(),
-  probeTeamPermission: vi.fn(),
-  probeProjectPermission: vi.fn(),
+  hasOrganizationPermission: vi.fn(),
+  hasTeamPermission: vi.fn(),
+  hasProjectPermission: vi.fn(),
 }));
 
-vi.mock("~/server/app-layer/permissions/imperative", () => rbacMocks);
+vi.mock("~/server/api/rbac", () => rbacMocks);
 
 const planMocks = vi.hoisted(() => ({
   getActivePlan: vi.fn(),
@@ -54,7 +54,7 @@ describe("assertCanWriteRetentionScope", () => {
     // earlier code reused the model-provider helper (project:manage) and
     // rejected a save the read snapshot had already offered.
     it("authorizes the write using project:update", async () => {
-      rbacMocks.probeProjectPermission.mockResolvedValue(true);
+      rbacMocks.hasProjectPermission.mockResolvedValue(true);
 
       await expect(
         assertCanWriteRetentionScope(ctx, {
@@ -63,7 +63,7 @@ describe("assertCanWriteRetentionScope", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(rbacMocks.probeProjectPermission).toHaveBeenCalledWith(
+      expect(rbacMocks.hasProjectPermission).toHaveBeenCalledWith(
         ctx,
         "project_a",
         "project:update",
@@ -73,7 +73,7 @@ describe("assertCanWriteRetentionScope", () => {
 
   describe("given a PROJECT scope and a caller who lacks project:update", () => {
     it("throws FORBIDDEN with data-retention wording", async () => {
-      rbacMocks.probeProjectPermission.mockResolvedValue(false);
+      rbacMocks.hasProjectPermission.mockResolvedValue(false);
 
       try {
         await assertCanWriteRetentionScope(ctx, {
@@ -95,7 +95,7 @@ describe("assertCanWriteRetentionScope", () => {
 
   describe("given a TEAM scope", () => {
     it("checks team:manage", async () => {
-      rbacMocks.probeTeamPermission.mockResolvedValue(true);
+      rbacMocks.hasTeamPermission.mockResolvedValue(true);
 
       await expect(
         assertCanWriteRetentionScope(ctx, {
@@ -104,7 +104,7 @@ describe("assertCanWriteRetentionScope", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(rbacMocks.probeTeamPermission).toHaveBeenCalledWith(
+      expect(rbacMocks.hasTeamPermission).toHaveBeenCalledWith(
         ctx,
         "team_a",
         "team:manage",
@@ -114,7 +114,7 @@ describe("assertCanWriteRetentionScope", () => {
 
   describe("given an ORGANIZATION scope", () => {
     it("checks organization:manage", async () => {
-      rbacMocks.probeOrganizationPermission.mockResolvedValue(true);
+      rbacMocks.hasOrganizationPermission.mockResolvedValue(true);
 
       await expect(
         assertCanWriteRetentionScope(ctx, {
@@ -123,8 +123,8 @@ describe("assertCanWriteRetentionScope", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(rbacMocks.probeOrganizationPermission).toHaveBeenCalledWith(
-        { session },
+      expect(rbacMocks.hasOrganizationPermission).toHaveBeenCalledWith(
+        { prisma, session },
         "org_1",
         "organization:manage",
       );
@@ -140,7 +140,7 @@ describe("assertCanWriteRetentionScope", () => {
         ),
       ).rejects.toBeInstanceOf(TRPCError);
 
-      expect(rbacMocks.probeProjectPermission).not.toHaveBeenCalled();
+      expect(rbacMocks.hasProjectPermission).not.toHaveBeenCalled();
     });
   });
 });
@@ -157,6 +157,7 @@ describe("assertCanDisableRetention", () => {
     it("allows disabling retention", () => {
       process.env.ADMIN_EMAILS = "ops@langwatch.ai,admin@langwatch.ai";
       const adminCtx = {
+        prisma,
         session: { user: { id: "u1", email: "admin@langwatch.ai" } },
       } as any;
       expect(() => assertCanDisableRetention(adminCtx)).not.toThrow();
@@ -167,6 +168,7 @@ describe("assertCanDisableRetention", () => {
     it("throws FORBIDDEN with platform-administrator wording", () => {
       process.env.ADMIN_EMAILS = "ops@langwatch.ai";
       const orgAdminCtx = {
+        prisma,
         session: { user: { id: "u2", email: "owner@acme.com" } },
       } as any;
       try {

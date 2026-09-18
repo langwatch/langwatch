@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { getApp } from "../../app-layer/app";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const topicsRouter = createTRPCRouter({
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("traces:view")
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       // The projected topic model is the source of truth; read it through
       // the topic-clustering service, never straight at the table.
@@ -16,7 +17,7 @@ export const topicsRouter = createTRPCRouter({
 
   getClusteringStatus: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input }) => {
       return await getApp().topicClustering.status.getByProjectId({
         projectId: input.projectId,
@@ -25,7 +26,7 @@ export const topicsRouter = createTRPCRouter({
 
   getClusteringRunHistory: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input }) => {
       return await getApp().topicClustering.status.getRunHistoryByProjectId({
         projectId: input.projectId,

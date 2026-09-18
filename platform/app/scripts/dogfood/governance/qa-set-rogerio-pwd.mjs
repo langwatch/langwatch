@@ -30,10 +30,6 @@ if (acc) {
       userId: user.id,
       type: "credential",
       provider: "credential",
-      // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
-      // credential provider's issuer is `local:credential`, not
-      // `local:oauth:credential`. Without it sign-in cannot find this row.
-      issuer: "local:credential",
       providerAccountId: user.id,
       password: hash,
     },

@@ -2,7 +2,6 @@ import type { Context, MiddlewareHandler } from "hono";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import type { ZodType, z } from "zod";
 
-import type { AccessDeclaration } from "@langwatch/authz";
 import type { EndpointConfig } from "./types.js";
 
 export interface SSECompletion {
@@ -59,13 +58,7 @@ function createTypedStream<TEvents extends Record<string, ZodType>>({
  * Each event type is declared with a Zod schema. The framework validates
  * event data against the schema before sending.
  */
-export type SSEConfig<
-  TEvents extends Record<string, ZodType>,
-  TQuery extends ZodType = ZodType,
-> = BaseSSEConfig<TEvents, TQuery> & AccessDeclaration;
-
-/** The access-independent half of {@link SSEConfig}. */
-export interface BaseSSEConfig<
+export interface SSEConfig<
   TEvents extends Record<string, ZodType>,
   TQuery extends ZodType = ZodType,
 > {

@@ -107,10 +107,6 @@ async function main() {
       userId: SMOKETEST_USER_ID,
       type: "credential",
       provider: "credential",
-      // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
-      // credential provider's issuer is `local:credential`, not
-      // `local:oauth:credential`. Without it sign-in cannot find this row.
-      issuer: "local:credential",
       providerAccountId: SMOKETEST_USER_ID,
       password: passwordHash,
     },
@@ -130,7 +126,6 @@ async function main() {
       userId: DEACTIVATED_USER_ID,
       type: "credential",
       provider: "credential",
-      issuer: "local:credential",
       providerAccountId: DEACTIVATED_USER_ID,
       password: passwordHash,
     },
@@ -448,7 +443,6 @@ async function main() {
       userId: "smoketest_legacy",
       type: "credential",
       provider: "credential",
-      issuer: "local:credential",
       providerAccountId: "smoketest_legacy",
       password: legacyHash,
     },
@@ -522,7 +516,6 @@ async function main() {
         userId: created.id,
         type: "credential",
         provider: "credential",
-        issuer: "local:credential",
         providerAccountId: created.id,
         password: trpcHashedPassword,
       },

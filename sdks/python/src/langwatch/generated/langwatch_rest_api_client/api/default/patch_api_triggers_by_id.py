@@ -12,13 +12,13 @@ from ...models.patch_api_triggers_by_id_response_401 import PatchApiTriggersById
 from ...models.patch_api_triggers_by_id_response_404 import PatchApiTriggersByIdResponse404
 from ...models.patch_api_triggers_by_id_response_422 import PatchApiTriggersByIdResponse422
 from ...models.patch_api_triggers_by_id_response_500 import PatchApiTriggersByIdResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiTriggersByIdBody,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -29,7 +29,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -108,8 +109,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiTriggersByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> Response[
     PatchApiTriggersByIdResponse200
     | PatchApiTriggersByIdResponse400
@@ -122,7 +123,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (PatchApiTriggersByIdBody):
+        body (PatchApiTriggersByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -147,8 +148,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiTriggersByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> (
     PatchApiTriggersByIdResponse200
     | PatchApiTriggersByIdResponse400
@@ -162,7 +163,7 @@ def sync(
 
     Args:
         id (str):
-        body (PatchApiTriggersByIdBody):
+        body (PatchApiTriggersByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -182,8 +183,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiTriggersByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> Response[
     PatchApiTriggersByIdResponse200
     | PatchApiTriggersByIdResponse400
@@ -196,7 +197,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (PatchApiTriggersByIdBody):
+        body (PatchApiTriggersByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -219,8 +220,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiTriggersByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> (
     PatchApiTriggersByIdResponse200
     | PatchApiTriggersByIdResponse400
@@ -234,7 +235,7 @@ async def asyncio(
 
     Args:
         id (str):
-        body (PatchApiTriggersByIdBody):
+        body (PatchApiTriggersByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

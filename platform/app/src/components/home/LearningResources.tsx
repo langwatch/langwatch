@@ -1,6 +1,5 @@
 import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { LEGAL_LINKS } from "~/utils/legalLinks";
 import { Link } from "../ui/link";
 
 /**
@@ -54,15 +53,7 @@ export function LearningResources({ trailing }: { trailing?: ReactNode }) {
         <ColophonDot />
         <ColophonLink href="https://status.langwatch.ai">Status</ColophonLink>
         <ColophonDot />
-        {/* The two documents by name, rather than the index that holds them:
-            "Legal" is a category, and nobody is looking for a category. */}
-        <ColophonLink href={LEGAL_LINKS.terms.href}>
-          {LEGAL_LINKS.terms.label}
-        </ColophonLink>
-        <ColophonDot />
-        <ColophonLink href={LEGAL_LINKS.privacy.href}>
-          {LEGAL_LINKS.privacy.label}
-        </ColophonLink>
+        <ColophonLink href="https://langwatch.ai/legal">Legal</ColophonLink>
         <Spacer />
         {trailing}
       </HStack>

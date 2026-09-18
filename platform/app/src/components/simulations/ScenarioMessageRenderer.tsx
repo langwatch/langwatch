@@ -10,9 +10,7 @@ import { visitContentPart } from "~/shared/content-parts/visit-content-part";
 import type { MediaPartData } from "~/shared/traces/mediaParts";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { MediaPart } from "./MediaPart";
-import type { NextSpeaker } from "./next-speaker";
 import { RunTurnSeparator } from "./RunTurnSeparator";
-import { TypingBubble } from "./TypingBubble";
 import { useSequentialAudioPlayback } from "./useSequentialAudioPlayback";
 import { safeJsonParseOrStringFallback } from "./utils/safe-json-parse-or-string-fallback";
 
@@ -59,8 +57,6 @@ interface ScenarioMessageRendererProps {
   variant: "grid" | "drawer";
   /** Project that owns the stored objects in this message thread. Forwarded to MediaPart for server-side probes. */
   projectId: string;
-  /** Whose message the run is waiting for, drawn as dots under the thread. */
-  typingRole?: NextSpeaker;
 }
 
 export function ScenarioMessageRenderer({
@@ -68,7 +64,6 @@ export function ScenarioMessageRenderer({
   streamingMessages,
   variant,
   projectId,
-  typingRole,
 }: ScenarioMessageRendererProps) {
   const smallerView = variant === "grid";
   const endRef = useRef<HTMLDivElement>(null);
@@ -84,7 +79,7 @@ export function ScenarioMessageRenderer({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [items, typingRole]);
+  }, [items]);
 
   // Ordered list of audio-only item ids — the single source of ordering truth
   // for the sequential playback hook. Filters to audio media only (not video /
@@ -283,12 +278,6 @@ export function ScenarioMessageRenderer({
               {turn.items.map(renderItem)}
             </VStack>
           ))}
-      {typingRole ? (
-        <TypingBubble
-          role={typingRole}
-          size={smallerView ? "compact" : "regular"}
-        />
-      ) : null}
       <div ref={endRef} />
     </VStack>
   );

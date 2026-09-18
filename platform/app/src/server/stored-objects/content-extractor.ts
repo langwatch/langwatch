@@ -35,7 +35,6 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 import {
-  isInlineDataCarrier,
   parseBase64DataUri,
   visitContentPartAsync,
 } from "~/shared/content-parts/visit-content-part";
@@ -104,9 +103,9 @@ export async function processContentPart({
       if (mediaPart.source.type !== "data") return noOp;
 
       const { value: base64, mimeType } = mediaPart.source;
-      // A source with no media type is not extractable: the read path serves
-      // whatever we store it as, so bytes with no declared type come back as
-      // an octet-stream download rather than a picture or a player.
+      // The dispatcher casts `source` from wire data without validating the
+      // payload type — a non-string `value` (arbitrary object walked by the
+      // generic value extractor) is not an inline media part.
       if (typeof base64 !== "string" || typeof mimeType !== "string") {
         return noOp;
       }
@@ -142,17 +141,14 @@ export async function processContentPart({
         ownerId,
       };
 
-      const source = {
-        type: "url",
-        value: `/api/files/${projectId}/${stored.id}`,
-        mimeType,
+      const rewrittenPart = {
+        ...(part as Record<string, unknown>),
+        source: {
+          type: "url",
+          value: `/api/files/${projectId}/${stored.id}`,
+          mimeType,
+        },
       };
-      // A Gemini `inline_data` part keeps its bytes in its own carrier key,
-      // not in `source`, so adding a `source` would leave the base64 in place.
-      // Rewrite those to the canonical media shape, which drops the carrier.
-      const rewrittenPart = isInlineDataCarrier(part)
-        ? { type: mediaPart.type, source }
-        : { ...(part as Record<string, unknown>), source };
 
       return { part: rewrittenPart, ref };
     },

@@ -38,13 +38,6 @@ export type AgentFields = {
  */
 export type AgentWithFields = TypedAgent & AgentFields;
 
-/** What a connected agent reads and produces: the conversation, one output. */
-const CONNECTED_AGENT_FIELDS: AgentFields = {
-  inputFields: [{ identifier: "messages", type: "chat_messages" }],
-  outputFields: [{ identifier: "output", type: "str" }],
-  fieldsResolved: true,
-};
-
 /**
  * The Studio workflow a workflow agent points at.
  *
@@ -115,9 +108,6 @@ export const resolveAgentFields = ({
   dsl?: Workflow | null;
 }): AgentFields => {
   if (type === "workflow") return workflowAgentFields(dsl);
-  // A connected agent's contract is fixed by the relay: it reads the
-  // conversation and answers with one output.
-  if (type === "connected") return CONNECTED_AGENT_FIELDS;
 
   return {
     inputFields: config.inputs ?? [],

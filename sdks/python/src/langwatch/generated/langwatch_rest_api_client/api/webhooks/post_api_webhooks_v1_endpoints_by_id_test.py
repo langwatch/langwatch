@@ -111,7 +111,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     PostApiWebhooksV1EndpointsByIdTestResponse200
     | PostApiWebhooksV1EndpointsByIdTestResponse400
@@ -151,7 +151,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> (
     PostApiWebhooksV1EndpointsByIdTestResponse200
     | PostApiWebhooksV1EndpointsByIdTestResponse400
@@ -187,7 +187,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     PostApiWebhooksV1EndpointsByIdTestResponse200
     | PostApiWebhooksV1EndpointsByIdTestResponse400
@@ -225,7 +225,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> (
     PostApiWebhooksV1EndpointsByIdTestResponse200
     | PostApiWebhooksV1EndpointsByIdTestResponse400

@@ -2,11 +2,9 @@
  * Unit tests for acceptInvite status guard.
  *
  * Regression tests for #450: acceptInvite must require status === "PENDING"
- * before applying the invite. Non-PENDING statuses (PAYMENT_PENDING, and the
- * retired WAITING_APPROVAL enum value no live row carries any more) must be
- * rejected with BAD_REQUEST.
+ * before applying the invite. Non-PENDING statuses (PAYMENT_PENDING,
+ * WAITING_APPROVAL) must be rejected with BAD_REQUEST.
  */
-import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
@@ -54,21 +52,6 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
   },
 }));
 
-// Identifier-aware acceptance (D11): the router asks the identity runtime
-// for the user's verified addresses. `null` = not on identifiers, keep the
-// legacy session-email comparison — the default here so the pre-identifier
-// tests exercise exactly the legacy branch.
-const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
-  // `betterAuth()` builds its adapter EAGERLY at module load, and this
-  // suite's import graph reaches it through the router. It has to be real
-  // enough to initialise; better-auth's own memory engine over an empty
-  // store is exactly that, and holds nothing this suite could assert
-  // against by accident.
-  identityStorageAdapter: () => memoryAdapter({}),
-}));
-
 // The invite's grants are ledger commands (ADR-092 delivery-plan PR 2).
 const ledger = vi.hoisted(() => ({
   attachBindings: vi.fn(),
@@ -100,10 +83,18 @@ vi.mock("../../rbac", async (importOriginal) => {
       ctx.permissionChecked = true;
       return next();
     },
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
-    resolveTeamPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    checkOrganizationPermission:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    checkTeamPermission:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
   };
 });
 
@@ -135,7 +126,9 @@ describe("organization.acceptInvite", () => {
     ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
     ledger.revokeBindingsWhere.mockResolvedValue(0);
     findUniqueMock = vi.fn();
-    inviteUpdateMock = vi.fn().mockResolvedValue({ count: 1 });
+    inviteUpdateMock = vi
+      .fn()
+      .mockResolvedValue(makeInvite({ status: "ACCEPTED" }));
     createManyMock = vi.fn().mockResolvedValue({ count: 1 });
   });
 
@@ -146,25 +139,20 @@ describe("organization.acceptInvite", () => {
         expires: "2099-01-01",
       },
     });
-    const prismaStub: any = {
+    (ctx as any).prisma = {
       // Acceptance and the membership row land in one transaction, and the
       // service refuses to run on somebody else's: `$connect` is what marks
-      // this stub as the root client it stands in for. The claim runs the
-      // callback form of `$transaction`, handing the stub back as `tx`.
+      // this stub as the root client it stands in for.
       $connect: vi.fn(),
-      $transaction: (arg: unknown) =>
-        typeof arg === "function"
-          ? (arg as (tx: unknown) => unknown)(prismaStub)
-          : Promise.all(arg as Promise<unknown>[]),
+      $transaction: (writes: Promise<unknown>[]) => Promise.all(writes),
       organizationInvite: {
         findUnique: findUniqueMock,
-        updateMany: inviteUpdateMock,
+        update: inviteUpdateMock,
         findFirst: vi.fn().mockResolvedValue(null),
       },
       organizationUser: { createMany: createManyMock },
       project: { findFirst: vi.fn().mockResolvedValue(null) },
     };
-    (ctx as any).prisma = prismaStub;
     return organizationRouter.createCaller(ctx);
   }
 
@@ -187,81 +175,16 @@ describe("organization.acceptInvite", () => {
       expect(createManyMock.mock.invocationCallOrder[0]!).toBeLessThan(
         ledger.attachBindings.mock.invocationCallOrder[0]!,
       );
-      // The claim is conditional on the (status, inviteCode) pair the caller
-      // read — that is what makes two racers on one PENDING invite unable to
-      // both win — and it records who accepted.
       expect(inviteUpdateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: "PENDING",
-            inviteCode: "test-code",
-          }),
-          data: {
-            status: "ACCEPTED",
-            acceptedByUserId: "user-1",
-            acceptedViaIdentifierId: null,
-          },
-        }),
+        expect.objectContaining({ data: { status: "ACCEPTED" } }),
       );
-      // The ACCEPTED claim rides the same transaction as the membership row,
+      // The ACCEPTED update rides the same transaction as the membership row,
       // and the ledger grant is emitted only once that transaction has
-      // committed — so the claim must be ordered before the grant just like
+      // committed — so the update must be ordered before the grant just like
       // the membership row is.
       expect(inviteUpdateMock.mock.invocationCallOrder[0]!).toBeLessThan(
         ledger.attachBindings.mock.invocationCallOrder[0]!,
       );
-    });
-  });
-
-  describe("when the signed-in user is on identifiers", () => {
-    /** @scenario "Acceptance requires verification and an exact normalized match" */
-    it("accepts through any verified identifier matching the invite's normalized address", async () => {
-      // The invite targets the work address with the admin's casing; the user
-      // is signed in as their personal email, but a VERIFIED Google identifier
-      // holds the work address. Casing folds away, and the plus tag does NOT:
-      // it is part of the address, so the identifier has to hold the same one
-      // the invite named.
-      findUniqueMock.mockResolvedValue(
-        makeInvite({ status: "PENDING", email: "Sam.J+team@Acme.com" }),
-      );
-      verifiedEmailsOfMock.mockResolvedValueOnce([
-        {
-          identifierId: "idf_g",
-          value: "sam.j+team@acme.com",
-          provider: "google",
-        },
-      ]);
-
-      const caller = createCaller("sam@personal.net");
-      const result = await caller.acceptInvite({ inviteCode: "test-code" });
-
-      expect(result.success).toBe(true);
-      // The claim records which identifier vouched for the acceptance.
-      expect(inviteUpdateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            acceptedViaIdentifierId: "idf_g",
-          }),
-        }),
-      );
-    });
-
-    it("refuses when no verified identifier holds the invited address", async () => {
-      // The session email HAPPENS to equal the invite's address, but for a
-      // user on identifiers the proven set is the authority — an address
-      // nothing verified never opens an invitation.
-      findUniqueMock.mockResolvedValue(
-        makeInvite({ status: "PENDING", email: "user@example.com" }),
-      );
-      verifiedEmailsOfMock.mockResolvedValueOnce([
-        { identifierId: "idf_o", value: "other@acme.com", provider: "email" },
-      ]);
-
-      const caller = createCaller();
-      await expect(
-        caller.acceptInvite({ inviteCode: "test-code" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
-      expect(createManyMock).not.toHaveBeenCalled();
     });
   });
 

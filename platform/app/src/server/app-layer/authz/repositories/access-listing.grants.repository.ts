@@ -50,7 +50,6 @@ import {
   ACCESS_LISTING_GROUP_SELECT,
   ACCESS_LISTING_USER_SELECT,
 } from "./access-listing.repository";
-import { liveGrants, liveRoles } from "./live-rows";
 
 /** The three scope tiers a listed binding can carry - RESOURCE rows are the
  *  share tier and PLATFORM rows are dormant facts; neither is a binding the
@@ -335,7 +334,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
       orgIds,
     });
 
-    const rows = await liveGrants(this.prisma).findMany({
+    const rows = await this.prisma.grant.findMany({
       where: {
         organizationId: { in: [...orgIds] },
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
@@ -448,7 +447,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
   }: {
     organizationId: string;
   }): Promise<CustomRole[]> {
-    const roles = await liveRoles(this.prisma).findMany({
+    const roles = await this.prisma.role.findMany({
       where: { organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
     });
@@ -467,7 +466,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     organizationId: string;
     where: Prisma.GrantWhereInput;
   }): Promise<GrantListRow[]> {
-    return liveGrants(this.prisma).findMany({
+    return this.prisma.grant.findMany({
       where: {
         organizationId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
@@ -490,7 +489,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     roleIds: readonly string[];
   }): Promise<CustomRole[]> {
     if (roleIds.length === 0) return [];
-    const roles = await liveRoles(this.prisma).findMany({
+    const roles = await this.prisma.role.findMany({
       where: { id: { in: [...roleIds] }, organizationId },
     });
     return roles.map((role) => toCustomRoleShape(role));

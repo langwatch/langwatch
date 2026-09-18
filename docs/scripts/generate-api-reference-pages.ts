@@ -29,33 +29,14 @@ interface EndpointGroup {
   /**
    * `METHOD /path` keys, in the order a reader should meet them.
    *
-   * The default sort is CRUD-shaped (list, create, get, update, delete), which
+   * The default sort is CRUD-shaped — list, create, get, update, delete — which
    * is right for a resource but wrong for a family that is a sequence of steps.
    * A group whose overview describes a lifecycle sets this so the sidebar and
    * the prose agree; anything the list omits falls in behind, still sorted the
    * default way.
    */
   endpointOrder?: string[];
-  /**
-   * Hand-written pages that belong to this family but document no single
-   * operation, appended after the generated endpoint pages.
-   *
-   * They have to be declared here rather than edited into `docs.json`, because
-   * this generator replaces the whole API Reference anchor on every run: a page
-   * added to the nav by hand survives until the next run and then vanishes.
-   */
-  extraPages?: string[];
 }
-
-/**
- * Pages that open the anchor, before the first endpoint family. Same reason as
- * `extraPages`: the anchor is generated wholesale, so its front matter has to
- * be generated too.
- */
-const INTRO_GROUP = {
-  group: "Get Started",
-  pages: ["api-reference/introduction"],
-};
 
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
 
@@ -77,8 +58,8 @@ const UNDOCUMENTED_CALLER_IDENTITY =
 const UNDOCUMENTED_MODEL_DEFAULTS =
   "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
 
-const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
-  "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
+const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
+  "Not yet documented in the API reference: the LangWatchQL analytics SQL routes require the analytics:view permission and have no reference pages yet.";
 
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
@@ -86,7 +67,7 @@ const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
  * entry, and the generator fails when one is owned by neither.
  */
 const SKIP_PATHS: Record<string, string> = {
-  "/": "Not an API route: the prompts app serves the spec's root path, which has no content to document.",
+  "/": "Not an API route: the prompts app serves the spec's root path, so there is nothing to document.",
   "/api/trace/search":
     "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
   "/api/trace/{id}":
@@ -103,12 +84,14 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
+  "/api/v1/projects/{projectId}/analytics/query/clickhouse":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/schema":
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts":
-    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
-    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
-  "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
-    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
+    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -118,9 +101,6 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/traces", "/api/trace"],
     overviewDescription:
       "Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.",
-    // The projection DSL shapes the response of the search endpoint rather than
-    // being an endpoint itself, and the Traces overview links to it.
-    extraPages: ["api-reference/traces/projection-dsl"],
   },
   {
     name: "Datasets",
@@ -214,37 +194,23 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Query simulation run results. List runs, get batch summaries, and retrieve individual run details.",
   },
   {
-    name: "Run Plans",
-    dirName: "run-plans",
-    pathPrefixes: ["/api/v1/run-plans"],
-    overviewDescription:
-      "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when no plan holds that name. List, read, run and archive run plans.",
-  },
-  {
-    name: "Test Suites",
-    dirName: "test-suites",
-    pathPrefixes: ["/api/v1/test-suites"],
-    overviewDescription:
-      "Organise agent tests. A test suite groups scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites.",
-  },
-  {
     name: "Suites",
     dirName: "suites",
     pathPrefixes: ["/api/suites"],
     overviewDescription:
-      "Deprecated. The /api/suites family is a frozen alias. New integrations use Run Plans and Test Suites.",
+      "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.",
   },
   {
     name: "Agents",
     dirName: "agents",
-    pathPrefixes: ["/api/v1/agents"],
+    pathPrefixes: ["/api/agents"],
     overviewDescription:
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
     name: "Coding Agents",
     dirName: "coding-agents",
-    pathPrefixes: ["/api/v1/coding-agent", "/api/coding-agent"],
+    pathPrefixes: ["/api/coding-agent"],
     overviewDescription:
       "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.",
   },
@@ -296,25 +262,11 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Query analytics timeseries data with metrics, aggregations, and filters.",
   },
   {
-    name: "Query",
-    dirName: "query",
-    pathPrefixes: ["/api/v1/query"],
-    overviewDescription:
-      "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query.",
-  },
-  {
     name: "Secrets",
     dirName: "secrets",
     pathPrefixes: ["/api/secrets"],
     overviewDescription:
       "Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.",
-  },
-  {
-    name: "Agent Cache",
-    dirName: "agent-cache",
-    pathPrefixes: ["/api/agent-cache"],
-    overviewDescription:
-      "A per-project store an agent keeps its own run state in. Values are encrypted at rest and each entry expires by itself.",
   },
   {
     name: "Model Providers",
@@ -645,28 +597,6 @@ function main() {
 
   const owners = resolveOwners(Object.keys(spec.paths));
 
-  // A hand-written page is named as a string, so a rename or a typo would drop
-  // it out of the sidebar silently: the same failure this generator exists to
-  // prevent. Check every one of them against the filesystem up front.
-  const declaredExtras = [
-    ...INTRO_GROUP.pages,
-    ...ENDPOINT_GROUPS.flatMap((group) => group.extraPages ?? []),
-  ];
-  const missingExtras = declaredExtras.filter(
-    (page) => !fs.existsSync(path.join(DOCS_DIR, `${page}.mdx`))
-  );
-  if (missingExtras.length > 0) {
-    const noun = missingExtras.length === 1 ? "page" : "pages";
-    console.error(
-      `ERROR: ${missingExtras.length} hand-written nav ${noun} named in this generator has no .mdx file:`
-    );
-    for (const page of missingExtras.sort()) console.error(`  ${page}`);
-    console.error(
-      "\nCreate the file, or drop it from INTRO_GROUP / the group's extraPages in docs/scripts/generate-api-reference-pages.ts."
-    );
-    process.exit(1);
-  }
-
   const unowned = Object.keys(spec.paths).filter(
     (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath),
   );
@@ -747,7 +677,7 @@ function main() {
         ? "key names an operation"
         : "keys name operations";
     console.error(
-      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts no entries:`,
+      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`,
     );
     for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
     console.error(
@@ -757,8 +687,6 @@ function main() {
   if (unknownOrder.length > 0 || misownedOrder.length > 0) {
     process.exit(1);
   }
-
-  allNavGroups.push(INTRO_GROUP);
 
   for (const group of ENDPOINT_GROUPS) {
     const dirPath = path.join(API_REF_DIR, group.dirName);
@@ -859,8 +787,6 @@ function main() {
 
       pages.push(`api-reference/${group.dirName}/${fileName}`);
     }
-
-    pages.push(...(group.extraPages ?? []));
 
     allNavGroups.push({ group: group.name, pages });
 

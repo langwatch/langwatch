@@ -1,10 +1,13 @@
 import { METRIC_ROLLUP_INTERVAL_MS } from "../schemas/constants";
-import type { MetricRollupRow } from "../schemas/metricDataPoint";
-import { bigint, isGap, type MetricRollupSourcePoint } from "./sequence";
+import type {
+  CanonicalMetricDataPoint,
+  MetricRollupRow,
+} from "../schemas/metricDataPoint";
+import { bigint, isGap } from "./sequence";
 
 /** One point of a bucket, with its index into the whole ordered series. */
 export interface BucketEntry {
-  point: MetricRollupSourcePoint;
+  point: CanonicalMetricDataPoint;
   index: number;
 }
 
@@ -12,7 +15,7 @@ export function baseRow({
   point,
   bucketStartMs,
 }: {
-  point: MetricRollupSourcePoint;
+  point: CanonicalMetricDataPoint;
   bucketStartMs: number;
 }): MetricRollupRow {
   return {
@@ -60,8 +63,8 @@ export function resetOrGap({
   current,
 }: {
   row: MetricRollupRow;
-  previous: MetricRollupSourcePoint | undefined;
-  current: MetricRollupSourcePoint;
+  previous: CanonicalMetricDataPoint | undefined;
+  current: CanonicalMetricDataPoint;
 }): void {
   if (isGap(previous, current)) row.gapCount++;
   else if (previous) row.resetCount++;
@@ -76,7 +79,7 @@ export function extendExtrema({
   point,
 }: {
   row: MetricRollupRow;
-  point: MetricRollupSourcePoint;
+  point: CanonicalMetricDataPoint;
 }): void {
   if (point.min !== null) {
     row.min = row.min === null ? point.min : Math.min(row.min, point.min);

@@ -221,7 +221,7 @@ func (r *BifrostRouter) buildConverseInput(
 ) (*bedrockruntime.ConverseInput, []string, error) {
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
-		return nil, nil, classifyRequestBuildError(ctx, err)
+		return nil, nil, classifyChatBuildError(ctx, err)
 	}
 	dropped := paramsDroppedFrom(dispatchCtx)
 	stampParamsDropped(ctx, dropped)

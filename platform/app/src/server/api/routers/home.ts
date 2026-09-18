@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { RecentItemsService } from "~/server/home/recent-items.service";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -19,7 +20,7 @@ export const homeRouter = createTRPCRouter({
         limit: z.number().min(1).max(50).default(12),
       }),
     )
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ ctx, input }) => {
       const recentItemsService = new RecentItemsService();
       return recentItemsService.getRecentItems({

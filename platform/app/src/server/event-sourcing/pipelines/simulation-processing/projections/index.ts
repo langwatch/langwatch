@@ -5,8 +5,4 @@ export type {
   SimulationRunState,
   SimulationRunStateData,
 } from "./simulationRunState.foldProjection";
-export {
-  hasRunDefiningEvent,
-  SimulationRunStateFoldProjection,
-} from "./simulationRunState.foldProjection";
-export { SimulationRunStateFoldStore } from "./simulationRunState.store";
+export { SimulationRunStateFoldProjection } from "./simulationRunState.foldProjection";

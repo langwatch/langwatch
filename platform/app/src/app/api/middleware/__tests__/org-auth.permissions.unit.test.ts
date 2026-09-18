@@ -20,14 +20,6 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
     resolveApiKeyPermission(...args),
 }));
 
-// The middleware resolves its service from the App on the request context.
-vi.mock("~/server/app-layer/app", async () => {
-  const { appCredentialPermissionsMock } = await import(
-    "~/test-utils/appCredentialPermissionsMock"
-  );
-  return appCredentialPermissionsMock();
-});
-
 import { requireOrgPermission, requireOrgPermissionOrThrow } from "../org-auth";
 
 type TestEnv = {

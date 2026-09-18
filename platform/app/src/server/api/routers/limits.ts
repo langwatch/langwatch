@@ -2,12 +2,13 @@ import { z } from "zod";
 import { getApp } from "../../app-layer/app";
 import { prisma } from "../../db";
 import { UsageStatsService } from "../../license-enforcement/usage-stats.service";
+import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const limitsRouter = createTRPCRouter({
   getUsage: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .permission("organization:view")
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
       const service = UsageStatsService.create(prisma);
@@ -27,7 +28,7 @@ export const limitsRouter = createTRPCRouter({
     // an admin-targeted notification with arbitrary numbers (a low-
     // impact spam vector). Zero TS callers, so the bump is invisible
     // to legitimate UX.
-    .permission("organization:manage")
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
       const notification = await getApp().usageLimits.checkAndSendWarning({
         organizationId: input.organizationId,

@@ -7,7 +7,6 @@ import {
   FinishRunCommand,
   MessageSnapshotCommand,
   QueueRunCommand,
-  RecordAgentInstanceCommand,
   StartRunCommand,
   TextMessageEndCommand,
   TextMessageStartCommand,
@@ -85,8 +84,6 @@ export interface SimulationProcessingPipelineDeps {
  * - startRun: Emits SimulationRunStartedEvent when run begins
  * - messageSnapshot: Emits SimulationMessageSnapshotEvent for message updates
  * - finishRun: Emits SimulationRunFinishedEvent when run completes
- * - recordAgentInstance: Emits SimulationRunAgentInstanceRecordedEvent with
- *   the connected agent instance that served the run
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
  * - computeRunMetrics: Computes cost/latency metrics from traces (ECST + pull)
  */
@@ -139,7 +136,6 @@ export function createSimulationProcessingPipeline(
     .withCommand("textMessageStart", TextMessageStartCommand)
     .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommandInstance("finishRun", FinishRunCommand, deps.finishRunCommand)
-    .withCommand("recordAgentInstance", RecordAgentInstanceCommand)
     .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
     .withCommandInstance(

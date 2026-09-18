@@ -124,6 +124,7 @@ secured
       // read-only API keys from ingesting traces.
       try {
         await enforceApiKeyCeiling({
+          prisma,
           resolved,
           permission: "traces:create",
         });

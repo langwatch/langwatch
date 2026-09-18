@@ -114,7 +114,7 @@ def sync_detailed(
     id: str,
     version_id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
@@ -154,7 +154,7 @@ def sync(
     id: str,
     version_id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> (
     PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
@@ -190,7 +190,7 @@ async def asyncio_detailed(
     id: str,
     version_id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400
@@ -228,7 +228,7 @@ async def asyncio(
     id: str,
     version_id: str,
     *,
-    client: AuthenticatedClient,
+    client: AuthenticatedClient | Client,
 ) -> (
     PostApiPromptsByIdVersionsByVersionIdRestoreResponse200
     | PostApiPromptsByIdVersionsByVersionIdRestoreResponse400

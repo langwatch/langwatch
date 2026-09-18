@@ -168,7 +168,7 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn(), setData: vi.fn() },
+        getById: { invalidate: vi.fn() },
       },
       agents: {
         getById: {

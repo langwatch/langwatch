@@ -27,7 +27,6 @@ function conversationRow(
     status: "idle",
     currentTurnId: null,
     lastError: null,
-    lastModel: null,
     messageCount: 0,
     lastActivityAtMs: 1,
     createdAtMs: 1,

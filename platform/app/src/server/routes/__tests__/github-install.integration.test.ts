@@ -20,19 +20,9 @@
  */
 import { createHmac } from "crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
-wireDefaultTestApp();
-
-// vi.hoisted runs before the import graph executes. A plain module-body
-// assignment is too late: wireDefaultTestApp's import chain reaches
-// ~/env.mjs, whose snapshot would capture the real .env secret first and the
-// route would refuse every state this file signs.
-const { TEST_SIGNING_KEY } = vi.hoisted(() => {
-  const key = "x".repeat(64);
-  process.env.CREDENTIALS_SECRET = key;
-  return { TEST_SIGNING_KEY: key };
-});
+const TEST_SIGNING_KEY = "x".repeat(64);
+process.env.CREDENTIALS_SECRET = TEST_SIGNING_KEY;
 
 // The App credentials are read through getGithubAppConfig, so the suite can
 // take the App away mid-file without fighting the env snapshot t3-env takes at
@@ -52,7 +42,7 @@ vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
 
 const getServerAuthSession = vi.fn();
 const isOrganizationMember = vi.fn();
-const probeOrganizationPermission = vi.fn();
+const hasOrganizationPermission = vi.fn();
 const recordInstallation = vi.fn();
 const handleWebhookEvent = vi.fn();
 const applyPullRequestEvent = vi.fn();
@@ -87,16 +77,11 @@ vi.mock("~/server/featureFlag", () => ({
 }));
 // Partial mock: the route uses only this helper, but other modules in the
 // import graph read further rbac exports (Resources etc.).
-// The route reads probeOrganizationPermission from the app-layer imperative
-// module (it moved off ~/server/api/rbac with ADR-092).
-vi.mock(
-  import("~/server/app-layer/permissions/imperative"),
-  async (importOriginal) => ({
-    ...(await importOriginal()),
-    probeOrganizationPermission: ((...args: unknown[]) =>
-      probeOrganizationPermission(...args)) as never,
-  }),
-);
+vi.mock(import("~/server/api/rbac"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  hasOrganizationPermission: ((...args: unknown[]) =>
+    hasOrganizationPermission(...args)) as never,
+}));
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
 async function request(path: string, init?: RequestInit) {
@@ -136,7 +121,7 @@ beforeEach(() => {
   appConfig.webhookSecret = "whsecret";
   getServerAuthSession.mockResolvedValue({ user: { id: "u1" } });
   isOrganizationMember.mockResolvedValue(true);
-  probeOrganizationPermission.mockResolvedValue(true);
+  hasOrganizationPermission.mockResolvedValue(true);
   recordInstallation.mockResolvedValue({ accountLogin: "acme" });
   applyPullRequestEvent.mockResolvedValue(true);
   isEnabled.mockResolvedValue(true);
@@ -174,12 +159,12 @@ describe("GET /api/github/install", () => {
       // Connecting the App grants repository access to every project in the
       // organization: membership alone must not be enough on the REST twin
       // either.
-      probeOrganizationPermission.mockResolvedValue(false);
+      hasOrganizationPermission.mockResolvedValue(false);
       const res = await request(
         "http://localhost/api/github/install?organizationId=org1",
       );
       expect(res.status).toBe(403);
-      expect(probeOrganizationPermission).toHaveBeenCalledWith(
+      expect(hasOrganizationPermission).toHaveBeenCalledWith(
         expect.anything(),
         "org1",
         "organization:manage",
@@ -292,7 +277,7 @@ describe("GET /api/github/setup", () => {
 
   describe("when the connect permission was lowered mid-flow", () => {
     it("re-checks organization management and refuses to persist the installation", async () => {
-      probeOrganizationPermission.mockResolvedValue(false);
+      hasOrganizationPermission.mockResolvedValue(false);
       const state = await makeState({ mode: "popup" });
 
       const res = await request(

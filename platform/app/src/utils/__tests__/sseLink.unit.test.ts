@@ -59,7 +59,7 @@ describe("classifySseFrame", () => {
     describe("when ordinary data entries arrive", () => {
       it("passes them through untouched", () => {
         expect(
-          classifySseFrame({ type: "status", status: "Starting Langy…" }),
+          classifySseFrame({ type: "status", status: "Poking Langy…" }),
         ).toBe("data");
         expect(classifySseFrame({ anything: 1 })).toBe("data");
         expect(classifySseFrame("plain string")).toBe("data");

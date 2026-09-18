@@ -31,7 +31,6 @@ import {
 	installSessionContextHooks,
 	removeSessionContextHooks,
 } from "./session-context-hooks";
-import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
 	assertCodexTurnHarvest,
 	buildScopedToolFunction,
@@ -123,7 +122,6 @@ export function installTelemetryWiring({
 			);
 		}
 		assertCodexTurnHarvest();
-		assertCodexAgentGuidance();
 		return { labels, warnings, requiredFailures };
 	}
 

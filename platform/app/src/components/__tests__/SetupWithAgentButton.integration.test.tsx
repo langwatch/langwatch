@@ -10,7 +10,6 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SETUP_SKILL_IDS } from "../../../scripts/generate-setup-skill-bodies";
 import {
   SETUP_SURFACES,
   type SetupSurface,
@@ -35,55 +34,26 @@ vi.mock("~/features/langy/stores/langyStore", () => ({
   ) => selector({ askLangy: askLangyMock }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "project_1" },
-    organization: { id: "org_1" },
-  }),
-}));
+const KNOWN_SKILLS = [
+  "tracing",
+  "experiments",
+  "online-evaluations",
+  "scenarios",
+  "prompts",
+  "datasets",
+];
 
-/** What the server answers with: the skill on its own, no credentials. */
-let mockSkillBody: string | undefined;
-const getPromptQueryMock = vi.fn(() => ({ data: mockSkillBody }));
-vi.mock("~/utils/api", () => ({
-  api: {
-    setupSkills: {
-      getPrompt: {
-        useQuery: (...args: unknown[]) => {
-          const result = getPromptQueryMock(...(args as []));
-          return { data: result.data ? { body: result.data } : undefined };
-        },
-      },
-    },
-  },
-}));
-
-/**
- * Read from the generator rather than copied: this list used to be a second
- * copy of the same names, and a new surface that offered a real skill failed
- * here for having drifted from the copy rather than for anything it did.
- */
-const KNOWN_SKILLS: readonly string[] = SETUP_SKILL_IDS;
-
-/** The surfaces whose prompt asks Langy to open the repository first. */
 const REPO_CONNECTED: SetupSurface[] = [
-  "connectedAgents",
   "traces",
   "experiments",
   "simulations",
   "simulationRuns",
 ];
 
-function renderButton({
-  surface,
-  apiKey,
-}: {
-  surface: SetupSurface;
-  apiKey?: string;
-}) {
+function renderButton(surface: SetupSurface) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SetupWithAgentButton surface={surface} apiKey={apiKey} />
+      <SetupWithAgentButton surface={surface} />
     </ChakraProvider>,
   );
 }
@@ -91,7 +61,6 @@ function renderButton({
 beforeEach(() => {
   vi.clearAllMocks();
   canAskMock.mockReturnValue(true);
-  mockSkillBody = undefined;
 });
 
 describe("SETUP_SURFACES", () => {
@@ -139,7 +108,7 @@ describe("SetupWithAgentButton", () => {
   describe("when the button renders on any surface", () => {
     /** @scenario the traces empty state keeps Setup via Agent on every project */
     it("reads Setup via Agent with no per-surface override", () => {
-      renderButton({ surface: "traces" });
+      renderButton("traces");
       expect(
         screen.getByRole("button", { name: /setup via agent/i }),
       ).toBeDefined();
@@ -148,26 +117,19 @@ describe("SetupWithAgentButton", () => {
   });
 
   describe("when the reader can ask Langy", () => {
-    /** @scenario The coding-agent prompt is offered first */
-    it("offers all three routes, copy first, and hands the surface prompt to Langy", async () => {
+    /** @scenario Langy is offered first where the reader can ask */
+    it("offers all three routes and hands the surface prompt to Langy", async () => {
       const user = userEvent.setup();
-      renderButton({ surface: "simulations" });
+      renderButton("simulations");
 
       await user.click(
         screen.getByRole("button", { name: /setup via agent/i }),
       );
-      const copy = await screen.findByText(
-        "Copy a prompt for your coding agent",
-      );
-      const langy = screen.getByText("Ask Langy to set it up");
-      screen.getByText(/read the agent testing documentation/i);
+      await screen.findByText("Ask Langy to set it up");
+      screen.getByText("Copy a prompt for your coding agent");
+      screen.getByText(/read the simulations documentation/i);
 
-      // Copy comes first, Langy second.
-      expect(
-        copy.compareDocumentPosition(langy) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-
-      await user.click(langy);
+      await user.click(screen.getByText("Ask Langy to set it up"));
       expect(askLangyMock).toHaveBeenCalledWith(
         SETUP_SURFACES.simulations.langyPrompt,
       );
@@ -179,7 +141,7 @@ describe("SetupWithAgentButton", () => {
     it("keeps the copy and docs routes but drops the Langy one", async () => {
       canAskMock.mockReturnValue(false);
       const user = userEvent.setup();
-      renderButton({ surface: "datasets" });
+      renderButton("datasets");
 
       await user.click(
         screen.getByRole("button", { name: /setup via agent/i }),
@@ -191,66 +153,8 @@ describe("SetupWithAgentButton", () => {
   });
 
   describe("when copying the prompt", () => {
-    /** @scenario The copied prompt carries the skill's own instructions */
-    it("writes the skill itself once the server answers", async () => {
-      mockSkillBody = "# Add LangWatch Tracing to Your Code\n\n## Step 1";
-      const user = userEvent.setup();
-      const writeText = vi.fn(() => Promise.resolve());
-      Object.defineProperty(navigator, "clipboard", {
-        value: { writeText },
-        configurable: true,
-      });
-      renderButton({ surface: "traces" });
-
-      await user.click(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      );
-      await user.click(
-        await screen.findByText("Copy a prompt for your coding agent"),
-      );
-
-      await waitFor(() =>
-        expect(writeText).toHaveBeenCalledWith(mockSkillBody),
-      );
-    });
-
-    /** @scenario The copied prompt leads with the project's keys */
-    it("puts the minted token above the skill without sending it to the server", async () => {
-      mockSkillBody = "# Add LangWatch Tracing to Your Code";
-      const user = userEvent.setup();
-      const writeText = vi.fn((_text: string) => Promise.resolve());
-      Object.defineProperty(navigator, "clipboard", {
-        value: { writeText },
-        configurable: true,
-      });
-      renderButton({ surface: "traces", apiKey: "sk-lw-minted" });
-
-      await user.click(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      );
-      await user.click(
-        await screen.findByText("Copy a prompt for your coding agent"),
-      );
-
-      await waitFor(() =>
-        expect(writeText).toHaveBeenCalledWith(
-          expect.stringContaining('LANGWATCH_API_KEY="sk-lw-minted"'),
-        ),
-      );
-      const copied = writeText.mock.calls[0]?.[0] ?? "";
-      expect(copied.indexOf("Use these keys to instrument:")).toBe(0);
-      expect(copied.indexOf(mockSkillBody)).toBeGreaterThan(0);
-
-      // A tRPC query is a GET, so a token in its input would be written
-      // into every log that records a URL.
-      expect(getPromptQueryMock).toHaveBeenCalledWith(
-        { projectId: "project_1", skill: "tracing" },
-        expect.objectContaining({ enabled: true }),
-      );
-    });
-
-    /** @scenario The install line stands in until the skill arrives */
-    it("falls back to the install line while the skill is on its way", async () => {
+    /** @scenario Copying the prompt confirms and survives a denied clipboard */
+    it("writes the skill-install prompt to the clipboard", async () => {
       const user = userEvent.setup();
       const writeText = vi.fn(() => Promise.resolve());
       // navigator.clipboard is getter-only in jsdom; redefine over
@@ -259,7 +163,7 @@ describe("SetupWithAgentButton", () => {
         value: { writeText },
         configurable: true,
       });
-      renderButton({ surface: "traces" });
+      renderButton("traces");
 
       await user.click(
         screen.getByRole("button", { name: /setup via agent/i }),
@@ -278,14 +182,13 @@ describe("SetupWithAgentButton", () => {
       );
     });
 
-    /** @scenario Copying the prompt confirms and survives a denied clipboard */
     it("reports the failure when the clipboard is denied", async () => {
       const user = userEvent.setup();
       Object.defineProperty(navigator, "clipboard", {
         value: { writeText: vi.fn(() => Promise.reject(new Error("denied"))) },
         configurable: true,
       });
-      renderButton({ surface: "traces" });
+      renderButton("traces");
 
       await user.click(
         screen.getByRole("button", { name: /setup via agent/i }),
@@ -305,7 +208,7 @@ describe("SetupWithAgentButton", () => {
   describe("when the docs entry is followed", () => {
     it("links the surface's documentation overview", async () => {
       const user = userEvent.setup();
-      renderButton({ surface: "prompts" });
+      renderButton("prompts");
 
       await user.click(
         screen.getByRole("button", { name: /setup via agent/i }),

@@ -108,10 +108,9 @@ describe("read-path tenant isolation", () => {
           }),
         },
         organizationUser: {
-          findFirst: vi.fn().mockResolvedValue({
-            role: OrganizationUserRole.MEMBER,
-            disabledAt: null,
-          }),
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
         },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: {
@@ -174,10 +173,9 @@ describe("read-path tenant isolation", () => {
     it("still grants a genuine member", async () => {
       const prisma = {
         organizationUser: {
-          findFirst: vi.fn().mockResolvedValue({
-            role: OrganizationUserRole.MEMBER,
-            disabledAt: null,
-          }),
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
         },
         groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
         roleBinding: {

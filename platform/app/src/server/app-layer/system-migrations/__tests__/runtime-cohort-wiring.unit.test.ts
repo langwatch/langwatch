@@ -4,8 +4,6 @@
  * skip. Every other cohort test injects that list directly, so only this
  * suite fails if the composition stops wiring it (or wires the wrong shape),
  * which would quietly make private-dataplane organizations enrollable.
- * Enrolls into the ADR-110 engine migration, the one organization-rooted
- * migration the runtime registers.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,7 +40,6 @@ vi.mock("../../../clickhouse/clickhouseClient", () => ({
     new Map([["org_private_dataplane", "http://private:8123"]]),
 }));
 
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
 import { systemMigrationsService } from "../runtime";
 
 describe("the cohort's private-dataplane exclusion wiring", () => {
@@ -54,10 +51,10 @@ describe("the cohort's private-dataplane exclusion wiring", () => {
   });
 
   describe("when a cohort's eligible pool is read through the real composition", () => {
-    /** @scenario "A cohort leaves out an enterprise organization by default" */
-    it.skip("excludes the organizations named by the private ClickHouse routing table", async () => {
+    /** @scenario "A cohort never includes an enterprise organization" */
+    it("excludes the organizations named by the private ClickHouse routing table", async () => {
       await systemMigrationsService.enrollCohort({
-        migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+        migrationName: "authz-team-user-backfill",
         sampleSize: 5,
         actorUserId: "user_ops",
       });

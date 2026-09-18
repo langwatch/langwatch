@@ -28,6 +28,7 @@
 
 import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
+import { checkProjectPermission } from "~/server/api/rbac";
 import {
   LangyCredentialService,
   langyEgressAllowlistSchema,
@@ -38,7 +39,7 @@ import { enforceLangyAccess, refuseDemoProject } from "./langyAccessMiddleware";
 export const langyEgressRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("langy:view")
+    .use(checkProjectPermission("langy:view"))
     .use(refuseDemoProject)
     .use(enforceLangyAccess)
     .query(async ({ ctx, input }) => {
@@ -58,7 +59,7 @@ export const langyEgressRouter = createTRPCRouter({
         allowlist: langyEgressAllowlistSchema,
       }),
     )
-    .permission("langy:manage")
+    .use(checkProjectPermission("langy:manage"))
     .use(refuseDemoProject)
     .use(enforceLangyAccess)
     .mutation(async ({ ctx, input }) => {

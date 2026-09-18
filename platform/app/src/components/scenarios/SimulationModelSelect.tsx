@@ -28,8 +28,7 @@ export function SimulationModelSelect({
   featureKey,
   size = "full",
 }: {
-  /** Left out where the caller writes its own label above the picker. */
-  label?: string;
+  label: string;
   value: string | null;
   onChange: (value: string | null) => void;
   featureKey: "scenarios.user_simulator" | "scenarios.judge";
@@ -90,11 +89,9 @@ export function SimulationModelSelect({
 
   return (
     <VStack align="stretch" gap={1} width="full">
-      {label && (
-        <Text fontSize="sm" fontWeight="medium">
-          {label}
-        </Text>
-      )}
+      <Text fontSize="sm" fontWeight="medium">
+        {label}
+      </Text>
       <ProviderModelSelector
         model={value ?? ""}
         options={options}

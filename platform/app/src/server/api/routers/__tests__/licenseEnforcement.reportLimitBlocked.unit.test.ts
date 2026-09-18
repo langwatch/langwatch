@@ -78,19 +78,13 @@ vi.mock("~/server/license-enforcement", () => {
   };
 });
 
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return {
-    // Consumers that degrade without Redis read through this one.
-    tryGetApp: () => null,
-    getApp: () => ({
-      permissions: appPermissionsService(),
-      usageLimits: mockUsageLimits,
-    }),
-  };
-});
+vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
+  getApp: () => ({
+    usageLimits: mockUsageLimits,
+  }),
+}));
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
@@ -102,7 +96,12 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    checkOrganizationPermission:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
   };
 });
 

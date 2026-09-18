@@ -1,29 +1,24 @@
-import { Badge, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 
 import type { SessionPullRequest } from "../sessionListRow";
 import { MissingValue } from "./MissingValue";
 
 /** How many pull requests a row names before the rest go behind a hover. */
-const MAX_LISTED_PULL_REQUESTS = 4;
+const MAX_LISTED_PULL_REQUESTS = 3;
 
 /**
  * What the session shipped. A session that lands a change, moves to the next
  * branch and opens a second pull request is one session with two, so the row
- * names each of them; past a handful the rest go behind a hover rather than
- * pushing every other column off the page.
- *
- * A number opens the pull request's own detail, the same drawer the pull
- * requests screen opens, because what a reader wants from this column is what
- * the change cost across every session that worked on it. GitHub is one more
- * click from there, in the drawer's own header.
+ * names each of them and links out; past a handful the rest go behind a hover
+ * rather than pushing every other column off the page.
  */
 export const PullRequestsCell: React.FC<{
   pullRequests: readonly SessionPullRequest[];
-  onOpenDetail: (pullRequest: SessionPullRequest) => void;
-}> = ({ pullRequests, onOpenDetail }) => {
+}> = ({ pullRequests }) => {
   if (pullRequests.length === 0) {
     return <MissingValue />;
   }
@@ -34,31 +29,19 @@ export const PullRequestsCell: React.FC<{
   return (
     <HStack gap={2} whiteSpace="nowrap">
       {listed.map((pullRequest) => (
-        // The row opens the replay; this opens the pull request instead, so
-        // it stops the click from reaching the row underneath it.
-        <chakra.button
+        // The row opens the replay; this link leaves for GitHub, so it stops
+        // the click from reaching the row underneath it.
+        <Link
           key={pullRequest.number}
-          type="button"
-          aria-label={`Open pull request #${pullRequest.number}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenDetail(pullRequest);
-          }}
-          bg="transparent"
-          border="none"
-          padding={0}
-          cursor="pointer"
+          href={pullRequest.url}
+          isExternal
           color="fg.muted"
           fontFamily="mono"
           fontSize="sm"
-          // Underlined because it is the one part of the row that goes
-          // somewhere other than where the row goes.
-          textDecoration="underline"
-          textUnderlineOffset="3px"
-          _hover={{ color: "fg" }}
+          onClick={(event) => event.stopPropagation()}
         >
           #{pullRequest.number}
-        </chakra.button>
+        </Link>
       ))}
       {rest.length > 0 ? (
         <Tooltip
@@ -74,17 +57,16 @@ export const PullRequestsCell: React.FC<{
           positioning={{ placement: "left" }}
         >
           {/* The remaining numbers are written down nowhere else on this row,
-              so the hover has a tab stop behind it. Outline badge, the same
-              overflow pill the traces table uses. */}
-          <Badge
-            size="xs"
-            variant="outline"
-            flexShrink={0}
+              so the hover has a tab stop behind it. */}
+          <Text
+            as="span"
+            fontSize="sm"
+            color="fg.muted"
             cursor="help"
             tabIndex={0}
           >
             +{rest.length}
-          </Badge>
+          </Text>
         </Tooltip>
       ) : null}
     </HStack>

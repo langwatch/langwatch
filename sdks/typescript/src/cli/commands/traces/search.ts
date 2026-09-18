@@ -31,9 +31,8 @@ export const searchTracesCommand = async (options: {
   limit?: string;
   origin?: string;
   errorsOnly?: boolean;
-  project?: string;
 } & RawOutputFlags): Promise<void> => {
-  await resolveCredentials({ project: options.project });
+  await resolveCredentials();
 
   const service = new TracesApiService();
   const spinner = createSpinner("Searching traces...").start();

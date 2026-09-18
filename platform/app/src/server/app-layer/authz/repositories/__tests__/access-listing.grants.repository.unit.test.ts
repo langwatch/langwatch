@@ -502,7 +502,7 @@ describe("GrantsAccessListingRepository", () => {
       ]);
       expect(prisma.role.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { organizationId: ORG, kind: "custom", deletedAt: null },
+          where: { organizationId: ORG, kind: "custom" },
         }),
       );
     });

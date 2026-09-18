@@ -12,8 +12,10 @@ import { useEffect, useState } from "react";
 import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
 import { useSession } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
-import { DashboardLayout } from "../../components/DashboardLayout";
-import { ProjectSelector } from "../../components/ProjectSelector";
+import {
+  DashboardLayout,
+  ProjectSelector,
+} from "../../components/DashboardLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 

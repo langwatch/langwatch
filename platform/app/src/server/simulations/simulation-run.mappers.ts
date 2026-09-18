@@ -38,13 +38,6 @@ export interface ClickHouseSimulationRunRow {
   UpdatedAt: string;
   FinishedAt: string | null;
   ArchivedAt: string | null;
-  /**
-   * How many messages the run actually holds, selected only by the trimmed
-   * list projection so a caller can tell a 6-message page from a 6-message
-   * conversation. Absent on the full-column reads, where the row already
-   * carries every message.
-   */
-  TotalMessageCount?: string;
 }
 
 export function mapStatus(status: string): ScenarioRunStatus {
@@ -141,15 +134,6 @@ export function mapClickHouseRowToScenarioRunData(
     };
   }) as ScenarioMessages;
 
-  // The trimmed list projection selects the real message count alongside the
-  // sliced arrays. Without it (full-column reads) the row holds every message,
-  // so nothing was trimmed.
-  const totalMessageCount =
-    row.TotalMessageCount != null
-      ? parseInt(row.TotalMessageCount, 10)
-      : messages.length;
-  const messagesTruncated = totalMessageCount > messages.length;
-
   const metCriteria = row.MetCriteria ?? [];
   const unmetCriteria = row.UnmetCriteria ?? [];
 
@@ -168,20 +152,11 @@ export function mapClickHouseRowToScenarioRunData(
     ? (() => {
         try {
           const parsed: unknown = JSON.parse(row.Metadata);
-          if (
-            parsed == null ||
-            typeof parsed !== "object" ||
-            Array.isArray(parsed)
-          ) {
-            return null;
-          }
-          // A run's secret parameter values never belong in a stored row, and
-          // the fold projection keeps them out. Dropped again on the way out
-          // so a row written by another path cannot serve one. The names, on
-          // `secretParameterNames`, stay.
-          const { secretParameters: _secretParameters, ...rest } =
-            parsed as Record<string, unknown>;
-          return rest;
+          return parsed != null &&
+            typeof parsed === "object" &&
+            !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
         } catch {
           return null;
         }
@@ -202,7 +177,6 @@ export function mapClickHouseRowToScenarioRunData(
     status: resolvedStatus,
     results,
     messages,
-    messagesTruncated,
     timestamp: startedAt ?? createdAt,
     updatedAt,
     durationInMs:

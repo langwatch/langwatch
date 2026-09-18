@@ -38,16 +38,10 @@
  *   ANTHROPIC_API_KEY=... OPENAI_API_KEY=... \
  *     pnpm tsx scripts/seed-governance-refactor-dogfood.ts
  *
- * Take those keys from platform/app/.env, which is where this app's model
- * provider keys live. An env file from another repository drifts, and a
- * stale key is indistinguishable from a fresh one once it is stored.
- *
- * Missing provider env vars are tolerated on a NEW row: it is created
- * with `customKeys=null` (disabled) so the row appears in the UI but the
- * gateway falls through to the next eligible MP on dispatch, and the
- * provider-matrix tests `t.Skip` those cells. A row that already carries
- * a credential keeps it, whether the env var is set or not, unless
- * --force-keys (or SEED_FORCE_KEYS=1) is passed.
+ * Missing provider env vars are tolerated — the corresponding MP is
+ * created with `customKeys=null` (disabled) so the row appears in the
+ * UI but the gateway will fall through to the next eligible MP on
+ * dispatch. Sergey's provider-matrix tests then `t.Skip` those cells.
  *
  * Emits the minted VK secrets to stdout ONCE. Capture them for the F
  * full-matrix dogfood lane.
@@ -59,23 +53,8 @@ import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
 } from "../src/server/gateway/virtualKey.crypto";
-import {
-  credentialWriteLog,
-  decideCredentialWrite,
-  keepHint,
-  readStoredCredential,
-  skipHint,
-} from "../src/server/modelProviders/seedProviderCredential";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { encrypt } from "../src/utils/encryption";
-
-/**
- * Replacing a provider credential that is already stored takes an explicit
- * opt in. The organizations this seeder runs against are shared, and the key
- * it would overwrite is encrypted in the column with no way back.
- */
-const SHOULD_FORCE_KEYS =
-  process.argv.includes("--force-keys") || process.env.SEED_FORCE_KEYS === "1";
 
 const prisma = new PrismaClient({
   adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
@@ -239,7 +218,7 @@ async function ensureModelProviders(
     organizationId: base.organizationId,
     name: "OpenAI",
     provider: "openai",
-    customKeys: openaiKey ? { OPENAI_API_KEY: openaiKey } : null,
+    customKeys: openaiKey ? encryptKeys({ OPENAI_API_KEY: openaiKey }) : null,
     rateLimitRpm: 600,
     fallbackPriorityGlobal: 10,
     scopes: [{ scopeType: "ORGANIZATION", scopeId: base.organizationId }],
@@ -251,7 +230,9 @@ async function ensureModelProviders(
     organizationId: base.organizationId,
     name: "Anthropic",
     provider: "anthropic",
-    customKeys: anthropicKey ? { ANTHROPIC_API_KEY: anthropicKey } : null,
+    customKeys: anthropicKey
+      ? encryptKeys({ ANTHROPIC_API_KEY: anthropicKey })
+      : null,
     rateLimitRpm: 300,
     fallbackPriorityGlobal: 20,
     scopes: [{ scopeType: "TEAM", scopeId: base.platformTeamId }],
@@ -265,7 +246,7 @@ async function ensureModelProviders(
         organizationId: base.organizationId,
         name: "Gemini",
         provider: "gemini",
-        customKeys: { GEMINI_API_KEY: geminiKey },
+        customKeys: encryptKeys({ GEMINI_API_KEY: geminiKey }),
         rateLimitRpm: 300,
         fallbackPriorityGlobal: 30,
         scopes: [{ scopeType: "ORGANIZATION", scopeId: base.organizationId }],
@@ -279,11 +260,11 @@ async function ensureModelProviders(
           organizationId: base.organizationId,
           name: "Bedrock",
           provider: "bedrock",
-          customKeys: {
+          customKeys: encryptKeys({
             AWS_ACCESS_KEY_ID: bedrockAccessKey,
             AWS_SECRET_ACCESS_KEY: bedrockSecretKey,
             AWS_REGION_NAME: bedrockRegion,
-          },
+          }),
           rateLimitRpm: 200,
           fallbackPriorityGlobal: 40,
           scopes: [{ scopeType: "ORGANIZATION", scopeId: base.organizationId }],
@@ -302,8 +283,7 @@ async function upsertModelProviderByName(input: {
   organizationId: string;
   name: string;
   provider: string;
-  /** Plaintext. Encrypted inside, so the log line can mask real key names. */
-  customKeys: Record<string, string> | null;
+  customKeys: string | Record<string, unknown> | null;
   rateLimitRpm: number;
   fallbackPriorityGlobal: number;
   scopes: Array<{
@@ -327,50 +307,15 @@ async function upsertModelProviderByName(input: {
         },
       },
     },
-    select: { id: true, customKeys: true },
+    select: { id: true },
   });
   if (existing) {
-    const stored = readStoredCredential(existing.customKeys);
-    const replacement = input.customKeys;
-    const decision = decideCredentialWrite({
-      stored,
-      replacement,
-      shouldForce: SHOULD_FORCE_KEYS,
-    });
-    process.stderr.write(
-      credentialWriteLog({
-        tag: "seed-governance",
-        organizationId: input.organizationId,
-        provider: input.provider,
-        modelProviderId: existing.id,
-        stored,
-        incoming: input.customKeys ?? {},
-        decision,
-      }),
-    );
-    // A row that cannot serve a request is left exactly as it is, whether
-    // because nothing can decrypt it or because it holds no credential and
-    // this run has none to give it. Enabling it would put a provider in the
-    // chain that fails at credential materialisation on every request.
-    if (decision.action === "skip") {
-      process.stderr.write(skipHint("seed-governance", decision.reason));
-      return existing;
-    }
-    if (decision.action === "keep") {
-      process.stderr.write(keepHint("seed-governance"));
-      await prisma.modelProvider.update({
-        where: { id: existing.id },
-        data: { enabled: true },
-      });
-      return existing;
-    }
     await prisma.modelProvider.update({
       where: { id: existing.id },
       data: {
-        // Only ever writes a credential, never clears one. The decision above
-        // cannot reach here with an empty replacement unless the row had
-        // nothing stored, and then there is nothing to lose.
-        ...(replacement ? { customKeys: encryptKeys(replacement) } : {}),
+        customKeys: input.customKeys
+          ? (input.customKeys as Prisma.InputJsonValue)
+          : Prisma.DbNull,
         enabled: true,
       },
     });
@@ -383,7 +328,7 @@ async function upsertModelProviderByName(input: {
       enabled: true,
       organizationId: input.organizationId,
       customKeys: input.customKeys
-        ? encryptKeys(input.customKeys)
+        ? (input.customKeys as Prisma.InputJsonValue)
         : Prisma.DbNull,
       rateLimitRpm: input.rateLimitRpm,
       fallbackPriorityGlobal: input.fallbackPriorityGlobal,

@@ -18,7 +18,6 @@ import { ParameterDefinitionsInput } from "./ui/ParameterDefinitionsInput";
  * typed and nothing is stored until the scenario itself is saved.
  *
  * @see specs/scenarios/scenario-run-parameters.feature
- * @see specs/scenarios/secret-run-parameters.feature
  */
 export function ScenarioParametersDialog({
   open,
@@ -43,7 +42,7 @@ export function ScenarioParametersDialog({
           <HStack gap={0}>
             <Dialog.Title>Parameters</Dialog.Title>
             <FieldInfoTooltip
-              description='Named values a run supplies, so the same scenario can run against another account, tenant or region. The situation, the criteria and the target read them as "params.NAME", and whoever starts the run can override any default. A secret parameter carries no default: its value is supplied when the run starts, and only the target reads it, as "secrets.NAME".'
+              description='Named values a run supplies, so the same scenario can run against another account, tenant or region. The situation, the criteria and the target read them as "params.NAME", and whoever starts the run can override any default.'
               testId="scenario-parameters-info"
             />
           </HStack>

@@ -34,7 +34,6 @@ const STRICT_ONLY_PII_ENTITIES: readonly string[] =
 
 import { createLogger } from "@langwatch/observability";
 import { featureFlagService } from "~/server/featureFlag";
-import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import type { PIIRedactionLevel } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type {
   OtlpAnyValue,
@@ -372,31 +371,19 @@ export class OtlpSpanPiiRedactionService {
     }
   }
 
-  /**
-   * `record` may be keyed by an addressing path rather than by the attribute
-   * name (the log and metric pipelines flatten a decoded OTLP tree into one).
-   * `attributeNames` restores the real name for the sensitive-NAME rules, which
-   * a path can never satisfy; without it those rules silently never fire.
-   */
-  private redactRecordNative({
-    record,
-    policy,
-    compiled,
-    attributeNames,
-  }: {
-    record: Record<string, string>;
-    policy: ResolvedDataPrivacy;
+  private redactRecordNative(
+    record: Record<string, string>,
+    policy: ResolvedDataPrivacy,
     compiled: {
       secrets: readonly RegExp[] | undefined;
       piiExceptions: readonly RegExp[] | undefined;
-    };
-    attributeNames?: Record<string, string>;
-  }): void {
+    },
+  ): void {
     for (const key of Object.keys(record)) {
       const value = record[key];
       if (value && value.length > 0) {
         const { text } = redactAttributeNative({
-          key: attributeNames?.[key] ?? key,
+          key,
           value,
           policy,
           compiledSecretPatterns: compiled.secrets,
@@ -447,7 +434,6 @@ export class OtlpSpanPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
-      attributeNames?: Record<string, string>;
     },
     policy: ResolvedDataPrivacy,
   ): void {
@@ -462,17 +448,8 @@ export class OtlpSpanPiiRedactionService {
       });
       if (text !== log.body) log.body = text;
     }
-    this.redactRecordNative({
-      record: log.attributes,
-      policy,
-      compiled,
-      attributeNames: log.attributeNames,
-    });
-    this.redactRecordNative({
-      record: log.resourceAttributes,
-      policy,
-      compiled,
-    });
+    this.redactRecordNative(log.attributes, policy, compiled);
+    this.redactRecordNative(log.resourceAttributes, policy, compiled);
   }
 
   /**
@@ -660,13 +637,6 @@ export class OtlpSpanPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
-      /**
-       * The real OTLP attribute name behind each key of `attributes`, where the
-       * two differ. Declared here because the native pass reads it: without it
-       * the public signature promises less than the method actually honours,
-       * and a caller building the argument inline could not pass it at all.
-       */
-      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
@@ -724,7 +694,6 @@ export class OtlpSpanPiiRedactionService {
     metric: {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
-      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
@@ -736,17 +705,12 @@ export class OtlpSpanPiiRedactionService {
     }
     if (this.nativePassActive(native.policy)) {
       const compiled = this.compileNativePatterns(native.policy);
-      this.redactRecordNative({
-        record: metric.attributes,
-        policy: native.policy,
+      this.redactRecordNative(metric.attributes, native.policy, compiled);
+      this.redactRecordNative(
+        metric.resourceAttributes,
+        native.policy,
         compiled,
-        attributeNames: metric.attributeNames,
-      });
-      this.redactRecordNative({
-        record: metric.resourceAttributes,
-        policy: native.policy,
-        compiled,
-      });
+      );
     }
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
@@ -794,13 +758,7 @@ export class OtlpSpanPiiRedactionService {
   ): Promise<PIICheckOptions | null> {
     const disabled = await featureFlagService.isEnabled(
       "ops_pii_strict_presidio_redaction_disabled",
-      {
-        distinctId: "span-pii-service",
-        defaultValue: false,
-        // A global kill switch for the whole service, not for one tenant.
-        projectId: NOT_TARGETED,
-        organizationId: NOT_TARGETED,
-      },
+      { distinctId: "span-pii-service", defaultValue: false },
     );
     if (disabled) return null;
     if (piiRedactionLevel === "DISABLED") return null;

@@ -12,13 +12,13 @@ from ...models.patch_api_suites_by_id_response_401 import PatchApiSuitesByIdResp
 from ...models.patch_api_suites_by_id_response_404 import PatchApiSuitesByIdResponse404
 from ...models.patch_api_suites_by_id_response_422 import PatchApiSuitesByIdResponse422
 from ...models.patch_api_suites_by_id_response_500 import PatchApiSuitesByIdResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiSuitesByIdBody,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -29,7 +29,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -108,8 +109,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiSuitesByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> Response[
     PatchApiSuitesByIdResponse200
     | PatchApiSuitesByIdResponse400
@@ -118,11 +119,11 @@ def sync_detailed(
     | PatchApiSuitesByIdResponse422
     | PatchApiSuitesByIdResponse500
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Update a suite (run plan).
+    """Update a suite (run plan)
 
     Args:
         id (str):
-        body (PatchApiSuitesByIdBody):
+        body (PatchApiSuitesByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -147,8 +148,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiSuitesByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> (
     PatchApiSuitesByIdResponse200
     | PatchApiSuitesByIdResponse400
@@ -158,11 +159,11 @@ def sync(
     | PatchApiSuitesByIdResponse500
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Update a suite (run plan).
+    """Update a suite (run plan)
 
     Args:
         id (str):
-        body (PatchApiSuitesByIdBody):
+        body (PatchApiSuitesByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -182,8 +183,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiSuitesByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> Response[
     PatchApiSuitesByIdResponse200
     | PatchApiSuitesByIdResponse400
@@ -192,11 +193,11 @@ async def asyncio_detailed(
     | PatchApiSuitesByIdResponse422
     | PatchApiSuitesByIdResponse500
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Update a suite (run plan).
+    """Update a suite (run plan)
 
     Args:
         id (str):
-        body (PatchApiSuitesByIdBody):
+        body (PatchApiSuitesByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -219,8 +220,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient,
-    body: PatchApiSuitesByIdBody,
+    client: AuthenticatedClient | Client,
+    body: PatchApiSuitesByIdBody | Unset = UNSET,
 ) -> (
     PatchApiSuitesByIdResponse200
     | PatchApiSuitesByIdResponse400
@@ -230,11 +231,11 @@ async def asyncio(
     | PatchApiSuitesByIdResponse500
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Update a suite (run plan).
+    """Update a suite (run plan)
 
     Args:
         id (str):
-        body (PatchApiSuitesByIdBody):
+        body (PatchApiSuitesByIdBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

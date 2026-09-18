@@ -1,16 +1,30 @@
 /**
  * @vitest-environment node
  *
- * The fork at the two API-key seams: an organization that finished its
- * migration is decided by the engine, one that has not by the legacy walk.
- *
- * Each case pins which resolver answered, mostly by construction — the access
- * exists as a Grant row and as no `RoleBinding` row, so the two cannot agree
- * — and where both would answer alike (the downgraded-owner deny) by
- * asserting the read only the engine issues.
+ * ADR-092 delivery-plan PR 3 — the fork at the two API-key seams. As in
+ * rbac.fork.unit.test.ts, each case pins which resolver is primary: mostly by
+ * construction (the access exists as a Grant head and as no compat
+ * `RoleBinding` row, so the resolvers cannot agree), and where both resolvers
+ * would answer alike — the downgraded-owner deny — by asserting the read only
+ * the engine issues.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
+import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
+
+const { userPermissionCheck, apiKeyPermissionCheck } = vi.hoisted(() => ({
+  userPermissionCheck: vi.fn(),
+  apiKeyPermissionCheck: vi.fn(),
+}));
+
+vi.mock("~/server/app-layer/authz/shadow", () => ({
+  authzShadowFor: () => ({
+    userPermissionCheck,
+    apiKeyPermissionCheck,
+    userBatchPermissionCheck: vi.fn(),
+  }),
+  demoProjectId: () => undefined,
+  parseShadowRate: () => 0,
+}));
 
 import {
   checkRoleBindingPermission,
@@ -42,22 +56,17 @@ const adminGrantAtProject = [
 function buildPrisma({
   onEngine,
   grants,
-  keyOwner = USER_ID,
 }: {
   onEngine: boolean;
   grants: Array<"USER" | "API_KEY">;
-  /** What the DATABASE says the key's owner is. Null is a service key. */
-  keyOwner?: string | null;
 }) {
   const grantFindMany = vi.fn(async (args: any) =>
     grants.includes(args?.where?.principalType) ? adminGrantAtProject : [],
   );
   const roleBindingFindMany = vi.fn().mockResolvedValue([]);
   const prisma = {
-    systemMigrationTenantState: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue(onEngine ? { status: "finalized" } : null),
+    authzCutoverProjection: {
+      findUnique: vi.fn().mockResolvedValue({ onEngine }),
     },
     project: {
       findUnique: vi.fn().mockResolvedValue({
@@ -66,9 +75,7 @@ function buildPrisma({
     },
     team: { findUnique: vi.fn().mockResolvedValue(null) },
     organizationUser: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
+      findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
     },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     roleBinding: {
@@ -84,12 +91,6 @@ function buildPrisma({
       findMany: vi.fn().mockResolvedValue([]),
     },
     user: { findFirst: vi.fn().mockResolvedValue(null) },
-    // The ceiling's subject: the engine resolves the key's owner through the
-    // collector rather than taking it from the caller, so every check that
-    // applies a ceiling reads this.
-    apiKey: {
-      findUnique: vi.fn().mockResolvedValue({ userId: keyOwner }),
-    },
     grant: { findMany: grantFindMany },
     role: { findMany: vi.fn().mockResolvedValue([]) },
   };
@@ -100,15 +101,17 @@ function buildPrisma({
   };
 }
 
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
 beforeEach(() => {
   vi.clearAllMocks();
-  resetAuthzEngineGateForTesting();
+  resetCutoverGateForTesting();
 });
 
 describe("the fork at the api-key seams", () => {
-  describe("given a migrated organization", () => {
+  describe("given a cut-over organization", () => {
     describe("when a named principal is checked", () => {
-      it("returns the engine's answer", async () => {
+      it("returns the engine's answer and compares legacy behind it", async () => {
         const { prisma, roleBindingFindMany } = buildPrisma({
           onEngine: true,
           grants: ["USER"],
@@ -123,8 +126,9 @@ describe("the fork at the api-key seams", () => {
         });
 
         expect(permitted).toBe(true);
-        // The engine answered alone: nothing runs the legacy walk behind it.
-        expect(roleBindingFindMany).not.toHaveBeenCalled();
+        await settle();
+        expect(roleBindingFindMany).toHaveBeenCalled();
+        expect(userPermissionCheck).not.toHaveBeenCalled();
       });
 
       describe("when the caller silences the comparison", () => {
@@ -140,7 +144,9 @@ describe("the fork at the api-key seams", () => {
             organizationId: ORGANIZATION_ID,
             scope: projectScope,
             permission: "datasets:manage",
+            skipShadow: true,
           });
+          await settle();
 
           expect(permitted).toBe(true);
           expect(roleBindingFindMany).not.toHaveBeenCalled();
@@ -160,6 +166,7 @@ describe("the fork at the api-key seams", () => {
             organizationId: ORGANIZATION_ID,
             scope: projectScope,
             permission: "datasets:manage",
+            skipShadow: true,
           });
 
           expect(permitted).toBe(true);
@@ -181,6 +188,7 @@ describe("the fork at the api-key seams", () => {
           organizationId: ORGANIZATION_ID,
           scope: projectScope,
           permission: "datasets:manage",
+          skipShadow: true,
         });
 
         expect(permitted).toBe(true);
@@ -200,6 +208,7 @@ describe("the fork at the api-key seams", () => {
             organizationId: ORGANIZATION_ID,
             scope: projectScope,
             permission: "datasets:manage",
+            skipShadow: true,
           });
 
           expect(permitted).toBe(false);
@@ -220,7 +229,6 @@ describe("the fork at the api-key seams", () => {
           const { prisma } = buildPrisma({
             onEngine: true,
             grants: ["API_KEY"],
-            keyOwner: null,
           });
 
           const permitted = await resolveApiKeyPermission({
@@ -230,46 +238,18 @@ describe("the fork at the api-key seams", () => {
             organizationId: ORGANIZATION_ID,
             scope: projectScope,
             permission: "datasets:manage",
+            skipShadow: true,
           });
 
           expect(permitted).toBe(true);
         });
       });
-
-      describe("when the caller claims the key has no owner but it does", () => {
-        /**
-         * The ceiling is resolved from the database, never from what the
-         * caller says. Taking `userId` on trust would let any caller shed an
-         * owner ceiling by passing null — the key's own grant would then
-         * answer alone, which is the whole thing the ceiling exists to stop.
-         *
-         * @scenario "An api key's ceiling cannot be dropped by its caller"
-         */
-        it("applies the ceiling anyway", async () => {
-          const { prisma } = buildPrisma({
-            onEngine: true,
-            grants: ["API_KEY"],
-            keyOwner: USER_ID,
-          });
-
-          const permitted = await resolveApiKeyPermission({
-            prisma,
-            apiKeyId: API_KEY_ID,
-            userId: null,
-            organizationId: ORGANIZATION_ID,
-            scope: projectScope,
-            permission: "datasets:manage",
-          });
-
-          expect(permitted).toBe(false);
-        });
-      });
     });
   });
 
-  describe("given an organization still on the legacy path", () => {
+  describe("given an organization that is not cut over", () => {
     describe("when a named principal is checked", () => {
-      it("keeps the legacy answer and never reads a grant", async () => {
+      it("keeps the legacy answer and the stage-A4 shadow", async () => {
         const { prisma, grantFindMany } = buildPrisma({
           onEngine: false,
           grants: ["USER"],
@@ -284,12 +264,20 @@ describe("the fork at the api-key seams", () => {
         });
 
         expect(permitted).toBe(false);
+        expect(userPermissionCheck).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userId: USER_ID,
+            legacyAllowed: false,
+            caller: "apiKeyPath.userBindings",
+            fromApiKeyPath: true,
+          }),
+        );
         expect(grantFindMany).not.toHaveBeenCalled();
       });
     });
 
     describe("when an api key's ceiling is resolved", () => {
-      it("keeps the legacy steps and never reads a grant", async () => {
+      it("keeps the legacy steps and the ceiling shadow", async () => {
         const { prisma, grantFindMany } = buildPrisma({
           onEngine: false,
           grants: ["API_KEY", "USER"],
@@ -305,6 +293,14 @@ describe("the fork at the api-key seams", () => {
         });
 
         expect(permitted).toBe(false);
+        expect(apiKeyPermissionCheck).toHaveBeenCalledWith(
+          expect.objectContaining({
+            apiKeyId: API_KEY_ID,
+            ownerUserId: USER_ID,
+            legacyAllowed: false,
+            caller: "apiKeyPath.ceiling",
+          }),
+        );
         expect(grantFindMany).not.toHaveBeenCalled();
       });
     });

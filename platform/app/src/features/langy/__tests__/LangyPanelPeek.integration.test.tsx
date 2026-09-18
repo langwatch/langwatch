@@ -192,9 +192,6 @@ vi.mock("~/utils/api", () => ({
       onConversationUpdate: {
         useSubscription: () => undefined,
       },
-      warmWorker: {
-        useMutation: () => ({ mutate: () => undefined }),
-      },
       stopTurn: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
@@ -221,12 +218,6 @@ vi.mock("~/utils/api", () => ({
       },
     },
     modelProvider: {
-      setRoleAssignmentForScope: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      setFeatureOverrideForScope: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
       getResolvedDefault: {
         useQuery: () => ({
           data: resolvedDefaultRef.current.data,

@@ -9,7 +9,7 @@ import {
   type LwqlKeyMapRow,
   lwqlKeyMapTableQualifiedName,
   productionLangWatchQLNames,
-} from "~/server/analytics/lwql/provisioning";
+} from "~/server/analytics/lwql/productionProvisioning";
 import { parseConnectionUrl } from "~/server/clickhouse/goose";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
@@ -425,8 +425,6 @@ export class ProjectService {
     organizationId: string;
     page: number;
     limit: number;
-    /** See {@link ProjectRepository.findAllByOrganization}. */
-    projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
     return this.repo.findAllByOrganization(params);
   }

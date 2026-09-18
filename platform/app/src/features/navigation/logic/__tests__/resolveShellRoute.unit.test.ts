@@ -80,18 +80,4 @@ describe("shell route classification", () => {
       expect(route.isPersonalScopeRoute).toBe(true);
     });
   });
-
-  describe("when the address is an internal ops page", () => {
-    /** @scenario Internal ops pages render in the new settings shell */
-    it("takes the settings detour so the settings shell draws around it", () => {
-      const route = resolveShellRoute({
-        ...base,
-        pathname: "/ops/feature-flags",
-      });
-
-      expect(route.isSettingsRoute).toBe(true);
-      expect(route.activeProductId).toBeNull();
-      expect(route.isOrgScopeRoute).toBe(true);
-    });
-  });
 });

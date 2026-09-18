@@ -47,9 +47,12 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    checkProjectPermission:
+      () =>
+      async ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
   };
 });
 
@@ -57,7 +60,6 @@ import { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service
 import { LangyConversationService } from "~/server/app-layer/langy/langy-conversation.service";
 import { PrismaLangyConversationRepository } from "~/server/app-layer/langy/repositories/langy-conversation.prisma.repository";
 import { createLangyConversationUpdateBroadcastSubscriber } from "~/server/app-layer/langy/subscribers/langy-conversation-update-broadcast.subscriber";
-import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { prisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { createInnerTRPCContext } from "../../trpc";
@@ -242,13 +244,7 @@ describe("Langy conversation updates reach exactly the members who may read", ()
       undefined,
       eventsReader,
     );
-    appHolder.current = {
-      broadcast,
-      langy: { conversations },
-      // `.permission()` procedures decide through getApp().permissions
-      // (ADR-092); this file's rbac mock still stubs the resolvers underneath.
-      permissions: permissionsServiceFor(prisma),
-    };
+    appHolder.current = { broadcast, langy: { conversations } };
 
     const subscriber = createLangyConversationUpdateBroadcastSubscriber({
       broadcast,

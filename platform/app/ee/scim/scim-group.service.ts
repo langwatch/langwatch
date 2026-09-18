@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { Group, PrismaClient } from "~/generated/prisma/client";
@@ -8,6 +6,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { SYSTEM_ACTORS } from "~/server/app-layer/authz/ledger-actor";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import type {
@@ -112,15 +111,15 @@ export class ScimGroupService {
   }
 
   async getGroup({
-    scimResourceId,
+    externalScimId,
     organizationId,
     excludeMembers = false,
   }: {
-    scimResourceId: string;
+    externalScimId: string;
     organizationId: string;
     excludeMembers?: boolean;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -135,20 +134,16 @@ export class ScimGroupService {
   async createGroup({
     request,
     organizationId,
-    connectionId = null,
   }: {
     request: ScimCreateGroupRequest;
     organizationId: string;
-    connectionId?: string | null;
   }): Promise<ScimGroup | ScimError> {
-    // The directory's own identifier first, and the display name second: a
-    // group renamed in the directory is the same group, and matching on the
-    // name would make it a second one.
-    const existing = await this.findExistingGroup({
-      organizationId,
-      connectionId,
-      externalId: request.externalId ?? null,
-      displayName: request.displayName,
+    const existing = await this.prisma.group.findFirst({
+      where: {
+        organizationId,
+        name: request.displayName,
+        scimSource: { not: null },
+      },
     });
     if (existing) {
       return this.scimError({
@@ -165,8 +160,7 @@ export class ScimGroupService {
         name: request.displayName,
         slug,
         scimSource: "scim",
-        externalId: request.externalId ?? null,
-        scimConnectionId: connectionId,
+        externalId: (request as { externalId?: string }).externalId ?? null,
       },
     });
 
@@ -187,31 +181,22 @@ export class ScimGroupService {
   }
 
   async replaceGroup({
-    scimResourceId,
+    externalScimId,
     organizationId,
     request,
   }: {
-    scimResourceId: string;
+    externalScimId: string;
     organizationId: string;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
-    // A PUT restates the whole resource, so it restates the directory's own
-    // identifier too. It used to be accepted on create only, which meant a
-    // directory that started sending one later could never attach it.
-    const renamed = request.displayName !== group.name;
-    const reidentified =
-      request.externalId != null && request.externalId !== group.externalId;
-    if (renamed || reidentified) {
+    if (request.displayName !== group.name) {
       await this.prisma.group.update({
         where: { id: group.id },
-        data: {
-          ...(renamed ? { name: request.displayName } : {}),
-          ...(reidentified ? { externalId: request.externalId } : {}),
-        },
+        data: { name: request.displayName },
       });
     }
 
@@ -245,15 +230,15 @@ export class ScimGroupService {
   }
 
   async updateGroup({
-    scimResourceId,
+    externalScimId,
     organizationId,
     patchRequest,
   }: {
-    scimResourceId: string;
+    externalScimId: string;
     organizationId: string;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -273,13 +258,13 @@ export class ScimGroupService {
   }
 
   async deleteGroup({
-    scimResourceId,
+    externalScimId,
     organizationId,
   }: {
-    scimResourceId: string;
+    externalScimId: string;
     organizationId: string;
   }): Promise<ScimError | null> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -305,62 +290,15 @@ export class ScimGroupService {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  /**
-   * The group this push is about, before one exists.
-   *
-   * `(connectionId, externalId)` is the key when the directory sends its own
-   * identifier, so two connections in one organization can each carry their
-   * own "engineering" and a group renamed in the directory stays one group.
-   * The display name is the fallback for a push that carries no identifier —
-   * which is what the previous code did unconditionally, and is why a renamed
-   * group arrived as a second one.
-   */
-  private async findExistingGroup({
-    organizationId,
-    connectionId,
-    externalId,
-    displayName,
-  }: {
-    organizationId: string;
-    connectionId: string | null;
-    externalId: string | null;
-    displayName: string;
-  }): Promise<Group | null> {
-    if (connectionId && externalId) {
-      const byIdentifier = await this.prisma.group.findFirst({
-        where: { organizationId, scimConnectionId: connectionId, externalId },
-      });
-      if (byIdentifier) return byIdentifier;
-    }
-    return this.prisma.group.findFirst({
-      where: {
-        organizationId,
-        name: displayName,
-        scimSource: { not: null },
-      },
-    });
-  }
-
-  /**
-   * The group a `/Groups/:id` request names.
-   *
-   * `:id` is the SERVICE PROVIDER's identifier (RFC 7643 §3.1) — ours, minted
-   * by us and stored by the directory — so resolving it against `Group.id` is
-   * correct. What was wrong was the name: the parameter was called
-   * `externalScimId`, which says it is the DIRECTORY's identifier, and
-   * `externalId` is a different column that this never read. Renamed rather
-   * than re-pointed, because re-pointing it would break every identity
-   * provider that has already stored the ids we handed out.
-   */
   private async findGroup({
-    scimResourceId,
+    externalScimId,
     organizationId,
   }: {
-    scimResourceId: string;
+    externalScimId: string;
     organizationId: string;
   }): Promise<Group | null> {
     return this.prisma.group.findFirst({
-      where: { id: scimResourceId, organizationId },
+      where: { id: externalScimId, organizationId },
     });
   }
 
@@ -535,10 +473,6 @@ export class ScimGroupService {
     return {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
       id: group.id,
-      // Echoed when we hold one. A directory that sent an externalId and
-      // never got it back could not tell that we kept it, which is what made
-      // the create-only cast below invisible for as long as it was wrong.
-      ...(group.externalId ? { externalId: group.externalId } : {}),
       displayName: group.name,
       ...(excludeMembers
         ? {}

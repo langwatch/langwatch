@@ -4,7 +4,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { resetAuthzEngineGateForTesting } from "~/server/app-layer/authz/engine-gate";
+import { resetCutoverGateForTesting } from "~/server/app-layer/authz/cutover-gate";
 import { PrismaRoleBindingRepository } from "../repositories/role-binding.prisma.repository";
 
 /** These reads now go through the per-organization fork, so the double has to
@@ -14,14 +14,14 @@ import { PrismaRoleBindingRepository } from "../repositories/role-binding.prisma
 const legacyPrisma = (roleBindingFindMany: ReturnType<typeof vi.fn>) =>
   ({
     roleBinding: { findMany: roleBindingFindMany },
-    systemMigrationTenantState: {
-      findUnique: vi.fn().mockResolvedValue(null),
+    authzCutoverProjection: {
+      findUnique: vi.fn().mockResolvedValue({ onEngine: false }),
     },
   }) as unknown as PrismaClient;
 
 describe("PrismaRoleBindingRepository tenant references", () => {
   afterEach(() => {
-    resetAuthzEngineGateForTesting();
+    resetCutoverGateForTesting();
   });
 
   it("drops a group binding whose group belongs to another organization", async () => {

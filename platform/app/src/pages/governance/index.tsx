@@ -6,6 +6,7 @@ import {
   HStack,
   Input,
   SimpleGrid,
+  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -193,11 +194,20 @@ function GovernanceOverviewPage() {
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <HStack gap={2}>
-          <Heading size="md">AI Governance</Heading>
-          <Badge colorPalette="purple" variant="subtle">
-            Preview
-          </Badge>
+        <HStack alignItems="end">
+          <VStack align="start" gap={1}>
+            <HStack gap={2}>
+              <Heading size="md">AI Governance</Heading>
+              <Badge colorPalette="purple" variant="subtle">
+                Preview
+              </Badge>
+            </HStack>
+            <Text color="fg.muted" fontSize="sm">
+              Spend, users, anomalies, and ingestion-source health for the
+              organization. Window: last 30 days.
+            </Text>
+          </VStack>
+          <Spacer />
         </HStack>
 
         {orgId && <QuarantineFillAlert organizationId={orgId} />}
@@ -235,7 +245,7 @@ function GovernanceOverviewPage() {
                 }
                 title="Add tools to the catalog"
                 description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
-                href="/governance/inventory?tab=catalog"
+                href="/governance/tool-catalog"
                 ctaLabel={
                   hasCatalogTiles
                     ? `${catalogTiles.length} tile${catalogTiles.length === 1 ? "" : "s"} in the catalog`
@@ -263,7 +273,7 @@ function GovernanceOverviewPage() {
                 }
                 title="Connect an ingestion source"
                 description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
-                href="/governance/inventory?tab=sources"
+                href="/governance/ingestion-sources"
                 ctaLabel={
                   hasSources
                     ? `${sources.length} source${sources.length === 1 ? "" : "s"} configured`
@@ -444,7 +454,11 @@ function GovernanceOverviewPage() {
               title="Spend by department"
               subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
               actions={
-                <Link href="/governance/people" color="blue.600" fontSize="sm">
+                <Link
+                  href="/governance/departments"
+                  color="blue.600"
+                  fontSize="sm"
+                >
                   Manage departments →
                 </Link>
               }
@@ -498,10 +512,7 @@ function GovernanceOverviewPage() {
                   </Text>
                   {/* An invitation to write, so only for whoever can. */}
                   {canManageSources && (
-                    <Link
-                      href="/governance/inventory?tab=sources"
-                      color="blue.600"
-                    >
+                    <Link href="/governance/ingestion-sources" color="blue.600">
                       + Add a source
                     </Link>
                   )}
@@ -878,7 +889,7 @@ function SourceChip({ source }: { source: SourceHealth }) {
 
   return (
     <Link
-      href="/governance/inventory?tab=sources"
+      href="/governance/ingestion-sources"
       _hover={{ textDecoration: "none" }}
     >
       <HStack

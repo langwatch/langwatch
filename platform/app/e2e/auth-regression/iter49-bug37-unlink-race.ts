@@ -65,7 +65,6 @@ async function main() {
         userId: user.id,
         type: "oauth",
         provider: "iter49-fake-provider",
-        issuer: "local:oauth:iter49-fake-provider",
         providerAccountId: `iter49-fake-${TS}`,
       },
     });

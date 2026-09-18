@@ -16,13 +16,12 @@ import {
   type RunParameterValues,
   type ScenarioParameterDefinition,
 } from "~/server/scenarios/parameters";
-import { targetLabelOf } from "~/server/suites/target-key";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
-  displayTypedValue,
-  serializeOptionalTypedScalarValue,
+  displayOptionalValue,
+  serializeOptionalScalarValue,
 } from "~/utils/jsonValueText";
 import { toaster } from "../ui/toaster";
 import { showSuiteRunError } from "./showSuiteRunError";
@@ -38,47 +37,21 @@ export interface UseRunSuiteOptions {
   onViewRun?: (suiteId: string) => void;
 }
 
-/** Where a declared parameter comes from. */
-export type ParameterSource = "scenario" | "agent";
-
 /**
- * One parameter a run can carry, with where it is declared: on a scenario of
- * the run, or by an agent the run goes against.
- */
-export type DeclaredParameter = ScenarioParameterDefinition & {
-  source: ParameterSource;
-  /** The label of the agent that declares it. Nothing for a scenario one. */
-  agentLabel?: string;
-};
-
-/** An agent of the run, with the parameters it declares. */
-export type ParameterDeclaringAgent = {
-  id: string;
-  name: string;
-  environment?: string | null;
-  owner?: { name: string | null } | null;
-  parameters?: readonly ScenarioParameterDefinition[];
-};
-
-/**
- * The parameters the scenarios of the run declare, keyed by name.
+ * Every parameter the run can carry: the union of what the scenarios in it
+ * declare.
  *
  * Two scenarios can declare the same name and only one of them describe it or
  * default it, so a name keeps the first description and the first default any
  * of them gives it rather than the last one read.
- *
- * Secret is the one field that is not first-wins: a name any scenario in the
- * run declares secret is offered as secret. The run refuses that pair anyway,
- * and asking for the value behind a password field is what lets the person see
- * the conflict instead of typing a credential into a plain field first.
  */
-function scenarioDeclaredParameters({
+function unionParameterDefinitions({
   scenarioIds,
   scenarios,
 }: {
   scenarioIds: string[];
   scenarios: readonly { id: string; parameters: unknown }[];
-}): Map<string, DeclaredParameter> {
+}): ScenarioParameterDefinition[] {
   const inRun = new Set(scenarioIds);
   const declared = scenarios
     .filter((scenario) => inRun.has(scenario.id))
@@ -86,59 +59,14 @@ function scenarioDeclaredParameters({
       parseScenarioParameterDefinitions(scenario.parameters),
     );
 
-  const union = new Map<string, DeclaredParameter>();
+  const union = new Map<string, ScenarioParameterDefinition>();
   for (const definition of declared) {
     const seen = union.get(definition.name);
     union.set(definition.name, {
-      ...(seen ?? definition),
       name: definition.name,
       description: seen?.description ?? definition.description,
       defaultValue: seen?.defaultValue ?? definition.defaultValue,
-      secret: seen?.secret === true || definition.secret === true,
-      source: "scenario",
     });
-  }
-  return union;
-}
-
-/** The parameters one agent declares, each tagged with the agent label. */
-function agentDeclaredParameters(
-  agent: ParameterDeclaringAgent,
-): DeclaredParameter[] {
-  const agentLabel = targetLabelOf({
-    name: agent.name,
-    environment: agent.environment,
-    ownerName: agent.owner?.name,
-    differingNames: new Set(),
-  });
-  return (agent.parameters ?? []).map((definition) => ({
-    ...definition,
-    source: "agent" as const,
-    agentLabel,
-  }));
-}
-
-/**
- * Every parameter the run can carry: the union of what the scenarios in it
- * declare, then what its agents declare.
- *
- * A scenario declaration wins over an agent's on a name both declare, the way
- * the server resolves it.
- */
-export function unionParameterDefinitions({
-  scenarioIds,
-  scenarios,
-  agents = [],
-}: {
-  scenarioIds: string[];
-  scenarios: readonly { id: string; parameters: unknown }[];
-  /** The agents the run goes against, for the parameters they declare. */
-  agents?: readonly ParameterDeclaringAgent[];
-}): DeclaredParameter[] {
-  const union = scenarioDeclaredParameters({ scenarioIds, scenarios });
-  for (const definition of agents.flatMap(agentDeclaredParameters)) {
-    if (union.has(definition.name)) continue;
-    union.set(definition.name, definition);
   }
   return [...union.values()];
 }
@@ -149,12 +77,8 @@ export function unionParameterDefinitions({
  * A name left empty is omitted rather than sent as an empty string: the run
  * then falls back to whatever default each scenario declares for it, which is
  * the same path a run that was never offered the name at all takes.
- *
- * A secret keeps whatever was typed as text. A token of digits is still a
- * token, and reading it as a number would both change it and have the run
- * refuse it, because a secret value has to be a string.
  */
-export function toRunParameters({
+function toRunParameters({
   definitions,
   values,
 }: {
@@ -163,15 +87,7 @@ export function toRunParameters({
 }): RunParameterValues | undefined {
   const parameters: RunParameterValues = {};
   for (const definition of definitions) {
-    const typed = values[definition.name] ?? "";
-    if (definition.secret === true) {
-      if (typed !== "") parameters[definition.name] = typed;
-      continue;
-    }
-    const value = serializeOptionalTypedScalarValue({
-      raw: typed,
-      type: definition.type,
-    });
+    const value = serializeOptionalScalarValue(values[definition.name] ?? "");
     if (value === undefined) continue;
     parameters[definition.name] = value;
   }
@@ -288,10 +204,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     for (const definition of parameterDefinitions) {
       values[definition.name] =
         parameterOverrides[definition.name] ??
-        displayTypedValue({
-          value: definition.defaultValue,
-          type: definition.type,
-        });
+        displayOptionalValue(definition.defaultValue);
     }
     return values;
   }, [parameterDefinitions, parameterOverrides]);

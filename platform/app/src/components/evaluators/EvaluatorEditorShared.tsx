@@ -31,7 +31,10 @@ import type {
   LocalEvaluatorConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
-import { isComparisonEvaluatorType } from "~/experiments-v3/types";
+import {
+  COMPARISON_EVALUATOR_TYPE,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
+} from "~/experiments-v3/types";
 import {
   applyHandledErrorToForm,
   FormServerError,
@@ -72,6 +75,17 @@ const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
   includeMetrics: [],
   randomizeOrder: true,
 };
+
+/**
+ * A legacy pairwise evaluator opens in the same form as a current one: its
+ * config is normalized to the comparison shape on load, so the only thing its
+ * evaluatorType still selects is which judge endpoint runs it.
+ */
+const isComparisonEvaluatorType = (
+  evaluatorType: string | undefined,
+): boolean =>
+  evaluatorType === COMPARISON_EVALUATOR_TYPE ||
+  evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
 export type EvaluatorMappingsConfig = {
   level?: "trace" | "thread";

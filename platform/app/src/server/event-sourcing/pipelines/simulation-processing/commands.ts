@@ -1,7 +1,6 @@
 import { defineCommand } from "../../commands/defineCommand";
 import {
   simulationMessageSnapshotEventDataSchema,
-  simulationRunAgentInstanceRecordedEventDataSchema,
   simulationRunCancelRequestedEventDataSchema,
   simulationRunDeletedEventDataSchema,
   simulationRunQueuedEventDataSchema,
@@ -104,21 +103,6 @@ export const TextMessageEndCommand = defineCommand({
   }),
   makeJobId: (d) =>
     `${d.tenantId}:${d.scenarioRunId}:text-message-end:${d.messageId}`,
-});
-
-export const RecordAgentInstanceCommand = defineCommand({
-  commandType: "lw.simulation_run.record_agent_instance",
-  eventType: "lw.simulation_run.agent_instance_recorded",
-  eventVersion: "2026-08-30",
-  aggregateType: "simulation_run",
-  schema: simulationRunAgentInstanceRecordedEventDataSchema,
-  aggregateId: (d) => d.scenarioRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:recordAgentInstance`,
-  spanAttributes: (d) => ({
-    "payload.scenarioRun.id": d.scenarioRunId,
-    "payload.agentInstance.hostname": d.agentInstance.hostname,
-  }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-agent-instance`,
 });
 
 export const CancelRunCommand = defineCommand({

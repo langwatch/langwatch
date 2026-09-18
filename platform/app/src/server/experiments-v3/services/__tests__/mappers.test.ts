@@ -191,7 +191,6 @@ describe("mapClickHouseItemsToRunWithItems", () => {
     EvaluationCost: null,
     EvaluationInputs: null,
     EvaluationDurationMs: null,
-    CarriedOver: 0,
     CreatedAt: "2024-01-15 10:30:00.000",
   };
 
@@ -220,7 +219,6 @@ describe("mapClickHouseItemsToRunWithItems", () => {
     EvaluationCost: 0.001,
     EvaluationInputs: null,
     EvaluationDurationMs: null,
-    CarriedOver: 0,
     CreatedAt: "2024-01-15 10:30:01.000",
   };
 

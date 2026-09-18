@@ -16,6 +16,7 @@ import {
 
 import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";
 
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const directionSchema = z.nativeEnum(GatewayGuardrailDirection);
@@ -24,7 +25,7 @@ const failureModeSchema = z.nativeEnum(GatewayGuardrailFailureMode);
 export const gatewayGuardrailsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("gatewayGuardrails:view")
+    .use(checkProjectPermission("gatewayGuardrails:view"))
     .query(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       return await service.list(input.projectId);
@@ -32,7 +33,7 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .permission("gatewayGuardrails:view")
+    .use(checkProjectPermission("gatewayGuardrails:view"))
     .query(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       return await service.get(input.id, input.projectId);
@@ -49,7 +50,7 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
         failureMode: failureModeSchema.optional(),
       }),
     )
-    .permission("gatewayGuardrails:manage")
+    .use(checkProjectPermission("gatewayGuardrails:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       return await service.create({
@@ -75,7 +76,7 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
         failureMode: failureModeSchema.optional(),
       }),
     )
-    .permission("gatewayGuardrails:manage")
+    .use(checkProjectPermission("gatewayGuardrails:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       return await service.update({
@@ -92,7 +93,7 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .permission("gatewayGuardrails:manage")
+    .use(checkProjectPermission("gatewayGuardrails:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       await service.archive({

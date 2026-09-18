@@ -16,18 +16,12 @@ export function SuiteArchiveDialog({
   onConfirm,
   suiteName,
   isLoading = false,
-  title = "Archive run plan?",
-  description = "Archived run plans will no longer appear in the sidebar. Test runs are preserved.",
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
   suiteName: string;
   isLoading?: boolean;
-  /** The question the dialog asks. A test suite asks about a test suite instead. */
-  title?: string;
-  /** What happens on confirm. A test suite also archives the scenarios it holds. */
-  description?: string;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
@@ -39,7 +33,7 @@ export function SuiteArchiveDialog({
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            {title}
+            Archive run plan?
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
@@ -50,13 +44,15 @@ export function SuiteArchiveDialog({
               </Text>
             </Text>
             <Text color="fg.muted" fontSize="sm">
-              {description}
+              Archived run plans will no longer appear in the sidebar. Test runs
+              are preserved.
             </Text>
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
           <Button
             variant="outline"
+            mr={3}
             onClick={(e) => {
               e.stopPropagation();
               onClose();

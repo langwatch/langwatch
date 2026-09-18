@@ -34,9 +34,7 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
     },
     mockPrisma: {
       organizationUser: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
+        findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       roleBinding: {
@@ -73,21 +71,10 @@ vi.mock("~/server/app-layer/app", async (importOriginal) => {
   const actual = await importOriginal<typeof AppLayerApp>();
   // misc.ts reads its connection through tryGetApp; getApp is overridden too
   // so both accessors agree on the fake.
-  // The authorize route decides through the App's permissions (ADR-092);
-  // composing over this file's mocked ~/server/db keeps the roleBinding
-  // stubs in charge of every outcome.
-  const { permissionsServiceFor } = await import(
-    "~/server/app-layer/permissions/runtime"
-  );
-  const { prisma: dbForPermissions } = await import("~/server/db");
-  const fakeApp = () => ({
-    redis: mockRedis,
-    permissions: permissionsServiceFor(dbForPermissions),
-  });
   return {
     ...actual,
-    getApp: fakeApp,
-    tryGetApp: fakeApp,
+    getApp: () => ({ redis: mockRedis }),
+    tryGetApp: () => ({ redis: mockRedis }),
   };
 });
 vi.mock("~/utils/encryption", () => ({
@@ -132,7 +119,7 @@ function resetMocks() {
     ]);
   mockPrisma.organizationUser.findFirst
     .mockReset()
-    .mockResolvedValue({ role: "MEMBER", disabledAt: null });
+    .mockResolvedValue({ role: "MEMBER" });
 }
 
 describe("POST /api/mcp/authorize — redirect_uri binding", () => {

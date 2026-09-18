@@ -119,7 +119,6 @@ export function lwqlResult(
     truncated: false,
     diagnostics: [],
     followsTimeWindow: true,
-    followsGranularity: false,
     ...overrides,
   };
 }

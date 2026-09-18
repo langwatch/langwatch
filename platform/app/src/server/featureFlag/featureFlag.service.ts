@@ -6,7 +6,6 @@ import {
 } from "./featureFlagStore.postgres";
 import type { FeatureFlagKey } from "./registry";
 import { resolveFlagDefinition } from "./registry";
-import { toRuleContextId } from "./targeting";
 import type {
   FeatureFlagEvaluateOptions,
   FeatureFlagServiceInterface,
@@ -100,8 +99,8 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     }
 
     const storeCtx = {
-      projectId: toRuleContextId(opts.projectId),
-      organizationId: toRuleContextId(opts.organizationId),
+      projectId: opts.projectId,
+      organizationId: opts.organizationId,
     };
 
     if (definition?.scope === "SYSTEM" || definition?.scope === "PRODUCT") {

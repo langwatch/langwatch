@@ -214,8 +214,7 @@ type System interface {
 	RestoreGroup(pid int)
 	// ProcessSamples lists every live process with the facts the tsgo governor
 	// needs (ADR-095): resident set, CPU clock, elapsed age, command line.
-	// Filtering to the compiler is the caller's job via
-	// domain.IsTypeScriptCompilerCommand — the
+	// Filtering to tsgo is the caller's job via domain.IsTsgoCommand — the
 	// sampler stays generic and the selection rule stays in one testable place.
 	ProcessSamples() []ProcessSample
 	// Kill SIGKILLs one process — never its group. The tsgo governor's targets

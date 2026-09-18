@@ -1,5 +1,4 @@
 import type { createLogger } from "@langwatch/observability";
-import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
 import type {
   EsKillSwitchKey,
@@ -71,9 +70,6 @@ export async function isComponentDisabled({
     const isDisabled = await featureFlagService.isEnabled(flagKey, {
       distinctId: tenantId,
       projectId: tenantId,
-      // A per-event hot path. It buys no organization lookup, so an operator
-      // stops one tenant by project id.
-      organizationId: NOT_TARGETED,
       defaultValue: false,
       cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
     });

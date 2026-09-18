@@ -8,6 +8,7 @@ import {
   PromptTagService,
   PromptTagValidationError,
 } from "~/server/prompt-config/prompt-tag.service";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -63,7 +64,7 @@ export const promptTagsRouter = createTRPCRouter({
    */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("prompts:view")
+    .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(
         ctx.prisma,
@@ -79,7 +80,7 @@ export const promptTagsRouter = createTRPCRouter({
    */
   create: protectedProcedure
     .input(z.object({ projectId: z.string(), name: z.string() }))
-    .permission("prompts:manage")
+    .use(checkProjectPermission("prompts:manage"))
     .mutation(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(
         ctx.prisma,
@@ -109,7 +110,7 @@ export const promptTagsRouter = createTRPCRouter({
         newName: z.string(),
       }),
     )
-    .permission("prompts:manage")
+    .use(checkProjectPermission("prompts:manage"))
     .mutation(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(
         ctx.prisma,
@@ -133,7 +134,7 @@ export const promptTagsRouter = createTRPCRouter({
    */
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), name: z.string() }))
-    .permission("prompts:manage")
+    .use(checkProjectPermission("prompts:manage"))
     .mutation(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(
         ctx.prisma,

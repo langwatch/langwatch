@@ -9,13 +9,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
-import type { TeamUserRole } from "~/generated/prisma/client";
+import { TeamUserRole } from "~/generated/prisma/client";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
 } from "../../../components/settings/ScopeChipPicker";
 import { Drawer } from "../../../components/ui/drawer";
-import { getTeamRolePermissions } from "../../../server/api/rbac";
+import {
+  getTeamRolePermissions,
+  hasPermissionWithHierarchy,
+} from "../../../server/api/rbac";
 import {
   computePermissionsFromSelections,
   PERMISSION_CATEGORIES,
@@ -31,10 +34,8 @@ import {
   bindingsToPermissionMode,
   bindingsToScopes,
   bindingsToSelections,
-  categoryAccessAvailability,
-  clampSelectionsToAvailability,
   deriveBindingRole,
-  getUserPermissionsAcrossScopes,
+  findBindingAtScope,
   type PermissionMode,
 } from "./utils";
 
@@ -99,39 +100,29 @@ export function EditApiKeyDrawer({
 
   const isServiceKey = apiKey ? !apiKey.userId : false;
 
-  const ceilingScopes = useMemo(
-    () =>
-      selectedScopes.length > 0
-        ? selectedScopes
-        : [
-            {
-              scopeType: "PROJECT" as const,
-              scopeId: currentProjectId ?? "",
-            },
-          ],
-    [selectedScopes, currentProjectId],
-  );
-  const primaryScope = ceilingScopes[0]!;
+  const primaryScope = selectedScopes[0] ?? {
+    scopeType: "PROJECT" as const,
+    scopeId: currentProjectId ?? "",
+  };
 
-  // Same ceiling the create drawer shows: the team-role bags carry no
-  // organization, gateway, governance or playground permissions, so reading
-  // them directly would lock rows a service key or an organization admin can
-  // in fact grant. Across every selected scope, not only the first: one
-  // permission list serves every binding, so a row the second scope refuses
-  // would fail the save with a scope violation.
   const userPermissions = useMemo(() => {
-    return getUserPermissionsAcrossScopes({
-      myBindings: myBindings.data,
-      scopes: ceilingScopes,
+    if (isServiceKey) return getTeamRolePermissions(TeamUserRole.ADMIN);
+    if (!myBindings.data) return [];
+
+    const binding = findBindingAtScope({
+      bindings: myBindings.data,
+      scopeType: primaryScope.scopeType,
+      scopeId: primaryScope.scopeId,
       organizationId,
       orgProjects,
-      isServiceKey,
-      getTeamRolePermissions: (role) =>
-        getTeamRolePermissions(role as TeamUserRole),
     });
+
+    if (!binding) return [];
+    return getTeamRolePermissions(binding.role as TeamUserRole);
   }, [
     myBindings.data,
-    ceilingScopes,
+    primaryScope.scopeType,
+    primaryScope.scopeId,
     organizationId,
     orgProjects,
     isServiceKey,
@@ -162,33 +153,22 @@ export function EditApiKeyDrawer({
     }
   }, [apiKey, organizationId, currentTeamId, currentProjectId]);
 
-  // Re-narrowed to the ceiling of whatever is selected NOW: the key's stored
-  // level, or one picked before another scope was added, can sit above what
-  // the caller holds everywhere the key will be bound, and the save would
-  // come back `api_key_scope_violation` for a row that still looked granted.
-  const effectiveCategorySelections = useMemo(
-    () =>
-      clampSelectionsToAvailability({
-        selections: categorySelections,
-        userPermissions,
-      }) as Record<string, PermissionSelection>,
-    [categorySelections, userPermissions],
-  );
-
   const handlePermissionModeChange = (mode: "all" | "restricted") => {
     setPermissionMode(mode);
     if (
       mode === "restricted" &&
-      Object.values(effectiveCategorySelections).every(
-        (v) => !v || v === "none",
-      )
+      Object.values(categorySelections).every((v) => !v || v === "none")
     ) {
       const allSelected: Record<string, PermissionSelection> = {};
       for (const cat of PERMISSION_CATEGORIES) {
-        const { canRead, canWrite } = categoryAccessAvailability({
-          category: cat,
-          userPermissions,
-        });
+        const canRead = cat.readPermissions.every((p) =>
+          hasPermissionWithHierarchy(userPermissions, p),
+        );
+        const canWrite =
+          cat.accessLevels.includes("write") &&
+          cat.writePermissions.every((p) =>
+            hasPermissionWithHierarchy(userPermissions, p),
+          );
         allSelected[cat.key] = canWrite ? "write" : canRead ? "read" : "none";
       }
       setCategorySelections(allSelected);
@@ -200,7 +180,7 @@ export function EditApiKeyDrawer({
 
     const permissions =
       permissionMode === "restricted"
-        ? computePermissionsFromSelections(effectiveCategorySelections)
+        ? computePermissionsFromSelections(categorySelections)
         : undefined;
 
     const bindings = selectedScopes.map((s) => ({
@@ -328,7 +308,7 @@ export function EditApiKeyDrawer({
                 {permissionMode === "restricted" && (
                   <PermissionCounter
                     count={
-                      Object.values(effectiveCategorySelections).filter(
+                      Object.values(categorySelections).filter(
                         (v) => v && v !== "none",
                       ).length
                     }
@@ -338,7 +318,7 @@ export function EditApiKeyDrawer({
 
               {permissionMode === "restricted" && (
                 <PermissionCategoryList
-                  selections={effectiveCategorySelections}
+                  selections={categorySelections}
                   userPermissions={userPermissions}
                   onChange={setCategorySelections}
                 />

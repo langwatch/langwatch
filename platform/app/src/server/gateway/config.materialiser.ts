@@ -16,7 +16,7 @@ import type {
   VirtualKey,
 } from "~/generated/prisma/client";
 
-import { readCustomKeys } from "~/server/modelProviders/customKeys";
+import { decrypt } from "../../utils/encryption";
 import {
   type LangyMirrorTier,
   resolveLangyMirrorTier,
@@ -29,15 +29,12 @@ import {
   resolveApplicableBudgets,
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
-import { computeConfigETag } from "./configETag";
 import { withTierFallthrough } from "./modelTierFallthrough";
-import { declaredModelsForProvider } from "./providerModelCatalog";
 import {
   eligibleModelProvidersForVk,
   scopeReachableModelProvidersForVk,
   traceProjectFor,
 } from "./scopeResolver";
-import { organizationSpendTenantIds } from "./spendTenants";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
@@ -77,20 +74,6 @@ export type ProviderSlot = {
   base_url?: string;
   region?: string;
   deployment_map?: Record<string, string>;
-  /**
-   * The operator-chosen routing handle of this ModelProvider row. A caller
-   * writes it where a provider family goes ("eu/claude-sonnet-5") to reach
-   * THIS instance rather than whichever instance of the family the key's chain
-   * order reaches first. Absent when the operator set none.
-   */
-  handle?: string;
-  /**
-   * What this provider declares it serves, for ROUTING a bare model name to
-   * the provider that owns it. Absent when the row declares nothing, which the
-   * gateway reads as "this provider said nothing" rather than "this provider
-   * serves nothing". Authorization stays with `models_allowed`.
-   */
-  models?: string[];
   config: Record<string, unknown>;
 };
 
@@ -103,12 +86,6 @@ export type ProviderSlot = {
 export type ProviderExclusionWire = {
   id: string;
   type: string;
-  /**
-   * The dropped row's routing handle, carried so a request naming it is told
-   * which of the key's settings dropped the provider instead of being told the
-   * operator's own handle means nothing.
-   */
-  handle?: string;
 };
 
 export type GatewayConfigPayload = {
@@ -329,19 +306,6 @@ export class GatewayConfigMaterialiser {
     };
   }
 
-  /**
-   * The version token for the bundle this materialiser would build for `vk`.
-   *
-   * It lives beside `materialise` because it describes that output: the token
-   * has to move whenever the bundle would come back different, and the two
-   * drifting apart is what lets a 304 confirm a bundle that is no longer
-   * current. See `configETag.ts` for what it covers and what it leaves to the
-   * change feed.
-   */
-  async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
-    return await computeConfigETag({ prisma: this.prisma, virtualKey: vk });
-  }
-
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
     const eligibleProviders = await eligibleModelProvidersForVk(
       this.prisma,
@@ -487,10 +451,11 @@ export class GatewayConfigMaterialiser {
       return new Map();
     }
     try {
-      const tenantIds = await organizationSpendTenantIds(
-        this.prisma,
-        vk.organizationId,
-      );
+      const orgProjects = await this.prisma.project.findMany({
+        where: { team: { organizationId: vk.organizationId } },
+        select: { id: true },
+      });
+      const tenantIds = orgProjects.map((p) => p.id);
       if (tenantIds.length === 0) return new Map();
       // Read each budget's spend from its RESOLVED bucket, exactly. The
       // bundle enforces this key's buckets, so the figure must be the
@@ -546,6 +511,19 @@ export class GatewayConfigMaterialiser {
       },
     });
   }
+}
+
+function decryptCustomKeys(raw: unknown): Record<string, unknown> {
+  if (raw === null || raw === undefined) return {};
+  if (typeof raw === "object") return raw as Record<string, unknown>;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(decrypt(raw)) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
 }
 
 // Resolve the policy-side of the bundle (model aliases + policy rules)
@@ -675,7 +653,7 @@ function geminiCredentials(
 
 export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
   const provider = mp.provider;
-  const customKeys = readCustomKeys(mp.customKeys).keys;
+  const customKeys = decryptCustomKeys(mp.customKeys);
   const pick = (k: string): string =>
     typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
 
@@ -758,7 +736,7 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
 
 function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const credentials = buildCredentials(mp);
-  const customKeys = readCustomKeys(mp.customKeys).keys;
+  const customKeys = decryptCustomKeys(mp.customKeys);
   // Providers whose base-URL override the gateway consumes (see mapProvider
   // in bifrost.go): "custom" and "openai" route it to Bifrost's VLLM
   // (OpenAI-compat) adapter; "anthropic" derives a per-endpoint custom
@@ -767,15 +745,10 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   // with an endpointKey resolve their endpoint elsewhere (Azure/Vertex via
   // credentials.endpoint), so emitting a per-slot base_url for them would
   // be a dead field. Scope the override to what's consumed.
-  // "elevenlabs" is on the list for the realtime session mint, which dials
-  // the vendor directly and must reach the residency host the customer
-  // chose: a signed URL minted against the default host is signed in the
-  // wrong region.
   const supportsBaseURLOverride =
     mp.provider === "custom" ||
     mp.provider === "openai" ||
-    mp.provider === "anthropic" ||
-    mp.provider === "elevenlabs";
+    mp.provider === "anthropic";
   const endpointKey = supportsBaseURLOverride
     ? modelProviders[mp.provider as keyof typeof modelProviders]?.endpointKey
     : undefined;
@@ -798,26 +771,7 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
     ...(baseURL ? { base_url: baseURL } : {}),
     ...(region ? { region } : {}),
     ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
-    ...routingWire({ mp }),
     config: buildProviderConfig(mp),
-  };
-}
-
-/**
- * The routing half of a provider slot: the handle that addresses this exact
- * instance, and the models it declares it serves. Both are absent rather than
- * empty when there is nothing to say, which is what the gateway reads as "this
- * provider said nothing" instead of "this provider serves nothing".
- */
-function routingWire({
-  mp,
-}: {
-  mp: ModelProvider;
-}): Pick<ProviderSlot, "handle" | "models"> {
-  const models = declaredModelsForProvider(mp);
-  return {
-    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
-    ...(models ? { models } : {}),
   };
 }
 
@@ -883,11 +837,7 @@ function routingModeToWire(
 }
 
 function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire {
-  return {
-    id: mp.id,
-    type: mp.provider,
-    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
-  };
+  return { id: mp.id, type: mp.provider };
 }
 
 /**

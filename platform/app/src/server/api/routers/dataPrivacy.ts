@@ -12,7 +12,7 @@ import {
   InvalidDataPrivacyConfigError,
   ScopeTargetNotFoundError,
 } from "~/server/data-privacy/dataPrivacyPolicy.service";
-import { authorizeInResolver } from "../rbac";
+import { authorizeInResolver, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInput = z.object({
@@ -29,7 +29,7 @@ export const dataPrivacyRouter = createTRPCRouter({
    */
   getSnapshot: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:view")
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       return getDataPrivacySnapshot(
         { prisma: ctx.prisma, session: ctx.session },
@@ -52,12 +52,7 @@ export const dataPrivacyRouter = createTRPCRouter({
         config: dataPrivacyConfigSchema,
       }),
     )
-    .use(
-      authorizeInResolver({
-        projectId:
-          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the write",
-      }),
-    )
+    .use(authorizeInResolver)
     .mutation(async ({ input, ctx }) => {
       const authCtx = { prisma: ctx.prisma, session: ctx.session };
       await assertScopeBelongsToProjectOrganization(
@@ -92,12 +87,7 @@ export const dataPrivacyRouter = createTRPCRouter({
         personalOnly: z.boolean(),
       }),
     )
-    .use(
-      authorizeInResolver({
-        projectId:
-          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the removal",
-      }),
-    )
+    .use(authorizeInResolver)
     .mutation(async ({ input, ctx }) => {
       const authCtx = { prisma: ctx.prisma, session: ctx.session };
       await assertScopeBelongsToProjectOrganization(

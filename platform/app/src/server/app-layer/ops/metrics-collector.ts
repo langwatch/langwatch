@@ -12,7 +12,6 @@ import {
   mergeHistogramCounts,
   windowPercentiles,
 } from "~/shared/ops/latency";
-import { totalInFlight as computeTotalInFlight } from "./in-flight";
 import { normalizeErrorMessage } from "./normalize-error-message";
 import {
   computeEngineCpuPercent,
@@ -1330,14 +1329,13 @@ export class OpsMetricsCollector {
       const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
       this.knownPipelinePaths = knownPaths;
 
-      // Reported on its own below as `pendingCount`, which stays pending-only.
       let totalPending = 0;
+      let totalActive = 0;
       for (const q of queues) {
         totalPending += q.totalPendingJobs;
+        totalActive += q.activeGroupCount;
       }
-      // Parked groups included: see ./in-flight.ts for why the derived
-      // ingestion rate below is wrong without them.
-      const totalInFlight = computeTotalInFlight({ queues });
+      const totalInFlight = totalPending + totalActive;
 
       const now = Date.now();
       const elapsed = (now - this.lastTimestamp) / 1000;

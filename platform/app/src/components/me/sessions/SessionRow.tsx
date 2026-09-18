@@ -11,7 +11,7 @@ import { PullRequestsCell } from "./cells/PullRequestsCell";
 import { SessionNameCell } from "./cells/SessionNameCell";
 import { TokenCostCell } from "./cells/TokenCostCell";
 import { SessionRowActions } from "./SessionRowActions";
-import type { SessionListRow, SessionPullRequest } from "./sessionListRow";
+import type { SessionListRow } from "./sessionListRow";
 
 /**
  * One session, read left to right. The whole row is the target that opens the
@@ -25,7 +25,6 @@ export const SessionRow: React.FC<{
   isOpening: boolean;
   onOpenReplay: () => void;
   onOpenInExplorer: (() => void) | undefined;
-  onOpenPullRequest: (pullRequest: SessionPullRequest) => void;
   onPrefetch: () => void;
 }> = ({
   row,
@@ -34,7 +33,6 @@ export const SessionRow: React.FC<{
   isOpening,
   onOpenReplay,
   onOpenInExplorer,
-  onOpenPullRequest,
   onPrefetch,
 }) => (
   <Table.Row
@@ -70,10 +68,7 @@ export const SessionRow: React.FC<{
       <TokenCostCell row={row} largestCost={largestCost} />
     </Table.Cell>
     <Table.Cell>
-      <PullRequestsCell
-        pullRequests={row.pullRequests}
-        onOpenDetail={onOpenPullRequest}
-      />
+      <PullRequestsCell pullRequests={row.pullRequests} />
     </Table.Cell>
     <Table.Cell>
       <SessionRowActions

@@ -30,6 +30,7 @@ import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { env } from "~/env.mjs";
+import { hasOrganizationPermission } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
@@ -54,8 +55,8 @@ import {
   verifyGithubInstallState,
 } from "~/server/app-layer/github/githubInstallState";
 import { parseGithubPullRequestEvent } from "~/server/app-layer/github/githubPullRequestEvent";
-import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
+import { prisma } from "~/server/db";
 
 import type { NextRequestShim } from "./types";
 
@@ -197,8 +198,8 @@ async function handleInstall(c: any): Promise<Response> {
   // takes organization management: the same permission the tRPC surface demands
   // for every write to the connection.
   if (
-    !(await probeOrganizationPermission(
-      { session },
+    !(await hasOrganizationPermission(
+      { prisma, session },
       organizationId,
       "organization:manage",
     ))
@@ -328,8 +329,8 @@ async function rejectUnauthorizedSetup({
   // lowered between /install and GitHub's redirect back here, and recording
   // the installation is the write the permission exists to gate.
   if (
-    !(await probeOrganizationPermission(
-      { session },
+    !(await hasOrganizationPermission(
+      { prisma, session },
       state.organizationId,
       "organization:manage",
     ))

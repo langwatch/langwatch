@@ -157,8 +157,7 @@ describe("searchTracesCommand()", () => {
 	});
 
 	describe("when format is json", () => {
-		/** @scenario "A search-backed list also carries the total under the common name" */
-		it("outputs the document it was given, with the total under the common name", async () => {
+		it("outputs raw JSON", async () => {
 			const result = {
 				traces: [{ traceId: "t1" }],
 				pagination: { totalHits: 1 },
@@ -167,19 +166,7 @@ describe("searchTracesCommand()", () => {
 
 			await searchTracesCommand({ format: "json" });
 
-			// A trace search says how many it matched as `totalHits`, and every
-			// resource list says it as `total`. Both are printed, so a caller has
-			// one name to read on any list.
-			expect(console.log).toHaveBeenCalledWith(
-				JSON.stringify(
-					{
-						traces: [{ traceId: "t1" }],
-						pagination: { totalHits: 1, total: 1 },
-					},
-					null,
-					2,
-				),
-			);
+			expect(console.log).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
 		});
 	});
 

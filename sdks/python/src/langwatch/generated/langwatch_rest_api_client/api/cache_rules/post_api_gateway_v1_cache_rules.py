@@ -16,7 +16,7 @@ from ...types import UNSET, Response, Unset, safe_http_status
 
 def _get_kwargs(
     *,
-    body: PostApiGatewayV1CacheRulesBody,
+    body: PostApiGatewayV1CacheRulesBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
@@ -28,7 +28,8 @@ def _get_kwargs(
         "url": "/api/gateway/v1/cache-rules",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -106,8 +107,8 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1CacheRulesBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1CacheRulesBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1CacheRulesResponse201
@@ -126,7 +127,7 @@ def sync_detailed(
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1CacheRulesBody):
+        body (PostApiGatewayV1CacheRulesBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -150,8 +151,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1CacheRulesBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1CacheRulesBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1CacheRulesResponse201
@@ -171,7 +172,7 @@ def sync(
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1CacheRulesBody):
+        body (PostApiGatewayV1CacheRulesBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -190,8 +191,8 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1CacheRulesBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1CacheRulesBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> Response[
     PostApiGatewayV1CacheRulesResponse201
@@ -210,7 +211,7 @@ async def asyncio_detailed(
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1CacheRulesBody):
+        body (PostApiGatewayV1CacheRulesBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -232,8 +233,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    body: PostApiGatewayV1CacheRulesBody,
+    client: AuthenticatedClient | Client,
+    body: PostApiGatewayV1CacheRulesBody | Unset = UNSET,
     idempotency_key: str | Unset = UNSET,
 ) -> (
     PostApiGatewayV1CacheRulesResponse201
@@ -253,7 +254,7 @@ async def asyncio(
 
     Args:
         idempotency_key (str | Unset):
-        body (PostApiGatewayV1CacheRulesBody):
+        body (PostApiGatewayV1CacheRulesBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

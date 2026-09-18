@@ -37,14 +37,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-// Every flag reads on, except the one that replaces the Simulations group
-// with Agent Testing: this file pins the grouped destinations. The real hook
-// answers false for it here anyway, because it is asked only for a project
-// and this account has none.
 vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: (flag: string) => ({
-    enabled: flag !== "release_ui_agent_testing_v2_enabled",
-  }),
+  useFeatureFlag: () => ({ enabled: true }),
 }));
 
 vi.mock("~/hooks/useOpsPermission", () => ({
@@ -74,7 +68,7 @@ vi.mock("~/components/sidebar/UsageIndicator", () => ({
   UsageIndicator: () => null,
 }));
 
-import { MainMenuSections } from "../MainMenu";
+import { MainMenu } from "../MainMenu";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <MemoryRouter>
@@ -82,8 +76,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   </MemoryRouter>
 );
 
-const renderMenu = () =>
-  render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
+const renderMenu = () => render(<MainMenu />, { wrapper: Wrapper });
 
 /** The grouped destinations only mount once their group is open. */
 const expandSimulations = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -97,7 +90,7 @@ const anchorHrefs = () =>
     anchor.getAttribute("href"),
   );
 
-describe("<MainMenuSections showExpanded />", () => {
+describe("<MainMenu />", () => {
   afterEach(() => {
     cleanup();
     localStorage.clear();
@@ -135,6 +128,16 @@ describe("<MainMenuSections showExpanded />", () => {
       expect(
         await screen.findByText("Create a project first to open Analytics."),
       ).toBeTruthy();
+    });
+
+    /** @scenario "Destinations that do not need a project keep working" */
+    it("keeps the destinations that do not need a project working", () => {
+      renderMenu();
+
+      expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+        "href",
+        "/settings",
+      );
     });
 
     it("renders the grouped destinations without duplicate React keys", async () => {

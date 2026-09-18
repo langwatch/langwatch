@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { ProductPageFrame } from "~/features/navigation/shell/ProductPageFrame";
+import { useNavigationV2ShellActive } from "~/features/navigation/useNavigationV2ShellActive";
 
 export interface SectionNavigationItem {
   label: string;
@@ -24,10 +25,11 @@ interface SectionNavigationLayoutProps extends SectionNavigationFrameProps {
   pageTitle?: string;
   orgScope?: boolean;
   /**
-   * Set when the product sidebar lists the same pages this rail does
-   * (Gateway, Governance). The rail then stands down and the content
-   * takes the full width; a section whose rail lists page-local
-   * destinations (Automations) leaves this unset and keeps its rail.
+   * Set when the navigation-v2 product sidebar lists the same pages this
+   * rail does (Gateway, Governance). Inside a v2 shell the rail then
+   * stands down and the content takes the full width; a section whose
+   * rail lists page-local destinations (Automations) leaves this unset
+   * and keeps its rail in every mode.
    * Spec: specs/navigation/shared-section-navigation-layout.feature
    */
   standDownRailInProductShell?: boolean;
@@ -47,9 +49,11 @@ export function SectionNavigationLayout({
   orgScope = false,
   standDownRailInProductShell = false,
 }: SectionNavigationLayoutProps) {
+  const isV2ShellActive = useNavigationV2ShellActive();
+  const railStandsDown = standDownRailInProductShell && isV2ShellActive;
   return (
     <DashboardLayout orgScope={orgScope} pageTitle={pageTitle}>
-      {standDownRailInProductShell ? (
+      {railStandsDown ? (
         <ProductPageFrame>{children}</ProductPageFrame>
       ) : (
         <SectionNavigationFrame

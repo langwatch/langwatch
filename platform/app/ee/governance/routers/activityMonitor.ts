@@ -22,8 +22,8 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
+import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
 
 const enterpriseGate = requireEnterprisePlan(
   ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
@@ -41,13 +41,10 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
       }),
     )
-    .permission("activityMonitor:view")
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create({
-        prisma: ctx.prisma,
-        repository: getApp().governance.activityMonitor,
-      });
+      const service = ActivityMonitorService.create(ctx.prisma);
       return await service.summary({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -72,13 +69,10 @@ export const activityMonitorRouter = createTRPCRouter({
         sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )
-    .permission("activityMonitor:view")
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create({
-        prisma: ctx.prisma,
-        repository: getApp().governance.activityMonitor,
-      });
+      const service = ActivityMonitorService.create(ctx.prisma);
       return await service.spendByUser({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -108,13 +102,10 @@ export const activityMonitorRouter = createTRPCRouter({
         sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )
-    .permission("activityMonitor:view")
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create({
-        prisma: ctx.prisma,
-        repository: getApp().governance.activityMonitor,
-      });
+      const service = ActivityMonitorService.create(ctx.prisma);
       return await service.spendByTeam({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -141,13 +132,10 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
       }),
     )
-    .permission("activityMonitor:view")
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create({
-        prisma: ctx.prisma,
-        repository: getApp().governance.activityMonitor,
-      });
+      const service = ActivityMonitorService.create(ctx.prisma);
       return await service.spendByDepartment({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -171,13 +159,10 @@ export const activityMonitorRouter = createTRPCRouter({
         groupBy: z.enum(["team", "user", "model"]).default("team"),
       }),
     )
-    .permission("activityMonitor:view")
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create({
-        prisma: ctx.prisma,
-        repository: getApp().governance.activityMonitor,
-      });
+      const service = ActivityMonitorService.create(ctx.prisma);
       return await service.spendOverTime({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -190,13 +175,10 @@ export const activityMonitorRouter = createTRPCRouter({
    */
   ingestionSourcesHealth: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .permission("activityMonitor:view")
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create({
-        prisma: ctx.prisma,
-        repository: getApp().governance.activityMonitor,
-      });
+      const service = ActivityMonitorService.create(ctx.prisma);
       return await service.ingestionSourcesHealth({
         organizationId: input.organizationId,
       });
@@ -215,13 +197,10 @@ export const activityMonitorRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).default(50),
       }),
     )
-    .permission("activityMonitor:view")
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create({
-        prisma: ctx.prisma,
-        repository: getApp().governance.activityMonitor,
-      });
+      const service = ActivityMonitorService.create(ctx.prisma);
       return await service.recentAnomalies({
         organizationId: input.organizationId,
         limit: input.limit,
@@ -242,13 +221,10 @@ export const activityMonitorRouter = createTRPCRouter({
         beforeIso: z.string().optional(),
       }),
     )
-    .permission("activityMonitor:view")
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create({
-        prisma: ctx.prisma,
-        repository: getApp().governance.activityMonitor,
-      });
+      const service = ActivityMonitorService.create(ctx.prisma);
       return await service.eventsForSource(input);
     }),
 
@@ -263,13 +239,10 @@ export const activityMonitorRouter = createTRPCRouter({
         sourceId: z.string(),
       }),
     )
-    .permission("activityMonitor:view")
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create({
-        prisma: ctx.prisma,
-        repository: getApp().governance.activityMonitor,
-      });
+      const service = ActivityMonitorService.create(ctx.prisma);
       return await service.sourceHealthMetrics(input);
     }),
 });

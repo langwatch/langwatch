@@ -35,8 +35,6 @@ function makeScenario(
   return {
     projectId: "proj-1",
     situation: "test situation",
-    version: 1,
-    testSuiteId: null,
     criteria: [],
     labels: [],
     parameters: null,

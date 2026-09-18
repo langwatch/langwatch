@@ -4,34 +4,19 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.get_api_suites_kind import GetApiSuitesKind
 from ...models.get_api_suites_response_200_item import GetApiSuitesResponse200Item
 from ...models.get_api_suites_response_400 import GetApiSuitesResponse400
 from ...models.get_api_suites_response_401 import GetApiSuitesResponse401
 from ...models.get_api_suites_response_422 import GetApiSuitesResponse422
 from ...models.get_api_suites_response_500 import GetApiSuitesResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
-def _get_kwargs(
-    *,
-    kind: GetApiSuitesKind | Unset = GetApiSuitesKind.CUSTOM,
-) -> dict[str, Any]:
-
-    params: dict[str, Any] = {}
-
-    json_kind: str | Unset = UNSET
-    if not isinstance(kind, Unset):
-        json_kind = kind.value
-
-    params["kind"] = json_kind
-
-    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+def _get_kwargs() -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/api/suites",
-        "params": params,
     }
 
     return _kwargs
@@ -105,8 +90,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient,
-    kind: GetApiSuitesKind | Unset = GetApiSuitesKind.CUSTOM,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     GetApiSuitesResponse400
     | GetApiSuitesResponse401
@@ -114,11 +98,7 @@ def sync_detailed(
     | GetApiSuitesResponse500
     | list[GetApiSuitesResponse200Item]
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the
-    project. By default only run plans are returned; pass kind=folder for test suites.
-
-    Args:
-        kind (GetApiSuitesKind | Unset):  Default: GetApiSuitesKind.CUSTOM.
+    """List all non-archived suites (run plans) for the project
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -128,9 +108,7 @@ def sync_detailed(
         Response[GetApiSuitesResponse400 | GetApiSuitesResponse401 | GetApiSuitesResponse422 | GetApiSuitesResponse500 | list[GetApiSuitesResponse200Item]]
     """
 
-    kwargs = _get_kwargs(
-        kind=kind,
-    )
+    kwargs = _get_kwargs()
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -141,8 +119,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient,
-    kind: GetApiSuitesKind | Unset = GetApiSuitesKind.CUSTOM,
+    client: AuthenticatedClient | Client,
 ) -> (
     GetApiSuitesResponse400
     | GetApiSuitesResponse401
@@ -151,11 +128,7 @@ def sync(
     | list[GetApiSuitesResponse200Item]
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the
-    project. By default only run plans are returned; pass kind=folder for test suites.
-
-    Args:
-        kind (GetApiSuitesKind | Unset):  Default: GetApiSuitesKind.CUSTOM.
+    """List all non-archived suites (run plans) for the project
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -167,14 +140,12 @@ def sync(
 
     return sync_detailed(
         client=client,
-        kind=kind,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient,
-    kind: GetApiSuitesKind | Unset = GetApiSuitesKind.CUSTOM,
+    client: AuthenticatedClient | Client,
 ) -> Response[
     GetApiSuitesResponse400
     | GetApiSuitesResponse401
@@ -182,11 +153,7 @@ async def asyncio_detailed(
     | GetApiSuitesResponse500
     | list[GetApiSuitesResponse200Item]
 ]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the
-    project. By default only run plans are returned; pass kind=folder for test suites.
-
-    Args:
-        kind (GetApiSuitesKind | Unset):  Default: GetApiSuitesKind.CUSTOM.
+    """List all non-archived suites (run plans) for the project
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -196,9 +163,7 @@ async def asyncio_detailed(
         Response[GetApiSuitesResponse400 | GetApiSuitesResponse401 | GetApiSuitesResponse422 | GetApiSuitesResponse500 | list[GetApiSuitesResponse200Item]]
     """
 
-    kwargs = _get_kwargs(
-        kind=kind,
-    )
+    kwargs = _get_kwargs()
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -207,8 +172,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient,
-    kind: GetApiSuitesKind | Unset = GetApiSuitesKind.CUSTOM,
+    client: AuthenticatedClient | Client,
 ) -> (
     GetApiSuitesResponse400
     | GetApiSuitesResponse401
@@ -217,11 +181,7 @@ async def asyncio(
     | list[GetApiSuitesResponse200Item]
     | None
 ):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the
-    project. By default only run plans are returned; pass kind=folder for test suites.
-
-    Args:
-        kind (GetApiSuitesKind | Unset):  Default: GetApiSuitesKind.CUSTOM.
+    """List all non-archived suites (run plans) for the project
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -234,6 +194,5 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
-            kind=kind,
         )
     ).parsed

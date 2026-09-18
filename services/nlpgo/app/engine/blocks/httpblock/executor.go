@@ -12,8 +12,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 )
 
 // Executor runs a single HTTP block invocation.
@@ -37,8 +35,7 @@ type Options struct {
 const defaultMaxResponseBytes int64 = 4 * 1024 * 1024
 
 // DefaultTimeout is the per-request HTTP node timeout when the
-// caller doesn't override it, and the ceiling a caller's own
-// Request.TimeoutMS is clamped to. Anchored at 12 minutes per the owner
+// caller doesn't override it. Anchored at 12 minutes per the owner
 // directive: customer agent backends (RAG retrieval, multi-step
 // scrapers, sub-workflow chains) legitimately take 10+ minutes
 // before responding, and Lambda's hard execution cap is 15 minutes,
@@ -77,14 +74,6 @@ func New(opts Options) *Executor {
 	}
 }
 
-// DefaultTimeout reports the wall-clock ceiling this executor applies. It is
-// both the budget for a request that names none and the upper bound on one
-// that does. Exported so the wiring that feeds it an operator knob is
-// observable from a test.
-func (e *Executor) DefaultTimeout() time.Duration {
-	return e.defaultTime
-}
-
 // Request is what the engine hands to the executor per node invocation.
 type Request struct {
 	URL          string
@@ -93,10 +82,8 @@ type Request struct {
 	OutputPath   string
 	Headers      map[string]string
 	Auth         *Auth
-	// TimeoutMS asks for LESS time than the operator allows; it can never
-	// buy more. 0 (and any negative) means the executor's own ceiling.
-	TimeoutMS int
-	Inputs    map[string]any
+	TimeoutMS    int
+	Inputs       map[string]any
 }
 
 // Auth is the auth config (already with secrets resolved).
@@ -162,12 +149,10 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, err
 	}
 
-	// The operator's ceiling wins. A node's `timeout_ms` only ever shortens
-	// the budget: a workflow author must not be able to escape
-	// NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS — the bound on how long one
-	// node may hold a worker waiting on a customer endpoint — by writing a
-	// bigger number into their own node.
-	timeout := blocktimeout.Clamp(e.defaultTime, req.TimeoutMS)
+	timeout := e.defaultTime
+	if req.TimeoutMS > 0 {
+		timeout = time.Duration(req.TimeoutMS) * time.Millisecond
+	}
 	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	httpReq = httpReq.WithContext(reqCtx)

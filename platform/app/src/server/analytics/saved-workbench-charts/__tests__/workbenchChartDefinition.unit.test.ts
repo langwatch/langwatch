@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { MAX_LWQL_LENGTH } from "../../lwql/limits";
+import { MAX_LWQL_LENGTH } from "../../lwql/sqlText";
 import {
   WORKBENCH_CHART_DEFINITION_VERSION,
   workbenchChartDefinitionSchema,

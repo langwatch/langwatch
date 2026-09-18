@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { hasLangyAccess } from "../langyAccessGate";
 
 describe("hasLangyAccess", () => {
@@ -18,7 +17,6 @@ describe("hasLangyAccess", () => {
       expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
         distinctId: "customer-1",
         projectId: "project-1",
-        organizationId: NOT_TARGETED,
       });
     });
   });
@@ -37,7 +35,6 @@ describe("hasLangyAccess", () => {
 
       expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
         distinctId: "customer-2",
-        projectId: NOT_TARGETED,
         organizationId: "org-1",
       });
     });
@@ -67,7 +64,7 @@ describe("hasLangyAccess", () => {
       const isEnabled = vi.fn().mockResolvedValue(false);
 
       // The GitHub install route has neither a projectId nor an organizationId
-      // in hand, so the gate states both scopes as not targeted.
+      // in hand, so the gate evaluates at user scope only.
       await expect(
         hasLangyAccess({
           user: { id: "customer-3" },
@@ -77,8 +74,6 @@ describe("hasLangyAccess", () => {
 
       expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
         distinctId: "customer-3",
-        projectId: NOT_TARGETED,
-        organizationId: NOT_TARGETED,
       });
     });
   });

@@ -20,14 +20,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   mockChangePassword,
-  mockSetPassword,
   mockUnlinkAccount,
   mockToasterCreate,
   publicEnvRef,
   linkedAccountsRef,
 } = vi.hoisted(() => ({
   mockChangePassword: vi.fn(),
-  mockSetPassword: vi.fn(),
   mockUnlinkAccount: vi.fn(),
   mockToasterCreate: vi.fn(),
   publicEnvRef: {
@@ -63,23 +61,9 @@ vi.mock("~/utils/api", () => ({
           data: { pendingSsoSetup: false },
         }),
       },
-      // `SignInMethodsSection` reads this to decide whether to offer "Set a
-      // password". Answered `true` because that is the section's own
-      // no-flicker default, and this suite drives the linked-account rows.
-      hasPassword: {
-        useQuery: () => ({ data: { hasPassword: true }, isLoading: false }),
-      },
       changePassword: {
         useMutation: () => ({
           mutateAsync: mockChangePassword,
-          isPending: false,
-        }),
-      },
-      // ADR-119: the same dialog sets a first password for an account that
-      // arrived by passkey or SSO. Reached at render, not only on submit.
-      setPassword: {
-        useMutation: () => ({
-          mutateAsync: mockSetPassword,
           isPending: false,
         }),
       },
@@ -121,11 +105,6 @@ vi.mock("~/utils/auth-client", () => ({
     data: { user: { email: "user@example.com" } },
   }),
   linkAccount: vi.fn(),
-  // `PasskeysSection` calls `useListPasskeys` at the top of its body, above
-  // the `PASSKEYS_ENABLED` early return the hooks rule forces it to sit
-  // above, so the flag cannot keep this off the render path. Only the hook is
-  // named: `passkey.*` is reached from click handlers this suite never fires.
-  authClient: { useListPasskeys: () => ({ data: [], isPending: false }) },
 }));
 
 vi.mock("~/components/SettingsLayout", () => ({
@@ -145,7 +124,6 @@ function renderPage() {
 
 beforeEach(() => {
   mockChangePassword.mockReset();
-  mockSetPassword.mockReset();
   mockUnlinkAccount.mockReset();
   mockToasterCreate.mockReset();
   publicEnvRef.current = { NEXTAUTH_PROVIDER: "auth0" };

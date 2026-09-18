@@ -11,23 +11,17 @@
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentRole } from "@langwatch/scenario";
+import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
-import {
-  createNlpFetchDispatcher,
-  type FetchInitWithDispatcher,
-  NLP_FETCH_HEADROOM_MS,
-  resolveFloorFetchTimeoutMs,
-  resolveMaxFetchTimeoutMs,
-} from "../../../nlpgo/timeouts";
 import type { RunParameterValues } from "../../parameters";
-import { resolveFieldMappings, sourceFieldOf } from "../resolve-field-mappings";
+import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
-import { SerializedAgentAdapter } from "./serialized-agent.adapter";
+
+/** Timeout for NLP service requests (2 minutes) */
+const NLP_FETCH_TIMEOUT_MS = 120_000;
 
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
@@ -61,7 +55,7 @@ const tracer = getLangWatchTracer("langwatch.scenarios.code-agent-adapter");
  * Serialized code agent adapter that uses pre-fetched configuration.
  * Sends code execution requests to the NLP service. No database access required.
  */
-export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
+export class SerializedCodeAgentAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
   private static readonly ENTRY_NODE_ID = "entry";
@@ -109,12 +103,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   async call(input: AgentInput): Promise<string> {
     const inputRecord = this.resolveInputValues(input);
     const workflow = this.buildWorkflow(inputRecord, this.turnParameters());
-    const { output, session } = await this.executeOnNlpService(
-      workflow,
-      inputRecord,
-    );
-    this.storeSession({ threadId: input.threadId, session });
-    return output;
+    const result = await this.executeOnNlpService(workflow, inputRecord);
+    return result;
   }
 
   /**
@@ -142,7 +132,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
    * an end node to capture the code node's outputs.
    */
   private buildWorkflow(
-    resolvedValues: Record<string, unknown>,
+    resolvedValues: Record<string, string>,
     params: RunParameterValues,
   ) {
     const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } =
@@ -179,13 +169,6 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
       template_adapter: "default" as const,
       secrets: this.config.secrets,
       params,
-      // The run's own credential, when the platform minted one. The engine
-      // injects it into the sandbox next to its LangWatch endpoint, so the
-      // code under test reaches the project's agent cache with no wiring of
-      // its own. An absent field injects nothing.
-      ...(this.config.sandboxApiKey
-        ? { sandbox_api_key: this.config.sandboxApiKey }
-        : {}),
       nodes: [
         this.buildEntryNode(inputs),
         this.buildCodeNode(inputs, outputs),
@@ -218,7 +201,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
 
   /** Build the entry node that provides input fields to the workflow. */
   private buildEntryNode(
-    inputs: { identifier: string; type: string; value: unknown }[],
+    inputs: { identifier: string; type: string; value: string }[],
   ) {
     return {
       id: SerializedCodeAgentAdapter.ENTRY_NODE_ID,
@@ -243,22 +226,11 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
     };
   }
 
-  /**
-   * Build the code node that executes the agent's Python code.
-   *
-   * A configured `timeoutMs` travels as the node's `timeout_ms` parameter —
-   * the identifier and units the engine reads (`nodeTimeout` in
-   * services/nlpgo/app/engine/engine.go). It is a request for a SHORTER
-   * budget only: the code executor clamps it to the operator's ceiling
-   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 600s when unset — see
-   * `services/nlpgo/config.go`), so a larger value buys the agent nothing. Omitted when unset, which leaves the engine
-   * on that operator default.
-   */
+  /** Build the code node that executes the agent's Python code. */
   private buildCodeNode(
-    inputs: { identifier: string; type: string; value: unknown }[],
+    inputs: { identifier: string; type: string; value: string }[],
     outputs: { identifier: string; type: string }[],
   ) {
-    const { timeoutMs } = this.config;
     return {
       id: SerializedCodeAgentAdapter.CODE_NODE_ID,
       type: "code",
@@ -273,55 +245,10 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
             type: "code",
             value: this.config.code,
           },
-          ...(timeoutMs === undefined
-            ? []
-            : [
-                {
-                  identifier: "timeout_ms",
-                  type: "int",
-                  value: timeoutMs,
-                },
-              ]),
         ],
         cls: "Code",
       },
     };
-  }
-
-  /**
-   * How long to wait on the NLP service for one turn.
-   *
-   * Always at least {@link resolveFloorFetchTimeoutMs}'s result — the engine's
-   * own code-block ceiling plus headroom — and above the agent's own code
-   * budget when that budget is longer, so the engine gets to enforce (and
-   * report) the timeout rather than the request being aborted from here —
-   * bounded by {@link resolveMaxFetchTimeoutMs}, this platform's operator-
-   * configurable maximum for one turn.
-   *
-   * An over-large `timeoutMs` is clamped rather than rejected. The schemas
-   * that carry it (`CodeAgentDataSchema`, `RawCodeAgentConfigSchema`) stay
-   * `.positive()` with no `.max()` on purpose: they mirror what is already
-   * stored on the agent, and the engine's contract for the same number is
-   * "clamp to the operator's ceiling", not "fail the call". Adding a `.max()`
-   * would make a stored value that the engine handles fine fail the whole
-   * scenario run at prefetch time instead — and there is no constant to put in
-   * a `.max()` any more, since the ceiling is now read from the environment.
-   *
-   * The ceiling bounds the deadline whether or not the agent named a budget:
-   * an operator who sets it below the floor has asked for a shorter socket
-   * hold than the engine's own ceiling, and gets it.
-   */
-  private fetchTimeoutMs(): number {
-    const { timeoutMs } = this.config;
-    const floorTimeoutMs = resolveFloorFetchTimeoutMs();
-    const maxTimeoutMs = resolveMaxFetchTimeoutMs();
-    if (timeoutMs === undefined) {
-      return Math.min(maxTimeoutMs, floorTimeoutMs);
-    }
-    return Math.min(
-      maxTimeoutMs,
-      Math.max(floorTimeoutMs, timeoutMs + NLP_FETCH_HEADROOM_MS),
-    );
   }
 
   /** Build the end node that captures code node outputs for the response. */
@@ -354,8 +281,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
    */
   private async executeOnNlpService(
     workflow: ReturnType<typeof this.buildWorkflow>,
-    inputRecord: Record<string, unknown>,
-  ): Promise<{ output: string; session: unknown }> {
+    inputRecord: Record<string, string>,
+  ): Promise<string> {
     const event = {
       type: "execute_flow" as const,
       payload: {
@@ -369,7 +296,6 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
     };
 
     const url = `${this.nlpServiceUrl}/go/studio/execute_sync`;
-    const fetchTimeoutMs = this.fetchTimeoutMs();
 
     return tracer.withActiveSpan(
       "SerializedCodeAgentAdapter.execute_nlp_request",
@@ -379,7 +305,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
           "scenario.agent.id": this.config.agentId,
           "http.url": url,
           "http.method": "POST",
-          "nlp.timeout_ms": fetchTimeoutMs,
+          "nlp.timeout_ms": NLP_FETCH_TIMEOUT_MS,
         },
       },
       async (span) => {
@@ -388,25 +314,17 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
         const timeout = setTimeout(() => {
           timedOut = true;
           controller.abort();
-        }, fetchTimeoutMs);
+        }, NLP_FETCH_TIMEOUT_MS);
 
         try {
-          let response: UndiciResponse;
+          let response: Response;
           try {
-            const fetchInit: FetchInitWithDispatcher = {
+            response = await fetch(url, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(event),
               signal: controller.signal,
-              dispatcher: createNlpFetchDispatcher({
-                timeoutMs: fetchTimeoutMs,
-              }),
-            };
-            // undici's own fetch, not the global one: Node's global fetch is
-            // bound to the undici bundled with Node, which rejects a
-            // dispatcher built by this package with "invalid onRequestStart
-            // method" (see mailer/providers/resend.ts for the same fix).
-            response = await undiciFetch(url, fetchInit);
+            });
           } catch (fetchError) {
             if (timedOut) {
               span.setAttribute(
@@ -414,7 +332,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
                 "timeout" satisfies AdapterErrorKind,
               );
               throw new SerializedCodeAgentAdapterError(
-                `Code execution failed: NLP service ${url} did not respond within ${fetchTimeoutMs}ms (request aborted).`,
+                `Code execution failed: NLP service ${url} did not respond within ${NLP_FETCH_TIMEOUT_MS}ms (request aborted).`,
                 { kind: "timeout", cause: fetchError },
               );
             }
@@ -450,19 +368,12 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
             trace_id: string;
             status: string;
             result: Record<string, unknown> | null;
-            nodes?: Record<
-              string,
-              { outputs?: Record<string, unknown> | null } | null
-            >;
           };
           span.setAttribute("nlp.status", result.status);
           if (result.trace_id) {
             span.setAttribute("nlp.trace_id", result.trace_id);
           }
-          return {
-            output: this.extractOutput(result.result),
-            session: this.extractSession(result.nodes),
-          };
+          return this.extractOutput(result.result);
         } finally {
           clearTimeout(timeout);
         }
@@ -478,19 +389,26 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
    *   Orphan mappings (for inputs that don't exist on the agent) are ignored.
    * Without scenarioMappings: first input gets the last user message, rest get "".
    */
-  private resolveInputValues(agentInput: AgentInput): Record<string, unknown> {
+  private resolveInputValues(agentInput: AgentInput): Record<string, string> {
     const declaredInputs =
       this.config.inputs.length > 0
         ? this.config.inputs
         : [{ identifier: "input", type: "str" }];
 
-    const mappings = this.config.scenarioMappings;
-    if (mappings && Object.keys(mappings).length > 0) {
-      return this.resolveMappedInputValues({
-        declaredInputs,
-        mappings,
+    if (
+      this.config.scenarioMappings &&
+      Object.keys(this.config.scenarioMappings).length > 0
+    ) {
+      const resolved = resolveFieldMappings({
+        fieldMappings: this.config.scenarioMappings,
         agentInput,
       });
+      // Only include values for inputs that exist on the agent
+      const record: Record<string, string> = {};
+      for (const inp of declaredInputs) {
+        record[inp.identifier] = resolved[inp.identifier] ?? "";
+      }
+      return record;
     }
 
     // Legacy behavior: first input = last user message, rest = ""
@@ -547,58 +465,6 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
 
     // Last resort: stringify the whole result
     return this.stringify(result);
-  }
-
-  /**
-   * One value per declared input, from its mapping. Orphan mappings, for
-   * inputs the agent does not declare, are ignored.
-   *
-   * An input mapped to the scenario session receives the JSON value the code
-   * returned, not text: the engine passes a non-string entry input through
-   * untouched, so the code reads back exactly what it returned, and None on
-   * the first turn of a thread.
-   */
-  private resolveMappedInputValues({
-    declaredInputs,
-    mappings,
-    agentInput,
-  }: {
-    declaredInputs: { identifier: string; type: string }[];
-    mappings: NonNullable<CodeAgentData["scenarioMappings"]>;
-    agentInput: AgentInput;
-  }): Record<string, unknown> {
-    const session = this.sessionOf(agentInput.threadId);
-    const resolved = resolveFieldMappings({
-      fieldMappings: mappings,
-      agentInput,
-      session,
-    });
-    const record: Record<string, unknown> = {};
-    for (const inp of declaredInputs) {
-      const mapping = mappings[inp.identifier];
-      const isSession =
-        mapping !== undefined && sourceFieldOf(mapping) === "session";
-      record[inp.identifier] = isSession
-        ? (session ?? null)
-        : (resolved[inp.identifier] ?? "");
-    }
-    return record;
-  }
-
-  /**
-   * The `session` the code returned beside its outputs, read from the code
-   * node's own state rather than the end node: the runner keeps every key the
-   * code returns, declared or not, so the session needs no declared output
-   * and no edge, and a code that returns none leaves the held value as it is.
-   */
-  private extractSession(
-    nodes:
-      | Record<string, { outputs?: Record<string, unknown> | null } | null>
-      | undefined,
-  ): unknown {
-    const outputs = nodes?.[SerializedCodeAgentAdapter.CODE_NODE_ID]?.outputs;
-    if (!outputs || typeof outputs !== "object") return undefined;
-    return "session" in outputs ? outputs.session : undefined;
   }
 
   private stringify(value: unknown): string {

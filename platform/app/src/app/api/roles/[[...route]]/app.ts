@@ -17,7 +17,6 @@
  * handlers never emit `management.role.*` rows of their own — that would
  * record the same mutation twice.
  */
-
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -25,11 +24,15 @@ import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import type { CustomRole, Organization } from "~/generated/prisma/client";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+import {
+  Actions,
+  isOrgExclusivePermission,
+  type Permission,
+  Resources,
+} from "~/server/api/rbac";
 import { prisma } from "~/server/db";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { RoleService } from "~/server/role/role.service";
-import { Actions, Resources } from "~/utils/rbacVocabulary";
 
 const { service, guard } = createManagementService({
   name: "roles",
