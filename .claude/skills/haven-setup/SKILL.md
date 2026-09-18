@@ -131,7 +131,36 @@ With the observability stack up, query Grafana instead — `gcx logs query
 and read `page.on('console', …)`: the tRPC/SSE logging gives a live timeline the server's
 stdout does not.
 
-## Gotcha 6: secrets resolve through `.env`, not through haven's overlay
+## Gotcha 6: a blank browser page is usually vite, not your code
+
+A re-optimize and a broken import look IDENTICAL from the browser: white page,
+nothing under `#root`. Vite re-optimizes whenever its resolved config changes
+or a new dependency appears, and while it runs every
+`/node_modules/.vite/deps/*` request 504s. On a shared checkout with several
+sessions editing packages, that is a regular occurrence and it is nobody's
+defect.
+
+**Check the dev server before you read a blank page as a defect:**
+
+```bash
+haven logs ui | tail -20   # "Re-optimizing dependencies" / "server restarted."
+                           # in the last minute? wait ~60s and reload.
+```
+
+Two states worth telling apart in that output:
+
+- `Re-optimizing dependencies` / `[optimizer] bundling` — transient, it comes
+  back on its own.
+- `server restart failed` with an error above it — a genuinely broken
+  `vite.config.ts` (often another session mid-edit). It will NOT recover by
+  waiting; the config has to become valid again.
+
+Only once the server is settled does the browser console mean anything. This
+cost two sessions real time on 2026-09-18: one restarted the ui lane twice
+chasing a "broken mount" that was a re-optimize it had caused itself minutes
+earlier.
+
+## Gotcha 7: secrets resolve through `.env`, not through haven's overlay
 
 haven's own injected variables (hostnames, ports, database URLs — see
 `tools/thuishaven/app/overlayenv.go`) go straight into each child's OS
