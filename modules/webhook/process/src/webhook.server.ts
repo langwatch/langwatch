@@ -41,31 +41,6 @@ export const webhookServer = defineServerModule("webhook")
   .withApp(WebhookApp)
   .withTransports(webhookEndpointTrpcTransport, webhookRest);
 
-/** Adapts the routed process member to Webhook's tenant-resolved read client. */
-export type WebhookRoutedClickHouse = Readonly<{
-  query(input: {
-    tenantId: string;
-    sql: string;
-    params?: Record<string, unknown>;
-  }): Promise<{ rows: unknown[] }>;
-}>;
-
-export function createWebhookClickHouseResolver(
-  clickhouse: WebhookRoutedClickHouse,
-): WebhookClickHouseClientResolver {
-  return (tenantId) =>
-    Promise.resolve({
-      async query(input) {
-        const result = await clickhouse.query({
-          tenantId,
-          sql: input.query,
-          params: input.query_params,
-        });
-        return { json: async () => result.rows };
-      },
-    });
-}
-
 /**
  * How another package composes this feature: the envelope a spend row is
  * rendered through, and the delivery graph a process runs. What the graph is

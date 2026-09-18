@@ -5,7 +5,7 @@ import { generate } from "@langwatch/ksuid";
 import {
   createWebhookClickHouseResolver,
   type WebhookRoutedClickHouse,
-} from "../../webhook.server.ts";
+} from "../clickhouse/webhook-clickhouse.resolver.ts";
 import type { WebhookId,WebhookSecret } from "../../app/webhook.app.ts";
 import { WebhookEndpointConfiguration } from "../../services/webhook-endpoint-policy.service.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
