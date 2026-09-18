@@ -21,9 +21,9 @@ const buildEnvironment: ConfigEnv = {
   isPreview: false,
 };
 
-async function resolveConfig(): Promise<UserConfig> {
+async function resolveConfig(environment: ConfigEnv = buildEnvironment): Promise<UserConfig> {
   return (await (viteConfig as (env: ConfigEnv) => Promise<UserConfig>)(
-    buildEnvironment,
+    environment,
   )) satisfies UserConfig;
 }
 
@@ -74,7 +74,22 @@ describe("given the browser entry of apps/ui", () => {
       // `platform/app` aliased `~`, `@app` and `@ee` into its own source tree.
       // Carrying any of them here would let a browser module reach the old
       // application, which is the one import direction the migration forbids.
-      expect(config.resolve?.alias).toBeUndefined();
+      expect(config.resolve?.alias).toEqual([]);
+    });
+  });
+
+  describe("when the dev config is resolved", () => {
+    it("aliases workspace packages to their own source and nothing else", async () => {
+      const config = await resolveConfig({ ...buildEnvironment, command: "serve" });
+      const aliases = config.resolve?.alias;
+
+      // Dev resolves a declared workspace dependency from source before pnpm
+      // has linked it. It is still the same forbidden direction if one of
+      // these ever points at the retired application rather than a package.
+      expect(Array.isArray(aliases)).toBe(true);
+      for (const entry of aliases as { find: RegExp; replacement: string }[]) {
+        expect(entry.replacement).not.toContain("platform/app");
+      }
     });
   });
 
