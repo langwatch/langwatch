@@ -28,6 +28,21 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   # ---------------------------------------------------------------------------
 
   @unit
+  Scenario: An eval function used outside the projection is told what to do instead
+    Given a statement calling eval in its WHERE clause
+    When the statement is validated
+    Then it is refused for the position the call is in
+    And the refusal does not tell the caller to filter on a plain column, because an eval answers after the query runs
+    And it says to filter the rows the statement returns, or to run it as an Instant Eval and read the matched results
+
+  @unit
+  Scenario: An extraction function used outside the projection keeps its advice
+    Given a statement calling conversation in its WHERE clause
+    When the statement is validated
+    Then it is refused for the position the call is in
+    And the refusal tells the caller to project it and filter, group or sort on a plain column
+
+  @unit
   Scenario: One question over an extracted conversation is accepted and planned
     Given a statement selecting eval(conversation(ConversationId), 'The customer sounds annoyed') AS annoyed
     When the statement is validated
