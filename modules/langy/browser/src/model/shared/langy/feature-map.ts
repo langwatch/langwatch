@@ -1,5 +1,5 @@
-import rawFeatureMap from "./feature-map.generated.json" with { type: "json" };
 import { createLangyFeatureMap, parseCliToolName } from "../../langy-feature-map.ts";
+import rawFeatureMap from "./feature-map.generated.json" with { type: "json" };
 
 const featureMap = createLangyFeatureMap(rawFeatureMap);
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import { resolvePeekProximity } from "../model/langy-peek-dock.ts";
 
 /**

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { traceViewContextChip } from "../use-langy-trace-view-context.ts";
 
 describe("traceViewContextChip", () => {

@@ -43,8 +43,8 @@ vi.mock("recharts", async (importOriginal) => {
   };
 });
 
-import { MessageContent } from "../message-content.tsx";
 import { isLangyTranscriptMessage } from "../../../../../model/langy-transcript.ts";
+import { MessageContent } from "../message-content.tsx";
 
 afterEach(cleanup);
 

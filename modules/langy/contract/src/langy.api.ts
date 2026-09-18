@@ -1,4 +1,6 @@
 import { moduleApi } from "@langwatch/kernel";
+
+import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
 import type {
   LangyConversationDetail,
   LangyConversationEventPage,
@@ -9,11 +11,17 @@ import type {
   LangyStartConversationTurnInput,
   LangyTurnResultInput,
 } from "./langy-conversation.ts";
+import type { RelayTally } from "./langy-rest.schemas.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
-import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
 
 /** The portable, callable Langy capability shared by process transports. */
 export interface LangyApi {
+  ingestInternalTurnResult(input: LangyTurnResultInput): Promise<{ status: "accepted" }>;
+  revokeInternalCredentials(input: {
+    apiKeyId: string;
+    projectId: string;
+  }): Promise<{ outcome: "revoked" | "already_revoked" }>;
+  receiveInternalFrames(body: ReadableStream<Uint8Array> | null): Promise<RelayTally>;
   stopTurn(input: LangyStopTurnInput & { userId: string }): Promise<void>;
   findEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null>;
   trySetEgressAllowlist(input: {

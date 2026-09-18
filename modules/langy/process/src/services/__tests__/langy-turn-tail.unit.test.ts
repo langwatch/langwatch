@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import type { LangyStreamRead } from "../../repositories/langy-token-buffer.repository.ts";
 import type { TurnHealth } from "../../rules/langy-turn-settlement.rules.ts";
 import { WEDGED_TURN_PATIENCE_MS } from "../../rules/langy-turn-settlement.rules.ts";

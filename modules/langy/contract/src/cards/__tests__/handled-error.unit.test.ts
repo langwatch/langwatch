@@ -4,6 +4,7 @@
  * error document makes through Langy's panel.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   handledErrorFromThrown,
   isTerminalFailure,

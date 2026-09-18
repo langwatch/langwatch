@@ -5,12 +5,12 @@
  */
 import * as z from "zod";
 
-import { langyChoiceSelectionSchema } from "./choices.ts";
 import {
   langyDerivedCardSchema,
   langyCardHintSchema,
   RENDERED_CARD_KINDS,
 } from "../cards/derived-safe.ts";
+import { langyChoiceSelectionSchema } from "./choices.ts";
 
 export const LANGY_CARD_PART_TYPE = "langy-card";
 export const LANGY_CARD_FAILED_PART_TYPE = "langy-card-failed";

@@ -6,6 +6,7 @@
  */
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { catchUpConversationFold } from "../langy-durable-catch-up.ts";
 

@@ -1,6 +1,6 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import { LangyTurnsRateLimitedError } from "@langwatch/langy-contract";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 /**

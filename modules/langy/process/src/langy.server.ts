@@ -1,6 +1,8 @@
-import { bindRestMiddleware } from "@langwatch/api/rest";
+import { bindRestMiddleware, bindRestCredential } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
+
 import { LangyApp } from "./app/langy.app.ts";
+import type { LangyTitleGenerator, LangySessionKeyMetrics } from "./app/langy.members.ts";
 import { LangyAnalyticsEventClickHouseRepository } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import type { LangyAnalyticsClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import { langyRepositories } from "./repositories/langy-repositories.registry.ts";
@@ -21,15 +23,9 @@ import {
   LangyTitleGeneratorService,
   type LangyTitleGeneratorDeps,
 } from "./services/langy-title-generator.service.ts";
-import { langyRestPrometheusMetrics } from "./services/prometheus.langy-rest-metrics.service.ts";
-import {
-  langyInternalMetrics,
-  langyRelayFrameMetrics,
-  langyRelayLiveBuffer,
-} from "./transport/langy-internal.rest.ts";
+import { langyInternalRest } from "./transport/langy-internal.rest.ts";
 import { langyTurnsMembers, langyTurnsRest } from "./transport/langy-turns.rest.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
-import type { LangyTitleGenerator,LangySessionKeyMetrics } from "./app/langy.members.ts";
 
 export type { LangyInfrastructure } from "./app/langy.members.ts";
 
@@ -89,10 +85,10 @@ export function createLangySessionKeyReap(options: {
 export const langyServer = defineServerModule("langy")
   .withRepositories(langyRepositories)
   .withApp(LangyApp)
-  .withTransports(langyTurnsRest, setupSkillsTrpcTransport)
-  /** Binds internal facts that langyInternalRest doesn't mount yet; the family's mount
-   * refuses boot until they're bound, and moving them would only shift the same lines later. */
-  .withTransportFacts(({ dependencies, members }) => {
+  .withTransports(langyTurnsRest, langyInternalRest, setupSkillsTrpcTransport)
+  .withTransportFacts(({ app, dependencies, members }) => {
+    if (!(app instanceof LangyApp))
+      throw new TypeError("Langy transport requires its constructed application");
     // Rollout gate then identity bridge, in that order - the chain both public
     // Langy families share. `actors` is the same user directory the deleted
     // `apps/api` mount passed straight through (`actors: prisma`).
@@ -100,9 +96,9 @@ export const langyServer = defineServerModule("langy")
       featureFlags: dependencies.featureFlags,
       actors: members.prisma,
     });
-    const metrics = langyRestPrometheusMetrics();
 
     return [
+      bindRestCredential("internalSecret", () => app.internalDoor),
       bindRestMiddleware(langyTurnsMembers, () => ({
         callers,
         // One `Prefer: wait` hold borrows a dedicated connection for its
@@ -120,11 +116,5 @@ export const langyServer = defineServerModule("langy")
           };
         },
       })),
-      bindRestMiddleware(langyInternalMetrics, () => metrics.internal),
-      bindRestMiddleware(langyRelayFrameMetrics, () => metrics.relayFrames),
-      // `LangyApp.reads` claims `redis`, so a process that installed this
-      // module HAS the live edge: there is no composition in which the relay
-      // is mounted over a buffer that does not exist.
-      bindRestMiddleware(langyRelayLiveBuffer, () => true),
     ];
   });

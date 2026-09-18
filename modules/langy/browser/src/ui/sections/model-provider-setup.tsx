@@ -4,11 +4,15 @@
  * Spec: specs/langy/langy-inline-model-setup.feature
  */
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { EditModelProviderForm } from "@langwatch/model-provider-browser/edit-model-provider-form";
 import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
+import { EditModelProviderForm } from "@langwatch/model-provider-browser/edit-model-provider-form";
 import { useCallback, useRef, useState } from "react";
-import { langyModelProviders, LANGY_RECOMMENDED_PROVIDER } from "../../model/langy-model-providers.ts";
+
 import { useLangyHost } from "../../model/langy-host.ts";
+import {
+  langyModelProviders,
+  LANGY_RECOMMENDED_PROVIDER,
+} from "../../model/langy-model-providers.ts";
 
 export type ModelProviderKey = string;
 

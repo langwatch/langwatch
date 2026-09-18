@@ -4,6 +4,7 @@
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
+
 import { useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import {
   type CapabilityCardInput,

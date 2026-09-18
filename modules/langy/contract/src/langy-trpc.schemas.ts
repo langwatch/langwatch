@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { langyEgressAllowlistSchema } from "./langy.ts";
 
 /** One chat message on the wire - role + opaque parts (bounded downstream). */

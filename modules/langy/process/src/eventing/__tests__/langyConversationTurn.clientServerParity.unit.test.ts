@@ -18,6 +18,7 @@ import {
   langyConversationTurnEventSchema,
 } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
+
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import { LangyConversationTurnFoldProjection } from "../langy-conversation-turn.projection.ts";
 

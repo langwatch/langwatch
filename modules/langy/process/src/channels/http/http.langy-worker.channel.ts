@@ -3,12 +3,12 @@ import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
-import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../../eventing/langy-conversation-process.schemas.ts";
 import type {
   LangyDispatchOutcome,
   LangyWorkerMetrics,
   LangyWorker,
 } from "../../app/langy.members.ts";
+import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../../eventing/langy-conversation-process.schemas.ts";
 
 export type { LangyDispatchOutcome } from "../../app/langy.members.ts";
 

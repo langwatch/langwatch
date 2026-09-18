@@ -1,7 +1,12 @@
 /**
  * TIME TRAVEL for the chat panel itself (developer mode).
  */
-import { LANGY_CONVERSATION_EVENT_TYPES, type LangyEventCursor, type LangyMessageDto } from "@langwatch/langy-contract";
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  type LangyEventCursor,
+  type LangyMessageDto,
+} from "@langwatch/langy-contract";
+
 import {
   type LangyDevLogRecord,
   replayTurnProjection,

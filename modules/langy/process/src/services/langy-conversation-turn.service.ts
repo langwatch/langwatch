@@ -5,17 +5,16 @@ import type {
   LangyMessageRecordedEventData,
   LangyMessageRole,
 } from "@langwatch/langy-contract";
-import { langyJsonValueSchema,LangyTurnErrors } from "@langwatch/langy-contract";
+import { langyJsonValueSchema, LangyTurnErrors } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+
+import { LangyConversationCommands } from "../app/langy.members.ts";
 import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
-import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
-
-import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service.ts";
-
 import { turnMessageId } from "../rules/langy-conversation-shape.rules.ts";
 import type { LangyConversationRuntime } from "./langy-conversation.service.ts";
-import { LangyConversationCommands } from "../app/langy.members.ts";
+import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service.ts";
+import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service.ts";
 
 /**
  * Everything one turn writes to the log: the user's message, the acceptance, each tool call,

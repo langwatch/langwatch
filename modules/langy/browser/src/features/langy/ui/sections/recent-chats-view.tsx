@@ -1,8 +1,3 @@
-/**
- * Langy's conversation history, as a FULL VIEW inside the panel.
- */
-import { nowInstant, startOfDay } from "@langwatch/time";
-import { readableDate } from "../../../../model/langy-row-format.ts";
 import {
   Box,
   Button,
@@ -14,6 +9,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { LangyConversationListItemDto } from "@langwatch/langy-contract";
+/**
+ * Langy's conversation history, as a FULL VIEW inside the panel.
+ */
+import { nowInstant, startOfDay } from "@langwatch/time";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowLeft, Check, MoreHorizontal, Pencil, Search, Trash2, X } from "lucide-react";
 import type React from "react";
@@ -27,11 +29,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { Menu } from "@langwatch/design-system/menu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { LangyConversationListItemDto } from "@langwatch/langy-contract";
-import { useLangyConversationListQuery } from "../../behavior/data/use-langy-conversation-list-query.ts";
+
 import { formatLangyConversationDate } from "../../../../model/langy-conversation-date.ts";
+import { readableDate } from "../../../../model/langy-row-format.ts";
+import { useLangyConversationListQuery } from "../../behavior/data/use-langy-conversation-list-query.ts";
 
 /** A conversation whose title subscriber hasn't landed yet still needs a name. */
 const UNTITLED = "Untitled chat";
@@ -445,7 +446,7 @@ function RenameRow({
     <HStack gap={1} flex={1} minWidth={0} paddingX={2} paddingY={1.5}>
       <Input
         size="xs"
-        
+
         aria-label="Conversation title"
         value={draftTitle}
         onChange={(event) => onDraftTitleChange(event.target.value)}
@@ -660,7 +661,12 @@ const ChatRow = memo(function ChatRow({
           onCancelRename={onCancelRename}
         />
       ) : (
-        <ChatRowTitleButton item={item} isActive={isActive} showDate={showDate} onSelect={onSelect} />
+        <ChatRowTitleButton
+          item={item}
+          isActive={isActive}
+          showDate={showDate}
+          onSelect={onSelect}
+        />
       )}
       <ChatRowMenu item={item} onStartRename={onStartRename} onDelete={onDelete} />
     </HStack>

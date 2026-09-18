@@ -38,8 +38,7 @@ describe("given a destination that is LangWatch's own", () => {
 
     it("still treats the LangWatch documentation as inside LangWatch", () => {
       expect(
-        classify("https://docs.langwatch.ai/introduction", "https://langwatch.acme.internal")
-          .kind,
+        classify("https://docs.langwatch.ai/introduction", "https://langwatch.acme.internal").kind,
       ).toBe("internal");
     });
   });

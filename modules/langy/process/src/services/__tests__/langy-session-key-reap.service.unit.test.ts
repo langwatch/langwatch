@@ -4,12 +4,12 @@
  * Spec: modules/langy/specs/langy-session-key-maintenance.feature
  */
 import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
+import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LangySessionKeyMetrics } from "../../app/langy.members.ts";
 import { LangySessionKeyReapRepository } from "../../repositories/langy-session-key-reap.repository.ts";
 import { LangySessionKeyReapService } from "../langy-session-key-reap.service.ts";
-import { Temporal, type Instant } from "@langwatch/time";
 
 class ReapRepository extends LangySessionKeyReapRepository {
   readonly calls: { name: string; now: Instant }[] = [];

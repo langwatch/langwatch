@@ -1,6 +1,6 @@
 import { handledErrorFromHerr } from "@langwatch/handled-error";
-import { describe, expect, it } from "vitest";
-import { LangyModelNotConfiguredError,
+import {
+  LangyModelNotConfiguredError,
   AGENT_CHAT_TIMEOUT_MS,
   LangyAgentAtCapacityError,
   LangyAgentErroredError,
@@ -10,8 +10,9 @@ import { LangyModelNotConfiguredError,
   LangyGithubRepoNotAccessibleError,
   LangyTurnErrors,
   LangyWorkerRestartingError,
-  LangyWorkerStoppedError } from "@langwatch/langy-contract";
-
+  LangyWorkerStoppedError,
+} from "@langwatch/langy-contract";
+import { describe, expect, it } from "vitest";
 
 /**
  * A turn fails in a handful of KNOWN ways. Each must reach the browser as its

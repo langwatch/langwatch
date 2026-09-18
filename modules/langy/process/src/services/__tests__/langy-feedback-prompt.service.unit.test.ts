@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+
+import type { LangyFeedbackPromptRedis } from "../../app/langy.members.ts";
 import {
   FEEDBACK_LONG_CONVERSATION_ANSWERS,
   FEEDBACK_QUIET_PERIOD_MS,
   LangyFeedbackPromptPolicy,
 } from "../langy-feedback-prompt.service.ts";
-import type { LangyFeedbackPromptRedis } from "../../app/langy.members.ts";
 
 const NOW = 1_700_000_000_000;
 

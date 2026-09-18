@@ -1,9 +1,7 @@
+import { LangyTurnHandoffRedisRepository, type LangyHandoffRedis } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
+
 import { LANGY_HANDOFF_TTL_SECONDS } from "../repositories/langy-live-turn.repository.ts";
-import {
-  LangyTurnHandoffRedisRepository,
-  type LangyHandoffRedis,
-} from "@langwatch/langy-process";
 
 function fakeRedis(): LangyHandoffRedis & { values: Map<string, string> } {
   const values = new Map<string, string>();

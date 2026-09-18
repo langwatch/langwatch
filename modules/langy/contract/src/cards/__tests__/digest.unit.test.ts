@@ -4,6 +4,7 @@
  * list `{ data, pagination.total }`, others are bare arrays or documents.
  */
 import { describe, expect, it } from "vitest";
+
 import { extractDigest, MAX_DIGEST_IDS } from "../digest.ts";
 
 describe("extractDigest, given a collection read", () => {

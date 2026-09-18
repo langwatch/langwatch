@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { langyRunText, langyTranscriptRuns } from "../langy-transcript.ts";
 
 const text = (value: string) => ({ type: "text", text: value });

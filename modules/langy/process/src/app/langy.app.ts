@@ -1,11 +1,12 @@
+import { BearerIdentity, type RestIdentity } from "@langwatch/api/rest";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 /**
  * The Langy feature's application: what its doors call. It holds every service and process
  * capability the feature's api files reach, and it is the one typed thing a transport is given.
  */
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { ProjectApi } from "@langwatch/project-contract";
 import { ValidationError } from "@langwatch/handled-error";
+import type { FeatureSetup } from "@langwatch/kernel";
 import {
   LangyConversationNotFoundError,
   type LangyConversationDetail,
@@ -22,24 +23,32 @@ import {
   type LangyStreamEntry,
   LangyApi,
   type LangyApi as LangyApiContract,
-  langyServerConfigSchema,
+  assertLangyServerConfig,
+  langyConfig,
+  langySecrets,
   type LangyServerConfig,
 } from "@langwatch/langy-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { PresenceApi, type PresenceTenantEmitter } from "@langwatch/presence-contract";
-import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
 
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
+import { HttpLangyWorkerAdapter } from "../channels/http/http.langy-worker.channel.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
+import { LangyInternalService } from "../services/langy-internal.service.ts";
+import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
+import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 import {
   SETTLEMENT_CONFIRM_POLLS,
   SETTLEMENT_POLL_MS,
 } from "../services/langy-turn-tail.service.ts";
-import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
+import { OtelLangyWorkerMetricsAdapter } from "../services/langy-worker-metrics-otel.service.ts";
+import { UnavailableLangyWorkerAdapter } from "../services/langy-worker-unavailable.service.ts";
+import type { LangyService } from "../services/langy.service.ts";
+import { langyRestPrometheusMetrics } from "../services/prometheus.langy-rest-metrics.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
 import { buildLangyConversationCommands } from "./langy-eventing.build.ts";
 
@@ -56,7 +65,8 @@ export type LangyRedis = Readonly<{
 
 /** What the process composes this feature's application from. */
 type LangyAppDependencies = {
-  langy: LangyApiContract;
+  langy: LangyService;
+  internalDoor: RestIdentity;
   /** The rows the module keeps outside its event log, chosen at boot. */
   repositories: LangyRepositories;
   /** Absent in a deployment without Redis; the live edge degrades to the fold. */
@@ -121,7 +131,8 @@ export class LangyApp implements LangyApiContract {
     /** The plan the turn window resolves through. */
     plans: EntitlementApi,
   };
-  static readonly configSchema = langyServerConfigSchema;
+  static readonly config = langyConfig;
+  static readonly secrets = langySecrets;
   /**
    * `eventing` is the agent-pipeline dispatcher's own producer registration
    * (`langy-eventing.build.ts`). `rateLimiter` is the per-project counter
@@ -129,10 +140,25 @@ export class LangyApp implements LangyApiContract {
    */
   static readonly reads = reads("prisma", "redis", "eventing", "rateLimiter");
 
-  static create(setup: LangySetup): LangyApp {
+  static async create(setup: LangySetup): Promise<LangyApp> {
+    const { channel, door } = await setup.secrets.into(langySecrets.internal, (internalSecret) => {
+      assertLangyServerConfig(setup.config, internalSecret);
+      const metrics = OtelLangyWorkerMetricsAdapter.create();
+      const channel =
+        setup.config.agentUrl && internalSecret
+          ? HttpLangyWorkerAdapter.create({
+              agentUrl: setup.config.agentUrl,
+              internalSecret,
+              metrics,
+            })
+          : UnavailableLangyWorkerAdapter.create(metrics);
+      const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
+      return { channel, door };
+    });
     const built = buildLangyInfrastructure({
       redis: setup.members.redis,
       config: setup.config,
+      worker: channel,
       repositories: setup.repositories,
     });
     const adapter = PostgresLangyAdapter.create({ database: setup.members.prisma });
@@ -146,6 +172,7 @@ export class LangyApp implements LangyApiContract {
     });
     return new LangyApp({
       langy,
+      internalDoor: door,
       repositories: setup.repositories,
       redis: setup.members.redis,
       presence: setup.dependencies.presence,
@@ -157,7 +184,31 @@ export class LangyApp implements LangyApiContract {
     });
   }
 
-  private constructor(private readonly dependencies: LangyAppDependencies) {}
+  get internalDoor(): RestIdentity {
+    return this.dependencies.internalDoor;
+  }
+
+  readonly #internal: LangyInternalService;
+
+  private constructor(private readonly dependencies: LangyAppDependencies) {
+    this.#internal = LangyInternalService.create(
+      dependencies.langy,
+      langyRestPrometheusMetrics(),
+      dependencies.redis !== null,
+    );
+  }
+
+  ingestInternalTurnResult(input: import("@langwatch/langy-contract").LangyTurnResultInput) {
+    return this.#internal.ingestTurnResult(input);
+  }
+
+  revokeInternalCredentials(input: { apiKeyId: string; projectId: string }) {
+    return this.#internal.revokeCredentials(input);
+  }
+
+  receiveInternalFrames(body: ReadableStream<Uint8Array> | null) {
+    return this.#internal.receiveFrames(body);
+  }
 
   /** The rows this application persists outside its own event log. */
   get repositories(): LangyRepositories {
@@ -168,7 +219,7 @@ export class LangyApp implements LangyApiContract {
    * The service itself, for the paths that are not a Langy door. Everything below serves a
    * person looking at a conversation.
    */
-  get langyService(): LangyApiContract {
+  get langyService(): LangyService {
     return this.dependencies.langy;
   }
 
@@ -505,12 +556,15 @@ export class LangyApp implements LangyApiContract {
   }): Promise<boolean> {
     const { projectId, conversationId, turnId, userId } = input;
     const { redis, langy, repositories } = this.dependencies;
-    if (redis && (await repositories.turnAccess.isTurnActor({
-      projectId,
-      conversationId,
-      turnId,
-      userId,
-    }))) {
+    if (
+      redis &&
+      (await repositories.turnAccess.isTurnActor({
+        projectId,
+        conversationId,
+        turnId,
+        userId,
+      }))
+    ) {
       return true;
     }
     const conversation = await langy.findByIdVisible({

@@ -4,12 +4,13 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { LangyFeedbackPromptPolicy } from "../../services/langy-feedback-prompt.service.ts";
-import { LangyService } from "../../services/langy.service.ts";
+
 import type { LangyConversationService } from "../../services/langy-conversation.service.ts";
 import type { LangyCredentialService } from "../../services/langy-credential.service.ts";
+import { LangyFeedbackPromptPolicy } from "../../services/langy-feedback-prompt.service.ts";
 import type { LangyMessageService } from "../../services/langy-message.service.ts";
 import type { LangyTurnService } from "../../services/langy-turn.service.ts";
+import { LangyService } from "../../services/langy.service.ts";
 
 function feedbackPrompt() {
   const values = new Map<string, string>();

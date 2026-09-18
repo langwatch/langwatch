@@ -6,21 +6,25 @@
 
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { createLogger } from "@langwatch/observability";
-import { WebSocket, WebSocketServer } from "ws";
+
 import type { ConnectUpgradeRouter as UpgradeRouter } from "@langwatch/api";
-import { PRESENCE_HEARTBEAT_MS,
+import {
+  PRESENCE_HEARTBEAT_MS,
   type CliFrame,
   cliFrameSchema,
   LOCAL_CONTROL_PROTOCOL_VERSION,
-  type PlatformFrame } from "@langwatch/langy-contract";
-import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
+  type PlatformFrame,
+} from "@langwatch/langy-contract";
+import { createLogger } from "@langwatch/observability";
+import { WebSocket, WebSocketServer } from "ws";
+
 import type { PresenceHeartbeat } from "../../repositories/langy-local-presence.repository.ts";
-import type { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
 import type {
   ControlCredential,
   ControlSession,
 } from "../../rules/langy-local-session-contract.rules.ts";
+import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
+import type { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:gateway");
 

@@ -1,4 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+
 import type { LangyTurnMetric } from "../../model/values/langy-turn.ts";
 import { NumberTicker } from "./number-ticker.tsx";
 

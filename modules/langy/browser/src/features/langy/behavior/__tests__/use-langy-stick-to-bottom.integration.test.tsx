@@ -4,6 +4,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { useLangyStickToBottom } from "../use-langy-stick-to-bottom.ts";
 
 // Motion ON — so the tests drive the real default path (smooth scrollIntoView),

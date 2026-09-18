@@ -12,7 +12,11 @@ import {
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { langyLocalRest, langyLocalRestMembers, type LangyLocalRestMembers } from "../langy-local.api.ts";
+import {
+  langyLocalRest,
+  langyLocalRestMembers,
+  type LangyLocalRestMembers,
+} from "../langy-local.api.ts";
 
 const PROJECT_ID = "project-123";
 const ORGANIZATION_ID = "organization-1";

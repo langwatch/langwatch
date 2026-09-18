@@ -1,10 +1,10 @@
+import type { LangyDerivedCard } from "../cards/derived-safe.ts";
 /**
  * Progressive preview (ADR-060 §7): client preview while fence streams.
  * Validates through same salvage as relay, keeps only latest valid card.
  * At settle, relay's part wins (reconciliation by blockId). See ADR-060.
  */
 import { salvageLangyDerivedCard } from "./salvage.ts";
-import type { LangyDerivedCard } from "../cards/derived-safe.ts";
 
 export interface LangyDerivedCardPreview {
   /** The raw fence buffer last fed. */

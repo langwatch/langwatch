@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { LangyMessageService } from "../../services/langy-message.service.ts";
 import type {
   LangyConversationRepository,

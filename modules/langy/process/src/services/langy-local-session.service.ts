@@ -4,38 +4,28 @@
  * subscription, turn start, and frame translation; transports own only clocks.
  */
 
-
-import { createLogger } from "@langwatch/observability";
-import { nanoid } from "nanoid";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { LangyTurnInProgressError,PRESENCE_HEARTBEAT_MS,
+import {
+  LangyTurnInProgressError,
+  PRESENCE_HEARTBEAT_MS,
   type CallEnvelope,
   LOCAL_CONTROL_PROTOCOL_VERSION,
   type PermissionAnsweredFrame,
   type PermissionRequiredFrame,
   type PlatformFrame,
   type RegisterFrame,
-  type ResultFrame } from "@langwatch/langy-contract";
-import {
-  LangyActorSessionService,
-  type LangyActorUserReader,
-} from "./langy-actor-session.service.ts";
+  type ResultFrame,
+} from "@langwatch/langy-contract";
+import { createLogger } from "@langwatch/observability";
 import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
-import {
-  connectMessage,
-  conversationTitle,
-  conversationUrl,
-} from "../rules/langy-local-session-text.rules.ts";
-import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
-import type { ControlRequestService } from "./langy-local-control-request.service.ts";
-import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
+import { nowInstant } from "@langwatch/time";
+import { nanoid } from "nanoid";
+
 import type {
   LangyLocalPresence,
   PresenceHeartbeat,
 } from "../repositories/langy-local-presence.repository.ts";
-import type { UserWaitService } from "./langy-local-user-wait.service.ts";
-import { LocalControlFramesService } from "./langy-local-session-frames.service.ts";
-
+import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
 import {
   type AuthenticateOutcome,
   type ControlBuffer,
@@ -50,8 +40,20 @@ import {
   type RegisterOutcome,
   eventWorkspace,
 } from "../rules/langy-local-session-contract.rules.ts";
+import {
+  connectMessage,
+  conversationTitle,
+  conversationUrl,
+} from "../rules/langy-local-session-text.rules.ts";
+import {
+  LangyActorSessionService,
+  type LangyActorUserReader,
+} from "./langy-actor-session.service.ts";
+import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
+import type { ControlRequestService } from "./langy-local-control-request.service.ts";
+import { LocalControlFramesService } from "./langy-local-session-frames.service.ts";
 import { LocalControlLifecycleService } from "./langy-local-session-lifecycle.service.ts";
-import { nowInstant } from "@langwatch/time";
+import type { UserWaitService } from "./langy-local-user-wait.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:session");
 

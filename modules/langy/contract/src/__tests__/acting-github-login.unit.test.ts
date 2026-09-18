@@ -1,3 +1,4 @@
+import { type LangyCredentialSession, resolveActingGithubLogin } from "@langwatch/langy-contract";
 /**
  * @vitest-environment node
  * The acting user's GitHub-login-like handle for bot-authored attribution
@@ -5,7 +6,6 @@
  * to the GitHub username charset so the Co-authored-by trailer is well-formed.
  */
 import { describe, expect, it } from "vitest";
-import { type LangyCredentialSession, resolveActingGithubLogin } from "@langwatch/langy-contract";
 
 function session(user: { name?: string; email?: string }): LangyCredentialSession {
   return { user: { id: "u1", ...user } };

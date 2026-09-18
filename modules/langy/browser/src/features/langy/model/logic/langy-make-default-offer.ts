@@ -1,4 +1,5 @@
 import type { ModelDefaultEffective } from "@langwatch/model-provider-contract";
+
 import type { ScopeTier } from "../../../../model/langy-host.ts";
 
 /**

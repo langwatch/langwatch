@@ -3,10 +3,11 @@
  * @see specs/langy/langy-dual-stream.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LANGY_STREAMING } from "../../../rules/langy-streaming-constants.rules.ts";
-import { LangyTokenBufferRedisRepository } from "../redis.langy-token-buffer.repository.ts";
-import type { LangyStreamRedis } from "../../langy-token-buffer.repository.ts";
+
 import { LANGY_EMPTY_TURN_FALLBACK } from "../../../rules/langy-empty-turn.rules.ts";
+import { LANGY_STREAMING } from "../../../rules/langy-streaming-constants.rules.ts";
+import type { LangyStreamRedis } from "../../langy-token-buffer.repository.ts";
+import { LangyTokenBufferRedisRepository } from "../redis.langy-token-buffer.repository.ts";
 
 interface RecordedEntry {
   type: string;

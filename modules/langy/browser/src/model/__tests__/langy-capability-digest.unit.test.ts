@@ -4,6 +4,7 @@
  * carries a valid one, recomputed via the shared extractor otherwise (live frames, old turns).
  */
 import { describe, expect, it } from "vitest";
+
 import { commandOfToolCall, digestOfToolCall } from "../langy-capability-digest.ts";
 
 describe("commandOfToolCall", () => {

@@ -3,13 +3,14 @@ import { ArrowRight, X } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { ACCENT, CARD } from "../../../../model/asaplangy-tokens.ts";
+
+import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
-import { api } from "../../../../behavior/langy-api.ts";
-import { useLangyFeedback } from "../../behavior/data/use-langy-feedback.ts";
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { ACCENT, CARD } from "../../../../model/asaplangy-tokens.ts";
 import { type LangyFeedbackSentiment } from "../../../../model/langy-feedback-directive.ts";
+import { useLangyFeedback } from "../../behavior/data/use-langy-feedback.ts";
 
 /** What the backend feedback capture accepts as the coarse rating + tone. */
 type FeedbackRating = "up" | "down";

@@ -4,10 +4,10 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "@langwatch/langy-contract";
-import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
-
 import { createLangyConversationUpdateBroadcastSubscriber } from "@langwatch/langy-process";
+import { describe, expect, it, vi } from "vitest";
+
+import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 
 const ACCEPTED_AT = 1_752_600_000_000;
 const context: EventSubscriberContext = {

@@ -1,5 +1,6 @@
-import { LangySessionKeyReapRepository } from "./langy-session-key-reap.repository.ts";
 import type { Instant } from "@langwatch/time";
+
+import { LangySessionKeyReapRepository } from "./langy-session-key-reap.repository.ts";
 
 export type LangySessionKeyRecord = {
   id: string;

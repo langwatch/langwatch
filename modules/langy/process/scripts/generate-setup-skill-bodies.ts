@@ -22,15 +22,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
 import { runScript } from "@langwatch/observability";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
 const SKILLS_DIR = path.join(REPO_ROOT, "skills/_compiled/native");
-const OUT = path.join(
-  REPO_ROOT,
-  "modules/langy/process/src/rules/setup-skill-bodies.rules.ts",
-);
+const OUT = path.join(REPO_ROOT, "modules/langy/process/src/rules/setup-skill-bodies.rules.ts");
 
 /** The docblock the generated module carries, so its provenance is on the file. */
 const HEADER = `/**

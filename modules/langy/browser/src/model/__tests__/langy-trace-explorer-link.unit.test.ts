@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
 // The Explorer's REAL parser. The whole value of the deep link rests on the
 // claim "what we put in `q` means, to the Explorer, what `--query` meant to the
 // CLI" — so the test asks the Explorer itself rather than taking our word for it.
 import { parse } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   asFreeTextTerm,
   buildAutomationHref,

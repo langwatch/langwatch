@@ -1,3 +1,5 @@
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
  * The local call state machine over the in-memory store, with a stand-in
  * for the command line: it takes the nudge off the gateway's channel and
@@ -5,12 +7,11 @@
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
+
+import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 import type { WorkspaceNudge } from "../../rules/langy-local-call-record.rules.ts";
 import { callKey, workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
-import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
+import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 
 const projectId = "proj_1";
 const conversationId = "conv_1";

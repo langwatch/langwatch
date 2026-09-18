@@ -5,7 +5,7 @@ import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
 import { useState } from "react";
-import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
+
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import type {
   LangyPlan,
@@ -13,6 +13,7 @@ import type {
   LangyPlanItemStatus,
 } from "../../../../model/langy-plan.ts";
 import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
+import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 
 const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }

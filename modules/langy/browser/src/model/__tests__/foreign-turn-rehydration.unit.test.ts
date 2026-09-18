@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { shouldRehydrateEngineFromDurable } from "../foreign-turn-rehydration.ts";
 
 // A steady-state, idle, active conversation whose durable fold has grown past

@@ -3,6 +3,7 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "@langwatch/langy-contract";
+
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import {
   LangyAgentRespondedEventSchema,
@@ -19,7 +20,6 @@ import {
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
 } from "../langy-conversation-state.projection.ts";
-
 import { buildLangyProcessEventView } from "../langy-conversation.process.ts";
 
 export const PROJECT_ID = "proj_langy";

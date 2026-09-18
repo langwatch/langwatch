@@ -3,6 +3,7 @@
  */
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   cliToolResultPayload,
   cliToolResultSchema,
@@ -12,10 +13,10 @@ import {
 import type { UIMessage } from "ai";
 import { AlertCircle, Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
+
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
+import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import {
   type CapabilityCommand,
   commandOfToolCall,
@@ -29,6 +30,12 @@ import {
 import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
 import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note.tsx";
 import {
+  type CapabilityProgress,
+  isProposalOutput,
+  resolveCapability,
+  resolveCapabilityProgress,
+} from "../../model/capabilities/capability-registry.ts";
+import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
 } from "../../model/logic/langy-tool-failure.ts";
@@ -37,12 +44,6 @@ import {
   describeToolCall,
   effectiveToolName,
 } from "../../model/logic/langy-tool-label.ts";
-import {
-  type CapabilityProgress,
-  isProposalOutput,
-  resolveCapability,
-  resolveCapabilityProgress,
-} from "../../model/capabilities/capability-registry.ts";
 import { LangyCapabilityPendingCard } from "./capabilities/langy-capability-pending-card.tsx";
 import {
   type CapabilityToolCall,

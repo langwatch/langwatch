@@ -1,23 +1,25 @@
 import { generate } from "@langwatch/ksuid";
-
-import { LANGY_CONVERSATION_STATUS,LangyTurnErrors,
+import {
+  LANGY_CONVERSATION_STATUS,
+  LangyTurnErrors,
   LangyConversationNotFoundError,
-  LangyConversationNotOwnedError } from "@langwatch/langy-contract";
-import { mintRunToken } from "../rules/langy-frame-auth.rules.ts";
+  LangyConversationNotOwnedError,
+} from "@langwatch/langy-contract";
+import { nowInstant, Temporal } from "@langwatch/time";
+
+import { LangyConversationCommands } from "../app/langy.members.ts";
 import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import {
   type LangyMessageRepository,
   type LangyMessageRow,
 } from "../repositories/langy-message.repository.ts";
-import { nowInstant,Temporal } from "@langwatch/time";
-
 import {
   adoptConversationId,
   type ConversationDetail,
 } from "../rules/langy-conversation-shape.rules.ts";
+import { mintRunToken } from "../rules/langy-frame-auth.rules.ts";
 import type { LangyConversationRuntime } from "./langy-conversation.service.ts";
-import { LangyConversationCommands } from "../app/langy.members.ts";
 
 /**
  * A conversation's own life: created, adopted under a caller-chosen id, forked, renamed,

@@ -1,7 +1,7 @@
 import { Button, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useRef } from "react";
 
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import type { MakeDefaultWritePlan } from "../../model/logic/langy-make-default-offer.ts";
 
 /**

@@ -27,8 +27,8 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
-import { Composer } from "../composer.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import { Composer } from "../composer.tsx";
 
 function renderComposer({
   variant,

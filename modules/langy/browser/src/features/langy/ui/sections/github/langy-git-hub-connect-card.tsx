@@ -4,10 +4,10 @@
  * Spec: specs/integrations/github-connection.feature.
  */
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { useGitHubConnectPopup } from "@langwatch/github-browser/surfaces/github-connect-popup";
 import { useState } from "react";
 import { GitHub } from "react-feather";
-import { useRouter } from "@langwatch/browser-host/use-router";
 
 // The in-app Integrations page — the SAME GitHub App flow the rest of the app
 // opens (Settings → Integrations), reachable without a popup.

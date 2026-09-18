@@ -4,8 +4,9 @@
  * @see specs/langy/langy-capability-cards.feature
  */
 import { describe, expect, it } from "vitest";
-import { SCHEMA_BY_CARD_KIND, namesCreatedResource } from "../schemas.ts";
+
 import { parseCliResult } from "../registry.ts";
+import { SCHEMA_BY_CARD_KIND, namesCreatedResource } from "../schemas.ts";
 import { parseCliToolResult, toCliToolResult } from "../tool-result.ts";
 
 describe("namesCreatedResource", () => {

@@ -1,21 +1,24 @@
-import { type ProcessDefinition,
+import {
+  type ProcessDefinition,
   buildProcessDefinition,
   buildProcessManager,
   InMemoryProcessStore,
   type IntentHandler,
   OutboxDispatcherService,
-  ProcessManagerService } from "@langwatch/eventing";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+  ProcessManagerService,
+} from "@langwatch/eventing";
 import { AGENT_DISPATCH_TIMEOUT_MS } from "@langwatch/langy-process";
-import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
 import type { LangyConversationProcessState } from "../../app/langy.members.ts";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_OUTBOX_LEASE_DURATION_MS,
   LANGY_PROCESS_INTENT_TYPES,
 } from "../langy-conversation-process.schemas.ts";
+import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import { langyConversationProcess } from "../langy-conversation.process.ts";
-import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,

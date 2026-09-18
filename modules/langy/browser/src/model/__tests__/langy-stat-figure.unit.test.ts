@@ -2,6 +2,7 @@
  * @see specs/langy/langy-derived-stats-presentation.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   formatStatFigure,
   formatStatNumber,

@@ -1,13 +1,15 @@
-import { nowInstant } from "@langwatch/time";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
   type LangyTurnProjectionState,
-  seedLangyTurnProjection,type LangyStreamEntry
+  seedLangyTurnProjection,
+  type LangyStreamEntry,
 } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 import { create } from "zustand";
+
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 
 /**

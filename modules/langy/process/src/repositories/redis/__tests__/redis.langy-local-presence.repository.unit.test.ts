@@ -1,3 +1,5 @@
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
  * What one heartbeat does to the folder record: moves it on, writes it
  * back after a lapse under an open connection, and leaves alone a
@@ -5,11 +7,10 @@
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+
 import { presenceKey } from "../../../rules/langy-local-control-keys.rules.ts";
-import { LangyLocalPresenceRedisRepository } from "../redis.langy-local-presence.repository.ts";
 import type { ConnectedWorkspace } from "../../langy-local-presence.repository.ts";
+import { LangyLocalPresenceRedisRepository } from "../redis.langy-local-presence.repository.ts";
 
 const conversationId = "conv_1";
 

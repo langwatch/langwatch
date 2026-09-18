@@ -4,10 +4,11 @@
  * prompt-injection surface, marked unverified in the rendered SYSTEM block.
  */
 
-import { describe, expect, it } from "vitest";
 import type { LangyMessageRow } from "@langwatch/langy-contract";
-import { LangyConversationMemoryService } from "../langy-conversation-memory.service.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import { LangyConversationMemoryService } from "../langy-conversation-memory.service.ts";
 
 type Digest = {
   resource: string;

@@ -1,5 +1,4 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
-import { describe, expect, it } from "vitest";
 import {
   advanceSettlement,
   decideSyntheticTerminal,
@@ -7,6 +6,7 @@ import {
   shouldAbandonWedgedTurn,
   WEDGED_TURN_PATIENCE_MS,
 } from "@langwatch/langy-process/rules/langy-turn-settlement";
+import { describe, expect, it } from "vitest";
 
 describe("decideSyntheticTerminal", () => {
   describe("when the turn's heartbeat is still fresh", () => {

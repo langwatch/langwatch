@@ -1,10 +1,11 @@
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 /**
  * @vitest-environment node
  * A retry-fixable generation failure must reach the outbox, not vanish silently.
  * @see specs/langy/langy-conversation-title.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+
 import type { LangyTrustedMessageReader } from "../langy-message.service.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
 

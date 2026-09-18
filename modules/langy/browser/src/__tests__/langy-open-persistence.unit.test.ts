@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { useLangyStore } from "../behavior/langy.store.ts";
 
 /**

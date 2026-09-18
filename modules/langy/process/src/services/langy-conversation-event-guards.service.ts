@@ -1,4 +1,5 @@
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
+
 import type {
   LangyAgentRespondedEvent,
   LangyAgentResponseFailedEvent,

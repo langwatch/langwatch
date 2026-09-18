@@ -5,9 +5,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { LangyThinkingLine } from "../../ui/sections/langy-thinking-line.tsx";
 import type { ThinkingMessage } from "../langy-thinking-line.ts";
 import { THINKING_STUCK_MS } from "../langy-thinking-line.ts";
-import { LangyThinkingLine } from "../../ui/sections/langy-thinking-line.tsx";
 
 const REASONING_TEXT =
   "The p95 spike is confined to one window. Checking whether the slow traces share anything.";

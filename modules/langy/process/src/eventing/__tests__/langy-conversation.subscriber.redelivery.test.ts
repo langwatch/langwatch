@@ -9,6 +9,7 @@ import {
   LANGY_CONVERSATION_STATUS,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import type { LangyConversationLivenessRecord } from "../langy-conversation.subscriber.ts";
 import {

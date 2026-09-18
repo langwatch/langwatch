@@ -4,13 +4,13 @@
  * the minted session key, authenticated in-handler like the socket.
  */
 
+import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import {
   approveControlRequestBodySchema,
   approveControlRequestResponseSchema,
@@ -30,8 +30,9 @@ import {
 import { z } from "zod";
 
 import type { LocalControlRuntime } from "#repositories/redis/redis.langy-local-control-runtime.repository";
-import { ControlRequestService } from "#services/langy-local-control-request.service";
 import { conversationUrl } from "#rules/langy-local-session-text.rules";
+import { ControlRequestService } from "#services/langy-local-control-request.service";
+
 import type { LocalControlLongPoll } from "./langy-local-control-long-poll.api.ts";
 
 /** Everything the control family reaches that Langy does not own. */
@@ -85,7 +86,8 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   .withRawBody("text")
   .withRawResponse({ produces: "application/json" })
   .withDocs({
-    description: "The registered frame with its instance token, or the refused frame with its reason.",
+    description:
+      "The registered frame with its instance token, or the refused frame with its reason.",
   })
   .withMiddleware(langyLocalControlRestMembers)
   .handle(async ({ raw, request }, members) => {
@@ -261,10 +263,9 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       userId: auth.userId,
       projectId: auth.projectId,
     });
-    return Response.json(
-      langyControlCancelResultSchema.parse({ id: input.id, cancelled: true }),
-      { status: 200 },
-    );
+    return Response.json(langyControlCancelResultSchema.parse({ id: input.id, cancelled: true }), {
+      status: 200,
+    });
   })
 
   .build();

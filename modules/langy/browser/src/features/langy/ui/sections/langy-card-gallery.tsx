@@ -1,3 +1,4 @@
+import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 /**
  * Developer-mode card gallery — every card Langy can produce, on demand.
  *
@@ -23,24 +24,25 @@
  * on, made visible).
  */
 import { Temporal } from "@langwatch/time";
-import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
-import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
+
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import type { LangyPermissionCardData } from "../../../../model/langy-local-waits.ts";
+import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
+import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
+import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
+import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line.tsx";
 import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
 } from "../../behavior/logic/langy-error-explainer.ts";
-import type { LangyPermissionCardData } from "../../../../model/langy-local-waits.ts";
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { LangyCapabilityPendingCard } from "./capabilities/langy-capability-pending-card.tsx";
 import { LangyCapabilityRenderer } from "./capabilities/langy-capability-renderer.tsx";
-import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 import { LangyDerivedCardsTestingGround } from "./derived-cards/langy-derived-cards-testing-ground.tsx";
 import { LangyGitHubConnectCard } from "./github/langy-git-hub-connect-card.tsx";
-import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
-import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
 import { LangyError } from "./langy-error.tsx";
 import { LangyFeedback } from "./langy-feedback.tsx";
 import { LangyLocalPermissionCard } from "./langy-local-permission-card.tsx";
@@ -48,7 +50,6 @@ import { LangyPlanLimitCard } from "./langy-plan-limit-card.tsx";
 import { LangyRecoveringLine } from "./langy-recovering-line.tsx";
 import { LangyToolActivity } from "./langy-tool-activity.tsx";
 import { type LangyProposal, ProposalCard } from "./message-content.tsx";
-import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line.tsx";
 
 /** A settled tool call, shaped exactly as the stream delivers one. */
 function call(name: string, output: unknown, input: unknown = {}) {

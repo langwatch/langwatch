@@ -1,19 +1,23 @@
 import { EventEmitter } from "node:events";
+
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   EventSourcing,
   EventStoreProducerOnly,
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
-import type { PresenceApi } from "@langwatch/presence-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { langySecrets } from "@langwatch/langy-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it, vi } from "vitest";
+
 import type { LangyRepositories } from "../../repositories/langy-repositories.registry.ts";
 import { LangyApp } from "../langy.app.ts";
-import { describe, expect, it, vi } from "vitest";
 
 const CONVERSATION = {
   projectId: "project_1",
@@ -23,7 +27,7 @@ const CONVERSATION = {
 
 describe("LangyApp", () => {
   it("calls the matching flat service methods through the real feature factory", async () => {
-    const app = createApp();
+    const app = await createApp();
     const getPage = vi.spyOn(app.langyService, "getPage").mockResolvedValue({
       items: [],
       nextCursor: null,
@@ -41,8 +45,35 @@ describe("LangyApp", () => {
     expect(getEventsAfter).toHaveBeenCalledOnce();
   });
 
-  it("keeps one service instance behind the application", () => {
-    const app = createApp();
+  it("resolves its own handle once and mints an internal credential at construction", async () => {
+    const handles: unknown[] = [];
+    const secrets = new ScopedSecrets(async (handle, build) => {
+      handles.push(handle);
+      return build("langy-test-secret");
+    });
+    const app = await createApp(secrets);
+    expect(handles).toEqual([langySecrets.internal]);
+    const door = app.internalDoor;
+    if (!door.identify) throw new Error("The Langy internal credential has no identify operation");
+    expect(
+      await door.identify({
+        request: new Request("http://local/internal", {
+          headers: { authorization: "Bearer langy-test-secret" },
+        }),
+      }),
+    ).toMatchObject({ internal: { secretName: "langy-internal" } });
+    expect(() =>
+      door.identify?.({
+        request: new Request("http://local/internal", {
+          headers: { authorization: "Bearer wrong-secret" },
+        }),
+      }),
+    ).toThrow(expect.objectContaining({ code: "unauthorized" }));
+    expect(handles).toHaveLength(1);
+  });
+
+  it("keeps one service instance behind the application", async () => {
+    const app = await createApp();
     expect(app.langyService).toBe(app.langyService);
   });
 });
@@ -96,7 +127,10 @@ function fakePresence(): PresenceApi {
   };
 }
 
-function createApp(): LangyApp {
+/** No handle is ever resolved through it in these tests. */
+const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
+
+function createApp(secrets = noSecrets): Promise<LangyApp> {
   return LangyApp.create({
     dependencies: {
       presence: fakePresence(),
@@ -114,8 +148,9 @@ function createApp(): LangyApp {
       eventing: producerEventing(),
       rateLimiter: { check: async () => ({ allowed: true }) },
     },
-    config: { agentUrl: undefined, internalSecret: undefined },
+    config: { agentUrl: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
+    secrets,
     repositories: {} as LangyRepositories,
   });
 }

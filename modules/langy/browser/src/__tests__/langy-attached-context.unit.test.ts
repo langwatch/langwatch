@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { mergeContextChips, traceContextChip } from "../behavior/langy-context-chips.ts";
 import {
   attachedContextToChip,

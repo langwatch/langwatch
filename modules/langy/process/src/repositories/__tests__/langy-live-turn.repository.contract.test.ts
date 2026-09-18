@@ -1,3 +1,4 @@
+import { instantiateRepositories } from "@langwatch/kernel";
 /**
  * @vitest-environment node
  * The contract every langy live-turn backend answers the same way, run
@@ -5,13 +6,10 @@
  * Redis joins as a second row when this package declares that datastore.
  */
 import { describe, expect, it } from "vitest";
-import { instantiateRepositories } from "@langwatch/kernel";
+
 import type { LangyTurnHandoff } from "../langy-live-turn.repository.ts";
 import type { ConnectedWorkspace } from "../langy-local-presence.repository.ts";
-import {
-  type LangyRepositories,
-  langyRepositories,
-} from "../langy-repositories.registry.ts";
+import { type LangyRepositories, langyRepositories } from "../langy-repositories.registry.ts";
 import { MemoryLangyRepositories } from "../memory/memory.langy.repositories.ts";
 
 const backends: readonly { name: string; create: () => LangyRepositories }[] = [

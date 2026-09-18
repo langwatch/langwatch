@@ -13,7 +13,7 @@ the turn wire.
 | Concern                                                                                  | Owner                                                                 |
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Target registration, proximity affordance, chip selection, and page-specific composition | `platform/app/src/features/langy`                                     |
-| Portable turn-context values, schema factory, sanitising, and prompt rendering           | `modules/langy/contract/src/langy-turn-context.ts`          |
+| Portable turn-context values, schema factory, sanitising, and prompt rendering           | `modules/langy/contract/src/langy-turn-context.ts`                    |
 | Installed-skill list used to specialise the portable schema                              | `platform/app/src/runtime/app/features/langy-turn-context.adapter.ts` |
 
 The app layer owns the UI gesture and route-derived offers. The contract owns

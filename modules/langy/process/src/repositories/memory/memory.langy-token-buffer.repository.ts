@@ -1,9 +1,7 @@
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
+
 import { LANGY_EMPTY_TURN_FALLBACK } from "../../rules/langy-empty-turn.rules.ts";
-import {
-  type LangyStreamRead,
-  LangyTokenBuffer,
-} from "../langy-token-buffer.repository.ts";
+import { type LangyStreamRead, LangyTokenBuffer } from "../langy-token-buffer.repository.ts";
 import type { LangyMemoryStore } from "./langy-memory.store.ts";
 
 /** How long a turn may go without a heartbeat before a follow gives up. */
@@ -113,11 +111,7 @@ export class LangyTokenBufferMemoryRepository extends LangyTokenBuffer {
     this.append(input, { type: "status", status: input.status });
   }
 
-  async heartbeat(input: {
-    conversationId: string;
-    turnId: string;
-    now?: number;
-  }): Promise<void> {
+  async heartbeat(input: { conversationId: string; turnId: string; now?: number }): Promise<void> {
     this.store.heartbeats.set(this.store.turnKey(input), input.now ?? Date.now());
   }
 
@@ -125,10 +119,7 @@ export class LangyTokenBufferMemoryRepository extends LangyTokenBuffer {
     return this.store.streams.get(this.store.turnKey(input)) ?? [];
   }
 
-  private append(
-    input: { conversationId: string; turnId: string },
-    entry: LangyStreamEntry,
-  ): void {
+  private append(input: { conversationId: string; turnId: string }, entry: LangyStreamEntry): void {
     const key = this.store.turnKey(input);
     const held = this.store.streams.get(key) ?? [];
     held.push({ id: `${held.length + 1}-0`, entry });

@@ -160,16 +160,17 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   };
 });
 
-import { LangySidecar } from "../langy-panel.tsx";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangySidecar } from "../langy-panel.tsx";
 
 const PROJECT_ID = "project-demo";
 const navigateMock = vi.fn();

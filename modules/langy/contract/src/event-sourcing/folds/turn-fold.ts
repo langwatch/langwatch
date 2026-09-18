@@ -18,6 +18,8 @@ import {
   type LangyUserWaitKind,
   type LangyUserWaitOutcome,
 } from "../../constants.ts";
+import { langyJsonValueSchema } from "../../json.ts";
+import type { LangyJsonObject, LangyJsonValue, LangyMessagePart } from "../../json.ts";
 import type {
   LangyAgentResponseFailedEventData,
   LangyAgentRespondedEventData,
@@ -31,8 +33,6 @@ import type {
   LangyUserWaitEndedEventData,
   LangyUserWaitStartedEventData,
 } from "../contracts/langy.events.ts";
-import { langyJsonValueSchema } from "../../json.ts";
-import type { LangyJsonObject, LangyJsonValue, LangyMessagePart } from "../../json.ts";
 
 /**
  * Composite fold key: one turn document per `(conversationId, turnId)`.

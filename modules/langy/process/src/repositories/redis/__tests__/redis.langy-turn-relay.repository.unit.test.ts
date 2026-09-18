@@ -1,8 +1,8 @@
+import { mintRunToken, signFrame } from "@langwatch/langy-process/streaming/langy-frame-auth";
 /** LangyTurnRelayAdapter succeeds runTurn's streaming role as a SECURITY boundary: verifies
  * frames, pins to turn, dedups replays, and fans to live buffer + durable event log. */
 import { describe, expect, it, vi } from "vitest";
 
-import { mintRunToken, signFrame } from "@langwatch/langy-process/streaming/langy-frame-auth";
 import {
   type LangyRelayBuffer,
   type LangyRelayConversations,

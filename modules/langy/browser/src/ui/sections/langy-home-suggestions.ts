@@ -1,5 +1,5 @@
-import { type LangySuggestion, SETUP_SUGGESTIONS, SUGGESTIONS } from "./langy-empty-state.tsx";
 import type { ProjectReach } from "../../model/langy-project-reach.ts";
+import { type LangySuggestion, SETUP_SUGGESTIONS, SUGGESTIONS } from "./langy-empty-state.tsx";
 
 /**
  * How many asks the home page's capability row shows.

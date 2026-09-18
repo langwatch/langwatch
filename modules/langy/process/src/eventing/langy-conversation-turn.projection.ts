@@ -1,4 +1,9 @@
-import { type Projection, type StateProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
+import {
+  type Projection,
+  type StateProjectionStore,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import {
   foldLangyConversationTurn,
   initLangyConversationTurnState,
@@ -6,6 +11,7 @@ import {
   type LangyConversationTurnData,
   makeConversationTurnKey,
 } from "@langwatch/langy-contract";
+
 import type {
   LangyAgentRespondedEvent,
   LangyAgentResponseFailedEvent,

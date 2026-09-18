@@ -12,8 +12,9 @@ import {
   langyTurnToolCallSchema,
   parseConversationTurnKey,
 } from "@langwatch/langy-contract";
-import { z } from "zod";
 import { Prisma } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
+
 import type { LangyDatabase } from "./langy-database.mapper.ts";
 
 /**

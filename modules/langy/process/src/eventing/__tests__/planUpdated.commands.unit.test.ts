@@ -6,6 +6,7 @@
 
 import type { TenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import { UpdatePlanCommand } from "../langy-conversation.intent.ts";
 
 const TENANT = "project-1";

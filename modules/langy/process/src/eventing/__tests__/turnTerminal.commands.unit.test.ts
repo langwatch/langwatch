@@ -6,6 +6,7 @@
 
 import type { TenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import {
   FailAgentResponseCommand,
   RecordAgentResponseCommand,

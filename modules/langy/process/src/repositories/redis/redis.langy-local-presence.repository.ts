@@ -4,10 +4,11 @@
  * heartbeat, so a sleeping machine reads offline with no explicit deregister.
  */
 
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { PRESENCE_TTL_MS } from "@langwatch/langy-contract";
-import { policyKey, presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
+
+import { policyKey, presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
 import {
   connectedWorkspaceSchema,
   type ConnectedWorkspace,

@@ -1,23 +1,24 @@
-/**
- * What the command line says while a call is in flight: it started, it finished, it needs a
- * permission answer, it got one. A frame from a connection that is no longer the current one
- * is ignored rather than acted on — the folder reconnected, and this socket is stale.
- */
-import { createLogger } from "@langwatch/observability";
-import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
-import type { UserWaitService } from "./langy-local-user-wait.service.ts";
 import {
   LangyWaitExpiredError,
   type PermissionAnsweredFrame,
   type PermissionRequiredFrame,
   type ResultFrame,
 } from "@langwatch/langy-contract";
-import { grantedPatterns } from "../rules/langy-local-session-text.rules.ts";
+/**
+ * What the command line says while a call is in flight: it started, it finished, it needs a
+ * permission answer, it got one. A frame from a connection that is no longer the current one
+ * is ignored rather than acted on — the folder reconnected, and this socket is stale.
+ */
+import { createLogger } from "@langwatch/observability";
+
 import type {
   ControlConversations,
   ControlSession,
   ControlSkipGate,
 } from "../rules/langy-local-session-contract.rules.ts";
+import { grantedPatterns } from "../rules/langy-local-session-text.rules.ts";
+import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
+import type { UserWaitService } from "./langy-local-user-wait.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:session");
 

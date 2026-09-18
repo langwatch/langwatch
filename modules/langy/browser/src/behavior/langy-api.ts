@@ -2,12 +2,12 @@
  * The procedures the Langy dock calls, and the two ways it calls them.
  */
 
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   LangyConversationListCursorDto,
   LangyConversationListItemDto,
 } from "@langwatch/langy-contract";
 import type { ModelDefaultResolvedTrpcOutput } from "@langwatch/model-provider-contract";
-import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 
 /**
  * A payload no contract package publishes yet.

@@ -4,6 +4,7 @@
  * refusing without it).
  */
 import type { EventSourcing } from "@langwatch/eventing";
+
 import { RedisLangyConversationProducerRepository } from "../repositories/redis/redis.langy-conversation-producer.repository.ts";
 import { LangyConversationCommands } from "./langy.members.ts";
 

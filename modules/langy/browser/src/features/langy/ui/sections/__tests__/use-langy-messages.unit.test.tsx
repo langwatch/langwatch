@@ -7,6 +7,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import { useLangyMessages } from "../../../behavior/data/use-langy-messages.ts";
 
 const previousConversation = {

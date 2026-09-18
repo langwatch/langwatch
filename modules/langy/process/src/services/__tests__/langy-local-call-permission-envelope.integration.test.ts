@@ -4,11 +4,12 @@
  * @see specs/langy/langy-local-control.feature
  */
 
-import { describe, expect, it } from "vitest";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { describe, expect, it } from "vitest";
+
 import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
+import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 
 const projectId = "project_envelope";
 const conversationId = "conv_envelope";

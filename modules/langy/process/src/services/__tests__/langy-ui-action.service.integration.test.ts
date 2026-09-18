@@ -1,3 +1,4 @@
+import { LangyUiActionUnknownError } from "@langwatch/langy-contract";
 /**
  * The dispatch → claim → complete round trip against a REAL Redis, so the BLPOP wait, the SET NX
  * claim race and the pending-record lifecycle stay exact (specs/langy/langy-ui-actions.feature).
@@ -6,13 +7,14 @@ import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redi
 import Redis from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { LangyUiActionUnknownError } from "@langwatch/langy-contract";
-import { LangyUiActionService, type UiActionRedis, uiActionKeys } from "../langy-ui-action.service.ts";
-import type {
-  LangyUiActionCatalog,
-  LangyUiActionDefinition,
-} from "../../app/langy.members.ts";
+
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
+import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../../app/langy.members.ts";
+import {
+  LangyUiActionService,
+  type UiActionRedis,
+  uiActionKeys,
+} from "../langy-ui-action.service.ts";
 
 const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
   "workbench.duplicateTarget": {

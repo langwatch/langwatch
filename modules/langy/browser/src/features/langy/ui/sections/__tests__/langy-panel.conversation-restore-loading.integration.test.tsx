@@ -227,14 +227,14 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   return { api: withFallback(explicitApi), trpcClient: {} };
 });
 
-import { LangySidecar } from "../langy-panel.tsx";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangySidecar } from "../langy-panel.tsx";
 
 /**
  * The host port, stubbed for a panel that is already open on a remembered

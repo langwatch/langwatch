@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { partitionStreamingText } from "../streaming-text.tsx";
 
 describe("partitionStreamingText", () => {

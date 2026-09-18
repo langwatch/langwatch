@@ -4,6 +4,7 @@
  */
 import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import { GitMerge, GitPullRequest, GitPullRequestClosed, type LucideIcon } from "lucide-react";
+
 import type {
   GithubPrCardData,
   GithubPrState,

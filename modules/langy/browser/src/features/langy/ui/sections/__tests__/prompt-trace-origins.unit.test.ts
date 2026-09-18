@@ -5,8 +5,9 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { describe, expect, it } from "vitest";
+
 import { ORIGIN_DISPLAY } from "@langwatch/trace-browser/surfaces/trace-origins";
+import { describe, expect, it } from "vitest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptPath = path.resolve(

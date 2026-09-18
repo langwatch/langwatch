@@ -5,6 +5,7 @@
  */
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
+
 import { normalizeLangyConversationTitle } from "../langy-conversation-title.rules.ts";
 
 describe("normalizeLangyConversationTitle", () => {

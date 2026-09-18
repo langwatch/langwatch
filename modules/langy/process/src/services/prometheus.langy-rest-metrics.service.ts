@@ -2,10 +2,7 @@
  * Every counter is looked up before creation so multiple installs reach the SAME counter. */
 import { Counter, register } from "prom-client";
 
-import type {
-  LangyInternalMetrics,
-  LangyRelayFrameMetrics,
-} from "../transport/langy-internal.rest.ts";
+import type { LangyInternalMetrics, LangyRelayFrameMetrics } from "./langy-internal.service.ts";
 
 /** Both counter sets the internal REST family names as facts. */
 export type LangyRestMetrics = Readonly<{

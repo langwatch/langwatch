@@ -1,3 +1,4 @@
+import type { EventSubscriberContext, StateProjectionStore } from "@langwatch/eventing";
 /**
  * Freshness signal for a permission card; real projection + subscriber catch
  * the bug where a skipped card event left buttons stuck after the turn ended.
@@ -9,7 +10,7 @@ import {
   type LangyConversationStateData,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { EventSubscriberContext, StateProjectionStore } from "@langwatch/eventing";
+
 import {
   LangyConversationStateFoldProjection,
   type LangyConversationProcessingEvent,

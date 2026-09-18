@@ -4,8 +4,11 @@
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import {
   LangyHostApi,
   LangyHostProvider,
@@ -16,9 +19,6 @@ import {
 } from "../../../../../../model/langy-host.ts";
 import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
 import { LangyEvalRunCard } from "../langy-eval-run-card.tsx";
-
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 
 const navigateMock = vi.fn();
 

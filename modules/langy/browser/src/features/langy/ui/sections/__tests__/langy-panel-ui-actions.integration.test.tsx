@@ -10,6 +10,7 @@ import type { ChatTransport, UIMessage } from "ai";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
 import type { LangyUiActionHandlers } from "../../../../../model/ui-actions/langy-ui-action-types.ts";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
@@ -184,14 +185,14 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   };
 });
 
-import { LangySidecar } from "../langy-panel.tsx";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangySidecar } from "../langy-panel.tsx";
 
 const PROJECT_ID = "project-demo";
 

@@ -6,7 +6,10 @@
 import type { LangyTurnToolCall } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { langyAnsweredOptionIds, langyQuestionCards } from "../../../../../model/langy-local-waits.ts";
+import {
+  langyAnsweredOptionIds,
+  langyQuestionCards,
+} from "../../../../../model/langy-local-waits.ts";
 import {
   questionToolCallIdsIn,
   questionWaitCardParts,

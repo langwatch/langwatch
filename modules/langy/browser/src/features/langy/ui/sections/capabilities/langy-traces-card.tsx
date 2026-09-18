@@ -2,11 +2,17 @@
  * Traces capability card (`langwatch.trace.search` / `langwatch.trace.get`).
  */
 import { Button, Text, VStack } from "@chakra-ui/react";
+import { useRouter } from "@langwatch/browser-host/use-router";
 // `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
 // panel agree on what a result document IS in exactly one place.
 import { asJsonDocument } from "@langwatch/langy-contract";
 import { Search } from "lucide-react";
-import { useRouter } from "@langwatch/browser-host/use-router";
+
+import {
+  collectionOf,
+  textValue,
+  totalOf,
+} from "../../../../../model/langy-cli-result-document.ts";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
@@ -18,7 +24,6 @@ import {
   extractToolText,
   summaryLines,
 } from "../../../model/capabilities/capability-registry.ts";
-import { collectionOf, textValue, totalOf } from "../../../../../model/langy-cli-result-document.ts";
 import { CapabilityRow, LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 interface ParsedTrace {

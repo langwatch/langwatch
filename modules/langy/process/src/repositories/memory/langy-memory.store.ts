@@ -1,7 +1,7 @@
+import type { LangyAnalyticsEventRecord } from "../langy-analytics-event.repository.ts";
+import type { LangyTurnAccess, LangyTurnHandoff } from "../langy-live-turn.repository.ts";
 import type { ConnectedWorkspace } from "../langy-local-presence.repository.ts";
 import type { LangyStreamRead } from "../langy-token-buffer.repository.ts";
-import type { LangyTurnAccess, LangyTurnHandoff } from "../langy-live-turn.repository.ts";
-import type { LangyAnalyticsEventRecord } from "../langy-analytics-event.repository.ts";
 
 /**
  * The one process-local store every memory repository reads and writes, so a

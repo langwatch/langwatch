@@ -1,16 +1,17 @@
-import type { ComponentProps } from "react";
 import { ArrowUpRight } from "lucide-react";
-import {
-  LangyDerivedCardView as LangyDerivedCardViewPresentation,
-  type LangyExploreLinkProps,
-} from "../../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
+import type { ComponentProps } from "react";
+
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
 } from "../../../../../model/langy-trace-explorer-link.ts";
+import {
+  LangyDerivedCardView as LangyDerivedCardViewPresentation,
+  type LangyExploreLinkProps,
+} from "../../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
+import { useChoicesRefRows } from "../../../behavior/derived-cards/use-choices-ref-rows.ts";
 import { TimeseriesPlot } from "../capabilities/langy-timeseries-card.tsx";
 import { LangySpaAnchor } from "../langy-spa-anchor.tsx";
-import { useChoicesRefRows } from "../../../behavior/derived-cards/use-choices-ref-rows.ts";
 
 export type LangyDerivedCardViewProps = ComponentProps<typeof LangyDerivedCardViewPresentation>;
 

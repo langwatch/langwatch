@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { CAPABILITY_HYDRATORS } from "../capability-hydrators.ts";
 
 describe("CAPABILITY_HYDRATORS.trace.byIds", () => {

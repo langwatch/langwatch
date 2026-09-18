@@ -9,13 +9,14 @@ import {
 } from "@chakra-ui/react";
 import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
-import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
+
 import {
   absorbContextTarget,
   type LangyContextTarget as LangyContextTargetDescriptor,
   useLangyContextTargetStore,
 } from "../../../../behavior/langy-context-target.store.ts";
 import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
+import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
 
 /**
  * The composer's command palette — `/` for skills, `#` for context.
@@ -182,7 +183,9 @@ export function LangyComposerPalette({
     const filtered = q ? items.filter((item) => item.searchText.includes(q)) : items;
     // `#` is CONTEXT, and only context.
     const order = GROUP_ORDER[mode];
-    const sorted = [...filtered].toSorted((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
+    const sorted = [...filtered].toSorted(
+      (a, b) => order.indexOf(a.group) - order.indexOf(b.group),
+    );
     return createListCollection({
       items: sorted,
       itemToValue: (item) => item.value,
@@ -266,7 +269,6 @@ export function LangyComposerPalette({
             </Text>
           </HStack>
           <Combobox.Input
-            
             placeholder={chrome.placeholder}
             flex={1}
             minWidth={0}

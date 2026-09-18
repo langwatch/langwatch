@@ -7,4 +7,7 @@ export {
   LangyUiPageOutOfDateError,
   LangyUiSaveFailedError,
 } from "./model/ui-actions/langy-ui-action-errors.ts";
-export { useRegisterLangyActions, useRegisterLangyHandlers } from "./ui/sections/langy-page-context.tsx";
+export {
+  useRegisterLangyActions,
+  useRegisterLangyHandlers,
+} from "./ui/sections/langy-page-context.tsx";

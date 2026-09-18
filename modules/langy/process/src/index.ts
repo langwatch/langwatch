@@ -206,15 +206,12 @@ export {
   LangyUiActionRestCatalog,
   type LangyUiActionsRestMembers,
 } from "./transport/api-rest/langy-ui-actions.api.ts";
-export {
-  langyInternalMetrics,
-  langyInternalRest,
-  langyRelayFrameMetrics,
-  langyRelayLiveBuffer,
-  type LangyInternalMetrics,
-  type LangyRelayFrameMetrics,
-  type RelayTally,
-} from "./transport/langy-internal.rest.ts";
+export { langyInternalRest } from "./transport/langy-internal.rest.ts";
+export type { RelayTally } from "@langwatch/langy-contract";
+export type {
+  LangyInternalMetrics,
+  LangyRelayFrameMetrics,
+} from "./services/langy-internal.service.ts";
 export {
   resolveLangyRestActor,
   resolveLangyRestCaller,

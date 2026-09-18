@@ -125,7 +125,8 @@ export const registerInstanceSchema = z.object({
   inFlightCallIds: z.array(z.string().max(128)).max(1000).default([]),
 });
 
-export const registerFrameSchema = z.object({ ...versioned.shape,
+export const registerFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("register"),
   cli: cliSchema,
   instance: registerInstanceSchema,
@@ -133,7 +134,8 @@ export const registerFrameSchema = z.object({ ...versioned.shape,
 });
 export type RegisterFrame = z.infer<typeof registerFrameSchema>;
 
-export const registeredFrameSchema = z.object({ ...versioned.shape,
+export const registeredFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("registered"),
   instanceId: z.string(),
   heartbeatIntervalMs: z.number().int().positive(),
@@ -158,7 +160,8 @@ export const LOCAL_CONTROL_REFUSED_CODES = [
 ] as const;
 export type LocalControlRefusedCode = (typeof LOCAL_CONTROL_REFUSED_CODES)[number];
 
-export const refusedFrameSchema = z.object({ ...versioned.shape,
+export const refusedFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("refused"),
   code: z.enum(LOCAL_CONTROL_REFUSED_CODES),
   message: z.string(),
@@ -176,19 +179,22 @@ export const callEnvelopeSchema = z
   .and(localToolCallSchema);
 export type CallEnvelope = z.infer<typeof callEnvelopeSchema>;
 
-export const callFrameSchema = z.object({ ...versioned.shape,
+export const callFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("call"),
   call: callEnvelopeSchema,
 });
 export type CallFrame = z.infer<typeof callFrameSchema>;
 
-export const cancelFrameSchema = z.object({ ...versioned.shape,
+export const cancelFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("cancel"),
   callId: z.string(),
 });
 export type CancelFrame = z.infer<typeof cancelFrameSchema>;
 
-export const ackFrameSchema = z.object({ ...versioned.shape,
+export const ackFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("ack"),
   callId: z.string(),
 });
@@ -227,7 +233,8 @@ export const bashOutputSchema = z.object({
   durationMs: z.number().int().nonnegative(),
 });
 
-export const resultFrameSchema = z.object({ ...versioned.shape,
+export const resultFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("result"),
   callId: z.string(),
   /** Tool output as text for the model; `bash` also carries `output`. */
@@ -257,7 +264,8 @@ export type CommandSegment = z.infer<typeof commandSegmentSchema>;
  * The CLI needs the developer's answer before it runs the call. The panel
  * renders a card with these fields; the platform answers with `permission`.
  */
-export const permissionRequiredFrameSchema = z.object({ ...versioned.shape,
+export const permissionRequiredFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("permission_required"),
   callId: z.string(),
   /** What the card shows as the thing to allow. */
@@ -284,7 +292,8 @@ export type PermissionRequiredFrame = z.infer<typeof permissionRequiredFrameSche
  * the wait from it unless the card answered first, in which case it is ignored:
  * the `permission` frame for that answer is already on its way.
  */
-export const permissionAnsweredFrameSchema = z.object({ ...versioned.shape,
+export const permissionAnsweredFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("permission_answered"),
   callId: z.string(),
   decision: z.enum(["allow_once", "allow_pattern", "deny"]),
@@ -296,7 +305,8 @@ export type PermissionAnsweredFrame = z.infer<typeof permissionAnsweredFrameSche
 export const PERMISSION_DECISIONS = ["allow_once", "allow_pattern", "deny", "expired"] as const;
 export type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
 
-export const permissionFrameSchema = z.object({ ...versioned.shape,
+export const permissionFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("permission"),
   callId: z.string(),
   decision: z.enum(PERMISSION_DECISIONS),
@@ -304,18 +314,21 @@ export const permissionFrameSchema = z.object({ ...versioned.shape,
 export type PermissionFrame = z.infer<typeof permissionFrameSchema>;
 
 /** The user turned permission checks on or off for this session. */
-export const policyFrameSchema = z.object({ ...versioned.shape,
+export const policyFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("policy"),
   skipPermissions: z.boolean(),
 });
 export type PolicyFrame = z.infer<typeof policyFrameSchema>;
 
-export const deregisterFrameSchema = z.object({ ...versioned.shape,
+export const deregisterFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("deregister"),
 });
 
 /** The platform closed the folder from the panel; the CLI exits. */
-export const disconnectFrameSchema = z.object({ ...versioned.shape,
+export const disconnectFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("disconnect"),
   reason: z.string().max(500),
 });

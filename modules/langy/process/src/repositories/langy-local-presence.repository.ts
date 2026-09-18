@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { workspaceInfoSchema } from "@langwatch/langy-contract";
+import { z } from "zod";
 
 export const connectedWorkspaceSchema = z.object({
   conversationId: z.string(),

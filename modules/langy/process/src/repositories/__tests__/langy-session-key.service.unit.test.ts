@@ -5,16 +5,17 @@ import {
   AuthzService,
 } from "@langwatch/authz-contract";
 import { type LangySessionKeyMetrics } from "@langwatch/langy-process";
+import { Temporal, type Instant } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyService,
 } from "../../services/langy-session-key.service.ts";
-import { describe, expect, it, vi } from "vitest";
 import {
   LangySessionKeyRepository,
   type LangySessionKeyRecord,
 } from "../langy-session-key.repository.ts";
-import { Temporal, type Instant } from "@langwatch/time";
 
 class SessionKeyRepository extends LangySessionKeyRepository {
   key: LangySessionKeyRecord | null = null;

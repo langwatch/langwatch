@@ -5,6 +5,7 @@
  * Spec: specs/home/langy-home-morph.feature
  */
 import { afterEach, describe, expect, it } from "vitest";
+
 import {
   glowRectFor,
   type MorphRect,

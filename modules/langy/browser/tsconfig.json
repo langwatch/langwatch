@@ -7,7 +7,10 @@
     "verbatimModuleSyntax": true,
     "jsx": "react-jsx",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    // `node` is for `scripts/` (Node generators) and the tests that read the
+    // repo from disk, not for `src/` — `process.env` in browser source is
+    // refused by `langwatch/environment-boundaries`, not by this list.
+    "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
     "resolveJsonModule": true,
 
     "noEmit": true,
@@ -40,7 +43,7 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
-      "path": "../../github/web/tsconfig.build.json"
+      "path": "../../github/browser/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
@@ -49,22 +52,22 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../model-provider/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../../model-provider/web-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../../ops/web/tsconfig.build.json"
+      "path": "../../ops/browser/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../trace/contract/tsconfig.build.json"
+      "path": "../../trace/browser-kit/tsconfig.build.json"
     },
     {
-      "path": "../../trace/web-kit/tsconfig.build.json"
+      "path": "../../trace/contract/tsconfig.build.json"
     }
   ]
 }

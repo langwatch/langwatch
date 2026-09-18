@@ -11,6 +11,7 @@ import {
   MANAGEMENT_API_VERSION,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   LangyApi,
   LangyApiRequestInvalidError,
@@ -20,19 +21,16 @@ import {
 import { z } from "zod";
 
 import type { LangyApp } from "#app/langy.app";
-import {
-  type LangyUiActionCatalog,
-  type LangyUiActionDefinition,
-} from "#app/langy.members";
+import { type LangyUiActionCatalog, type LangyUiActionDefinition } from "#app/langy.members";
+import { LANGY_UI_ACTIONS_FLAG } from "#app/langy.members";
+import type { LangyActorUserReader } from "#services/langy-actor-session.service";
+import { LangyRestCallerService } from "#services/langy-rest-caller.service";
 import {
   LangyUiActionService,
   type UiActionBackendRunner,
   type UiActionRedis,
 } from "#services/langy-ui-action.service";
-import { LANGY_UI_ACTIONS_FLAG } from "#app/langy.members";
-import { LangyRestCallerService } from "#services/langy-rest-caller.service";
-import type { LangyActorUserReader } from "#services/langy-actor-session.service";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+
 import type { LangyRestCeiling } from "./langy-rest-credentials.api.ts";
 
 const AUTH_REASON =

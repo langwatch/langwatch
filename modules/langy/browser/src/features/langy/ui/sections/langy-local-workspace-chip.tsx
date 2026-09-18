@@ -9,7 +9,6 @@ import { useEffect, useState } from "react";
 
 import { describeError } from "../../../../behavior/errors.tsx";
 import { api } from "../../../../behavior/langy-api.ts";
-
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 
 export interface LangyLocalWorkspaceChipProps {

@@ -5,6 +5,7 @@
  * Spec: specs/langy/langy-panel-fold-motion.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   deriveWaveActivity,
   isErrorTransition,

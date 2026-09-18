@@ -1,16 +1,15 @@
+import { LANGY_TURN_OVERRIDE_FALLBACK } from "@langwatch/langy-contract";
 /**
  * The override resolver holds the last registry text it read for the life of
  * the PROCESS (not per-conversation), deliberately: a Prisma blip on a later
  * turn must not swap the system block, which is the provider's cache prefix.
  */
 import { describe, expect, it, vi } from "vitest";
-import { LANGY_TURN_OVERRIDE_FALLBACK } from "@langwatch/langy-contract";
-import { LangyTurnOverrideService } from "../langy-turn-override.service.ts";
-import type { LangyPrompt } from "../langy-prompt-registry.service.ts";
 
-function fakePrompts(
-  findByIdOrHandle: LangyPrompt["findByIdOrHandle"],
-): LangyPrompt {
+import type { LangyPrompt } from "../langy-prompt-registry.service.ts";
+import { LangyTurnOverrideService } from "../langy-turn-override.service.ts";
+
+function fakePrompts(findByIdOrHandle: LangyPrompt["findByIdOrHandle"]): LangyPrompt {
   return { findByIdOrHandle };
 }
 

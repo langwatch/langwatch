@@ -34,7 +34,7 @@ import {
   langyUserWaitStartedEventDataSchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
-import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
+
 import type {
   LangyEffectMembers,
   LangyGenerateTitleIntent,
@@ -44,6 +44,7 @@ import {
   langyGenerateTitleIntentSchema,
   langyWorkerDispatchIntentSchema,
 } from "./langy-conversation-process.schemas.ts";
+import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 
 export const createLangyWorkerDispatchIntent =
   (ports: LangyEffectMembers): IntentExecutor<LangyWorkerDispatchIntent> =>

@@ -22,7 +22,7 @@
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../agent/server/tsconfig.build.json"
+      "path": "../../agent/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
@@ -76,10 +76,13 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../feature-flag/server/tsconfig.build.json"
+      "path": "../../feature-flag/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/redis-client/tsconfig.build.json"

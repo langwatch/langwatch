@@ -1,22 +1,23 @@
+import {
+  LIVE_STREAM_KEEPALIVE_MS,
+  PERMISSION_WAIT_BUDGET_MS,
+  QUESTION_WAIT_BUDGET_MS,
+} from "@langwatch/langy-contract";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
  * User wait, the primitive behind permission/question cards, tested over in-memory stand-ins.
  * @see specs/langy/langy-local-permissions.feature
  * @see specs/langy/langy-choice-questions.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import {
-  LIVE_STREAM_KEEPALIVE_MS,
-  PERMISSION_WAIT_BUDGET_MS,
-  QUESTION_WAIT_BUDGET_MS,
-} from "@langwatch/langy-contract";
-import { UserWaitService } from "../langy-local-user-wait.service.ts";
+
+import { waitKey } from "../../rules/langy-local-control-keys.rules.ts";
 import type {
   UserWaitBuffer,
   UserWaitEvents,
 } from "../../rules/langy-local-user-wait-record.rules.ts";
-import { waitKey } from "../../rules/langy-local-control-keys.rules.ts";
+import { UserWaitService } from "../langy-local-user-wait.service.ts";
 
 const projectId = "proj_1";
 const conversationId = "conv_1";

@@ -1,15 +1,16 @@
-import { nowInstant } from "@langwatch/time";
 import { Box, HStack } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+
+import { useCyclingVerb } from "../../behavior/use-cycling-verb.ts";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import type {
   LangyThinkingTone,
   LangyToolNarrator,
   ThinkingMessage,
 } from "../../model/langy-thinking-line.ts";
 import { langyThinkingLine } from "../../model/langy-thinking-line.ts";
-import { useCyclingVerb } from "../../behavior/use-cycling-verb.ts";
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import { langyThinkingShimmerStyles } from "../../model/values/langy-shimmer.ts";
 import { LANGY_THINKING_VERBS } from "../../model/values/langy-thinking-verbs.ts";
 import { STATUS_LINE_ROW, StatusOrb } from "./streaming-status-line.tsx";

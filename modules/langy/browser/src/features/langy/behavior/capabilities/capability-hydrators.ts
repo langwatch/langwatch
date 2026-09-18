@@ -3,9 +3,10 @@
  */
 
 import { nowInstant, toEpochMs } from "@langwatch/time";
+
 import type { api } from "../../../../behavior/langy-api.ts";
-import { asFreeTextTerm } from "../../../../model/langy-trace-explorer-link.ts";
 import { traceMetaLine, truncateRowText } from "../../../../model/langy-row-format.ts";
+import { asFreeTextTerm } from "../../../../model/langy-trace-explorer-link.ts";
 
 /**
  * The trace row a card hydrates fresh, as this file reads it.

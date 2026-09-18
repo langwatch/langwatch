@@ -3,8 +3,8 @@
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
-import { Check } from "lucide-react";
 import type { GithubProgressEvent, GithubProgressStage } from "@langwatch/langy-contract";
+import { Check } from "lucide-react";
 
 type Step = {
   stage: GithubProgressStage;

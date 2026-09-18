@@ -1,3 +1,4 @@
+import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
 /**
  * @vitest-environment node
  * Pins the ADR-061 mirror-tier resolver's v1 behaviour: content by
@@ -5,8 +6,6 @@
  * its own turns. Per-org policy is a later seam; until then every org is `content`.
  */
 import { describe, expect, it } from "vitest";
-
-import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
 
 describe("resolveLangyMirrorTier", () => {
   describe("when no mirror project id is configured", () => {

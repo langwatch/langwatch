@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   agentContextChip,
   annotationContextChip,
@@ -329,9 +330,9 @@ describe("traceChipDisplayName", () => {
   describe("given a trace with a resolved trace name", () => {
     /** @scenario The trace display name falls back through the fields the app already uses */
     it("falls back through the resolved name, the root span name, then nothing", () => {
-      expect(
-        traceChipDisplayName({ traceName: "checkout flow", name: "POST /checkout" }),
-      ).toBe("checkout flow");
+      expect(traceChipDisplayName({ traceName: "checkout flow", name: "POST /checkout" })).toBe(
+        "checkout flow",
+      );
       expect(traceChipDisplayName({ traceName: null, name: "POST /checkout" })).toBe(
         "POST /checkout",
       );

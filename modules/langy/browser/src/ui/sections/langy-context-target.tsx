@@ -1,7 +1,8 @@
 import type { CSSProperties, ReactElement } from "react";
 import { cloneElement } from "react";
-import { useLangyContextTarget } from "../../behavior/use-langy-context-target.ts";
+
 import type { LangyContextTarget as LangyContextTargetDescriptor } from "../../behavior/langy-context-target.store.ts";
+import { useLangyContextTarget } from "../../behavior/use-langy-context-target.ts";
 
 /**
  * Declare a thing on the page as something Langy can be pointed at — the one-wrapper

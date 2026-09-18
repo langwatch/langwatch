@@ -10,7 +10,6 @@ import {
 } from "@langwatch/langy-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import { HttpLangyWorkerAdapter } from "../channels/http/http.langy-worker.channel.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import { LangyBlockOtelMetricsAdapter } from "../services/langy-block-metrics-otel.service.ts";
@@ -24,9 +23,7 @@ import type {
   LangyServiceCompositionOptions,
 } from "../services/langy-postgres.service.ts";
 import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
-import { OtelLangyWorkerMetricsAdapter } from "../services/langy-worker-metrics-otel.service.ts";
-import { UnavailableLangyWorkerAdapter } from "../services/langy-worker-unavailable.service.ts";
-import { LangyGithubPermit } from "./langy.members.ts";
+import { LangyGithubPermit, type LangyWorker } from "./langy.members.ts";
 
 /** The Redis surface this file needs: exactly what `LangyGithubPrCounter` names. */
 export type LangyGithubPrRedis = Readonly<{
@@ -114,23 +111,10 @@ export type LangyBuiltInfrastructure = Omit<LangyServiceCompositionOptions, "com
 export function buildLangyInfrastructure(input: {
   redis: RedisConnection | null;
   config: LangyServerConfig;
+  worker: LangyWorker;
   repositories: LangyRepositories;
 }): LangyBuiltInfrastructure {
-  const { redis, config, repositories } = input;
-
-  const workerMetrics = OtelLangyWorkerMetricsAdapter.create();
-  // No agent manager unless this process was started with the langyagent
-  // manager's address and shared secret (LANGY_AGENT_URL / LANGY_INTERNAL_SECRET,
-  // ADR-129) — a deployment without them refuses dispatch by name rather than
-  // guessing at an address.
-  const worker =
-    config.agentUrl && config.internalSecret
-      ? HttpLangyWorkerAdapter.create({
-          agentUrl: config.agentUrl,
-          internalSecret: config.internalSecret,
-          metrics: workerMetrics,
-        })
-      : UnavailableLangyWorkerAdapter.create(workerMetrics);
+  const { redis, repositories, worker } = input;
 
   const permits = LangyGithubPrPermitsAdapter.create(
     LangyGithubPrQuotaService.create({

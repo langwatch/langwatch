@@ -5,7 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+
 import {
   computeFrameMac,
   mintRunToken,
@@ -13,6 +13,8 @@ import {
   signFrame,
   verifyFrame,
 } from "@langwatch/langy-process/streaming/langy-frame-auth";
+import { describe, expect, it } from "vitest";
+
 import type { LangyFrameEnvelope, LangyFrameSigned } from "../../app/langy.members.ts";
 
 interface Vectors {

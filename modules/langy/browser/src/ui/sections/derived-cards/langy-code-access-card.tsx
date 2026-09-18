@@ -1,24 +1,23 @@
+import { Box, Button, chakra, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
+import { SHARE_CONTROL_COMMAND } from "@langwatch/langy-contract";
 /**
  * The code access card (ADR-129): four states, all read from `langy.getLocalWorkspace` rather
  * than the tool call, which is only where the card hangs, never what it says.
  */
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import { Box, Button, chakra, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
 import { Check, FolderCode, GitPullRequest } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
-import { LangyCopyButton } from "../../elements/langy-copy-button.tsx";
 import { describeError } from "../../../behavior/errors.tsx";
-import { SHARE_CONTROL_COMMAND } from "@langwatch/langy-contract";
 import { api } from "../../../behavior/langy-api.ts";
-
+import { useLangyLocalControlStore } from "../../../behavior/langy-local-control.store.ts";
+import { LangyGitHubConnectCard } from "../../../features/langy/ui/sections/github/langy-git-hub-connect-card.tsx";
 import {
   readLocalFolderPick,
   writeLocalFolderPick,
 } from "../../../model/langy-code-access-pick.ts";
-import { useLangyLocalControlStore } from "../../../behavior/langy-local-control.store.ts";
-import { LangyGitHubConnectCard } from "../../../features/langy/ui/sections/github/langy-git-hub-connect-card.tsx";
+import { LangyCopyButton } from "../../elements/langy-copy-button.tsx";
 
 /** The option ids the selection carries, so the message reads the same words. */
 export const LANGY_CODE_ACCESS_OPTIONS = {

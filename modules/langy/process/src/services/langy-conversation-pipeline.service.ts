@@ -15,9 +15,16 @@ import type {
   LangyMessageProjectionRecord,
 } from "@langwatch/langy-contract";
 import { LANGY_CONVERSATION_PROCESSING_EVENT_TYPES } from "@langwatch/langy-contract";
-import { langyConversationProcess } from "../eventing/langy-conversation.process.ts";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../eventing/langy-conversation-process.schemas.ts";
+
 import type { LangyEffectMembers } from "../app/langy.members.ts";
+import {
+  LangyAnalyticsEventMapProjection,
+  type LangyAnalyticsEventProjectionRecord,
+} from "../eventing/langy-analytics-event.projection.ts";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../eventing/langy-conversation-process.schemas.ts";
+import { LangyConversationStateFoldProjection } from "../eventing/langy-conversation-state.projection.ts";
+import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
+import { LangyConversationTurnFoldProjection } from "../eventing/langy-conversation-turn.projection.ts";
 import {
   AcceptAgentTurnCommand,
   ArchiveConversationCommand,
@@ -42,14 +49,8 @@ import {
   UpdateConversationMetadataCommand,
   UpdatePlanCommand,
 } from "../eventing/langy-conversation.intent.ts";
-import {
-  LangyAnalyticsEventMapProjection,
-  type LangyAnalyticsEventProjectionRecord,
-} from "../eventing/langy-analytics-event.projection.ts";
-import { LangyConversationStateFoldProjection } from "../eventing/langy-conversation-state.projection.ts";
-import { LangyConversationTurnFoldProjection } from "../eventing/langy-conversation-turn.projection.ts";
+import { langyConversationProcess } from "../eventing/langy-conversation.process.ts";
 import { LangyMessageOperationalMapProjection } from "../eventing/langy-message-operational.projection.ts";
-import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
 
 export interface LangyConversationProcessingPipelineDeps {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;

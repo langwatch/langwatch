@@ -5,14 +5,16 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_STATUS,
 } from "@langwatch/langy-contract";
-import { describe, expect, it, vi } from "vitest";
-import { type LangyTurnHandoff,
+import {
+  type LangyTurnHandoff,
   createAgentTurnLivenessSubscriber,
   LANGY_HEARTBEAT_GRACE_MS,
-  type LangyConversationLivenessRecord } from "@langwatch/langy-process";
+  type LangyConversationLivenessRecord,
+} from "@langwatch/langy-process";
+import { describe, expect, it, vi } from "vitest";
+
 import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
-
 
 const NOW = 1_752_600_100_000;
 const ACCEPTED_AT = NOW - LANGY_HEARTBEAT_GRACE_MS;

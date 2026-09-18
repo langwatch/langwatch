@@ -26,7 +26,10 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
-import { datasetContextChip, traceContextChip } from "../../../../../behavior/langy-context-chips.ts";
+import {
+  datasetContextChip,
+  traceContextChip,
+} from "../../../../../behavior/langy-context-chips.ts";
 import { Composer } from "../composer.tsx";
 
 const held = [

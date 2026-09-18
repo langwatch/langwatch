@@ -6,6 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   LangyHostApi,
   LangyHostProvider,

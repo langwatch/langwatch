@@ -3,13 +3,16 @@
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
 import { describe, expect, it } from "vitest";
-import type { LangyNavigateProject,LangyNavigateResourceLocator } from "../../app/langy.members.ts";
+
+import type {
+  LangyNavigateProject,
+  LangyNavigateResourceLocator,
+} from "../../app/langy.members.ts";
 import type { LangyNavigateResourceKind } from "../../rules/langy-navigate-resources.rules.ts";
 import { LangyNavigateFallbackService } from "../langy-navigate-fallback.service.ts";
 
 class FakeProjects implements LangyNavigateProject {
-  constructor(private readonly slugs: Record<string, string>) {
-  }
+  constructor(private readonly slugs: Record<string, string>) {}
   trySlugOf(projectId: string): Promise<string | null> {
     return Promise.resolve(this.slugs[projectId] ?? null);
   }
@@ -18,8 +21,7 @@ class FakeProjects implements LangyNavigateProject {
 class FakeResources implements LangyNavigateResourceLocator {
   readonly lookups: { kind: LangyNavigateResourceKind; resourceId: string }[] = [];
 
-  constructor(private readonly answer: (kind: LangyNavigateResourceKind) => string | null) {
-  }
+  constructor(private readonly answer: (kind: LangyNavigateResourceKind) => string | null) {}
 
   async tryLocate(input: {
     projectId: string;

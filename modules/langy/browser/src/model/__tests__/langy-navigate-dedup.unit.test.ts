@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { navigateDedupKey, reserveNavigate } from "../langy-navigate-dedup.ts";
 
 describe("navigateDedupKey", () => {

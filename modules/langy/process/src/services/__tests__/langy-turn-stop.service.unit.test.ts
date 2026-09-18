@@ -1,16 +1,17 @@
+import {
+  LangyConversationNotOwnedError,
+  LangyTurnNotStoppableError,
+} from "@langwatch/langy-contract";
 /**
  * The durable Stop workflow: who may stop a turn, and what stopping it
  * records regardless of what the worker does. Ported from origin/main's
  * `LangyTurnService.stopTurn`. See specs/langy/langy-stop-and-resume.feature.
  */
 import { describe, expect, it, vi } from "vitest";
-import {
-  LangyConversationNotOwnedError,
-  LangyTurnNotStoppableError,
-} from "@langwatch/langy-contract";
-import { LangyTurnStopService } from "../langy-turn-stop.service.ts";
+
 import { LangyFinalPartsService } from "../langy-final-parts.service.ts";
 import type { LangyTurnServiceDependencies } from "../langy-turn-shared.service.ts";
+import { LangyTurnStopService } from "../langy-turn-stop.service.ts";
 
 function makeStopDeps(
   over: {

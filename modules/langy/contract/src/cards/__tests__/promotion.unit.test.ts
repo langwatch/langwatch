@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { assertTotalOrder, CARD_PROBES, promoteCard, type CardProbe } from "../registry.ts";
 import { toCliToolResult } from "../tool-result.ts";
 

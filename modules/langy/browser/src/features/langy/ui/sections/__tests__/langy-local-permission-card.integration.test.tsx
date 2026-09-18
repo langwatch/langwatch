@@ -37,9 +37,12 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
-import { LangyLocalPermissionCard, SKIP_NOT_ALLOWED_HINT } from "../langy-local-permission-card.tsx";
-import type { LangyPermissionCardData } from "../../../../../model/langy-local-waits.ts";
 import { useLangyLocalControlStore } from "../../../../../behavior/langy-local-control.store.ts";
+import type { LangyPermissionCardData } from "../../../../../model/langy-local-waits.ts";
+import {
+  LangyLocalPermissionCard,
+  SKIP_NOT_ALLOWED_HINT,
+} from "../langy-local-permission-card.tsx";
 
 afterEach(cleanup);
 beforeEach(() => {

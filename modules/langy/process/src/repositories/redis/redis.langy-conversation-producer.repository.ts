@@ -9,15 +9,16 @@ import type {
   LangyMessageProjectionRecord,
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
-import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
+
 import type { LangyTitleGenerator } from "../../app/langy.members.ts";
-import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
-import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
-import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
+import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
 import type { LangyConversationUpdateChannel } from "../../eventing/langy-conversation.subscriber.ts";
+import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import { NullLangyWorkerMetricsAdapter } from "../../services/langy-worker-metrics-null.service.ts";
 import { UnavailableLangyWorkerAdapter } from "../../services/langy-worker-unavailable.service.ts";
 import { EventingLangyConversationAdapter } from "./redis.langy-conversation-runtime.repository.ts";
+import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
+import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

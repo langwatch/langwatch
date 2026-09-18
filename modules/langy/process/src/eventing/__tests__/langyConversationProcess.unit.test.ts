@@ -1,19 +1,21 @@
-import { type ProcessDefinition,
+import {
+  type ProcessDefinition,
   buildProcessDefinition,
   buildProcessManager,
   InMemoryProcessStore,
   ProcessManagerService,
-  type ProcessRef } from "@langwatch/eventing";
+  type ProcessRef,
+} from "@langwatch/eventing";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 
+import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
 import type { LangyConversationProcessState } from "../../app/langy.members.ts";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,
 } from "../langy-conversation-process.schemas.ts";
+import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import { langyConversationProcess } from "../langy-conversation.process.ts";
-import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
 import {
   agentRespondedEvent,
   agentResponseFailedEvent,

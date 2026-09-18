@@ -1,10 +1,3 @@
-/**
- * The user wait as a record and as a refusal: what the platform keeps about one card while it
- * is on screen, the answer shape the panel polls for, and the error a second answer gets. No
- * store and no command dispatch is reachable from here.
- */
-import { nanoid } from "nanoid";
-import { z } from "zod";
 import {
   LangyWaitExpiredError,
   type LangyUserWaitEndedEventData,
@@ -12,6 +5,14 @@ import {
   type PollWaitResponse,
 } from "@langwatch/langy-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+/**
+ * The user wait as a record and as a refusal: what the platform keeps about one card while it
+ * is on screen, the answer shape the panel polls for, and the error a second answer gets. No
+ * store and no command dispatch is reachable from here.
+ */
+import { nanoid } from "nanoid";
+import { z } from "zod";
+
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 
 /** What the platform keeps about one card while it is on screen. */

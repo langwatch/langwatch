@@ -4,14 +4,15 @@
  * durable events (ADR-044 part 2).
  */
 
+import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
+
+import { langyEmptyTurnLine } from "../../rules/langy-empty-turn.rules.ts";
 import {
   LANGY_LIVENESS,
   LANGY_STREAM,
   LANGY_STREAMING,
 } from "../../rules/langy-streaming-constants.rules.ts";
-import { langyEmptyTurnLine } from "../../rules/langy-empty-turn.rules.ts";
-import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
-import { nowInstant } from "@langwatch/time";
 import {
   type LangyStreamRead,
   type LangyStreamRedis,
@@ -63,7 +64,10 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
     this.redis = deps.redis;
   }
 
-  static create(deps: { redis: unknown; blockingRedis?: unknown }): LangyTokenBufferRedisRepository {
+  static create(deps: {
+    redis: unknown;
+    blockingRedis?: unknown;
+  }): LangyTokenBufferRedisRepository {
     const redis = deps.redis as LangyStreamRedis;
     if (deps.blockingRedis) {
       redis.blocking = deps.blockingRedis as LangyStreamRedis["blocking"];
@@ -563,11 +567,11 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
     while (!signal?.aborted) {
       const res = (await (
         reader as {
-          xread(
-            ...args: (string | number)[]
-          ): Promise<[string, [string, string[]][]][]> | null;
+          xread(...args: (string | number)[]): Promise<[string, [string, string[]][]][]> | null;
         }
-      ).xread("BLOCK", LANGY_STREAMING.FOLLOW_BLOCK_MS, "STREAMS", key, cursor)) as [string, [string, string[]][]][] | null;
+      ).xread("BLOCK", LANGY_STREAMING.FOLLOW_BLOCK_MS, "STREAMS", key, cursor)) as
+        | [string, [string, string[]][]][]
+        | null;
       if (!res) continue; // block timed out; loop re-checks the abort signal
       for (const [, rows] of res) {
         for (const [id, fields] of rows) {

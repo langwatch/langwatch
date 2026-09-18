@@ -1,16 +1,15 @@
 import { REHYDRATION_WINDOW_MS } from "@langwatch/eventing";
-import { describe, expect, it, vi } from "vitest";
 import {
   LangyConversationIdUnadoptableError,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "@langwatch/langy-contract";
-import {
-  LangyConversationService,
-} from "../langy-conversation.service.ts";
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
 import type { LangyConversationCommands } from "../../app/langy.members.ts";
 import type { LangyConversationRepository } from "../../repositories/langy-conversation-projection.repository.ts";
-import { Temporal } from "@langwatch/time";
+import { LangyConversationService } from "../langy-conversation.service.ts";
 
 /** Latest-version fold row the read repository returns. */
 type Row = {

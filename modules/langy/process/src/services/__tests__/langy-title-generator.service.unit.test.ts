@@ -8,11 +8,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("ai", () => ({ generateText: vi.fn() }));
 
-import { generateText } from "ai";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import { generateText } from "ai";
+
 import type { LangyTitleModelResolver } from "../../app/langy.members.ts";
-import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
 import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";
+import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
 
 const mockGenerateText = vi.mocked(generateText);
 
@@ -23,8 +24,7 @@ const CONVERSATION_ID = "conversation-1";
 class RecordingTitleModel implements LangyTitleModelResolver {
   readonly asked: { projectId: string; featureKey: string; fallbackModel: string }[] = [];
 
-  constructor(private readonly answer: unknown = { modelId: "openai/gpt-5-mini" }) {
-  }
+  constructor(private readonly answer: unknown = { modelId: "openai/gpt-5-mini" }) {}
 
   resolveTitleModel(input: {
     projectId: string;
@@ -46,7 +46,9 @@ class RefusingTitleModel implements LangyTitleModelResolver {
 /** A project with no cheap model configured: nothing to retry. */
 class UnconfiguredTitleModel implements LangyTitleModelResolver {
   resolveTitleModel(): Promise<never> {
-    return Promise.reject(new ModelNotConfiguredError("langy_title", "FAST", "Langy titles", PROJECT_ID));
+    return Promise.reject(
+      new ModelNotConfiguredError("langy_title", "FAST", "Langy titles", PROJECT_ID),
+    );
   }
 }
 

@@ -1,11 +1,12 @@
+import { type LangyLinkRedis } from "@langwatch/langy-process";
 /**
  * The resource-link store is Langy's per-CONVERSATION memory of which platform address a lookup
  * surfaced for a resource — the only thing a later `langwatch navigate open <id>` may resolve
  * an address from.
  */
 import { describe, expect, it, vi } from "vitest";
+
 import { LangyResourceLinksRedisRepository } from "../repositories/redis/redis.langy-resource-links.repository.ts";
-import { type LangyLinkRedis } from "@langwatch/langy-process";
 
 function fakeRedis() {
   const hashes = new Map<string, Map<string, string>>();

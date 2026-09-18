@@ -29,16 +29,17 @@ import {
   langyLocalStartWaitRequestSchema,
   langyLocalWorkspaceQuerySchema,
 } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { LocalControlRuntime } from "#repositories/redis/redis.langy-local-control-runtime.repository";
-import { LangyKeyIdentityService } from "#services/langy-key-identity.service";
 import type { ControlSkipGate } from "#rules/langy-local-session-contract.rules";
 import { conversationTitle, conversationUrl } from "#rules/langy-local-session-text.rules";
-import { ControlRequestService } from "#services/langy-local-control-request.service";
 import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
+import { LangyKeyIdentityService } from "#services/langy-key-identity.service";
+import { ControlRequestService } from "#services/langy-local-control-request.service";
+
 import type { UserWaitEvents } from "../../rules/langy-local-user-wait-record.rules.ts";
-import { nowInstant } from "@langwatch/time";
 
 /** A local call is a small JSON document, never an upload. */
 const MAX_BODY_BYTES = 256 * 1024;
@@ -189,7 +190,9 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withPermission(LOCAL_PERMISSION)
   .withQuery(langyLocalWorkspaceQuerySchema)
   .withRawResponse({ produces: "application/json" })
-  .withDocs({ description: "The code access card's own status document, as the command line reads it." })
+  .withDocs({
+    description: "The code access card's own status document, as the command line reads it.",
+  })
   .withMiddleware(langyLocalRestMembers)
   .handle(async ({ app, input, request }, members) => {
     const auth = await resolveLocalCaller({ request, members });

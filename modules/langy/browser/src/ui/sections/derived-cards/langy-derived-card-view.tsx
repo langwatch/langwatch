@@ -3,6 +3,7 @@
  * validates as out (ADR-060 §3).
  */
 import { Box, Button, Grid, Table, Text } from "@chakra-ui/react";
+import { MeterBar } from "@langwatch/design-system/meter-bar";
 import type {
   LangyCardHint,
   LangyChoiceSelection,
@@ -14,7 +15,7 @@ import type {
 } from "@langwatch/langy-contract";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
-import { MeterBar } from "@langwatch/design-system/meter-bar";
+
 import { formatStatFigure, isComparableSeries } from "../../../model/langy-stat-figure.ts";
 import { StreamingStatCard } from "../streaming-stat-card.tsx";
 import { LangyChoicesCard, type ChoicesRefRow } from "./langy-choices-card.tsx";

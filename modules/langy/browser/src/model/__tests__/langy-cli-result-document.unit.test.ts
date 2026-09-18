@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { collectionOf, countResults, totalOf } from "../langy-cli-result-document.ts";
 
 describe("collectionOf", () => {

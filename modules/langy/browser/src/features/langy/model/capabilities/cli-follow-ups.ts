@@ -3,7 +3,10 @@ import {
   followUpsForResult as followPackageUpsForResult,
   SUGGESTION_LABEL,
 } from "../../../../model/langy-cli-follow-ups.ts";
-import type { FollowUpSuggestion, SettledToolResult } from "../../../../model/langy-cli-follow-ups.ts";
+import type {
+  FollowUpSuggestion,
+  SettledToolResult,
+} from "../../../../model/langy-cli-follow-ups.ts";
 import {
   featureForCliToolName,
   featuresConsuming,

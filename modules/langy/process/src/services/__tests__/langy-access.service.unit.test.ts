@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it, vi } from "vitest";
+
 import { LangyAccessService } from "../langy-access.service.ts";
 
 function featureFlags(enabled: boolean) {

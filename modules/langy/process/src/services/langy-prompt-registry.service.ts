@@ -3,8 +3,8 @@
  * WHERE the row lives is a deployment decision (see ADR-050): a prompt row
  */
 
-import { createLogger } from "@langwatch/observability";
 import { LANGY_PROMPT_DEFAULT_TAG, type LangyPromptHandle } from "@langwatch/langy-contract";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:langy:prompt-registry");
 

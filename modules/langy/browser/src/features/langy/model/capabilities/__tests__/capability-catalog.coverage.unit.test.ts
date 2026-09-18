@@ -1,11 +1,13 @@
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+
 /**
  * Drift guard between the CLI's real command surface and the capability catalog.
  * @see specs/langy/langy-capability-cards.feature
  */
 import { DIGEST_STRATEGIES } from "@langwatch/langy-contract";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
+
 import {
   CAPABILITY_CATALOG,
   CAPABILITY_SURFACES,

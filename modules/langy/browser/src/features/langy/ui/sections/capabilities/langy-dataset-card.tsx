@@ -4,13 +4,14 @@
  */
 import { Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";
+
+import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document.ts";
 import { useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import {
   type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
 } from "../../../model/capabilities/capability-registry.ts";
-import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document.ts";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,
@@ -78,8 +79,7 @@ function describeMissingDatasets({
   unavailable: boolean;
   returned: number;
 }): string {
-  if (unavailable)
-    return "Couldn't load these datasets right now. Open Datasets to see them.";
+  if (unavailable) return "Couldn't load these datasets right now. Open Datasets to see them.";
   return returned === 1
     ? "This dataset is no longer available."
     : "These datasets are no longer available.";

@@ -1,6 +1,6 @@
 import type { EventHandler, IntentExecutor, ProcessManagerApplier } from "@langwatch/eventing";
 import { LANGY_CONVERSATION_EVENT_TYPES, LANGY_TITLE_SOURCE } from "@langwatch/langy-contract";
-import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
+
 import type {
   LangyConversationProcessState,
   LangyEffectMembers,
@@ -15,6 +15,7 @@ import {
   langyProcessEventViewSchema,
   langyWorkerDispatchIntentSchema,
 } from "./langy-conversation-process.schemas.ts";
+import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 import {
   createLangyGenerateTitleIntent,
   createLangyWorkerDispatchIntent,

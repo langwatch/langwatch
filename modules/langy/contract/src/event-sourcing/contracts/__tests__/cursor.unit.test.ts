@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { compareLangyEventCursors, cursorHasReachedEvent, type LangyEventCursor } from "../cursor.ts";
+import {
+  compareLangyEventCursors,
+  cursorHasReachedEvent,
+  type LangyEventCursor,
+} from "../cursor.ts";
 
 const at = (acceptedAt: number, eventId: string): LangyEventCursor => ({
   acceptedAt,

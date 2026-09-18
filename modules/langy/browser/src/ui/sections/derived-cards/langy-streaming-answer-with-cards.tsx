@@ -9,8 +9,12 @@ import {
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
 import { Fragment, useMemo, useRef, type ReactNode } from "react";
+
 import { StreamingText } from "../streaming-text.tsx";
-import { LangyDerivedCardView, type LangyDerivedCardViewProps } from "./langy-derived-card-view.tsx";
+import {
+  LangyDerivedCardView,
+  type LangyDerivedCardViewProps,
+} from "./langy-derived-card-view.tsx";
 
 type StreamSegment =
   | { type: "text"; text: string }

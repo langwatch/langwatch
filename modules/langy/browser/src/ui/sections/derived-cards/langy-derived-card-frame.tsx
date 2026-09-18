@@ -2,10 +2,10 @@
  * The derived chrome — provenance, styled ONCE (ADR-060 §4).
  */
 import { HStack, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "../../../behavior/use-reduced-motion.ts";
 import { langyThinkingShimmerStyles } from "../../../model/values/langy-shimmer.ts";
 

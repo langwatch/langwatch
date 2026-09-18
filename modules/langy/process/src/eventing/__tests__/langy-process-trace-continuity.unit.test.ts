@@ -4,21 +4,24 @@
  * @vitest-environment node
  */
 
-import { type EventSubscriberContext,
+import {
+  type EventSubscriberContext,
   buildIntentHandlers,
   buildProcessManager,
   InMemoryProcessStore,
   OutboxDispatcherService,
   type ProcessRef,
-  ProcessRuntime } from "@langwatch/eventing";
+  ProcessRuntime,
+} from "@langwatch/eventing";
 import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../langy-conversation-process.schemas.ts";
-import { langyConversationProcess } from "../langy-conversation.process.ts";
+
 import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../langy-conversation-process.schemas.ts";
+import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
+import { langyConversationProcess } from "../langy-conversation.process.ts";
 import { agentTurnAcceptedEvent, CONVERSATION_ID, PROJECT_ID, T0 } from "./langyEventFixtures.ts";
 
 /**

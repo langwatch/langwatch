@@ -11,10 +11,7 @@ import {
   type LangyActorResolution,
   type LangyActorUserReader,
 } from "./langy-actor-session.service.ts";
-import {
-  LangyKeyIdentityService,
-  type LangyIdentityToken,
-} from "./langy-key-identity.service.ts";
+import { LangyKeyIdentityService, type LangyIdentityToken } from "./langy-key-identity.service.ts";
 
 /** A caller who got through, or the dark surface that answers nothing. */
 export type LangyRestCaller =

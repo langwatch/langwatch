@@ -6,6 +6,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { useLingeringDodge } from "../use-lingering-dodge.ts";
 
 const RELEASE_MS = 1000;

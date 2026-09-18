@@ -1,5 +1,7 @@
 import { z } from "zod";
+
 import { cliToolResultSchema, type CliToolResult } from "./cards/tool-result.ts";
+import { langyMessagePartSchema } from "./json.ts";
 import { startCallBodySchema, startWaitBodySchema } from "./langy.local-control-http.ts";
 import {
   cliFrameSchema,
@@ -7,7 +9,6 @@ import {
   refusedFrameSchema,
   registeredFrameSchema,
 } from "./langy.local-control-protocol.ts";
-import { langyMessagePartSchema } from "./json.ts";
 
 // ── internal control-plane (the Go agent's outbound calls) ─────────────────
 
@@ -187,3 +188,11 @@ export const langyUiActionDispatchBodySchema = z.object({
    */
   experimentSlug: z.string().min(1).optional(),
 });
+
+export const langyRelayTallySchema = z.object({
+  applied: z.number().int().nonnegative(),
+  duplicate: z.number().int().nonnegative(),
+  rejected: z.number().int().nonnegative(),
+  terminal: z.boolean(),
+});
+export type RelayTally = z.infer<typeof langyRelayTallySchema>;

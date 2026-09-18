@@ -1,5 +1,3 @@
-import { describe, expect, it, vi } from "vitest";
-
 import {
   EventingLangyMaintenanceAdapter,
   LANGY_SESSION_KEYS_METRIC_NAME,
@@ -7,6 +5,7 @@ import {
   langySessionKeyReapWake,
   runLangySessionKeyReap,
 } from "@langwatch/langy-process";
+import { describe, expect, it, vi } from "vitest";
 
 const wakeContext = (at: number) => ({
   at,

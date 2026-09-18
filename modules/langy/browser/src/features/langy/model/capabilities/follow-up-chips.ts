@@ -6,7 +6,10 @@ import {
   buildAutomationHref,
   readTraceSearchQuery,
 } from "../../../../model/langy-trace-explorer-link.ts";
-import type { TraceSearchQuery, UnstatedWindow } from "../../../../model/langy-trace-explorer-link.ts";
+import type {
+  TraceSearchQuery,
+  UnstatedWindow,
+} from "../../../../model/langy-trace-explorer-link.ts";
 import { buildSurfaceHref, SURFACE_BY_FEATURE, SURFACE_LABEL } from "./capability-registry.ts";
 import { followUpsForResult } from "./cli-follow-ups.ts";
 
@@ -123,5 +126,7 @@ export function deriveFollowUpChips({
 
   // Carried offers first — a chip that brings the data with it is worth more
   // than one that merely opens a page — then cap.
-  return chips.toSorted((a, b) => Number(b.carried) - Number(a.carried)).slice(0, MAX_FOLLOW_UP_CHIPS);
+  return chips
+    .toSorted((a, b) => Number(b.carried) - Number(a.carried))
+    .slice(0, MAX_FOLLOW_UP_CHIPS);
 }

@@ -1,3 +1,4 @@
+import { carryLangyConversation } from "@langwatch/langy-contract";
 /**
  * @vitest-environment jsdom
  *
@@ -7,8 +8,8 @@
  */
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { useLangyConversationDeepLink } from "../../../../../behavior/use-langy-conversation-deep-link.ts";
-import { carryLangyConversation } from "@langwatch/langy-contract";
 
 const setSearchParams = vi.fn();
 const searchParams = { current: new URLSearchParams() };

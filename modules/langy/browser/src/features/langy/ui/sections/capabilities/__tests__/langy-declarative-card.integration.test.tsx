@@ -10,9 +10,7 @@ import type { CliResultDigest } from "@langwatch/langy-contract";
 import { render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
-import { LangyDeclarativeCard } from "../langy-declarative-card.tsx";
-import type { CapabilityData } from "../../../../behavior/use-capability-data.ts";
+
 import {
   LangyHostApi,
   LangyHostProvider,
@@ -21,6 +19,9 @@ import {
   type LangyHostTeam,
   type LangyRouteReading,
 } from "../../../../../../model/langy-host.ts";
+import type { CapabilityData } from "../../../../behavior/use-capability-data.ts";
+import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
+import { LangyDeclarativeCard } from "../langy-declarative-card.tsx";
 
 /**
  * A minimal host: the deep-link chip and the row links both resolve through

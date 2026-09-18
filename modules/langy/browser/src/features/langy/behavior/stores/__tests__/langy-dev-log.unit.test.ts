@@ -1,6 +1,7 @@
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   replayTurnProjection,
   tapeForConversation,
@@ -8,7 +9,6 @@ import {
   tokenStreamText,
   useLangyDevLog,
 } from "../langy-dev-log.ts";
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 
 /**
  * The inspector's tape: four lanes on one ring, recorded only while armed, and a REPLAY

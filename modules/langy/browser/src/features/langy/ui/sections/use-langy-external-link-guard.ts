@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 
+import { classifyLangyLinkDestination } from "../../model/logic/langy-link-destination.ts";
 import type {
   LangyExternalLinkDialogProps,
   LangyExternalLinkTarget,
 } from "../elements/langy-external-link-dialog.tsx";
-import { classifyLangyLinkDestination } from "../../model/logic/langy-link-destination.ts";
 
 export interface LangyExternalLinkGuard {
   /** Spread onto the Langy panel root. */

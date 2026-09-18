@@ -1,4 +1,5 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
+
 import { type LangySessionKeyMetrics } from "../app/langy.members.ts";
 
 /** Series name pinned because two processes write it: App via prom-client, worker via OTLP.
@@ -16,8 +17,7 @@ export class OtelLangySessionKeyMetricsAdapter implements LangySessionKeyMetrics
     );
   }
 
-  private constructor(private readonly keys: CounterHandle) {
-  }
+  private constructor(private readonly keys: CounterHandle) {}
 
   record(input: { operation: "minted" | "revoked" | "reaped"; count?: number }): void {
     this.keys.inc({ op: input.operation }, input.count ?? 1);

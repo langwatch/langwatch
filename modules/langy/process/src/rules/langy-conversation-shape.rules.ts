@@ -13,12 +13,13 @@ import {
   type LangyEventCursor,
   type LangyLocalRecordWait,
 } from "@langwatch/langy-contract";
+import { Temporal, type Instant } from "@langwatch/time";
+
 import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
 import type {
   LangyConversationListCursor,
   LangyConversationRow,
 } from "../repositories/langy-conversation-projection.repository.ts";
-import { Temporal, type Instant } from "@langwatch/time";
 
 /**
  * Adoptable ids are the shape a caller may propose. Anything else is refused before it

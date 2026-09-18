@@ -1,10 +1,11 @@
-import type { LangyCredentialSession, LangyCredentials, LangyMirrorTier } from "./langy.ts";
-import type { LangyMessagePart } from "./json.ts";
+import type { Instant } from "@langwatch/time";
+
 import type { CliResultDigest } from "./cards/digest.ts";
 import type { CliToolResult } from "./cards/tool-result.ts";
-import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turn-wire.ts";
 import type { LangyEventCursor } from "./event-sourcing/contracts/cursor.ts";
-import type { Instant } from "@langwatch/time";
+import type { LangyConversationTurnWireEvent } from "./event-sourcing/contracts/turn-wire.ts";
+import type { LangyMessagePart } from "./json.ts";
+import type { LangyCredentialSession, LangyCredentials, LangyMirrorTier } from "./langy.ts";
 
 export type LangyConversationListItem = {
   id: string;
@@ -126,10 +127,7 @@ export type LangyCredentialTurnCapability = {
   }): Promise<LangyCredentials>;
   findEgressAllowlist(input: { projectId: string }): Promise<string[] | null>;
   resolveMirrorTier(input: { projectId: string }): Promise<LangyMirrorTier>;
-  findModelsAllowed(input: {
-    projectId: string;
-    organizationId: string;
-  }): Promise<string[] | null>;
+  findModelsAllowed(input: { projectId: string; organizationId: string }): Promise<string[] | null>;
 };
 
 export type LangyMessageTurnCapability = {

@@ -2,14 +2,15 @@ import { chakra } from "@chakra-ui/react";
 import { Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
 import "../../behavior/langy-context-target.css";
-import { useLangyContextArming } from "../../behavior/use-langy-context-arming.ts";
 import {
   absorbContextTarget,
   releaseContextTarget,
   useLangyContextTargetStore,
 } from "../../behavior/langy-context-target.store.ts";
 import { useLangyStore } from "../../behavior/langy.store.ts";
+import { useLangyContextArming } from "../../behavior/use-langy-context-arming.ts";
 
 /**
  * The one moving part behind "point at things and add them to Langy". Mounted once,

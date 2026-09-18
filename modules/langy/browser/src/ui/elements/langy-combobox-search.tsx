@@ -36,7 +36,6 @@ export function LangyComboboxSearch({ placeholder }: { placeholder: string }) {
           <Search size={13} />
         </Box>
         <Combobox.Input
-          
           placeholder={placeholder}
           height="full"
           minWidth={0}

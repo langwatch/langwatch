@@ -4,6 +4,9 @@
 
 import { useChart } from "@chakra-ui/charts";
 import { Box, Button, HStack, Menu, Portal, Text, VStack } from "@chakra-ui/react";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { toaster } from "@langwatch/design-system/toaster";
 import { ArrowUpRight, LayoutDashboard, TrendingDown, TrendingUp } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -18,12 +21,8 @@ import {
 } from "recharts";
 import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
-import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "@langwatch/browser-host/errors";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../../behavior/langy-api.ts";
-import { useRouter } from "@langwatch/browser-host/use-router";
-
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { formatMoneyShort, Money } from "../../../../../ui/elements/langy-money.tsx";
 import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry.ts";
 import { LangyCapabilityCard } from "./langy-capability-card.tsx";

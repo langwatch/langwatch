@@ -1,6 +1,6 @@
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Eraser, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";

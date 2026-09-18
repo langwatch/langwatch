@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+
 import { LANGY_FEATURE_ID, langyRelayFrameSchema, langyTurnInputSchema } from "../index.ts";
 
 describe("Langy contract", () => {

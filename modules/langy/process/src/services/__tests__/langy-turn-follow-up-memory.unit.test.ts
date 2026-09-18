@@ -4,14 +4,15 @@
  * capabilities change, and gone whenever the fleet rolls.
  */
 import type { LangyMessageRow } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
+
 import { LANGY_REFERENT_POLICY } from "../langy-conversation-memory.service.ts";
 import {
   LangyTurnService,
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
 } from "../langy-turn.service.ts";
-import { nowInstant } from "@langwatch/time";
 
 function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const dispatch = vi.fn(async () => "accepted" as const);

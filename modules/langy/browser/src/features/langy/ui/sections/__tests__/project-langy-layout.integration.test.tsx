@@ -47,7 +47,6 @@ vi.mock("../../../../../behavior/use-langy-conversation-deep-link.ts", () => ({
   useLangyConversationDeepLink: () => undefined,
 }));
 
-import ProjectLangyLayout from "../project-langy-layout.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostApi,
@@ -57,6 +56,7 @@ import {
   type LangyHostTeam,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
+import ProjectLangyLayout from "../project-langy-layout.tsx";
 
 function LangySidecarStub() {
   const isOpen = useLangyStore((s) => s.isOpen);

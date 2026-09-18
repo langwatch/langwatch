@@ -1,5 +1,5 @@
-import type { LangyContextChip } from "./langy.store.ts";
 import { shortenChipId } from "./langy-context-chips.ts";
+import type { LangyContextChip } from "./langy.store.ts";
 
 /**
  * What a context chip actually gives Langy, said out loud.

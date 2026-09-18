@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,

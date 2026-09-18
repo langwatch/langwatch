@@ -1,12 +1,13 @@
 /** @vitest-environment jsdom */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import type { LangyDerivedCard, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
+import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { LangyFailedCard } from "../../../elements/derived-cards/langy-failed-card.tsx";
 import { LangyChoicesCard } from "../langy-choices-card.tsx";
 import { LangyDerivedCardView } from "../langy-derived-card-view.tsx";
-import { LangyFailedCard } from "../../../elements/derived-cards/langy-failed-card.tsx";
 
 afterEach(cleanup);
 
@@ -43,7 +44,11 @@ describe("Langy derived card presentation", () => {
       blockId: "q-publish",
       question: "Publish the winner?",
       options: [
-        { id: "publish", label: "Publish the winning draft", ref: { type: "prompt", id: "prompt_1" } },
+        {
+          id: "publish",
+          label: "Publish the winning draft",
+          ref: { type: "prompt", id: "prompt_1" },
+        },
       ],
     };
 
@@ -54,7 +59,9 @@ describe("Langy derived card presentation", () => {
           lockState={{ status: "open" }}
           onSelect={vi.fn()}
           refRows={
-            new Map([["publish", { state: "live", primary: "support-reply-v1", secondary: "version 3" }]])
+            new Map([
+              ["publish", { state: "live", primary: "support-reply-v1", secondary: "version 3" }],
+            ])
           }
         />
       </ChakraProvider>,

@@ -1,18 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
 import {
   LANGY_PROMPT_DEFAULT_TAG,
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { LangyPrompt, LangyPromptRegistryService } from "../langy-prompt-registry.service.ts";
 
 const FALLBACK = "IN-REPO FALLBACK PROMPT";
 const PROJECT_ID = "project_system";
 
 /** Build a fake LangyPrompt whose read returns whatever `prompt` is passed. */
-function fakePromptPort(
-  findByIdOrHandle: LangyPrompt["findByIdOrHandle"],
-): LangyPrompt {
+function fakePromptPort(findByIdOrHandle: LangyPrompt["findByIdOrHandle"]): LangyPrompt {
   return { findByIdOrHandle };
 }
 

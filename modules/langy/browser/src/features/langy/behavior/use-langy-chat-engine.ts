@@ -1,11 +1,10 @@
 import { useChat } from "@ai-sdk/react";
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
+import type { LangyMessageDto } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useRef } from "react";
 
-import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { api } from "../../../behavior/langy-api.ts";
-
-import type { LangyMessageDto } from "@langwatch/langy-contract";
 import { isLangyTranscriptMessage } from "../../../model/langy-transcript.ts";
 import type { createLangyChatTransport } from "./logic/langy-chat-transport.ts";
 
@@ -43,8 +42,7 @@ export function useLangyChatEngine({
   const previousStatusRef = useRef(status);
   useEffect(() => {
     const wasInFlight =
-      previousStatusRef.current === "submitted" ||
-      previousStatusRef.current === "streaming";
+      previousStatusRef.current === "submitted" || previousStatusRef.current === "streaming";
     const isSettled = status === "ready" || status === "error";
     if (wasInFlight && isSettled) {
       void utils.dashboardWidgets.list.invalidate();

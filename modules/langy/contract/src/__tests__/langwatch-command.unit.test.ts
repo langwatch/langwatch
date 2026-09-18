@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { isSoleLangwatchInvocation, parseLangwatchCommand } from "@langwatch/langy-contract";
+import { describe, expect, it } from "vitest";
 
 describe("parseLangwatchCommand", () => {
   describe("given a plain CLI invocation", () => {

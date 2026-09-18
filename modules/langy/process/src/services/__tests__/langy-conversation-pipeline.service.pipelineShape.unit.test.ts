@@ -9,19 +9,20 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../../eventing/langy-conversation-process.schemas.ts";
+
 import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
 import {
   agentRespondedEvent,
   CONVERSATION_ID,
   PROJECT_ID,
 } from "../../eventing/__tests__/langyEventFixtures.ts";
+import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../../eventing/langy-conversation-process.schemas.ts";
+import type { LangyConversationProcessingEvent } from "../../eventing/langy-conversation-state.projection.ts";
 import {
   LangyConversationPipelineAdapter,
   type LangyConversationProcessingPipelineDeps,
 } from "../langy-conversation-pipeline.service.ts";
-import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
-import type { LangyConversationProcessingEvent } from "../../eventing/langy-conversation-state.projection.ts";
 
 /**
  * Proves the FINAL Langy pipeline shape from the public static definition (conversation + turn)
@@ -158,7 +159,9 @@ describe("langy-conversation-processing pipeline shape", () => {
       it("keeps subscribers independent of projections and subscribers", () => {
         const { pipeline, subscribers } = buildPipeline();
 
-        expect([...pipeline.eventSubscribers.keys()].toSorted()).toEqual([...SUBSCRIBER_NAMES].toSorted());
+        expect([...pipeline.eventSubscribers.keys()].toSorted()).toEqual(
+          [...SUBSCRIBER_NAMES].toSorted(),
+        );
         for (const subscriber of subscribers) {
           expect(pipeline.eventSubscribers.get(subscriber.name)).toBe(subscriber);
         }

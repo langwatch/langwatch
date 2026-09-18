@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { describeToolCall, effectiveToolName, skillCardDetail } from "../langy-tool-label.ts";
 
 /**

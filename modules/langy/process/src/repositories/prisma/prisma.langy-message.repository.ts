@@ -1,8 +1,9 @@
 import { langyMessagePartSchema } from "@langwatch/langy-contract";
-import type { LangyDatabase } from "./langy-database.mapper.ts";
+import { Temporal, toEpochMs } from "@langwatch/time";
+
 import { LangyMessageRepository } from "../langy-message.repository.ts";
 import type { LangyMessageRow, MessageRole } from "../langy-message.repository.ts";
-import { Temporal, toEpochMs } from "@langwatch/time";
+import type { LangyDatabase } from "./langy-database.mapper.ts";
 
 export class PrismaLangyMessageRepository extends LangyMessageRepository {
   constructor(private readonly prisma: LangyDatabase) {

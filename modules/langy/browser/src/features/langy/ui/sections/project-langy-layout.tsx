@@ -1,13 +1,14 @@
 import { Box } from "@chakra-ui/react";
-import { memo, type ReactNode, useEffect } from "react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { memo, type ReactNode, useEffect } from "react";
+
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { LangySidecar } from "./langy-panel.tsx";
+import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "../../../../model/langy-panel-layout.ts";
+import { LangyProvider, useLangy } from "../../../../ui/sections/langy-page-context.tsx";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
 import { useShowLangy } from "../../behavior/use-show-langy.ts";
-import { LangyProvider, useLangy } from "../../../../ui/sections/langy-page-context.tsx";
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
-import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "../../../../model/langy-panel-layout.ts";
+import { LangySidecar } from "./langy-panel.tsx";
 
 /**
  * Layout route that mounts Langy once per project, above the swapping page.

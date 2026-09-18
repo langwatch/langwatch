@@ -2,17 +2,18 @@
  * Trace-sample card (`langwatch.trace.search`).
  */
 
-import { readableDate } from "../../../../../model/langy-row-format.ts";
 import { Button, Text } from "@chakra-ui/react";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
+
 import { traceContextChip } from "../../../../../behavior/langy-context-chips.ts";
 import {
   collectionOf,
   textValue,
   totalOf,
 } from "../../../../../model/langy-cli-result-document.ts";
+import { readableDate } from "../../../../../model/langy-row-format.ts";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
@@ -21,8 +22,8 @@ import {
 import { LangyContextTarget } from "../../../../../ui/sections/langy-context-target.tsx";
 import { LangyObservationState } from "../../../../../ui/sections/langy-observation-state.tsx";
 import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data.ts";
-import { LangySpaAnchor } from "../langy-spa-anchor.tsx";
 import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry.ts";
+import { LangySpaAnchor } from "../langy-spa-anchor.tsx";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,

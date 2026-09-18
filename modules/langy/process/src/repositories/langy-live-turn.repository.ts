@@ -91,9 +91,6 @@ export interface LangyFrameDedupRepository {
 
 /** Conversation-scoped links Langy's navigate command resolves an id against. */
 export interface LangyResourceLinksRepository {
-  remember(input: {
-    conversationId: string;
-    links: { id: string; href: string }[];
-  }): Promise<void>;
+  remember(input: { conversationId: string; links: { id: string; href: string }[] }): Promise<void>;
   resolve(input: { conversationId: string; id: string }): Promise<string | null>;
 }

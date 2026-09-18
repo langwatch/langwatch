@@ -1,7 +1,8 @@
-import { nowInstant } from "@langwatch/time";
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+
 import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import type { LangyProgressSample, LangyTurnMetric } from "../../model/values/langy-turn.ts";
 import { LangyObserverGlyph } from "./langy-observation-state.tsx";

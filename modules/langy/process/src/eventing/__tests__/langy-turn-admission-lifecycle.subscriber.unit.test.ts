@@ -1,8 +1,9 @@
 import type { EventSubscriberContext } from "@langwatch/eventing";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
-import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import { createLangyTurnAdmissionLifecycleSubscriber } from "@langwatch/langy-process";
+import { describe, expect, it, vi } from "vitest";
+
+import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 
 const context: EventSubscriberContext = {
   tenantId: "ignored-project",

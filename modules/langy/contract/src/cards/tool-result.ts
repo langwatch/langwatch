@@ -2,6 +2,8 @@
  * Langy CLI result value: discriminated union so all layers carry same typed value.
  */
 import * as z from "zod";
+
+import { CARD_PROBES, cardKindFor, promoteCard } from "./registry.ts";
 import {
   dashboardCardSchema,
   datasetCardSchema,
@@ -17,7 +19,6 @@ import {
   tracesCardSchema,
   SCHEMA_BY_CARD_KIND,
 } from "./schemas.ts";
-import { CARD_PROBES, cardKindFor, promoteCard } from "./registry.ts";
 
 /**
  * Card outcome: absent (settled), unconfirmed (payload doesn't substantiate claim).

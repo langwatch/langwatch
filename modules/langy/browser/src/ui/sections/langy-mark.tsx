@@ -1,4 +1,5 @@
 import { Box } from "@chakra-ui/react";
+
 import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 
 /**

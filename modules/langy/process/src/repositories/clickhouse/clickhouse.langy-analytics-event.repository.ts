@@ -1,10 +1,11 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, toDate } from "@langwatch/time";
+
 import {
   LangyAnalyticsEventSink,
   type LangyAnalyticsEventRecord,
 } from "../langy-analytics-event.repository.ts";
-import { Temporal, toDate } from "@langwatch/time";
 
 /**
  * The `DateTime64(3)` columns. The ClickHouse client serialises a `Date`; an

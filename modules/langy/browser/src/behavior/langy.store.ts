@@ -15,10 +15,12 @@ import {
   settleTurn as reduceSettleTurn,
   stopDispatched as reduceStopDispatched,
   seedLangyTurnProjection,
-  type TurnPhaseState,type LangyResourceKind
+  type TurnPhaseState,
+  type LangyResourceKind,
 } from "@langwatch/langy-contract";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+
 import type { LangyProgressSample } from "../model/values/langy-turn.ts";
 
 /**

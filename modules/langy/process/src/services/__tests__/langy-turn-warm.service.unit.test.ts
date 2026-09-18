@@ -8,10 +8,8 @@ import {
   LangyModelNotConfiguredError,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type {
-  LangyWorkerProbeInput,
-  LangyWorkerWarmInput,
-} from "../../app/langy.members.ts";
+
+import type { LangyWorkerProbeInput, LangyWorkerWarmInput } from "../../app/langy.members.ts";
 import { LangySessionKeyScopeError } from "../langy-session-key-scope.error.ts";
 import type {
   LangyTurnServiceDependencies,

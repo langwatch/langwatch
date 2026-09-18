@@ -9,7 +9,7 @@ import {
   cliVerbTone,
   type MeasuredCardKind,
 } from "@langwatch/langy-contract";
-import { type CliCommand, parseCliToolName, type LangyFeatureMap } from "./langy-feature-map.ts";
+
 import {
   CAPABILITY_CATALOG,
   type CapabilityBodyWidget,
@@ -17,6 +17,7 @@ import {
   type CapabilityIconName,
   type CapabilitySurface,
 } from "./langy-capability-catalog.ts";
+import { type CliCommand, parseCliToolName, type LangyFeatureMap } from "./langy-feature-map.ts";
 
 /** Visual tone of the shared capability-card shell. */
 export type CapabilityTone = "read" | "created" | "updated" | "removed";

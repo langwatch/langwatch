@@ -4,8 +4,9 @@
  * Spec: specs/skills/empty-state-skill-setup.feature
  */
 import { describe, expect, it } from "vitest";
-import { SetupSkillsService } from "../setup-skills.service.ts";
+
 import { SETUP_SKILL_BODIES } from "../../rules/setup-skill-bodies.rules.ts";
+import { SetupSkillsService } from "../setup-skills.service.ts";
 
 describe("SetupSkillsService", () => {
   const skills = SetupSkillsService.create();

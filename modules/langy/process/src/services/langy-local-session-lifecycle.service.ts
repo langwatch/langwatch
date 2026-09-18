@@ -1,12 +1,16 @@
+import { LOCAL_CONTROL_PROTOCOL_VERSION, type PlatformFrame } from "@langwatch/langy-contract";
 /**
  * The folder's comings and goings: announcing it when it registers, retiring it when it goes,
  * and reacting to what another pod says about it. Retiring fails the calls it was working on,
  * so the worker's poll answers at once rather than at the deadline.
  */
 import { createLogger } from "@langwatch/observability";
-import { LOCAL_CONTROL_PROTOCOL_VERSION, type PlatformFrame } from "@langwatch/langy-contract";
+
+import {
+  type WorkspaceNudge,
+  workspaceNudgeSchema,
+} from "../rules/langy-local-call-record.rules.ts";
 import { disconnectMessage } from "../rules/langy-local-session-text.rules.ts";
-import { type WorkspaceNudge, workspaceNudgeSchema } from "../rules/langy-local-call-record.rules.ts";
 
 /** A nudge from another pod, or null when it is not one this build understands. */
 function safeNudge(raw: string): WorkspaceNudge | null {
@@ -19,14 +23,14 @@ function safeNudge(raw: string): WorkspaceNudge | null {
   }
 }
 import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
-import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
-import type { ControlRequestService } from "./langy-local-control-request.service.ts";
 import type {
   ControlBuffer,
   ControlConversations,
   ControlEvents,
   ControlSession,
 } from "../rules/langy-local-session-contract.rules.ts";
+import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
+import type { ControlRequestService } from "./langy-local-control-request.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:session");
 

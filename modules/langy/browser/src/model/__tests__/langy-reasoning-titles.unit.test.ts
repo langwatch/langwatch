@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { foldReasoningTitles, stripReasoningTitles } from "../langy-reasoning-titles.ts";
 
 /**

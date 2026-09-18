@@ -5,7 +5,11 @@
  */
 import { z } from "zod";
 
-import { langyJsonValueSchema, langyMessagePartSchema, langyMessageRoleSchema } from "../../json.ts";
+import {
+  langyJsonValueSchema,
+  langyMessagePartSchema,
+  langyMessageRoleSchema,
+} from "../../json.ts";
 
 /**
  * ConversationStarted — explicit creation event, sets owner (first-writer-

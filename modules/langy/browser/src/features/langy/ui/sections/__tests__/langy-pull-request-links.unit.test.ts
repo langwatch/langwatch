@@ -5,6 +5,7 @@
  * mentioned stays plain. @see specs/langy/langy-github-prs.feature
  */
 import { describe, expect, it } from "vitest";
+
 import {
   linkPullRequestReferences,
   pullRequestLinksFromToolParts,

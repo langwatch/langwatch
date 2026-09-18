@@ -1,34 +1,34 @@
 import { EventEmitter } from "node:events";
-import type {
-  LangyConversationCommands,
-  LangyEventingMembers,
-  LangyTurnTechnicalMembers,
-} from "@langwatch/langy-process";
-import { LangyApp } from "../app/langy.app.ts";
-import { LangyService } from "../services/langy.service.ts";
-import {
-  LangyBlockOtelMetricsAdapter,
-  PostgresLangyAdapter,
-} from "@langwatch/langy-process";
-import {
-  createRecordingMeterProvider,
-  type RecordingMeterProvider,
-} from "@langwatch/observability/metrics/testing";
+
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   EventSourcing,
   EventStoreProducerOnly,
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
-import type { PresenceApi } from "@langwatch/presence-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type {
+  LangyConversationCommands,
+  LangyEventingMembers,
+  LangyTurnTechnicalMembers,
+} from "@langwatch/langy-process";
+import { LangyBlockOtelMetricsAdapter, PostgresLangyAdapter } from "@langwatch/langy-process";
+import {
+  createRecordingMeterProvider,
+  type RecordingMeterProvider,
+} from "@langwatch/observability/metrics/testing";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
-import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { describe, expect, it, vi } from "vitest";
+
+import { LangyApp } from "../app/langy.app.ts";
+import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
+import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
+import { LangyService } from "../services/langy.service.ts";
 
 const COMMAND_NAMES = [
   "createConversation",
@@ -151,14 +151,14 @@ describe("PostgresLangyAdapter", () => {
   describe("given a process that built Langy once", () => {
     describe("when a transport asks the application for the capability", () => {
       /** @scenario "transports share one Langy capability" */
-      it("hands back the one service the adapter built, not a second graph", () => {
+      it("hands back the one service the adapter built, not a second graph", async () => {
         const instance = PostgresLangyAdapter.create({ database: undefined! });
         const service = instance.build(compositionOptions());
 
-        const app = createApp();
+        const app = await createApp();
 
         expect(app.langyService).toBe(app.langyService);
-        expect(createApp().langyService).not.toBe(app.langyService);
+        expect((await createApp()).langyService).not.toBe(app.langyService);
         expect(instance.build(compositionOptions())).toBe(service);
       });
     });
@@ -233,7 +233,10 @@ function compositionOptions() {
   });
 }
 
-function createApp(): LangyApp {
+/** No handle is ever resolved through it in these tests. */
+const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
+
+function createApp(): Promise<LangyApp> {
   return LangyApp.create({
     dependencies: {
       presence: testPresence(),
@@ -247,8 +250,9 @@ function createApp(): LangyApp {
       eventing: producerEventing(),
       rateLimiter: { check: async () => ({ allowed: true }) },
     },
-    config: { agentUrl: undefined, internalSecret: undefined },
+    config: { agentUrl: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
+    secrets: noSecrets,
     repositories: {} as LangyRepositories,
   });
 }

@@ -2,6 +2,7 @@
  * Registry: which card reads which CLI command; unknown →generic.
  */
 import type * as z from "zod";
+
 import {
   dashboardProbeSchema,
   evaluatorConfigProbeSchema,

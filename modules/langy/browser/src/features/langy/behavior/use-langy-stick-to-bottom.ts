@@ -1,5 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { useReducedMotion } from "../../../behavior/use-reduced-motion.ts";
 
 /**

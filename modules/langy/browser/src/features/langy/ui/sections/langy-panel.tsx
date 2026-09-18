@@ -1,89 +1,31 @@
-import { nowInstant } from "@langwatch/time";
-import { readableDate } from "../../../../model/langy-row-format.ts";
 import { Box, chakra, HStack, IconButton, Separator, Text, VStack } from "@chakra-ui/react";
-import { mergeContextChips } from "../../../../behavior/langy-context-chips.ts";
-import { removeContextChip } from "../../../../behavior/langy-context-target.store.ts";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { Menu } from "@langwatch/design-system/menu";
+import { toaster } from "@langwatch/design-system/toaster";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
-  attachedContextToChip,
-  type LangyPanelEffect,
-  type LangyPanelMode,
-  useLangyStore,
-} from "../../../../behavior/langy.store.ts";
-import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
-import { useLangyContextDropZone } from "../../../../behavior/use-langy-context-drop-zone.ts";
-import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
-import { useLangyOrbProximity } from "../../../../behavior/use-langy-orb-proximity.ts";
-import { useLangyPeekProximity } from "../../../../behavior/use-langy-peek-proximity.ts";
-import { useLangyTurnSignals } from "../../../../behavior/use-langy-turn-signals.ts";
-import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
-import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top.ts";
-import { PANEL_ROOT_ATTR } from "../../../../model/composer-morph-geometry.ts";
-import { shouldRehydrateEngineFromDurable } from "../../../../model/foreign-turn-rehydration.ts";
-import { resolveLangyActivityOwnership } from "../../../../model/langy-activity-ownership.ts";
-import { langyChoicesTimeline } from "../../../../model/langy-choices-timeline.ts";
-import { latestCodeAccessCallId } from "../../../../model/langy-code-access-tool.ts";
-import { resolveComposerModel } from "../../../../model/langy-composer-model.ts";
-import { langyDraftToRestore } from "../../../../model/langy-draft-recovery.ts";
-import { isLangyTranscriptMessage } from "../../../../model/langy-transcript.ts";
-import { isLangyHiddenLocalNotice,
+  isLangyHiddenLocalNotice,
   isSendUnanswered,
   LANGY_CHOICE_SELECTION_PART_TYPE,
   type LangyChoiceSelection,
   type LangyDerivedCard,
   type LangyDerivedChoicesCard,
   renderLangyChoiceSelectionText,
-  type LangyResourceContext } from "@langwatch/langy-contract";
-import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
-import { useLangyLocalRecord } from "../../behavior/data/use-langy-local-record.ts";
-import { LANGY_CODE_ACCESS_ASK_AGAIN } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
-import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
-import { LangyLocalPermissionCard } from "./langy-local-permission-card.tsx";
-import { LangyLocalWorkspaceChip } from "./langy-local-workspace-chip.tsx";
-import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup.ts";
+  type LangyResourceContext,
+} from "@langwatch/langy-contract";
 import {
-  APP_HEADER_HEIGHT,
-  FLOATING_PANEL_CSS_WIDTH,
-  FLOATING_PANEL_INSET,
-  LANGY_DODGE_STAGGER_MS,
-  LANGY_TRANSITION,
-  langyRestingFloorPx,
-  PANEL_LAYOUT_TRANSITION,
-  resolveFloatingPanelWidth,
-  SIDEBAR_PANEL_WIDTH,
-} from "../../../../model/langy-panel-layout.ts";
-import {
-  FLOATING_PEEK_NEAR_PX,
-  type LangyPeekPhase,
-  resolvePeekTranslate,
-  SIDEBAR_PEEK_NEAR_PX,
-} from "../../../../model/langy-peek-dock.ts";
-import { langyPlan } from "../../../../model/langy-plan.ts";
-import { resolveLangyStopTarget } from "../../../../model/langy-stop-target.ts";
-import {
-  questionToolCallIdsIn,
-  questionWaitCardParts,
-} from "../../../../model/langy-question-tool.ts";
-import {
-  currentTurnAssistant,
-  hasTokens,
-  langyTurnActivityKey,
-  runningTool,
-  settledTool,
-} from "../../../../model/langy-thinking-line.ts";
-import { deriveWaveActivity } from "../../../../model/langy-wave-motion.ts";
-import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action.ts";
-import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
-import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
-import { LangyWave } from "../../../../ui/elements/langy-wave.tsx";
-import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer.tsx";
-import { EmptyState } from "../../../../ui/sections/langy-empty-state.tsx";
-import {
-  PANEL_SUGGESTION_COUNT,
-  selectLangySuggestions,
-} from "../../../../ui/sections/langy-home-suggestions.ts";
-import { LangyMark, LangyMarkGradientDefs } from "../../../../ui/sections/langy-mark.tsx";
-import { LangyThinkingLine } from "../../../../ui/sections/langy-thinking-line.tsx";
-import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line.tsx";
+  allModelOptions,
+  useModelSelectionOptions,
+} from "@langwatch/model-provider-browser/surfaces/model-selector";
+import { nowInstant } from "@langwatch/time";
 import type { UIMessage } from "ai";
 import {
   AppWindow,
@@ -114,44 +56,99 @@ import {
   useRef,
   useState,
 } from "react";
+
 import { useProjectReach } from "../../../../behavior/home/use-project-reach.ts";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { Kbd } from "@langwatch/design-system/kbd";
-import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
-import { Menu } from "@langwatch/design-system/menu";
-import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { toaster } from "@langwatch/design-system/toaster";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { showErrorToast } from "@langwatch/browser-host/errors";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { LangyModelProviderSetup } from "../../../../ui/sections/model-provider-setup.tsx";
-import { useDrawer } from "@langwatch/browser-host/drawer";
-import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 // ONE definition of the wire shape, server-side, imported by both ends, the route
 // spreads `langyTurnContextSchema.shape` into its body schema, and this types the
 // payload against the same source.
 import { api, trpcClient } from "../../../../behavior/langy-api.ts";
-import { LangyPlanCard } from "./langy-plan-card.tsx";
-import { useRouter } from "@langwatch/browser-host/use-router";
+import { mergeContextChips } from "../../../../behavior/langy-context-chips.ts";
+import { removeContextChip } from "../../../../behavior/langy-context-target.store.ts";
+import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
+import {
+  attachedContextToChip,
+  type LangyPanelEffect,
+  type LangyPanelMode,
+  useLangyStore,
+} from "../../../../behavior/langy.store.ts";
+import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
+import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
+import { useLangyContextDropZone } from "../../../../behavior/use-langy-context-drop-zone.ts";
+import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
+import { useLangyOrbProximity } from "../../../../behavior/use-langy-orb-proximity.ts";
+import { useLangyPeekProximity } from "../../../../behavior/use-langy-peek-proximity.ts";
+import { useLangyTurnSignals } from "../../../../behavior/use-langy-turn-signals.ts";
+import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
+import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top.ts";
+import { PANEL_ROOT_ATTR } from "../../../../model/composer-morph-geometry.ts";
+import { shouldRehydrateEngineFromDurable } from "../../../../model/foreign-turn-rehydration.ts";
+import { resolveLangyActivityOwnership } from "../../../../model/langy-activity-ownership.ts";
+import { langyChoicesTimeline } from "../../../../model/langy-choices-timeline.ts";
+import { latestCodeAccessCallId } from "../../../../model/langy-code-access-tool.ts";
+import { resolveComposerModel } from "../../../../model/langy-composer-model.ts";
+import { langyDraftToRestore } from "../../../../model/langy-draft-recovery.ts";
+import {
+  langyPermissionCards,
+  langyQuestionCards,
+  langyQuestionWaitsByToolCall,
+  routeLangyChoiceAnswer,
+} from "../../../../model/langy-local-waits.ts";
+import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup.ts";
+import {
+  APP_HEADER_HEIGHT,
+  FLOATING_PANEL_CSS_WIDTH,
+  FLOATING_PANEL_INSET,
+  LANGY_DODGE_STAGGER_MS,
+  LANGY_TRANSITION,
+  langyRestingFloorPx,
+  PANEL_LAYOUT_TRANSITION,
+  resolveFloatingPanelWidth,
+  SIDEBAR_PANEL_WIDTH,
+} from "../../../../model/langy-panel-layout.ts";
+import {
+  FLOATING_PEEK_NEAR_PX,
+  type LangyPeekPhase,
+  resolvePeekTranslate,
+  SIDEBAR_PEEK_NEAR_PX,
+} from "../../../../model/langy-peek-dock.ts";
+import { langyPlan } from "../../../../model/langy-plan.ts";
+import {
+  questionToolCallIdsIn,
+  questionWaitCardParts,
+} from "../../../../model/langy-question-tool.ts";
+import { readableDate } from "../../../../model/langy-row-format.ts";
+import { resolveLangyStopTarget } from "../../../../model/langy-stop-target.ts";
+import {
+  currentTurnAssistant,
+  hasTokens,
+  langyTurnActivityKey,
+  runningTool,
+  settledTool,
+} from "../../../../model/langy-thinking-line.ts";
+import { isLangyTranscriptMessage } from "../../../../model/langy-transcript.ts";
+import { deriveWaveActivity } from "../../../../model/langy-wave-motion.ts";
+import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action.ts";
+import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
+import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
+import { LangyWave } from "../../../../ui/elements/langy-wave.tsx";
+import { LANGY_CODE_ACCESS_ASK_AGAIN } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
+import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
+import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer.tsx";
+import { EmptyState } from "../../../../ui/sections/langy-empty-state.tsx";
+import {
+  PANEL_SUGGESTION_COUNT,
+  selectLangySuggestions,
+} from "../../../../ui/sections/langy-home-suggestions.ts";
+import { LangyMark, LangyMarkGradientDefs } from "../../../../ui/sections/langy-mark.tsx";
+import { LangyThinkingLine } from "../../../../ui/sections/langy-thinking-line.tsx";
+import { LangyModelProviderSetup } from "../../../../ui/sections/model-provider-setup.tsx";
+import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line.tsx";
 import { useLangyConversationCommands } from "../../behavior/data/use-langy-conversation-commands.ts";
 import { useLangyConversationList } from "../../behavior/data/use-langy-conversation-list.ts";
+import { useLangyLocalRecord } from "../../behavior/data/use-langy-local-record.ts";
 import { useLangyMessages } from "../../behavior/data/use-langy-messages.ts";
-import { useLangyChatEngine } from "../../behavior/use-langy-chat-engine.ts";
-import { useLangyExternalLinkGuard } from "./use-langy-external-link-guard.ts";
-import { useLangyFreshness } from "../../behavior/use-langy-freshness.ts";
-import { useLangyPageContext } from "./use-langy-page-context.ts";
-import { useLangyStickToBottom } from "../../behavior/use-langy-stick-to-bottom.ts";
-import {
-  turnHadSideEffects,
-  useLangyTurnRecovery,
-} from "../../behavior/use-langy-turn-recovery.ts";
-import { useLangyWarmWorker } from "../../behavior/use-langy-warm-worker.ts";
 import { syncLangyAfterDefaultModelWrite } from "../../behavior/logic/coding-default-sync.ts";
 import {
   createLangyChatTransport,
@@ -168,20 +165,24 @@ import {
   readLangyTrpcError,
   resolveLiveTurnError,
 } from "../../behavior/logic/langy-error-explainer.ts";
+import { buildTimeTravelView } from "../../behavior/logic/langy-time-travel.ts";
+import { isInternalHref } from "../../behavior/logic/spa-link.ts";
+import { tapeForConversation, useLangyDevLog } from "../../behavior/stores/langy-dev-log.ts";
+import { useLangyChatEngine } from "../../behavior/use-langy-chat-engine.ts";
+import { useLangyFreshness } from "../../behavior/use-langy-freshness.ts";
+import { useLangyStickToBottom } from "../../behavior/use-langy-stick-to-bottom.ts";
 import {
-  langyPermissionCards,
-  langyQuestionCards,
-  langyQuestionWaitsByToolCall,
-  routeLangyChoiceAnswer,
-} from "../../../../model/langy-local-waits.ts";
+  turnHadSideEffects,
+  useLangyTurnRecovery,
+} from "../../behavior/use-langy-turn-recovery.ts";
+import { useLangyWarmWorker } from "../../behavior/use-langy-warm-worker.ts";
 import {
   type MakeDefaultWritePlan,
   makeDefaultOffer,
 } from "../../model/logic/langy-make-default-offer.ts";
 import { langyToolNarrator } from "../../model/logic/langy-tool-narrator.ts";
-import { buildTimeTravelView } from "../../behavior/logic/langy-time-travel.ts";
-import { isInternalHref } from "../../behavior/logic/spa-link.ts";
-import { tapeForConversation, useLangyDevLog } from "../../behavior/stores/langy-dev-log.ts";
+import { LangyExternalLinkDialog } from "../elements/langy-external-link-dialog.tsx";
+import { LangyMakeDefaultDialog } from "../elements/langy-make-default-dialog.tsx";
 import { AnimatedConversationTitle } from "./animated-conversation-title.tsx";
 import { Composer } from "./composer.tsx";
 import { ConversationSkeleton, skeletonMessageCount } from "./conversation-skeleton.tsx";
@@ -189,16 +190,19 @@ import { LangyGitHubConnectCard } from "./github/langy-git-hub-connect-card.tsx"
 import { LangyCardGallery } from "./langy-card-gallery.tsx";
 import { LangyDevDrawer } from "./langy-dev-drawer.tsx";
 import { LangyError } from "./langy-error.tsx";
-import { LangyExternalLinkDialog } from "../elements/langy-external-link-dialog.tsx";
-import { LangyMakeDefaultDialog } from "../elements/langy-make-default-dialog.tsx";
+import { LangyLocalPermissionCard } from "./langy-local-permission-card.tsx";
+import { LangyLocalWorkspaceChip } from "./langy-local-workspace-chip.tsx";
+import { LangyPlanCard } from "./langy-plan-card.tsx";
 import { LangyRecoveringLine } from "./langy-recovering-line.tsx";
 import { toPendingCapabilities } from "./langy-tool-activity.tsx";
 import { type LangyProposal, MessageContent, type ProposalHandlers } from "./message-content.tsx";
 import { RecentChatsView } from "./recent-chats-view.tsx";
+import { useLangyExternalLinkGuard } from "./use-langy-external-link-guard.ts";
+
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
 import "../../../../ui/elements/langy-theme.css";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { useLangyPageContext } from "./use-langy-page-context.ts";
 
 // The same feature key Langy's chat route resolves against. Used to seed the
 // composer's model picker with whatever's actually resolving today — opening

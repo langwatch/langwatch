@@ -1,8 +1,9 @@
-import { readableDate } from "../../../model/langy-row-format.ts";
-import { useMemo } from "react";
 import type { TimeRange } from "@langwatch/trace-browser/surfaces/trace-filters";
 import { useFilterStore, useViewStore } from "@langwatch/trace-browser/surfaces/trace-view-state";
+import { useMemo } from "react";
+
 import type { LangyContextChip } from "../../../behavior/langy.store.ts";
+import { readableDate } from "../../../model/langy-row-format.ts";
 
 export type ObservabilitySource = "traces" | "events" | "logs" | "metrics";
 

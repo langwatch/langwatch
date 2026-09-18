@@ -4,16 +4,17 @@
  * specs/langy/langy-stop-and-resume.feature.
  */
 import type { Redis } from "ioredis";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { LangyTurnServiceDeps } from "../services/langy-turn.service.ts";
-import { LangyTurnService } from "../services/langy-turn.service.ts";
 import IORedis from "ioredis";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+import type { LangyTurnHandoff } from "../repositories/langy-live-turn.repository.ts";
+import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
 import {
   type LangyHandoffRedis,
   LangyTurnHandoffRedisRepository,
 } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
-import type { LangyTurnHandoff } from "../repositories/langy-live-turn.repository.ts";
-import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
+import type { LangyTurnServiceDeps } from "../services/langy-turn.service.ts";
+import { LangyTurnService } from "../services/langy-turn.service.ts";
 import { testRedisUrl } from "./support/test-redis-url.ts";
 
 /** Native Redis, the way every other datastore suite in this repo asks for one. */

@@ -1,10 +1,12 @@
+import { LangyUiActionUnknownError } from "@langwatch/langy-contract";
 /**
  * The UI-action dispatch/claim/complete protocol, against fakes (specs/langy/langy-ui-
  * actions.feature).
  */
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { LangyUiActionUnknownError } from "@langwatch/langy-contract";
+
+import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../../app/langy.members.ts";
 import {
   LangyUiActionService,
   UI_ACTION_MAX_BUDGET_MS,
@@ -12,10 +14,6 @@ import {
   type UiActionRedis,
   uiActionKeys,
 } from "../langy-ui-action.service.ts";
-import type {
-  LangyUiActionCatalog,
-  LangyUiActionDefinition,
-} from "../../app/langy.members.ts";
 
 const duplicateTargetSchema = z.object({ targetId: z.string() });
 const runSchema = z.object({});

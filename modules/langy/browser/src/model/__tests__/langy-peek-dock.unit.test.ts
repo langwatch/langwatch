@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { FLOATING_PANEL_INSET } from "../langy-panel-layout.ts";
 import {
   FLOATING_PEEK_REST_PX,

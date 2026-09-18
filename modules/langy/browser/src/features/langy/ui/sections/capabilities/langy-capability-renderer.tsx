@@ -10,6 +10,7 @@ import {
   parseCliToolResult,
   toCliToolResult,
 } from "@langwatch/langy-contract";
+
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { digestOfToolCall } from "../../../../../model/langy-capability-digest.ts";
 import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary.tsx";

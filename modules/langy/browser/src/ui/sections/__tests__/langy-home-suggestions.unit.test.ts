@@ -4,6 +4,7 @@
  * selection. Spec: specs/home/langy-home.feature, langy-empty-state-suggestions.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { SETUP_SUGGESTIONS, SUGGESTIONS } from "../langy-empty-state.tsx";
 import {
   HOME_SUGGESTION_COUNT,

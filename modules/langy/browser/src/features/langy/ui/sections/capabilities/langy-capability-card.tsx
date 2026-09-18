@@ -1,5 +1,8 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { toRelativeSameOriginHref } from "@langwatch/langy-contract";
+import { ArrowUpRight } from "lucide-react";
+import type { ReactNode } from "react";
+
 import {
   type CapabilityIconName,
   type CapabilitySurface,
@@ -9,11 +12,12 @@ import {
   LangyCapabilityCard as LangyCapabilityCardPresentation,
   type LangyCapabilityTone,
 } from "../../../../../ui/sections/langy-capability-card.tsx";
-import { ArrowUpRight } from "lucide-react";
-import type { ReactNode } from "react";
 import { useSpaLinkClick } from "../../../behavior/logic/spa-link.ts";
+import {
+  buildSurfaceHref,
+  SURFACE_LABEL,
+} from "../../../model/capabilities/capability-registry.ts";
 import { LangySpaAnchor } from "../langy-spa-anchor.tsx";
-import { buildSurfaceHref, SURFACE_LABEL } from "../../../model/capabilities/capability-registry.ts";
 
 export { CapabilityRowSkeletons };
 

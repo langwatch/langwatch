@@ -28,6 +28,7 @@ import type {
 } from "@langwatch/langy-contract";
 import type { LanguageModel } from "ai";
 import type { z } from "zod";
+
 import {
   LANGY_ID_RESOURCES,
   LANGY_PROCESS_INTENT_TYPES,
@@ -93,11 +94,9 @@ export interface LangyProcessEventViewer {
   toView(event: unknown): LangyProcessEventView;
 }
 
-
 export interface LangyWorkerDispatcher {
   dispatchTurn(params: LangyWorkerDispatchIntent & { projectId: string }): Promise<void>;
 }
-
 
 export interface LangyTitleGeneration {
   generateTitle(params: LangyGenerateTitleIntent & { projectId: string }): Promise<void>;
@@ -147,11 +146,7 @@ export interface LangyFrameEnvelope extends LangyFrameSigned {
 /** The frame-authentication boundary: sign, verify, mint, and generate a nonce. */
 export interface LangyFrameAuth {
   computeFrameMac(runToken: string, frame: LangyFrameSigned): string;
-  signFrame(
-    runToken: string,
-    identity: LangyFrameIdentity,
-    payload: string,
-  ): LangyFrameEnvelope;
+  signFrame(runToken: string, identity: LangyFrameIdentity, payload: string): LangyFrameEnvelope;
   verifyFrame(runToken: string, frame: LangyFrameEnvelope): boolean;
   mintRunToken(): string;
   newFrameNonce(): string;
@@ -171,7 +166,6 @@ export interface LangyNavigateProject {
   /** The project's slug, or null when it cannot be read. */
   trySlugOf(projectId: string): Promise<string | null>;
 }
-
 
 export interface LangyNavigateResourceLocator {
   /**
@@ -235,7 +229,6 @@ export type LangyBackendSaveResult =
 export type LangyBackendRunResult =
   | Readonly<{ started: true; runId: string; total: number }>
   | Readonly<{ started: false; refusal: string }>;
-
 
 export interface LangyUiActionBackend {
   /**

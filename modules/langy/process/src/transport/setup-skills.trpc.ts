@@ -4,8 +4,8 @@
  * Spec: specs/skills/empty-state-skill-setup.feature
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { LangyApi, setupSkillsTrpc } from "@langwatch/langy-contract";
 import { NotFoundError } from "@langwatch/handled-error";
+import { LangyApi, setupSkillsTrpc } from "@langwatch/langy-contract";
 
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 

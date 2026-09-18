@@ -1,3 +1,4 @@
+import { PayloadTooLargeError } from "@langwatch/api";
 /** /api/langy/conversations: public turn surface for CLI/HTTP agents. Published literally
  * with /api/v1 twin. Refusal order: credential (401), API-key langy:create ceiling (403),
  * per-project rollout flag, identity bridge, then application. */
@@ -7,7 +8,6 @@ import {
   MANAGEMENT_API_VERSION,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { PayloadTooLargeError } from "@langwatch/api";
 import {
   LangyApi,
   LangyApiIdentityDeniedError,
@@ -18,12 +18,12 @@ import {
 import { z } from "zod";
 
 import { LANGY_API_KEY_TURNS_FLAG } from "../rules/langy-rest-flags.rules.ts";
+import type { LangyIdentityToken } from "../services/langy-key-identity.service.ts";
+import type { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import {
   type LangyTurnBufferWatch,
   LangyTurnSettlementWaiterService,
 } from "../services/langy-turn-settlement-waiter.service.ts";
-import type { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
-import type { LangyIdentityToken } from "../services/langy-key-identity.service.ts";
 
 /**
  * A turn is text plus small structured parts, never an upload.
@@ -170,7 +170,9 @@ async function startTurn(input: {
           ...result,
           status: settlement.outcome,
           error: settlement.error,
-          reply: settlement.succeeded ? { role: "assistant" as const, text: settlement.text } : null,
+          reply: settlement.succeeded
+            ? { role: "assistant" as const, text: settlement.text }
+            : null,
         },
         {
           status: 200,

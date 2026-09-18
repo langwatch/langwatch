@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { LangyModelGroup } from "../langy-model-profile.ts";
 import { splitLangyModels } from "../langy-model-suggestions.ts";
 
@@ -47,7 +48,9 @@ describe("splitLangyModels", () => {
 
     it("keeps every model reachable across the two lists", () => {
       const { suggested, more } = splitLangyModels({ items: CATALOGUE });
-      expect([...values(suggested), ...values(more)].toSorted()).toEqual(values(CATALOGUE).toSorted());
+      expect([...values(suggested), ...values(more)].toSorted()).toEqual(
+        values(CATALOGUE).toSorted(),
+      );
     });
   });
 

@@ -1,3 +1,6 @@
+import { CONTROL_REQUEST_TTL_MS } from "@langwatch/langy-contract";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
  * The control request against the in-memory store, with a minter standing
  * in for the session key service: the flow is the same, and nothing here
@@ -5,14 +8,12 @@
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import { CONTROL_REQUEST_TTL_MS } from "@langwatch/langy-contract";
+
+import { controlRequestKey } from "../../rules/langy-local-control-keys.rules.ts";
 import {
   ControlRequestService,
   type StoredControlRequest,
 } from "../langy-local-control-request.service.ts";
-import { controlRequestKey } from "../../rules/langy-local-control-keys.rules.ts";
 
 const projectId = "proj_1";
 const userId = "user_1";

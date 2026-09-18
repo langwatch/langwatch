@@ -1,17 +1,18 @@
-/**
- * What the platform keeps about one local tool call while it is in flight, and what one pod
- * tells another about a conversation's folder. Shape only: the dispatcher owns the transitions.
- */
-import { z } from "zod";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import {
   CALL_STATES,
   bashOutputSchema,
   localCallErrorSchema,
   localToolCallSchema,
 } from "@langwatch/langy-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+/**
+ * What the platform keeps about one local tool call while it is in flight, and what one pod
+ * tells another about a conversation's folder. Shape only: the dispatcher owns the transitions.
+ */
+import { z } from "zod";
+
+import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 
 /** What the platform keeps about one call while it is in flight. */
 export const storedLocalCallSchema = z

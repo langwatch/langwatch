@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
 import {
   canUserSeeLangyConversationUpdate,
   isLangyConversationUpdateVisibleToUser,
 } from "@langwatch/langy-contract";
+import { describe, expect, it } from "vitest";
 
 /** Build a raw freshness broadcast payload string as the subscriber emits it. */
 function makePayload(fields: {

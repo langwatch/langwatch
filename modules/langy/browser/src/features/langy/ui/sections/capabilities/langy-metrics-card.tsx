@@ -2,9 +2,10 @@
  * Analytics capability card (`get_analytics`).
  */
 
-import { Temporal, toEpochMs } from "@langwatch/time";
 import { Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";
+import { Temporal, toEpochMs } from "@langwatch/time";
+
 import { type LangyTurnMetric } from "../../../../../model/values/langy-turn.ts";
 import { formatMoneyShort } from "../../../../../ui/elements/langy-money.tsx";
 import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card.tsx";

@@ -1,10 +1,11 @@
+import type { LangyStreamEntry } from "@langwatch/langy-contract";
 /**
  * The turn's own account of what happened when, folded off its live stream.
  * This is what lets the record keep the paragraphs written BETWEEN the calls,
  * which live nowhere else once the stream lapses.
  */
 import { describe, expect, it } from "vitest";
-import type { LangyStreamEntry } from "@langwatch/langy-contract";
+
 import { LangyTurnOrderService } from "../langy-turn-order.service.ts";
 
 const delta = (text: string) => ({ type: "delta", text }) as LangyStreamEntry;

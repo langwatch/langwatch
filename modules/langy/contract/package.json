@@ -29,10 +29,11 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

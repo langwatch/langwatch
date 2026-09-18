@@ -5,24 +5,29 @@
  * @vitest-environment node
  */
 import { EventEmitter } from "node:events";
+
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   EventSourcing,
   EventStoreProducerOnly,
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LangyRepositories } from "../../repositories/langy-repositories.registry.ts";
 import { LangyApp } from "../langy.app.ts";
+
+/** No handle is ever resolved through it in these tests. */
+const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
 const TIER_PLAN_TYPE: Record<string, string> = {
   "org-free": "FREE",
@@ -78,8 +83,8 @@ function fakePresence(): PresenceApi {
   };
 }
 
-function harness() {
-  const app = LangyApp.create({
+async function harness() {
+  const app = await LangyApp.create({
     dependencies: {
       presence: fakePresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -100,8 +105,9 @@ function harness() {
       eventing: recordingEventing(),
       rateLimiter: windowLimiter(),
     },
-    config: { agentUrl: undefined, internalSecret: undefined },
+    config: { agentUrl: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
+    secrets: noSecrets,
     repositories: {} as LangyRepositories,
   });
 
@@ -128,7 +134,7 @@ const FREE_TURNS_PER_MINUTE = resolveRequestBound("langyTurnsPerMinute", "FREE")
 describe("LangyApp.startConversationTurn", () => {
   describe("given a free-tier project under its turn ceiling", () => {
     it("dispatches every turn", async () => {
-      const { startTurn, dispatched } = harness();
+      const { startTurn, dispatched } = await harness();
 
       for (let index = 0; index < FREE_TURNS_PER_MINUTE; index++) {
         await expect(startTurn("project-free")).resolves.toEqual({
@@ -142,7 +148,7 @@ describe("LangyApp.startConversationTurn", () => {
 
   describe("given a free-tier project at its turn ceiling", () => {
     it("refuses the next turn 429 and never dispatches it", async () => {
-      const { startTurn, dispatched } = harness();
+      const { startTurn, dispatched } = await harness();
       for (let index = 0; index < FREE_TURNS_PER_MINUTE; index++) {
         await startTurn("project-free");
       }
@@ -163,7 +169,7 @@ describe("LangyApp.startConversationTurn", () => {
 
   describe("given an enterprise project past the free turn ceiling", () => {
     it("dispatches the turn: the ceiling is tier-resolved, not static", async () => {
-      const { startTurn, dispatched } = harness();
+      const { startTurn, dispatched } = await harness();
       for (let index = 0; index < FREE_TURNS_PER_MINUTE; index++) {
         await startTurn("project-enterprise");
       }

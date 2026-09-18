@@ -4,11 +4,6 @@
  * pending -> running -> [awaiting_permission -> running ->] done (terminal).
  */
 
-import { createLogger } from "@langwatch/observability";
-import { nanoid } from "nanoid";
-import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
-import { callActivityLine } from "../rules/langy-local-call-activity.rules.ts";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import {
   CALL_ENVELOPE_SLACK_MS,
   CALL_OFFLINE_WAIT_MS,
@@ -18,18 +13,22 @@ import {
   PERMISSION_WAIT_BUDGET_MS,
   POLL_INTERVAL_MS,
   LangyLocalRecordUnreadableError,
-  LangyLocalWorkspaceOfflineError
+  LangyLocalWorkspaceOfflineError,
 } from "@langwatch/langy-contract";
-import { type CallState, type PollCallResponse,type CallEnvelope,type LocalToolCall,type ResultFrame } from "@langwatch/langy-contract";
 import {
-  callKeepaliveKey,
-  callKey,
-  pendingCallsKey,
-  workspaceChannel,
-} from "../rules/langy-local-control-keys.rules.ts";
-import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
+  type CallState,
+  type PollCallResponse,
+  type CallEnvelope,
+  type LocalToolCall,
+  type ResultFrame,
+} from "@langwatch/langy-contract";
+import { createLogger } from "@langwatch/observability";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
+import { nanoid } from "nanoid";
 
+import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
+import { callActivityLine } from "../rules/langy-local-call-activity.rules.ts";
 import {
   storedLocalCallSchema,
   type LocalCallBuffer,
@@ -37,6 +36,13 @@ import {
   type StoredLocalCall,
   type WorkspaceNudge,
 } from "../rules/langy-local-call-record.rules.ts";
+import {
+  callKeepaliveKey,
+  callKey,
+  pendingCallsKey,
+  workspaceChannel,
+} from "../rules/langy-local-control-keys.rules.ts";
+import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
 
 const logger = createLogger("langwatch:langy:local-control:dispatcher");
 export class LocalCallDispatcherService {

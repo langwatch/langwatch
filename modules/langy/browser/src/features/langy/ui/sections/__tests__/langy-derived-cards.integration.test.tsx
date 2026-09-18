@@ -8,6 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { langyChoicesTimeline } from "../../../../../model/langy-choices-timeline.ts";
 
 vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
@@ -50,8 +51,8 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   };
 });
 
-import { MessageContent } from "../message-content.tsx";
 import { StreamingAnswerWithCards } from "../derived-cards/streaming-answer-with-cards.tsx";
+import { MessageContent } from "../message-content.tsx";
 
 afterEach(cleanup);
 

@@ -5,8 +5,8 @@ import {
 } from "@langwatch/langy-contract";
 
 import type { api } from "../../../../behavior/langy-api.ts";
-import { useLangyDevLog } from "../stores/langy-dev-log.ts";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useLangyDevLog } from "../stores/langy-dev-log.ts";
 
 type ApiUtils = ReturnType<typeof api.useUtils>;
 

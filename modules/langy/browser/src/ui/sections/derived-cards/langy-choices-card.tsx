@@ -199,7 +199,6 @@ export function LangyChoicesCard({
         {open && card.allowOther === true && otherOpen && (
           <HStack gap={1.5}>
             <chakra.input
-              
               value={otherText}
               onChange={(event) => setOtherText(event.target.value)}
               onKeyDown={(event) => {
