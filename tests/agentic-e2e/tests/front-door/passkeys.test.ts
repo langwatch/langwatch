@@ -63,8 +63,19 @@ test.describe("Passkeys", () => {
       // be offering one — the title says "Sign in faster next time" rather
       // than the two-step-only "Secure your account" wording.
       await expect(nudge).toContainText("Sign in faster next time");
+      // The dialog closes on the click and the dismissal is written behind
+      // it, so waiting only for it to disappear leaves the write in flight.
+      // The next line is a document navigation, which throws away the page
+      // that knows the question was answered — so if the write has not landed
+      // the server still says to offer, the dialog mounts again over the
+      // security page, and its positioner swallows the click on
+      // `create-passkey`. Wait for the write, not for the animation.
+      const dismissed = page.waitForResponse((response) =>
+        response.url().includes("user.dismissSecureAccountNudge"),
+      );
       await page.getByRole("button", { name: "Not now" }).click();
       await expect(nudge).not.toBeVisible();
+      await dismissed;
 
       // ── #4: adding a passkey from settings ──
       await page.goto("/settings/security");
