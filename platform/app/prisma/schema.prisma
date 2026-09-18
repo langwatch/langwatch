@@ -1191,6 +1191,7 @@ enum CostType {
   GUARDRAIL
   CLUSTERING
   BATCH_EVALUATION
+  INSTANT_EVAL
 }
 
 enum CostReferenceType {
@@ -1198,6 +1199,7 @@ enum CostReferenceType {
   TRACE
   PROJECT
   BATCH
+  INSTANT_EVAL
 }
 
 model Cost {
@@ -5462,4 +5464,3 @@ model IdentityMatchSuggestion {
   // The review surface reads one organization's candidates, strongest first.
   @@index([organizationId, score])
 }
-
