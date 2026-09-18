@@ -12,12 +12,15 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { ASSISTANT_OPTIONS } from "~/components/me/tiles/assistantIcons";
+
 import {
   applicableRowsForTool,
   badgesForTool,
   billingForTool,
   buildRegisteredToolCards,
   type RegisteredTool,
+  VENDOR_UNKNOWN,
   vendorForTool,
 } from "../registeredTools";
 
@@ -93,13 +96,52 @@ describe("given a registered tool", () => {
   describe("when it is billed on what it consumed", () => {
     /** @scenario "A consumption-billed tool carries the token count it is billed on" */
     it("has the token row and no payment row", () => {
-      for (const tool of [provider, assistant("opencode")]) {
+      for (const tool of [provider, assistant("opencode"), assistant("pi")]) {
         expect(billingForTool(tool)).toBe("consumption");
         const rows = applicableRowsForTool(tool);
         expect(rows).toContain("tokens30Days");
         expect(rows).not.toContain("seats");
         expect(rows).not.toContain("subscriptions");
       }
+    });
+  });
+
+  describe("when the tool is pi", () => {
+    /**
+     * The exact two strings, not merely "not the fall-back". Nothing else in
+     * the repo pins either of them, so without this a vendor of three spaces
+     * renders a blank maker line on the card and every test still passes.
+     */
+    /** @scenario "The catalog names Earendil Works as pi's maker and bills it on use" */
+    it("names Earendil Works and bills pi on what it consumed", () => {
+      expect(vendorForTool(assistant("pi"))).toBe("Earendil Works");
+      expect(billingForTool(assistant("pi"))).toBe("consumption");
+    });
+  });
+
+  /**
+   * The maps are now total over the kinds the picker offers, so a missing kind
+   * is a compile error rather than something to test for. What typing cannot
+   * see is a kind that is present and useless — an empty string, or a
+   * deliberate `unknown` — which reaches the card as a blank maker line or a
+   * tool with no payment rows. That is what these read the picker's own list
+   * for.
+   */
+  describe("when every kind the tile picker offers is looked up", () => {
+    const offeredKinds = ASSISTANT_OPTIONS.map((option) => option.value).filter(
+      (kind) => kind !== "custom",
+    );
+
+    /** @scenario "Every assistant the picker offers carries a maker and a billing model" */
+    it.each(offeredKinds)("gives %s a maker a customer could read", (kind) => {
+      const vendor = vendorForTool(assistant(kind));
+      expect(vendor).not.toBe(VENDOR_UNKNOWN);
+      expect(vendor.trim()).not.toBe("");
+    });
+
+    /** @scenario "Every assistant the picker offers carries a maker and a billing model" */
+    it.each(offeredKinds)("knows how %s is paid for", (kind) => {
+      expect(billingForTool(assistant(kind))).not.toBe("unknown");
     });
   });
 

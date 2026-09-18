@@ -21,6 +21,7 @@ export type BannerAgent =
   | "codex"
   | "gemini_cli"
   | "copilot"
+  | "pi"
   | "unknown";
 
 export interface SessionBanner {
@@ -51,6 +52,13 @@ function detectBannerAgent({
   if (service.includes("codex")) return "codex";
   if (service.includes("gemini")) return "gemini_cli";
   if (service.includes("copilot")) return "copilot";
+  // EXACT, never `includes`: "pi" is a substring of "anthropic", "copilot"
+  // and "pipeline", so a substring test here would relabel Claude Code and
+  // Copilot sessions as pi. The exactness is the whole guard — unlike the
+  // cowork/claude pair above, this line's POSITION protects nothing, so do
+  // not "fix" a future collision by moving it. Same rule, same reason, as
+  // the pipeline registry entry (`agents/pi.ts`).
+  if (service === "pi") return "pi";
 
   for (const span of spans) {
     if (span.name.startsWith("claude_code.")) return "claude_code";
@@ -60,6 +68,9 @@ function detectBannerAgent({
     if (span.name === "llm_call") return "gemini_cli";
     // Copilot's call span is "chat <model>" — the only agent naming this way.
     if (span.name.startsWith("chat ")) return "copilot";
+    // Delimited by the trailing dot for the same reason as the service test
+    // above — a bare "pi" prefix would also claim "pipeline.*".
+    if (span.name.startsWith("pi.")) return "pi";
   }
   return "unknown";
 }

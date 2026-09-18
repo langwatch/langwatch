@@ -5,6 +5,7 @@ import { codexAgent } from "./codex";
 import { copilotAgent } from "./copilot";
 import { geminiCliAgent } from "./geminiCli";
 import { opencodeAgent } from "./opencode";
+import { piAgent } from "./pi";
 
 /**
  * The agent registry — ordered, first match wins.
@@ -26,6 +27,15 @@ export const CODING_AGENT_REGISTRY = [
   codexAgent,
   geminiCliAgent,
   copilotAgent,
+  // pi stays LAST, and moving it up is a silent bug. Its id is a substring of
+  // `anthropic` and `copilot`, so it is the one entry whose match rule has to
+  // be delimited rather than the usual `signalSays` substring test (see
+  // `pi.ts`). Last position is the belt to that rule's braces: under
+  // first-match-wins, an established agent answers before pi ever gets asked,
+  // so a future widening of pi's rule cannot steal a session that some other
+  // definition already claims. `__tests__/pi.unit.test.ts` asserts this
+  // position on its own, so a reorder fails without also breaking the rule.
+  piAgent,
 ] as const satisfies readonly CodingAgentDefinition[];
 
 // Module-load failure on a duplicate id, matching the guard `mergeAliasTables`

@@ -69,6 +69,9 @@ const EXCLUDED_COMMANDS = new Set([
   "gemini",
   "opencode",
   "copilot",
+  // pi, same shape as the wrappers above. Registered hidden and not yet
+  // advertised while ADR-132 capture is being built out.
+  "pi",
   // VS Code launcher: `code` execs VS Code with Copilot Chat telemetry env,
   // returning no LangWatch result. ADR-039 §Extension #2.
   "code",

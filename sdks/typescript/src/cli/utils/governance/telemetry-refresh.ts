@@ -242,7 +242,23 @@ export async function resolveLiveIngestionKey({
 	return {
 		token: r.token,
 		prefix: r.prefix,
-		endpoint: r.endpoint,
+		// Deliberately NOT `r.endpoint`. The mint response advertises the
+		// server's own canonical base URL, which is not always the URL this
+		// login actually reaches it on: a reverse proxy, a port-forward, a
+		// tunnel, or a local dev stack all leave the two different. Both cache
+		// branches above derive the endpoint from `cfg.control_plane_url`, so
+		// trusting the server here made the minting run — and only the minting
+		// run — post somewhere else. Observed against a local stack: run one
+		// minted, resolved to the server's https hostname, failed the TLS
+		// handshake with SELF_SIGNED_CERT_IN_CHAIN, and lost every turn it had
+		// captured; run two read the cached key, resolved to the logged-in
+		// host, and delivered. Silent first-run data loss, self-healing after.
+		//
+		// Using the login's own host makes all three branches agree. Nothing
+		// regresses by dropping `r.endpoint`: a deployment that genuinely
+		// served ingestion off a different host would already be broken from
+		// the second run onward, because the cache path never consulted it.
+		endpoint: otlpEndpointFor(cfg.control_plane_url),
 		minted: true,
 	};
 }

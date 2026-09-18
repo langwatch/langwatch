@@ -1,0 +1,1037 @@
+/**
+ * Finding pi's session directory when the user has moved it — the flag, the
+ * environment variable, and pi's settings file, in pi's own precedence order.
+ *
+ * Feature: specs/coding-agent/pi-session-capture.feature
+ */
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import {
+  crossProjectSessionsRoot,
+  defaultPiProjectSessionsDir,
+  defaultPiSessionsRoot,
+  encodePiCwdDirName,
+  explicitSessionFileFromArgs,
+  offersCrossProjectSessionPicker,
+  PI_AGENT_DIR_ENV,
+  PI_SESSION_DIR_ENV,
+  piAgentDir,
+  piProjectSettingsPath,
+  piSettingsPath,
+  resolvePiSessionDir,
+  sessionDirFromArgs,
+} from "../pi-session-dir";
+
+/** A throwaway HOME, so no test can read or write the real ~/.pi. */
+let home: string;
+
+/**
+ * A fixed working directory, so the default branch asserts against a known
+ * encoded folder name rather than wherever the test runner happens to start.
+ */
+const cwd = "/work/project";
+
+/**
+ * pi's default agent root under the throwaway HOME, written out rather than
+ * asked of {@link piAgentDir}, so a test that expects the default is asserting
+ * against a literal and not against whatever the resolver currently returns.
+ */
+const defaultAgentDir = () => join(home, ".pi", "agent");
+
+beforeEach(() => {
+  home = mkdtempSync(join(tmpdir(), "lw-pi-session-dir-"));
+  mkdirSync(defaultAgentDir(), { recursive: true });
+});
+
+afterEach(() => {
+  rmSync(home, { recursive: true, force: true });
+});
+
+const writeSettings = (contents: string, agentDir = defaultAgentDir()) => {
+  writeFileSync(piSettingsPath(agentDir), contents);
+};
+
+/** A relocated agent root, created empty, the way `PI_CODING_AGENT_DIR` leaves it. */
+const makeAgentDir = (name: string) => {
+  const agentDir = join(home, name);
+  mkdirSync(agentDir, { recursive: true });
+  return agentDir;
+};
+
+describe("resolving pi's session directory", () => {
+  describe("given the directory named on the command line", () => {
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("reads the session from the directory the flag names", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: ["--model", "sonnet", "--session-dir", "/elsewhere/sessions"],
+        env: {},
+        home,
+      });
+
+      expect(resolved).toBe("/elsewhere/sessions");
+    });
+
+    /**
+     * pi has no `--flag=value` spelling: its parser matches whole tokens and
+     * drops `--session-dir=/x` into `unknownFlags`, then writes to its default.
+     * Honouring it here pointed capture at a directory pi never filled and
+     * reported nothing, so the joined-up form must resolve to the default.
+     *
+     * The outcome is compared against a launch with no arguments at all rather
+     * than against `defaultPiProjectSessionsDir`, because calling that helper
+     * here asks the resolver to confirm its own arithmetic: the resolver calls
+     * the same function, so the assertion holds even when the function itself
+     * is wrong. Sabotaging the default to its own parent — a directory that
+     * holds no session file at any time — left an assertion of that shape
+     * green. Comparing two launches pins the only thing this scenario claims:
+     * that the spelling changed nothing.
+     */
+    /** @scenario "A directory named in a spelling pi ignores does not move capture" */
+    it("ignores the joined-up spelling, the way pi ignores it", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: ["--session-dir=/elsewhere/sessions"],
+        env: {},
+        home,
+        cwd,
+      });
+      const withoutTheSpelling = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(withoutTheSpelling);
+      expect(resolved).not.toBe("/elsewhere/sessions");
+    });
+
+    /**
+     * pi stops reading flags at `--`, so a `--session-dir` behind it is a
+     * message, not a relocation. Compared against an argument-free launch for
+     * the reason given above.
+     */
+    /** @scenario "A directory named in a spelling pi ignores does not move capture" */
+    it("stops reading flags at the argument terminator", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: ["--", "--session-dir", "/elsewhere/sessions"],
+        env: {},
+        home,
+        cwd,
+      });
+      const withoutTheTerminator = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(withoutTheTerminator);
+      expect(resolved).not.toBe("/elsewhere/sessions");
+    });
+
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("outranks the variable and the settings file", async () => {
+      writeSettings(JSON.stringify({ sessionDir: "/from-settings" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: ["--session-dir", "/from-flag"],
+        env: { [PI_SESSION_DIR_ENV]: "/from-env" },
+        home,
+      });
+
+      expect(resolved).toBe("/from-flag");
+    });
+  });
+
+  describe("given the directory named in the environment", () => {
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("reads the session from the directory the variable names", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_SESSION_DIR_ENV]: "/from-env" },
+        home,
+      });
+
+      expect(resolved).toBe("/from-env");
+    });
+
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("outranks the settings file", async () => {
+      writeSettings(JSON.stringify({ sessionDir: "/from-settings" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_SESSION_DIR_ENV]: "/from-env" },
+        home,
+      });
+
+      expect(resolved).toBe("/from-env");
+    });
+
+    it("treats a blank variable as unset", async () => {
+      writeSettings(JSON.stringify({ sessionDir: "/from-settings" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_SESSION_DIR_ENV]: "   " },
+        home,
+      });
+
+      expect(resolved).toBe("/from-settings");
+    });
+  });
+
+  describe("given the directory named in pi's settings file", () => {
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("reads the session from the directory the settings name", async () => {
+      writeSettings(
+        JSON.stringify({ theme: "dark", sessionDir: "/from-settings" }),
+      );
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+      });
+
+      expect(resolved).toBe("/from-settings");
+    });
+
+    /**
+     * pi expands a leading tilde before it writes (`utils/paths.js:58`, called
+     * at `core/session-manager.js:1207`), so the directory it writes into is
+     * never the literal `~`. For one commit this resolver returned the literal
+     * and every session of such a user was missed in silence — the same failure
+     * as reading the parent directory, from a different cause.
+     *
+     * A settings file is where this is unavoidable rather than unlucky: JSON
+     * has no expansion of its own, so a user who means their home directory can
+     * only write `~`. The assertions below name the expanded path and then say
+     * outright that the literal is not it, so reverting the expansion fails
+     * here rather than passing on a path nobody reads.
+     */
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("reads the session from home when the settings start the path at a tilde", async () => {
+      writeSettings(JSON.stringify({ sessionDir: "~/pi-sessions" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(join(home, "pi-sessions"));
+      expect(resolved).not.toBe("~/pi-sessions");
+      expect(resolved.startsWith("~")).toBe(false);
+    });
+
+    /**
+     * The same expansion on the two higher-precedence sources. A shell expands
+     * an unquoted tilde before pi ever sees it, so these matter for a quoted
+     * flag and for a variable set from a file rather than a shell — narrower
+     * than the settings case, and the same one-line fix covers them.
+     */
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("expands a tilde from the flag and from the environment too", async () => {
+      writeSettings(JSON.stringify({ theme: "dark" }));
+
+      const fromFlag = await resolvePiSessionDir({
+        toolArgs: ["--session-dir", "~/pi-sessions"],
+        env: {},
+        home,
+        cwd,
+      });
+      const fromEnv = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_SESSION_DIR_ENV]: "~/pi-sessions" },
+        home,
+        cwd,
+      });
+
+      expect(fromFlag).toBe(join(home, "pi-sessions"));
+      expect(fromEnv).toBe(join(home, "pi-sessions"));
+    });
+
+    /**
+     * A tilde that does not start the path is a directory name, not a home
+     * reference, and pi leaves it alone. Without this the fix could be written
+     * as a replace-anywhere and still look correct.
+     */
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("leaves a tilde alone when it is part of a directory name", async () => {
+      writeSettings(JSON.stringify({ sessionDir: "/srv/~backup/sessions" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe("/srv/~backup/sessions");
+    });
+  });
+
+  /**
+   * pi keeps a second settings file inside the project and merges it OVER the
+   * global one, so a project that moves its own session directory moves it for
+   * real. Reading only the global file left capture on the default while pi
+   * wrote where the project said, which is a silent miss.
+   *
+   * These tests write a global file naming somewhere else, so a resolver that
+   * ignores the project file lands on a path that can be told apart from the
+   * default as well as from the project's.
+   */
+  describe("given the directory named in the project's own settings file", () => {
+    /** The project settings file pi reads, written into a real directory. */
+    const writeProjectSettings = (projectCwd: string, contents: string) => {
+      mkdirSync(join(projectCwd, ".pi"), { recursive: true });
+      writeFileSync(join(projectCwd, ".pi", "settings.json"), contents);
+    };
+
+    /** A working directory under the throwaway HOME, so nothing real is read. */
+    const makeProject = () => {
+      const projectCwd = join(home, "project");
+      mkdirSync(projectCwd, { recursive: true });
+      return projectCwd;
+    };
+
+    /** @scenario "A session directory the project moved is the one capture reads" */
+    it("reads the session from the directory the project's settings name", async () => {
+      const projectCwd = makeProject();
+      writeProjectSettings(
+        projectCwd,
+        JSON.stringify({ sessionDir: "/from-project" }),
+      );
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-project");
+    });
+
+    /** @scenario "A session directory the project moved is the one capture reads" */
+    it("outranks the global settings file, the way pi's merge does", async () => {
+      const projectCwd = makeProject();
+      writeSettings(JSON.stringify({ sessionDir: "/from-global" }));
+      writeProjectSettings(
+        projectCwd,
+        JSON.stringify({ sessionDir: "/from-project" }),
+      );
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-project");
+      expect(resolved).not.toBe("/from-global");
+    });
+
+    /**
+     * The precedence above the settings files is unchanged: pi reads the flag
+     * and the variable before it asks its settings manager anything.
+     */
+    /** @scenario "A session directory the project moved is the one capture reads" */
+    it("still loses to the flag and to the environment", async () => {
+      const projectCwd = makeProject();
+      writeProjectSettings(
+        projectCwd,
+        JSON.stringify({ sessionDir: "/from-project" }),
+      );
+
+      const fromFlag = await resolvePiSessionDir({
+        toolArgs: ["--session-dir", "/from-flag"],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+      const fromEnv = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_SESSION_DIR_ENV]: "/from-env" },
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(fromFlag).toBe("/from-flag");
+      expect(fromEnv).toBe("/from-env");
+    });
+
+    /**
+     * A project file that names nothing usable must fall THROUGH to the global
+     * one rather than past it to the default, which is how a half-written
+     * project file would quietly disable a global relocation.
+     */
+    /** @scenario "A session directory the project moved is the one capture reads" */
+    it("falls through to the global settings when the project file is broken", async () => {
+      const projectCwd = makeProject();
+      writeSettings(JSON.stringify({ sessionDir: "/from-global" }));
+      writeProjectSettings(projectCwd, '{"sessionDir": "/half-written"');
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-global");
+    });
+
+    /** @scenario "A session directory the project moved is the one capture reads" */
+    it("names the project's settings file where pi keeps it", () => {
+      expect(piProjectSettingsPath("/work/project")).toBe(
+        join("/work/project", ".pi", "settings.json"),
+      );
+    });
+
+    /**
+     * The mark leads the file's bytes rather than sitting inside the JSON body,
+     * because the defect is in decoding those first bytes: an escape within the
+     * body parses fine and would prove nothing.
+     *
+     * Spelled as the escape rather than as the character itself. Both put the
+     * same byte in the file under test, but the character is invisible in this
+     * source, where it reads as an ordinary space to every reader and is an
+     * error to the repo's lint.
+     */
+    /** @scenario "A settings file written with a byte order mark still moves capture" */
+    it("reads a project settings file that begins with a byte order mark", async () => {
+      const projectCwd = makeProject();
+      writeProjectSettings(
+        projectCwd,
+        `\uFEFF${JSON.stringify({ sessionDir: "/from-project" })}`,
+      );
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-project");
+    });
+
+    /**
+     * The global file goes through the same reader, so the mark must not
+     * disable a relocation written there either.
+     */
+    /** @scenario "A settings file written with a byte order mark still moves capture" */
+    it("reads a global settings file that begins with a byte order mark", async () => {
+      const projectCwd = makeProject();
+      writeSettings(`\uFEFF${JSON.stringify({ sessionDir: "/from-global" })}`);
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-global");
+    });
+  });
+
+  describe("given nothing has moved the directory", () => {
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("falls back to the place pi writes by default", async () => {
+      writeSettings(JSON.stringify({ theme: "dark" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
+    });
+
+    /**
+     * The one that was wrong while every other test here was green: the
+     * default is not the sessions folder, it is one folder per working
+     * directory inside it, and a reader pointed at the parent sees only
+     * directories. Spelling the whole path out is the point — an assertion
+     * against `defaultPiProjectSessionsDir` alone would agree with the
+     * function however the function encoded it.
+     */
+    /** @scenario "A default pi launch is read from the folder pi makes for this project" */
+    it("names the per-project folder pi encodes from the working directory", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: "/work/project",
+      });
+
+      expect(resolved).toBe(
+        join(home, ".pi", "agent", "sessions", "--work-project--"),
+      );
+      expect(resolved).not.toBe(join(home, ".pi", "agent", "sessions"));
+    });
+
+    /**
+     * The other half of the rule, and the reason the default cannot simply be
+     * "always append the project folder": pi applies the encoded folder only
+     * when it is choosing the directory itself. A directory the user named is
+     * the directory pi writes into, unchanged.
+     */
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("keeps a named directory flat, the way pi uses it", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: ["--session-dir", "/elsewhere/sessions"],
+        env: {},
+        home,
+        cwd: "/work/project",
+      });
+
+      expect(resolved).toBe("/elsewhere/sessions");
+    });
+
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("falls back when there is no settings file at all", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
+    });
+  });
+
+  describe("given a settings file that cannot be understood", () => {
+    it("falls through to the default rather than throwing on broken JSON", async () => {
+      writeSettings('{"sessionDir": "/half-written"');
+
+      await expect(
+        resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
+    });
+
+    it("falls through when the file is not an object", async () => {
+      writeSettings('"just a string"');
+
+      await expect(
+        resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
+    });
+
+    it("falls through when sessionDir is not a string", async () => {
+      writeSettings(JSON.stringify({ sessionDir: 42 }));
+
+      await expect(
+        resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
+    });
+
+    it("falls through when sessionDir is blank", async () => {
+      writeSettings(JSON.stringify({ sessionDir: "  " }));
+
+      await expect(
+        resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
+    });
+
+    it("lets a broken settings file fall through to the variable, not past it", async () => {
+      writeSettings("not json at all");
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_SESSION_DIR_ENV]: "/from-env" },
+        home,
+      });
+
+      expect(resolved).toBe("/from-env");
+    });
+  });
+
+  /**
+   * `PI_CODING_AGENT_DIR` moves pi's whole agent directory, and with it both
+   * places this resolver reads: the settings file (`config.js:440-442`) and the
+   * sessions root (`config.js:457-459`), because each is a `join` onto
+   * `getAgentDir()` (`config.js:420-426`). A resolver that hard-codes
+   * `~/.pi/agent` reads a settings file pi is not writing and walks a sessions
+   * tree pi is not filling, and reports no error for either.
+   *
+   * These tests give the relocated root a name that is not `.pi/agent` and put
+   * nothing in the default one, so anything still looking at the default has
+   * nowhere to accidentally succeed.
+   */
+  describe("given pi's whole agent directory has been moved", () => {
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("looks for the default sessions under the moved agent directory", async () => {
+      const agentDir = makeAgentDir("relocated-agent");
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: agentDir },
+        home,
+        cwd: "/work/project",
+      });
+
+      expect(resolved).toBe(join(agentDir, "sessions", "--work-project--"));
+      expect(resolved.startsWith(defaultAgentDir())).toBe(false);
+    });
+
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("reads the settings file out of the moved agent directory", async () => {
+      const agentDir = makeAgentDir("relocated-agent");
+      writeSettings(JSON.stringify({ sessionDir: "/named-in-moved" }), agentDir);
+      // The default root holds a settings file naming somewhere else, so
+      // reading the wrong one resolves to the wrong directory rather than to
+      // the default and can be told apart from simply missing the file.
+      writeSettings(JSON.stringify({ sessionDir: "/named-in-default" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: agentDir },
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe("/named-in-moved");
+    });
+
+    /**
+     * pi passes the variable through `expandTildePath`, which is
+     * `normalizePath` with no options (`config.js:408-410`), so a leading tilde
+     * is a home reference to pi and never a directory called `~`. JSON is not
+     * the only place a user cannot expand one themselves: a variable set from a
+     * config file or a `.env` reaches the process unexpanded too.
+     */
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("expands a tilde in the moved agent directory", async () => {
+      const agentDir = makeAgentDir("relocated-agent");
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: "~/relocated-agent" },
+        home,
+        cwd: "/work/project",
+      });
+
+      expect(resolved).toBe(join(agentDir, "sessions", "--work-project--"));
+      expect(resolved.startsWith("~")).toBe(false);
+    });
+
+    /**
+     * The two relocations compose rather than compete: the agent directory says
+     * WHERE the settings file is, and the settings file still says where the
+     * sessions are. Getting this wrong in either direction — reading the
+     * default settings, or letting the moved root override a directory the user
+     * named — is a separate bug from not reading the variable at all.
+     */
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("still lets the moved settings file name a session directory of its own", async () => {
+      const agentDir = makeAgentDir("relocated-agent");
+      writeSettings(JSON.stringify({ sessionDir: "~/pi-sessions" }), agentDir);
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: agentDir },
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(join(home, "pi-sessions"));
+      expect(resolved.startsWith(agentDir)).toBe(false);
+    });
+
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("treats a blank agent directory as unset", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: "   " },
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(
+        defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }),
+      );
+    });
+
+    /**
+     * The regression guard for the overwhelmingly common case: nobody sets the
+     * variable, and the answer is exactly what it was before it was read at all.
+     */
+    /** @scenario "A default pi launch is read from the folder pi makes for this project" */
+    it("resolves to pi's own default when the variable is absent", () => {
+      expect(piAgentDir({ env: {}, home })).toBe(join(home, ".pi", "agent"));
+      expect(piSettingsPath(piAgentDir({ env: {}, home }))).toBe(
+        join(home, ".pi", "agent", "settings.json"),
+      );
+    });
+  });
+});
+
+describe("encoding a working directory the way pi names its folder", () => {
+  /** @scenario "A default pi launch is read from the folder pi makes for this project" */
+  it("drops the leading separator and wraps the rest in double dashes", () => {
+    expect(encodePiCwdDirName("/work/project")).toBe("--work-project--");
+  });
+
+  /** @scenario "A default pi launch is read from the folder pi makes for this project" */
+  it("keeps a dot in a path segment, which pi does not replace", () => {
+    expect(encodePiCwdDirName("/a/b/.claude/worktrees/c")).toBe(
+      "--a-b-.claude-worktrees-c--",
+    );
+  });
+
+  /**
+   * Both the drive colon and the separator become dashes, and a drive letter
+   * has no leading separator to drop, so `C:\` becomes `C--`. That is pi's
+   * output, not a tidy one: the first written expectation here was
+   * `--C-work-project--` and the run said otherwise.
+   */
+  it("turns a Windows separator and drive colon into dashes too", () => {
+    expect(encodePiCwdDirName("C:\\work\\project")).toBe("--C--work-project--");
+  });
+});
+
+describe("reading the session directory out of pi's arguments", () => {
+  it("finds nothing when the flag is absent", () => {
+    expect(sessionDirFromArgs(["--model", "sonnet"])).toBeNull();
+  });
+
+  it("finds nothing when the flag ends the arguments", () => {
+    expect(sessionDirFromArgs(["--session-dir"])).toBeNull();
+  });
+
+  /**
+   * pi takes the next token unconditionally, so this really does name a
+   * directory called `--verbose` to pi. Reading it as "no directory" left
+   * capture on the default while pi wrote elsewhere.
+   */
+  it("takes a value that looks like a flag, because pi takes it", () => {
+    expect(sessionDirFromArgs(["--session-dir", "--verbose"])).toBe("--verbose");
+  });
+
+  it("finds nothing in the joined-up spelling, which pi does not accept", () => {
+    expect(sessionDirFromArgs(["--session-dir=/joined"])).toBeNull();
+    expect(sessionDirFromArgs(["--session-dir="])).toBeNull();
+  });
+
+  it("does not match a flag that merely starts with the same letters", () => {
+    expect(sessionDirFromArgs(["--session-dirs", "/nope"])).toBeNull();
+  });
+
+  it("names a directory that starts with a dash from the value slot", () => {
+    expect(sessionDirFromArgs(["--session-dir", "-weird"])).toBe("-weird");
+  });
+
+  it("stops at the argument terminator the way pi does", () => {
+    expect(sessionDirFromArgs(["--", "--session-dir", "/after"])).toBeNull();
+    // The terminator ends parsing, so an earlier flag still stands.
+    expect(
+      sessionDirFromArgs(["--session-dir", "/before", "--", "--session-dir", "/after"]),
+    ).toBe("/before");
+  });
+
+  it("lets a later flag override an earlier one", () => {
+    expect(
+      sessionDirFromArgs([
+        "--session-dir",
+        "/first",
+        "--session-dir",
+        "/second",
+      ]),
+    ).toBe("/second");
+  });
+
+  it("does not read the flag's own value as another flag", () => {
+    // The consumed value is skipped, so a directory literally called
+    // "--session-dir" cannot shift the parse onto the token after it.
+    expect(
+      sessionDirFromArgs(["--session-dir", "/real", "trailing"]),
+    ).toBe("/real");
+  });
+});
+
+/**
+ * `--session` takes a path OR a session id, and pi tells them apart by shape
+ * alone, never by asking the filesystem. Only the path route matters here: pi
+ * opens that exact file and keeps writing to it where it lies, so a capture
+ * watching a directory never sees it. Every id route ends inside the session
+ * directory — a local match is already there, and a match in another project is
+ * forked into this one — so an id needs nothing from this function.
+ *
+ * The shape test is pi's, in pi's own order, and the branches are walked
+ * separately below so a rewrite that collapses them fails here.
+ */
+describe("reading an explicitly named session file out of pi's arguments", () => {
+  const launchedIn = "/work/project";
+
+  /** @scenario "A session pi was told to open by path is captured where it lies" */
+  it("finds nothing when the flag is absent", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--model", "sonnet"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+  });
+
+  /** @scenario "A session pi was told to open by path is captured where it lies" */
+  it("names the file when the value carries a separator", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "/other/session.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBe("/other/session.jsonl");
+  });
+
+  /**
+   * The separator and the extension are separate branches of pi's test, so a
+   * bare file name in the launch directory counts on the extension alone.
+   */
+  /** @scenario "A session pi was told to open by path is captured where it lies" */
+  it("names the file when the value only ends in pi's extension", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "picked.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBe(join(launchedIn, "picked.jsonl"));
+  });
+
+  /** @scenario "A session pi was told to open by path is captured where it lies" */
+  it("resolves a relative path against the directory pi was launched in", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "../sessions/picked.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBe("/work/sessions/picked.jsonl");
+  });
+
+  /**
+   * An id is not a path, and treating one as a path would hand capture a file
+   * name that does not exist while the real session sits in the directory.
+   */
+  /** @scenario "A session pi was told to open by path is captured where it lies" */
+  it("finds nothing when the value is a session id", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "abc123"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "44444444-4444-4444-8444-444444444444"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+  });
+
+  /**
+   * The accepted spelling is asserted alongside the rejected ones, on the same
+   * path, so that a reader which accepts nothing at all fails here. Without it
+   * the test states only that three calls returned nothing, which is satisfied
+   * by a function that always returns nothing.
+   */
+  /** @scenario "A directory named in a spelling pi ignores does not move capture" */
+  it("ignores spellings pi does not accept, while taking the one it does", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "/other/session.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBe("/other/session.jsonl");
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session=/other/session.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--", "--session", "/other/session.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+  });
+
+  /**
+   * `--session-id` names an id pi gives a NEW session in its own directory, and
+   * it shares a prefix with `--session`. Matching on the prefix would turn a
+   * new local session into a file path that does not exist.
+   */
+  /** @scenario "A session pi was told to open by path is captured where it lies" */
+  it("does not match the flag that merely starts with the same letters", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session-id", "/not/a/path.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+  });
+});
+
+/**
+ * `--resume` opens pi's session picker, and the picker is fed from every
+ * project's sessions as well as this one's. Whatever the user picks, pi keeps
+ * writing it where it already lives — so a resume is the one ordinary launch
+ * that can spend its whole life in another project's folder, out of reach of a
+ * capture watching one directory. Nothing is reported when that happens.
+ *
+ * It is also the common route there: naming another project's file by path is
+ * rare, while `--resume` is how people actually reopen work.
+ */
+describe("deciding whether a resume can reach another project's sessions", () => {
+  /** @scenario "A session resumed from another project is captured where it lives" */
+  it("finds no wider root on an ordinary launch", async () => {
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: [], env: {}, home, cwd }),
+    ).resolves.toBeNull();
+  });
+
+  /** @scenario "A session resumed from another project is captured where it lives" */
+  it("names the root holding every project's sessions when pi will offer them", async () => {
+    const root = defaultPiSessionsRoot(defaultAgentDir());
+
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: ["--resume"], env: {}, home, cwd }),
+    ).resolves.toBe(root);
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: ["-r"], env: {}, home, cwd }),
+    ).resolves.toBe(root);
+  });
+
+  /**
+   * A relocation moves the root too, so the wider search has to follow it
+   * rather than reaching back into the default that pi is no longer filling.
+   */
+  /** @scenario "A session resumed from another project is captured where it lives" */
+  it("follows a moved agent directory", async () => {
+    const agentDir = makeAgentDir("relocated-agent");
+
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume"],
+        env: { [PI_AGENT_DIR_ENV]: agentDir },
+        home,
+        cwd,
+      }),
+    ).resolves.toBe(defaultPiSessionsRoot(agentDir));
+  });
+
+  /**
+   * When the user has named a session directory, pi's picker lists that one
+   * directory and nothing else, so it is already entirely watched. Widening
+   * then would reach into folders pi is not offering.
+   */
+  /** @scenario "A session resumed from another project is captured where it lives" */
+  it("stays narrow when the session directory has been moved", async () => {
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume", "--session-dir", "/elsewhere/sessions"],
+        env: {},
+        home,
+        cwd,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume"],
+        env: { [PI_SESSION_DIR_ENV]: "/from-env" },
+        home,
+        cwd,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  /**
+   * The caller has already resolved this directory and passes it in. Two tests,
+   * because the option has to be USED rather than merely accepted: a directory
+   * that is the default answers with the root, and one that is not answers
+   * null, which an implementation that ignored the argument and resolved for
+   * itself could not do — it would answer the same way to both.
+   */
+  /** @scenario "A session resumed from another project is captured where it lives" */
+  it("decides from the directory it is handed rather than resolving again", async () => {
+    const theDefault = defaultPiProjectSessionsDir({
+      cwd,
+      agentDir: defaultAgentDir(),
+    });
+
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume"],
+        env: {},
+        home,
+        cwd,
+        sessionsDir: theDefault,
+      }),
+    ).resolves.toBe(defaultPiSessionsRoot(defaultAgentDir()));
+
+    // Nothing on the command line or in the environment has moved anything, so
+    // a resolver asked to work it out again would say the default and widen.
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--resume"],
+        env: {},
+        home,
+        cwd,
+        sessionsDir: "/somewhere/the/user/moved/it",
+      }),
+    ).resolves.toBeNull();
+  });
+
+  /**
+   * `--continue` takes the most recent session of THIS project, so it needs no
+   * widening; reading it as a resume would capture other projects for a launch
+   * that never leaves this one.
+   */
+  /** @scenario "A session resumed from another project is captured where it lives" */
+  it("does not widen for the flags that stay in this project", async () => {
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: ["--continue"], env: {}, home, cwd }),
+    ).resolves.toBeNull();
+    await expect(
+      crossProjectSessionsRoot({ toolArgs: ["-c"], env: {}, home, cwd }),
+    ).resolves.toBeNull();
+    await expect(
+      crossProjectSessionsRoot({
+        toolArgs: ["--session", "abc123"],
+        env: {},
+        home,
+        cwd,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  /**
+   * Tagged to the resume scenario rather than to the spelling one: what the
+   * terminator decides here is whether the search widens to other projects,
+   * which is the resume scenario's claim. The spelling scenario is about the
+   * directory capture reads, and nothing about that moves in this test.
+   */
+  /** @scenario "A session resumed from another project is captured where it lives" */
+  it("does not read a resume flag behind the argument terminator", () => {
+    expect(offersCrossProjectSessionPicker(["--", "--resume"])).toBe(false);
+    expect(offersCrossProjectSessionPicker(["-r", "--", "--resume"])).toBe(true);
+  });
+});

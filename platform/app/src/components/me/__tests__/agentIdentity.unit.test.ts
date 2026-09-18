@@ -27,6 +27,21 @@ describe("assistantKindOfAgent", () => {
     it("resolves opencode to its own kind", () => {
       expect(assistantKindOfAgent("opencode")).toBe("opencode");
     });
+
+    /** @scenario "An agent slug resolves to its product name" */
+    it("resolves pi to its own kind", () => {
+      expect(assistantKindOfAgent("pi")).toBe("pi");
+    });
+
+    /** @scenario "An agent slug resolves to its product name" */
+    it("names pi through the preset, which carries pi's own mark", () => {
+      const kind = assistantKindOfAgent("pi");
+      expect(kind).not.toBeNull();
+      expect(kind && ASSISTANT_PRESETS[kind].label).toBe("pi");
+      expect(kind && ASSISTANT_PRESETS[kind].iconUrl).toBe(
+        "/images/external-icons/pi.svg",
+      );
+    });
   });
 
   describe("given a slug the registry spells differently", () => {

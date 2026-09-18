@@ -16,6 +16,7 @@ export type CodingAgent =
   | "codex"
   | "gemini_cli"
   | "copilot"
+  | "pi"
   | "unknown";
 
 /**

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { AssistantKind } from "~/components/me/tiles/assistantIcons";
 import type { AiToolEntry, AiToolTileType } from "~/components/me/tiles/types";
 
 import {
@@ -51,12 +52,24 @@ export type ToolBilling = "seat" | "subscription" | "consumption" | "unknown";
  * source and runs on a key the person supplies, so what it costs is what it
  * consumed.
  *
- * An assistant kind missing from this map — `custom`, or one added to the
- * picker before this map catches up — falls to `unknown`, which shows no
- * payment rows at all. That is the honest default: a made-up billing model
- * would put a Seats row on a tool nobody buys seats for.
+ * Keyed on `AssistantKind` rather than `string`, so a kind added to the picker
+ * without a billing model here is a compile error rather than a card that
+ * renders wrong. The map was `Record<string, …>`, and the gap that cost us was
+ * exactly the one that typing forbids: pi shipped in the picker, fell through
+ * to `unknown`, and showed a customer no payment rows on a tool whose billing
+ * model we knew.
+ *
+ * `custom` is excluded because it is the "not one of ours" escape hatch: it has
+ * no fixed vendor and no fixed billing model by definition.
+ *
+ * The runtime fall-back below still stands, because the lookup key is
+ * unvalidated text off a registry row rather than an `AssistantKind`. Typing
+ * the map closes the gap we control; the fall-back handles input we do not.
  */
-const ASSISTANT_BILLING: Record<string, ToolBilling> = {
+const ASSISTANT_BILLING: Record<
+  Exclude<AssistantKind, "custom">,
+  ToolBilling
+> = {
   claude_code: "subscription",
   claude_cowork: "subscription",
   codex: "subscription",
@@ -64,6 +77,10 @@ const ASSISTANT_BILLING: Record<string, ToolBilling> = {
   opencode: "consumption",
   cursor: "seat",
   github_copilot: "seat",
+  // Same shape as opencode: open source, run on a key the person supplies, so
+  // what it costs is what it consumed. There is no pi plan and no pi seat to
+  // count.
+  pi: "consumption",
 };
 
 /**
@@ -73,7 +90,7 @@ const ASSISTANT_BILLING: Record<string, ToolBilling> = {
  * registry: the registry's keys are routing identifiers and several of them
  * ("bedrock", "google") are not how anyone names the company on a renewal.
  */
-const ASSISTANT_VENDOR: Record<string, string> = {
+const ASSISTANT_VENDOR: Record<Exclude<AssistantKind, "custom">, string> = {
   claude_code: "Anthropic",
   claude_cowork: "Anthropic",
   codex: "OpenAI",
@@ -81,6 +98,10 @@ const ASSISTANT_VENDOR: Record<string, string> = {
   opencode: "Open source",
   cursor: "Anysphere",
   github_copilot: "GitHub",
+  // Named for the company rather than "Open source", which is what opencode
+  // carries: pi has a maker a customer can put on a renewal, and the licence is
+  // a separate fact from who publishes it.
+  pi: "Earendil Works",
 };
 
 const PROVIDER_VENDOR: Record<string, string> = {
@@ -98,8 +119,14 @@ const PROVIDER_VENDOR: Record<string, string> = {
   cloudflare: "Cloudflare",
 };
 
-/** Said when the registry does not tell us who makes a tool. */
-const VENDOR_UNKNOWN = "Vendor not recorded";
+/**
+ * Said when the registry does not tell us who makes a tool.
+ *
+ * Exported so a test can assert a tool did NOT fall back here without copying
+ * the wording. A copy passes the moment this string is reworded, which is
+ * silently the same as not checking at all.
+ */
+export const VENDOR_UNKNOWN = "Vendor not recorded";
 
 /** What an organization's own internal tool is attributed to. */
 const VENDOR_IN_HOUSE = "In-house";
@@ -150,6 +177,22 @@ const TYPE_ROWS: Record<AiToolTileType, readonly ToolCardRow[]> = {
   model_provider: [],
   external_tool: ["agents", "conversations30Days"],
 };
+
+/**
+ * Read a per-kind map with the kind a registry row actually carries.
+ *
+ * The maps above are total over `AssistantKind`, which is what makes forgetting
+ * a kind a compile error. The key here is not an `AssistantKind` — it is text
+ * off a JSON config column that nothing validates — so the widening is the
+ * honest description of the lookup, and the caller supplies the fall-back for
+ * a kind we have never heard of.
+ */
+function byAssistantKind<T>(
+  map: Record<Exclude<AssistantKind, "custom">, T>,
+  kind: string,
+): T | undefined {
+  return (map as Record<string, T | undefined>)[kind];
+}
 
 const CONFIG_STRING = (
   config: Record<string, unknown>,
@@ -204,7 +247,10 @@ export function billingForTool(tool: RegisteredTool): ToolBilling {
   // payment row applies — what it costs shows up as the usage it drove.
   if (tool.type === "external_tool") return "unknown";
   return (
-    ASSISTANT_BILLING[CONFIG_STRING(tool.config, "assistantKind")] ?? "unknown"
+    byAssistantKind(
+      ASSISTANT_BILLING,
+      CONFIG_STRING(tool.config, "assistantKind"),
+    ) ?? "unknown"
   );
 }
 
@@ -244,8 +290,10 @@ export function vendorForTool(tool: RegisteredTool): string {
     return PROVIDER_VENDOR[key] ?? VENDOR_UNKNOWN;
   }
   return (
-    ASSISTANT_VENDOR[CONFIG_STRING(tool.config, "assistantKind")] ??
-    VENDOR_UNKNOWN
+    byAssistantKind(
+      ASSISTANT_VENDOR,
+      CONFIG_STRING(tool.config, "assistantKind"),
+    ) ?? VENDOR_UNKNOWN
   );
 }
 

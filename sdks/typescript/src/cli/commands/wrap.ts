@@ -40,3 +40,10 @@ export const wrapGemini = async (args: string[]): Promise<void> => {
 export const wrapOpencode = async (args: string[]): Promise<void> => {
   await runWrapped("opencode", args);
 };
+
+export const wrapPi = async (args: string[]): Promise<void> => {
+  // pi exports no telemetry of its own; what gets captured is read back out of
+  // the session file pi writes (ADR-132). The launch itself takes the same
+  // shared path as every other tool.
+  await runWrapped("pi", args);
+};

@@ -102,7 +102,14 @@ describe("given a source with ingested events", () => {
     ];
     renderTable({ fetchPage: fakeServer(events), pageSize: 10 });
 
-    const table = await screen.findByRole("table");
+    // Await a data row, not the table. The table element is present during the
+    // loading state too - it holds the skeleton rows - so `findByRole("table")`
+    // resolves before the fetch lands, and the synchronous `getAllByTestId`
+    // below then reads a body of `source-event-skeleton-row` and finds nothing.
+    // That is a race, not a slow machine: it failed in CI on exactly this line
+    // with the skeleton body in the dump, while passing locally every run.
+    await screen.findAllByTestId("source-event-row");
+    const table = screen.getByRole("table");
     for (const header of [
       "Time",
       "Type",
@@ -447,7 +454,11 @@ describe("given the pager can only honour what the cursor gives it", () => {
       makeEvent({ id: `e${i}`, ts: BASE_TS - i * 1000 }),
     );
     renderTable({ fetchPage: fakeServer(events), pageSize: 10 });
-    const table = await screen.findByRole("table");
+    // Same race as above: the table is on screen while the body is still
+    // skeletons, so awaiting it is not awaiting the page. The indicator text
+    // asserted below only says "showing 1-10" once a page has landed.
+    await screen.findAllByTestId("source-event-row");
+    const table = screen.getByRole("table");
 
     for (const header of within(table).getAllByRole("columnheader")) {
       expect(within(header).queryByRole("button")).toBeNull();

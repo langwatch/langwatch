@@ -30,6 +30,12 @@ import {
 	copilotPrespawnWarnings,
 } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
+import { createPiCapture, type PiCapture } from "./pi-capture";
+import {
+	crossProjectSessionsRoot,
+	explicitSessionFileFromArgs,
+	resolvePiSessionDir,
+} from "./pi-session-dir";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import {
 	maybeOfferIngestionShellRcPersist,
@@ -52,6 +58,93 @@ import {
  * runs, streaming each completed turn's I/O instead of one burst on exit.
  */
 const CODEX_IO_POLL_MS = 2_500;
+
+/**
+ * How often the wrapper re-reads pi's session file while the session runs.
+ *
+ * The same cadence as codex, and for the same reason: often enough that a turn
+ * appears in the product while the developer is still looking at it, rarely
+ * enough that a poll of a few appended lines is nothing next to the work pi is
+ * doing between them.
+ */
+const PI_SESSION_POLL_MS = 2_500;
+
+/**
+ * How long the exit path will wait for the final capture sweep before giving
+ * up on it.
+ *
+ * By the time the sweep runs, pi has exited and the user's shell is blocked on
+ * this process for its prompt. The post inside the sweep is bounded - the
+ * transport gives it five seconds - but the reader's `stat` and `read` are
+ * not, and an `fs` promise against a stalled network home directory never
+ * settles and cannot be cancelled once libuv holds it. Unbounded, a wedged
+ * mount would hold the terminal open forever over a capture that is
+ * explicitly allowed to fail.
+ *
+ * Ten seconds covers the legitimate case rather than being a guess: a tick's
+ * post with up to five seconds left to time out, then the sweep's own post
+ * with five of its own. Anything past that is not slow, it is stuck.
+ *
+ * Since {@link drainPiCapture} the sweep is a loop rather than one pass, so on
+ * a resumed session with a large unread prefix ten seconds is a budget rather
+ * than a ceiling the work is guaranteed to fit inside. That is the deliberate
+ * trade — the shell is waiting, and the bound the user pays must not grow with
+ * the size of a file they resumed — and running out of it is not silent: the
+ * timeout line below says the sweep was cut short and the unread-bytes line
+ * beside it says how much of the file went unread.
+ */
+const PI_FINAL_SWEEP_DEADLINE_MS = 10_000;
+
+/**
+ * Read every session file to its end, or until a pass stops making headway.
+ *
+ * One `harvest()` is not one file. The reader consumes a bounded window per
+ * file per pass — `pi-session-stream.ts:98` caps it at 8 MiB and
+ * `pi-session-stream.ts:319` takes `min(size, offset + cap)` — so a resumed
+ * session whose file carries a large historical prefix can spend a whole pass
+ * inside rows it has already seen. That pass emits nothing, posts nothing, and
+ * leaves the turns the user just produced sitting unread past the window. The
+ * single sweep this replaced would then exit on it, and the next run's row
+ * filter (`pi-capture.ts:238`, `event.timeUnixMs >= sinceMs`) is later than
+ * those turns, so nothing ever picks them up again.
+ *
+ * Why the loop cannot be driven by the event count: a window that lands
+ * entirely on history legitimately returns zero events while bytes remain, so
+ * "this pass emitted nothing" and "this file is finished" are different
+ * questions and only the second one ends a drain. {@link PiCapture.unreadBytes}
+ * answers the second directly, off the size each pass already stat'd.
+ *
+ * Why it cannot spin: a pass that fails to shrink the backlog ends it. That
+ * covers the cases where progress is impossible rather than slow — a file that
+ * became unreadable between the `stat` and the read, a window with no complete
+ * line in it — and also the case where progress is real but pi is still
+ * appending faster than we read, where stopping is the right answer anyway
+ * because the shell is already waiting on us.
+ *
+ * Deliberately NOT given a deadline of its own. It runs inside the existing
+ * race against PI_FINAL_SWEEP_DEADLINE_MS, which is what keeps the total bound
+ * the user pays unchanged; a second timer would silently double it.
+ *
+ * Exported for its own test rather than only through `runWrapped`. The property
+ * that matters most here is that it terminates, and a run through the wrapper
+ * cannot fail on a non-terminating loop: the deadline above would cut it off at
+ * ten seconds and the run would look merely slow. Driving it against a capture
+ * whose backlog never shrinks is the only arrangement in which a missing guard
+ * fails rather than hides.
+ */
+export async function drainPiCapture(capture: PiCapture): Promise<void> {
+	// Infinity rather than a first reading, so the first pass always runs. That
+	// is what makes this identical to the single `harvest()` it replaced on the
+	// common path: a file consumed to its end reports zero and the loop is over
+	// after one iteration.
+	let unread = Number.POSITIVE_INFINITY;
+	for (;;) {
+		await capture.harvest();
+		const remaining = capture.unreadBytes();
+		if (remaining === 0 || remaining >= unread) return;
+		unread = remaining;
+	}
+}
 
 /** Single-quote a string for safe interpolation into a `sh -c` command. */
 const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
@@ -770,6 +863,108 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		codexPoll.unref?.();
 	}
 
+	// pi ships no exporter at all, and its child is deliberately handed no
+	// endpoint and no token (ADR-132 revision v9), so its session file is not
+	// one capture path among several — it is the only one there is. Poll it
+	// while pi runs, on the same shape codex uses above.
+	//
+	// Started with NO test on `modeResult.mode`, unlike codex. pi ignores
+	// base-URL environment variables entirely (revision v10), so there is no
+	// gateway run of pi that a mode gate would be protecting from
+	// double-tracing: the condition would be true on every run today, and the
+	// day the policy changed it would turn all capture off in silence, for
+	// exactly the users holding keys. What capture actually needs is somewhere
+	// to post to, so that is what is checked — and it says so rather than going
+	// quiet, because pi has no second path to fall back on.
+	let piCapture: PiCapture | null = null;
+	let piPoll: ReturnType<typeof setInterval> | null = null;
+	// Two variables for one pass, because the tick and the exit sweep want
+	// different things from it: the tick only needs to know whether one is
+	// running, while the sweep has to be able to WAIT for it - see there for
+	// why.
+	//
+	// The promise is never null, and that is deliberate rather than tidy. Its
+	// only non-null assignment happens inside the tick callback, and
+	// control-flow analysis does not look inside callbacks: declared as
+	// `Promise<unknown> | null`, the compiler would follow the straight line
+	// from here to the sweep, see nothing but the initialiser, and narrow the
+	// variable to `null` - turning the sweep's wait into `await null` with no
+	// diagnostic beyond a lint rule. Starting from a resolved promise means
+	// there is no null to narrow to and the wait keeps its meaning; awaiting it
+	// when no tick has run is a no-op.
+	let piTickRunning = false;
+	let piInFlight: Promise<unknown> = Promise.resolve();
+	if (tool === "pi") {
+		if (modeResult.endpoint && modeResult.ingestionToken) {
+			// The working directory is not incidental here: with nothing moving
+			// pi's session directory, it is what names the folder pi writes
+			// into, and reading its parent finds only folders.
+			const piSessionsDir = await resolvePiSessionDir({
+				toolArgs,
+				env: process.env,
+				cwd: process.cwd(),
+			});
+			const capture = createPiCapture({
+				// Stamped before the spawn: a session file untouched since then is
+				// one this run never wrote to, and belongs to nobody's launch of ours.
+				sinceMs: sessionStartMs,
+				sessionsDir: piSessionsDir,
+				// A session named by path is opened where it lies rather than copied
+				// into the directory above, so it needs naming separately or it is
+				// never read. Empty when pi was given an id or nothing, because every
+				// id route ends inside that directory already.
+				sessionFiles: [
+					explicitSessionFileFromArgs({ toolArgs, cwd: process.cwd() }),
+				].filter((path): path is string => path !== null),
+				// A resume can pick another project's session, which pi then keeps
+				// writing where it already lives. Null on every other launch, which
+				// keeps capture to this project.
+				crossProjectSessionsRoot: await crossProjectSessionsRoot({
+					toolArgs,
+					env: process.env,
+					cwd: process.cwd(),
+					// The directory resolved above, so this decides whether to widen
+					// from the same place capture is watching rather than from a
+					// second reading of both settings files.
+					sessionsDir: piSessionsDir,
+				}),
+				// Events, never spans: a pi turn on both lanes would be counted twice.
+				logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
+				token: modeResult.ingestionToken,
+			});
+			piCapture = capture;
+			piPoll = setInterval(() => {
+				// Skip a tick while the previous pass is still running - and NOT for
+				// the reason the codex block gives. A codex harvest is stateless and
+				// its span ids are trace-id-derived, so overlap there merely wastes a
+				// request. Two pi passes that interleave both read the same byte range
+				// and both run `cursor.offset += complete.length`
+				// (`pi-session-stream.ts:210`), leaving the offset a whole chunk past
+				// the end of the file. Nothing is sent twice - the seen-set stops that
+				// - but every append after it is skipped until the file happens to
+				// shrink and the cursor resets to zero. It heals itself, silently,
+				// having lost the turns in between.
+				if (piTickRunning) return;
+				piTickRunning = true;
+				piInFlight = capture
+					.harvest()
+					.catch(() => 0)
+					.finally(() => {
+						piTickRunning = false;
+					});
+			}, PI_SESSION_POLL_MS);
+			// Same as codex: the child drives the lifecycle, so the timer must never
+			// be the thing keeping the process alive.
+			piPoll.unref?.();
+		} else {
+			process.stderr.write(
+				`${lwTag()} pi session capture is off for this run: no ingestion ` +
+					`endpoint or key was resolved, and pi has no other way to reach ` +
+					`LangWatch. Nothing from this session will be recorded.\n`,
+			);
+		}
+	}
+
 	let child;
 	if (aliasShell) {
 		const reapply = buildShellReapply({
@@ -817,6 +1012,115 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			await codexStreamer.harvest(Date.now());
 		} catch {
 			/* content recovery is non-essential; never block exit on it */
+		}
+	}
+
+	// Same for pi: the turns written between the last tick and exit are the ones
+	// the user just produced, so the final sweep is where a short session lands
+	// in full. `harvest` resolves on a failed post rather than throwing, and the
+	// try is here anyway - a coding session must never fail on capture.
+	if (piPoll) clearInterval(piPoll);
+	if (piCapture) {
+		// Abandoning the sweep has to be said out loud. A turn the deadline
+		// interrupts is already off the pending list and on the wire, so it is
+		// counted as neither pending nor dropped - the loss report below is
+		// blind to it and would print nothing at all. Silence there is the same
+		// undercount the report exists to prevent, arriving through a different
+		// door.
+		let sweepTimedOut = false;
+		try {
+			// `clearInterval` stops future ticks; it does not stop the pass a tick
+			// already started, and one may have begun up to a poll interval ago
+			// with a post that has five seconds to time out. Everything below
+			// this line assumes that pass is finished. The sweep shares the
+			// reader's cursors with it, so two passes inside `stream.read` on the
+			// same file both advance the same offset over the same bytes and
+			// re-key the same rows past the seen-set - duplicate turns, on a fold
+			// whose sums commute and cannot collapse them. And the report that
+			// follows reads counters the running pass has not written yet, so it
+			// would announce a clean exit and then `process.exit` out from under
+			// the post still carrying those turns. Silence about a real loss, at
+			// the exact moment the loss is the user's last turns.
+			// Bounded, because everything below is owed to a shell that is
+			// already waiting. See PI_FINAL_SWEEP_DEADLINE_MS. Losing the last
+			// turns is bad; wedging the user's terminal to avoid losing them is
+			// worse. What the deadline costs is reported by `sweepTimedOut`
+			// above, and it has to be, because the pending count alone does not
+			// cover it.
+			//
+			// The deadline timer is deliberately not `unref`'d. If the sweep is
+			// stuck on something that does not itself hold the event loop, an
+			// unreferenced timer would let node fall off the end and exit 0 on
+			// its own, skipping both the report and the `process.exit(exitCode)`
+			// below - handing the shell a success it did not earn.
+			let sweepDeadline: ReturnType<typeof setTimeout> | undefined;
+			try {
+				await Promise.race([
+					(async () => {
+						// Resolved already when no tick is running, so this is a no-op
+						// in the common case and a real wait in the one that matters.
+						await piInFlight;
+						await drainPiCapture(piCapture);
+					})(),
+					new Promise<void>((resolve) => {
+						// No `.unref()` here, unlike both intervals in this function
+						// and every other deadline timer in the CLI. That is the whole
+						// point, not an oversight - see the paragraph above before
+						// adding one.
+						sweepDeadline = setTimeout(() => {
+							sweepTimedOut = true;
+							resolve();
+						}, PI_FINAL_SWEEP_DEADLINE_MS);
+					}),
+				]);
+			} finally {
+				if (sweepDeadline) clearTimeout(sweepDeadline);
+			}
+		} catch {
+			/* capture is non-essential; never block exit on it */
+		}
+		// Say what was lost. Turns held back after the final sweep are turns the
+		// reader will not offer again, so silence here would be an undercount the
+		// user could never account for.
+		// Turns discarded on overflow count too, and separately: those were lost
+		// mid-session rather than at exit, so a user reading only the pending
+		// figure would think a long outage cost them one pass.
+		if (sweepTimedOut) {
+			process.stderr.write(
+				`${lwTag()} pi session capture did not finish in ` +
+					`${Math.round(PI_FINAL_SWEEP_DEADLINE_MS / 1_000)}s and was ` +
+					`abandoned so this shell could exit; the last turns of this ` +
+					`session may not have been recorded.\n`,
+			);
+		}
+		// Reported independently of the line above, and both can be true: the
+		// deadline says the sweep was cut short, this says what was still held
+		// when it was.
+		const undelivered = piCapture.pendingCount() + piCapture.droppedCount();
+		if (undelivered > 0) {
+			process.stderr.write(
+				`${lwTag()} ${undelivered} pi turn${undelivered === 1 ? "" : "s"} ` +
+					`could not be sent to LangWatch and were not recorded.\n`,
+			);
+		}
+		// A third, independent thing that can be true, and the only one of the
+		// three the counters above cannot see. Pending and dropped both count
+		// events the reader already produced; this counts the file it never got
+		// to, which has produced no events at all. A drain that ended with bytes
+		// left — because the deadline cut it off, or because a pass stopped
+		// making headway — has left the user's last turns on disk, and they are
+		// not deferred to the next run: `readTurnsSince` keeps only rows at or
+		// after that run's start (`pi-capture.ts:238`), and these are older than
+		// it by then. Saying nothing here would rebuild the exact silent loss
+		// this drain was added to close, one door along.
+		const unread = piCapture.unreadBytes();
+		if (unread > 0) {
+			process.stderr.write(
+				`${lwTag()} pi session capture stopped ${unread} byte` +
+					`${unread === 1 ? "" : "s"} short of the end of this session's ` +
+					`file; the turns in that remainder were not read and will not be ` +
+					`recorded.\n`,
+			);
 		}
 	}
 

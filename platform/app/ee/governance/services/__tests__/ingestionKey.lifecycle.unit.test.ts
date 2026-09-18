@@ -50,6 +50,10 @@ import {
   IngestionKeySourceNotAllowedError,
 } from "../ingestionKey.errors";
 import { IngestionKeyService } from "../ingestionKey.service";
+import {
+  CODING_AGENT_ORIGIN_VALUE,
+  originForIngestSourceType,
+} from "../ingestKeyProvenance.utils";
 
 const USER = "user_1";
 const ORG = "org_1";
@@ -150,6 +154,28 @@ describe("IngestionKeyService", () => {
 
         expect(workspace.findExisting).not.toHaveBeenCalled();
         expect(apiKeys.create).not.toHaveBeenCalled();
+      });
+
+      // pi (ADR-132) is captured from its session file rather than from an
+      // exporter, but the capture still POSTs under an ingest key, and the
+      // personal mint is the only route the CLI has to one. Both halves are
+      // asserted together because either alone leaves the capture broken:
+      // a refused mint means no key, and a key stamped `ai_tool` means the
+      // session never appears among the coding agents.
+      it("mints a pi key and stamps it as a coding agent", async () => {
+        const issued = await service.mint({
+          userId: USER,
+          organizationId: ORG,
+          sourceType: "pi",
+          parentApiKeyId: LOGIN_KEY,
+          createdByDeviceLabel: "laptop",
+        });
+
+        expect(issued.sourceType).toBe("pi");
+        expect(apiKeys.create).toHaveBeenCalledWith(
+          expect.objectContaining({ ingestSourceType: "pi", userId: USER }),
+        );
+        expect(originForIngestSourceType("pi")).toBe(CODING_AGENT_ORIGIN_VALUE);
       });
     });
 

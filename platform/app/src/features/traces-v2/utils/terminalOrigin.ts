@@ -28,6 +28,17 @@ const CODING_AGENT_SERVICE_MARKERS = [
 ] as const;
 
 /**
+ * Service names matched WHOLE rather than as substrings. `pi` is here and not
+ * in the list above because two letters are not a marker: as a substring it
+ * hits `my-api`, `pipeline-worker`, `spider` and every other service with
+ * those letters anywhere in its name. Permissive is the house style for this
+ * predicate, but permissive means "a real coding agent under an unexpected
+ * name", not "any service at all". pi's wrapper stamps exactly `pi`
+ * (`agents/pi.ts`), so the whole-string test loses nothing.
+ */
+const CODING_AGENT_SERVICE_NAMES = ["pi"] as const;
+
+/**
  * True when the trace looks like a coding-agent terminal session. Any one of:
  * the service is a known coding-agent CLI, the origin is a coding agent, or a
  * `terminal.type` was reported at all (that attribute is only set by a
@@ -40,6 +51,7 @@ export function isTerminalOrigin(signals: TerminalOriginSignals): boolean {
   if (CODING_AGENT_SERVICE_MARKERS.some((marker) => service.includes(marker))) {
     return true;
   }
+  if (CODING_AGENT_SERVICE_NAMES.some((name) => service === name)) return true;
   if ((signals.origin ?? "") === "coding_agent") return true;
   const terminalType = (signals.terminalType ?? "").trim();
   if (terminalType.length > 0) return true;

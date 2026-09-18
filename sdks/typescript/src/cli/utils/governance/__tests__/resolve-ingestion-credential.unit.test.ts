@@ -221,5 +221,72 @@ describe("resolveIngestionCredential", () => {
 			expect(out.projectLabel).toBeUndefined();
 			expect(out.token).toBe("ik-lw-fresh00000000000_secret");
 		});
+
+		/**
+		 * The mint response advertises the server's own canonical base URL,
+		 * which is not always the URL this login reaches it on — a reverse
+		 * proxy, a port-forward, a tunnel, or a local dev stack all leave the
+		 * two different. Both cache branches derive the endpoint from
+		 * `control_plane_url`, so honouring the server here sent the minting
+		 * run, and only the minting run, somewhere else: observed against a
+		 * local stack as a TLS failure that silently lost every captured turn
+		 * of run one, with run two delivering fine off the cached key.
+		 *
+		 * The test above cannot catch that: it mocks the advertised endpoint
+		 * as the same host the config already names, so agreement there proves
+		 * nothing. This one makes the two disagree.
+		 */
+		it("ignores a mint endpoint that disagrees with the logged-in host", async () => {
+			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+				token: "ik-lw-fresh00000000000_secret",
+				prefix: "ik-lw-fres",
+				endpoint: "https://canonical.example.com/api/otel",
+			});
+
+			const out = await resolveIngestionCredential({
+				cfg: baseCfg({ control_plane_url: "http://127.0.0.1:49958" }),
+				tool: "codex",
+				sourceType: "codex",
+			});
+
+			expect(out.minted).toBe(true);
+			expect(out.endpoint).toBe("http://127.0.0.1:49958/api/otel");
+			expect(out.endpoint).not.toContain("canonical.example.com");
+		});
+
+		/**
+		 * The point of the fix is that run one and run two agree. Asserting the
+		 * minted endpoint alone would still pass if the cache branch drifted.
+		 */
+		it("resolves the same endpoint whether the key is minted or cached", async () => {
+			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+				token: "ik-lw-fresh00000000000_secret",
+				prefix: "ik-lw-fres",
+				endpoint: "https://canonical.example.com/api/otel",
+			});
+			(cliApi.listIngestionKeys as ReturnType<typeof vi.fn>).mockResolvedValue([
+				{ sourceType: "codex", lookupId: "cachedlookupid" },
+			]);
+
+			const minted = await resolveIngestionCredential({
+				cfg: baseCfg({ control_plane_url: "http://127.0.0.1:49958" }),
+				tool: "codex",
+				sourceType: "codex",
+			});
+			const cached = await resolveIngestionCredential({
+				cfg: baseCfg({
+					control_plane_url: "http://127.0.0.1:49958",
+					default_personal_ingest_keys: {
+						codex: { secret: "ik-lw-cachedlookupid_secret" },
+					},
+				}),
+				tool: "codex",
+				sourceType: "codex",
+			});
+
+			expect(minted.minted).toBe(true);
+			expect(cached.minted).toBe(false);
+			expect(minted.endpoint).toBe(cached.endpoint);
+		});
 	});
 });

@@ -42,7 +42,11 @@ import prompts from "prompts";
 import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
-import { copilotSeatBypassSuffix, type WrapperMode } from "./wrapper-mode";
+import {
+  copilotSeatBypassSuffix,
+  ingestionOnlyNotice,
+  type WrapperMode,
+} from "./wrapper-mode";
 import {
   resolvePlatformToolPolicy,
   type PlatformToolPolicyMap,
@@ -369,6 +373,17 @@ export async function resolveWrapperPath(
     return { mode: "gateway", prompted: false };
   }
   if (!allowGateway && allowOtlp) {
+    // Say so. This branch is the ordinary launch for an ingestion-only tool,
+    // and its result is handed to resolveWrapperMode as a FORCED mode — so by
+    // the time that function's downgrade branch is evaluated the mode is
+    // already "ingestion" and the branch cannot run. Its notice never printed
+    // here. The copilot write directly above exists for the same reason in the
+    // opposite direction (ADR-039 D3); this is that seam's other half.
+    //
+    // Reached only when nothing is pinned: an explicit --tool-mode=gateway or
+    // a saved gateway preference returns earlier, and those runs DO get the
+    // downgrade branch's notice, from the same shared sentence.
+    writeImpl(`${ingestionOnlyNotice(tool, cfg.tool_policies)}\n`);
     return { mode: "ingestion", prompted: false };
   }
   if (!allowGateway && !allowOtlp) {

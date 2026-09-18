@@ -16,6 +16,7 @@ export const ASSISTANT_KINDS = [
   "opencode",
   "cursor",
   "github_copilot",
+  "pi",
   "custom",
 ] as const;
 
@@ -73,6 +74,25 @@ export const ASSISTANT_PRESETS: Record<
     label: "GitHub Copilot",
     iconUrl: "/images/external-icons/github-copilot.svg",
     darkModeInvert: true,
+  },
+  // The real mark, which this entry previously lacked. It is the logo pi's own
+  // README renders, fetched from the address that README points at
+  // (https://pi.dev/logo-auto.svg) and checked byte-for-byte against what we
+  // ship. pi is MIT, published as @earendil-works/pi-coding-agent from
+  // github.com/earendil-works/pi, so redistributing it is on the same footing
+  // as every other vendor mark in this folder. Brand-coloured, so it stays
+  // legible on both themes and does not want the dark-mode invert.
+  //
+  // ADR-132 v13, which reverses rung 18.3. That rung settled "no asset added …
+  // we hold no license to redistribute one", and the licence half of it was an
+  // assumption rather than a finding. The tell that misled it is worth keeping:
+  // the npm package does not contain the logo, so searching the installed
+  // package returns nothing and reads as proof no mark is available. It only
+  // means the mark is not shipped with the code.
+  pi: {
+    label: "pi",
+    iconUrl: "/images/external-icons/pi.svg",
+    darkModeInvert: false,
   },
 };
 

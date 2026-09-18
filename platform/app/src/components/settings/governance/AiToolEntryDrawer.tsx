@@ -841,6 +841,23 @@ function CliPathsSection({
   setForm: (f: FormState) => void;
 }) {
   const cursorOnly = form.assistantKind === "cursor";
+  // The server forces this off whatever the tile stores
+  // (resolveToolPolicyOverrides), so show that rather than a switch an admin
+  // can turn on to no effect. Same shape as the cursor case on the
+  // direct-ingestion row below.
+  //
+  // Not a claim that pi CANNOT be routed. Two ways exist and both were run
+  // against pi: PI_CODING_AGENT_DIR relocates pi's whole agent directory, and
+  // AZURE_OPENAI_BASE_URL beats a model's own baseUrl on the Azure lane. What
+  // pi ignores is narrower than it looks: OPENAI_BASE_URL and
+  // ANTHROPIC_BASE_URL only, both hardcoded past in pi-ai's provider files.
+  //
+  // We decline on cost, not ability. PI_CODING_AGENT_DIR moves auth.json and
+  // settings.json with models.json, so redirecting pi would shadow the user's
+  // own sign-in. langy accepts that cost inside its own sandbox
+  // (services/langyworker/src/models.ts); the langwatch CLI runs against the
+  // user's real install and does not. ADR-132 §Invariants.
+  const isIngestionOnly = form.assistantKind === "pi";
   return (
     <FormSection
       label="CLI paths"
@@ -851,11 +868,14 @@ function CliPathsSection({
           <VStack align="start" gap={0}>
             <Text fontSize="sm">Allow gateway (virtual key)</Text>
             <Text fontSize="xs" color="fg.muted">
-              Route through the LangWatch gateway with a personal virtual key.
+              {isIngestionOnly
+                ? "Routing pi would hide your own pi sign-in, so we read its session file instead."
+                : "Route through the LangWatch gateway with a personal virtual key."}
             </Text>
           </VStack>
           <Switch
-            checked={form.allowVk}
+            checked={isIngestionOnly ? false : form.allowVk}
+            disabled={isIngestionOnly}
             onCheckedChange={({ checked }) =>
               setForm({ ...form, allowVk: checked })
             }

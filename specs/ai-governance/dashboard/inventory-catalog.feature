@@ -57,6 +57,20 @@ Feature: The Inventory catalog is the tools the organization runs
     Then a card for that tool is on screen
     And it carries the tool's own name and the vendor it comes from
 
+  # The picker and the catalog are two lists that have to agree, and nothing
+  # made them. A coding assistant offered in the tile but absent from the
+  # catalog's per-tool maps still registered and still rendered — as a card with
+  # no maker and no payment rows, for a tool whose maker and billing model were
+  # both perfectly well known. pi shipped that way. Keying the maps on the
+  # assistant kind now makes an outright omission a compile error; this covers
+  # what typing cannot see, which is an entry that is present and empty.
+  @unit
+  Scenario: Every assistant the picker offers carries a maker and a billing model
+    Given the coding assistants the tool tile offers to register
+    When each one's catalog card is read
+    Then every card names a maker rather than a blank or "Vendor not recorded"
+    And every card states a billing model rather than leaving it unknown
+
   @integration
   Scenario: The catalog lists registered tools and not ingestion sources
     Given the organization has connected sources and registered tools
