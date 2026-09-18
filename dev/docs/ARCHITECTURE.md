@@ -598,8 +598,17 @@ replaces them.
 
 **Secrets are the sibling package, and a secret is a value you may only
 pass through** (approved 2026-09-18). A module declares its handles beside
-its config (`Secret.define`, env spellings, optionality); the app builds
-only the READER — a fluent adapter chain built from a handed-in builder,
+its config — `Secret.define({ privateKey: Secret.load("GITHUB_APP_PRIVATE_KEY") })`
+— where **`Secret.load(id)` takes ONE identifier every adapter interprets
+for itself**: the env adapter reads the variable of that name, the
+1Password adapter reads that key in the vault's dictionary (config, by
+contrast, always reads the environment). **Global concerns declare the
+same way at their framework owner** — logging and telemetry are
+everyone-sends-to-one-place concerns, so the process-server and
+observability packages declare their config slices and secret handles
+exactly as a module does, and the preamble order (config → secrets →
+telemetry) is what makes a logging credential resolvable the moment
+telemetry initializes. The app builds only the READER — a fluent adapter chain built from a handed-in builder,
 `.withSecrets((config, secrets) => secrets.withEnv().withFile()
 .withOnePassword(...))` — installed on the Server preamble AFTER
 `withConfig`, so config can feed secrets (the 1Password vault key is a
