@@ -7,6 +7,7 @@ import type { S3Client } from "@aws-sdk/client-s3";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import {
   DatasetApi,
+  DatasetNotFoundError,
   type DatasetNormalizePayload,
   type AbortPendingUploadInput,
   type BatchEvaluationRecord,
@@ -263,6 +264,19 @@ export class DatasetApp implements DatasetApi {
     return this.#datasets.getBySlugOrId(input);
   }
 
+  /** One dataset by slug or id when the selection may no longer exist. */
+  async findBySlugOrId(input: DatasetLookupInput): Promise<Dataset | null> {
+    try {
+      return await this.#datasets.getBySlugOrId(input);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) {
+        return null;
+      }
+
+      throw error;
+    }
+  }
+
   /** Several datasets by id, for the references an evaluation names. */
   getByIds(input: { projectId: string; datasetIds: string[] }): Promise<Dataset[]> {
     return this.#datasets.getByIds(input);
@@ -344,6 +358,19 @@ export class DatasetApp implements DatasetApi {
   /** One page of a dataset's records, plus the authoritative total. */
   getDatasetPage(input: DatasetPageInput): Promise<DatasetPage> {
     return this.#datasets.getDatasetPage(input);
+  }
+
+  /** One records page when its dataset may have been archived or deleted. */
+  async findDatasetPage(input: DatasetPageInput): Promise<DatasetPage | null> {
+    try {
+      return await this.#datasets.getDatasetPage(input);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) {
+        return null;
+      }
+
+      throw error;
+    }
   }
 
   /** The first entries plus the authoritative total, for previews. */

@@ -3,7 +3,12 @@
  * Incomplete upserts can arrive, copy reads a second project (authorization
  * gap), services stubbed. HTTP/tRPC testing is elsewhere.
  */
-import type { Dataset } from "@langwatch/dataset-contract";
+import {
+  DatasetNotFoundError,
+  datasetPageSchema,
+  type Dataset,
+  type DatasetPage,
+} from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { DatasetService } from "../../services/dataset.service.ts";
@@ -43,6 +48,11 @@ function harness({
   if (datasetService.getDatasetWithRecords) {
     vi.spyOn(DatasetService.prototype, "getDatasetWithRecords").mockImplementation(
       datasetService.getDatasetWithRecords,
+    );
+  }
+  if (datasetService.getDatasetPage) {
+    vi.spyOn(DatasetService.prototype, "getDatasetPage").mockImplementation(
+      datasetService.getDatasetPage,
     );
   }
 
@@ -266,6 +276,118 @@ describe("DatasetApp", () => {
       });
 
       expect(firstCall(dataset.getDatasetWithRecords).limitMb).toBe(25);
+    });
+  });
+
+  describe("when a selected dataset may have been removed", () => {
+    it("returns the found dataset without changing it", async () => {
+      const { app } = harness();
+
+      await expect(
+        app.findBySlugOrId({ projectId: "project-1", slugOrId: "original" }),
+      ).resolves.toBe(replacing);
+    });
+
+    /** @scenario "An optional dataset lookup reports an unavailable selection" */
+    it("returns null when the service reports an unavailable selection", async () => {
+      const { app } = harness({
+        dataset: {
+          getBySlugOrId: vi.fn(async () => {
+            throw new DatasetNotFoundError();
+          }),
+        },
+      });
+
+      await expect(
+        app.findBySlugOrId({ projectId: "project-1", slugOrId: "gone" }),
+      ).resolves.toBeNull();
+    });
+
+    /** @scenario "An optional dataset lookup reports an unavailable selection" */
+    it("keeps an unexpected lookup failure observable", async () => {
+      const unexpected = new Error("database unavailable");
+      const { app } = harness({
+        dataset: {
+          getBySlugOrId: vi.fn(async () => {
+            throw unexpected;
+          }),
+        },
+      });
+
+      await expect(
+        app.findBySlugOrId({ projectId: "project-1", slugOrId: "original" }),
+      ).rejects.toBe(unexpected);
+    });
+  });
+
+  describe("when a selected dataset page may have been removed", () => {
+    /** @scenario "An optional dataset page reports an unavailable selection" */
+    it("returns a found page without changing its rows or count", async () => {
+      const page: DatasetPage = datasetPageSchema.parse({
+        id: "dataset-1",
+        name: "Golden set",
+        columnTypes: [{ name: "input", type: "string" }],
+        datasetRecords: [
+          {
+            id: "record-2",
+            datasetId: "dataset-1",
+            projectId: "project-1",
+            entry: { input: "second" },
+            createdAt: new Date(0),
+            updatedAt: new Date(0),
+          },
+          {
+            id: "record-1",
+            datasetId: "dataset-1",
+            projectId: "project-1",
+            entry: { input: "first" },
+            createdAt: new Date(0),
+            updatedAt: new Date(0),
+          },
+        ],
+        count: 5,
+        page: 2,
+        limit: 2,
+        totalPages: 3,
+      });
+      const { app } = harness({
+        dataset: { getDatasetPage: vi.fn(async (): Promise<DatasetPage> => page) },
+      });
+
+      await expect(
+        app.findDatasetPage({ projectId: "project-1", slugOrId: "original", page: 2, limit: 2 }),
+      ).resolves.toBe(page);
+    });
+
+    /** @scenario "An optional dataset page reports an unavailable selection" */
+    it("returns null when the page service reports an unavailable dataset", async () => {
+      const { app } = harness({
+        dataset: {
+          getDatasetPage: vi.fn(async () => {
+            throw new DatasetNotFoundError();
+          }),
+        },
+      });
+
+      await expect(
+        app.findDatasetPage({ projectId: "project-1", slugOrId: "gone", page: 1, limit: 50 }),
+      ).resolves.toBeNull();
+    });
+
+    /** @scenario "An optional dataset page reports an unavailable selection" */
+    it("keeps an unexpected page failure observable", async () => {
+      const unexpected = new Error("record store unavailable");
+      const { app } = harness({
+        dataset: {
+          getDatasetPage: vi.fn(async () => {
+            throw unexpected;
+          }),
+        },
+      });
+
+      await expect(
+        app.findDatasetPage({ projectId: "project-1", slugOrId: "original", page: 1, limit: 50 }),
+      ).rejects.toBe(unexpected);
     });
   });
 });

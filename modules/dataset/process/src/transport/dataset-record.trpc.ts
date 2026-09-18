@@ -5,7 +5,7 @@
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { DatasetApi, DatasetNotFoundError, datasetRecordTrpc } from "@langwatch/dataset-contract";
+import { DatasetApi, datasetRecordTrpc } from "@langwatch/dataset-contract";
 
 /**
  * The editor asks for a wider window than the 5 MB default (~3 rows of
@@ -50,21 +50,14 @@ export const datasetRecordTrpcTransport = defineTrpcRouter(DatasetApi, datasetRe
 
   .procedure("listPaginated")
   .withPermission("datasets:view")
-  .handle(async ({ app, input }) => {
-    try {
-      return await app.getDatasetPage({
-        slugOrId: input.datasetId,
-        projectId: input.projectId,
-        page: input.page,
-        limit: input.limit,
-      });
-    } catch (error) {
-      // Parity with getAll: an archived or missing dataset reads as null, so
-      // the editor surfaces "no longer available" rather than a failure.
-      if (error instanceof DatasetNotFoundError) return null;
-      throw error;
-    }
-  })
+  .handle(async ({ app, input }) =>
+    app.findDatasetPage({
+      slugOrId: input.datasetId,
+      projectId: input.projectId,
+      page: input.page,
+      limit: input.limit,
+    }),
+  )
 
   .procedure("download")
   .withPermission("datasets:view")

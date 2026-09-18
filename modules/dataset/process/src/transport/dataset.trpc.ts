@@ -5,7 +5,7 @@
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { DatasetApi, DatasetNotFoundError, datasetTrpc } from "@langwatch/dataset-contract";
+import { DatasetApi, datasetTrpc } from "@langwatch/dataset-contract";
 
 export const datasetTrpcTransport = defineTrpcRouter(DatasetApi, datasetTrpc)
   .procedure("upsert")
@@ -38,19 +38,12 @@ export const datasetTrpcTransport = defineTrpcRouter(DatasetApi, datasetTrpc)
 
   .procedure("getById")
   .withPermission("datasets:view")
-  .handle(async ({ app, input }) => {
-    try {
-      return await app.getBySlugOrId({
-        projectId: input.projectId,
-        slugOrId: input.datasetId,
-      });
-    } catch (error) {
-      // An archived or missing dataset reads as an empty selection rather than
-      // failing the page that asked for it.
-      if (error instanceof DatasetNotFoundError) return null;
-      throw error;
-    }
-  })
+  .handle(async ({ app, input }) =>
+    app.findBySlugOrId({
+      projectId: input.projectId,
+      slugOrId: input.datasetId,
+    }),
+  )
 
   .procedure("deleteById")
   .withPermission("datasets:delete")

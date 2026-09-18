@@ -75,6 +75,20 @@ Feature: Shared Dataset service
     Then the transport refuses it as a client precondition failure
     And it does not report a server fault
 
+  @unit
+  Scenario: An optional dataset lookup reports an unavailable selection
+    Given a dataset lookup that the service says is unavailable
+    When the get-by-id transport reads that selection
+    Then it answers null
+    And it preserves found values and unexpected failures
+
+  @unit
+  Scenario: An optional dataset page reports an unavailable selection
+    Given a dataset page lookup that the service says is unavailable
+    When the paginated-records transport reads that selection
+    Then it answers null
+    And it preserves found rows, ordering, totals, and unexpected failures
+
   Rule: The Datasets pages are served from the browser application
 
     # Both pages moved out of platform/app with the family. What the application

@@ -48,6 +48,7 @@ export interface DatasetApi {
   findNextAvailableName(input: DatasetNameInput): Promise<string>;
   listDatasets: (input: ListDatasetsInput) => Promise<DatasetListResult>;
   getBySlugOrId(input: DatasetLookupInput): Promise<Dataset>;
+  findBySlugOrId(input: DatasetLookupInput): Promise<Dataset | null>;
   updateMapping(input: {
     datasetId: string;
     projectId: string;
@@ -70,6 +71,7 @@ export interface DatasetApi {
     },
   ) => Promise<DatasetWithRecords>;
   getDatasetPage(input: DatasetPageInput): Promise<DatasetPage>;
+  findDatasetPage(input: DatasetPageInput): Promise<DatasetPage | null>;
   getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead>;
   listRecords: (input: DatasetPageInput) => Promise<DatasetRecordPage>;
   batchCreateRecords: (input: CreateDatasetRecordsInput) => Promise<DatasetRecord[]>;

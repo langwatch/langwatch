@@ -6,8 +6,9 @@ import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc"
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   batchRecordTrpc,
-  DatasetNotFoundError,
   DatasetNotReadyError,
+  datasetPageSchema,
+  datasetSchema,
   datasetRecordTrpc,
   datasetTrpc,
   type DatasetApi,
@@ -156,13 +157,48 @@ describe("the dataset tRPC declaration", () => {
   });
 
   describe("when the dataset a read names is archived or missing", () => {
+    it("preserves a found dataset's fields", async () => {
+      const found = datasetSchema.parse({
+        id: "dataset-1",
+        projectId: "project-1",
+        name: "Golden set",
+        slug: "golden-set",
+        columnTypes: [{ name: "input", type: "string" }],
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+        archivedAt: null,
+        mapping: null,
+        useS3: false,
+        s3RecordCount: null,
+        contentLayout: "postgres",
+        status: "ready",
+        statusError: null,
+        stagingKey: null,
+        uploadFilename: null,
+        rowCount: null,
+        sizeBytes: null,
+        chunkCount: null,
+        chunkOffsets: null,
+      });
+      const handlers = callable(
+        datasetTrpcTransport,
+        completeDatasetApi({ findBySlugOrId: vi.fn(async () => found) }),
+      );
+
+      await expect(
+        handlers.getById!({
+          ...invocation,
+          input: { projectId: "project-1", datasetId: "golden-set" },
+        }),
+      ).resolves.toBe(found);
+    });
+
     it("reads as null rather than failing the page", async () => {
+      const findBySlugOrId = vi.fn(async () => null);
       const handlers = callable(
         datasetTrpcTransport,
         completeDatasetApi({
-          getBySlugOrId: async () => {
-            throw new DatasetNotFoundError();
-          },
+          findBySlugOrId,
         }),
       );
 
@@ -172,15 +208,15 @@ describe("the dataset tRPC declaration", () => {
           input: { projectId: "project-1", datasetId: "gone" },
         }),
       ).resolves.toBeNull();
+      expect(findBySlugOrId).toHaveBeenCalledWith({ projectId: "project-1", slugOrId: "gone" });
     });
 
     it("reads a missing paged dataset as null so the editor can say so", async () => {
+      const findDatasetPage = vi.fn(async () => null);
       const handlers = callable(
         datasetRecordTrpcTransport,
         completeDatasetApi({
-          getDatasetPage: async () => {
-            throw new DatasetNotFoundError();
-          },
+          findDatasetPage,
         }),
       );
 
@@ -190,20 +226,67 @@ describe("the dataset tRPC declaration", () => {
           input: { projectId: "project-1", datasetId: "gone", page: 1, limit: 50 },
         }),
       ).resolves.toBeNull();
+      expect(findDatasetPage).toHaveBeenCalledWith({
+        projectId: "project-1",
+        slugOrId: "gone",
+        page: 1,
+        limit: 50,
+      });
+    });
+
+    it("preserves a found page's rows, ordering, and count", async () => {
+      const page = datasetPageSchema.parse({
+        id: "dataset-1",
+        name: "Golden set",
+        columnTypes: [{ name: "input", type: "string" }],
+        datasetRecords: [
+          {
+            id: "record-2",
+            datasetId: "dataset-1",
+            projectId: "project-1",
+            entry: { input: "second" },
+            createdAt: new Date(0),
+            updatedAt: new Date(0),
+          },
+          {
+            id: "record-1",
+            datasetId: "dataset-1",
+            projectId: "project-1",
+            entry: { input: "first" },
+            createdAt: new Date(0),
+            updatedAt: new Date(0),
+          },
+        ],
+        count: 5,
+        page: 2,
+        limit: 2,
+        totalPages: 3,
+      });
+      const handlers = callable(
+        datasetRecordTrpcTransport,
+        completeDatasetApi({ findDatasetPage: vi.fn(async () => page) }),
+      );
+
+      await expect(
+        handlers.listPaginated!({
+          ...invocation,
+          input: { projectId: "project-1", datasetId: "golden-set", page: 2, limit: 2 },
+        }),
+      ).resolves.toBe(page);
     });
   });
 
   describe("when the dataset a record call names is still being prepared", () => {
     /** @scenario "A still-preparing dataset refuses record reads and writes" */
     it("lets the refusal through as a client precondition failure", async () => {
-      const notReady = () => {
+      const notReady = async (): Promise<never> => {
         throw new DatasetNotReadyError({ status: "processing" });
       };
       const handlers = callable(
         datasetRecordTrpcTransport,
         completeDatasetApi({
-          getDatasetPage: notReady as never,
-          batchCreateRecords: notReady as never,
+          findDatasetPage: notReady,
+          batchCreateRecords: notReady,
         }),
       );
       const input = { projectId: "project-1", datasetId: "dataset-1" };
