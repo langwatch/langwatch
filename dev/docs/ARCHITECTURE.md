@@ -1036,6 +1036,32 @@ invented:
   by modules only through their declared `*HostApi`. Ambient React context is
   never a cross-module transport; modules never import a vendor (posthog,
   router, theme) directly.
+- **An unmounted host is refused at install, not thrown at render** (ruled
+  2026-09-18). A screen declares a `*HostApi`; if nothing mounts it, `createUi`
+  refuses by name — the same way the kernel already refuses a screen name two
+  modules claim, and in the same pass, **before a component renders** (§10).
+
+  The measurement that forced it: **35 of 39 `*HostProvider`s had no production
+  mount at all.** Every one is exported from its package barrel, ready, and
+  nobody mounts it. The failure that surfaced it was `auth`: loading `/`
+  redirected to `/auth/signin`, which threw `AuthHostUnavailableError` from
+  `usePublicEnv` and rendered "This page did not load". Auth was not special —
+  it was the screen someone happened to open.
+
+  The defect is not the missing mount, which is ordinary unfinished work. The
+  defect is that **nothing said so**: a seam declared across 39 packages and
+  implemented in 4 read as healthy, and each one waits to fail until a customer
+  navigates to it. A refusal that names the module and the host turns 35 latent
+  runtime crashes into one boot error with a list.
+
+  The shape to mount is the one that already works, which is why the capability
+  slot below is the mechanism rather than a second idea:
+
+  ```tsx
+  // packages/ui-kernel/src/ui-feature-shell.tsx — the only mount pattern
+  <UiScopeHostProvider value={resolved.scope?.scopeHost()}>
+  ```
+
 - **A capability travels by declaration** (ruled 2026-09-18). `defineWebModule`
   carries a capability slot, and the composition root reaches a module's
   capability implementation through `./declaration` like everything else:
