@@ -65,14 +65,19 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 	return problems, nil
 }
 
-// prReviewBotGates checks the three skip clauses are still present in some
-// job's `if:` condition.
+// prReviewBotReviewJob is the workflow's single job. The skip clauses live on
+// its `if:`; a guard that joined every job's `if:` would keep passing after a
+// clause drifted onto some unrelated job, so the check reads this job alone.
+const prReviewBotReviewJob = "review"
+
+// prReviewBotGates checks the three skip clauses are still present on the
+// review job's `if:` condition, and reports when the job itself is gone.
 func prReviewBotGates(workflow *ciscan.Workflow) []string {
-	conditions := make([]string, 0, len(workflow.Jobs))
-	for _, job := range workflow.JobNames() {
-		conditions = append(conditions, workflow.Jobs[job].If)
+	job, ok := workflow.Jobs[prReviewBotReviewJob]
+	if !ok {
+		return []string{fmt.Sprintf(
+			"%s has no %q job to gate", PRReviewBotWorkflow, prReviewBotReviewJob)}
 	}
-	joined := strings.Join(conditions, "\n")
 
 	names := make([]string, 0, len(prReviewBotGateClauses))
 	for name := range prReviewBotGateClauses {
@@ -83,7 +88,7 @@ func prReviewBotGates(workflow *ciscan.Workflow) []string {
 	var problems []string
 	for _, name := range names {
 		clause := prReviewBotGateClauses[name]
-		if !strings.Contains(joined, clause) {
+		if !strings.Contains(job.If, clause) {
 			problems = append(problems, fmt.Sprintf(
 				"%s no longer gates on %q (%s check missing)", PRReviewBotWorkflow, clause, name))
 		}
@@ -129,7 +134,7 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 			"%s concurrency group %q does not key on the PR number", PRReviewBotWorkflow, group))
 	}
 
-	if cancels, isValid := workflow.Concurrency.CancelsInProgress(); !isValid || !cancels {
+	if !workflow.Concurrency.CancelsInProgress() {
 		problems = append(problems, fmt.Sprintf("%s does not set cancel-in-progress: true", PRReviewBotWorkflow))
 	}
 
@@ -141,8 +146,26 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 // branch, with a trailing comment recording what it means. The action and ref
 // come from ciscan; the comment comes from the raw scan, since yaml drops it.
 func prReviewBotPinning(workflow *ciscan.Workflow, raw string) []string {
+	uses := workflowUses(workflow)
+	if len(uses) == 0 {
+		return []string{fmt.Sprintf("%s has no `uses:` steps, so this guard is watching nothing", PRReviewBotWorkflow)}
+	}
+
 	commented := commentedUses(raw)
 
+	var problems []string
+	for _, use := range uses {
+		if problem, bad := pinProblem(use, commented); bad {
+			problems = append(problems, problem)
+		}
+	}
+
+	return problems
+}
+
+// workflowUses collects every non-empty `uses:` value across the workflow's
+// jobs, in sorted-job order so guard output is stable.
+func workflowUses(workflow *ciscan.Workflow) []string {
 	var uses []string
 	for _, job := range workflow.JobNames() {
 		for _, step := range workflow.Jobs[job].Steps {
@@ -152,27 +175,24 @@ func prReviewBotPinning(workflow *ciscan.Workflow, raw string) []string {
 		}
 	}
 
-	if len(uses) == 0 {
-		return []string{fmt.Sprintf("%s has no `uses:` steps, so this guard is watching nothing", PRReviewBotWorkflow)}
+	return uses
+}
+
+// pinProblem reports the single pinning problem a `uses:` value has, if any: a
+// ref that is not a full commit SHA, or a full-SHA pin with no version comment.
+func pinProblem(use string, commented map[string]bool) (problem string, bad bool) {
+	action, ref, found := strings.Cut(use, "@")
+	if !found || !fullSHAPattern.MatchString(ref) {
+		return fmt.Sprintf(
+			"%s pins %s to %q, which is not a full 40-character commit SHA", PRReviewBotWorkflow, action, ref), true
 	}
 
-	var problems []string
-	for _, use := range uses {
-		action, ref, found := strings.Cut(use, "@")
-		if !found || !fullSHAPattern.MatchString(ref) {
-			problems = append(problems, fmt.Sprintf(
-				"%s pins %s to %q, which is not a full 40-character commit SHA", PRReviewBotWorkflow, action, ref))
-
-			continue
-		}
-
-		if !commented[use] {
-			problems = append(problems, fmt.Sprintf(
-				"%s pins %s to a SHA with no version comment", PRReviewBotWorkflow, action))
-		}
+	if !commented[use] {
+		return fmt.Sprintf(
+			"%s pins %s to a SHA with no version comment", PRReviewBotWorkflow, action), true
 	}
 
-	return problems
+	return "", false
 }
 
 // commentedUses maps each `uses:` value to whether its line carries a trailing
