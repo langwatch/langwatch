@@ -108,6 +108,14 @@
       "instruction": "Does `text` make a claim about the product in the past tense (\"agreed\", \"judged\", \"found\", \"ran\") where the present (\"agrees\", \"judges\") is what a visitor reads on a landing page? A chart footnote describing how a measurement was taken (\"each judge ran at\") is exempt, and so is past tense inside a quoted user question (\"where the customer was frustrated\").",
       "yes": "a claim about what the product does or delivers is in the past tense, outside a measurement footnote or a quoted question",
       "no": "every claim about the product is in the present tense; past tense appears only in a measurement footnote or a quoted question"
+    },
+    {
+      "id": "today-as-timeframe",
+      "name": "Rule 15: banned word, today as a time frame",
+      "kind": "regex",
+      "pattern": "\\btoday\\b",
+      "flags": "gi",
+      "note": "\"a question you wrote today\" says nothing a visitor can use; drop the time frame or name the real one (a new question, right now, in the last 30 days)."
     }
   ]
 }
