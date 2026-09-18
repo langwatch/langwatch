@@ -51,6 +51,25 @@ export function chooseLlmSpanForTrace({
 }
 
 /**
+ * One span's conversation, split the way the drawer's two panels split it.
+ *
+ * Never null for a span: a span with no readable payload answers with two empty
+ * lists, because the caller asked about *this* span and "it holds nothing" is
+ * the answer. {@link llmMessagesForTrace} is where absence becomes null,
+ * because there the question is which span to read at all.
+ */
+export function llmMessagesForSpan({ span }: { span: Span }): LlmTraceMessages {
+  const input = spanIOToChatMessages(span.input) ?? [];
+  const output =
+    spanIOToChatMessages(span.output) ??
+    wrapAsMessage({ text: spanIOToText(span.output), role: "assistant" });
+  return {
+    input: splitChatForPanel({ messages: input, panel: "input" }),
+    output: splitChatForPanel({ messages: output, panel: "output" }),
+  };
+}
+
+/**
  * The chosen LLM span's conversation, split the way the drawer's two panels
  * split it. Falls back to the trace's own primary input and output when no LLM
  * span carries chat input, which is the common case for traces recorded by an
@@ -64,16 +83,7 @@ export function llmMessagesForTrace({
   spans: Span[];
 }): LlmTraceMessages | null {
   const span = chooseLlmSpanForTrace({ spans });
-  if (span) {
-    const input = spanIOToChatMessages(span.input) ?? [];
-    const output =
-      spanIOToChatMessages(span.output) ??
-      wrapAsMessage({ text: spanIOToText(span.output), role: "assistant" });
-    return {
-      input: splitChatForPanel({ messages: input, panel: "input" }),
-      output: splitChatForPanel({ messages: output, panel: "output" }),
-    };
-  }
+  if (span) return llmMessagesForSpan({ span });
 
   const inputText = trace.input?.value ?? "";
   const outputText = trace.output?.value ?? "";

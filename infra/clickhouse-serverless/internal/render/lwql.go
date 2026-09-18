@@ -174,8 +174,19 @@ type lwqlRowFilter struct {
 // for the restricted profile plus the optional PostgreSQL bridge collection.
 type lwqlServerConfig struct {
 	AccessControlImprovements lwqlAccessControlImprovements `yaml:"access_control_improvements"`
-	NamedCollections          *lwqlNamedCollections         `yaml:"named_collections,omitempty"`
+	// UserDefinedZooKeeperPath moves the SQL user-defined function store from
+	// each replica's local disk into Keeper. Written in replicated mode only —
+	// see renderLWQL for why, and why it is nil on a single node.
+	UserDefinedZooKeeperPath *string               `yaml:"user_defined_zookeeper_path,omitempty"`
+	NamedCollections         *lwqlNamedCollections `yaml:"named_collections,omitempty"`
 }
+
+// lwqlUserDefinedZooKeeperPath is where the SQL user-defined function store
+// lives in Keeper. The literal path the shipped config.xml documents for this
+// setting; a Keeper ensemble shared by two ClickHouse clusters would need the
+// cluster name in it, which LangWatch's topology (one ensemble per cluster)
+// does not.
+const lwqlUserDefinedZooKeeperPath = "/clickhouse/user_defined"
 
 type lwqlAccessControlImprovements struct {
 	SettingsConstraintsReplacePrevious bool `yaml:"settings_constraints_replace_previous"`
@@ -292,6 +303,26 @@ func renderLWQL(input *config.Input, usersD, configD string) error {
 		AccessControlImprovements: lwqlAccessControlImprovements{
 			SettingsConstraintsReplacePrevious: true,
 		},
+	}
+	// The LangWatchQL app functions are SQL user-defined functions, created by
+	// DDL from the application's catalog — the one LangWatchQL object that
+	// cannot be static config, because ClickHouse has no XML form of
+	// CREATE FUNCTION for a SQL UDF (the config-time form,
+	// user_defined_executable_functions_config, forks a process per call).
+	//
+	// A CREATE FUNCTION writes the server's local disk store, so on a
+	// multi-replica cluster it lands on the replica that ran it and nowhere
+	// else. Pointing the store at Keeper makes one create reach every replica,
+	// and makes a replica rebuilt or rejoined later pick the functions up at
+	// boot — which an ON CLUSTER broadcast, writing each local store at the
+	// moment it runs, would not.
+	//
+	// Written only in replicated mode: on a single node there is no Keeper to
+	// reach, and declaring the path would make the function store depend on an
+	// ensemble that is not there.
+	if input.Replicated {
+		path := lwqlUserDefinedZooKeeperPath
+		serverConfig.UserDefinedZooKeeperPath = &path
 	}
 	// lwql_postgres named collection: rendered only with both a host and the
 	// plaintext reader password (ClickHouse must dial PostgreSQL with the real

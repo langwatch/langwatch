@@ -5304,13 +5304,13 @@ func (e PatchApiMonitorsByIdJSONBodyMappingsMapping1Source1) Valid() bool {
 
 // Defines values for PatchApiMonitorsByIdJSONBodyMappingsMapping1Type.
 const (
-	Thread PatchApiMonitorsByIdJSONBodyMappingsMapping1Type = "thread"
+	PatchApiMonitorsByIdJSONBodyMappingsMapping1TypeThread PatchApiMonitorsByIdJSONBodyMappingsMapping1Type = "thread"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiMonitorsByIdJSONBodyMappingsMapping1Type enum.
 func (e PatchApiMonitorsByIdJSONBodyMappingsMapping1Type) Valid() bool {
 	switch e {
-	case Thread:
+	case PatchApiMonitorsByIdJSONBodyMappingsMapping1TypeThread:
 		return true
 	default:
 		return false
@@ -14478,6 +14478,9 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds2) Valid() bool {
 
 // Defines values for PostApiV1Query200JSONResponseBodyDiagnosticsCode.
 const (
+	APPFUNCTIONRESULTTRUNCATED PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_RESULT_TRUNCATED"
+	APPFUNCTIONUNRESOLVEDKEYS  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_UNRESOLVED_KEYS"
+	APPFUNCTIONVALUETRUNCATED  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_VALUE_TRUNCATED"
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
 	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
 	MULTIPROJECTRESULT         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
@@ -14488,6 +14491,12 @@ const (
 // Valid indicates whether the value is a known member of the PostApiV1Query200JSONResponseBodyDiagnosticsCode enum.
 func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	switch e {
+	case APPFUNCTIONRESULTTRUNCATED:
+		return true
+	case APPFUNCTIONUNRESOLVEDKEYS:
+		return true
+	case APPFUNCTIONVALUETRUNCATED:
+		return true
 	case INCOMPLETECOMPARISONPERIOD:
 		return true
 	case MISSINGTIMEBUCKETS:
@@ -14593,6 +14602,66 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod) Valid() bo
 	}
 }
 
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncodingJson GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding = "json"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncodingText GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding = "text"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncodingJson:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncodingText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesCosts  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates = "costs"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesInput  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates = "input"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesOutput GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates = "output"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesCosts:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesInput:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindSpan   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind = "span"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindThread GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind = "thread"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindTrace  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind = "trace"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindSpan:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindThread:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindTrace:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates.
 const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGatesCosts  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates = "costs"
@@ -14677,6 +14746,66 @@ func (e GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType) Val
 	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeRange:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingJson GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding = "json"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingText GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding = "text"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingJson:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates = "costs"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesInput  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates = "input"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesOutput GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates = "output"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesCosts:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesInput:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindSpan   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "span"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindThread GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "thread"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindTrace  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "trace"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindSpan:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindThread:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindTrace:
 		return true
 	default:
 		return false
@@ -26432,6 +26561,15 @@ type GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates string
 // GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod defines parameters for GetApiV1QueryReference.
 type GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod string
 
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding string
+
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates string
+
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind string
+
 // GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates defines parameters for GetApiV1QueryReference.
 type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates string
 
@@ -26443,6 +26581,15 @@ type GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod string
 
 // GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType defines parameters for GetApiV1QueryReference.
 type GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType string
+
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding string
+
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates string
+
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind string
 
 // GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates defines parameters for GetApiV1QuerySchema.
 type GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates string
@@ -107076,6 +107223,18 @@ type GetApiV1QueryReferenceResponse struct {
 				Pagination              string  `json:"pagination"`
 			} `json:"limits"`
 			Schema struct {
+				AppFunctions []struct {
+					Available   bool                                                                    `json:"available"`
+					Cap         int                                                                     `json:"cap"`
+					Description string                                                                  `json:"description"`
+					Encoding    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding `json:"encoding"`
+					ExampleSql  string                                                                  `json:"exampleSql"`
+					Gates       []GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates  `json:"gates"`
+					KeyKind     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind  `json:"keyKind"`
+					Name        string                                                                  `json:"name"`
+					Returns     string                                                                  `json:"returns"`
+					Signature   string                                                                  `json:"signature"`
+				} `json:"appFunctions"`
 				Database  string   `json:"database"`
 				Functions []string `json:"functions"`
 				Views     []struct {
@@ -107191,6 +107350,18 @@ type GetApiV1QuerySchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		AppFunctions []struct {
+			Available   bool                                                       `json:"available"`
+			Cap         int                                                        `json:"cap"`
+			Description string                                                     `json:"description"`
+			Encoding    GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding `json:"encoding"`
+			ExampleSql  string                                                     `json:"exampleSql"`
+			Gates       []GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates  `json:"gates"`
+			KeyKind     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind  `json:"keyKind"`
+			Name        string                                                     `json:"name"`
+			Returns     string                                                     `json:"returns"`
+			Signature   string                                                     `json:"signature"`
+		} `json:"appFunctions"`
 		Database  string   `json:"database"`
 		Functions []string `json:"functions"`
 		Views     []struct {
@@ -133331,6 +133502,18 @@ func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryRefe
 					Pagination              string  `json:"pagination"`
 				} `json:"limits"`
 				Schema struct {
+					AppFunctions []struct {
+						Available   bool                                                                    `json:"available"`
+						Cap         int                                                                     `json:"cap"`
+						Description string                                                                  `json:"description"`
+						Encoding    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding `json:"encoding"`
+						ExampleSql  string                                                                  `json:"exampleSql"`
+						Gates       []GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates  `json:"gates"`
+						KeyKind     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind  `json:"keyKind"`
+						Name        string                                                                  `json:"name"`
+						Returns     string                                                                  `json:"returns"`
+						Signature   string                                                                  `json:"signature"`
+					} `json:"appFunctions"`
 					Database  string   `json:"database"`
 					Functions []string `json:"functions"`
 					Views     []struct {
@@ -133466,6 +133649,18 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			AppFunctions []struct {
+				Available   bool                                                       `json:"available"`
+				Cap         int                                                        `json:"cap"`
+				Description string                                                     `json:"description"`
+				Encoding    GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding `json:"encoding"`
+				ExampleSql  string                                                     `json:"exampleSql"`
+				Gates       []GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates  `json:"gates"`
+				KeyKind     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind  `json:"keyKind"`
+				Name        string                                                     `json:"name"`
+				Returns     string                                                     `json:"returns"`
+				Signature   string                                                     `json:"signature"`
+			} `json:"appFunctions"`
 			Database  string   `json:"database"`
 			Functions []string `json:"functions"`
 			Views     []struct {

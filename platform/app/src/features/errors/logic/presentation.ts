@@ -467,6 +467,42 @@ const presentations = {
     describe: () =>
       "We can't read what was stored for it. Rebuild the widget and save it again.",
   },
+  lwql_app_function_key_cap: {
+    title: "That's too many records to read at once",
+    describe: (error) => {
+      // The cap is per key kind, so the copy names the kind the run broke
+      // rather than always saying "conversations": a trace or span cap
+      // rejection that talks about conversations sends the reader looking in
+      // the wrong place.
+      const kind = error.meta.keyKind;
+      const noun =
+        kind === "thread"
+          ? "conversations"
+          : kind === "span"
+            ? "model calls"
+            : kind === "trace"
+              ? "traces"
+              : "records";
+      const cap = error.meta.cap;
+      const capped =
+        typeof cap === "number"
+          ? `A single run can read ${cap.toLocaleString()} ${noun}.`
+          : `A single run can only read so many ${noun}.`;
+      return `${capped} Lower the row limit, group the query more coarsely, or run it in pages.`;
+    },
+  },
+  lwql_app_function_hydration_failed: {
+    // Deliberately says nothing about retrying a different way: the query
+    // itself was fine, so there is nothing for the reader to change.
+    title: "We couldn't read the conversation content",
+    describe: () =>
+      "The query ran, but we couldn't load the conversations or traces it asked for. This is a temporary problem on our side. Try again shortly, or contact support if it persists.",
+  },
+  lwql_app_function_unavailable: {
+    title: "Extraction functions aren't available here yet",
+    describe: () =>
+      "This deployment hasn't finished setting up the functions this query uses. Ask your workspace administrator to redeploy, or contact support.",
+  },
   lwql_unavailable: {
     // Names the workspace administrator first: on a self-hosted deployment
     // the reader's own operator controls whether this is provisioned, and

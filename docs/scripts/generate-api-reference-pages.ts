@@ -321,6 +321,9 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/v1/query"],
     overviewDescription:
       "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query.",
+    // The extraction functions are a feature of the query language rather than
+    // an endpoint, so no OpenAPI operation describes them.
+    extraPages: ["api-reference/query/extraction-functions"],
   },
   {
     name: "Secrets",

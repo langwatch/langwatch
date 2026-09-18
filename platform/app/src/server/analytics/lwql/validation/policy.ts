@@ -85,6 +85,22 @@ export interface LangWatchQLPolicy {
    */
   readonly gatedColumns: readonly string[];
   /**
+   * Content permissions the caller *holds*, which is the positive form of
+   * {@link LangWatchQLPolicy.gatedColumns}.
+   *
+   * Both are needed, and they are not redundant. A column is gated when its own
+   * declared gates are not all held, so the withheld *set* is all the walk
+   * needs to refuse a column reference. An app function has no column to look
+   * up: what the walk has to answer is "does this caller hold `input` and
+   * `output`", and a list of withheld column names cannot answer it — a
+   * deployment whose catalog happened to expose no output-gated column would
+   * produce an empty withheld set and admit every function.
+   *
+   * Fail-closed like the derivation it comes from: an unresolved `Protections`
+   * holds nothing, so every gated function is refused rather than admitted.
+   */
+  readonly heldPermissions?: readonly string[];
+  /**
    * Database an unqualified table name resolves to — the same one the executor
    * connects with. Omit it and unqualified names are matched as written.
    */
@@ -108,6 +124,7 @@ export interface LangWatchQLPolicy {
 export interface ResolvedLangWatchQLPolicy {
   readonly allowedTables: ReadonlySet<string>;
   readonly gatedColumns: ReadonlySet<string>;
+  readonly heldPermissions: ReadonlySet<string>;
   readonly reservedDatabases: ReadonlySet<string>;
   readonly defaultDatabase: string;
   readonly limits: LangWatchQLLimits;
@@ -155,6 +172,7 @@ export function resolveLangWatchQLPolicy(
     gatedColumns: new Set(
       policy.gatedColumns.map((column) => column.trim().toLowerCase()),
     ),
+    heldPermissions: new Set(policy.heldPermissions ?? []),
     reservedDatabases: new Set(RESERVED_DATABASES),
     defaultDatabase,
     limits: policy.limits ?? DEFAULT_LWQL_LIMITS,

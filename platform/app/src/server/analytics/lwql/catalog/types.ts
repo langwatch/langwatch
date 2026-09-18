@@ -696,10 +696,14 @@ export function lwqlGatedColumns({
  * `getUserProtectionsForProject` returns when the policy resolver is down
  * grants nothing.
  *
- * Exported because the query reference answers the same question one level up:
- * whether a published EXAMPLE is runnable by this caller. Deriving that from
- * the protections a second time is how the reference would come to disagree
- * with the schema about who may read a cost column.
+ * The positive twin of {@link lwqlGatedColumns}, and three callers need it. A
+ * gated *column* can be decided from the withheld set alone, because a column
+ * is in it or it is not; an app function has no column to look up, so the only
+ * question there is which permissions the caller holds. The query reference
+ * answers the same question one level up: whether a published EXAMPLE is
+ * runnable by this caller. Deriving either from the protections a second time
+ * is how they would come to disagree with the schema about who may read a cost
+ * column.
  */
 export function lwqlHeldPermissions(
   protections: Protections,

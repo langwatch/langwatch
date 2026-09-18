@@ -437,7 +437,7 @@ export function describeQueryReference({
             protections,
             views: LWQL_VIEW_CATALOG,
           })
-        : { database, functions: [], views: [] },
+        : { database, functions: [], views: [], appFunctions: [] },
       limits: {
         maxStatementLength: MAX_LWQL_LENGTH,
         maxRowsReturned: DEFAULT_LWQL_RESULT_LIMITS.maxRows,

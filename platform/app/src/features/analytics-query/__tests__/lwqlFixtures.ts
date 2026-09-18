@@ -13,8 +13,9 @@ import type {
 } from "~/server/analytics/lwql";
 
 /**
- * A response with two views, a gated column, units, join keys and example
- * SQL — everything the browser and the completion model are supposed to read.
+ * A response with two views, a gated column, units, join keys, example SQL and
+ * two app functions: everything the browser and the completion model are
+ * supposed to read.
  */
 export const SCHEMA_RESPONSE: LangWatchQLSchema = {
   database: "analytics",
@@ -88,6 +89,34 @@ export const SCHEMA_RESPONSE: LangWatchQLSchema = {
   // suites assert the surface shows what the response carried, so a handful of
   // names is enough to prove the field is threaded through.
   functions: ["avg", "count", "toStartOfHour"],
+  appFunctions: [
+    {
+      name: "conversation",
+      signature: "conversation(thread_key)",
+      description: "The whole thread as markdown.",
+      returns: "Nullable(String)",
+      encoding: "text",
+      keyKind: "thread",
+      cap: 200,
+      gates: ["input", "output"],
+      available: true,
+      exampleSql:
+        "SELECT thread_id, conversation(thread_id) AS transcript\nFROM analytics.traces_daily\nWHERE occurred_on >= subtractDays(now(), 7)\nLIMIT 20",
+    },
+    {
+      name: "thread_traces",
+      signature: "thread_traces(thread_key)",
+      description: "The thread's trace identifiers, oldest first.",
+      returns: "Array(String)",
+      encoding: "text",
+      keyKind: "thread",
+      cap: 200,
+      gates: [],
+      available: true,
+      exampleSql:
+        "SELECT thread_id, thread_traces(thread_id) AS trace_ids\nFROM analytics.traces_daily\nWHERE occurred_on >= subtractDays(now(), 7)\nLIMIT 20",
+    },
+  ],
 };
 
 /** Every view name the response carries. */

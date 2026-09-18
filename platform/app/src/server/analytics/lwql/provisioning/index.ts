@@ -20,6 +20,13 @@
 
 export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./accessModel";
 export {
+  type LangWatchQLAppFunctionConflict,
+  type LangWatchQLServerFunctionRow,
+  lwqlAppFunctionConflicts,
+  lwqlAppFunctionCreateQuery,
+  lwqlAppFunctionReconciliationQuery,
+} from "./appFunctionStatements";
+export {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";

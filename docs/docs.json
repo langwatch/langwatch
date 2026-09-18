@@ -1393,7 +1393,8 @@
               "api-reference/query/overview",
               "api-reference/query/discover-both-query-languages",
               "api-reference/query/discover-the-queryable-langwatchql-schema",
-              "api-reference/query/run-a-langwatchql-query"
+              "api-reference/query/run-a-langwatchql-query",
+              "api-reference/query/extraction-functions"
             ]
           },
           {

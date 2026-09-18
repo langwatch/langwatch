@@ -168,13 +168,15 @@ const RESULT_CEILINGS = `A statement that names no \`LIMIT\` is capped at ${DEFA
 const RUN_DESCRIPTION =
   "Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\n" +
   `Diagnostics are advisory and never reject a query. ${LWQL_CLEAN_DIAGNOSTICS_MEANING}\n\n` +
+  "A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A run that would need more distinct conversations, traces or spans than the published cap answers 422 rather than a partial result.\n\n" +
   `${HEADER_RULE}\n\n` +
   `${RESULT_CEILINGS}\n\n` +
   "Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.";
 
 const SCHEMA_DESCRIPTION =
   "Lists the LangWatchQL analytics views this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each view's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.\n\n" +
-  "Scoped to the projects the credential can read and their permissions: a column this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.\n\n" +
+  "Under `appFunctions` it lists the app functions a projection may call, each with its signature, the type and encoding of the value it returns, how many distinct keys one run may read, and the permissions it needs.\n\n" +
+  "Scoped to the projects the credential can read and their permissions: a column or app function this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.\n\n" +
   `${HEADER_RULE}`;
 
 const REFERENCE_DESCRIPTION =

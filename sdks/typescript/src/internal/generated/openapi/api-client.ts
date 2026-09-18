@@ -1048,6 +1048,8 @@ export interface paths {
          *
          *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          *
+         *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A run that would need more distinct conversations, traces or spans than the published cap answers 422 rather than a partial result.
+         *
          *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
          *
          *     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
@@ -1072,7 +1074,9 @@ export interface paths {
          * Discover the queryable LangWatchQL schema
          * @description Lists the LangWatchQL analytics views this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each view's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.
          *
-         *     Scoped to the projects the credential can read and their permissions: a column this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+         *     Under `appFunctions` it lists the app functions a projection may call, each with its signature, the type and encoding of the value it returns, how many distinct keys one run may read, and the permissions it needs.
+         *
+         *     Scoped to the projects the credential can read and their permissions: a column or app function this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
          *
          *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
          */
@@ -8973,7 +8977,7 @@ export interface operations {
                         coarsenedFromSeconds?: number;
                         diagnostics: {
                             /** @enum {string} */
-                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
@@ -9120,6 +9124,20 @@ export interface operations {
                             exampleSql: string;
                         }[];
                         functions: string[];
+                        appFunctions: {
+                            name: string;
+                            signature: string;
+                            description: string;
+                            returns: string;
+                            /** @enum {string} */
+                            encoding: "text" | "json";
+                            /** @enum {string} */
+                            keyKind: "trace" | "thread" | "span";
+                            cap: number;
+                            gates: ("input" | "output" | "costs")[];
+                            available: boolean;
+                            exampleSql: string;
+                        }[];
                     };
                 };
             };
@@ -9245,6 +9263,20 @@ export interface operations {
                                     exampleSql: string;
                                 }[];
                                 functions: string[];
+                                appFunctions: {
+                                    name: string;
+                                    signature: string;
+                                    description: string;
+                                    returns: string;
+                                    /** @enum {string} */
+                                    encoding: "text" | "json";
+                                    /** @enum {string} */
+                                    keyKind: "trace" | "thread" | "span";
+                                    cap: number;
+                                    gates: ("input" | "output" | "costs")[];
+                                    available: boolean;
+                                    exampleSql: string;
+                                }[];
                             };
                             limits: {
                                 maxStatementLength: number;

@@ -8418,6 +8418,139 @@
           ],
           "exampleSql": "SELECT PromptVersionId, PromptId, VersionNumber\nFROM analytics.prompt_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         }
+      ],
+      "appFunctions": [
+        {
+          "name": "conversation",
+          "signature": "conversation(thread_key)",
+          "description": "The whole thread as one markdown transcript, the way the trace drawer renders it: the system prompt once, then one section per turn, with a marker where content was redacted.",
+          "returns": "Nullable(String)",
+          "encoding": "text",
+          "keyKind": "thread",
+          "cap": 200,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT ConversationId, conversation(ConversationId) AS transcript\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "conversation_bounded",
+          "signature": "conversation_bounded(thread_key, max_tokens, until_trace_id)",
+          "description": "The same transcript under a token budget: the opening and closing turns are kept and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
+          "returns": "Nullable(String)",
+          "encoding": "text",
+          "keyKind": "thread",
+          "cap": 200,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "thread_traces",
+          "signature": "thread_traces(thread_key)",
+          "description": "The thread's trace ids, oldest first. Carries no captured content, so it needs no content permission.",
+          "returns": "Array(String)",
+          "encoding": "text",
+          "keyKind": "thread",
+          "cap": 200,
+          "gates": [],
+          "available": true,
+          "exampleSql": "SELECT ConversationId, thread_traces(ConversationId) AS trace_ids\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "llm_readable_trace",
+          "signature": "llm_readable_trace(trace_id, max_tokens)",
+          "description": "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the model calls, then the slowest.",
+          "returns": "Nullable(String)",
+          "encoding": "text",
+          "keyKind": "trace",
+          "cap": 1000,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT TraceId, llm_readable_trace(TraceId, 8000) AS text\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+        },
+        {
+          "name": "llm_messages",
+          "signature": "llm_messages(trace_id)",
+          "description": "The chat messages of the trace's chosen LLM call, as JSON `{input, output}` — the same split the trace drawer's two panels show. Falls back to the trace's own captured input and output when no LLM span carries a conversation.",
+          "returns": "Nullable(String)",
+          "encoding": "json",
+          "keyKind": "trace",
+          "cap": 1000,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT TraceId, llm_messages(TraceId) AS messages\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+        },
+        {
+          "name": "llm_input_messages",
+          "signature": "llm_input_messages(trace_id)",
+          "description": "Only the request side of `llm_messages`, as a JSON array: the conversation history the model was given on this turn.",
+          "returns": "Nullable(String)",
+          "encoding": "json",
+          "keyKind": "trace",
+          "cap": 1000,
+          "gates": [
+            "input"
+          ],
+          "available": true,
+          "exampleSql": "SELECT TraceId, llm_input_messages(TraceId) AS messages\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+        },
+        {
+          "name": "llm_output_messages",
+          "signature": "llm_output_messages(trace_id)",
+          "description": "Only the response side of `llm_messages`, as a JSON array: everything the agent did from the last request onwards, tool calls and results included.",
+          "returns": "Nullable(String)",
+          "encoding": "json",
+          "keyKind": "trace",
+          "cap": 1000,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT TraceId, llm_output_messages(TraceId) AS messages\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+        },
+        {
+          "name": "llm_messages_span",
+          "signature": "llm_messages_span(trace_id, span_id)",
+          "description": "The chat messages of one named span rather than the trace's chosen one, as JSON `{input, output}`.",
+          "returns": "Nullable(String)",
+          "encoding": "json",
+          "keyKind": "span",
+          "cap": 1000,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT TraceId, SpanId, llm_messages_span(TraceId, SpanId) AS messages\nFROM analytics.spans\nWHERE StartTime >= subtractDays(now(), 1)\nORDER BY StartTime DESC\nLIMIT 20"
+        },
+        {
+          "name": "trace_json",
+          "signature": "trace_json(trace_id)",
+          "description": "The whole trace as one JSON object, spans included — the export shape, for post-training data and for reading a trace outside the product.",
+          "returns": "Nullable(String)",
+          "encoding": "json",
+          "keyKind": "trace",
+          "cap": 1000,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT TraceId, trace_json(TraceId) AS trace\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+        }
       ]
     },
     "limits": {
