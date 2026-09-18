@@ -15,61 +15,37 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./surfaces/langy-demo-project": {
-      "langwatch-declaration-source": "./src/model/langy-demo-project.ts",
-      "types": "./dist/model/langy-demo-project.d.ts",
-      "default": "./src/model/langy-demo-project.ts"
-    },
-    "./surfaces/asaplangy": {
-      "langwatch-declaration-source": "./src/asaplangy.ts",
-      "types": "./dist/asaplangy.d.ts",
-      "default": "./src/asaplangy.ts"
-    },
-    "./langy-page-registration": {
-      "langwatch-declaration-source": "./src/langy-page-registration.ts",
-      "types": "./dist/langy-page-registration.d.ts",
-      "default": "./src/langy-page-registration.ts"
-    },
-    "./surfaces/langy-theme.css": "./src/ui/elements/langy-theme.css",
-    "./surfaces/langy-store": {
-      "langwatch-declaration-source": "./src/langy-store.ts",
-      "types": "./dist/langy-store.d.ts",
-      "default": "./src/langy-store.ts"
-    },
-    "./surfaces/langy-context": {
-      "langwatch-declaration-source": "./src/langy-context.ts",
-      "types": "./dist/langy-context.d.ts",
-      "default": "./src/langy-context.ts"
-    },
-    "./surfaces/langy-mark": {
-      "langwatch-declaration-source": "./src/langy-mark.ts",
-      "types": "./dist/langy-mark.d.ts",
-      "default": "./src/langy-mark.ts"
-    },
-    "./surfaces/langy-panel-layout": {
-      "langwatch-declaration-source": "./src/langy-panel-layout.ts",
-      "types": "./dist/langy-panel-layout.d.ts",
-      "default": "./src/langy-panel-layout.ts"
-    },
-    "./langy-ui-actions": {
-      "langwatch-declaration-source": "./src/langy-ui-actions.ts",
-      "types": "./dist/langy-ui-actions.d.ts",
-      "default": "./src/langy-ui-actions.ts"
-    },
-    "./langy-code-access-preference": {
-      "langwatch-declaration-source": "./src/langy-code-access-preference.ts",
-      "types": "./dist/langy-code-access-preference.d.ts",
-      "default": "./src/langy-code-access-preference.ts"
+    "./declaration": {
+      "langwatch-declaration-source": "./src/langy.web.ts",
+      "types": "./dist/langy.web.d.ts",
+      "default": "./src/langy.web.ts"
     },
     "./langy": {
       "langwatch-declaration-source": "./src/langy.ts",
       "types": "./dist/langy.d.ts",
       "default": "./src/langy.ts"
     },
-    "./surfaces/langy-theme": {
-      "types": "./src/ui/elements/langy-theme.ts",
-      "default": "./src/ui/elements/langy-theme.ts"
-    }
+    "./langy-code-access-preference": {
+      "langwatch-declaration-source": "./src/langy-code-access-preference.ts",
+      "types": "./dist/langy-code-access-preference.d.ts",
+      "default": "./src/langy-code-access-preference.ts"
+    },
+    "./langy-page-registration": {
+      "langwatch-declaration-source": "./src/langy-page-registration.ts",
+      "types": "./dist/langy-page-registration.d.ts",
+      "default": "./src/langy-page-registration.ts"
+    },
+    "./langy-ui-actions": {
+      "langwatch-declaration-source": "./src/langy-ui-actions.ts",
+      "types": "./dist/langy-ui-actions.d.ts",
+      "default": "./src/langy-ui-actions.ts"
+    },
+    "./surfaces/asaplangy": {
+      "langwatch-declaration-source": "./src/asaplangy.ts",
+      "types": "./dist/asaplangy.d.ts",
+      "default": "./src/asaplangy.ts"
+    },
+    "./surfaces/langy-theme.css": "./src/ui/elements/langy-theme.css"
   },
   "scripts": {
     "typecheck": "tsc -b",
@@ -89,15 +65,16 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/github-browser": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
     "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/ops-browser": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-browser": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",
     "@tanstack/react-virtual": "catalog:",
     "ai": "catalog:",

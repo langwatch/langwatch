@@ -19,6 +19,7 @@ import { featureFlagWeb } from "@langwatch/feature-flag-browser/declaration";
 import { gatewayWeb } from "@langwatch/gateway-browser/declaration";
 import { githubWeb } from "@langwatch/github-browser/declaration";
 import { governanceWeb } from "@langwatch/enterprise-governance-browser/declaration";
+import { langyWeb } from "@langwatch/langy-browser/declaration";
 import { licensingWeb } from "@langwatch/enterprise-licensing-browser/declaration";
 import { modelProviderWeb } from "@langwatch/model-provider-browser/declaration";
 import { monitorWeb } from "@langwatch/monitor-browser/declaration";
@@ -34,6 +35,7 @@ import { scenarioWeb } from "@langwatch/scenario-browser/declaration";
 import { scimWeb } from "@langwatch/enterprise-scim-browser/declaration";
 import { secretWeb } from "@langwatch/secret-browser/declaration";
 import { shareWeb } from "@langwatch/share-browser/declaration";
+import { suiteWeb } from "@langwatch/suite-browser/declaration";
 import { topicWeb } from "@langwatch/topic-browser/declaration";
 import { traceWeb } from "@langwatch/trace-browser/declaration";
 import { userWeb } from "@langwatch/user-browser/declaration";
@@ -59,6 +61,7 @@ export const webModules = [
   gatewayWeb satisfies { readonly name: "gateway" },
   githubWeb satisfies { readonly name: "github" },
   governanceWeb satisfies { readonly name: "governance" },
+  langyWeb satisfies { readonly name: "langy" },
   licensingWeb satisfies { readonly name: "licensing" },
   modelProviderWeb satisfies { readonly name: "model-provider" },
   monitorWeb satisfies { readonly name: "monitor" },
@@ -74,6 +77,7 @@ export const webModules = [
   scimWeb satisfies { readonly name: "scim" },
   secretWeb satisfies { readonly name: "secret" },
   shareWeb satisfies { readonly name: "share" },
+  suiteWeb satisfies { readonly name: "suite" },
   topicWeb satisfies { readonly name: "topic" },
   traceWeb satisfies { readonly name: "trace" },
   userWeb satisfies { readonly name: "user" },
