@@ -27,17 +27,63 @@ type Step struct {
 	Env  map[string]string `yaml:"env"`
 }
 
-// Job is one entry under `jobs:`.
+// Job is one entry under `jobs:`. If is the job-level `if:` condition, read as
+// literal text rather than evaluated — a guard's job is to notice a gate
+// clause disappearing, not to re-implement GitHub's expression language.
 type Job struct {
 	Name  string `yaml:"name"`
+	If    string `yaml:"if"`
 	Steps []Step `yaml:"steps"`
+}
+
+// PullRequest is the `on.pull_request` trigger and the event types that fire
+// it.
+type PullRequest struct {
+	Types []string `yaml:"types"`
+}
+
+// On models the workflow `on:` triggers the guards read. Only pull_request is
+// modeled, because that is the trigger whose event types a guard asserts.
+type On struct {
+	PullRequest PullRequest `yaml:"pull_request"`
+}
+
+// Concurrency models the workflow-level `concurrency:` block: the group runs
+// share, and whether a superseded run is canceled.
+type Concurrency struct {
+	Group            string `yaml:"group"`
+	CancelInProgress any    `yaml:"cancel-in-progress"`
+}
+
+// CancelsInProgress reads cancel-in-progress as a bool, accepting YAML's
+// unquoted form and the quoted string form.
+//
+// isValid is false when the key is absent or set to anything not recognizably
+// true or false, so a guard can tell "set to false" apart from "not set" —
+// both leave a superseded run alive, but only one is a typo.
+func (c Concurrency) CancelsInProgress() (value, isValid bool) {
+	switch typed := c.CancelInProgress.(type) {
+	case bool:
+		return typed, true
+	case string:
+		switch {
+		case strings.EqualFold(typed, "true"):
+			return true, true
+		case strings.EqualFold(typed, "false"):
+			return false, true
+		}
+	}
+
+	return false, false
 }
 
 // Workflow is a single .yml file under .github/workflows.
 type Workflow struct {
 	// Path is repo-relative, so guard output is copy-pasteable.
-	Path string
-	Jobs map[string]Job `yaml:"jobs"`
+	Path        string
+	On          On             `yaml:"on"`
+	Concurrency Concurrency    `yaml:"concurrency"`
+	Jobs        map[string]Job `yaml:"jobs"`
 }
 
 // WorkflowDir is where GitHub requires workflows to live.

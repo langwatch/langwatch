@@ -23,7 +23,7 @@ Feature: PR Review Bot workflow
   # Gating: Dependabot PRs
   # ============================================================================
 
-  @workflow @ci @unit
+  @unit
   Scenario: Dependabot PRs are skipped
     Given the pull request is authored by dependabot[bot]
     When the workflow runs
@@ -34,7 +34,7 @@ Feature: PR Review Bot workflow
   # Gating: Fork PRs
   # ============================================================================
 
-  @workflow @ci @unit
+  @unit
   Scenario: Pull requests from forks are skipped
     Given the pull request originates from a fork
     And the fork does not have access to repository secrets
@@ -46,7 +46,7 @@ Feature: PR Review Bot workflow
   # Gating: Draft PRs
   # ============================================================================
 
-  @workflow @ci @unit
+  @unit
   Scenario: Draft pull requests are skipped
     Given the pull request is marked as draft
     When the workflow runs
@@ -61,7 +61,7 @@ Feature: PR Review Bot workflow
   # that event — not that a review is posted, since posting is decided by
   # langwatch-pr-review-bot outside this repository.
 
-  @workflow @ci @unit
+  @unit
   Scenario: Review runs on pull request opened
     Given a pull request is opened in the same repository
     And the PR is not a draft
@@ -69,7 +69,7 @@ Feature: PR Review Bot workflow
     When the workflow runs
     Then the review job executes
 
-  @workflow @ci @unit
+  @unit
   Scenario: Review runs on pull request synchronize
     Given a pull request is open in the same repository
     And new commits are pushed to the PR
@@ -78,7 +78,7 @@ Feature: PR Review Bot workflow
     When the workflow runs
     Then the review job executes
 
-  @workflow @ci @unit
+  @unit
   Scenario: Review runs on pull request reopened
     Given a pull request was previously closed
     And the PR is reopened
@@ -87,7 +87,7 @@ Feature: PR Review Bot workflow
     When the workflow runs
     Then the review job executes
 
-  @workflow @ci @unit
+  @unit
   Scenario: Review runs on ready for review
     Given a draft pull request exists
     And the draft is marked ready for review
@@ -99,13 +99,13 @@ Feature: PR Review Bot workflow
   # Concurrency
   # ============================================================================
 
-  @workflow @ci @unit
-  Scenario: In-progress review is cancelled for the same PR
+  @unit
+  Scenario: In-progress review is canceled for the same PR
     Given a review is in progress for pull request #123
     And the same PR receives a new commit
     And the workflow is triggered again for #123
     When the new workflow run starts
-    Then the previous review run is cancelled
+    Then the previous review run is canceled
     And only the latest review run proceeds
     And exactly one review result is posted for #123
 
@@ -119,7 +119,7 @@ Feature: PR Review Bot workflow
   # past is worse than no assertion — it reads as coverage that does not
   # exist.
 
-  @workflow @ci @unit
+  @unit
   Scenario: Every action the workflow uses is pinned to a full commit SHA
     When the workflow runs
     Then every "uses:" step references a full 40-character commit SHA, never a tag or branch
