@@ -297,7 +297,7 @@ describe("getProjectLambdaArn", () => {
     });
   });
 
-  describe("config reconcile", () => {
+  describe("when an existing Lambda's configuration has drifted", () => {
     const currentImageUri =
       "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest";
 
@@ -436,6 +436,13 @@ describe("getProjectLambdaArn", () => {
     /** @scenario A concurrent update makes AWS reject the reconcile but resolution still succeeds */
     it("swallows an in-progress conflict on the configuration update", async () => {
       const drifted = { ...mockLambdaConfig, MemorySize: 1024 };
+      // AWS SDK v3 exceptions discriminate on the stable `name` field, not
+      // the message text — mirror that shape here rather than relying on
+      // message wording.
+      const conflictError = new Error(
+        "An update is in progress for resource: ...",
+      );
+      conflictError.name = "ResourceConflictException";
 
       vi.spyOn(LambdaClient.prototype as any, "send")
         .mockResolvedValueOnce({ Configuration: drifted })
@@ -443,7 +450,7 @@ describe("getProjectLambdaArn", () => {
           Configuration: drifted,
           Code: { ImageUri: currentImageUri },
         })
-        .mockRejectedValueOnce(new Error("An update is in progress"))
+        .mockRejectedValueOnce(conflictError)
         .mockResolvedValue({ Configuration: mockLambdaConfig });
 
       const arn = await getProjectLambdaArn("reconcile-conflict");

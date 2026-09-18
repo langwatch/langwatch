@@ -369,14 +369,14 @@ const updateProjectLambdaImage = async (
  */
 const reconcileProjectLambdaConfig = async (
   lambda: LambdaClient,
-  functionName: string,
   params: {
+    functionName: string;
     config: LangWatchLambdaConfig;
     currentConfig: FunctionConfiguration;
     projectId: string;
   },
 ): Promise<FunctionConfiguration | null> => {
-  const { config, currentConfig, projectId } = params;
+  const { functionName, config, currentConfig, projectId } = params;
   const desiredEnv = buildDesiredLambdaEnvironmentVariables(config);
   const currentEnv = currentConfig.Environment?.Variables ?? {};
   const envDrifted = Object.entries(desiredEnv).some(
@@ -537,13 +537,16 @@ const updateProjectLambdaImageIfDrifted = async (
     );
     // AWS rejects UpdateFunctionConfiguration while a code update is still in
     // flight ("ResourceConflictException: An update is in progress"), so the
-    // code update must fully land before a reconcile can follow.
-    await pollLambdaUntilReady(lambda, functionName);
+    // code update must fully land before a reconcile can follow. A container
+    // image update can take longer than the default poll budget (image
+    // optimization), so use the full 5-minute budget the pollLambdaUntilReady
+    // default comment promises but its 500ms interval doesn't reach.
+    await pollLambdaUntilReady(lambda, functionName, 600, 500);
     return updated;
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message.includes("An update is in progress")
+      error.name === "ResourceConflictException"
     ) {
       logger.info(
         { projectId },
@@ -562,19 +565,19 @@ const updateProjectLambdaImageIfDrifted = async (
  */
 const reconcileProjectLambdaConfigSafely = async (
   lambda: LambdaClient,
-  functionName: string,
   params: {
+    functionName: string;
     config: LangWatchLambdaConfig;
     currentConfig: FunctionConfiguration;
     projectId: string;
   },
 ): Promise<FunctionConfiguration | null> => {
   try {
-    return await reconcileProjectLambdaConfig(lambda, functionName, params);
+    return await reconcileProjectLambdaConfig(lambda, params);
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message.includes("An update is in progress")
+      error.name === "ResourceConflictException"
     ) {
       logger.info(
         { projectId: params.projectId },
@@ -628,15 +631,12 @@ const syncExistingProjectLambda = async (
   // a correct drift baseline regardless: UpdateFunctionCode never changes
   // Environment or MemorySize.
   if (functionDetails.Configuration) {
-    const reconciled = await reconcileProjectLambdaConfigSafely(
-      lambda,
+    const reconciled = await reconcileProjectLambdaConfigSafely(lambda, {
       functionName,
-      {
-        config,
-        currentConfig: functionDetails.Configuration,
-        projectId,
-      },
-    );
+      config,
+      currentConfig: functionDetails.Configuration,
+      projectId,
+    });
     if (reconciled) {
       lambdaConfig = reconciled;
     }
