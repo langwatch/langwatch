@@ -1069,9 +1069,24 @@ invented:
   sentence this section already starts: capabilities are composed by the shell
   and reach modules through a declared `*HostApi`.
 
-  A theme config is NOT a capability. It is pure data, it fetches nothing, and
-  it belongs in a kit — `apps/ui` keeps the skin, so `langy-theme` travelling
-  as theme data is the shape, not an exception to it.
+  **The slot is "what the composition root installs from this module", whether
+  or not it fetches** (ruled 2026-09-18). Fetching is what makes a capability
+  ineligible for a KIT; it was never what makes it a capability. Reading the
+  slot as fetch-only stranded a whole class: a PURE symbol whose only consumer
+  is `apps/ui` could not be a kit (rule 5 — one consumer never mints one), nor
+  a capability, nor a subpath (§3.4), and rule 5's usual remedy — inline or
+  duplicate into the consumer — assumes the consumer may hold code, which
+  §10.1 says `apps/ui` may not. Measured before ruling: **9 such specifiers
+  across 6 modules** (auth, langy, navigation, organization, scenario, trace),
+  so it is a class and not a coincidence. Each is a barrel today, and splits
+  into fetching and pure halves on inspection; both halves ride the slot, so
+  the split costs nothing.
+
+  A theme config still is NOT a capability. It is pure data with consumers
+  besides the composition root, so it belongs in a kit — `apps/ui` keeps the
+  skin, and `langy-theme` travelling as theme data is the shape. The test is
+  the consumer, not the purity: **many consumers → kit; the composition root
+  → the slot.**
 
 - **One Analytics capability** wraps every instrumentation destination
   (posthog, gtag, browser tracing). Modules emit named events through it —
