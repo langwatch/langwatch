@@ -2,6 +2,7 @@
 import "@langwatch/time/polyfill";
 import process from "node:process";
 
+import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { setTraceUrlProvider } from "@langwatch/handled-error";
 import { createServerApp } from "@langwatch/installed-modules/server";
 import { configureLogger, createLogger, loggerConfigurationFrom } from "@langwatch/observability";
@@ -33,7 +34,10 @@ export async function startWorker(): Promise<Server> {
     healthPort: config.liveness.metricsPort,
   }).with(prometheusMetrics({ token: config.liveness.metricsToken }));
 
-  const runtime = await createServerApp("worker").boot();
+  const runtime = await createServerApp("worker")
+    // The audit sink is this deployment's choice: OSS records nothing, enterprise swaps in its own.
+    .withModules([auditLogNullServer] as const)
+    .boot();
 
   // Jobs drain before anything they call into is released.
   server.with(hostedRuntime({ name: "worker runtime", runtime, drain: true }));

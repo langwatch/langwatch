@@ -2,6 +2,7 @@
 import "@langwatch/time/polyfill";
 import process from "node:process";
 
+import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { setTraceUrlProvider } from "@langwatch/handled-error";
 import { createServerApp } from "@langwatch/installed-modules/server";
 import { configureLogger, createLogger } from "@langwatch/observability";
@@ -32,7 +33,10 @@ export async function startApi(): Promise<Server> {
     shutdownDeadlineMs: config.shutdown.processDeadlineMs,
   });
 
-  const runtime = await createServerApp("api").boot();
+  const runtime = await createServerApp("api")
+    // The audit sink is this deployment's choice: OSS records nothing, enterprise swaps in its own.
+    .withModules([auditLogNullServer] as const)
+    .boot();
 
   server.with(hostedRuntime({ name: "api runtime", runtime }));
   await server.listen();
