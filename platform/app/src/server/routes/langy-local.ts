@@ -18,7 +18,6 @@
 
 import type { Context } from "hono";
 import { z } from "zod";
-import { env } from "~/env.mjs";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
@@ -44,11 +43,8 @@ import {
   startWaitBodySchema,
   workspaceStatusSchema,
 } from "~/server/langy-local-control/http";
+import { openControlRequest } from "~/server/langy-local-control/open-control-request";
 import { getLocalControlRuntime } from "~/server/langy-local-control/runtime";
-import {
-  conversationTitle,
-  conversationUrl,
-} from "~/server/langy-local-control/session.core";
 import { reconcileSkipPolicy } from "~/server/langy-local-control/skip-policy";
 import { bodyLimit } from "./_lib/body-limit";
 
@@ -201,27 +197,14 @@ secured
         conversationId: body.conversationId,
       });
 
-      const runtime = getLocalControlRuntime();
-      const request = await runtime.requests.create({
-        projectId: auth.projectId,
-        projectName: auth.projectName,
+      const request = await openControlRequest({
+        project: {
+          id: auth.projectId,
+          name: auth.projectName,
+          slug: auth.projectSlug,
+        },
         userId: auth.userId,
-        conversationId: conversation.id,
-        conversationTitle: conversationTitle(conversation.title),
-        conversationUrl: conversationUrl(
-          conversation.id,
-          env.BASE_HOST,
-          auth.projectSlug,
-        ),
-      });
-      await getApp().commands.langy.requestLocalControl({
-        tenantId: auth.projectId,
-        occurredAt: Date.now(),
-        conversationId: conversation.id,
-        requestId: request.id,
-        userId: auth.userId,
-        expiresAt: request.expiresAt,
-        command: SHARE_CONTROL_COMMAND,
+        conversation,
       });
 
       return c.json(

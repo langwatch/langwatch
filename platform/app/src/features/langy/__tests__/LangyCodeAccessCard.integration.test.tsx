@@ -14,12 +14,28 @@
  * the install path opens.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
+import { useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const setPreference = vi.fn();
 const refetchWorkspace = vi.fn();
+const renewRequest = vi.fn();
 let workspaceData: unknown = null;
+/** What the platform answers once a fresh request is opened. */
+let workspaceAfterRenew: unknown = null;
+const workspaceListeners = new Set<() => void>();
+/** A new answer from the platform, as a refetch delivers it to a mounted card. */
+function answerWorkspace(data: unknown) {
+  workspaceData = data;
+  for (const listener of workspaceListeners) listener();
+}
 let workspaceError: unknown = null;
 let githubInstallations: Array<{
   installationId: string;
@@ -40,12 +56,31 @@ vi.mock("~/utils/api", () => ({
   api: {
     langy: {
       getLocalWorkspace: {
-        useQuery: () => ({
-          data: workspaceData,
-          isLoading: workspaceData === null && workspaceError === null,
-          isError: workspaceError !== null,
-          error: workspaceError,
-          refetch: refetchWorkspace,
+        useQuery: () => {
+          const data = useSyncExternalStore(
+            (listener) => {
+              workspaceListeners.add(listener);
+              return () => workspaceListeners.delete(listener);
+            },
+            () => workspaceData,
+          );
+          return {
+            data,
+            isLoading: data === null && workspaceError === null,
+            isError: workspaceError !== null,
+            error: workspaceError,
+            refetch: refetchWorkspace,
+          };
+        },
+      },
+      renewLocalControlRequest: {
+        useMutation: () => ({
+          mutate: (input: unknown, options?: { onSuccess?: () => void }) => {
+            renewRequest(input);
+            if (workspaceAfterRenew) answerWorkspace(workspaceAfterRenew);
+            options?.onSuccess?.();
+          },
+          isPending: false,
         }),
       },
       setCodeAccessPreference: {
@@ -77,6 +112,8 @@ afterEach(cleanup);
 beforeEach(() => {
   setPreference.mockClear();
   refetchWorkspace.mockClear();
+  renewRequest.mockClear();
+  workspaceAfterRenew = null;
   workspaceError = null;
   githubInstallations = [{ installationId: "i1", accountLogin: "acme" }];
   // The local-folder pick persists per browser, so one test's click would
@@ -90,6 +127,7 @@ const ASKING = {
   skipAllowed: false,
   skipPermissions: false,
   pendingRequest: null,
+  requestState: "open",
   codeAccessPreference: null,
 };
 
@@ -338,16 +376,163 @@ describe("given a request the terminal has not approved yet", () => {
     expect(screen.queryByText("How should I reach your code?")).toBeNull();
   });
 
-  describe("when the request has run out", () => {
-    it("says so and offers to ask again", () => {
-      const onAskAgain = vi.fn();
-      renderCard({ now: () => 10_000 + 20 * 60_000, onAskAgain });
-      fireEvent.click(screen.getByText("Share local folder"));
+  describe("when the request's time runs out while the card is on screen", () => {
+    afterEach(() => vi.useRealTimers());
 
-      expect(screen.getByText("Request expired, ask again")).toBeDefined();
-      fireEvent.click(screen.getByText("Ask again"));
-      expect(onAskAgain).toHaveBeenCalledTimes(1);
+    /** @scenario "A waiting card turns expired when its time runs out" */
+    it("turns expired, offers to try again and reads the folder state again", () => {
+      vi.useFakeTimers();
+      let clock = 10_000;
+      renderCard({ now: () => clock });
+      fireEvent.click(screen.getByText("Share local folder"));
+      expect(
+        screen.getByText(/Waiting for you to approve in the terminal/),
+      ).toBeDefined();
+      expect(refetchWorkspace).not.toHaveBeenCalled();
+
+      clock = 10_000 + 6 * 60_000;
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(screen.getByText("This request expired.")).toBeDefined();
+      expect(screen.getByText("Try again")).toBeDefined();
+      expect(
+        screen.queryByText(/Waiting for you to approve in the terminal/),
+      ).toBeNull();
+      expect(refetchWorkspace).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("given I chose the local folder and the request is over", () => {
+  const OPEN = {
+    ...ASKING,
+    pendingRequest: {
+      id: "req_1",
+      expiresAt: new Date(10_000 + 5 * 60_000).toISOString(),
+    },
+  };
+  const over = (requestState: string) => ({
+    ...ASKING,
+    pendingRequest: null,
+    requestState,
+  });
+
+  /** The card as it is reopened: the pick was made while the request was open. */
+  function reopenWith(
+    data: unknown,
+    props: Parameters<typeof renderCard>[0] = {},
+  ) {
+    workspaceData = OPEN;
+    const first = renderCard({ now: () => 10_000 });
+    fireEvent.click(screen.getByText("Share local folder"));
+    first.unmount();
+    workspaceData = data;
+    return renderCard({ now: () => 10_000 + 60 * 60_000, ...props });
+  }
+
+  /** @scenario "A card reopened after its request expired says so" */
+  it("says the request expired, with no waiting line and no spinner", () => {
+    const { container } = reopenWith(over("expired"));
+
+    expect(screen.getByText("This request expired.")).toBeDefined();
+    expect(screen.getByText("Try again")).toBeDefined();
+    expect(
+      screen.queryByText(/Waiting for you to approve in the terminal/),
+    ).toBeNull();
+    expect(container.querySelector(".chakra-spinner")).toBeNull();
+    expect(
+      screen.queryByText("npx langwatch@latest langy --share-control"),
+    ).toBeNull();
+  });
+
+  /** @scenario "Trying again opens a fresh request on the same card" */
+  it("opens a fresh request and goes back to the command and a countdown", () => {
+    const onChoiceSelect = vi.fn();
+    const onAskAgain = vi.fn();
+    reopenWith(over("expired"), { onChoiceSelect, onAskAgain });
+    workspaceAfterRenew = {
+      ...ASKING,
+      pendingRequest: {
+        id: "req_2",
+        expiresAt: new Date(10_000 + 60 * 60_000 + 15 * 60_000).toISOString(),
+      },
+    };
+
+    fireEvent.click(screen.getByText("Try again"));
+
+    expect(renewRequest).toHaveBeenCalledWith({
+      projectId: "p_1",
+      conversationId: "c_1",
+    });
+    expect(
+      screen.getByText("npx langwatch@latest langy --share-control"),
+    ).toBeDefined();
+    expect(screen.getByText(/Expires in 15 minutes/)).toBeDefined();
+    expect(refetchWorkspace).toHaveBeenCalled();
+    expect(onChoiceSelect).not.toHaveBeenCalled();
+    expect(onAskAgain).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A request declined in the terminal reads as declined" */
+  it("says the request was declined in the terminal", () => {
+    reopenWith(over("declined"));
+
+    expect(
+      screen.getByText("This request was declined in the terminal."),
+    ).toBeDefined();
+    expect(screen.getByText("Try again")).toBeDefined();
+  });
+
+  /** @scenario "A share that ended offers to share again" */
+  it("says sharing stopped and offers to share again", () => {
+    reopenWith(over("ended"));
+
+    expect(screen.getByText("Sharing stopped.")).toBeDefined();
+    fireEvent.click(screen.getByText("Share again"));
+    expect(renewRequest).toHaveBeenCalledTimes(1);
+  });
+
+  describe("when the conversation is only being read", () => {
+    it("says what happened and offers nothing to press", () => {
+      reopenWith(over("expired"), {
+        onChoiceSelect: undefined,
+        onAskAgain: undefined,
+      });
+
+      expect(screen.getByText("This request expired.")).toBeDefined();
+      expect(screen.queryByText("Try again")).toBeNull();
+    });
+  });
+});
+
+describe("given a fresh card whose request already expired", () => {
+  beforeEach(() => {
+    workspaceData = { ...ASKING, requestState: "expired" };
+    workspaceAfterRenew = {
+      ...ASKING,
+      pendingRequest: {
+        id: "req_2",
+        expiresAt: new Date(10_000 + 15 * 60_000).toISOString(),
+      },
+    };
+  });
+
+  /** @scenario "Choosing the local folder after the request expired opens a fresh one" */
+  it("opens a fresh request as the folder is chosen", () => {
+    renderCard({ now: () => 10_000 });
+
+    fireEvent.click(screen.getByText("Share local folder"));
+
+    expect(renewRequest).toHaveBeenCalledWith({
+      projectId: "p_1",
+      conversationId: "c_1",
+    });
+    expect(
+      screen.getByText("npx langwatch@latest langy --share-control"),
+    ).toBeDefined();
+    expect(screen.getByText(/Expires in 15 minutes/)).toBeDefined();
   });
 });
 

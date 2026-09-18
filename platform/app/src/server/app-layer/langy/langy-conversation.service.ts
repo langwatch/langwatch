@@ -53,6 +53,10 @@ import {
 } from "~/server/event-sourcing/domain/tenantId";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
+import {
+  type LatestControlRequest,
+  latestControlRequest,
+} from "~/server/langy-local-control/request-state";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationIdUnadoptableError,
@@ -617,6 +621,29 @@ export class LangyConversationService {
       waits: recordWaitsOf(foldWaitTurns(all)),
       workspaceConnected: lastWorkspaceConnection(all),
     };
+  }
+
+  /**
+   * The latest request to share a folder this conversation recorded, and
+   * whether a folder connected through it (ADR-129). The open request lives in
+   * Redis only while a terminal can approve it; this is what is left to say
+   * why there is nothing to approve. The caller proves the conversation first.
+   */
+  async getLatestLocalControlRequest({
+    projectId,
+    conversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LatestControlRequest | null> {
+    if (!this.events) return null;
+    const all = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      0,
+    );
+    return latestControlRequest(all);
   }
 
   /**
