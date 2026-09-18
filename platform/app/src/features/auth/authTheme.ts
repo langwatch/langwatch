@@ -102,6 +102,13 @@ export const authThemeConfig = defineConfig({
            * that reads as an action on white disappears into a dark field.
            */
           detail: mode(brand[500], orange300(0.75)),
+          /**
+           * A small filled marker that carries white text, such as the pick
+           * order on the guided onboarding's value cards: the brand deepened
+           * on paper so the white digit stays readable, the solid orange on
+           * ink.
+           */
+          badge: mode(brand[600], orange(0.92)),
           focusRing: mode(orange(0.22), orange300(0.22)),
           glow: mode(orange(0.28), orange300(0.22)),
           /**
