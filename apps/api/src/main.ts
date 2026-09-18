@@ -1,15 +1,14 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
-
 import process from "node:process";
 
 import { setTraceUrlProvider } from "@langwatch/handled-error";
+import { createServerApp } from "@langwatch/installed-modules/server";
 import { configureLogger, createLogger } from "@langwatch/observability";
 import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
 import { startOtlpMetricsExport } from "@langwatch/observability/node";
 import { Server } from "@langwatch/process-server";
 import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
-import { createServerApp } from "@langwatch/installed-modules/server";
 
 import { apiLoggerConfiguration, resolveApiConfig } from "./config.ts";
 
@@ -35,7 +34,7 @@ export async function startApi(): Promise<Server> {
 
   const runtime = await createServerApp("api").boot();
 
-  server.host({ name: "api runtime", start: () => runtime.start(), stop: () => runtime.stop() });
+  server.with({ name: "api runtime", start: () => runtime.start(), stop: () => runtime.stop() });
   await server.listen();
   return server;
 }

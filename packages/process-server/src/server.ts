@@ -1,3 +1,5 @@
+import http, { type IncomingMessage, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 import process from "node:process";
 
 import { ResourceScope } from "@langwatch/kernel";
@@ -22,7 +24,29 @@ export type ServerOptions = Readonly<{
    */
   ownsProcess?: boolean;
   exit?: (code: number) => never;
+  /**
+   * The built-in health door's port. Absent binds an ephemeral port, so the
+   * door is on for every process regardless of whether it configured one.
+   */
+  healthPort?: number;
 }>;
+
+/**
+ * A route a component contributes to the server's own built-in health door,
+ * rather than a listener of its own. `/healthz` is reserved; everything else
+ * is dispatched to the route whose `path` matches exactly.
+ */
+export type HealthRoute = Readonly<{
+  path: string;
+  handle: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>;
+}>;
+
+/** Whatever `.with()` accepts: a lifecycle component, or a health-door route. */
+export type ServerContribution = ServerComponent | HealthRoute;
+
+function isHealthRoute(contribution: ServerContribution): contribution is HealthRoute {
+  return "path" in contribution && "handle" in contribution;
+}
 
 /**
  * One thing the server hosts. Components start in the order they were hosted
@@ -52,6 +76,9 @@ export class Server {
   static create(options: ServerOptions): Server {
     const exit = options.exit ?? (process.exit.bind(process) as (code: number) => never);
     const server = new Server(options.name, options.logger, options.shutdownDeadlineMs, exit);
+    // Hosted first, so it stops LAST: the health door outlives every drain
+    // phase, and a probe during shutdown still sees the process as alive.
+    server.with(server.createHealthComponent(options.healthPort));
     if (options.ownsProcess !== false) {
       server.disposeFatal = installFatalHandlers({
         service: options.name,
@@ -69,6 +96,8 @@ export class Server {
   readonly graceful: GracefulShutdown;
 
   private readonly components: ServerComponent[] = [];
+  private readonly healthRoutes = new Map<string, HealthRoute>();
+  private healthListener: http.Server | undefined;
   private disposeFatal: (() => void) | undefined;
   private disposeSignals: (() => void) | undefined;
   private listening: Promise<void> | undefined;
@@ -90,15 +119,62 @@ export class Server {
   }
 
   /**
-   * Mounts one component. Called after the application is composed, so the
-   * server hosts a built thing rather than constructing one.
+   * The one word for mounting something on this server: a lifecycle
+   * component, or a route on the built-in health door. Packages own the
+   * vocabulary — this only tells the two contribution shapes apart.
    */
-  host(component: ServerComponent): this {
-    if (this.sealed) {
-      throw new Error(`${this.name} cannot host "${component.name}" after it has started.`);
+  with(contribution: ServerContribution): this {
+    if (isHealthRoute(contribution)) {
+      this.healthRoutes.set(contribution.path, contribution);
+      return this;
     }
-    this.components.push(component);
+    if (this.sealed) {
+      throw new Error(`${this.name} cannot host "${contribution.name}" after it has started.`);
+    }
+    this.components.push(contribution);
     return this;
+  }
+
+  /** The health door's bound address, once started. `null` before or after. */
+  get healthAddress(): AddressInfo | string | null {
+    return this.healthListener?.address() ?? null;
+  }
+
+  private createHealthComponent(port: number | undefined): ServerComponent {
+    return {
+      name: `${this.name} health`,
+      start: async () => {
+        const listener = http.createServer((request, response) =>
+          this.handleHealthRequest(request, response),
+        );
+        await bindHttpServer(listener, port ?? 0);
+        this.healthListener = listener;
+      },
+      stop: async () => {
+        const active = this.healthListener;
+        this.healthListener = undefined;
+        if (active === undefined) return;
+        await closeHttpServer(active);
+      },
+    };
+  }
+
+  private handleHealthRequest(request: IncomingMessage, response: ServerResponse): void {
+    if (request.url === "/healthz") {
+      response.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+      return;
+    }
+
+    const route = request.url === undefined ? undefined : this.healthRoutes.get(request.url);
+    if (route === undefined) {
+      response.writeHead(404).end();
+      return;
+    }
+
+    void Promise.resolve(route.handle(request, response)).catch((error: unknown) => {
+      this.logger.error({ error, path: route.path }, `${this.name}: health route failed`);
+      if (!response.headersSent) response.writeHead(500).end();
+    });
   }
 
   /**
@@ -192,4 +268,28 @@ function installFatalHandlers(options: {
     process.off("uncaughtException", uncaughtException);
     process.off("unhandledRejection", unhandledRejection);
   };
+}
+
+function bindHttpServer(listener: http.Server, port: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onError = (error: Error): void => reject(error);
+    listener.once("error", onError);
+    listener.listen(port, () => {
+      listener.off("error", onError);
+      resolve();
+    });
+  });
+}
+
+function closeHttpServer(listener: http.Server): Promise<void> {
+  return new Promise((resolve, reject) => {
+    listener.close((error) => {
+      if (error !== undefined) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+    listener.closeAllConnections();
+  });
 }

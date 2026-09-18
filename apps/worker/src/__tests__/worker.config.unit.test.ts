@@ -1,6 +1,7 @@
 import { InvalidRuntimeConfigError } from "@langwatch/config";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
+
 import {
   resolveWorkerConfig,
   resolveWorkerDataplaneS3Config,
@@ -570,7 +571,7 @@ describe("resolveWorkerConfig", () => {
   });
 
   it("carries the spend settlement grace unparsed, for the gateway package to bound", () => {
-    // `settlementGraceMs` in @langwatch/gateway-server owns the parse, its
+    // `settlementGraceMs` in @langwatch/gateway-process owns the parse, its
     // lower bound and the warning it logs, and the App's REST settlement
     // policy calls that same function on this same variable. A second parse
     // here is how the two ends of one grace window drift apart.

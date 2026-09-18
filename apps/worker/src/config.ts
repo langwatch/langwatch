@@ -1,3 +1,12 @@
+import { agentServerConfigDefinition, type AgentServerConfig } from "@langwatch/agent-contract";
+import { assertAuthServerConfig, authServerConfigDefinition } from "@langwatch/auth-contract";
+import { authzServerConfigDefinition } from "@langwatch/authz-contract";
+import { automationServerConfigDefinition } from "@langwatch/automation-contract";
+import {
+  parseRoutingTable,
+  poolSizingFromEnv,
+  type PoolSizingInput,
+} from "@langwatch/clickhouse-client";
 import {
   assertObservabilityDoesNotSelfIngest,
   clickhouseConfigDefinition,
@@ -16,53 +25,47 @@ import {
   RuntimeConfig,
   type ConfigValue,
 } from "@langwatch/config";
-import { assertAuthServerConfig, authServerConfigDefinition } from "@langwatch/auth-contract";
-import { authzServerConfigDefinition } from "@langwatch/authz-contract";
-import { agentServerConfigDefinition, type AgentServerConfig } from "@langwatch/agent-contract";
-import { automationServerConfigDefinition } from "@langwatch/automation-contract";
-import {
-  assertBillingServerConfig,
-  billingServerConfigDefinition,
-} from "@langwatch/enterprise-billing-contract";
 import { dataPrivacyServerConfigDefinition } from "@langwatch/data-privacy-contract";
 import {
   dataRetentionServerConfigDefinition,
   resolvePlatformDefaultRetentionDays,
 } from "@langwatch/data-retention-contract";
 import {
+  assertBillingServerConfig,
+  billingServerConfigDefinition,
+} from "@langwatch/enterprise-billing-contract";
+import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
+import { managedProviderServerConfigDefinition } from "@langwatch/enterprise-managed-provider-contract";
+import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract";
+import {
   evaluationServerConfigDefinition,
   resolveWorkerEvaluationEnvironment,
 } from "@langwatch/evaluation-contract";
+import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { gatewayServerConfigDefinition } from "@langwatch/gateway-contract";
 import { githubServerConfigDefinition } from "@langwatch/github-contract";
+import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { langyServerConfigDefinition } from "@langwatch/langy-contract";
-import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
 import { logServerConfigDefinition } from "@langwatch/log-contract";
 import { metricServerConfigDefinition } from "@langwatch/metric-contract";
-import { managedProviderServerConfigDefinition } from "@langwatch/enterprise-managed-provider-contract";
-import { modelProviderServerConfigDefinition,getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
+import {
+  modelProviderServerConfigDefinition,
+  getLatestOpenAIChatFlagship,
+} from "@langwatch/model-provider-contract";
 import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
-import { opsServerConfigDefinition } from "@langwatch/ops-contract";
-import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract";
-import { secretServerConfigDefinition } from "@langwatch/secret-contract";
-import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
-import { traceServerConfigDefinition } from "@langwatch/trace-contract";
-import { webhookServerConfigDefinition } from "@langwatch/webhook-contract";
+import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-process";
 import { createLogger } from "@langwatch/observability";
 import {
   otlpMetricsExportOptionsFrom,
   type OtlpMetricsExportOptions,
 } from "@langwatch/observability/node";
-import {
-  parseRoutingTable,
-  poolSizingFromEnv,
-  type PoolSizingInput,
-} from "@langwatch/clickhouse-client";
-import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
-import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
-import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
-import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
+import { opsServerConfigDefinition } from "@langwatch/ops-contract";
 import type { RequestBoundsOverrides } from "@langwatch/plans";
+import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
+import { secretServerConfigDefinition } from "@langwatch/secret-contract";
+import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
+import { traceServerConfigDefinition } from "@langwatch/trace-contract";
+import { webhookServerConfigDefinition } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
 /** Somewhere a configured-but-unusable value can be said out loud. */
@@ -213,7 +216,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
   langy: langyServerConfigDefinition,
   /**
    * Carried raw (not a number): `settlementGraceMs` in
-   * `@langwatch/gateway-server` owns the parse, bound and warning — the
+   * `@langwatch/gateway-process` owns the parse, bound and warning — the
    * same function the REST settlement policy calls on the same variable.
    */
   gateway: { spendSettlementGraceMs: gatewayServerConfigDefinition.spendSettlementGraceMs },
@@ -753,8 +756,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
         // events to the deployment's own collector.
         langwatchEndpoint: value.observability.endpoint?.trim() || undefined,
         publicBaseUrl: value.mail.baseHost?.trim() || void 0,
-        voicePublicBaseUrl:
-          environmentStrings(source).VOICE_PUBLIC_BASE_URL?.trim() || void 0,
+        voicePublicBaseUrl: environmentStrings(source).VOICE_PUBLIC_BASE_URL?.trim() || void 0,
         // A blank override is not a model. It resolves to the registry
         // flagship rather than to an empty string, which a child would carry
         // to the provider as a model named "".

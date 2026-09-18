@@ -1,15 +1,14 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
-
 import process from "node:process";
 
 import { setTraceUrlProvider } from "@langwatch/handled-error";
+import { createServerApp } from "@langwatch/installed-modules/server";
 import { configureLogger, createLogger, loggerConfigurationFrom } from "@langwatch/observability";
 import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
-import { startOtlpMetricsExport } from "@langwatch/observability/node";
+import { prometheusMetrics, startOtlpMetricsExport } from "@langwatch/observability/node";
 import { Server } from "@langwatch/process-server";
 import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
-import { createServerApp } from "@langwatch/installed-modules/server";
 
 import { resolveWorkerConfig } from "./config.ts";
 
@@ -31,12 +30,13 @@ export async function startWorker(): Promise<Server> {
     name: config.serviceName,
     logger,
     shutdownDeadlineMs: config.shutdown.processDeadlineMs,
-  });
+    healthPort: config.liveness.metricsPort,
+  }).with(prometheusMetrics({ token: config.liveness.metricsToken }));
 
   const runtime = await createServerApp("worker").boot();
 
   // Jobs drain before anything they call into is released.
-  server.host({
+  server.with({
     name: "worker runtime",
     start: () => runtime.start(),
     stop: () => runtime.stop(),

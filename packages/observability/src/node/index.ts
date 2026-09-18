@@ -22,6 +22,11 @@ export {
   type OtlpMetricsExportOptions,
   type OtlpMetricsTelemetryInputs,
 } from "./otlp-metrics.ts";
+export {
+  prometheusMetrics,
+  type PrometheusExposition,
+  type PrometheusMetricsOptions,
+} from "./prometheus-metrics-door.ts";
 
 // Every method of a service, wrapped in a span named `ClassName.methodName`,
 // applied once at factory time so the service's own methods stay clean.
