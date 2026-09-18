@@ -279,7 +279,18 @@ from the installed tuple: install the first namespace-declaring module and
 place. **All routing is the framework's.** Every request flows through
 `@langwatch/api` — middleware, family and namespace placement, per-route
 auth binding, all driven by the modules' declarations. No application code
-routes anything. **Each expose member sets up only the base**: headers and
+routes anything. **The hosting dispatch is a pass-through with exactly one
+decision** (ruled 2026-09-18): an unconditional preamble on every request —
+trusted-proxy remap resolved once, base security headers stamped on every
+response, owned by no surface so no surface can forget them — then `/api/**`
+forwards to the API package (the tRPC-vs-REST split is the framework's own
+routing; the dispatch does not know tRPC exists), and everything else is
+the bundle side: an optional session READ on document requests only (never
+hashed assets — the surface is auth-capable, not auth-enforcing, until a
+policy such as a private-instance gate says otherwise), then serving —
+immutable assets, `index.html` with the injected meta tag, CSP overlaid on
+the stamped base. There is no Router class, no mount API, no scoped router
+object anywhere. **Each expose member sets up only the base**: headers and
 general security, as named CLASSES from `@langwatch/api`, never inline
 data — `HeaderPolicy.strict()` (the floor no surface drops below; `.with`/
 `.merge` overlay, `.without` is the loud exception), `ContentSecurityPolicy
