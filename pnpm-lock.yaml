@@ -3139,6 +3139,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:identity/process
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../packages/kernel
       '@langwatch/langy-process':
         specifier: workspace:*
         version: link:langy/process

@@ -29,11 +29,13 @@ function hasDeclarationExport({ half, manifest, entry, indexPath }) {
 
 /** Every catalogue entry whose half exists on disk and exports its declaration. */
 function declarationsFor({ root, catalogue, half, suffix }) {
+  // Directories renamed to process/browser; declaration files keep their old stem for now.
+  const dir = half === "server" ? "process" : "browser";
   const declarations = [];
   for (const entry of catalogue.features) {
-    const packagePath = resolve(root, entry.root, half, "package.json");
-    const declarationPath = resolve(root, entry.root, half, "src", `${entry.id}.${half}.ts`);
-    const indexPath = resolve(root, entry.root, half, "src", "index.ts");
+    const packagePath = resolve(root, entry.root, dir, "package.json");
+    const declarationPath = resolve(root, entry.root, dir, "src", `${entry.id}.${half}.ts`);
+    const indexPath = resolve(root, entry.root, dir, "src", "index.ts");
     if (!existsSync(packagePath)) continue;
     if (!existsSync(declarationPath)) continue;
     const manifest = JSON.parse(readFileSync(packagePath, "utf8"));
@@ -59,7 +61,7 @@ function declarationsFor({ root, catalogue, half, suffix }) {
  * reviewer see every client a build opens, on one page, without booting it.
  */
 function membersFor({ root, entry }) {
-  const appDirectory = resolve(root, entry.root, "server", "src", "app");
+  const appDirectory = resolve(root, entry.root, "process", "src", "app");
   if (!existsSync(appDirectory)) return [];
 
   const apps = readdirSync(appDirectory).filter((name) => name.endsWith(".app.ts"));
@@ -77,7 +79,7 @@ function membersFor({ root, entry }) {
 function memberSourceFor({ root, catalogue }) {
   const rows = [];
   for (const entry of catalogue.features) {
-    const packageJsonPath = resolve(root, entry.root, "server", "package.json");
+    const packageJsonPath = resolve(root, entry.root, "process", "package.json");
     if (!existsSync(packageJsonPath)) continue;
     rows.push([entry.id, membersFor({ root, entry })]);
   }
@@ -108,26 +110,45 @@ function memberSourceFor({ root, catalogue }) {
 
 /** The generated source for one list, imports first and the array last. */
 function sourceFor({ declarations, constant, half }) {
-  const imports = declarations.map(
-    (declaration) => `import { ${declaration.symbol} } from "${declaration.specifier}";`,
-  );
+  const imports = [
+    ...(half === "server"
+      ? ['import { createApp, type ServerRole } from "@langwatch/kernel";']
+      : []),
+    ...declarations.map(
+      (declaration) => `import { ${declaration.symbol} } from "${declaration.specifier}";`,
+    ),
+  ];
   const entries = declarations.map((declaration) =>
     half === "web"
       ? `  ${declaration.symbol} satisfies { readonly id: "${declaration.id}" },`
       : `  ${declaration.symbol},`,
   );
-  const batches =
+  const isEnterprise = (declaration) => declaration.specifier.startsWith("@langwatch/enterprise-");
+  const tierList = (constantName, kept) =>
+    `export const ${constantName} = [${kept.map((declaration) => declaration.symbol).join(", ")}] as const;`;
+  const CHUNK = 5;
+  const chunks = Array.from({ length: Math.ceil(declarations.length / CHUNK) }, (_, index) =>
+    declarations.slice(index * CHUNK, index * CHUNK + CHUNK),
+  );
+  const tiers =
     half === "server"
       ? [
           "",
-          "/** Compiler-sized batches of the same ordered module graph. */",
-          ...Array.from({ length: Math.ceil(declarations.length / 5) }, (_, batch) => {
-            const symbols = declarations
-              .slice(batch * 5, batch * 5 + 5)
-              .map((declaration) => declaration.symbol)
-              .join(", ");
-            return `export const serverModuleBatch${batch} = [${symbols}] as const;`;
-          }),
+          "/** The same graph by tier, so a build states which tiers it installs. */",
+          tierList("coreServerModules", declarations.filter((one) => !isEnterprise(one))),
+          tierList("enterpriseServerModules", declarations.filter(isEnterprise)),
+          "",
+          "/**",
+          " * The graph in chunks, and the chain that installs it. TypeScript cannot",
+          " * instantiate 49 modules in one `withModules` call (TS2589), so the chain",
+          " * is generated here and a process installs everything with one call.",
+          " */",
+          ...chunks.map((chunk, index) => tierList(`serverModuleChunk${index}`, chunk)),
+          "",
+          "export const createServerApp = (role: ServerRole) =>",
+          "  createApp({ role })" +
+            chunks.map((_, index) => `\n    .withModules(serverModuleChunk${index})`).join("") +
+            ";",
         ]
       : [];
   const empty = `/** No module declares a ${half} half yet. */\nexport const ${constant} = [] as const;\n`;
@@ -138,7 +159,7 @@ function sourceFor({ declarations, constant, half }) {
     `export const ${constant} = [`,
     ...entries,
     "] as const;",
-    ...batches,
+    ...tiers,
     "",
   ].join("\n");
 
@@ -157,8 +178,10 @@ function packageSourceFor({ root, catalogue }) {
     ...declarationsFor({ root, catalogue, half: "web", suffix: "Web" }),
   ];
 
+  // The generated chain imports createApp from the kernel, so the manifest
+  // declares it — resolution by hoisting luck broke the first real boot.
   manifest.dependencies = Object.fromEntries(
-    [...new Set(installed.map((declaration) => declaration.package))]
+    [...new Set(["@langwatch/kernel", ...installed.map((declaration) => declaration.package)])]
       .toSorted()
       .map((name) => [name, "workspace:*"]),
   );
