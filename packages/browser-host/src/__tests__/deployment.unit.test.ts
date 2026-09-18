@@ -3,14 +3,19 @@ import { describe, expect, it } from "vitest";
 
 import { deriveUiDeployment } from "../deployment.ts";
 
-/** Only the fields the decoder reads; the rest of the shape is not its business. */
+/** A whole config, so a field the decoder stops reading fails here rather than being cast away. */
 function configWith(overrides: Partial<PublicAppConfig>): PublicAppConfig {
   return {
-    mode: "production",
+    appBaseUrl: "https://app.example",
+    gatewayBaseUrl: "https://gateway.example",
     deployment: "self-hosted",
-    capabilities: { nlp: true, langevals: true },
+    mode: "production",
+    telemetry: { browserTracing: false, sampleRatio: 0 },
+    capabilities: { email: true, nlp: true, langevals: true },
+    passkeys: false,
+    identityFrontDoor: false,
     ...overrides,
-  } as PublicAppConfig;
+  };
 }
 
 describe("deriveUiDeployment", () => {
