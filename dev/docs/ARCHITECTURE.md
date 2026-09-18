@@ -374,11 +374,13 @@ chooses which), and every `create()` **arrives with its things already
 resolved**. Passing a hand-assembled composition object into anything is
 banned as a shape — nothing receives a bag it has to pick apart.
 
-**The application half extends `ModuleApp`** (ruled 2026-09-18) — the base
-class in `@langwatch/module` that carries the declaration statics, the
-setup-type inference and the graph contract. The class keeps its `<Name>App`
-name: "module" stays reserved for the whole `{contract, process, browser}`
-unit, "app" for its process-side application. Both dependency declarations
+**The application half extends `ProcessModuleApp`** (ruled 2026-09-18) —
+the base class in `@langwatch/module` that carries the declaration statics,
+the setup-type inference and the graph contract. The name says all three
+words on purpose: the **app** of the **module**'s **process** half — the
+module also has a browser half this class has nothing to do with. The
+class keeps its `<Name>App` name: "module" stays reserved for the whole
+`{contract, process, browser}` unit. Both dependency declarations
 are **string tuples** against a closed vocabulary — the process names, and
 the generated module-name map — so a typo is a compile error and `create()`
 receives exact typed picks. The graph resolves transitively (a dependency's
