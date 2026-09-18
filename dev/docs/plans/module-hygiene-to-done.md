@@ -1,6 +1,6 @@
 # Module hygiene completion plan
 
-Scope: the original sixteen-route request and the subsequent 57-module audit. Preserve released behaviour. The ten implementation lanes are an allocation of work, not a completion claim.
+Scope: the original sixteen-route request and the subsequent 57-module audit. Preserve released behaviour. The current execution batch is five Terra implementation lanes, followed by coordinator review. Remaining lanes stay queued; an agent count is not a completion claim.
 
 ## Delivery order
 
@@ -19,9 +19,11 @@ Scope: the original sixteen-route request and the subsequent 57-module audit. Pr
 
 At most three workers run concurrently. Each owns disjoint paths. Shared framework additions and dependency integration are coordinated centrally. New collaborator needs are resolved through the owning API or framework, never an untyped bag or a placeholder that only refuses.
 
+Current batch: governance, scenario, gateway/OTLP, webhook, hosted MCP. Langy residue, authorization, errors and memory coverage remain queued after the requested five-agent review.
+
 ## Reconciliation after these lanes
 
-Recheck every original audit finding against current source. Record one of: fixed with proof, intentional and supported by a specific reason, or open with a concrete next action. Remaining implementation is requeued; ten handoffs do not terminate the task.
+Recheck every original audit finding against current source. Record one of: fixed with proof, intentional and supported by a specific reason, or open with a concrete next action. Remaining implementation is requeued; five handoffs do not terminate the completion checklist.
 
 Particular residuals to account for:
 
@@ -51,4 +53,4 @@ Final acceptance: reconcile the finding ledger, test the composed API/worker and
 
 Earlier work collected in six commits: ef5722e683 (streaming), 642fc1036f (share), 94c32a7312 (licensing/entitlement), 61ae6fe6a0 (Langy), cdb205e9b9 (prompt), a6ba4e2df4 (identity). Streaming's 19 focused tests passed. Other group proof and limitations are recorded in `.claude/handoffs/hygiene-commits.md` and `/tmp/langwatch-module-hygiene-proof.md`.
 
-Wave 1 is running. Governance has a real composition gap: two distinct same-name API tokens and an installed app exposing only part of the full API. Auth CLI session peer operations are a concrete prerequisite. Scenario needs a portable structured-generation operation from model-provider. Neither gap is solved by mounting an incomplete app.
+Five Terra implementation lanes have been reviewed. Scenario generation/export is mounted and behavior-proven. Governance has its Auth prerequisite but needs real complete composition. Gateway has scoped HMAC and OTLP alias proof but still lacks its production protocol supplier. Webhook has a faithful memory sender but no live dispatch integration. Hosted MCP has its first OAuth extraction, with atomic redemption; session hosting/lifecycle remains open. Detailed results and exact check limitations: `.claude/handoffs/hygiene-wave-review.md`.
