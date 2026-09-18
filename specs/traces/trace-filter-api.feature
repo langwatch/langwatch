@@ -154,3 +154,9 @@ Feature: The trace filter language and its value discovery over the API key surf
     When they ask for the values behind an attribute key
     Then the window's floor is raised to that cutoff
     But a named facet keeps the window the caller asked for
+
+  @unit
+  Scenario: A window bound naming a day that does not exist is refused
+    Given a caller asking for one field's values
+    When a window bound names the thirtieth of February
+    Then the request is refused rather than rolled forward into March

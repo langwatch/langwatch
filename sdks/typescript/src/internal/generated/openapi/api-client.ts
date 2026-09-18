@@ -1098,7 +1098,7 @@ export interface paths {
          *
          *     An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.
          *
-         *     Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema, the same answer `GET /api/v1/query/schema` gives it.
+         *     Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema. `GET /api/v1/query/schema` is stricter and refuses that key outright, which is why this document withholds the catalog rather than repeating it.
          */
         get: operations["getApiV1QueryReference"];
         put?: never;

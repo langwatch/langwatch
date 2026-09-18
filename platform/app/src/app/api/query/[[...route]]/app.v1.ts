@@ -122,6 +122,17 @@ function queryAccess() {
   return apiKeyPermission(QUERY_PERMISSION);
 }
 
+/**
+ * What a cache may do with a document shaped by the caller's own permissions.
+ *
+ * Both discovery doors answer differently per credential: `available`, the
+ * columns in the schema, and whether the LangWatchQL half is open at all. A
+ * cache keyed on the URL, or on the project, would replay one key's document
+ * to another, so the answer says not to store it rather than trusting every
+ * proxy between here and the caller to key on the credential.
+ */
+const CREDENTIAL_SHAPED = "private, no-store";
+
 /** The project the credential resolved to, plus its redaction protections. */
 async function callerContext(c: Context) {
   const project = c.get("project");
@@ -148,7 +159,7 @@ const REFERENCE_DESCRIPTION =
   "It also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator and the real translator before it ships, so a published example parses and compiles; whether THIS key can run one is its own `available` flag.\n\n" +
   "Pure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory. It is cacheable only PER CREDENTIAL — `available`, the embedded schema and the gated columns all differ between keys, so a shared cache must key on the credential and never serve one key's document to another. The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.\n\n" +
   "An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.\n\n" +
-  "Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema, the same answer `GET /api/v1/query/schema` gives it.";
+  "Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema. `GET /api/v1/query/schema` is stricter and refuses that key outright, which is why this document withholds the catalog rather than repeating it.";
 
 /**
  * `POST /api/v1/query` — execute one statement.
@@ -229,6 +240,7 @@ function registerSchema(secured: ReturnType<typeof createProjectApp>): void {
     }),
     async (c) => {
       const { protections } = await callerContext(c);
+      c.header("Cache-Control", CREDENTIAL_SHAPED);
       return c.json(
         await getLangWatchQLService().describeSchema({ protections }),
       );
@@ -255,7 +267,8 @@ function registerSchema(secured: ReturnType<typeof createProjectApp>): void {
  * trace filter half is the traces family's vocabulary, and a key scoped to
  * `traces:view` alone would otherwise be refused the only document that
  * describes the language it is entitled to use. The SQL half is withheld from
- * such a key instead, which is the same answer `/schema` gives it.
+ * such a key instead: `/schema` refuses it outright, so publishing the catalog
+ * here would be that door standing open next to the one that is shut.
  *
  * Runs the real ceiling rather than a second copy of the rule, so a legacy
  * project key keeps passing and a scoped key is checked exactly once.
@@ -296,6 +309,7 @@ function registerReference(secured: ReturnType<typeof createProjectApp>): void {
     }),
     async (c) => {
       const { project, protections } = await callerContext(c);
+      c.header("Cache-Control", CREDENTIAL_SHAPED);
       return c.json(
         describeQueryReference({
           protections,

@@ -5,8 +5,9 @@
  * whole of it on `analytics:view`, the way the rest of this family is gated,
  * would refuse a key scoped to `traces:view` the only document describing the
  * trace filter — a language that key is entitled to use. So the door answers
- * any project credential and the LangWatchQL half is withheld instead, which
- * is the same answer `GET /api/v1/query/schema` gives such a key.
+ * any project credential and the LangWatchQL half is withheld instead.
+ * `GET /api/v1/query/schema` refuses such a key outright; this document
+ * answers, minus the catalog that door would have refused.
  *
  * The ceiling is mocked rather than reimplemented: what is under test is that
  * the route asks it and shapes the document from the answer, not what the
@@ -104,6 +105,12 @@ describe("GET /reference", () => {
   describe("when the key holds analytics:view", () => {
     beforeEach(() => {
       mockEnforceCeiling.mockResolvedValue(undefined);
+    });
+
+    /** @scenario "A key entitled only to traces still reads the filter vocabulary" */
+    it("tells caches not to store a document shaped by one credential", async () => {
+      const response = await readReference();
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
     });
 
     it("answers both halves", async () => {

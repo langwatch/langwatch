@@ -276,6 +276,30 @@ describe("GET /facets", () => {
       );
     });
 
+    /**
+     * `Date.parse` rolls an impossible date forward rather than refusing it, so
+     * a window ending on the 30th of February quietly covers two days the
+     * caller never asked for.
+     */
+    /** @scenario "A window bound naming a day that does not exist is refused" */
+    it("refuses a day the calendar does not have", async () => {
+      const response = await facets("?field=model&endDate=2026-02-30");
+      expect(response.status).toBe(422);
+      expect(mockGetFacetValues).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A window bound naming a day that does not exist is refused" */
+    it("accepts the last day a month really has", async () => {
+      const response = await facets("?field=model&endDate=2026-02-28");
+      expect(response.status).toBe(200);
+    });
+
+    /** @scenario "A window bound naming a day that does not exist is refused" */
+    it("accepts a leap day in a leap year", async () => {
+      const response = await facets("?field=model&endDate=2028-02-29");
+      expect(response.status).toBe(200);
+    });
+
     it("accepts an ISO string on the same parameters", async () => {
       const response = await facets(
         "?field=model&startDate=2026-09-01T00:00:00.000Z",

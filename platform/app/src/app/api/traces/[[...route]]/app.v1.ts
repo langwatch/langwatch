@@ -77,9 +77,34 @@ const EPOCH_MILLIS = /^\d+$/;
 const facetWindowBoundSchema = z
   .string()
   .refine(
-    (value) => EPOCH_MILLIS.test(value) || !Number.isNaN(Date.parse(value)),
+    (value) =>
+      EPOCH_MILLIS.test(value) ||
+      (namesARealDay(value) && !Number.isNaN(Date.parse(value))),
     { message: "Expected epoch milliseconds or a date string" },
   );
+
+/** The calendar date at the front of an ISO string, if it starts with one. */
+const ISO_CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})/;
+
+/**
+ * Whether an ISO-shaped bound names a day that exists.
+ *
+ * `Date.parse` rolls an impossible date forward instead of refusing it, so
+ * `2026-02-30` becomes March 2 and a window ending there quietly covers two
+ * days nobody asked for. The digits are checked against the month's real
+ * length rather than against a re-parse, because a bound carrying a timezone
+ * offset has a different UTC date by design and a round-trip would reject it.
+ */
+function namesARealDay(value: string): boolean {
+  const match = ISO_CALENDAR_DATE.exec(value);
+  if (!match) return true;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12) return false;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day >= 1 && day <= daysInMonth;
+}
 
 /** One window bound as epoch milliseconds, whichever way it was written. */
 function facetWindowBound(value: string): number {
