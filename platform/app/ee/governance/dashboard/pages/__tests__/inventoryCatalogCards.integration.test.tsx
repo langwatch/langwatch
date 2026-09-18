@@ -109,7 +109,7 @@ describe("given an admin on the Inventory page", () => {
       await openTab(/Environments/);
       const table = await screen.findByTestId("environments-table");
       expect(
-        within(table).getByText("example-env.crm.test"),
+        await within(table).findByText("example-env.crm.test"),
       ).toBeInTheDocument();
       expect(
         within(table).getByText("Discovered from Assistant transcripts"),
@@ -122,7 +122,7 @@ describe("given an admin on the Inventory page", () => {
       await openTab(/Environments/);
       const table = await screen.findByTestId("environments-table");
       expect(
-        within(table).getAllByText("Discovered automatically").length,
+        (await within(table).findAllByText("Discovered automatically")).length,
       ).toBeGreaterThan(0);
     });
 
@@ -134,13 +134,13 @@ describe("given an admin on the Inventory page", () => {
       );
       await openTab(/Environments/);
       const table = await screen.findByTestId("environments-table");
-      expect(within(table).getByText("Production")).toBeInTheDocument();
+      expect(await within(table).findByText("Production")).toBeInTheDocument();
       expect(within(table).queryByText("example-env.crm.test")).toBeNull();
       await userEvent.click(
         screen.getByRole("button", { name: "Hide sample data" }),
       );
       expect(
-        within(table).getByText("example-env.crm.test"),
+        await within(table).findByText("example-env.crm.test"),
       ).toBeInTheDocument();
       expect(within(table).queryByText("Production")).toBeNull();
     });
@@ -149,7 +149,9 @@ describe("given an admin on the Inventory page", () => {
     it("replaces real sources with read-only samples until disabled", async () => {
       renderScreen();
       await openTab(/Sources/);
-      expect(screen.getByTestId("source-row-src-genie")).toBeInTheDocument();
+      expect(
+        await screen.findByTestId("source-row-src-genie"),
+      ).toBeInTheDocument();
       await userEvent.click(
         screen.getByRole("button", { name: "See sample data" }),
       );
@@ -163,7 +165,9 @@ describe("given an admin on the Inventory page", () => {
       await userEvent.click(
         screen.getByRole("button", { name: "Hide sample data" }),
       );
-      expect(screen.getByTestId("source-row-src-genie")).toBeInTheDocument();
+      expect(
+        await screen.findByTestId("source-row-src-genie"),
+      ).toBeInTheDocument();
     });
 
     /** @scenario "The catalog is offered as a grid or as a table" */

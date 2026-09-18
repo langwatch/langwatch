@@ -1,9 +1,10 @@
 /**
  * Request and response schemas for the query domain.
  *
- * Two calls, two payloads: what `POST /api/v1/query` accepts
- * ({@link lwqlQuerySchema}) and what each of the two routes answers with
- * ({@link lwqlResultSchema}, {@link lwqlSchemaSchema}).
+ * One request payload — what `POST /api/v1/query` accepts
+ * ({@link lwqlQuerySchema}) — and one response payload per route
+ * ({@link lwqlResultSchema}, {@link lwqlSchemaSchema},
+ * {@link queryReferenceSchema}).
  *
  * The payload schemas were lifted verbatim from the routes this door
  * superseded (`api/analytics-sql/[[...route]]/app.v1.ts`, removed by issue
@@ -28,6 +29,7 @@ import {
   lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,
 } from "~/server/analytics/lwql/timeWindowSchema";
+import { QUERY_EXAMPLE_INTENTS } from "~/server/app-layer/traces/query-language/examples";
 
 /**
  * A bound parameter's value.
@@ -170,5 +172,87 @@ export const lwqlSchemaSchema = z.object({
       available: z.boolean(),
       exampleSql: z.string(),
     }),
+  ),
+});
+
+const queryReferenceEndpointSchema = z.object({
+  method: z.enum(["GET", "POST"]),
+  path: z.string(),
+  description: z.string(),
+});
+
+/**
+ * The query reference, as the OpenAPI document describes it.
+ *
+ * Loose where the payload is a projection of something already published
+ * elsewhere in this file — the LangWatchQL schema — and exact where the
+ * consumer branches on it: the example's `language`, `intent` and `available`
+ * are what an agent picks a query with, and a spec that would not enumerate
+ * them makes it guess from prose.
+ */
+export const queryReferenceSchema = z.object({
+  version: z.string(),
+  lwql: z.object({
+    enabled: z.boolean(),
+    schema: lwqlSchemaSchema,
+    limits: z.object({
+      maxStatementLength: z.number(),
+      maxRowsReturned: z.number(),
+      maxResultBytes: z.number(),
+      maxExecutionTimeSeconds: z.number(),
+      pagination: z.string(),
+    }),
+    endpoints: z.array(queryReferenceEndpointSchema),
+  }),
+  traceFilter: z.object({
+    syntax: z.string(),
+    fields: z.array(
+      z.object({
+        name: z.string(),
+        label: z.string(),
+        valueType: z.enum(["categorical", "range", "text", "existence"]),
+        // Nullable rather than optional, for the same reason the schema's
+        // `unit` is: every field answers the grouping question, and `null` is
+        // the answer for one the product has not placed in a group yet.
+        group: z.string().nullable(),
+        facetable: z.boolean(),
+        knownValues: z.array(z.string()),
+      }),
+    ),
+    dynamicPrefixes: z.array(
+      z.object({
+        prefix: z.string(),
+        label: z.string(),
+        description: z.string(),
+        aliases: z.array(z.string()),
+      }),
+    ),
+    endpoints: z.array(queryReferenceEndpointSchema),
+  }),
+  examples: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      intent: z.enum(QUERY_EXAMPLE_INTENTS),
+      language: z.enum(["lwql", "trace-filter"]),
+      tags: z.array(z.string()),
+      text: z.string(),
+      parameters: z.array(
+        z.object({
+          name: z.string(),
+          type: z.string(),
+          description: z.string(),
+        }),
+      ),
+      requires: z.object({
+        gates: z.array(z.enum(["input", "output", "costs"])),
+        functions: z.array(z.string()),
+      }),
+      available: z.boolean(),
+      notes: z.string().optional(),
+    }),
+  ),
+  decisionTable: z.array(
+    z.object({ when: z.string(), use: z.string(), why: z.string() }),
   ),
 });

@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { BackofficeTable, EmptyCell, formatDateTime } from "../BackofficeTable";
 
@@ -225,32 +225,7 @@ function BugReportDrawer({
           )}
           {report.data && (
             <VStack align="stretch" gap={6}>
-              <SimpleGrid columns={2} gap={3}>
-                <Fact label="Received">
-                  {formatDateTime(report.data.createdAt)}
-                </Fact>
-                <Fact label="Kind">
-                  {kindLabel[report.data.kind] ?? report.data.kind}
-                </Fact>
-                <Fact label="Source">{report.data.source}</Fact>
-                <Fact label="Agent">{report.data.agent ?? "unknown"}</Fact>
-                <Fact label="CLI version">
-                  {report.data.cliVersion ?? "unknown"}
-                </Fact>
-                <Fact label="Project">
-                  {report.data.linkedProjectId ?? "not linked"}
-                </Fact>
-                <Fact label="Contact">
-                  {report.data.contactEmail ?? "none"}
-                </Fact>
-                <Fact label="Transcript">
-                  {report.data.sessionData
-                    ? report.data.sessionTruncated
-                      ? "attached, truncated"
-                      : "attached"
-                    : "none"}
-                </Fact>
-              </SimpleGrid>
+              <BugReportFacts report={report.data} />
 
               {report.data.summary && (
                 <Box>
@@ -271,44 +246,80 @@ function BugReportDrawer({
               )}
 
               {report.data.sessionData && (
-                <Box>
-                  <HStack marginBottom={2}>
-                    <Text fontWeight="semibold">Session transcript</Text>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={copyTranscript}
-                    >
-                      <Copy size={12} /> Copy
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={downloadTranscript}
-                    >
-                      <Download size={12} /> Download .jsonl
-                    </Button>
-                  </HStack>
-                  <Box
-                    backgroundColor="bg.muted"
-                    borderRadius="md"
-                    padding={3}
-                    fontSize="xs"
-                    fontFamily="mono"
-                    whiteSpace="pre-wrap"
-                    wordBreak="break-all"
-                    maxHeight="480px"
-                    overflowY="auto"
-                  >
-                    {report.data.sessionData}
-                  </Box>
-                </Box>
+                <SessionTranscript
+                  sessionData={report.data.sessionData}
+                  onCopy={copyTranscript}
+                  onDownload={downloadTranscript}
+                />
               )}
             </VStack>
           )}
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/** One report, as the drawer reads it back. */
+type BugReport = NonNullable<RouterOutputs["bugReports"]["getById"]>;
+
+/** The one-line facts about a report, as the drawer's two-column grid. */
+function BugReportFacts({ report }: { report: BugReport }) {
+  return (
+    <SimpleGrid columns={2} gap={3}>
+      <Fact label="Received">{formatDateTime(report.createdAt)}</Fact>
+      <Fact label="Kind">{kindLabel[report.kind] ?? report.kind}</Fact>
+      <Fact label="Source">{report.source}</Fact>
+      <Fact label="Agent">{report.agent ?? "unknown"}</Fact>
+      <Fact label="CLI version">{report.cliVersion ?? "unknown"}</Fact>
+      <Fact label="Project">{report.linkedProjectId ?? "not linked"}</Fact>
+      <Fact label="Contact">{report.contactEmail ?? "none"}</Fact>
+      <Fact label="Transcript">
+        {report.sessionData
+          ? report.sessionTruncated
+            ? "attached, truncated"
+            : "attached"
+          : "none"}
+      </Fact>
+    </SimpleGrid>
+  );
+}
+
+/** The attached session transcript, with the two ways to take it away. */
+function SessionTranscript({
+  sessionData,
+  onCopy,
+  onDownload,
+}: {
+  sessionData: string;
+  onCopy: () => void;
+  onDownload: () => void;
+}) {
+  return (
+    <Box>
+      <HStack marginBottom={2}>
+        <Text fontWeight="semibold">Session transcript</Text>
+        <Button size="xs" variant="outline" onClick={onCopy}>
+          <Copy size={12} /> Copy
+        </Button>
+        <Button size="xs" variant="outline" onClick={onDownload}>
+          <Download size={12} /> Download .jsonl
+        </Button>
+      </HStack>
+      <Box
+        backgroundColor="bg.muted"
+        borderRadius="md"
+        padding={3}
+        fontSize="xs"
+        fontFamily="mono"
+        whiteSpace="pre-wrap"
+        wordBreak="break-all"
+        maxHeight="480px"
+        overflowY="auto"
+      >
+        {sessionData}
+      </Box>
+    </Box>
   );
 }
 

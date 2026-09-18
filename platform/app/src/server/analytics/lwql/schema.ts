@@ -297,7 +297,7 @@ export function describeLangWatchQLAppFunctions({
   /** Whether this project may call an eval function. Off unless it is asked. */
   instantEvalsEnabled?: boolean;
 }): readonly LangWatchQLSchemaAppFunction[] {
-  const held = new Set(lwqlHeldPermissions({ protections }));
+  const held = lwqlHeldPermissions(protections);
   return appFunctions.map((definition) => ({
     name: definition.name,
     kind: definition.kind,

@@ -77,6 +77,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Selected Text Events](https://langwatch.ai/docs/user-events/selected-text.md): Track selected text events in LangWatch to understand user behavior and improve LLM performance across AI agent evaluations.
 - [Custom Events](https://langwatch.ai/docs/user-events/custom.md): Track custom user events in your LLM application using LangWatch to support analytics, evaluations, and agent testing workflows.
 
+- [Querying your data](https://langwatch.ai/docs/features/querying-your-data.md): LangWatch answers two query languages, analytics SQL and the trace filter. One endpoint describes both, and the CLI runs either without a browser.
 - [Alerts and Automations](https://langwatch.ai/docs/features/automations.md): Configure Alerts and Automations in LangWatch to detect regressions, notify teams, and enforce automated guardrails for AI agent testing.
 - [Exporting Analytics](https://langwatch.ai/docs/features/embedded-analytics.md): Export LangWatch analytics into your own dashboards to monitor LLM quality, agent testing metrics, and evaluation performance.
 
@@ -722,6 +723,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Traces
 
 - [Overview](https://langwatch.ai/docs/api-reference/traces/overview.md): Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.
+- [Discover what the trace filter fields hold](https://langwatch.ai/docs/api-reference/traces/discover-what-the-trace-filter-fields-ho.md)
 - [Search traces](https://langwatch.ai/docs/api-reference/traces/search.md)
 - [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
 - [Get Transcript](https://langwatch.ai/docs/api-reference/traces/get-transcript.md)
@@ -1010,6 +1012,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Query
 
 - [Overview](https://langwatch.ai/docs/api-reference/query/overview.md): Run a read-only LangWatchQL SELECT over your project's analytics views, or discover which views and columns your key can query.
+- [Discover both query languages](https://langwatch.ai/docs/api-reference/query/discover-both-query-languages.md)
 - [Discover the queryable LangWatchQL schema](https://langwatch.ai/docs/api-reference/query/discover-the-queryable-langwatchql-schema.md)
 - [Run a LangWatchQL query](https://langwatch.ai/docs/api-reference/query/run-a-langwatchql-query.md)
 - [Extraction And Eval Functions](https://langwatch.ai/docs/api-reference/query/extraction-functions.md): Project the text of a conversation, a trace or an LLM call straight out of a LangWatchQL query, and ask a question about it.

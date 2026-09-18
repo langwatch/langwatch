@@ -1,10 +1,12 @@
 /**
  * The query domain — LangWatchQL over REST, on its own family.
  *
- * Two doors:
+ * Three doors:
  *
  *  - `POST /api/v1/query` — run one statement
  *  - `GET  /api/v1/query/schema` — describe what may be queried
+ *  - `GET  /api/v1/query/reference` — describe both query languages, with
+ *    worked examples and which one answers which kind of question
  *
  * This supersedes `/api/v1/projects/{projectId}/analytics/query/clickhouse`
  * and its sibling `.../analytics/schema` — both removed (issue #7565), so this
@@ -48,6 +50,7 @@
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
@@ -58,6 +61,7 @@ import {
   getLangWatchQLService,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
 } from "~/server/analytics/lwql";
+import { describeQueryReference } from "~/server/analytics/query-reference";
 import {
   type createProjectApp,
   handlerManagedAuth,
@@ -65,15 +69,22 @@ import {
 import { validator as zValidator } from "~/server/api/validation";
 import {
   createUnifiedKeyAuthMiddleware,
+  enforceApiKeyCeiling,
   type KeyAuthVariables,
 } from "~/server/api-key/auth-middleware";
+import type { ResolvedToken } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
 import {
   canonicalBaseResponses,
   canonicalUnprocessableResponses,
 } from "../../shared/base-responses";
 import { resolveLwqlQueryScope } from "./queryScope";
-import { lwqlQuerySchema, lwqlResultSchema, lwqlSchemaSchema } from "./schemas";
+import {
+  lwqlQuerySchema,
+  lwqlResultSchema,
+  lwqlSchemaSchema,
+  queryReferenceSchema,
+} from "./schemas";
 
 const logger = createLogger("langwatch:api:query");
 
@@ -116,6 +127,17 @@ function queryAccess() {
   });
 }
 
+/**
+ * What a cache may do with a document shaped by the caller's own permissions.
+ *
+ * Both discovery doors answer differently per credential: `available`, the
+ * columns in the schema, and whether the LangWatchQL half is open at all. A
+ * cache keyed on the URL, or on the project, would replay one key's document
+ * to another, so the answer says not to store it rather than trusting every
+ * proxy between here and the caller to key on the credential.
+ */
+const CREDENTIAL_SHAPED = "private, no-store";
+
 /** The projects the credential may read, plus the strictest redaction protections across them. */
 async function callerContext(c: Context) {
   return resolveLwqlQueryScope({
@@ -156,6 +178,15 @@ const SCHEMA_DESCRIPTION =
   "Under `appFunctions` it lists the app functions a projection may call, each with its signature, the type and encoding of the value it returns, how many distinct keys one run may read, and the permissions it needs.\n\n" +
   "Scoped to the projects the credential can read and their permissions: a column or app function this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.\n\n" +
   `${HEADER_RULE}`;
+
+const REFERENCE_DESCRIPTION =
+  "Describes both query languages in one payload: LangWatchQL (SQL over the analytics views) with its schema, limits and endpoints, and the trace filter (a Lucene-flavored string over the trace list) with its syntax, its fields and their static value vocabularies, and the open-ended attribute namespaces.\n\n" +
+  "It also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator and the real translator before it ships, so a published example parses and compiles; whether THIS key can run one is its own `available` flag.\n\n" +
+  "Pure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory rather than from the database.\n\n" +
+  "It answers `Cache-Control: private, no-store`, because the document is shaped by the calling credential: `available`, the embedded schema and the gated columns all differ between keys, and a cache keyed on the URL or the project would replay one key's document to another. Ask for it again rather than storing it.\n\n" +
+  "The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.\n\n" +
+  "An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.\n\n" +
+  "Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema. `GET /api/v1/query/schema` is stricter and refuses that key outright, which is why this document withholds the catalog rather than repeating it.";
 
 /**
  * `POST /api/v1/query` — execute one statement.
@@ -250,6 +281,7 @@ function registerSchema(secured: QuerySecuredApp): void {
     }),
     async (c) => {
       const { projects, protections } = await callerContext(c);
+      c.header("Cache-Control", CREDENTIAL_SHAPED);
       return c.json(
         await getLangWatchQLService().describeSchema({
           projectIds: projects.map((project) => project.id),
@@ -269,8 +301,105 @@ function registerSchema(secured: QuerySecuredApp): void {
  */
 type QuerySecuredApp = ReturnType<typeof createProjectApp<KeyAuthVariables>>;
 
+/**
+ * The reference door's declared policy: authenticated, but gated on nothing.
+ *
+ * Separate from {@link queryAccess} because the two doors want different
+ * credentials. Running a statement needs `analytics:view` somewhere; reading
+ * the reference needs no RBAC permission at all, because half of what it
+ * describes is the traces family's own filter vocabulary. Declaring
+ * `analytics:view` here would state a ceiling the handler does not enforce.
+ */
+function referenceAccess() {
+  return handlerManagedAuth({
+    reason:
+      "Any authenticated API key may read the reference: the trace-filter half is the traces family's vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused.",
+    permissions: [],
+    credential: "apiKey",
+  });
+}
+
+/**
+ * Whether this credential could run LangWatchQL here.
+ *
+ * Asked rather than enforced, because the reference answers either way: the
+ * trace filter half is the traces family's vocabulary, and a key scoped to
+ * `traces:view` alone would otherwise be refused the only document that
+ * describes the language it is entitled to use. The SQL half is withheld from
+ * such a key instead: `/schema` refuses it outright, so publishing the catalog
+ * here would be that door standing open next to the one that is shut.
+ *
+ * Runs the real ceiling rather than a second copy of the rule, so a legacy
+ * project key keeps passing and a scoped key is checked exactly once.
+ */
+async function holdsQueryPermission(c: Context): Promise<boolean> {
+  const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
+  if (!resolved) return false;
+  try {
+    await enforceApiKeyCeiling({
+      resolved,
+      permission: QUERY_PERMISSION,
+      app: appFromContext(c),
+    });
+    return true;
+  } catch (error) {
+    if (HandledError.isHandled(error)) return false;
+    throw error;
+  }
+}
+
+/**
+ * `GET /api/v1/query/reference`: describe both query languages.
+ *
+ * A sibling of `/schema` rather than a replacement for it: `/schema` is the
+ * LangWatchQL catalog and stays exactly what it was, and this is the document a
+ * caller reads when it does not yet know WHICH language answers its question.
+ * It embeds the same schema, so a caller that wants both pays one round trip.
+ *
+ * Pure apart from the one fact that depends on the caller: whether its key
+ * reaches LangWatchQL at all. That answer comes from the scope the other two
+ * doors already resolve, so the document is otherwise read from memory.
+ */
+function registerReference(secured: QuerySecuredApp): void {
+  secured.access(referenceAccess()).get(
+    "/reference",
+    queryAuth,
+    describeRoute({
+      summary: "Discover both query languages",
+      description: REFERENCE_DESCRIPTION,
+      tags: QUERY_TAGS,
+      responses: {
+        ...canonicalBaseResponses,
+        200: {
+          description:
+            "The LangWatchQL schema and limits, the trace filter's syntax and fields, worked examples in both languages, and which language answers which kind of question.",
+          content: {
+            "application/json": { schema: resolver(queryReferenceSchema) },
+          },
+        },
+      },
+    }),
+    async (c) => {
+      const { projects, protections } = await callerContext(c);
+      c.header("Cache-Control", CREDENTIAL_SHAPED);
+      return c.json(
+        describeQueryReference({
+          protections,
+          // The LangWatchQL half is open when the key both clears the API-key
+          // ceiling and resolves to at least one readable project: a key that
+          // reads nowhere would get an empty catalog anyway, and saying so is
+          // what tells a `traces:view` caller to use the filter instead.
+          lwqlEnabled: (await holdsQueryPermission(c)) && projects.length > 0,
+          database: getLangWatchQLService().database,
+        }),
+      );
+    },
+  );
+}
+
 /** Registers the query-domain routes. */
 export function registerQueryRoutes(secured: QuerySecuredApp): void {
   registerRun(secured);
   registerSchema(secured);
+  registerReference(secured);
 }

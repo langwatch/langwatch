@@ -557,6 +557,19 @@ export class LangWatchQLService {
   }
 
   /**
+   * The database every dataset name is qualified with.
+   *
+   * Published because the query reference assembles the same schema alongside a
+   * second query language, and the qualifier is a deployment fact only this
+   * service holds — `analytics` in production, a per-suite database under test.
+   * Re-deriving it at the reference would mean a document whose dataset names
+   * are unrunnable on exactly the deployments where it differs.
+   */
+  get database(): string {
+    return this.deps.database;
+  }
+
+  /**
    * Decides whether a statement may run for these permissions, without running
    * it — steps 2 and 3 of the order this file documents.
    *
@@ -623,7 +636,7 @@ export class LangWatchQLService {
       gatedColumns: lwqlGatedColumns({ protections, views: this.views }),
       // The positive form of the same permissions, which is what an app
       // function is gated on: it has no column for the withheld set to name.
-      heldPermissions: lwqlHeldPermissions({ protections }),
+      heldPermissions: [...lwqlHeldPermissions(protections)],
       instantEvalsEnabled,
       defaultDatabase: this.deps.database,
     });
@@ -781,6 +794,66 @@ export class LangWatchQLService {
   }
 
   /**
+   * Step 4: the database call, and the one ceiling that is checked on what it
+   * returned rather than on what the application then put in it.
+   *
+   * Split from {@link executeValidated} because it is the half with no
+   * decisions left in it — the statement is settled, the scope is settled, and
+   * what comes back is rows.
+   */
+  private async runStatement({
+    executor,
+    projects,
+    sql,
+    validation,
+    granularity,
+  }: {
+    readonly executor: LangWatchQLExecutor;
+    readonly projects: readonly LangWatchQLCaller[];
+    readonly sql: string;
+    readonly validation: ValidatedLangWatchQL;
+    readonly granularity: LangWatchQLGranularityResolution;
+  }): Promise<Awaited<ReturnType<LangWatchQLExecutor["execute"]>>> {
+    const executionParameters = executionParametersFor({
+      validation,
+      granularity,
+    });
+
+    const execution = await executor.execute({
+      // The submitted statement, with one edit and no other: a default `LIMIT`
+      // appended when the caller named none, so an unbounded query is capped
+      // rather than streamed. A statement that already pages is sent verbatim.
+      sql: validation.appendRowLimit
+        ? appendDefaultRowLimit(
+            sql,
+            this.limits.maxRows,
+            validation.appendRowLimitBeforeOffset,
+          )
+        : sql,
+      ...(Object.keys(executionParameters).length > 0
+        ? { parameters: executionParameters }
+        : {}),
+      tenantCapability: lwqlTenantCapabilitySet({
+        secrets: projects.map((project) => project.lwqlKey),
+      }),
+      usesAppFunctions: validation.appFunctions.length > 0,
+    });
+
+    // A finished result larger than the byte ceiling is refused outright rather
+    // than cut: a body that looks whole but is missing its tail is the worse
+    // failure for an analytics caller. The row count is already bounded by the
+    // LIMIT above; this is the ceiling a query can still overshoot on width.
+    // Measured on what the database returned, which for an app-function query
+    // is a page of keys — the hydrated bytes have their own ceiling below.
+    assertResultWithinByteCeiling({
+      rows: execution.rows,
+      maxResultBytes: this.limits.maxResultBytes,
+    });
+
+    return execution;
+  }
+
+  /**
    * Steps 5a and 5b: turn the keys into values, then record what that cost.
    *
    * Hydration runs after the database and before the diagnostics, because the
@@ -865,40 +938,12 @@ export class LangWatchQLService {
     readonly granularity: LangWatchQLGranularityResolution;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
-    const executionParameters = executionParametersFor({
+    const execution = await this.runStatement({
+      executor,
+      projects,
+      sql,
       validation,
       granularity,
-    });
-
-    const execution = await executor.execute({
-      // The submitted statement, with one edit and no other: a default `LIMIT`
-      // appended when the caller named none, so an unbounded query is capped
-      // rather than streamed. A statement that already pages is sent verbatim.
-      sql: validation.appendRowLimit
-        ? appendDefaultRowLimit(
-            sql,
-            this.limits.maxRows,
-            validation.appendRowLimitBeforeOffset,
-          )
-        : sql,
-      ...(Object.keys(executionParameters).length > 0
-        ? { parameters: executionParameters }
-        : {}),
-      tenantCapability: lwqlTenantCapabilitySet({
-        secrets: projects.map((project) => project.lwqlKey),
-      }),
-      usesAppFunctions: validation.appFunctions.length > 0,
-    });
-
-    // A finished result larger than the byte ceiling is refused outright rather
-    // than cut: a body that looks whole but is missing its tail is the worse
-    // failure for an analytics caller. The row count is already bounded by the
-    // LIMIT above; this is the ceiling a query can still overshoot on width.
-    // Measured on what the database returned, which for an app-function query
-    // is a page of keys — the hydrated bytes have their own ceiling below.
-    assertResultWithinByteCeiling({
-      rows: execution.rows,
-      maxResultBytes: this.limits.maxResultBytes,
     });
 
     const hydration = await this.hydrateAndBill({

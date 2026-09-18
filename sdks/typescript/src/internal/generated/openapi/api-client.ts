@@ -1048,7 +1048,7 @@ export interface paths {
          *
          *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          *
-         *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A run that would need more distinct conversations, traces or spans than the published cap answers 422 rather than a partial result.
+         *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.
          *
          *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
          *
@@ -1081,6 +1081,38 @@ export interface paths {
          *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
          */
         get: operations["getApiV1QuerySchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/query/reference": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover both query languages
+         * @description Describes both query languages in one payload: LangWatchQL (SQL over the analytics views) with its schema, limits and endpoints, and the trace filter (a Lucene-flavored string over the trace list) with its syntax, its fields and their static value vocabularies, and the open-ended attribute namespaces.
+         *
+         *     It also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator and the real translator before it ships, so a published example parses and compiles; whether THIS key can run one is its own `available` flag.
+         *
+         *     Pure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory rather than from the database.
+         *
+         *     It answers `Cache-Control: private, no-store`, because the document is shaped by the calling credential: `available`, the embedded schema and the gated columns all differ between keys, and a cache keyed on the URL or the project would replay one key's document to another. Ask for it again rather than storing it.
+         *
+         *     The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.
+         *
+         *     An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.
+         *
+         *     Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema. `GET /api/v1/query/schema` is stricter and refuses that key outright, which is why this document withholds the catalog rather than repeating it.
+         */
+        get: operations["getApiV1QueryReference"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3997,6 +4029,32 @@ export interface paths {
         put?: never;
         /** @description Search traces for a project */
         post: operations["postApiTracesSearch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/traces/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover what the trace filter fields hold
+         * @description What the trace filter fields actually hold in THIS project, which the filter language's own reference deliberately does not carry: values are tenant data, they move under you, and reading them all costs about thirty aggregate queries.
+         *
+         *     Two answers from one door. Without `field` you get the discovery payload: every facet this project has, each with its top values and counts, plus the range bounds for the numeric ones. With `field` you get one field's values, paged, filtered by `prefix`.
+         *
+         *     The values are cached and refreshed in the background, so a cold project answers `pending: true` with the payload it has; call again shortly for the computed one.
+         *
+         *     Use it whenever you are unsure how a value is spelled. `GET /api/v1/query/reference` lists the fields and their fixed vocabularies; only this endpoint knows the open ones.
+         */
+        get: operations["getApiTracesFacets"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8919,7 +8977,7 @@ export interface operations {
                         coarsenedFromSeconds?: number;
                         diagnostics: {
                             /** @enum {string} */
-                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
@@ -9070,15 +9128,223 @@ export interface operations {
                             name: string;
                             signature: string;
                             description: string;
+                            /** @enum {string} */
+                            kind: "extraction" | "eval";
                             returns: string;
                             /** @enum {string} */
                             encoding: "text" | "json";
                             /** @enum {string} */
-                            keyKind: "trace" | "thread" | "span";
+                            keyKind: "trace" | "thread" | "span" | "text";
                             cap: number;
                             gates: ("input" | "output" | "costs")[];
                             available: boolean;
                             exampleSql: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1QueryReference: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The LangWatchQL schema and limits, the trace filter's syntax and fields, worked examples in both languages, and which language answers which kind of question. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: string;
+                        lwql: {
+                            enabled: boolean;
+                            schema: {
+                                database: string;
+                                views: {
+                                    name: string;
+                                    description: string;
+                                    grain: string;
+                                    joinKeys: string[];
+                                    timeColumn: string;
+                                    freshness: string;
+                                    columns: {
+                                        name: string;
+                                        type: string;
+                                        description: string;
+                                        /** @enum {string|null} */
+                                        unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                        gates: ("input" | "output" | "costs")[];
+                                        available: boolean;
+                                    }[];
+                                    exampleSql: string;
+                                }[];
+                                functions: string[];
+                                appFunctions: {
+                                    name: string;
+                                    signature: string;
+                                    description: string;
+                                    /** @enum {string} */
+                                    kind: "extraction" | "eval";
+                                    returns: string;
+                                    /** @enum {string} */
+                                    encoding: "text" | "json";
+                                    /** @enum {string} */
+                                    keyKind: "trace" | "thread" | "span" | "text";
+                                    cap: number;
+                                    gates: ("input" | "output" | "costs")[];
+                                    available: boolean;
+                                    exampleSql: string;
+                                }[];
+                            };
+                            limits: {
+                                maxStatementLength: number;
+                                maxRowsReturned: number;
+                                maxResultBytes: number;
+                                maxExecutionTimeSeconds: number;
+                                pagination: string;
+                            };
+                            endpoints: {
+                                /** @enum {string} */
+                                method: "GET" | "POST";
+                                path: string;
+                                description: string;
+                            }[];
+                        };
+                        traceFilter: {
+                            syntax: string;
+                            fields: {
+                                name: string;
+                                label: string;
+                                /** @enum {string} */
+                                valueType: "categorical" | "range" | "text" | "existence";
+                                group: string | null;
+                                facetable: boolean;
+                                knownValues: string[];
+                            }[];
+                            dynamicPrefixes: {
+                                prefix: string;
+                                label: string;
+                                description: string;
+                                aliases: string[];
+                            }[];
+                            endpoints: {
+                                /** @enum {string} */
+                                method: "GET" | "POST";
+                                path: string;
+                                description: string;
+                            }[];
+                        };
+                        examples: {
+                            id: string;
+                            title: string;
+                            /** @enum {string} */
+                            intent: "triage" | "cost" | "latency" | "quality" | "conversations" | "discovery" | "export";
+                            /** @enum {string} */
+                            language: "lwql" | "trace-filter";
+                            tags: string[];
+                            text: string;
+                            parameters: {
+                                name: string;
+                                type: string;
+                                description: string;
+                            }[];
+                            requires: {
+                                gates: ("input" | "output" | "costs")[];
+                                functions: string[];
+                            };
+                            available: boolean;
+                            notes?: string;
+                        }[];
+                        decisionTable: {
+                            when: string;
+                            use: string;
+                            why: string;
                         }[];
                     };
                 };
@@ -30329,6 +30595,8 @@ export interface operations {
                     /** @description When true, fetches full span data for each trace. Useful for bulk export. Default false. */
                     includeSpans?: boolean;
                     llmMode?: boolean;
+                    /** @description A trace filter string in the same language the Trace Explorer's search bar speaks — `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, `evaluatorVerdict:fail`, a quoted phrase for free text. It is combined with `filters`, `query` and `traceIds` rather than replacing any of them, so every condition you send must hold. `GET /api/v1/query/reference` lists every field and the syntax; `GET /api/traces/facets` says what values a field actually holds. A malformed filter, or one naming a field the language does not have, is a 422 that names the field. */
+                    filter?: string;
                     /**
                      * @description Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation.
                      * @default occurred
@@ -30408,6 +30676,131 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiTracesFacets: {
+        parameters: {
+            query?: {
+                field?: string;
+                prefix?: string;
+                limit?: number;
+                offset?: number;
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Without `field`, every facet the project has with its top values and whether the payload is still being computed. With `field`, that field's values and counts plus the distinct total and whether more remain. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        facets: ({
+                            key: string;
+                            /** @enum {string} */
+                            kind: "categorical" | "range" | "dynamic_keys";
+                            label: string;
+                            group: string;
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                        /** @description True when the payload is still being computed and what you have is the last committed one, possibly empty. Call again shortly. */
+                        pending: boolean;
+                    } | {
+                        values: {
+                            value: string;
+                            label?: string;
+                            count: number;
+                        }[];
+                        /** @description Distinct values the field holds in the window, before paging. */
+                        total: number;
+                        hasMore: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The field is an attribute key and this project hides captured input or output, so its values are not listed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        error: "trace_attribute_values_withheld";
+                        message: string;
+                        trace?: string;
+                    };
+                };
+            };
+            /** @description The query did not name a facet with values to list. `fields` names the offending parameter and each reason carries what was received and what exists. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        error: "validation_error";
+                        message: string;
+                        /** @constant */
+                        target: "query";
+                        fields: string[];
+                        reasons: {
+                            code: string;
+                            meta?: {
+                                field?: string;
+                                type?: string;
+                                message?: string;
+                                received?: string;
+                                expected?: string[];
+                            };
+                        }[];
+                        trace?: string;
                     };
                 };
             };

@@ -464,6 +464,7 @@ export const APP_ERROR_CODES = [
   "template_validation_error",
   "test_fire_unavailable",
   "time_range_too_wide",
+  "trace_attribute_values_withheld",
   "trace_not_evaluatable",
   "trace_not_found",
   "trace_project_required",
