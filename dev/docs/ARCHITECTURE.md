@@ -277,6 +277,24 @@ dependency; `main.ts` never touches lifecycle:
 | `createApp`/`boot` | what modules declared, and how to register it on the server |
 | `Server` | signals, phases, deadline, `/healthz`, `/metrics`, serve |
 
+**The Server chain is fluent and speaks in named factories** (ruled
+2026-09-18). Health is **built in and on by default**: `Server.create({...,
+healthPort })` opens the one HTTP door, `/healthz` answering during boot.
+Everything else arrives through ONE generic word — `.with(component)` — and
+Server never learns a domain word: the packages own the vocabulary.
+`prometheusMetrics({ token })` comes from `@langwatch/observability` (so an
+OTel export variant can sit beside it without any main changing shape),
+`hostedMembers(stores)` from process-stores, `hostedRuntime({ name, runtime,
+drain })` from the process package. A raw `{ name, start, stop }` object
+literal at a call site is banned — if a component has no spoken factory,
+write the factory. Transport/route discovery is likewise built in at the
+layer that owns the route table (`boot()`/the api package), never a module.
+
+**Deployment-choice modules are one line in the main.** The audit sink is
+the worked example: OSS composes `auditLogNullServer` (records nothing),
+an enterprise deployment swaps in its real module — one `.withModules`
+line, no conditional wiring.
+
 **The worker** is the same file with `role: "worker"` and `server.run()`
 instead of `serve()`. The role decides what `boot()` hosts: jobs and
 subscriptions instead of HTTP doors. Liveness/metrics is a built-in Server
@@ -371,6 +389,48 @@ classified keys, ordered chain (env/.env → 1Password opt-in → refusal by
 name), redaction everywhere. Nothing outside the secrets package, config
 composition and boot files reads a secret env var.
 
+**Three layers, and which one a value belongs to** (ruled 2026-09-18):
+
+1. **Store connections are process-global and invisible to modules.**
+   `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL` are declared once, in the
+   process's stores config; a module declares `reads("prisma")` and receives
+   an opened client. Which tier that client is — Postgres or memory — is the
+   process's config, and the module cannot tell.
+2. **Module-shaped values live on the module's own schema** (github's
+   signing key, monitor thresholds, retention days). The global object is
+   **domain-driven** (`stores`, `mail`, `deployment`, …); a module-named
+   slice exists only when a module truly has its own values — most have none.
+3. **Shared deployment facts are canonical leaves.** A fact several schemas
+   legitimately read (`BASE_HOST`, `IS_SAAS`) is ONE exported `ConfigValue`
+   in `@langwatch/config` (`deployment-facts.ts`), imported by instance. The
+   compiler admits a re-bound env var only when the claimants are literally
+   that same leaf — one meaning shared N ways passes, a second meaning for
+   the same variable still refuses at boot (that refusal caught a real bug
+   the night it landed).
+
+**Config is drilled, never ambient.** There is no async context and no
+dependency-injection container. The process config is one object composed of
+smaller objects; every function receives the narrowest slice that answers
+its question, as an argument. Deep nesting paying for itself in signatures
+is the intended pressure.
+
+**A module maps its own config to its dependency state.** Whether a seam is
+configured is derived *inside* the module from its declared slice plus its
+closed members — never defaulted invisibly, never hand-supplied by the
+process. An unconfigured seam refuses by name with a stable error code. This
+is the completion of §3.3's fourth case: what remains for the process to
+`.provide` is only what no slice and no member can answer.
+
+**Browser config is a declared projection.** A module's contract names which
+of its values are browser-safe (a schema plus a `project` function — by
+construction never a secret). The api builds one namespaced object from
+every installed module's projection and injects it into the served page;
+`defineBrowserModule`'s config declaration validates its slice **before
+first render**, so a missing value is a boot refusal naming the module, not
+an `undefined` deep in a component. The same drilling rule applies on the
+browser: screens receive values as props, nothing reads the injected blob
+directly.
+
 ---
 
 ## 7. Stores, the tier, and migrations
@@ -423,6 +483,13 @@ process holding DDL locks is how deploys die.
 
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.
+
+**Resolving is the ClickHouse client's own concept** (ruled 2026-09-18,
+landing): nothing outside `@langwatch/clickhouse-client` knows what
+"resolving" a client means — you never hold an unresolved client; the
+`clickhouse` member is tenant-resolving by construction. The per-module
+resolver adapters (`create<F>ClickHouseResolver`) are transitional and die
+when this lands.
 
 ---
 
@@ -621,30 +688,31 @@ array; `get*` = one or throws).
 
 ## 16. Renames in flight
 
-This document names the target. The tree is mid-rename; both columns exist
-until each lane lands. New code uses the left column only.
+This document names the target. **Landed 2026-09-18:** the tree rename
+(`modules/*/process`, `*/browser`, `*/browser-kit`; package names
+`*-process`/`*-browser`/`*-browser-kit`), `@langwatch/process-stores`,
+`@langwatch/browser-host` (+drawer), `@langwatch/browser-trpc`, plan-gate
+dissolved into `entitlement-contract`, and `.withStores(stores)` on the
+chain. New code uses the left column only.
 
 | Target | Today |
 |---|---|
 | `@langwatch/module` (light core) | `@langwatch/kernel`'s token half |
 | `@langwatch/process` | `@langwatch/process-server` + kernel's boot AND declaration halves |
-| `@langwatch/process-stores` | `@langwatch/infrastructure` |
 | `@langwatch/browser` | `@langwatch/ui-kernel` (boot half) |
-| `@langwatch/browser-host` | `@langwatch/browser-host` (trimmed) + `@langwatch/browser-host/drawer` (merged) |
-| `@langwatch/browser-trpc` | `@langwatch/browser-trpc` |
-| `modules/*/process` · `*-process` | `modules/*/server` · `*-server` |
-| `modules/*/browser` · `*-browser` | `modules/*/web` · `*-web` |
-| `modules/*/browser-kit` | `modules/*/web-kit` |
+| `createProcessApp(role)` | `createServerApp(role)` (generated) |
+| `openStores(config)` | `createProcessMembers({ config })` |
 | `defineProcessModule` / `defineBrowserModule` | `defineServerModule` / `defineWebModule` |
 | `traceProcessModule` / `processModules` | `traceServer` / `serverModules` |
 | `TraceModule` + `.withApi(...)` | `TraceApp` + `.withApp(...)` |
-| `.withStores(stores)` | per-store `with*` calls |
-| — (dissolved) | `@langwatch/enterprise-plan-gate` → `entitlement-contract` |
+| `<f>.module.ts` / `<f>.web.ts` file stems | `<f>.server.ts` / `<f>.web.ts` |
 
-Also open, each a worklist: ~14 modules still demand bespoke keys pending
-§3.3; `browserModules` is empty (no module exports `./declaration` yet — the
-browser serves chrome only); worker job declarations designed, not landed;
-the tasks entrypoint rebuild.
+Also open, each a worklist: the config-defined dependency state migration
+(§6 — deletes the remaining bespoke member tail and the `licenseSource`
+token); eventing member composition for both roles; `browserModules` is
+empty (no module exports `./declaration` yet — the browser serves chrome
+only); the ClickHouse resolver ruling (§7); worker job declarations designed,
+not landed.
 
 ---
 
