@@ -1094,7 +1094,11 @@ export interface paths {
          *
          *     It also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator and the real translator before it ships, so a published example parses and compiles; whether THIS key can run one is its own `available` flag.
          *
-         *     Pure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory. It is cacheable only PER CREDENTIAL — `available`, the embedded schema and the gated columns all differ between keys, so a shared cache must key on the credential and never serve one key's document to another. The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.
+         *     Pure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory rather than from the database.
+         *
+         *     It answers `Cache-Control: private, no-store`, because the document is shaped by the calling credential: `available`, the embedded schema and the gated columns all differ between keys, and a cache keyed on the URL or the project would replay one key's document to another. Hold it in memory for the life of a process if you like, keyed on the credential you sent; do not put it in a shared cache.
+         *
+         *     The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.
          *
          *     An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.
          *
