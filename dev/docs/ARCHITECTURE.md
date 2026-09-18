@@ -298,10 +298,10 @@ eighteen `thing.otherthing.ts` fragments to open next. Helpers live inside
 the class file they serve; a fourth class in a directory means the concept
 is wrongly cut. **Each expose member sets up only the base**: headers and
 general security, as named CLASSES from `@langwatch/api`, never inline
-data — `HeaderPolicy.strict()` (the floor no surface drops below; `.with`/
+data — `SecurityHeaders.strict()` (the floor no surface drops below; `.with`/
 `.merge` overlay, `.without` is the loud exception), `ContentSecurityPolicy
 .app()` (the browser bundle's composed overlay — connect-src rides config),
-`TrustedProxies.fromConfig(...)` (Server-level — client-address truth is
+`ClientAddress.fromClientAddress(...)` (Server-level — client-address truth is
 one answer for every surface). The chaining is pre-done in importable
 defaults — `trpcSurfaceDefaults()`, `restSurfaceDefaults()`,
 `browserBundleDefaults()` — and a bare member call IS its default; a
