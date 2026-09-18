@@ -8422,6 +8422,7 @@
       "appFunctions": [
         {
           "name": "conversation",
+          "kind": "extraction",
           "signature": "conversation(thread_key)",
           "description": "The whole thread as one markdown transcript, the way the trace drawer renders it: the system prompt once, then one section per turn, with a marker where content was redacted.",
           "returns": "Nullable(String)",
@@ -8437,6 +8438,7 @@
         },
         {
           "name": "conversation_bounded",
+          "kind": "extraction",
           "signature": "conversation_bounded(thread_key, max_tokens, until_trace_id)",
           "description": "The same transcript under a token budget: the opening and closing turns are kept and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
           "returns": "Nullable(String)",
@@ -8452,6 +8454,7 @@
         },
         {
           "name": "thread_traces",
+          "kind": "extraction",
           "signature": "thread_traces(thread_key)",
           "description": "The thread's trace ids, oldest first. Carries no captured content, so it needs no content permission.",
           "returns": "Array(String)",
@@ -8464,6 +8467,7 @@
         },
         {
           "name": "llm_readable_trace",
+          "kind": "extraction",
           "signature": "llm_readable_trace(trace_id, max_tokens)",
           "description": "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the model calls, then the slowest.",
           "returns": "Nullable(String)",
@@ -8479,6 +8483,7 @@
         },
         {
           "name": "llm_messages",
+          "kind": "extraction",
           "signature": "llm_messages(trace_id)",
           "description": "The chat messages of the trace's chosen LLM call, as JSON `{input, output}` — the same split the trace drawer's two panels show. Falls back to the trace's own captured input and output when no LLM span carries a conversation.",
           "returns": "Nullable(String)",
@@ -8494,6 +8499,7 @@
         },
         {
           "name": "llm_input_messages",
+          "kind": "extraction",
           "signature": "llm_input_messages(trace_id)",
           "description": "Only the request side of `llm_messages`, as a JSON array: the conversation history the model was given on this turn.",
           "returns": "Nullable(String)",
@@ -8508,6 +8514,7 @@
         },
         {
           "name": "llm_output_messages",
+          "kind": "extraction",
           "signature": "llm_output_messages(trace_id)",
           "description": "Only the response side of `llm_messages`, as a JSON array: everything the agent did from the last request onwards, tool calls and results included.",
           "returns": "Nullable(String)",
@@ -8523,6 +8530,7 @@
         },
         {
           "name": "llm_messages_span",
+          "kind": "extraction",
           "signature": "llm_messages_span(trace_id, span_id)",
           "description": "The chat messages of one named span rather than the trace's chosen one, as JSON `{input, output}`.",
           "returns": "Nullable(String)",
@@ -8538,6 +8546,7 @@
         },
         {
           "name": "trace_json",
+          "kind": "extraction",
           "signature": "trace_json(trace_id)",
           "description": "The whole trace as one JSON object, spans included — the export shape, for post-training data and for reading a trace outside the product.",
           "returns": "Nullable(String)",
@@ -8550,6 +8559,84 @@
           ],
           "available": true,
           "exampleSql": "SELECT TraceId, trace_json(TraceId) AS trace\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+        },
+        {
+          "name": "eval",
+          "kind": "eval",
+          "signature": "eval(text, instructions)",
+          "description": "How likely the statement is true of the text, between 0 and 1. The judge is calibrated, so 0.9 means nine times in ten rather than a confident yes.",
+          "returns": "Nullable(Float64)",
+          "encoding": "text",
+          "keyKind": "text",
+          "cap": 1000,
+          "gates": [],
+          "available": false,
+          "exampleSql": "SELECT ConversationId, eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "eval_criteria",
+          "kind": "eval",
+          "signature": "eval_criteria(text, instructions, criteria)",
+          "description": "The same judgement as `eval`, with the boundary spelled out: what counts as yes, then what does not.",
+          "returns": "Nullable(Float64)",
+          "encoding": "text",
+          "keyKind": "text",
+          "cap": 1000,
+          "gates": [],
+          "available": false,
+          "exampleSql": "SELECT ConversationId, eval_criteria(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed', ['sarcasm, repetition or a raised voice count', 'a calm complaint does not count']) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "eval_passed",
+          "kind": "eval",
+          "signature": "eval_passed(text, instructions, threshold)",
+          "description": "The same judgement as `eval`, answered as 1 or 0 against a threshold you choose.",
+          "returns": "Nullable(UInt8)",
+          "encoding": "text",
+          "keyKind": "text",
+          "cap": 1000,
+          "gates": [],
+          "available": false,
+          "exampleSql": "SELECT ConversationId, eval_passed(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed', 0.7) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "eval_score",
+          "kind": "eval",
+          "signature": "eval_score(text, instructions, min, max)",
+          "description": "A rating on the whole-numbered scale you name, answered as the probability-weighted mean of the levels rather than the single most likely one.",
+          "returns": "Nullable(Float64)",
+          "encoding": "text",
+          "keyKind": "text",
+          "cap": 1000,
+          "gates": [],
+          "available": false,
+          "exampleSql": "SELECT ConversationId, eval_score(conversation_bounded(ConversationId, 8000, ''), 'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5) AS satisfaction\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "eval_category",
+          "kind": "eval",
+          "signature": "eval_category(text, instructions, options)",
+          "description": "The most likely option out of the ones you list, as its name.",
+          "returns": "Nullable(String)",
+          "encoding": "text",
+          "keyKind": "text",
+          "cap": 1000,
+          "gates": [],
+          "available": false,
+          "exampleSql": "SELECT ConversationId, eval_category(conversation_bounded(ConversationId, 8000, ''), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "eval_category_probs",
+          "kind": "eval",
+          "signature": "eval_category_probs(text, instructions, options)",
+          "description": "The same judgement as `eval_category`, as a JSON object of option name to probability, for when the runner-up matters.",
+          "returns": "Nullable(String)",
+          "encoding": "json",
+          "keyKind": "text",
+          "cap": 1000,
+          "gates": [],
+          "available": false,
+          "exampleSql": "SELECT ConversationId, eval_category_probs(conversation_bounded(ConversationId, 8000, ''), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent_probabilities\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         }
       ]
     },

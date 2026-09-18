@@ -139,6 +139,13 @@ export interface LangWatchQLSchemaAppFunction {
   readonly encoding: LangWatchQLAppFunctionEncoding;
   /** What the first argument names, which is what the cap counts. */
   readonly keyKind: LangWatchQLAppFunctionKeyKind;
+  /**
+   * Whether the value is read from a trace or judged by a model.
+   *
+   * Published because the two cost different things: an extraction function is
+   * a read, and an eval function is a metered classification per row.
+   */
+  readonly kind: "extraction" | "eval";
   /** How many distinct keys of that kind one run may read. */
   readonly cap: number;
   /** Permissions that must *all* be held to call it. Empty for an ungated one. */
@@ -230,11 +237,14 @@ export function describeLangWatchQLSchema({
   protections,
   views = LWQL_VIEW_CATALOG,
   appFunctions = LWQL_APP_FUNCTION_CATALOG,
+  instantEvalsEnabled = false,
 }: {
   database: string;
   protections: Protections;
   views?: readonly LangWatchQLViewDefinition[];
   appFunctions?: readonly LangWatchQLAppFunctionDefinition[];
+  /** Whether this project may call an eval function. Off unless it is asked. */
+  instantEvalsEnabled?: boolean;
 }): LangWatchQLSchema {
   const withheld = new Set(lwqlGatedColumns({ protections, views }));
   return {
@@ -262,6 +272,7 @@ export function describeLangWatchQLSchema({
       database,
       protections,
       appFunctions,
+      instantEvalsEnabled,
     }),
   };
 }
@@ -278,14 +289,18 @@ export function describeLangWatchQLAppFunctions({
   database,
   protections,
   appFunctions = LWQL_APP_FUNCTION_CATALOG,
+  instantEvalsEnabled = false,
 }: {
   database: string;
   protections: Protections;
   appFunctions?: readonly LangWatchQLAppFunctionDefinition[];
+  /** Whether this project may call an eval function. Off unless it is asked. */
+  instantEvalsEnabled?: boolean;
 }): readonly LangWatchQLSchemaAppFunction[] {
   const held = lwqlHeldPermissions(protections);
   return appFunctions.map((definition) => ({
     name: definition.name,
+    kind: definition.kind,
     signature: lwqlAppFunctionSignature(definition),
     description: definition.description,
     returns: definition.returns,
@@ -293,7 +308,13 @@ export function describeLangWatchQLAppFunctions({
     keyKind: definition.keyKind,
     cap: lwqlAppFunctionCap(definition),
     gates: definition.gates,
-    available: definition.gates.every((gate) => held.has(gate)),
+    // Two conditions for an eval function, and both are about whether the call
+    // would work: the caller's permissions, and whether this project may judge
+    // at all. Publishing one as available where nothing can answer it puts a
+    // caller in front of a query that always comes back null.
+    available:
+      definition.gates.every((gate) => held.has(gate)) &&
+      (definition.kind !== "eval" || instantEvalsEnabled),
     exampleSql: definition.example(database),
   }));
 }

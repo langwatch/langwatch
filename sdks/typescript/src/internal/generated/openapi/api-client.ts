@@ -1048,7 +1048,7 @@ export interface paths {
          *
          *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          *
-         *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A run that would need more distinct conversations, traces or spans than the published cap answers 422 rather than a partial result.
+         *     A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.
          *
          *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
          *
@@ -8977,7 +8977,7 @@ export interface operations {
                         coarsenedFromSeconds?: number;
                         diagnostics: {
                             /** @enum {string} */
-                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED";
+                            code: "MULTI_PROJECT_RESULT" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD" | "APP_FUNCTION_VALUE_TRUNCATED" | "APP_FUNCTION_UNRESOLVED_KEYS" | "APP_FUNCTION_RESULT_TRUNCATED" | "INSTANT_EVAL_SKIPPED";
                             message: string;
                             meta?: {
                                 [key: string]: unknown;
@@ -9128,11 +9128,13 @@ export interface operations {
                             name: string;
                             signature: string;
                             description: string;
+                            /** @enum {string} */
+                            kind: "extraction" | "eval";
                             returns: string;
                             /** @enum {string} */
                             encoding: "text" | "json";
                             /** @enum {string} */
-                            keyKind: "trace" | "thread" | "span";
+                            keyKind: "trace" | "thread" | "span" | "text";
                             cap: number;
                             gates: ("input" | "output" | "costs")[];
                             available: boolean;
@@ -9267,11 +9269,13 @@ export interface operations {
                                     name: string;
                                     signature: string;
                                     description: string;
+                                    /** @enum {string} */
+                                    kind: "extraction" | "eval";
                                     returns: string;
                                     /** @enum {string} */
                                     encoding: "text" | "json";
                                     /** @enum {string} */
-                                    keyKind: "trace" | "thread" | "span";
+                                    keyKind: "trace" | "thread" | "span" | "text";
                                     cap: number;
                                     gates: ("input" | "output" | "costs")[];
                                     available: boolean;

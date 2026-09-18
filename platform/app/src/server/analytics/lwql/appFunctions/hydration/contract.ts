@@ -8,9 +8,13 @@
  * @see ../hydrate.ts
  */
 
+import type { InstantEvalClassifier } from "~/server/app-layer/instant-evals/classifier/classifier";
 import type { Protections } from "~/server/traces/protections";
 import type { LangWatchQLColumn } from "../../executor";
-import type { LangWatchQLAppFunctionDefinition } from "../catalog";
+import type {
+  LangWatchQLAppFunctionDefinition,
+  LangWatchQLAppFunctionKeyKind,
+} from "../catalog";
 import type { LangWatchQLAppFunctionCall } from "../plan";
 import type { LangWatchQLAppFunctionTraceSource } from "../traceSource";
 
@@ -65,6 +69,41 @@ export interface LangWatchQLHydrationInput {
   readonly rows: readonly Record<string, unknown>[];
   readonly limits: LangWatchQLHydrationLimits;
   readonly traceSource: LangWatchQLAppFunctionTraceSource;
+  /**
+   * The judge behind an eval function, and the ceilings on using it.
+   *
+   * Absent when the statement calls no eval function, which is every
+   * LangWatchQL query that existed before Instant Evals.
+   */
+  readonly instantEvals?: InstantEvalHydrationSupport;
+  /**
+   * The caller's cancellation, where the surface has one.
+   *
+   * A judged query is the one LangWatchQL shape that keeps spending after the
+   * caller has gone: a thousand classifications outlive the HTTP request that
+   * asked for them. So the signal is threaded all the way to the classifier,
+   * and an abort stops the run rather than being counted as a row that could
+   * not be judged.
+   */
+  readonly signal?: AbortSignal;
+}
+
+/** What the eval half of a hydration run is allowed to do. */
+export interface InstantEvalHydrationSupport {
+  readonly classifier: InstantEvalClassifier;
+  /** Classifications in flight at once, across the whole query. */
+  readonly maxConcurrency: number;
+  /** Input tokens one synchronous query may send, before it is refused. */
+  readonly queryTokenBudget: number;
+}
+
+/** What the eval half of a hydration run spent. */
+export interface LangWatchQLEvalUsage {
+  /** Classifications made, which is one per distinct text. */
+  readonly requests: number;
+  readonly inputTokens: number;
+  /** Distinct texts that came back unjudged, by why. */
+  readonly skipped: Readonly<Record<string, number>>;
 }
 
 export interface LangWatchQLHydrationResult {
@@ -74,19 +113,32 @@ export interface LangWatchQLHydrationResult {
   readonly isTruncatedByBytes: boolean;
   readonly valueTruncations: readonly LangWatchQLValueTruncation[];
   readonly unresolvedKeys: readonly LangWatchQLUnresolvedKeys[];
+  /** Present only when the statement called an eval function. */
+  readonly evalUsage?: LangWatchQLEvalUsage;
 }
 
 /** A call, with the catalog entry it names. */
 export interface ResolvedCall {
   readonly call: LangWatchQLAppFunctionCall;
   readonly definition: LangWatchQLAppFunctionDefinition;
+  /**
+   * The extraction this call judges, for an eval function written over one.
+   *
+   * When it is present, the key in the column belongs to *this* function, not
+   * to the eval — the database's two identity UDFs left the inner one's key
+   * there — so the read, the cap and the computed text all follow it.
+   */
+  readonly source?: LangWatchQLAppFunctionDefinition;
+  /** The source's kind where there is one, otherwise the definition's own. */
+  readonly keyKind: LangWatchQLAppFunctionKeyKind;
   /** Distinct keys this call needs, keyed by {@link appFunctionKeyId}. */
   readonly keys: Map<string, readonly string[]>;
 }
 
 /** One computed value, and whether the per-value ceiling cut it. */
 export interface ComputedValue {
-  readonly value: string | readonly string[] | null;
+  /** A number for a judged column, text or a list for an extracted one. */
+  readonly value: string | number | readonly string[] | null;
   readonly isTruncated: boolean;
   /** False when the key named no trace, thread or span at all. */
   readonly isResolved: boolean;

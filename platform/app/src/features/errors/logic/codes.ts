@@ -200,6 +200,8 @@ export const APP_ERROR_CODES = [
   "ingestion_key_workspace_missing",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
+  "instant_eval_classifier_unavailable",
+  "instant_eval_query_budget_exceeded",
   "insufficient_permissions",
   // Also a Go code, with copy already written under the shared/transport
   // heading — the REST boundary in `packages/api` puts it on the wire as the

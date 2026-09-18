@@ -151,6 +151,10 @@ export const lwqlSchemaSchema = z.object({
       name: z.string(),
       signature: z.string(),
       description: z.string(),
+      // Whether the value is read from a trace or judged by a model. The two
+      // cost different things: an extraction is a read, an eval is a metered
+      // classification per row.
+      kind: z.enum(["extraction", "eval"]),
       // The ClickHouse type of the HYDRATED column, which is not the type the
       // key had — the application re-declares it after computing the value.
       returns: z.string(),

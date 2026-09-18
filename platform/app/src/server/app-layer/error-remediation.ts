@@ -217,6 +217,19 @@ const registry = {
       "Contact support to have it enabled for this workspace",
     ],
   },
+  instant_eval_query_budget_exceeded: {
+    tips: [
+      "Read `meta.estimatedTokens` against `meta.budget`; that is the text the whole query would send to be judged, summed across its rows",
+      "Lower the query's LIMIT, or extract less text per row by passing a smaller token budget to the extraction function inside the eval call",
+      "To judge the whole selection rather than a sample, run the same statement as a job instead of on this endpoint",
+    ],
+  },
+  instant_eval_classifier_unavailable: {
+    tips: [
+      "The query itself was accepted and ran; judging the text it projected is what failed",
+      "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
+    ],
+  },
   lwql_app_function_key_cap: {
     tips: [
       "Read `meta.cap` and `meta.distinct`; the query needs more distinct keys than one run may read",
@@ -233,7 +246,7 @@ const registry = {
   },
   lwql_app_function_unavailable: {
     tips: [
-      "The extraction functions are not provisioned on this deployment, so retrying the same query will not help",
+      "The app functions are not provisioned on this deployment, so retrying the same query will not help",
       "They are created at deploy time; a redeploy converges them, and the query works unchanged afterwards",
     ],
   },

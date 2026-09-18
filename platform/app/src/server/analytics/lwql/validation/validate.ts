@@ -81,12 +81,16 @@
 
 import {
   type LangWatchQLAppFunctionDefinition,
-  type LangWatchQLAppFunctionParameter,
   lwqlAppFunction,
   lwqlAppFunctionSignature,
 } from "../appFunctions/catalog";
-import type { LangWatchQLAppFunctionCall } from "../appFunctions/plan";
+import type {
+  LangWatchQLAppFunctionCall,
+  LangWatchQLAppFunctionOption,
+  LangWatchQLAppFunctionSource,
+} from "../appFunctions/plan";
 import { LWQL_MAX_RESULT_ROWS } from "../limits";
+import { readAppFunctionArguments } from "./appFunctionArguments";
 import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
@@ -939,59 +943,22 @@ function walkAppFunctionCall({
   frame: Frame;
   ctx: WalkContext;
 }): void {
-  // The arguments are walked whatever else fails, so a gated column or a
-  // refused function inside the key is reported too. The frame drops
-  // `isOutermostSelect`, which is what refuses a nested app function: one
-  // hydration stage cannot resolve a key that is itself a value it has to
-  // compute first.
-  const inside: Frame = { ...frame, isOutermostSelect: false };
   const args = Array.isArray(node.arguments) ? node.arguments : [];
-  for (const argument of args) {
-    walkChildNode({ value: argument, node, frame: inside, ctx });
-  }
+  const source = walkAppFunctionArguments({
+    node,
+    definition,
+    args,
+    frame,
+    ctx,
+  });
 
   if (frame.isOutermostSelect !== true) {
     reportAppFunctionPosition({ name: definition.name, node, frame, ctx });
     return;
   }
 
-  // Spelling before anything else: the query reaches the database verbatim and
-  // ClickHouse resolves a SQL UDF by its exact name, so admitting a mis-cased
-  // call would build a plan for a statement that cannot run.
-  const written = typeof node.name === "string" ? node.name.trim() : "";
-  if (written !== definition.name) {
-    report({
-      ctx,
-      frame,
-      code: "APP_FUNCTION_NAME_CASE",
-      message: `Write "${echoIdentifier(written)}" as "${definition.name}": the query runs exactly as written, and the database matches this function's name letter for letter.`,
-      node,
-    });
-    return;
-  }
-
-  const column = aliasOf(node);
-  if (column === null) {
-    report({
-      ctx,
-      frame,
-      code: "APP_FUNCTION_ALIAS_REQUIRED",
-      message: `The function "${echoIdentifier(definition.name)}" needs an alias: write it as "${lwqlAppFunctionSignature(definition)} AS my_column".`,
-      node,
-    });
-    return;
-  }
-
-  if (!holdsAppFunctionGates({ definition, ctx })) {
-    report({
-      ctx,
-      frame,
-      code: "APP_FUNCTION_GATED",
-      message: `The function "${echoIdentifier(definition.name)}" is not available to you. It needs the ${definition.gates.join(" and ")} permission; ask an administrator for it, or remove the call.`,
-      node,
-    });
-    return;
-  }
+  const column = admitAppFunctionCall({ node, definition, frame, ctx });
+  if (column === null) return;
 
   const options = readAppFunctionOptions({
     definition,
@@ -1002,11 +969,183 @@ function walkAppFunctionCall({
   });
   if (options === null) return;
 
+  // A nested call that was itself refused leaves no plan: the statement is
+  // already rejected, and half a plan is a plan for a query that never runs.
+  if (source !== null && source.source === null) return;
+
   ctx.appFunctions.push({
     column,
     function: definition.name,
     options,
+    ...(source?.source ? { source: source.source } : {}),
   });
+}
+
+/**
+ * Walks a call's arguments, and reads the nested extraction out of the first
+ * one where there is one.
+ *
+ * The arguments are walked whatever else fails, so a gated column or a refused
+ * function inside the key is reported too. The frame drops `isOutermostSelect`,
+ * which is what refuses a nested app function everywhere except the one place
+ * nesting is allowed: the key of an eval function, read here before the
+ * ordinary walk can get to it and refuse it.
+ */
+function walkAppFunctionArguments({
+  node,
+  definition,
+  args,
+  frame,
+  ctx,
+}: {
+  node: SqlAstNode;
+  definition: LangWatchQLAppFunctionDefinition;
+  args: readonly unknown[];
+  frame: Frame;
+  ctx: WalkContext;
+}): { readonly source: LangWatchQLAppFunctionSource | null } | null {
+  const inside: Frame = { ...frame, isOutermostSelect: false };
+  const source =
+    definition.kind === "eval"
+      ? readNestedSource({ key: args[0], frame: inside, ctx })
+      : null;
+  for (const [index, argument] of args.entries()) {
+    if (source !== null && index === 0) continue;
+    walkChildNode({ value: argument, node, frame: inside, ctx });
+  }
+  return source;
+}
+
+/**
+ * The extraction call an eval function reads its text from, when it has one.
+ *
+ * `null` means the key is not an app-function call at all, so the ordinary walk
+ * should handle it — a column, a `concat`, anything the policy already admits.
+ * A returned object means this module has dealt with the key, whether or not it
+ * admitted it, so the caller must not walk it a second time and report
+ * everything twice.
+ *
+ * Only one level, and only an extraction function. Deeper nesting has nowhere
+ * to run: hydration reads one key out of the column and computes one value from
+ * it, so a second extraction inside the first would have no key of its own. An
+ * eval inside an eval is worse than unsupported — it would ask the classifier
+ * about a probability.
+ */
+function readNestedSource({
+  key,
+  frame,
+  ctx,
+}: {
+  key: unknown;
+  frame: Frame;
+  ctx: WalkContext;
+}): { readonly source: LangWatchQLAppFunctionSource | null } | null {
+  if (!isNode(key) || key.type !== "Function") return null;
+  if (typeof key.name !== "string") return null;
+  const nested = lwqlAppFunction(key.name);
+  if (!nested) return null;
+
+  if (nested.kind !== "extraction") {
+    reportAppFunctionPosition({ name: nested.name, node: key, frame, ctx });
+    return { source: null };
+  }
+
+  // Its own arguments, under a frame that is still not the outermost select,
+  // so anything nested inside *it* is refused by the ordinary function walk.
+  const args = Array.isArray(key.arguments) ? key.arguments : [];
+  for (const argument of args) {
+    walkChildNode({ value: argument, node: key, frame, ctx });
+  }
+
+  if (key.name.trim() !== nested.name) {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_NAME_CASE",
+      message: `Write "${echoIdentifier(key.name.trim())}" as "${nested.name}": the query runs exactly as written, and the database matches this function's name letter for letter.`,
+      node: key,
+    });
+    return { source: null };
+  }
+
+  if (!holdsAppFunctionGates({ definition: nested, ctx })) {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_GATED",
+      message: `The function "${echoIdentifier(nested.name)}" is not available to you. It needs the ${nested.gates.join(" and ")} permission; ask an administrator for it, or remove the call.`,
+      node: key,
+    });
+    return { source: null };
+  }
+
+  const options = readAppFunctionOptions({
+    definition: nested,
+    args,
+    node: key,
+    frame,
+    ctx,
+  });
+  if (options === null) return { source: null };
+  return { source: { function: nested.name, options } };
+}
+
+/**
+ * The three rules a call in the right place still has to pass, and the output
+ * column it earns by passing them.
+ *
+ * `null` means one of them failed and was reported. Spelling comes first: the
+ * query reaches the database verbatim and ClickHouse resolves a SQL UDF by its
+ * exact name, so admitting a mis-cased call would build a plan for a statement
+ * that cannot run.
+ */
+function admitAppFunctionCall({
+  node,
+  definition,
+  frame,
+  ctx,
+}: {
+  node: SqlAstNode;
+  definition: LangWatchQLAppFunctionDefinition;
+  frame: Frame;
+  ctx: WalkContext;
+}): string | null {
+  const refuse = (code: LangWatchQLViolationCode, message: string): null => {
+    report({ ctx, frame, code, message, node });
+    return null;
+  };
+
+  const written = typeof node.name === "string" ? node.name.trim() : "";
+  if (written !== definition.name) {
+    return refuse(
+      "APP_FUNCTION_NAME_CASE",
+      `Write "${echoIdentifier(written)}" as "${definition.name}": the query runs exactly as written, and the database matches this function's name letter for letter.`,
+    );
+  }
+
+  const column = aliasOf(node);
+  if (column === null) {
+    return refuse(
+      "APP_FUNCTION_ALIAS_REQUIRED",
+      `The function "${echoIdentifier(definition.name)}" needs an alias: write it as "${lwqlAppFunctionSignature(definition)} AS my_column".`,
+    );
+  }
+
+  if (!holdsAppFunctionGates({ definition, ctx })) {
+    return refuse(
+      "APP_FUNCTION_GATED",
+      `The function "${echoIdentifier(definition.name)}" is not available to you. It needs the ${definition.gates.join(" and ")} permission; ask an administrator for it, or remove the call.`,
+    );
+  }
+
+  if (definition.kind === "eval" && !ctx.policy.instantEvalsEnabled) {
+    return refuse(
+      "APP_FUNCTION_GATED",
+      `The function "${echoIdentifier(definition.name)}" is not available to you. A judgement is charged to one project, so it needs Instant Evals switched on for a key that reads a single project; ask an administrator to enable them, use a project key, or remove the call.`,
+    );
+  }
+
+  return column;
 }
 
 /** The alias a projection element was written with, or `null`. */
@@ -1032,11 +1171,12 @@ function holdsAppFunctionGates({
  * The literal option values, or `null` when the arguments do not match the
  * signature.
  *
- * Arity is exact and there is one signature per function, so "which overload
- * did they mean" is never a question. Options must be literals rather than
- * expressions or bound parameters, because the hydration plan is built before a
- * single row comes back: an option chosen at run time would make one column
- * mean different things in different rows of the same result.
+ * The rules themselves live in `./appFunctionArguments.ts`, which is pure and
+ * has no opinion about how a refusal is reported; this is the half that reports
+ * one. Arity is exact and there is one signature per function, because a
+ * ClickHouse SQL UDF is a lambda with a fixed parameter list and calling one
+ * with any other count is `BAD_ARGUMENTS` — so "which overload did they mean"
+ * is never a question the validator has to answer.
  */
 function readAppFunctionOptions({
   definition,
@@ -1050,103 +1190,17 @@ function readAppFunctionOptions({
   node: SqlAstNode;
   frame: Frame;
   ctx: WalkContext;
-}): (string | number)[] | null {
-  const refuse = (message: string): null => {
-    report({
-      ctx,
-      frame,
-      code: "APP_FUNCTION_ARGUMENT",
-      message,
-      node,
-    });
-    return null;
-  };
-
-  if (args.length !== definition.parameters.length) {
-    return refuse(wrongArityMessage(definition));
-  }
-
-  const options: (string | number)[] = [];
-  for (const [index, parameter] of definition.parameters.entries()) {
-    if (parameter.role === "key") continue;
-    const value = readOptionLiteral({ node: args[index], parameter });
-    if (value === null) {
-      return refuse(nonLiteralOptionMessage({ definition, parameter }));
-    }
-    options.push(value);
-  }
-  return options;
-}
-
-function wrongArityMessage(
-  definition: LangWatchQLAppFunctionDefinition,
-): string {
-  const count = definition.parameters.length;
-  const plural = count === 1 ? "" : "s";
-  return `The function "${echoIdentifier(definition.name)}" takes exactly ${count} argument${plural}: write it as "${lwqlAppFunctionSignature(definition)}".`;
-}
-
-function nonLiteralOptionMessage({
-  definition,
-  parameter,
-}: {
-  definition: LangWatchQLAppFunctionDefinition;
-  parameter: LangWatchQLAppFunctionParameter;
-}): string {
-  const expected =
-    parameter.type === "number" ? "positive whole number" : "text";
-  return `The "${echoIdentifier(parameter.name)}" argument of "${echoIdentifier(definition.name)}" must be a ${expected} written directly in the query, not a column or a bound parameter.`;
-}
-
-/**
- * One option argument as its literal value, or `null` when it is not one.
- *
- * The parser reports every literal's `value` as a string and its kind as
- * `value_type` (`UInt64`, `String`, …), so a number is recognised by that type
- * being anything other than `String` rather than by a list of numeric type
- * names — a list that a parser release could add to. A numeric option must also
- * be a positive whole number: a negative or fractional token budget would reach
- * a renderer as a budget that keeps nothing, which looks like an empty
- * conversation rather than like a rejected argument.
- */
-function readOptionLiteral({
-  node,
-  parameter,
-}: {
-  node: unknown;
-  parameter: LangWatchQLAppFunctionParameter;
-}): string | number | null {
-  if (!isNode(node) || node.type !== "Literal") return null;
-  const { value, value_type: valueType } = node;
-  if (typeof valueType !== "string") return null;
-  return parameter.type === "string"
-    ? textLiteral({ value, valueType })
-    : positiveIntegerLiteral({ value, valueType });
-}
-
-function textLiteral({
-  value,
-  valueType,
-}: {
-  value: unknown;
-  valueType: string;
-}): string | null {
-  if (valueType !== "String" || typeof value !== "string") return null;
-  return value;
-}
-
-function positiveIntegerLiteral({
-  value,
-  valueType,
-}: {
-  value: unknown;
-  valueType: string;
-}): number | null {
-  if (valueType === "String") return null;
-  if (typeof value !== "string" && typeof value !== "number") return null;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
+}): LangWatchQLAppFunctionOption[] | null {
+  const outcome = readAppFunctionArguments({ definition, args });
+  if (outcome.ok) return outcome.options;
+  report({
+    ctx,
+    frame,
+    code: "APP_FUNCTION_ARGUMENT",
+    message: outcome.message,
+    node,
+  });
+  return null;
 }
 
 /**

@@ -109,6 +109,7 @@ describe("given the app-function catalog", () => {
       expect(() =>
         lwqlAppFunctionBody({
           name: "no_key",
+          kind: "extraction",
           description: "",
           parameters: [
             {

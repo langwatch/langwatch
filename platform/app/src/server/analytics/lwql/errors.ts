@@ -584,7 +584,7 @@ export class LangWatchQLAppFunctionUnavailableError extends HandledError {
   constructor(options: { reasons?: readonly Error[] } = {}) {
     super(
       "lwql_app_function_unavailable",
-      "The extraction functions this query uses are not available on this deployment yet.",
+      "The functions this query uses are not available on this deployment yet.",
       {
         httpStatus: 503,
         fault: "platform",

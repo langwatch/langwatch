@@ -96,6 +96,16 @@ export const LWQL_DIAGNOSTIC_CODES = [
    * budget per call, not a narrower query.
    */
   "APP_FUNCTION_RESULT_TRUNCATED",
+  /**
+   * Some texts went unjudged, so their judged columns are null.
+   *
+   * Distinct from an unresolved key: the key found its text and the text was
+   * sent — the judge did not answer for it, because it was rate limited, too
+   * large even after being cut, or because this deployment has no judge
+   * configured at all. The reasons ride in `meta`, because the action differs:
+   * run the statement again, extract less text, or ask an administrator.
+   */
+  "INSTANT_EVAL_SKIPPED",
 ] as const;
 
 export type LangWatchQLDiagnosticCode = (typeof LWQL_DIAGNOSTIC_CODES)[number];
@@ -174,6 +184,8 @@ export interface LangWatchQLAppFunctionDiagnosticsInput {
     readonly function: string;
     readonly keys: number;
   }[];
+  /** How many texts went unjudged, by why. Absent when nothing was judged. */
+  readonly skippedJudgements?: Readonly<Record<string, number>>;
 }
 
 /**
@@ -285,6 +297,20 @@ function appFunctionDiagnostics({
       message:
         "Some rows are null because their conversation or trace id matched nothing. Check the ids, and that the rows are inside the retention window.",
       meta: { columns: appFunctions.unresolvedKeys },
+    });
+  }
+
+  const skipped = appFunctions.skippedJudgements ?? {};
+  const skippedTexts = Object.values(skipped).reduce(
+    (total, count) => total + count,
+    0,
+  );
+  if (skippedTexts > 0) {
+    diagnostics.push({
+      code: "INSTANT_EVAL_SKIPPED",
+      message:
+        "Some rows are null because their text could not be judged. Run the query again, ask for less text per row, or check that judging is switched on for this project.",
+      meta: { texts: skippedTexts, reasons: skipped },
     });
   }
 

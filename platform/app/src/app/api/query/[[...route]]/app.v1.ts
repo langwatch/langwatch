@@ -168,7 +168,7 @@ const RESULT_CEILINGS = `A statement that names no \`LIMIT\` is capped at ${DEFA
 const RUN_DESCRIPTION =
   "Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\n" +
   `Diagnostics are advisory and never reject a query. ${LWQL_CLEAN_DIAGNOSTICS_MEANING}\n\n` +
-  "A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A run that would need more distinct conversations, traces or spans than the published cap answers 422 rather than a partial result.\n\n" +
+  "A projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A projection may also call the eval functions, which judge a text with a model and are charged for; their key is the text itself. A run that would need more distinct conversations, traces, spans or texts than the published cap answers 422 rather than a partial result, and a run whose texts would exceed the per-query token budget answers 422 before anything is sent.\n\n" +
   `${HEADER_RULE}\n\n` +
   `${RESULT_CEILINGS}\n\n` +
   "Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.";
@@ -241,6 +241,10 @@ function registerRun(secured: QuerySecuredApp): void {
         projects,
         protections,
         sql,
+        // The request's own cancellation. It matters for exactly one thing:
+        // a statement calling an eval function keeps paying a classifier per
+        // row after the client has hung up, and nothing else here does.
+        signal: c.req.raw.signal,
         ...(parameters ? { parameters } : {}),
         ...(timeWindow ? { timeWindow } : {}),
         ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
@@ -276,16 +280,18 @@ function registerSchema(secured: QuerySecuredApp): void {
       },
     }),
     async (c) => {
-      const { protections } = await callerContext(c);
+      const { projects, protections } = await callerContext(c);
       c.header("Cache-Control", CREDENTIAL_SHAPED);
       return c.json(
-        await getLangWatchQLService().describeSchema({ protections }),
+        await getLangWatchQLService().describeSchema({
+          projectIds: projects.map((project) => project.id),
+          protections,
+        }),
       );
     },
   );
 }
 
-/**
 /**
  * The query app's context, widened with what the key-auth middleware sets.
  *

@@ -67515,8 +67515,8 @@ openapi: "GET /api/v1/query/schema"
 # FILE: ./api-reference/query/extraction-functions.mdx
 
 ---
-title: "Extraction Functions"
-description: "Project the text of a conversation, a trace or an LLM call straight out of a LangWatchQL query."
+title: "Extraction And Eval Functions"
+description: "Project the text of a conversation, a trace or an LLM call straight out of a LangWatchQL query, and ask a question about it."
 ---
 
 ## What They Are
@@ -67598,6 +67598,70 @@ Each row carries a conversation identifier and its transcript, cut to roughly ei
 ```
 
 `messages` holds a JSON string with an `input` and an `output` array, matching what the trace view shows for the same call.
+
+## Eval Functions
+
+An eval function asks a question about a text and answers it per row. The text is normally an extraction function, which is the one place a function may be nested:
+
+```sql
+SELECT
+  ConversationId,
+  eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed
+FROM analytics.trace_metrics
+WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
+GROUP BY ConversationId
+LIMIT 100
+```
+
+| Function | Returns |
+|---|---|
+| `eval(text, instructions)` | How likely the statement is true, between 0 and 1. |
+| `eval_criteria(text, instructions, criteria)` | The same, with two entries saying what counts as yes and what does not. |
+| `eval_passed(text, instructions, threshold)` | 1 when the probability is at or above the threshold, 0 below it. |
+| `eval_score(text, instructions, min, max)` | A rating on the whole-numbered scale you name, as the probability-weighted mean of its levels. A scale holds at most 10 levels, so the two ends may be at most 9 apart. |
+| `eval_category(text, instructions, options)` | The most likely option, as its name. Each option is written `name: what it means`, 2 to 255 of them. |
+| `eval_category_probs(text, instructions, options)` | The same judgement as a JSON object of option name to probability. |
+
+`eval` takes two arguments and `eval_criteria` takes three. They are separate names because a function in the database has one fixed argument count, so the criteria form cannot be an optional third argument on `eval`.
+
+The rules of the extraction functions all apply: the call is an aliased entry in the top level `SELECT` list, the arguments other than the text are written directly in the query, and the text may nest one extraction function, but not a second level.
+
+### What One Query Costs
+
+Every distinct text is one call to the judge. Several eval functions over the same expression travel in that one call, so asking three questions of a conversation costs about the same as asking one:
+
+```sql
+SELECT
+  ConversationId,
+  eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed,
+  eval_category(
+    conversation_bounded(ConversationId, 8000, ''),
+    'What is the customer asking for',
+    ['refund: wants money back', 'bug: reports something broken', 'other: anything else']
+  ) AS intent
+FROM analytics.trace_metrics
+WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
+GROUP BY ConversationId
+LIMIT 100
+```
+
+Judging is metered and charged per query. Two separate ceilings apply, and each one refuses the run rather than returning part of it:
+
+- A run judges at most 1,000 distinct texts, the same shape of cap the extraction functions carry. Past it the answer is `422` with the code `lwql_app_function_key_cap`, naming the cap and how many texts the query needed.
+- A run whose texts together would exceed the per-query token budget answers `422` with the code `instant_eval_query_budget_exceeded`, before anything is sent to the judge.
+
+For either one: lower the `LIMIT`, ask the extraction function for a smaller token budget, or run the statement as a job.
+
+A text longer than the judge takes is cut before it is sent, keeping the start. Pass a token budget to the extraction function to choose what survives instead.
+
+### When A Row Is Not Judged
+
+Judged columns are `Nullable`. A null means the row was not judged, and the response says why:
+
+- `INSTANT_EVAL_SKIPPED` means the text reached the judge and came back unanswered. The reasons ride in `meta`: rate limited, too large even after being cut, or no judge configured on this deployment.
+- `APP_FUNCTION_UNRESOLVED_KEYS` means the extraction produced no text at all, so the row was never sent to the judge.
+
+`GET /api/v1/query/schema` lists every eval function with `kind` set to `eval` and `available` saying whether this project may call one. A call made while it may not is refused with `APP_FUNCTION_GATED`.
 
 ---
 

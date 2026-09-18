@@ -20,7 +20,10 @@ object that cannot follow that pattern, and §4 says why.
 content rather than the preview).
 
 **Behavioural contract:**
-[specs/lwql/app-functions.feature](../../../specs/lwql/app-functions.feature).
+[specs/lwql/app-functions.feature](../../../specs/lwql/app-functions.feature),
+and for the eval functions
+[specs/lwql/eval-functions.feature](../../../specs/lwql/eval-functions.feature)
+plus [specs/instant-evals/classifier.feature](../../../specs/instant-evals/classifier.feature).
 
 ## Context
 
@@ -282,3 +285,89 @@ which tier it silently reached.
   predicate as a post-hydration filter, and `LIMIT` would then bound candidate
   rows rather than matches, a semantic that has to be documented before it
   ships.
+
+## Amendment, 2026-09-18: eval functions and the classifier interface
+
+The eval functions land on this machinery with no change to it. `eval`,
+`eval_criteria`, `eval_passed`, `eval_score`, `eval_category` and
+`eval_category_probs` are catalog entries like the extraction ones: a projection
+UDF in ClickHouse, projection-only with an alias, options as literals, a value
+the application computes after the query. Four things are new.
+
+**Nesting, one level, one direction.** An eval function's key is the text to
+judge, and that text is normally an extraction function. So the validator admits
+an extraction call inside an eval call and nothing else: not an eval inside an
+eval, not an extraction inside an extraction, not an eval inside an extraction.
+The database makes this work on its own — two identity UDFs compose to the
+identity, so the column carries the *inner* function's key — and the hydration
+stage runs the extraction first and judges what it produced. Deeper nesting has
+nowhere to run: hydration reads one key per column and computes one value from
+it, so a second extraction inside the first would have no key of its own.
+
+**One request per text, never per row pair.** Several eval calls over the same
+nested expression are grouped into one classification carrying every question,
+which is what keeps a three-question query the price of a one-question query.
+Rows are never packed together: the bench measured 98% agreement on single
+conversations against 87% with eight packed into one request, and eleven points
+of accuracy is not worth a seventh of the cost.
+
+**Two names for one boolean question.** `eval(text, instructions)` and
+`eval(text, instructions, criteria)` were meant to be one name with two
+arities, and ClickHouse will not have it. A SQL UDF is a lambda with a fixed
+parameter list; calling one with any other count is `BAD_ARGUMENTS` (36),
+measured on 25.8: "Lambda (a, b) -> a expect 2 arguments. Actual: 3". There is
+no overloading and no default argument. So the criteria form is its own
+function, `eval_criteria`, which matches what the rest of the family already
+does — the name says what the extra argument is. A three-argument `eval` is
+refused by arity with a message naming `eval_criteria`, so the spelling a reader
+reaches for first still lands in one round trip.
+
+**The judge is behind an interface, and it is ours.**
+`app-layer/instant-evals/classifier` publishes `InstantEvalClassifier`, which
+carries its own limits and its own pricing so nothing above it holds a provider
+constant. The shipped implementation calls TypeSafe Jev with LangWatch's own
+key, never a customer's; a deployment with no key gets a null implementation
+that skips every question rather than failing every query. Requests are paced by
+a Redis token bucket shared by every pod, because the quota belongs to the
+platform's key rather than to a process, and it falls back to a low local rate
+when Redis cannot be reached — a slowdown, not an outage.
+
+Two ceilings are new and both are refusals rather than partial answers, for the
+reason §5 already gives. `instant_eval_query_budget_exceeded` (422) refuses a
+synchronous query whose estimated tokens exceed the per-query budget, before
+anything is sent, and its remediation says to run the statement as a job.
+`instant_eval_classifier_unavailable` (503, `provider` fault) is the case where
+*nothing* was judged; a query where some texts went unjudged answers normally
+with null cells and an `INSTANT_EVAL_SKIPPED` diagnostic naming the reasons.
+Gating is a product flag on the project **and** a configured classifier on the
+deployment, together: publishing a function as available where nothing can
+answer it puts a caller in front of a query that always comes back null.
+
+One cost row is recorded per query, not per judged row, carrying our cost as the
+amount and the customer's price beside it. `WHERE` predicates over an eval
+function remain the later phase this ADR already describes.
+
+Three details were settled by measuring the live API rather than by reading the
+plan, and each one is pinned by a test built from the captured response:
+
+- **A score answer is keyed by level position, and `legend` says which level
+  each position means.** A range of 20 to 24 came back as
+  `probabilities: {"0":0, …, "4":0.69}` with `legend: {"0":"20", …, "4":"24"}`.
+  The weighted mean therefore resolves each key through the legend first and
+  accepts only levels the question actually offered, which is what keeps the
+  reading correct if the keys ever become the criteria themselves.
+- **A score holds at most ten levels.** Eleven is refused with `Too many score
+  levels. Must have at most 10 levels.`, so `eval_score(text, 'x', 0, 10)` is
+  refused by the validator where it was written rather than once per row at the
+  provider. The ceiling is published through the classifier's limits, so there
+  is one number rather than two that can disagree.
+- **`jev-latest` is a real model name; a version written out is not.**
+  `jev-1.13` is refused as an unknown model while `jev-latest` resolves to
+  `jev-1.13.0` in the response, so that is the default, with `JEV_MODEL` to pin
+  whatever concrete name the provider later publishes.
+
+Cancellation is threaded from the request to the classifier. A judged query is
+the one LangWatchQL shape that keeps spending after its caller has gone, so the
+REST route passes the request's own `AbortSignal`, the runner checks it between
+classifications, and an abort propagates rather than being counted as a row that
+could not be judged.

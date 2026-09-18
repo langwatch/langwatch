@@ -101,6 +101,22 @@ export interface LangWatchQLPolicy {
    */
   readonly heldPermissions?: readonly string[];
   /**
+   * Whether this caller may call an eval function.
+   *
+   * Its own field rather than another entry in
+   * {@link LangWatchQLPolicy.heldPermissions}, because it is not a permission:
+   * it is a product flag on the project **and** the presence of a classifier on
+   * the deployment, resolved together by
+   * `~/server/app-layer/instant-evals/access.ts`. Folding it into the
+   * permission set would let a caller's redaction protections decide whether a
+   * feature exists.
+   *
+   * Absent means off, so a caller that never asks the question never gets the
+   * functions — which is the right default for the save path, where a statement
+   * is being stored rather than run.
+   */
+  readonly instantEvalsEnabled?: boolean;
+  /**
    * Database an unqualified table name resolves to — the same one the executor
    * connects with. Omit it and unqualified names are matched as written.
    */
@@ -125,6 +141,7 @@ export interface ResolvedLangWatchQLPolicy {
   readonly allowedTables: ReadonlySet<string>;
   readonly gatedColumns: ReadonlySet<string>;
   readonly heldPermissions: ReadonlySet<string>;
+  readonly instantEvalsEnabled: boolean;
   readonly reservedDatabases: ReadonlySet<string>;
   readonly defaultDatabase: string;
   readonly limits: LangWatchQLLimits;
@@ -173,6 +190,7 @@ export function resolveLangWatchQLPolicy(
       policy.gatedColumns.map((column) => column.trim().toLowerCase()),
     ),
     heldPermissions: new Set(policy.heldPermissions ?? []),
+    instantEvalsEnabled: policy.instantEvalsEnabled === true,
     reservedDatabases: new Set(RESERVED_DATABASES),
     defaultDatabase,
     limits: policy.limits ?? DEFAULT_LWQL_LIMITS,

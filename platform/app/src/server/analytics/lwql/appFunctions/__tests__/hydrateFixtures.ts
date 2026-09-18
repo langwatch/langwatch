@@ -11,7 +11,10 @@
 import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { hydrateLangWatchQLAppFunctions } from "../hydrate";
-import type { LangWatchQLHydrationLimits } from "../hydration/contract";
+import type {
+  InstantEvalHydrationSupport,
+  LangWatchQLHydrationLimits,
+} from "../hydration/contract";
 import type { LangWatchQLAppFunctionTraceSource } from "../traceSource";
 
 export const PROTECTIONS: Protections = {
@@ -94,6 +97,8 @@ export const hydrate = (input: {
   rows: Record<string, unknown>[];
   traceSource: LangWatchQLAppFunctionTraceSource;
   limits?: LangWatchQLHydrationLimits;
+  instantEvals?: InstantEvalHydrationSupport;
+  signal?: AbortSignal;
 }) =>
   hydrateLangWatchQLAppFunctions({
     projectIds: ["project-a"],

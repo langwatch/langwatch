@@ -467,6 +467,16 @@ const presentations = {
     describe: () =>
       "We can't read what was stored for it. Rebuild the widget and save it again.",
   },
+  instant_eval_query_budget_exceeded: {
+    title: "That's too much text to judge in one query",
+    describe: () =>
+      "Ask for fewer rows, or extract less text from each one. To judge the whole selection, run it as a job instead.",
+  },
+  instant_eval_classifier_unavailable: {
+    title: "The judgements couldn't be made right now",
+    describe: () =>
+      "The query ran, but nothing could be judged. Try again in a moment.",
+  },
   lwql_app_function_key_cap: {
     title: "That's too many records to read at once",
     describe: (error) => {
