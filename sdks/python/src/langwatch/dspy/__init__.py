@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import logging
 import random
 import re
 import time
@@ -12,6 +13,7 @@ from langwatch.utils.utils import safe_get
 from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
 import langwatch
+import httpx
 from langwatch.http_client import create_client
 import json
 from pydantic import BaseModel
@@ -32,8 +34,46 @@ from dspy.primitives.example import Example
 from pydantic.fields import FieldInfo
 from coolname import generate_slug
 from retry import retry
+from tenacity import (
+    retry as tenacity_retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 from dspy.evaluate.evaluate import Evaluate
 from dspy.utils.callback import with_callbacks
+
+logger = logging.getLogger("langwatch.dspy")
+
+# Steps that could not be sent stay buffered and ride along with the next
+# step. The cap only matters during a long platform outage, when it bounds
+# how much optimization telemetry accumulates in memory.
+MAX_BUFFERED_STEPS = 50
+
+# `/api/dspy/log_steps` refuses bodies over its 20 MB `bodyLimit` with a 413,
+# a client error no retry can fix. Buffered steps are posted in bodies that
+# stay within it, so a buffer that grew during an outage is delivered in
+# several accepted requests instead of being refused whole.
+MAX_STEPS_BODY_BYTES = 20 * 1024 * 1024
+
+
+def _is_transient_error(error: BaseException) -> bool:
+    """Network blips and server 5xx responses are retryable; client 4xx
+    responses are real answers and must surface immediately."""
+    if isinstance(error, (httpx.TimeoutException, httpx.ConnectError)):
+        return True
+    return (
+        isinstance(error, httpx.HTTPStatusError)
+        and error.response.status_code >= 500
+    )
+
+
+_retry_on_transient = tenacity_retry(
+    retry=retry_if_exception(_is_transient_error),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -158,6 +198,21 @@ class DSPyStep(BaseModel):
     examples: List[DSPyExample]
     llm_calls: List[DSPyLLMCall]
     timestamps: Timestamps
+
+
+def _serialize_step(step: DSPyStep) -> bytes:
+    """The step as the JSON object the platform stores, long strings truncated.
+
+    The result is the exact bytes that go on the wire for this step, which is
+    what `send_steps` measures batches by.
+    """
+    item = json.loads(json.dumps(step, cls=SerializableAndPydanticEncoder))
+    item = truncate_object_recursively(
+        item,
+        max_string_length=5000,
+        max_list_dict_length=-1,
+    )
+    return json.dumps(item).encode("utf-8")
 
 
 class LangWatchDSPy:
@@ -375,6 +430,10 @@ class LangWatchDSPy:
         The step carries the examples buffered by the tracked metric since the
         previous step, unless `examples` is given, in which case those are sent
         and the buffer is discarded either way.
+
+        Sending is best effort: a platform or network failure is logged and the
+        step stays buffered for the next attempt, so telemetry can never fail
+        an optimizer trial that already produced a real score.
         """
         step = DSPyStep(
             run_id=self.run_id or "unknown",
@@ -392,21 +451,68 @@ class LangWatchDSPy:
         self.steps_buffer.append(step)
         self.examples_buffer = []
         self.llm_calls_buffer = []
-        self.send_steps()
-
-    @retry(tries=5, delay=1, backoff=2)
-    def send_steps(self):
-        data_list = json.loads(
-            json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder)
-        )
-        data = [
-            truncate_object_recursively(
-                item,
-                max_string_length=5000,
-                max_list_dict_length=-1,
+        if len(self.steps_buffer) > MAX_BUFFERED_STEPS:
+            dropped = len(self.steps_buffer) - MAX_BUFFERED_STEPS
+            del self.steps_buffer[:dropped]
+            logger.warning(
+                "[LangWatch] Dropped %d oldest unsent step(s) to bound memory "
+                "while the platform is unreachable.",
+                dropped,
             )
-            for item in data_list
-        ]
+        try:
+            self.send_steps()
+        except Exception as err:
+            logger.warning(
+                "[LangWatch] Could not log optimizer step %s (%s). The trial "
+                "score is unaffected; %d step(s) stay buffered and will be "
+                "retried with the next step.",
+                index,
+                err,
+                len(self.steps_buffer),
+            )
+
+    def send_steps(self) -> None:
+        """Post the buffered steps, oldest first, in bodies the platform accepts.
+
+        Each batch leaves the buffer only once its post is accepted, so a
+        failure part-way leaves exactly the unsent steps for the next attempt.
+        A step whose body alone is over the limit can never be accepted and is
+        dropped, rather than holding every later step behind its 413.
+        """
+        while self.steps_buffer:
+            count, body = self._first_batch()
+            if count == 0:
+                step = self.steps_buffer.pop(0)
+                logger.warning(
+                    "[LangWatch] Dropped optimizer step %s: its %d byte body is "
+                    "over the platform's %d byte request limit.",
+                    step.index,
+                    len(body),
+                    MAX_STEPS_BODY_BYTES,
+                )
+                continue
+            self._post_steps(body)
+            del self.steps_buffer[:count]
+
+    def _first_batch(self) -> tuple[int, bytes]:
+        """The longest run of buffered steps, from the oldest, whose JSON array
+        body fits `MAX_STEPS_BODY_BYTES` — or, when even the oldest step alone
+        does not, zero steps and that step's body."""
+        items: List[bytes] = []
+        size = len(b"[]")
+        for step in self.steps_buffer:
+            item = _serialize_step(step)
+            needed = len(item) + (len(b",") if items else 0)
+            if size + needed > MAX_STEPS_BODY_BYTES:
+                if not items:
+                    return 0, item
+                break
+            items.append(item)
+            size += needed
+        return len(items), b"[" + b",".join(items) + b"]"
+
+    @_retry_on_transient
+    def _post_steps(self, body: bytes) -> None:
         with create_client(timeout=60) as client:
             response = client.post(
                 f"{langwatch.get_endpoint()}/api/dspy/log_steps",
@@ -414,10 +520,9 @@ class LangWatchDSPy:
                     **build_auth_headers(langwatch.get_api_key() or ""),
                     "Content-Type": "application/json",
                 },
-                content=json.dumps(data),
+                content=body,
             )
         better_raise_for_status(response)
-        self.steps_buffer = []
 
     def tracer(self, trace: LangWatchTrace):
         return DSPyTracer(trace=trace)
