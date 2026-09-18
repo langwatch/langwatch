@@ -47,6 +47,7 @@ vi.mock("ora", () => ({
     succeed: vi.fn(),
     fail: vi.fn(),
     warn: vi.fn(),
+    stop: vi.fn(),
     text: "",
   }),
 }));
@@ -97,6 +98,21 @@ const RUN = {
   finishedAt: null,
 };
 
+/** The same run once it is over, which is what a blocking run answers with. */
+const FINISHED_RUN = {
+  ...RUN,
+  status: "finished" as const,
+  total: 10_000,
+  progress: 10_000,
+  matched: 412,
+  matchedByQuestion: { q1: 412 },
+  tokens: 6_100_000,
+  costUsd: 0.2562,
+  priceUsd: 0.33,
+  startedAt: "2026-09-18T12:00:01.000Z",
+  finishedAt: "2026-09-18T12:00:21.000Z",
+};
+
 const ESTIMATE = {
   rows: 5_000,
   isRowsCapped: false,
@@ -143,6 +159,7 @@ beforeEach(() => {
   }) as never);
   logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
   errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  sampleSpy.mockResolvedValue({ rows: [], judgments: [] });
 });
 
 afterEach(() => {
@@ -183,7 +200,7 @@ describe("instant-eval run, given a question", () => {
     /** @scenario "A run over a thousand rows prints the estimate before it creates" */
     it("prices it first, then creates it", async () => {
       estimateSpy.mockResolvedValue(ESTIMATE);
-      createSpy.mockResolvedValue(RUN);
+      createSpy.mockResolvedValue(FINISHED_RUN);
 
       await runInstantEvalCommand(
         "the customer sounds annoyed",
@@ -200,7 +217,7 @@ describe("instant-eval run, given a question", () => {
 
     it("creates the run anyway when pricing it fails", async () => {
       estimateSpy.mockRejectedValue(new Error("down"));
-      createSpy.mockResolvedValue(RUN);
+      createSpy.mockResolvedValue(FINISHED_RUN);
 
       await runInstantEvalCommand("annoyed", { limit: "10000" }, []);
 
@@ -210,7 +227,7 @@ describe("instant-eval run, given a question", () => {
     /** @scenario "A machine format keeps the estimate out of the document" */
     it("keeps the estimate out of a machine document", async () => {
       estimateSpy.mockResolvedValue(ESTIMATE);
-      createSpy.mockResolvedValue(RUN);
+      createSpy.mockResolvedValue(FINISHED_RUN);
 
       await runInstantEvalCommand(
         "annoyed",
@@ -219,7 +236,7 @@ describe("instant-eval run, given a question", () => {
       );
 
       const document = JSON.parse(printed());
-      expect(document.outcome).toBe("created");
+      expect(document.outcome).toBe("finished");
       expect(document.run.id).toBe(RUN.id);
     });
   });
@@ -227,7 +244,7 @@ describe("instant-eval run, given a question", () => {
   describe("when the run is small", () => {
     /** @scenario "A small run is created without a separate estimate call" */
     it("creates it without a second round trip", async () => {
-      createSpy.mockResolvedValue(RUN);
+      createSpy.mockResolvedValue(FINISHED_RUN);
 
       await runInstantEvalCommand("annoyed", { limit: "200" }, []);
 
@@ -239,7 +256,7 @@ describe("instant-eval run, given a question", () => {
   describe("when the run was created", () => {
     /** @scenario "run prints the statement under a heading in table mode" */
     it("prints the statement under its own heading", async () => {
-      createSpy.mockResolvedValue(RUN);
+      createSpy.mockResolvedValue(FINISHED_RUN);
 
       await runInstantEvalCommand("annoyed", {}, []);
 
@@ -247,6 +264,88 @@ describe("instant-eval run, given a question", () => {
       expect(output).toContain("Statement:");
       expect(output).toContain("FROM analytics.traces");
       expect(output).toContain("start_at");
+    });
+  });
+
+  describe("when the run finishes", () => {
+    /** @scenario "run waits for the run and prints what it found" */
+    it("prints the headline with the matches, the time and the price", async () => {
+      createSpy.mockResolvedValue(FINISHED_RUN);
+
+      await runInstantEvalCommand("annoyed", {}, []);
+
+      const output = printed();
+      expect(output).toContain("Found");
+      expect(output).toContain("412");
+      expect(output).toContain("$0.33");
+      expect(output).toContain("instant-eval results");
+    });
+
+    /** @scenario "run reads back the first rows of a finished run" */
+    it("reads the rows back through the sample, judging nothing again", async () => {
+      createSpy.mockResolvedValue(FINISHED_RUN);
+
+      await runInstantEvalCommand("annoyed", {}, []);
+
+      expect(sampleSpy).toHaveBeenCalledWith(FINISHED_RUN.id, { n: 20 });
+    });
+
+    /** @scenario "--show changes how many rows the run prints" */
+    it("asks for the number of rows --show named", async () => {
+      createSpy.mockResolvedValue(FINISHED_RUN);
+
+      await runInstantEvalCommand("annoyed", { show: "5" }, []);
+
+      expect(sampleSpy).toHaveBeenCalledWith(FINISHED_RUN.id, { n: 5 });
+    });
+
+    /** @scenario "A machine format answers with one document carrying the run and its rows" */
+    it("carries the run and its judgements in one document", async () => {
+      createSpy.mockResolvedValue(FINISHED_RUN);
+      sampleSpy.mockResolvedValue({
+        rows: [{ TraceId: "abc", q1: "the customer is upset" }],
+        judgments: [
+          {
+            traceId: "abc",
+            questionId: "q1",
+            status: "judged",
+            passed: true,
+            probability: 0.82,
+            score: null,
+            label: null,
+          },
+        ],
+      });
+
+      await runInstantEvalCommand("annoyed", { output: "json" }, []);
+
+      const document = JSON.parse(printed());
+      expect(document.outcome).toBe("finished");
+      expect(document.judgments).toHaveLength(1);
+    });
+  });
+
+  describe("when the run is detached", () => {
+    /** @scenario "--detach creates the run and returns its id" */
+    it("returns the id without waiting for the run", async () => {
+      createSpy.mockResolvedValue(RUN);
+
+      await runInstantEvalCommand("annoyed", { detach: true }, []);
+
+      expect(getSpy).not.toHaveBeenCalled();
+      expect(sampleSpy).not.toHaveBeenCalled();
+      expect(printed()).toContain("instant-eval status");
+    });
+  });
+
+  describe("when a run ends in a state that is not finished", () => {
+    /** @scenario "A run that failed exits non-zero" */
+    it("exits non-zero", async () => {
+      createSpy.mockResolvedValue({ ...FINISHED_RUN, status: "failed" });
+
+      await runInstantEvalCommand("annoyed", {}, []);
+
+      expect(process.exitCode).toBe(1);
     });
   });
 

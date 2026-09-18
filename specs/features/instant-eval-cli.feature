@@ -181,6 +181,85 @@ Feature: langwatch instant-eval, asking one question of a whole production histo
     And the failure code is reported
 
   @unit
+  Scenario: run waits for the run and prints what it found
+    Given a line asking a question of a target
+    When the run finishes
+    Then the command prints how many rows matched, how long it took and what it cost
+    And it points at the command that reads the rest of the matches
+
+  @unit
+  Scenario: run reads back the first rows of a finished run
+    Given a run that has finished
+    When the command prints its answer
+    Then it re-reads the first rows through the sample, judging nothing again
+
+  @unit
+  Scenario: --show changes how many rows the run prints
+    Given a line carrying --show 5
+    When the run finishes
+    Then five rows are read back instead of the default twenty
+
+  @unit
+  Scenario: A machine format answers with one document carrying the run and its rows
+    Given a line asking for a machine format
+    When the run finishes
+    Then the document holds the run and the judgements of the rows it printed
+
+  @unit
+  Scenario: --detach creates the run and returns its id
+    Given a line carrying --detach
+    When the run is created
+    Then the command answers with the id and never follows the run
+
+  @unit
+  Scenario: A run that failed exits non-zero
+    Given a run that ends in a state other than finished
+    When the command prints its answer
+    Then the exit code is non-zero
+
+  @unit
+  Scenario: A run reports its progress on one line while it judges
+    Given a run part way through its rows
+    When its progress is rendered
+    Then one line carries the judged count, the matches, the tokens and the time
+
+  @unit
+  Scenario: A finished run headlines the matches, the time and the price
+    Given a finished run whose questions all answer yes or no
+    When its headline is rendered
+    Then it counts the matches against the rows it read, with the time, the tokens and the price
+
+  @unit
+  Scenario: A run that did not finish reports only what it judged
+    Given a run that failed before judging any row
+    When its headline is rendered
+    Then it counts the rows it judged, not the rows it had selected
+
+  @unit
+  Scenario: A run whose questions are not yes or no reports what it read
+    Given a finished run asking for a score
+    When its headline is rendered
+    Then it counts no matches, because a score has no threshold to be past
+
+  @unit
+  Scenario: A run that is already over is not polled
+    Given a run that is already finished when the command starts following it
+    When it is followed
+    Then it answers at once without reading the run again
+
+  @unit
+  Scenario: A blocking run gives up following after its ceiling
+    Given a run that is still going after forty five minutes
+    When it is followed
+    Then the command gives up, hands back the run it last read and points at the status command
+
+  @unit
+  Scenario: A blocking run stops following after repeated read failures
+    Given a run whose reads keep failing
+    When it is followed
+    Then the command stops after five tries and keeps the run it last had
+
+  @unit
   Scenario: A --last window past any date is refused
     Given a line asking for a window written with more digits than a date can hold
     When the window is read

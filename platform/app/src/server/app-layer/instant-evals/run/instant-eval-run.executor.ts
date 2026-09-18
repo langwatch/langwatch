@@ -28,7 +28,11 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import type { LangWatchQLAppFunctionCall } from "~/server/analytics/lwql";
+import {
+  type LangWatchQLAppFunctionCall,
+  lwqlAppFunction,
+  lwqlAppFunctionCap,
+} from "~/server/analytics/lwql";
 import type {
   InstantEvalPageOutcome,
   InstantEvalRunPort,
@@ -58,8 +62,11 @@ const logger = createLogger("langwatch:instant-evals:run-executor");
  * Rows one page judges when the texts are ordinary.
  *
  * Five hundred, which is half the thousand-key cap the hydration stage
- * enforces, so a statement whose extraction reads threads rather than traces
- * still fits its own lower cap on most pages.
+ * enforces for a trace or a span. A statement whose extraction reads another
+ * kind of key has a lower cap of its own, and
+ * {@link instantEvalPageSizeFor} lowers the page to it: `threads` caps at two
+ * hundred keys, so a five hundred row page over conversations fails the whole
+ * run with `lwql_app_function_key_cap` rather than judging anything.
  */
 export const INSTANT_EVAL_PAGE_SIZE = 500;
 
@@ -119,11 +126,45 @@ export async function loadRun({
   };
 }
 
-/** The page size the sampled texts call for. */
-export function instantEvalPageSizeFor(averageTextBytes: number): number {
-  return averageTextBytes > INSTANT_EVAL_LARGE_TEXT_BYTES
-    ? INSTANT_EVAL_SMALL_PAGE_SIZE
-    : INSTANT_EVAL_PAGE_SIZE;
+/**
+ * The keys one execution of this statement may hydrate, the lowest cap wins.
+ *
+ * Every app function the statement calls carries a cap by the kind of key it
+ * reads, and one execution has to satisfy all of them at once. A statement
+ * over conversations is the case that matters: its cap is two hundred, far
+ * below the five hundred a page would otherwise hold.
+ */
+export function instantEvalKeyCapFor(
+  calls: readonly LangWatchQLAppFunctionCall[],
+): number {
+  const caps = calls.flatMap((call) => {
+    const names = [call.function, call.source?.function].filter(
+      (name): name is string => typeof name === "string",
+    );
+    return names.flatMap((name) => {
+      const definition = lwqlAppFunction(name);
+      return definition ? [lwqlAppFunctionCap(definition)] : [];
+    });
+  });
+  return caps.length === 0 ? INSTANT_EVAL_PAGE_SIZE : Math.min(...caps);
+}
+
+/**
+ * The page size the sampled texts and the statement's key caps call for.
+ *
+ * The text size chooses a page, and the key cap bounds it: a page over the cap
+ * is refused by the hydration stage, which fails the run rather than returning
+ * fewer rows, so the cap has to be respected here and not discovered there.
+ */
+export function instantEvalPageSizeFor(
+  averageTextBytes: number,
+  keyCap: number = INSTANT_EVAL_PAGE_SIZE,
+): number {
+  const byText =
+    averageTextBytes > INSTANT_EVAL_LARGE_TEXT_BYTES
+      ? INSTANT_EVAL_SMALL_PAGE_SIZE
+      : INSTANT_EVAL_PAGE_SIZE;
+  return Math.max(1, Math.min(byText, keyCap));
 }
 
 /** The mean byte length of the judged texts in a sample of rows. */

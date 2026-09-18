@@ -8,13 +8,13 @@ description: Every langwatch instant-eval subcommand and flag, with the lines th
 
 ```bash
 langwatch instant-eval run "the customer sounds annoyed" \
-  --target threads --last 7d --limit 100 --wait
+  --target threads --last 7d --limit 100
 ```
 
-That judges the last seven days of conversations, a hundred of them, and waits
-for the answer. In table mode it also prints the LangWatchQL statement it ran,
-which is the statement you edit when you want more than the shorthand gives
-you.
+That judges a hundred of the last seven days of conversations and prints the
+matches when it is done. While it works you see the LangWatchQL statement it
+ran, which is the statement you edit when you want more than the shorthand
+gives you, and a progress line.
 
 ## Pricing a run before you ask
 
@@ -27,6 +27,11 @@ The estimate counts the rows, measures a sample of their texts, and prices the
 run from that. No row is judged and no charge is made. `run --estimate` does
 the same and exits; a plain `run` over a thousand rows prints the price first,
 then starts.
+
+The row count is exact. The price is not: it comes from the first fifty rows
+the statement returns, so a selection whose rows vary a lot in length costs
+more or less than the estimate said. Read it as the order of magnitude, and
+read the finished run's own token count for what it actually cost.
 
 ## Reading what came back
 
@@ -63,7 +68,8 @@ Starts a run. Takes a question, or a statement of your own.
 | `--limit <n>` | Rows the run may judge (default 1000) |
 | `--name <name>` | What to call the run |
 | `--estimate` | Price the run and exit |
-| `--wait [minutes]` | Follow the run, up to 45 minutes or the minutes given |
+| `--detach` | Create the run and return its id instead of waiting for it |
+| `--show <n>` | Rows to print when the run finishes (default 20, at most 25) |
 
 A modifier flag describes the question before it, so a line may ask two
 questions that each carry their own criteria:
@@ -94,29 +100,38 @@ langwatch instant-eval run \
 langwatch instant-eval run --questions-file questions.json --target threads --last 7d
 ```
 
-A file is also how a question gets a name of its own. Without one, questions
-are called `q1`, `q2` and so on, and that name is the column the answer lands
-in and the name every judgement is filed under.
+A file is also how you name a question. Without a name, questions are called
+`q1`, `q2` and so on. The answer goes into a column with that name, and every
+judgement is filed under it.
 
 ### What `--filter` accepts
 
-`--filter` speaks the trace explorer's language, and a target supports the
-fields the LangWatchQL trace view can answer: `traceId`, `traceName`, `service`,
-`origin`, `user`, `customer`, `conversation`, `scenarioRun`, `topic`,
-`subtopic`, `label`, `model`, `status:error`, `cost`, `duration`, `tokens`,
-`promptTokens`, `completionTokens`, `tokensPerSecond`, `ttft`, `ttlt`, `spans`,
-`tokensEstimated`, `selectedPrompt`, `lastUsedPrompt`, `promptVersion`,
-`trace.attribute.<key>`, and a bare word as free text.
+`--filter` takes the same syntax as the trace explorer's search bar. With a
+`--target`, you can filter on the fields of the trace row itself.
 
-Anything that reaches outside the trace row is refused by name: span fields
-(`spanId`, `spanName`, `spanType`, `spanStatus`, `rootSpanType`,
-`span.attribute.<key>`, `containsAi`), evaluation fields (`eval`, `evaluator*`, `guardrail`),
-events and annotations (`event`, `event.attribute.<key>`, `annotation`,
-`feedback`), scenario-run fields (`scenario`, `scenarioSet`, `scenarioBatch`,
-`scenarioStatus`, `scenarioVerdict`), and `status:ok` or `status:warning`. The
-refusal lists what it does accept. Ask the rest with `--sql`, which reaches
-every table. See [the target shorthand](/features/instant-evals/shorthand) for
-where the filter lands in each target's statement.
+| Group | Fields |
+|---|---|
+| Identity | `traceId`, `traceName`, `service`, `origin`, `user`, `customer`, `conversation`, `scenarioRun` |
+| Classification | `topic`, `subtopic`, `label`, `model`, `status:error` |
+| Cost and size | `cost`, `duration`, `tokens`, `promptTokens`, `completionTokens`, `tokensPerSecond`, `ttft`, `ttlt`, `spans`, `tokensEstimated` |
+| Prompts | `selectedPrompt`, `lastUsedPrompt`, `promptVersion` |
+| Attributes | `trace.attribute.<key>` |
+| Free text | a bare word |
+
+Every other field sits outside the trace row, so a `--target` refuses it by
+name and lists what you can use instead.
+
+| Group | Refused fields |
+|---|---|
+| Spans | `spanId`, `spanName`, `spanType`, `spanStatus`, `rootSpanType`, `span.attribute.<key>`, `containsAi` |
+| Evaluations | `eval`, `evaluator*`, `guardrail` |
+| Events and annotations | `event`, `event.attribute.<key>`, `annotation`, `feedback` |
+| Scenario runs | `scenario`, `scenarioSet`, `scenarioBatch`, `scenarioStatus`, `scenarioVerdict` |
+| Errors | `status:ok`, `status:warning` |
+
+Ask for any of those with `--sql`, which reaches every table. To see where
+each target puts the filter in its statement, read
+[the target shorthand](/features/instant-evals/shorthand).
 
 ### Rerunning the statement a target wrote
 
@@ -132,17 +147,35 @@ langwatch query "$(cat written.sql)" \
 Change the values to move the window without touching the query. Resubmitting
 it as a run works the same way, with `--sql` and two `--param` flags.
 
-### Waiting
+### What you see while it runs
 
-`--wait` polls every three seconds and reports one line:
+`run` prints the statement, then one progress line that updates in place:
 
 ```
-Judging... 3,200/10,000 (412 matched)
+Judging 3,200/10,000 · 412 matched · 1.9M tokens · 12s
 ```
 
-It exits non-zero when the run failed and when the wait ran out, so a script
-can tell a red run from a green one. A run that outlives the wait keeps going;
-follow it later with `status`.
+When the run ends, that is replaced by the headline and the first rows:
+
+```
+Found 412 matches in 10,000 conversations · 20.4s · 6.1M tokens · $0.33
+```
+
+Press Ctrl-C to stop watching. The run keeps going, and the command prints the
+`status` line that reads it back. `run` exits non-zero when the run did not
+finish, so a script can tell a red run from a green one.
+
+In `-o json` and `-o agents` the command still waits, and answers with one
+document holding the run and the judgements of the rows it printed.
+
+### Starting a run without waiting
+
+```bash
+langwatch instant-eval run "the customer sounds annoyed" --target threads --detach
+```
+
+`--detach` creates the run, prints its id and returns. Read it back later with
+`status`, or follow it with `status <id> --wait`.
 
 ## status
 
@@ -175,10 +208,11 @@ langwatch instant-eval results <id> --question annoyed --matched --limit 200
 | `--matched` / `--unmatched` | Only the ones that matched, or only the ones that did not |
 | `--status <status>` | Only `judged`, `skipped` or `failed` judgements |
 | `--limit <n>` | Judgements per page, at most 1000 (default 100) |
-| `--cursor <cursor>` | The cursor the previous page answered with |
+| `--cursor <cursor>` | The cursor you got from the previous page |
 
-The cursor is the only way to read the page after a page: no judgement is ever
-carried by two pages, and none is skipped while the run is still writing.
+Use the cursor to read the next page. It is the only way to page safely while
+the run is still writing: you never see the same judgement twice, and you never
+skip one.
 
 ## sample
 
@@ -196,12 +230,13 @@ row again and costs no money.
 langwatch instant-eval cancel <id>
 ```
 
-Asks the run to stop before its next page. The pages it already judged keep
-their judgements and stay readable. A run that already finished answers 409.
+Stops the run before its next page. You keep every judgement it had already
+written, and you can read them the same way. Cancel a run that has already
+finished and you get back a 409.
 
 ## Output
 
-Every subcommand honours the shared output contract: `-o table|json|agents|yaml`,
+Use the shared output flags on any subcommand: `-o table|json|agents|yaml`,
 `--json <fields>` and `--jq <path>`. In a machine format the statement is a
 field of the run rather than a printed block, and the progress line stays on
 standard error so the document a script reads holds one object.

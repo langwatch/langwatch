@@ -4,20 +4,19 @@ sidebarTitle: Target shorthand
 description: What a target and a filter expand into, which filter fields a shorthand can ask for, and how to take the statement it wrote and edit it.
 ---
 
-## Why the statement is handed back
+## Where does the statement come from
 
-A run always executes one LangWatchQL statement. When you send a target and
-your questions instead of a statement, the platform writes one and stores it on
-the run, and `run` prints it under a Statement heading. That is deliberate: the
-shorthand is a way into the query language rather than a replacement for it, so
-the first thing it gives you is the query it wrote.
+Every run executes one LangWatchQL statement. Send a target and your questions
+instead of a statement and LangWatch writes one for you, stores it on the run,
+and `run` prints it under a Statement heading.
 
-Copy it, edit it, and resubmit it with `--sql`, or run it through
+Take that statement when you need more than the shorthand covers. Edit it and
+submit it back with `--sql`, or run it through
 [the query endpoint](/api-reference/query/overview) to see the rows before you
 judge them.
 
-The statement carries two parameters, `start_at` and `end_at`, so a rerun has
-to supply both:
+The statement takes two parameters, `start_at` and `end_at`, so supply both
+when you run it again:
 
 ```bash
 langwatch query "$(cat written.sql)" \
@@ -25,9 +24,8 @@ langwatch query "$(cat written.sql)" \
   --param end_at=2026-09-18T00:00:00
 ```
 
-The values are the window the shorthand resolved, which `run` prints beside the
-statement. Any other window works too, which is the point of taking the
-statement: the same query over a different week is a `--param` change.
+`run` prints these two values beside the statement. Change them to move the
+window.
 
 ## What each target expands into
 
@@ -99,13 +97,13 @@ long it is, write the statement yourself and pass the budget you want.
 
 ## What a shorthand filter can ask for
 
-`--filter` speaks the same language as the trace explorer's search bar, and a
-shorthand supports the half of it the LangWatchQL trace view can answer:
+`--filter` takes the same syntax as the trace explorer's search bar. A target
+supports the fields of the trace row itself:
 
 | Group | Fields |
 |---|---|
 | Identity | `traceId`, `traceName`, `service`, `origin`, `user`, `customer`, `conversation`, `scenarioRun` |
-| Classification | `topic`, `subtopic`, `label`, `model`, `status` (the value `error` only) |
+| Classification | `topic`, `subtopic`, `label`, `model`, `status:error` |
 | Cost and size | `cost`, `duration`, `tokens`, `promptTokens`, `completionTokens`, `tokensPerSecond`, `ttft`, `ttlt`, `spans`, `tokensEstimated` |
 | Prompts | `selectedPrompt`, `lastUsedPrompt`, `promptVersion` |
 | Attributes | `trace.attribute.<key>` |
@@ -127,20 +125,25 @@ condition would charge you for judging rows you meant to exclude.
 | Scenario runs | `scenario`, `scenarioSet`, `scenarioBatch`, `scenarioStatus`, `scenarioVerdict` |
 | Errors | `error`, `errorMessage`, and `status:ok` or `status:warning` |
 
-`status:error` is supported because the trace view carries an error flag;
-`status:ok` and `status:warning` need the evaluation rows.
+You can filter on `status:error`, because the error flag is a column of the
+trace row. `status:ok` and `status:warning` read the evaluation rows instead,
+so ask for those with `--sql`.
 
 Ask any of those with a statement instead, using `--sql`: LangWatchQL reaches
-every table, and the trace filter is only a shortcut for the common case. The
-refusal names the field it rejected and lists the fields it accepts.
+every table, and the trace filter is only a shortcut for the common case. When
+a field is refused you get back the field you wrote and the fields you can use
+instead.
 
-## Where the filter lands
+## Where does the filter go
 
-Over `traces` the filter is a condition in the statement's own WHERE clause.
-Over `threads` and `llm-spans` it is a subquery on the trace view, because
-neither the metrics view nor the span view carries the trace's attributes. So a
-conversation is kept when any of its traces matches, and a model call is kept
-when its trace matches. Both subqueries bound their own time column.
+Over `traces`, LangWatch puts your filter in the statement's own WHERE clause.
+Over `threads` and `llm-spans` it goes into a subquery on the trace view,
+because the trace's attributes are not columns of the metrics view or the span
+view.
+
+You get a conversation when any of its traces matches, and a model call when
+its trace matches. The same time bounds apply inside each subquery, so you
+never pay for rows outside your window.
 
 ## Sending a statement instead
 
@@ -148,9 +151,9 @@ A statement needs two things to be a run: it has to project `TraceId`, and it
 has to project at least one eval function column. Everything else is yours.
 
 ```bash
-langwatch instant-eval run --sql "$(cat annoyed.sql)" --limit 10000 --wait
+langwatch instant-eval run --sql "$(cat annoyed.sql)" --limit 10000
 ```
 
-A request carrying both `sql` and `target` is refused, and so is one carrying
-neither. `--param` belongs to a statement of your own: a target writes its own
-parameters, so there is none of yours left to fill.
+Send either `sql` or `target`, not both and not neither. Use `--param` only
+with your own statement: a target writes its own parameters, so you have none
+left to fill.

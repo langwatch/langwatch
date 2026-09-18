@@ -20,6 +20,7 @@ export {
   LWQL_APP_FUNCTION_KEY_CAPS,
   LWQL_APP_FUNCTION_KEY_KINDS,
   lwqlAppFunction,
+  lwqlAppFunctionCap,
   lwqlAppFunctionNames,
   lwqlAppFunctionSignature,
 } from "./appFunctions/catalog";

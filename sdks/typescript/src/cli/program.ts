@@ -2914,6 +2914,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     "Run a LangWatchQL statement of your own instead of a target. It must project TraceId and at least one eval function column";
   const INSTANT_EVAL_LIMIT_HELP =
     "Rows the run may judge (default: 1000). Ten thousand is allowed on every plan and a hundred thousand on a plan that lifts the cap";
+  // Hidden on `run`, where waiting is the default. `status` still offers it.
   const INSTANT_EVAL_WAIT_HELP =
     "Wait for the run to finish, up to 45 minutes or the number of minutes given, and exit non-zero when it failed";
   const INSTANT_EVAL_START_HELP =
@@ -2925,7 +2926,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   const instantEvalRunCmd = instantEvalCmd
     .command("run [question]")
-    .description("Start a run, asking your question of every row it finds");
+    .description(
+      "Ask your question of every row it finds, and print the matches when it is done",
+    );
   const readInstantEvalRunQuestions = trackQuestionFlags(instantEvalRunCmd);
 
   rendersOwnResult(
@@ -2948,7 +2951,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--limit <n>", INSTANT_EVAL_LIMIT_HELP)
       .option("--name <name>", "What to call the run. Yours to choose")
       .option("--estimate", "Price the run and exit without starting it")
-      .option("--wait [minutes]", INSTANT_EVAL_WAIT_HELP)
+      .option("--detach", "Create the run and return its id instead of waiting for it")
+      .option("--show <n>", "Rows to print when the run finishes (default 20, at most 25)")
+      // A run waits by default now, so --wait asks for what already happens.
+      // Kept and hidden so a line written against the old shape still runs.
+      .addOption(new Option("--wait [minutes]", INSTANT_EVAL_WAIT_HELP).hideHelp())
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (question: string | undefined, _options: unknown, command: Command) => {
     // Merged globals: a root-position `--output` only lands on the ROOT

@@ -13,6 +13,7 @@ vi.mock("ora", () => ({
     succeed: vi.fn(),
     fail: vi.fn(),
     warn: vi.fn(),
+    stop: vi.fn(),
     text: "",
   }),
 }));
