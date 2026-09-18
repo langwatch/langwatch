@@ -91,15 +91,11 @@ export {
 
 /**
  * How another package composes this feature: the envelope a spend row is
- * rendered through, and the delivery graph a process runs.
+ * rendered through.
  */
 export {
   webhookServer,
-  createWebhookDelivery,
   createWebhookEnvelopes,
-  type WebhookDeliveryAbsenceReport,
-  type WebhookDeliveryComposition,
-  type WebhookDeliverySubstrates,
   type WebhookEnvelopes,
   type WebhookLiveDatabase,
 } from "./webhook.server.ts";

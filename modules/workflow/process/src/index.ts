@@ -68,13 +68,7 @@ export {
   type NlpLambdaFunction,
   type NlpLambdaArnCache,
 } from "./app/workflow.app.ts";
-export {
-  buildStudioLambdaConfig,
-  createWorkflowRepositories,
-  createWorkflowService,
-  type WorkflowServiceCompositionInput,
-  workflowServer,
-} from "./workflow.server.ts";
+export { buildStudioLambdaConfig, workflowServer } from "./workflow.server.ts";
 
 /** The five declarations the installer carries, and the sixth the process builds. */
 export { cronRest } from "./transport/cron.rest.ts";
