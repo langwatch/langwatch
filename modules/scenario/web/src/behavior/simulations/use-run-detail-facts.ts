@@ -9,7 +9,7 @@ import { z } from "zod";
 import { runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { buildDisplayTitle } from "@langwatch/suite-web/run-formatters";
 import { useTargetNameMap } from "../use-target-name-map.ts";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { shouldShowNoResponse } from "../../model/scenario-run-status.utils.ts";
 import type { ScenarioRunState } from "./use-run-state-stream.ts";
 

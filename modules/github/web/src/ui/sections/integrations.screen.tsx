@@ -6,7 +6,7 @@
 import { Badge, Button, Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
-import { UiSlot } from "@langwatch/ui-host/slots";
+import { UiSlot } from "@langwatch/browser-host/slots";
 import { githubApi } from "../../behavior/github-api.ts";
 import {
   GITHUB_ERROR_QUERY_KEY,

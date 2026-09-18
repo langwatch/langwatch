@@ -8,7 +8,7 @@ import { Box, Card as ChakraCard } from "@chakra-ui/react";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import type { Edge, Node } from "@xyflow/react";
 
-import { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
+import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { useWorkflowHost } from "../../../model/workflow-host.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
 import { FullLogo } from "@langwatch/design-system/full-logo";

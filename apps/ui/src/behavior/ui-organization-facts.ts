@@ -7,7 +7,7 @@
 import { trpcQueryKey } from "@langwatch/api/web";
 import { useQuery } from "@tanstack/react-query";
 import { readPublicAppConfig } from "./public-config";
-import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
+import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { useUiRpc } from "./ui-rpc";
 
 export const UI_ACTIVE_PLAN_PROCEDURE = "limits.getUsage";

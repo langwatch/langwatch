@@ -20,9 +20,7 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import { ENTERPRISE_FEATURE_ERRORS, isEnterpriseTier } from "@langwatch/enterprise-plan-gate";
 import {
   ScimApi,
   ScimProtocolError,
@@ -45,7 +43,12 @@ import {
   type ScimTokenSummary,
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import {
+  ENTERPRISE_FEATURE_ERRORS,
+  EntitlementApi,
+  isEnterpriseTier,
+} from "@langwatch/entitlement-contract";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 

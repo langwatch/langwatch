@@ -81,6 +81,9 @@
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/process-stores/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {

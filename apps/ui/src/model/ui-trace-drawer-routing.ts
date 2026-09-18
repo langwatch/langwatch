@@ -2,7 +2,7 @@
  * Route a drawer-open request to the Trace Explorer drawer.
  */
 
-import type { DrawerOpenRewrite } from "@langwatch/ui-drawer";
+import type { DrawerOpenRewrite } from "@langwatch/browser-host/drawer";
 
 export const routeTraceDrawerForV2: DrawerOpenRewrite = (drawer, props) => {
   if (drawer === "traceDetails" && typeof props?.traceId === "string" && props.traceId) {

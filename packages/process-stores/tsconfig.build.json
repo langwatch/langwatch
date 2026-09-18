@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@langwatch/infrastructure": ["./src/index.ts"]
+      "@langwatch/process-stores": ["./src/index.ts"]
     },
     "composite": true,
     "declaration": true,

@@ -47,7 +47,7 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
   }),

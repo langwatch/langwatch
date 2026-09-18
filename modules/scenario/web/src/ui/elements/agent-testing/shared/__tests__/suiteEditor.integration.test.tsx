@@ -5,27 +5,19 @@
  * @see specs/features/agent-testing/suite-editor.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
-import { SUITE_EDITOR_DRAWER } from "../../../../sections/agent-testing/cases/drawer-keys.ts";
+
 // DANGLING: `SuiteEditorDrawer` / `useSuiteEditorStore` do not exist anywhere
 // in this tree - the whole never-ported suite-editor surface (also
 // SuiteEvaluatorsSection, useOpenSuiteEditor, evaluators/attachment-rules,
 // useOpenScenarioEvaluatorEditor, useProjectEvaluators). See handoff
 // merge-scenario-dangling-imports.
-import { SuiteEditorDrawer } from "../suite/SuiteEditorDrawer";
-import { useSuiteEditorStore } from "../suite/suiteEditorStore";
+import { SUITE_EDITOR_DRAWER, SuiteEditorDrawer } from "../../suite/suite-editor-drawer.tsx";
+import { useSuiteEditorStore } from "../../suite/suite-editor-store.ts";
 
 const mockSuiteGetById = vi.hoisted(() => vi.fn());
 const mockEvaluatorsGetAll = vi.hoisted(() => vi.fn());
@@ -47,11 +39,9 @@ const drawerState = vi.hoisted(() => ({
   params: {} as Record<string, string>,
   stack: [] as { drawer: string }[],
 }));
-const flowCallbacksStore = vi.hoisted(
-  () => ({}) as Record<string, Record<string, unknown>>,
-);
+const flowCallbacksStore = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>);
 
-vi.mock("~/utils/api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       suites: {
@@ -76,24 +66,29 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),
 }));
 
-vi.mock("~/hooks/useProjectSpanNames", () => ({
+vi.mock("@langwatch/trace-web/surfaces/project-span-names", () => ({
   useProjectSpanNames: () => ({
     spanNames: [{ key: "run_sql", label: "run_sql" }],
     metadataKeys: [],
   }),
 }));
 
-vi.mock("~/components/ui/toaster", () => ({
+vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: mockToast },
 }));
 
-vi.mock("~/hooks/useDrawer", () => ({
+vi.mock("@langwatch/browser-host/errors", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/browser-host/errors")>()),
+  showErrorToast: mockToast,
+}));
+
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
     closeDrawer: mockCloseDrawer,
@@ -175,9 +170,7 @@ const SQL_ATTACHMENT: EvaluatorAttachment = {
   },
 };
 
-function storedSuite(
-  overrides: { fields?: unknown; evaluators?: unknown; name?: string } = {},
-) {
+function storedSuite(overrides: { fields?: unknown; evaluators?: unknown; name?: string } = {}) {
   return {
     id: "suite_1",
     name: "Refunds",
@@ -240,13 +233,7 @@ function stubVerticalLayout(): () => void {
 }
 
 /** One keystroke, delivered where dnd-kit's keyboard sensor listens for it. */
-function press({
-  element,
-  code,
-}: {
-  element: HTMLElement;
-  code: string;
-}): void {
+function press({ element, code }: { element: HTMLElement; code: string }): void {
   fireEvent.keyDown(element, { code, key: code === "Space" ? " " : code });
 }
 
@@ -301,22 +288,14 @@ describe("the suite editor drawer", () => {
     await screen.findByLabelText("Test suite name");
     const chips = screen.getByTestId("customize-suite-chips");
     expect(chips).toHaveTextContent("Customize test suite");
-    expect(screen.getByTestId("customize-chip-suite-fields")).toHaveTextContent(
-      "Add fields",
+    expect(screen.getByTestId("customize-chip-suite-fields")).toHaveTextContent("Add fields");
+    expect(screen.getByTestId("customize-chip-suite-evaluators")).toHaveTextContent(
+      "Add evaluators",
     );
-    expect(
-      screen.getByTestId("customize-chip-suite-evaluators"),
-    ).toHaveTextContent("Add evaluators");
-    expect(
-      screen.queryByTestId("suite-fields-section"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-evaluators-section"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("suite-fields-section")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("suite-evaluators-section")).not.toBeInTheDocument();
     // The chip row takes whatever space the name leaves above it.
-    expect(
-      window.getComputedStyle(chips.parentElement as Element).marginTop,
-    ).toBe("auto");
+    expect(window.getComputedStyle(chips.parentElement as Element).marginTop).toBe("auto");
   });
 
   /** @scenario "Editing a suite opens the sections it already uses" */
@@ -332,19 +311,13 @@ describe("the suite editor drawer", () => {
     );
 
     const fields = await screen.findByTestId("suite-fields-section");
-    expect(within(fields).getByLabelText("Field 1 identifier")).toHaveValue(
-      "golden_sql",
-    );
-    expect(within(fields).getByLabelText("Field 2 identifier")).toHaveValue(
-      "table_schema",
-    );
+    expect(within(fields).getByLabelText("Field 1 identifier")).toHaveValue("golden_sql");
+    expect(within(fields).getByLabelText("Field 2 identifier")).toHaveValue("table_schema");
     const evaluators = screen.getByTestId("suite-evaluators-section");
-    expect(
-      within(evaluators).getByTestId("evaluator-pill-att_sql"),
-    ).toHaveTextContent("SQL Query Equivalence");
-    expect(
-      screen.queryByTestId("customize-suite-chips"),
-    ).not.toBeInTheDocument();
+    expect(within(evaluators).getByTestId("evaluator-pill-att_sql")).toHaveTextContent(
+      "SQL Query Equivalence",
+    );
+    expect(screen.queryByTestId("customize-suite-chips")).not.toBeInTheDocument();
   });
 
   // --- Fields ---
@@ -356,24 +329,22 @@ describe("the suite editor drawer", () => {
       const user = userEvent.setup();
       openEditor();
 
-      await user.click(
-        await screen.findByTestId("customize-chip-suite-fields"),
-      );
+      await user.click(await screen.findByTestId("customize-chip-suite-fields"));
 
       const section = screen.getByTestId("suite-fields-section");
       const identifier = within(section).getByLabelText("Field 1 identifier");
       expect(identifier).toHaveValue("");
       expect(identifier).toHaveAttribute("placeholder", "expected_tools");
       const type = within(section).getByLabelText("Field 1 type");
-      expect(
-        Array.from((type as HTMLSelectElement).options).map((o) => o.text),
-      ).toEqual(["Text", "Number", "Boolean"]);
+      expect(Array.from((type as HTMLSelectElement).options).map((o) => o.text)).toEqual([
+        "Text",
+        "Number",
+        "Boolean",
+      ]);
       // An identifier and a type: one text box and one select per row.
       expect(within(section).getAllByRole("textbox")).toHaveLength(1);
       expect(within(section).getAllByRole("combobox")).toHaveLength(1);
-      expect(
-        screen.queryByTestId("customize-chip-suite-fields"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("customize-chip-suite-fields")).not.toBeInTheDocument();
     });
 
     /** @scenario "Fields can be added and removed" */
@@ -403,20 +374,14 @@ describe("the suite editor drawer", () => {
     /** @scenario "The reorder handle appears only when there is more than one field" */
     it("hides the handle while one field stands alone and gives every row one once a second arrives", async () => {
       const user = userEvent.setup();
-      openEditor(
-        storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }),
-      );
+      openEditor(storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }));
       await screen.findByTestId("suite-fields-section");
 
-      expect(
-        screen.queryByRole("button", { name: "Reorder field" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Reorder field" })).not.toBeInTheDocument();
 
       await user.click(screen.getByTestId("suite-add-field"));
 
-      expect(
-        screen.getAllByRole("button", { name: "Reorder field" }),
-      ).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: "Reorder field" })).toHaveLength(2);
     });
 
     /** @scenario "A field is reordered by its handle" */
@@ -448,9 +413,7 @@ describe("the suite editor drawer", () => {
         await waitFor(() => expect(announcement()).not.toBe(pickedUp));
 
         press({ element: firstHandle, code: "Space" });
-        await waitFor(() =>
-          expect(identifiers()).toEqual(["table_schema", "golden_sql"]),
-        );
+        await waitFor(() => expect(identifiers()).toEqual(["table_schema", "golden_sql"]));
 
         await user.click(screen.getByTestId("suite-editor-save"));
         expect(mockUpdateMutate).toHaveBeenCalledWith(
@@ -469,26 +432,16 @@ describe("the suite editor drawer", () => {
     /** @scenario "Closing the fields section takes the fields away" */
     it("closes the section, offers the chip again and saves no field", async () => {
       const user = userEvent.setup();
-      openEditor(
-        storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }),
-      );
+      openEditor(storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }));
       await screen.findByTestId("suite-fields-section");
 
-      await user.click(
-        screen.getByRole("button", { name: "Remove the fields" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Remove the fields" }));
 
-      expect(
-        screen.queryByTestId("suite-fields-section"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.getByTestId("customize-chip-suite-fields"),
-      ).toBeInTheDocument();
+      expect(screen.queryByTestId("suite-fields-section")).not.toBeInTheDocument();
+      expect(screen.getByTestId("customize-chip-suite-fields")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("suite-editor-save"));
-      expect(mockUpdateMutate).toHaveBeenCalledWith(
-        expect.objectContaining({ fields: [] }),
-      );
+      expect(mockUpdateMutate).toHaveBeenCalledWith(expect.objectContaining({ fields: [] }));
     });
   });
 
@@ -500,19 +453,13 @@ describe("the suite editor drawer", () => {
       const user = userEvent.setup();
       openEditor();
 
-      await user.click(
-        await screen.findByTestId("customize-chip-suite-evaluators"),
-      );
+      await user.click(await screen.findByTestId("customize-chip-suite-evaluators"));
 
-      expect(
-        screen.getByTestId("suite-evaluators-section"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("suite-evaluators-section")).toBeInTheDocument();
       expect(mockOpenDrawer).toHaveBeenCalledWith("evaluatorList", {
         onClose: mockGoBack,
       });
-      expect(flowCallbacksStore.evaluatorList?.onSelect).toEqual(
-        expect.any(Function),
-      );
+      expect(flowCallbacksStore.evaluatorList?.onSelect).toEqual(expect.any(Function));
     });
 
     /** @scenario "The evaluators section reads as pills and an Add evaluator button" */
@@ -536,12 +483,12 @@ describe("the suite editor drawer", () => {
       );
 
       const section = await screen.findByTestId("suite-evaluators-section");
-      expect(
-        within(section).getByTestId("evaluator-pill-att_sql"),
-      ).toHaveTextContent("SQL Query Equivalence");
-      expect(
-        within(section).getByTestId("evaluator-pill-att_pii"),
-      ).toHaveTextContent("PII Leak Scanner");
+      expect(within(section).getByTestId("evaluator-pill-att_sql")).toHaveTextContent(
+        "SQL Query Equivalence",
+      );
+      expect(within(section).getByTestId("evaluator-pill-att_pii")).toHaveTextContent(
+        "PII Leak Scanner",
+      );
       const add = within(section).getByTestId("suite-add-evaluator");
       expect(add).toHaveTextContent("Add evaluator");
       expect(window.getComputedStyle(add).borderStyle).not.toBe("dashed");
@@ -550,19 +497,11 @@ describe("the suite editor drawer", () => {
     /** @scenario "Picking an evaluator attaches it with inferred mappings" */
     it("attaches a picked evaluator with inferred mappings, required, and opens its editor for the golden input", async () => {
       const user = userEvent.setup();
-      openEditor(
-        storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }),
-      );
-      await user.click(
-        await screen.findByTestId("customize-chip-suite-evaluators"),
-      );
+      openEditor(storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }));
+      await user.click(await screen.findByTestId("customize-chip-suite-evaluators"));
 
       act(() => {
-        (
-          flowCallbacksStore.evaluatorList!.onSelect as (
-            evaluator: unknown,
-          ) => void
-        )(SQL_EVALUATOR);
+        (flowCallbacksStore.evaluatorList!.onSelect as (evaluator: unknown) => void)(SQL_EVALUATOR);
       });
 
       const attached = draft()?.evaluators[0];
@@ -595,16 +534,10 @@ describe("the suite editor drawer", () => {
     it("attaches an evaluator whose inputs all read something and returns to the editor", async () => {
       const user = userEvent.setup();
       openEditor();
-      await user.click(
-        await screen.findByTestId("customize-chip-suite-evaluators"),
-      );
+      await user.click(await screen.findByTestId("customize-chip-suite-evaluators"));
 
       act(() => {
-        (
-          flowCallbacksStore.evaluatorList!.onSelect as (
-            evaluator: unknown,
-          ) => void
-        )(PII_EVALUATOR);
+        (flowCallbacksStore.evaluatorList!.onSelect as (evaluator: unknown) => void)(PII_EVALUATOR);
       });
 
       expect(draft()?.evaluators[0]).toMatchObject({
@@ -622,16 +555,12 @@ describe("the suite editor drawer", () => {
     it("opens the editor on a picked evaluator whose required input reads nothing", async () => {
       const user = userEvent.setup();
       openEditor();
-      await user.click(
-        await screen.findByTestId("customize-chip-suite-evaluators"),
-      );
+      await user.click(await screen.findByTestId("customize-chip-suite-evaluators"));
 
       act(() => {
-        (
-          flowCallbacksStore.evaluatorList!.onSelect as (
-            evaluator: unknown,
-          ) => void
-        )(EXACT_MATCH_EVALUATOR);
+        (flowCallbacksStore.evaluatorList!.onSelect as (evaluator: unknown) => void)(
+          EXACT_MATCH_EVALUATOR,
+        );
       });
 
       expect(draft()?.evaluators[0]?.mappings.expected_output).toBeUndefined();
@@ -659,11 +588,7 @@ describe("the suite editor drawer", () => {
       await user.click(screen.getByTestId("suite-add-evaluator"));
 
       act(() => {
-        (
-          flowCallbacksStore.evaluatorList!.onSelect as (
-            evaluator: unknown,
-          ) => void
-        )(PII_EVALUATOR);
+        (flowCallbacksStore.evaluatorList!.onSelect as (evaluator: unknown) => void)(PII_EVALUATOR);
       });
 
       expect(draft()?.evaluators).toHaveLength(1);
@@ -694,12 +619,8 @@ describe("the suite editor drawer", () => {
     /** @scenario "An evaluator created from the list lands its editor on the suite editor" */
     it("resets the stack to the suite editor and stacks the new attachment's editor on it", async () => {
       const user = userEvent.setup();
-      openEditor(
-        storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }),
-      );
-      await user.click(
-        await screen.findByTestId("customize-chip-suite-evaluators"),
-      );
+      openEditor(storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }));
+      await user.click(await screen.findByTestId("customize-chip-suite-evaluators"));
       mockOpenDrawer.mockClear();
 
       await saveCreated({ id: "eval_sql", name: "SQL Query Equivalence" });
@@ -729,9 +650,7 @@ describe("the suite editor drawer", () => {
     it("attaches an evaluator that needs no mapping and stays on the suite editor", async () => {
       const user = userEvent.setup();
       openEditor();
-      await user.click(
-        await screen.findByTestId("customize-chip-suite-evaluators"),
-      );
+      await user.click(await screen.findByTestId("customize-chip-suite-evaluators"));
       mockOpenDrawer.mockClear();
 
       await saveCreated({ id: "eval_pii", name: "PII Leak Scanner" });
@@ -751,9 +670,7 @@ describe("the suite editor drawer", () => {
     it("opens the list with a way back to the suite editor", async () => {
       const user = userEvent.setup();
       openEditor();
-      await user.click(
-        await screen.findByTestId("customize-chip-suite-evaluators"),
-      );
+      await user.click(await screen.findByTestId("customize-chip-suite-evaluators"));
       expect(mockOpenDrawer).toHaveBeenLastCalledWith("evaluatorList", {
         onClose: mockGoBack,
       });
@@ -792,12 +709,11 @@ describe("the suite editor drawer", () => {
 
       const missing = await screen.findByTestId("evaluator-pill-att_exact");
       expect(missing).toHaveAttribute("data-missing", "true");
-      expect(
-        within(missing).getByTestId("evaluator-pill-alert-att_exact"),
-      ).toBeInTheDocument();
-      expect(
-        within(missing).getByTestId("evaluator-pill-required-att_exact"),
-      ).toHaveAttribute("title", "Required to pass");
+      expect(within(missing).getByTestId("evaluator-pill-alert-att_exact")).toBeInTheDocument();
+      expect(within(missing).getByTestId("evaluator-pill-required-att_exact")).toHaveAttribute(
+        "title",
+        "Required to pass",
+      );
 
       const whole = screen.getByTestId("evaluator-pill-att_pii");
       expect(whole).not.toHaveAttribute("data-missing");
@@ -833,13 +749,14 @@ describe("the suite editor drawer", () => {
 
       const callbacks = flowCallbacksStore.evaluatorEditor!;
       act(() => {
-        (
-          callbacks.onMappingChange as (input: string, mapping: unknown) => void
-        )("expected_output", {
-          type: "source",
-          sourceId: "scenario",
-          path: ["fields", "golden_sql"],
-        });
+        (callbacks.onMappingChange as (input: string, mapping: unknown) => void)(
+          "expected_output",
+          {
+            type: "source",
+            sourceId: "scenario",
+            path: ["fields", "golden_sql"],
+          },
+        );
       });
       expect(draft()?.evaluators[0]?.mappings.expected_output).toEqual({
         type: "source",
@@ -876,16 +793,10 @@ describe("the suite editor drawer", () => {
       );
       await screen.findByTestId("suite-evaluators-section");
 
-      await user.click(
-        screen.getByRole("button", { name: "Remove the evaluators" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Remove the evaluators" }));
 
-      expect(
-        screen.queryByTestId("suite-evaluators-section"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.getByTestId("customize-chip-suite-evaluators"),
-      ).toBeInTheDocument();
+      expect(screen.queryByTestId("suite-evaluators-section")).not.toBeInTheDocument();
+      expect(screen.getByTestId("customize-chip-suite-evaluators")).toBeInTheDocument();
       expect(draft()?.evaluators).toEqual([]);
     });
   });
@@ -937,9 +848,7 @@ describe("the suite editor drawer", () => {
 
       await user.click(screen.getByTestId("suite-editor-save"));
 
-      expect(
-        screen.getByText("A test suite needs a name."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("A test suite needs a name.")).toBeInTheDocument();
       expect(mockUpdateMutate).not.toHaveBeenCalled();
     });
 
@@ -947,16 +856,12 @@ describe("the suite editor drawer", () => {
     it("refuses a row with no identifier and sends nothing", async () => {
       const user = userEvent.setup();
       openEditor();
-      await user.click(
-        await screen.findByTestId("customize-chip-suite-fields"),
-      );
+      await user.click(await screen.findByTestId("customize-chip-suite-fields"));
 
       await user.click(screen.getByTestId("suite-editor-save"));
 
       expect(
-        within(screen.getByTestId("suite-field-row-0")).getByText(
-          "A field needs an identifier.",
-        ),
+        within(screen.getByTestId("suite-field-row-0")).getByText("A field needs an identifier."),
       ).toBeInTheDocument();
       expect(mockUpdateMutate).not.toHaveBeenCalled();
     });
@@ -985,9 +890,7 @@ describe("the suite editor drawer", () => {
 
       const row = screen.getByTestId("suite-field-row-1");
       expect(row).toHaveTextContent("table_schema is not a usable name.");
-      expect(screen.getByTestId("suite-field-row-0")).not.toHaveTextContent(
-        "usable name",
-      );
+      expect(screen.getByTestId("suite-field-row-0")).not.toHaveTextContent("usable name");
       expect(mockToast).not.toHaveBeenCalled();
     });
 

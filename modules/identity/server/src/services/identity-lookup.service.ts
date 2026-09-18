@@ -10,7 +10,7 @@ import {
   routingIdentifierOf,
 } from "@langwatch/identity-contract";
 import type { AuditLogApi, AuditLogJsonValue } from "@langwatch/audit-log-contract";
-import type { RateLimiter } from "@langwatch/infrastructure";
+import type { RateLimiter } from "@langwatch/process-stores";
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import type {
   IdentityLookupRepository,

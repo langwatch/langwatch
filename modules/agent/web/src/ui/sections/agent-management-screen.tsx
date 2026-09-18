@@ -23,7 +23,7 @@ import {
   type AgentPushDialogInput,
   type AgentWithFields,
 } from "./agent-management-page.tsx";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import {
   useAgentManagementHost,
   type AgentManagementHost,

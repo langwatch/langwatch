@@ -159,11 +159,11 @@ describe("given the additional seams named for this rule", () => {
     });
   });
 
-  describe("when the infrastructure package value-imports the client", () => {
-    /** @scenario "The infrastructure package is allowed" */
+  describe("when the process-stores package value-imports the client", () => {
+    /** @scenario "The process-stores package is allowed" */
     it("reports nothing", () => {
       expect(
-        ids('import Redis from "ioredis";', "packages/infrastructure/src/redis-members.ts"),
+        ids('import Redis from "ioredis";', "packages/process-stores/src/redis-members.ts"),
       ).toEqual([]);
     });
   });

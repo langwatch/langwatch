@@ -5,7 +5,7 @@
  */
 
 import { useCallback } from "react";
-import { setFlowCallbacks, type useDrawer } from "@langwatch/ui-drawer";
+import { setFlowCallbacks, type useDrawer } from "@langwatch/browser-host/drawer";
 import type { api } from "../../../../behavior/scenario-api.ts";
 import {
   type AttachableEvaluator,

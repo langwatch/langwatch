@@ -26,12 +26,12 @@ import {
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Select } from "@langwatch/design-system/select";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
+import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
 import { useOptimizationExecution } from "./use-optimization-execution.ts";

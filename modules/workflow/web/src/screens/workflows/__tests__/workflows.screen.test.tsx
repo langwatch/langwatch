@@ -29,7 +29,7 @@ const calls = vi.hoisted(() => ({
   invalidateAll: vi.fn(),
 }));
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => {
+vi.mock("@langwatch/browser-trpc/workflow-api", () => {
   const mutation = (spy: (input: unknown) => unknown) => ({
     useMutation: () => ({
       isPending: false,

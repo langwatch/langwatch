@@ -19,12 +19,12 @@ import type { Experiment } from "@langwatch/experiment-contract";
 import type { Project } from "@langwatch/workflow-contract";
 import { EvaluatorResultChip } from "@langwatch/evaluator-web/evaluator-result-chip";
 import { ExternalImage } from "@langwatch/design-system/external-image";
-import { Link } from "@langwatch/ui-host/link";
+import { Link } from "@langwatch/browser-host/link";
 import { describeCellFailure } from "../../../model/experiments-v3/cell-failure.ts";
 import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
-import { useDrawer } from "@langwatch/ui-drawer";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
 import {

@@ -26,13 +26,13 @@ const agentsOnServer = {
   data: [] as Record<string, unknown>[],
 };
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
   }),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn((type: string, params: Record<string, unknown>) => {
       openedDrawerType = type;
@@ -70,7 +70,7 @@ vi.mock("../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     useUtils: () => ({
       agents: { getById: { fetch: vi.fn() } },

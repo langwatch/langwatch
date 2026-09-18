@@ -13,7 +13,7 @@ import {
   scenarioMappingSchema,
   scenarioMappingSources,
 } from "@langwatch/scenario-contract";
-import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import {
   type AttachableEvaluator,
   evaluatorCanRequire,

@@ -17,7 +17,7 @@ const mockRouter = {
   events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
 };
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => mockRouter,
 }));
 

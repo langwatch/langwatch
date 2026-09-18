@@ -30,7 +30,7 @@
     "@langwatch/authz-web-kit": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "lucide-react": "catalog:",
     "motion": "catalog:"
   },

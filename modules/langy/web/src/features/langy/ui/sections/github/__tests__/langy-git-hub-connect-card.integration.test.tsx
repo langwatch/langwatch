@@ -8,7 +8,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 

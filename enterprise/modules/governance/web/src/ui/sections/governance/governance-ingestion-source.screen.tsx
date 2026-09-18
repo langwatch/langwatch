@@ -46,7 +46,7 @@ import { readHandledError } from "../../../model/handled-error.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
 import { useGovernanceRouter } from "../../../behavior/governance-router.ts";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import {
   needsIngestSecret,
   type SourceType,

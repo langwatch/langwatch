@@ -1,5 +1,5 @@
 import { formatShortDate } from "./short-date.ts";
-import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { nowInstant } from "@langwatch/time";
 
 /** A day, the point where "how long ago" stops beating "which day". */

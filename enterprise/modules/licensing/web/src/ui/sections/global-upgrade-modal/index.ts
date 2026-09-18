@@ -4,4 +4,4 @@
  * specs/licensing/proration-preview.feature.
  */
 export { GlobalUpgradeModal } from "./global-upgrade-modal.tsx";
-export { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
+export { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";

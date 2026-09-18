@@ -11,7 +11,7 @@ import {
   unionParameterDefinitions,
   type DeclaredParameter,
 } from "../../../../behavior/suites/use-run-suite.ts";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";

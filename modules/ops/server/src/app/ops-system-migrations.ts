@@ -1,4 +1,4 @@
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { Cluster, Redis } from "ioredis";
 import {
   type MigrationCohort,

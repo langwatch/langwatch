@@ -29,7 +29,7 @@ import {
 import { GroupDetailDialog } from "../../../ui/sections/group-detail-dialog.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { UiSlot } from "@langwatch/ui-host/slots";
+import { UiSlot } from "@langwatch/browser-host/slots";
 import { useActivePlan } from "../../../behavior/use-active-plan.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import type { RouterOutputs } from "../../../behavior/organization-api.ts";

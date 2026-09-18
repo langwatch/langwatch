@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";

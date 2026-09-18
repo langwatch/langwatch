@@ -4,6 +4,7 @@
  * one stops sharing a cache with `api.organization.*` call sites that haven't moved.
  */
 
+import { createModuleApi, type ModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { Plan } from "@langwatch/entitlement-contract";
 import type {
   EnrichedAuditLog,
@@ -12,13 +13,13 @@ import type {
   OrganizationUser,
   User,
 } from "@langwatch/organization-contract";
+
 import type { TeamRoleValue } from "../model/member-role-constraints.ts";
 import type {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "../model/prisma-types.ts";
-import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 
 /**
  * The export must send this exact shape: a pre-filtered deep-link that
@@ -749,7 +750,7 @@ export type OrganizationApiMap = {
  * and same React Query cache as the application's `api` proxy — see
  * `createModuleApi` for why separate instances still share cache entries.
  */
-export const organizationApi = createModuleApi<OrganizationApiMap>();
+export const organizationApi: ModuleApi<OrganizationApiMap> = createModuleApi<OrganizationApiMap>();
 
 /**
  * The outputs of this map, addressed the way `RouterOutputs` was — a

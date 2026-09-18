@@ -16,10 +16,10 @@ import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import { Controller, FormProvider, type Resolver, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { slugify } from "@langwatch/design-system/slugify";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/platform-defaults";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { DEFAULT_MAPPINGS, migrateLegacyMappings,type MappingState,mappingStateSchema } from "@langwatch/dataset-contract";
@@ -36,7 +36,7 @@ import {
   type CheckPreconditions,
   checkPreconditionsSchema,
 } from "../../../model/evaluations/types.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { EvaluatorTracesMapping } from "../../elements/evaluations/evaluator-traces-mapping.tsx";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Tooltip } from "@langwatch/design-system/tooltip";

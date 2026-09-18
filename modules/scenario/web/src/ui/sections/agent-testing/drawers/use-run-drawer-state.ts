@@ -11,7 +11,7 @@ import {
   useCancelScenarioRun,
 } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
-import { useDrawerParams } from "@langwatch/ui-drawer";
+import { useDrawerParams } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { api } from "../../../../behavior/scenario-api.ts";

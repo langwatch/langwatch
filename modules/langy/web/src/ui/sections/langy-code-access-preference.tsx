@@ -3,7 +3,7 @@
  * it back. Hangs off the Integrations screen's GitHub card.
  */
 import { Button, HStack, Text } from "@chakra-ui/react";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 
 import { api } from "../../behavior/langy-api.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";

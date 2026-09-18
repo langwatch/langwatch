@@ -1091,11 +1091,11 @@ describe("frontend UI architecture boundaries", () => {
     }
   });
 
-  it("allows frontend features to import the UI platform packages ui-drawer and ui-host", () => {
+  it("allows frontend features to import the UI platform package browser-host", () => {
     writeCatalogue([{ id: "prompt-studio" }]);
     write(
       "apps/ui/src/features/prompt-studio/route.ts",
-      ['import "@langwatch/ui-drawer";', 'import "@langwatch/ui-host";'].join("\n"),
+      ['import "@langwatch/browser-host/drawer";', 'import "@langwatch/browser-host";'].join("\n"),
     );
 
     expect(policies([]).filter((policy) => policy === "ui-browser-capability")).toEqual([]);

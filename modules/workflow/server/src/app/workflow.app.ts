@@ -8,7 +8,7 @@ import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/a
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi, type ModelRole } from "@langwatch/model-provider-contract";

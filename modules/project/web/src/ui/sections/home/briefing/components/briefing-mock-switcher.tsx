@@ -1,5 +1,5 @@
 import { chakra } from "@chakra-ui/react";
-import { useUiDeployment } from "@langwatch/ui-host/capabilities";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import type { ChangeEvent } from "react";
 import { BRIEFING_MOCKS, setBriefingMock, useBriefingMock } from "../mocks/briefing-mocks.ts";
 

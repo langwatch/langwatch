@@ -1,7 +1,7 @@
 import { HStack, Text } from "@chakra-ui/react";
 import { CopyIcon } from "@langwatch/design-system/copy-icon";
 import { Popover } from "@langwatch/design-system/popover";
-import { Link as UiLink } from "@langwatch/ui-host/link";
+import { Link as UiLink } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-scope";
 import Mustache from "mustache";
 import { useState } from "react";

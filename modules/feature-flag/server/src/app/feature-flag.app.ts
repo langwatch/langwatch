@@ -22,7 +22,7 @@ import {
   type OrganizationFeatureFlagsForCaller,
   type PublicAnonymousFlagMap,
 } from "@langwatch/feature-flag-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";

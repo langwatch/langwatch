@@ -11,7 +11,7 @@ import type { Period } from "@langwatch/analytics-web-kit/period-selector";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useNow } from "../../../../behavior/use-now.ts";
-import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   formatPassRate,

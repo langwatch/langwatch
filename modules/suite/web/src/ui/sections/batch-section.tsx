@@ -7,7 +7,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useNow } from "../elements/runs/now-provider.tsx";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
-import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import type { BatchRun, BatchRunSummary } from "../../model/run-history-transforms.ts";
 import { computeBatchRunSummary, computeIterationMap } from "../../model/run-history-transforms.ts";
 import { ScenarioRunContent } from "./scenario-run-content.tsx";

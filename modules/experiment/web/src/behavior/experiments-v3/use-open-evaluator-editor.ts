@@ -9,7 +9,7 @@ import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-web-kit/variables";
-import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import type { EvaluatorConfig, TargetConfig } from "../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../model/experiments-v3/types.ts";
 import { createEvaluatorEditorCallbacks } from "../../model/experiments-v3/evaluator-editor-callbacks.ts";

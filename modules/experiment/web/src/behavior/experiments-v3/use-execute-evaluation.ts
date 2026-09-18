@@ -1,9 +1,9 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { toaster } from "@langwatch/ui-host/toaster";
-import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   type EvaluationV3Event,
   type ExecutionScope,

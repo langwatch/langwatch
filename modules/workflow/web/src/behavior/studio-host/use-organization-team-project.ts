@@ -7,7 +7,7 @@ import { Temporal, toDate } from "@langwatch/time";
 
 import { useWorkflowHost, type WorkflowCopyTarget } from "../../model/workflow-host.ts";
 import type { Project } from "@langwatch/workflow-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 
 /**
  * The project row, as the studio's closure reads it.

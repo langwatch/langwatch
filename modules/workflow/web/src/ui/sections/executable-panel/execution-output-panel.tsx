@@ -13,7 +13,7 @@ import { useDebounceValue } from "usehooks-ts";
 import { RenderInputOutput } from "@langwatch/trace-web/surfaces/render-input-output";
 import { SpanDuration } from "@langwatch/trace-web/surfaces/span-details";
 import { RedactedField } from "../redacted-field.tsx";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { ExecutionState } from "@langwatch/workflow-contract";
 
 interface OutputPanelProps {

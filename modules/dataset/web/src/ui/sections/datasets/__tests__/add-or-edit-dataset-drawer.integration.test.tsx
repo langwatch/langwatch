@@ -12,20 +12,20 @@ import { describe, expect, it, vi } from "vitest";
 const closeDrawer = vi.fn();
 const created = vi.fn();
 
-vi.mock("@langwatch/ui-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ closeDrawer }),
 }));
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_1", slug: "acme" } }),
 }));
 
 const toasts: { title?: string }[] = [];
-vi.mock("@langwatch/ui-host/toaster", () => ({
+vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { create: (toast: { title?: string }) => toasts.push(toast) },
 }));
 
-vi.mock("@langwatch/ui-host/errors", () => ({
+vi.mock("@langwatch/browser-host/errors", () => ({
   describeError: () => "",
   showErrorToast: () => void 0,
 }));
@@ -39,7 +39,7 @@ vi.mock("@langwatch/workflow-web", () => ({
  * `onSuccess` with the written row. That callback is where the crash lived, so
  * a double that never calls it would prove nothing.
  */
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     dataset: {
       upsert: {

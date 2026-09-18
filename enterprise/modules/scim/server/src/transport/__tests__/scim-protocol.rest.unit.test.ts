@@ -8,7 +8,7 @@
  * when wiring provisioning, so it must name the right resource.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
-import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
+import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import type { ScimListResponse, ScimUser } from "@langwatch/enterprise-scim-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -25,15 +25,13 @@ class DirectoryFake extends ScimServiceFake {
       ? ({ status: "ok", organizationId: ORGANIZATION_ID, connectionId: null } as const)
       : ({ status: "invalid_token" } as const),
   );
-  override readonly listUsers = vi.fn(
-    async (): Promise<ScimListResponse<ScimUser>> => ({
-      schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
-      totalResults: 0,
-      startIndex: 1,
-      itemsPerPage: 100,
-      Resources: [],
-    }),
-  );
+  override readonly listUsers = vi.fn(async (): Promise<ScimListResponse<ScimUser>> => ({
+    schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+    totalResults: 0,
+    startIndex: 1,
+    itemsPerPage: 100,
+    Resources: [],
+  }));
 }
 
 function mount() {
@@ -140,8 +138,8 @@ describe("given a directory holding this organization's SCIM bearer token", () =
   describe("when the token is valid but the organization's plan does not include directory sync", () => {
     it("answers the protocol's own 403 document, not a 401 or a 404", async () => {
       class UnentitledDirectory extends ScimServiceFake {
-        override readonly verifyToken = vi.fn(async () =>
-          ({ status: "plan_not_entitled", organizationId: ORGANIZATION_ID }) as const,
+        override readonly verifyToken = vi.fn(
+          async () => ({ status: "plan_not_entitled", organizationId: ORGANIZATION_ID }) as const,
         );
       }
       const { app } = scimTestApp({ scim: new UnentitledDirectory() });

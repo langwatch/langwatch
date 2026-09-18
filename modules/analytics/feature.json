@@ -6,7 +6,7 @@
         "@langwatch/evaluator-web/evaluation-types",
         "@langwatch/prompt-web-kit/variables",
         "@langwatch/workflow-web/feature-flag",
-        "@langwatch/api-client-web/workflow-api"
+        "@langwatch/browser-trpc/workflow-api"
       ]
     }
   }

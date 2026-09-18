@@ -21,7 +21,7 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
 
 // The bare rig has no router; the query object stands in for the address.
 const routerQuery: Record<string, unknown> = {};
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: vi.fn(() => ({ query: routerQuery })),
 }));
 
@@ -30,7 +30,7 @@ import posthog from "posthog-js";
 // referencing it unbound for the mock assertion below needs a local type
 // that carries it as a plain function property instead.
 const mockedPosthog = posthog as unknown as { capture: ReturnType<typeof vi.fn> };
-import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
+import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference.ts";
 import { NewSimulationsCallout } from "../../../sections/suites/new-simulations-callout.tsx";
 

@@ -4,7 +4,7 @@ import { differenceInCalendarDays, format, startOfDay, subDays } from "@langwatc
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { Popover } from "@langwatch/design-system/popover";
 
 /** Date range used for time-based filtering across the app. */

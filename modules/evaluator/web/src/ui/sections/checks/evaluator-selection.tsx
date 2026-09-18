@@ -14,16 +14,16 @@ import {
 import { AlertTriangle, Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import NextLink from "@langwatch/workflow-web/next-link";
-import { useRouter } from "@langwatch/ui-host/use-router";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useFeatureFlag } from "@langwatch/workflow-web/feature-flag";
 import { evaluatorDisplayName,
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { Link } from "@langwatch/ui-host/link";
+import { Link } from "@langwatch/browser-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 

@@ -6,6 +6,7 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
+    "types": ["node"],
 
     "noEmit": true,
 
@@ -22,7 +23,7 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../api-client-web/tsconfig.build.json"
+      "path": "../browser-trpc/tsconfig.build.json"
     },
     {
       "path": "../design-system/tsconfig.build.json"
@@ -41,9 +42,6 @@
     },
     {
       "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../ui-drawer/tsconfig.build.json"
     }
   ]
 }

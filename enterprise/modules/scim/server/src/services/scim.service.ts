@@ -1,8 +1,7 @@
+import crypto from "node:crypto";
+
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import crypto from "node:crypto";
-import type { UserProfile } from "@langwatch/user-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   type ScimCreateUserRequest,
   type ScimCreateGroupRequest,
@@ -16,19 +15,19 @@ import {
   ScimConnectionRequiredError,
   ScimTokenNotFoundError,
   type ScimTokenEntitlement,
-  type ScimTokenSummary
+  type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { nowInstant } from "@langwatch/time";
+import type { UserProfile } from "@langwatch/user-contract";
+
+import type { ScimSyncLifecycle, ScimUserPushOperation } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
-import type {
-  ScimSyncLifecycle,
-  ScimUserPushOperation,
-} from "../app/scim.members.ts";
-import { ScimDirectoryService } from "./scim-directory.service.ts";
+import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
+import { ScimDirectoryService } from "./scim-directory.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service.ts";
-import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
 import type { ScimSessionRevocation } from "./scim-user-profile.service.ts";
 
 /**

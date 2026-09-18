@@ -17,8 +17,8 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, ExternalLink } from "react-feather";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
-import { useRouter } from "@langwatch/ui-host/use-router";
-import { Link } from "@langwatch/ui-host/link";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { Link } from "@langwatch/browser-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDejaViewLink } from "@langwatch/workflow-web/surfaces/deja-view-link";
 import { FormatMoney } from "@langwatch/workflow-web/format-money";
@@ -26,9 +26,9 @@ import { VersionBox } from "@langwatch/workflow-web/version-history";
 import type {
   WorkflowApiRouter,
   RouterOutputs,
-} from "@langwatch/api-client-web/workflow-api";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+} from "@langwatch/browser-trpc/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";

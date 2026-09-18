@@ -35,7 +35,7 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/evaluator-server": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/infrastructure": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",

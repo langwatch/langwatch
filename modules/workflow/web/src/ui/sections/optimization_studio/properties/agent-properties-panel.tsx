@@ -44,7 +44,7 @@ import {
 } from "@langwatch/agent-web/agent-editors";
 import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
   buildAgentNodeData,

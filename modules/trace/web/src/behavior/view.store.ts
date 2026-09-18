@@ -1,4 +1,4 @@
-import { readUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
+import { readUiStorage, writeUiStorage } from "@langwatch/browser-host/storage";
 import { useMemo } from "react";
 import { create, type StateCreator } from "zustand";
 import { useShallow } from "zustand/react/shallow";

@@ -163,13 +163,13 @@ describe("given a members file named by convention", () => {
 });
 
 describe("given a package whose whole domain is ClickHouse", () => {
-  describe("when the shared infrastructure package value-imports the client", () => {
+  describe("when the shared process-stores package value-imports the client", () => {
     /** @scenario "A package whose domain is the store is outside the rule" */
     it("reports nothing", () => {
       expect(
         ids(
           'import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";',
-          "packages/infrastructure/src/tenant-directory.ts",
+          "packages/process-stores/src/tenant-directory.ts",
         ),
       ).toEqual([]);
     });

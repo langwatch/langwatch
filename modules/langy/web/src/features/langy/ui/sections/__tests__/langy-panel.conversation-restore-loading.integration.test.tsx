@@ -62,7 +62,7 @@ const notifyEngine = () => {
   engine.listeners.forEach((notify) => notify());
 };
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -101,7 +101,7 @@ vi.mock("@ai-sdk/react", async () => {
   };
 });
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ currentDrawer: null }),
 }));
 

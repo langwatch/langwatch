@@ -3,13 +3,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { UiFeedback, useUiCapabilities } from "@langwatch/ui-host/capabilities";
-import { useActiveScope, usePermissions, useSession } from "@langwatch/ui-host/session";
+import { UiFeedback, useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { useActiveScope, usePermissions, useSession } from "@langwatch/browser-host/session";
 import { trpcQueryKey } from "@langwatch/api/web";
 import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 import { useBrowserUiSession } from "../src/behavior/ui-session";
 import { UI_SESSION_QUERY_KEY, type UiAuthClient } from "../src/behavior/ui-session-client";
-import { createUiFeatureShell } from "../src/ui/sections/ui-feature-shell";
+import { createUiFeatureShell } from "../src/shell/ui-feature-shell";
 import { JANE, organizationWith, PERSONAL_TEAM, SHARED_TEAM } from "./fixtures/ui-scope-graph";
 
 type Deferred<T> = {

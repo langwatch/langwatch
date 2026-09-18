@@ -3,9 +3,10 @@
  * @see specs/licensing/proration-preview.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
+
 import { GlobalUpgradeModal } from "../global-upgrade-modal.tsx";
 
 const renderGate = (isSaaS: boolean) =>

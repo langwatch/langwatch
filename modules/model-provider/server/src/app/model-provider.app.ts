@@ -54,7 +54,7 @@ import {
 } from "@langwatch/model-provider-contract";
 
 import { AuthzApi } from "@langwatch/authz-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/kernel";

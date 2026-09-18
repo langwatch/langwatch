@@ -18,13 +18,13 @@ const savedCodeEvaluator = {
   },
 };
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "p1", slug: "p1" },
   }),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: vi.fn(),
     canGoBack: false,
@@ -35,11 +35,11 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => undefined,
 }));
 
-vi.mock("@langwatch/ui-host/toaster", () => ({
+vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-vi.mock("@langwatch/ui-host/errors", () => ({
+vi.mock("@langwatch/browser-host/errors", () => ({
   showErrorToast: vi.fn(),
 }));
 
@@ -48,11 +48,12 @@ vi.mock("@langwatch/ui-host/errors", () => ({
 vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
   CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
-vi.mock("@langwatch/prompt-web-kit/variables", () => ({
+vi.mock("@langwatch/prompt-web-kit/variables", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/prompt-web-kit/variables")>()),
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     useUtils: () => ({
       evaluators: {
@@ -226,12 +227,8 @@ describe("CodeEvaluatorEditorDrawer", () => {
           expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();
         });
 
-        expect(
-          screen.queryByTestId("evaluator-gate-section"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByTestId("evaluator-remove-button"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("evaluator-gate-section")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("evaluator-remove-button")).not.toBeInTheDocument();
       });
     });
   });

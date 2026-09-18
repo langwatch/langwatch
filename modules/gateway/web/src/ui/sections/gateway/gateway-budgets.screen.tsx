@@ -34,7 +34,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
 import { api } from "../../../behavior/gateway-api.ts";
 import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 
 type BudgetListRow = ReturnType<typeof useBudgetRows>["rows"][number];

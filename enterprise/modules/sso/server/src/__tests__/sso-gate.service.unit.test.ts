@@ -1,37 +1,14 @@
-import type { PlanInfo } from "@langwatch/entitlement-contract";
 import {
-  LicensingService,
-  type LicenseStatus,
+  type LicensingApi,
   type PlatformLicenseAccess,
-  type RemoveLicenseResult,
-  type StoreLicenseResult,
 } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as BetterAuthSsoAdapter from "../rules/better-auth-sso-adapter.rules.ts";
+
 import type { SsoGateLogger } from "../app/sso.members.ts";
+import * as BetterAuthSsoAdapter from "../rules/better-auth-sso-adapter.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
-
-class FakeLicensingService extends LicensingService {
-  readonly inspectPlatformAccess =
-    vi.fn<(input: { instanceLicenseKey?: string | undefined }) => Promise<PlatformLicenseAccess>>();
-
-  getActivePlan(): Promise<PlanInfo> {
-    return Promise.reject(new Error("unused"));
-  }
-  getSelfHostedPlan(): Promise<PlanInfo> {
-    return Promise.reject(new Error("unused"));
-  }
-  validateAndStoreLicense(): Promise<StoreLicenseResult> {
-    return Promise.reject(new Error("unused"));
-  }
-  getLicenseStatus(): Promise<LicenseStatus> {
-    return Promise.reject(new Error("unused"));
-  }
-  removeLicense(): Promise<RemoveLicenseResult> {
-    return Promise.reject(new Error("unused"));
-  }
-}
 
 class FakeLogger implements SsoGateLogger {
   readonly info = vi.fn<SsoGateLogger["info"]>();
@@ -77,13 +54,15 @@ const validAccess = (
 });
 
 describe("SsoGateService", () => {
-  let licensing: FakeLicensingService;
+  let licensing: LicensingApi;
+  const inspectPlatformAccess =
+    vi.fn<(input: { instanceLicenseKey?: string | undefined }) => Promise<PlatformLicenseAccess>>();
   let logger: FakeLogger;
 
   beforeEach(() => {
-    licensing = new FakeLicensingService();
+    licensing = createApiFixture<LicensingApi>({ inspectPlatformAccess });
     logger = new FakeLogger();
-    licensing.inspectPlatformAccess.mockResolvedValue({
+    inspectPlatformAccess.mockResolvedValue({
       allowed: false,
       inspections: [],
     });
@@ -104,12 +83,12 @@ describe("SsoGateService", () => {
   /** @scenario "SaaS is unaffected by license gating" */
   it("allows SaaS without asking the licensing service", async () => {
     expect(await create({ ...baseConfiguration(), isSaas: true }).platformAllowed()).toBe(true);
-    expect(licensing.inspectPlatformAccess).not.toHaveBeenCalled();
+    expect(inspectPlatformAccess).not.toHaveBeenCalled();
   });
 
   /** @scenario "An expired but genuine license still keeps SSO working" */
   it("allows any signature-valid organization license even when expired", async () => {
-    licensing.inspectPlatformAccess.mockResolvedValue(validAccess({ expired: true }));
+    inspectPlatformAccess.mockResolvedValue(validAccess({ expired: true }));
 
     expect(await create().platformAllowed()).toBe(true);
     expect(logger.warn).toHaveBeenCalledWith(
@@ -123,7 +102,7 @@ describe("SsoGateService", () => {
 
   /** @scenario "A signed license enables a mounted provider" */
   it("resolves the configured provider once the licensing service reports genuine access", async () => {
-    licensing.inspectPlatformAccess.mockResolvedValue(validAccess());
+    inspectPlatformAccess.mockResolvedValue(validAccess());
 
     await expect(create().resolveProvider()).resolves.toBe("auth0");
   });
@@ -140,7 +119,7 @@ describe("SsoGateService", () => {
 
   /** @scenario "A tampered license does not enable SSO" */
   it("rejects a tampered license and explains the failed signature", async () => {
-    licensing.inspectPlatformAccess.mockResolvedValue({
+    inspectPlatformAccess.mockResolvedValue({
       allowed: false,
       inspections: [
         {
@@ -161,7 +140,7 @@ describe("SsoGateService", () => {
 
   /** @scenario "An SSO-only deployment recovers by setting the instance license key" */
   it("passes the instance license to the shared licensing service", async () => {
-    licensing.inspectPlatformAccess.mockResolvedValue(
+    inspectPlatformAccess.mockResolvedValue(
       validAccess({ source: "instance", organizationId: undefined }),
     );
 
@@ -171,7 +150,7 @@ describe("SsoGateService", () => {
         instanceLicenseKey: "instance-license",
       }).platformAllowed(),
     ).toBe(true);
-    expect(licensing.inspectPlatformAccess).toHaveBeenCalledWith({
+    expect(inspectPlatformAccess).toHaveBeenCalledWith({
       instanceLicenseKey: "instance-license",
     });
   });
@@ -179,7 +158,7 @@ describe("SsoGateService", () => {
   /** @scenario "Self-hosted with a genuine org license keeps SSO working with zero action" */
   it("shares one successful process decision across concurrent requests", async () => {
     let settle: (access: PlatformLicenseAccess) => void = () => {};
-    licensing.inspectPlatformAccess.mockReturnValue(
+    inspectPlatformAccess.mockReturnValue(
       new Promise((resolve) => {
         settle = resolve;
       }),
@@ -192,27 +171,27 @@ describe("SsoGateService", () => {
 
     expect(await first).toBe(true);
     expect(await second).toBe(true);
-    expect(licensing.inspectPlatformAccess).toHaveBeenCalledOnce();
+    expect(inspectPlatformAccess).toHaveBeenCalledOnce();
   });
 
   /** @scenario "A licensing-store outage refuses SSO and heals itself" */
   /** @scenario "A failed license-store evaluation is retried" */
   it("evicts a failed licensing decision so the next request self-heals", async () => {
-    licensing.inspectPlatformAccess
+    inspectPlatformAccess
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce(validAccess());
     const service = create();
 
     expect(await service.platformAllowed()).toBe(false);
     expect(await service.platformAllowed()).toBe(true);
-    expect(licensing.inspectPlatformAccess).toHaveBeenCalledTimes(2);
+    expect(inspectPlatformAccess).toHaveBeenCalledTimes(2);
   });
 
   /** @scenario "A licensing store that never answers stops being waited on" */
   it("times out a stuck licensing service and retries later", async () => {
     vi.useFakeTimers();
     try {
-      licensing.inspectPlatformAccess
+      inspectPlatformAccess
         .mockReturnValueOnce(new Promise(() => {}))
         .mockResolvedValueOnce(validAccess());
       const service = create(baseConfiguration(), 50);
@@ -229,7 +208,7 @@ describe("SsoGateService", () => {
   /** @scenario "A provider id this build cannot mount falls back to email" */
   /** @scenario "A provider without credentials falls back to email" */
   it("falls back to email when a licensed provider cannot mount", async () => {
-    licensing.inspectPlatformAccess.mockResolvedValue(
+    inspectPlatformAccess.mockResolvedValue(
       validAccess({ source: "instance", organizationId: undefined }),
     );
     const configuration = {

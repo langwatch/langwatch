@@ -10,7 +10,7 @@ import {
   parseEvaluatorAttachments,
   parseSuiteFieldDefinitions,
 } from "@langwatch/scenario-contract";
-import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
+import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { Scenario } from "../../../../model/prisma-types.ts";

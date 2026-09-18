@@ -13,11 +13,11 @@ import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
 import { Controller, type FieldErrors, useFieldArray, useFormContext } from "react-hook-form";
 import { type ZodType, z } from "zod";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { AddModelProviderKey } from "@langwatch/workflow-web/add-model-provider-key";
 import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { camelCaseToTitleCase, titleCase } from "@langwatch/design-system/string-casing";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {

@@ -22,7 +22,7 @@ import type { SuiteLastRun } from "../use-test-cases-data.ts";
 
 const routerPush = vi.fn();
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: routerPush,
@@ -36,7 +36,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/format-time-ago", () => ({
+vi.mock("@langwatch/browser-host/format-time-ago", () => ({
   formatTimeAgoCompact: () => "2h ago",
   formatTimeAgo: () => "2 hours ago",
 }));

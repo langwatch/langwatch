@@ -26,13 +26,13 @@ import {
   useUiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "@langwatch/ui-host/capabilities";
+} from "@langwatch/browser-host/capabilities";
 import type { UiFeatureApiTransport } from "../src/behavior/ui-feature-transport";
 import { resolveUiFailureCopy } from "../src/behavior/ui-feedback";
 import { useBrowserUiSession } from "../src/behavior/ui-session";
 import type { UiAuthClient } from "../src/behavior/ui-session-client";
 import { UI_ORGANIZATIONS_PROCEDURE } from "../src/behavior/ui-session-queries";
-import { createUiFeatureShell } from "../src/ui/sections/ui-feature-shell";
+import { createUiFeatureShell } from "../src/shell/ui-feature-shell";
 import { JANE, organizationWith, PERSONAL_TEAM, SHARED_TEAM } from "./fixtures/ui-scope-graph";
 
 /** Ending the session is on the same client; no test here ends one. */

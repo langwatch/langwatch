@@ -125,7 +125,7 @@ vi.mock("../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
     closeDrawer: vi.fn(),
@@ -148,7 +148,7 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: {},
     asPath: "/test-project/agent-testing",

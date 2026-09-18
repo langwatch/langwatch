@@ -17,7 +17,7 @@ export function isBrowserSkipPath(relPath) {
   return (
     relPath.includes("/web/") ||
     relPath.startsWith("packages/design-system/") ||
-    relPath.startsWith("packages/ui-drawer/") ||
+    relPath.startsWith("packages/browser-host/src/drawer/") ||
     relPath.startsWith("packages/mail/")
   );
 }

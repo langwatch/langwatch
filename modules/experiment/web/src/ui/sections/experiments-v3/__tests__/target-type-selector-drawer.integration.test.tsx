@@ -15,7 +15,7 @@ const mockCloseDrawer = vi.fn();
 const mockOpenDrawer = vi.fn();
 const mockGoBack = vi.fn();
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
     openDrawer: mockOpenDrawer,

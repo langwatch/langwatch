@@ -9,7 +9,8 @@ import type {
   PlanEnricher,
   ResolvePlanInput,
 } from "@langwatch/entitlement-contract";
-import type { SubscriptionRepository } from "../repositories/subscription.repository.ts";
+
+import type { BillingSubscription } from "../repositories/subscription.repository.ts";
 import { SaaSPlanProviderService } from "./plan-provider.service.ts";
 
 /** What a deployment's plan sources are decided from. */
@@ -25,7 +26,7 @@ export type DeploymentPlanSourcesOptions = Readonly<{
   /**
    * The Stripe subscription rows a hosted paid plan is read from.
    */
-  subscriptions?: SubscriptionRepository;
+  subscriptions?: BillingSubscription;
   /**
    * The operator allow-list, for the ONE thing the subscription source does with it: an
    * impersonating staff member sees the organization's real limitations rather than the
@@ -90,7 +91,7 @@ export class DeploymentPlanSourcesService {
  */
 class SubscriptionEntitlementSource implements EntitlementSource {
   static create(options: {
-    subscriptions: SubscriptionRepository;
+    subscriptions: BillingSubscription;
     isSaas: boolean;
     adminEmails: readonly string[];
   }): SubscriptionEntitlementSource {

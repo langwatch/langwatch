@@ -18,7 +18,7 @@ import {
 } from "@langwatch/project-web/surfaces/tech-stack";
 import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "../../../behavior/onboarding-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../../behavior/use-required-session.ts";

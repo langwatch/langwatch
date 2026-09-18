@@ -3,7 +3,7 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 import type * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
-import { useUiDeployment } from "@langwatch/ui-host/capabilities";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 
 import { explainAnyError } from "./errors/index.ts";
 

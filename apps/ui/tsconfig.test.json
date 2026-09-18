@@ -17,9 +17,6 @@
       "path": "../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../packages/api-client-web/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/api-key/web/tsconfig.build.json"
     },
     {
@@ -36,6 +33,12 @@
     },
     {
       "path": "../../modules/automation/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/browser-trpc/tsconfig.build.json"
     },
     {
       "path": "../../packages/config/tsconfig.build.json"
@@ -132,12 +135,6 @@
     },
     {
       "path": "../../modules/trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/ui-drawer/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/ui-host/tsconfig.build.json"
     },
     {
       "path": "../../packages/ui-kernel/tsconfig.build.json"

@@ -4,7 +4,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { SimulationSuite } from "../../model/prisma-types.ts";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import {
   parseScenarioParameterDefinitions,

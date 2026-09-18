@@ -9,11 +9,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-import { Markdown } from "@langwatch/ui-host/markdown";
+import { Markdown } from "@langwatch/browser-host/markdown";
 
 import { LangyExternalLinkDialog } from "../../elements/langy-external-link-dialog.tsx";
 import {

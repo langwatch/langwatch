@@ -13,13 +13,13 @@ import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../../ui/element
 import { ReturnToNewSimulationsBanner } from "../../../ui/sections/suites/return-to-new-simulations-banner.tsx";
 import { useAgentTestingRedirect } from "../../../behavior/suites/use-agent-testing-redirect.ts";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
 import type { Scenario } from "../../../model/prisma-types.ts";
 import { useScenarioLabelFilter as useLabelFilter } from "../../../behavior/use-scenario-label-filter.ts";
 import { useNewScenarioFlow } from "../../../behavior/use-new-scenario-flow.ts";
 import { useScenarioSelection } from "../../../behavior/use-scenario-selection.ts";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { api } from "../../../behavior/scenario-api.ts";

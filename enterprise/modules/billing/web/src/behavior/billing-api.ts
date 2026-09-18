@@ -3,10 +3,11 @@
  * from features not yet split. Segment names are load-bearing for React Query cache.
  */
 
-import type { subscriptionTrpc, currencyTrpc } from "@langwatch/enterprise-billing-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
-import type { Plan } from "@langwatch/entitlement-contract";
+import type { subscriptionTrpc, currencyTrpc } from "@langwatch/enterprise-billing-contract";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
+import type { Plan } from "@langwatch/entitlement-contract";
+
 import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
 
 /** The organization every billing procedure is scoped to. */

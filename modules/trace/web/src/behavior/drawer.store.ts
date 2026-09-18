@@ -1,4 +1,4 @@
-import { readUiStorage, removeUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
+import { readUiStorage, removeUiStorage, writeUiStorage } from "@langwatch/browser-host/storage";
 import { create, type StateCreator } from "zustand";
 import { isPreviewTraceId } from "../model/preview-trace-id.ts";
 import { selectIsTraceEditDirty, useTraceEditStore } from "./trace-edit.store.ts";

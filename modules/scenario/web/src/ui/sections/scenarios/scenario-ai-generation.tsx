@@ -28,7 +28,7 @@ import {
   classifyGenerationError,
   reportableGenerationFailure,
 } from "../../../behavior/scenarios/classify-generation-error.ts";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import {
   getDefaultModelState,
   type DefaultModelState,

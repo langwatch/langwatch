@@ -19,7 +19,7 @@
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "react-feather": "catalog:",
     "react-icons": "catalog:"
   },

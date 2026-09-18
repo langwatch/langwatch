@@ -1,4 +1,5 @@
 import { AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { RoleApi } from "@langwatch/role-contract";
@@ -7,6 +8,7 @@ import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { roleServer } from "../../role.server.ts";
+import { testPlan, testRolePrisma } from "./role.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 
@@ -26,15 +28,14 @@ function process(role: "api" | "worker") {
   });
   const organization = createApiFixture<OrganizationApi>();
   const user = createApiFixture<UserApi>();
+  const entitlement = createApiFixture<EntitlementApi>({
+    getActivePlan: async () => testPlan(),
+  });
 
   return createApp({ role })
     .withModules([withMemoryRepositories(roleServer)])
-    .withMember("role", {
-      scope: { assertNoPersonalTeamScope: async () => void 0 },
-      plan: { assertCustomRolesAllowed: async () => void 0 },
-      bindingIds: { newBindingId: () => "binding-1" },
-    })
-    .provide({ authz, organization, user });
+    .withRelational(testRolePrisma())
+    .provide({ authz, organization, user, entitlement });
 }
 
 describe("role app installation", () => {

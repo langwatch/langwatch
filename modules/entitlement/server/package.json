@@ -25,7 +25,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/infrastructure": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

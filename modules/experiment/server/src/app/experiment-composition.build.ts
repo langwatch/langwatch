@@ -17,7 +17,7 @@ import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experi
 import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";

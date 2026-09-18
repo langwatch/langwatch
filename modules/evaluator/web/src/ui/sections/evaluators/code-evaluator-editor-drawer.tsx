@@ -1,30 +1,29 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
-import { LuArrowLeft } from "react-icons/lu";
-
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { toaster } from "@langwatch/ui-host/toaster";
-import {
-  type FieldMapping as UIFieldMapping,
-  type Variable,
-  VariablesSection,
-} from "@langwatch/prompt-web-kit/variables";
-import { showErrorToast } from "@langwatch/ui-host/errors";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { CodeEditor } from "@langwatch/workflow-web/surfaces/code-editor-transport";
-import { rewriteCodeSignature } from "@langwatch/workflow-web/code-agent";
 import {
   type CodeEvaluatorConfig,
   codeEvaluatorOutputFields,
   defaultCodeEvaluatorConfig,
 } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import {
+  type FieldMapping as UIFieldMapping,
+  type Variable,
+  VariablesSection,
+} from "@langwatch/prompt-web-kit/variables";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/browser-host/drawer";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { rewriteCodeSignature } from "@langwatch/workflow-web/code-agent";
+import { CodeEditor } from "@langwatch/workflow-web/surfaces/code-editor-transport";
+import { useEffect, useRef, useState } from "react";
+import { LuArrowLeft } from "react-icons/lu";
 
 import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
 import {
@@ -32,7 +31,11 @@ import {
   type CodeEvaluatorField,
   validCodeEvaluatorFields,
 } from "../../blocks/code-evaluator-editor.tsx";
-import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
+import {
+  EvaluatorGateSection,
+  type EvaluatorGateConfig,
+  type EvaluatorMappingsConfig,
+} from "./evaluator-editor-shared.tsx";
 
 type EditableField = CodeEvaluatorField;
 
@@ -50,6 +53,9 @@ export type CodeEvaluatorEditorDrawerProps = {
   onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
   /** Called with the saved evaluator; flow callbacks take precedence. */
   onSave?: (evaluator: { id: string; name: string }) => void;
+  gate?: EvaluatorGateConfig;
+  onRequiredChange?: (required: boolean) => void;
+  onRemove?: () => void;
 };
 
 /** Form state and the create/update mutation behind the drawer; no JSX in here. */
@@ -268,10 +274,26 @@ export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps)
           ) : (
             <CodeEvaluatorFormFields form={form} />
           )}
+          {props.gate && (
+            <EvaluatorGateSection
+              gate={props.gate}
+              required={props.gate.required}
+              onRequiredChange={props.onRequiredChange}
+            />
+          )}
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <HStack width="full" justify="space-between" gap={3}>
-            {form.disabledReason ? (
+            {props.onRemove ? (
+              <Button
+                variant="ghost"
+                colorPalette="red"
+                onClick={props.onRemove}
+                data-testid="evaluator-remove-button"
+              >
+                Remove evaluator
+              </Button>
+            ) : form.disabledReason ? (
               <Text fontSize="sm" color="fg.muted" data-testid="code-evaluator-disabled-reason">
                 {form.disabledReason}
               </Text>

@@ -6,7 +6,7 @@
 import { PrismaProcessStore, PrismaScheduledJobStore } from "@langwatch/eventing/server";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { Logger } from "@langwatch/observability";
 import { OpsCapabilityUnavailableError } from "@langwatch/ops-contract";
 import type { RedisConnection } from "@langwatch/redis-client";

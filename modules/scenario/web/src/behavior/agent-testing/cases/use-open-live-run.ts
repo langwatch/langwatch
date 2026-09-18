@@ -5,7 +5,7 @@
  */
 
 import { useCallback } from "react";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 
 export type OpenLiveRunParams = {
   batchRunId: string;

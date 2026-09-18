@@ -38,7 +38,7 @@
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "lucide-react": "catalog:",
     "next-themes": "catalog:",
     "react-error-boundary": "catalog:",

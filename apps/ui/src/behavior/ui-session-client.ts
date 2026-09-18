@@ -6,7 +6,7 @@
 
 import { createAuthClient } from "better-auth/react";
 import { HandledError } from "@langwatch/handled-error";
-import type { UiActor } from "@langwatch/ui-host/capabilities";
+import type { UiActor } from "@langwatch/browser-host/capabilities";
 import { isUiApiUnreachable } from "./ui-api-reachability";
 
 /** The session endpoint, relative to the auth client's own base URL. */

@@ -6,7 +6,7 @@
 
 import { useCallback } from "react";
 import type { TestCase } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer.tsx";
 
 export type CaseOpenActions = {

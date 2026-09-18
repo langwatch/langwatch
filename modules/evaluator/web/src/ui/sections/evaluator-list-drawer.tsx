@@ -13,7 +13,7 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "@langwatch/experiment-contract";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { formatDistanceToNow } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useState } from "react";

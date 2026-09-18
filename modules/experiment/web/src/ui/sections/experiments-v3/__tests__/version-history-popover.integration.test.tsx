@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let canRestore = true;
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "acme" },
     hasPermission: (permission: string) =>
@@ -44,12 +44,12 @@ vi.mock("../../../../behavior/experiments-v3/use-evaluations-v3-store.ts", () =>
 }));
 
 const mockToast = vi.fn();
-vi.mock("@langwatch/ui-host/toaster", () => ({
+vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { create: (...args: unknown[]) => mockToast(...args) },
 }));
 
 const mockErrorToast = vi.fn();
-vi.mock("@langwatch/ui-host/errors", () => ({
+vi.mock("@langwatch/browser-host/errors", () => ({
   showErrorToast: (...args: unknown[]) => mockErrorToast(...args),
 }));
 
@@ -63,7 +63,7 @@ let versionsQuery: {
   isError: boolean;
 } = { data: undefined, isLoading: true, isError: false };
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     experiments: {
       listWorkbenchVersions: { useQuery: () => versionsQuery },

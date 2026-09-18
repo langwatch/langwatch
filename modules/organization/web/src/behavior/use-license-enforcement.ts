@@ -6,7 +6,7 @@
 
 // The upgrade modal is a shared zustand singleton: opening it here and
 // mounting it elsewhere is one modal, not a copy.
-import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import { useCallback } from "react";
 import { api } from "./organization-api.ts";
 import { useOrganizationTeamProject } from "./use-organization-team-project.ts";

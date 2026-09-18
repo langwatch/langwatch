@@ -1,12 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
-import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+
+import type { Plan } from "../plan.ts";
 import {
   assertEnterprisePlan,
   assertEnterprisePlanType,
   ENTERPRISE_FEATURE_ERRORS,
   isEnterpriseTier,
-} from "../src/index.ts";
+} from "../index.ts";
+
+const BASE_PLAN: Plan = {
+  planSource: "free",
+  type: "FREE",
+  name: "Free",
+  free: true,
+  maxMembers: 20,
+  maxMembersLite: 0,
+  maxMessagesPerMonth: 1000,
+  canPublish: false,
+  prices: { USD: 0, EUR: 0 },
+};
 
 const mockGetActivePlan = vi.fn();
 const planProvider = { getActivePlan: mockGetActivePlan };
@@ -68,10 +80,7 @@ describe("the Enterprise plan gate", () => {
       /** @scenario Enterprise plan from subscription is recognized */
       /** @scenario Enterprise plan from license is recognized */
       it("resolves without throwing", async () => {
-        const enterprisePlan: PlanInfo = {
-          ...FREE_PLAN,
-          type: "ENTERPRISE",
-        };
+        const enterprisePlan: Plan = { ...BASE_PLAN, type: "ENTERPRISE" };
         mockGetActivePlan.mockResolvedValue(enterprisePlan);
 
         await expect(
@@ -88,10 +97,7 @@ describe("the Enterprise plan gate", () => {
       it.each(["FREE", "OPEN_SOURCE", "PRO", "GROWTH"])(
         "throws FORBIDDEN for %s plan",
         async (planType) => {
-          const plan: PlanInfo = {
-            ...FREE_PLAN,
-            type: planType,
-          };
+          const plan: Plan = { ...BASE_PLAN, type: planType };
           mockGetActivePlan.mockResolvedValue(plan);
 
           await expect(
@@ -108,10 +114,7 @@ describe("the Enterprise plan gate", () => {
       );
 
       it("uses the provided errorMessage", async () => {
-        mockGetActivePlan.mockResolvedValue({
-          ...FREE_PLAN,
-          type: "FREE",
-        });
+        mockGetActivePlan.mockResolvedValue({ ...BASE_PLAN, type: "FREE" });
 
         await expect(
           assertEnterprisePlan({
@@ -142,10 +145,7 @@ describe("the Enterprise plan gate", () => {
     });
 
     it("passes user to planProvider when provided", async () => {
-      const enterprisePlan: PlanInfo = {
-        ...FREE_PLAN,
-        type: "ENTERPRISE",
-      };
+      const enterprisePlan: Plan = { ...BASE_PLAN, type: "ENTERPRISE" };
       mockGetActivePlan.mockResolvedValue(enterprisePlan);
 
       const user = { id: "user-1", email: "test@example.com", name: "Test" };

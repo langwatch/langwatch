@@ -10,11 +10,11 @@ import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { useDebounce } from "use-debounce";
 
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web-kit/scope-picker";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
-import { applyHandledErrorToForm } from "@langwatch/ui-host/errors";
+import { applyHandledErrorToForm } from "@langwatch/browser-host/errors";
 import { FormServerError } from "@langwatch/handled-error/views";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";

@@ -16,7 +16,7 @@ import {
   UiNavigation,
   UiRoute,
   type UiRouteReadingValues,
-} from "@langwatch/ui-host/capabilities";
+} from "@langwatch/browser-host/capabilities";
 
 class RouterUiNavigation extends UiNavigation {
   constructor(private readonly navigateTo: NavigateFunction) {

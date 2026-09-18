@@ -15,7 +15,7 @@
         "@langwatch/trace-web/surfaces/trace-view-state",
         "@langwatch/workflow-web/isolated-error-boundary",
         "@langwatch/workflow-web/markdown",
-        "@langwatch/api-client-web/workflow-api"
+        "@langwatch/browser-trpc/workflow-api"
       ]
     }
   }

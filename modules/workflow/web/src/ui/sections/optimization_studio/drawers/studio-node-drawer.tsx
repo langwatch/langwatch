@@ -4,7 +4,7 @@ import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/
 import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
 import { OutputsSection } from "@langwatch/prompt-web/outputs-section";
 import { VariablesSection } from "@langwatch/prompt-web-kit/variables";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type {
   AgentComponent,
   Component,

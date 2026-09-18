@@ -5,7 +5,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { showErrorToast } from "../../../errors/index.ts";
 import type { TraceFailureNotice, TraceHostApi } from "../../../../../behavior/trace-host.ts";
 import { useExportTraces } from "../use-export-traces.ts";

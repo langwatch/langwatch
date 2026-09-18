@@ -15,13 +15,13 @@ import {
   modelProviderIcons,
   ProviderIconGlyph,
 } from "@langwatch/model-provider-web-kit/provider-icons";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { isCodexModel, isModelAllowedForFeature,
   buildCustomModelDisplayNames,
   modelDisplayLabel,
   allLitellmModels,
   type ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import {
   MODEL_ICON_SIZE,
@@ -29,7 +29,7 @@ import {
 } from "@langwatch/prompt-contract/llm-config-constants";
 import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { Link } from "@langwatch/ui-host/link";
+import { Link } from "@langwatch/browser-host/link";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 

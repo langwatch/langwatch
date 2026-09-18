@@ -8,7 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "proj-1" },
   }),
@@ -22,11 +22,11 @@ vi.mock("../../../elements/evaluations/evaluator-traces-mapping.tsx", () => ({
 
 // The drawer navigator reads a react-router location this package never
 // mounts; only `openDrawer` is reachable from the form's "Try it out" panel.
-vi.mock("@langwatch/ui-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn(), goBack: vi.fn() }),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     pathname: "/[project]/evaluations/[id]/edit",
     query: { project: "proj-1", id: "monitor-1" },
@@ -41,7 +41,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 // say nothing about which evaluator definition it resolved, so every procedure
 // answers with an empty, settled result and the few that steer the render are
 // named explicitly below.
-vi.mock("@langwatch/api-client-web/workflow-api", () => {
+vi.mock("@langwatch/browser-trpc/workflow-api", () => {
   const emptyQuery = () => ({
     data: void 0,
     isLoading: false,

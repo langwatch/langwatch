@@ -23,14 +23,14 @@ import {
   UiFeedback,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "@langwatch/ui-host/capabilities";
+} from "@langwatch/browser-host/capabilities";
 import { useUiApiWait, UI_API_WAIT_HINT_AFTER_MS } from "../src/behavior/ui-api-reachability";
 import type { UiFeatureApiTransport } from "../src/behavior/ui-feature-transport";
 import { useBrowserUiSession } from "../src/behavior/ui-session";
 import type { UiAuthClient } from "../src/behavior/ui-session-client";
 import { UI_ORGANIZATIONS_PROCEDURE } from "../src/behavior/ui-session-queries";
-import { UiApiWaitingScreen, UI_API_DEV_COMMAND } from "../src/ui/sections/ui-api-waiting-screen";
-import { createUiFeatureShell } from "../src/ui/sections/ui-feature-shell";
+import { UiApiWaitingScreen, UI_API_DEV_COMMAND } from "../src/shell/ui-api-waiting-screen";
+import { createUiFeatureShell } from "../src/shell/ui-feature-shell";
 import { JANE, organizationWith, PERSONAL_TEAM, SHARED_TEAM } from "./fixtures/ui-scope-graph";
 
 const refusesToSignOut = (): Promise<unknown> => {

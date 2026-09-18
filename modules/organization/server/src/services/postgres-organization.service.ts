@@ -1,6 +1,6 @@
 import type { OrganizationService as OrganizationServiceContract } from "@langwatch/organization-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type {
   GroupIdentity,
   PersonalWorkspaceDiagnostics,

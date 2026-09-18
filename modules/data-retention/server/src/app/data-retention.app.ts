@@ -25,7 +25,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { DataRetentionPlanResolver } from "./data-retention.members.ts";
 import { ClickHouseRetroactiveRetentionRepository } from "../repositories/clickhouse/clickhouse.retroactive-retention.repository.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";

@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/api-client-web",
+  "name": "@langwatch/browser-trpc",
   "version": "0.1.0",
   "private": true,
   "description": "The browser's typed API clients: one tRPC client per family of procedures, derived from the contracts, so a feature that calls a family does not depend on the feature that happens to host it.",

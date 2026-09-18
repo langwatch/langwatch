@@ -23,7 +23,7 @@ import type {
 } from "@langwatch/topic-contract";
 import { useState } from "react";
 import { topicApi } from "../../behavior/topic-api.ts";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { useTopicHost } from "../../model/topic-host.ts";
 import { nowInstant } from "@langwatch/time";
 

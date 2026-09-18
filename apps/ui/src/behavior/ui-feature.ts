@@ -6,8 +6,8 @@
 
 import type { ComponentType, ReactNode } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import type { UiDrawerRegistry } from "@langwatch/ui-drawer";
-import type { UiCapabilityInstall } from "@langwatch/ui-host/capabilities";
+import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import type { UiCapabilityInstall } from "@langwatch/browser-host/capabilities";
 import type {
   UiFeatureApiBinding,
   UiFeatureApiProvider,

@@ -50,7 +50,7 @@ export type TopicClusteringCommands = ProjectInfrastructure["topicClustering"];
 /**
  * The two process members this application reads, from the closed fourteen-name
  * vocabulary. Their shapes are restated rather than imported from
- * `@langwatch/infrastructure`: a module depends on contracts.
+ * `@langwatch/process-stores`: a module depends on contracts.
  */
 type ProjectProcessMembers = Readonly<{
   /** The deployment's symmetric cipher, for the stored-object credentials. */

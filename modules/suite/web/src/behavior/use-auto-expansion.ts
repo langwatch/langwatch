@@ -1,6 +1,6 @@
 // Auto-expand most recent row per panel, reset on groupBy change.
 
-import { readUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
+import { readUiStorage, writeUiStorage } from "@langwatch/browser-host/storage";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseAutoExpansionOptions {

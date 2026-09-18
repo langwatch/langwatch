@@ -35,11 +35,11 @@ import { Pagination } from "@langwatch/design-system/pagination";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { showErrorToast } from "@langwatch/ui-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal.tsx";
 import { downloadCsv } from "@langwatch/csv/download";
 import {

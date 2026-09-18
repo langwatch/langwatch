@@ -31,7 +31,7 @@ vi.mock("../use-post-event.tsx", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/toaster", () => ({
+vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 

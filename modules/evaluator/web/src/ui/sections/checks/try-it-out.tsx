@@ -18,11 +18,11 @@ import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { useFilterParams } from "@langwatch/analytics-web/surfaces/filter-params";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   type Evaluators,
   evaluatorsSchema,
@@ -34,7 +34,7 @@ import {
   evaluatePreconditions,
 } from "../../../model/evaluations/preconditions.ts";
 import type { CheckPreconditions } from "../../../model/evaluations/types.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import type { Money } from "@langwatch/design-system/type-utils";
 import { FilterSidebar } from "@langwatch/analytics-web/surfaces/filter-sidebar";

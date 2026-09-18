@@ -4,7 +4,7 @@
  * @vitest-environment node
  */
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/infrastructure/members";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import { describe, expect, it, vi } from "vitest";
 
 import type { WebhookDispatchResult } from "../../app/webhook.app.ts";

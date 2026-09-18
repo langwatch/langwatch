@@ -40,9 +40,9 @@ export type CurrentDrawerProps = {
   marginTop?: number;
   restriction?: CurrentDrawerRestriction;
   /**
-   * Whether this is a development build - this package cannot ask
-   * (`ui-host` depends on it), so the mounting shell answers. Absent means
-   * production: the duplicate-drawer warning stays off.
+   * Whether this is a development build - the mounting shell answers this
+   * rather than this module asking directly. Absent means production: the
+   * duplicate-drawer warning stays off.
    */
   isDevelopment?: boolean;
 };

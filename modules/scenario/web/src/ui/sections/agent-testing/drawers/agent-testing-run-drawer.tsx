@@ -5,7 +5,7 @@
  */
 
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { RunDrawerContent } from "./run-drawer-content.tsx";
 import { RunDrawerHeaderBand } from "./run-drawer-header-band.tsx";
 import { RunDrawerErrorBody } from "./run-drawer-error-body.tsx";

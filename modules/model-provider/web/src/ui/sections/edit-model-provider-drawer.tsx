@@ -1,6 +1,6 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import { modelProviderIcons } from "@langwatch/model-provider-web-kit/provider-icons";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import {
   findModelProviderById,
   isResolvableProviderId,

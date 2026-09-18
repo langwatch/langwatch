@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useMemo } from "react";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { PromptTemplateFieldsContext } from "../../../behavior/experiments-v3/use-prompt-template-fields.ts";
 import type { TargetConfig } from "../../../model/experiments-v3/types.ts";

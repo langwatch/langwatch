@@ -15,7 +15,7 @@ import {
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityEmailService, RoutingDecision } from "@langwatch/identity-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { nowInstant, type Instant } from "@langwatch/time";

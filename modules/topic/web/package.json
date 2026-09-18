@@ -23,7 +23,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
-    "@langwatch/ui-host": "workspace:*"
+    "@langwatch/browser-host": "workspace:*"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",

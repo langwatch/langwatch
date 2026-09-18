@@ -4,7 +4,8 @@
  * `isHandledBy*` and stays quiet. specs/licensing/license-failure-modal.feature.
  */
 
-import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+
 import {
   extractLimitExceededInfo,
   extractLiteMemberRestrictionInfo,

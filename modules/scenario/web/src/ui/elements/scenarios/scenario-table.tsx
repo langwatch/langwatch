@@ -6,7 +6,7 @@ import {
   scenarioContextChip,
 } from "@langwatch/langy-web/surfaces/langy-context";
 import type { Scenario } from "../../../model/prisma-types.ts";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { fromDate } from "@langwatch/time";
 import { TagList } from "../tag-list.tsx";
 

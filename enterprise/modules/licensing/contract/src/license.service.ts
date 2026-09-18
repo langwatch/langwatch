@@ -1,4 +1,5 @@
 import type { PlanInfo } from "@langwatch/entitlement-contract";
+
 import type { GenerateLicenseInput, GenerateLicenseOutput } from "./license.commands.ts";
 import type {
   LicenseStatus,

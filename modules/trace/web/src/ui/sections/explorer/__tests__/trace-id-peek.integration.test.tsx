@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createUiScopeHost,
   UiScopeHostProvider,
-} from "@langwatch/ui-host/use-organization-team-project";
+} from "@langwatch/browser-host/use-organization-team-project";
 
 import { TraceIdPeek, TracePreviewHoverCard } from "../trace-id-peek.tsx";
 

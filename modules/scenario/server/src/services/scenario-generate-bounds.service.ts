@@ -1,5 +1,5 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/infrastructure/members";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScenarioGenerateRateLimitedError } from "@langwatch/scenario-contract";
 

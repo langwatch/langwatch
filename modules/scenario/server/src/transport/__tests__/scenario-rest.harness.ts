@@ -1,8 +1,27 @@
 import { EventEmitter } from "node:events";
 
-import type { AgentTestService } from "../../services/agent-test.service.ts";
-import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
-import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
+import type { AgentApi } from "@langwatch/agent-contract";
+import {
+  bindRestMiddleware,
+  createRestRuntime,
+  projectRestFacts,
+  type RestErrorHandler,
+} from "@langwatch/api/rest";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { HandledError } from "@langwatch/handled-error";
+import type { Encryption } from "@langwatch/process-stores/members";
+import type { ResourceOwnership } from "@langwatch/kernel";
+import type { ProjectApi } from "@langwatch/project-contract";
+import {
+  type ScenarioExecutionService,
+  type ScenarioTabRegistry,
+  type SimulationService,
+} from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
+import { HTTPException } from "hono/http-exception";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+
 import type {
   AgentAdapterFactory,
   CancellationPublisher,
@@ -15,28 +34,11 @@ import type {
   ScenarioProcessorServiceMetrics,
   ScenarioTabStore,
 } from "../../app/scenario.app.ts";
-import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
-import {
-  type ScenarioExecutionService,
-  type ScenarioTabRegistry,
-  type SimulationService,
-} from "@langwatch/scenario-contract";
-import type { ResourceOwnership } from "@langwatch/kernel";
-import type { Encryption } from "@langwatch/infrastructure/members";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { UserApi } from "@langwatch/user-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import {
-  bindRestMiddleware,
-  createRestRuntime,
-  projectRestFacts,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
-import { HTTPException } from "hono/http-exception";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
+import type { AgentTestService } from "../../services/agent-test.service.ts";
+import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
+import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 
 export const PROJECT_ID = "project_scenario_rest";
 export const PROJECT_SLUG = "scenario-rest-project";
@@ -59,6 +61,7 @@ export function createScenarioRestTestApp(
   const app = ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
+      agents: createApiFixture<AgentApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),

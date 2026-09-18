@@ -55,7 +55,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@tanstack/react-virtual": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",

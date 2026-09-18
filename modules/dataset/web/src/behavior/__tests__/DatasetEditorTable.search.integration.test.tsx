@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { DatasetEditorTable } from "../../ui/sections/datasets/editor/dataset-editor-table.tsx";
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme-app" },
     organization: { id: "org-1", name: "Acme" },
@@ -34,7 +34,7 @@ const refetchSpy = vi.fn();
 // read `datasetRecord`/`dataset` off the same workflow family's tRPC hooks
 // (the borrowed-procedures family it shares with the studio) - one module,
 // one mock.
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     datasetRecord: {
       getAll: { useQuery: (...args: unknown[]) => listPaginatedQuery(...args) },

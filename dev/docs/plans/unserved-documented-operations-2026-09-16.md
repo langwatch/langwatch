@@ -38,7 +38,7 @@ Artefacts: `.apidiff/report-20260916-r5.json`, `.apidiff/ledger-20260916-r5.json
 ## Status after the first two valid runs (r8, r9)
 
 r7 died at `pnpm install --frozen-lockfile` on a lockfile that had been
-committed without `@langwatch/api-client-web`. r8 and r9 are the first runs
+committed without `@langwatch/browser-trpc`. r8 and r9 are the first runs
 since Sep 14 whose credentials all survived, so their counts are the first that
 mean anything.
 

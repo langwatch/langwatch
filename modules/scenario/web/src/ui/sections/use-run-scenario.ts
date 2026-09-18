@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import type { ScenarioFailureAction } from "../../model/scenario-host.ts";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
 import type { TargetValue } from "../../model/scenario-target.ts";

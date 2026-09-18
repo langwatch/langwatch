@@ -21,7 +21,6 @@ packages:
   - "modules"
   - "enterprise"
   - "enterprise/packages/composition/*"
-  - "enterprise/packages/plan-gate"
   - "enterprise/modules/*/*"
   - "mcp/typescript"
   - "plugins/*"

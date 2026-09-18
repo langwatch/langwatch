@@ -68,11 +68,12 @@ import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+import { AgentApi } from "@langwatch/agent-contract";
 import { z } from "zod";
 import { on, type EventEmitter } from "node:events";
 import type { AgentAdapter } from "@langwatch/scenario";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import type { AgentTestService } from "../services/agent-test.service.ts";
@@ -87,6 +88,7 @@ import {
   SilentScenarioActivity,
   type ScenarioActivity,
 } from "../services/scenario-activity.service.ts";
+import { ConnectedTargetService } from "../services/connected-target.service.ts";
 
 /**
  * The process's per-tenant fan-out, as this feature uses it: one emitter per project that relays
@@ -114,6 +116,7 @@ export interface ScenarioAppDependencies {
   activity: ScenarioActivity;
   /** The author-assist door's tier-effective generation window. */
   generateBounds: ScenarioGenerateBoundsService;
+  connectedTargets: ConnectedTargetService;
 }
 
 /**
@@ -159,6 +162,7 @@ export type ScenarioAppConfig = z.infer<typeof scenarioAppConfigSchema>;
 
 /** The peer APIs this feature reads directly. */
 export const scenarioAppDependencyTokens = {
+  agents: AgentApi,
   users: UserApi,
   /** The project→organization hop the author-assist's window resolves through. */
   projects: ProjectApi,
@@ -202,6 +206,7 @@ export class ScenarioApp implements ScenarioApi {
 
     return new ScenarioApp({
       agentTesting: setup.members.agentTesting,
+      connectedTargets: ConnectedTargetService.create(setup.dependencies.agents),
       scenarios,
       simulations: setup.members.simulations,
       scenarioExecution: setup.members.scenarioExecution,
@@ -489,15 +494,20 @@ export class ScenarioApp implements ScenarioApi {
    * scheduled — the same order the suite execution port uses. The resolved parameters travel on the
    * metadata, which is the only channel that carries them into execution.
    */
-  queueSimulationRun(input: QueueSimulationRunInput): Promise<void> {
+  async queueSimulationRun(input: QueueSimulationRunInput): Promise<void> {
+    const target = await this.#dependencies.connectedTargets.resolve({
+      projectId: input.projectId,
+      target: input.target,
+      actorId: input.actor?.id,
+    });
     const secretParameterNames = Object.keys(input.secretParameters);
     const metadata = {
       // The reserved namespace records the target this run was pointed at, the
       // scenario version it was queued from, who started it and the models it
       // resolved, the same way a suite run does.
       langwatch: {
-        targetReferenceId: input.target.referenceId,
-        targetType: input.target.type,
+        targetReferenceId: target.referenceId,
+        targetType: target.type,
         ...(input.scenarioVersion !== undefined ? { scenarioVersion: input.scenarioVersion } : {}),
         ...withActor(input.actor),
         ...withResolvedModels(input.resolvedModels),
@@ -507,7 +517,7 @@ export class ScenarioApp implements ScenarioApi {
       ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
     };
 
-    return this.#dependencies.simulations.queueRun({
+    await this.#dependencies.simulations.queueRun({
       tenantId: input.projectId,
       scenarioRunId: input.scenarioRunId,
       scenarioId: input.scenarioId,
@@ -516,7 +526,7 @@ export class ScenarioApp implements ScenarioApi {
       name: input.name,
       metadata,
       ...(secretParameterNames.length > 0 ? { secretParameters: input.secretParameters } : {}),
-      target: { type: input.target.type, referenceId: input.target.referenceId },
+      target: { type: target.type, referenceId: target.referenceId },
       occurredAt: nowInstant().epochMilliseconds,
     });
   }

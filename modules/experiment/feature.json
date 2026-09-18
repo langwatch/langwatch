@@ -36,7 +36,7 @@
         "@langwatch/workflow-web/studio-dataset-columns",
         "@langwatch/workflow-web/studio-scope",
         "@langwatch/workflow-web/version-history",
-        "@langwatch/api-client-web/workflow-api",
+        "@langwatch/browser-trpc/workflow-api",
         "@langwatch/workflow-web-kit/workflow-icons"
       ]
     }

@@ -27,7 +27,7 @@ import { api } from "../../behavior/organization-api.ts";
 import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints.ts";
 import type { InviteData, MembersForm, TeamAssignment } from "../../model/member-invite-form.ts";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
-import { useUiSeatTypeCopy } from "@langwatch/ui-host/slots";
+import { useUiSeatTypeCopy } from "@langwatch/browser-host/slots";
 import {
   type RoleOption,
   TeamRoleSelectItemContent,

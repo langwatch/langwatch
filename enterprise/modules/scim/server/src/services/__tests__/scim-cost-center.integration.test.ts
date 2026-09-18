@@ -1,3 +1,19 @@
+import { createDepartmentTestService } from "@langwatch/enterprise-governance-server/testing";
+import {
+  SCIM_ENTERPRISE_USER_SCHEMA,
+  type ScimCreateUserRequest,
+  type ScimPatchRequest,
+} from "@langwatch/enterprise-scim-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -8,27 +24,11 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { createDepartmentTestService } from "@langwatch/enterprise-governance-server/testing";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  SCIM_ENTERPRISE_USER_SCHEMA,
-  type ScimCreateUserRequest,
-  type ScimPatchRequest,
-} from "@langwatch/enterprise-scim-contract";
-
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
-import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 import { PrismaScimRepository } from "../../repositories/prisma/prisma.scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
 const CORE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
 const PATCH_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
@@ -57,9 +57,10 @@ class EnterprisePlan implements Pick<EntitlementApi, "getActivePlan"> {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:scim:test:cost-center"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -67,8 +68,7 @@ describe.skipIf(!databaseUrl)("ScimService department auto-assignment", () => {
   const ns = `scim-dept-${nanoid(8)}`;
   const ORG_ID = `org-${ns}`;
 
-  const departments = () =>
-    createDepartmentTestService(prisma);
+  const departments = () => createDepartmentTestService(prisma);
 
   /**
    * Everything SCIM asks of the user directory, over the same rows: creating

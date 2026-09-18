@@ -3,7 +3,7 @@
  * Agent Testing release flag is on for the project.
  * @see specs/suites/new-simulations-callout.feature
  */
-import { readUiStorage, removeUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
+import { readUiStorage, removeUiStorage, writeUiStorage } from "@langwatch/browser-host/storage";
 import { useSyncExternalStore } from "react";
 
 const STORAGE_PREFIX = "langwatch:prefer-legacy-simulations:v1:";

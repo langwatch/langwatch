@@ -7,8 +7,8 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { markHandledGlobally } from "@langwatch/ui-host/errors";
-import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
+import { markHandledGlobally } from "@langwatch/browser-host/errors";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,7 +18,7 @@ const calls = vi.hoisted(() => ({
   push: vi.fn(),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: vi.fn(),
     openDrawer: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => ({}),
 }));
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "project-1" },
     organization: { id: "org-1" },
@@ -38,11 +38,11 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: calls.push, replace: vi.fn(), query: {}, asPath: "/", isReady: true }),
 }));
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     useUtils: () => ({ evaluators: { getAll: { invalidate: vi.fn() } } }),
     workflow: {

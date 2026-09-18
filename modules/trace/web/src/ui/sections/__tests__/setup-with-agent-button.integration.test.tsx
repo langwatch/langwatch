@@ -13,7 +13,7 @@ import {
   SetupWithAgentButton,
   setupAgentPrompt,
 } from "../setup-with-agent-button.tsx";
-import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import type { TraceFailureNotice, TraceHostApi } from "../../../behavior/trace-host.ts";
 
 const canAskMock = vi.fn(() => true);
@@ -34,7 +34,7 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
     selector({ askLangy: askLangyMock }),
 }));
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1" },
     organization: { id: "org_1" },

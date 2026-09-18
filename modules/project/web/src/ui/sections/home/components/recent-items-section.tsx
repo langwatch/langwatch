@@ -10,7 +10,7 @@ import {
   featureIcons,
   recentItemTypeToFeature,
 } from "@langwatch/navigation-web/surfaces/command-bar";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { HomeCard } from "./home-card.tsx";
 import { HOME_SECTION_GAP, HomeSectionHeader } from "./home-section-header.tsx";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";

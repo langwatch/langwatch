@@ -120,7 +120,7 @@ LangWatch uses a centralized drawer system with URL-based state management. Draw
 The system consists of two parts:
 
 1. **`CurrentDrawer`** - A global component, mounted once near the app root, that reads URL params and renders the appropriate drawer
-2. **`useDrawer`** - A hook (from `@langwatch/ui-drawer`) for opening/closing drawers and managing navigation
+2. **`useDrawer`** - A hook (from `@langwatch/browser-host/drawer`) for opening/closing drawers and managing navigation
 
 **Important:** Don't render drawers explicitly in pages - `CurrentDrawer` handles rendering automatically based on URL state. This ensures:
 
@@ -131,7 +131,7 @@ The system consists of two parts:
 ### Basic Usage
 
 ```tsx
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 
 function MyComponent() {
   const { openDrawer, closeDrawer, canGoBack, goBack, currentDrawer } = useDrawer();
@@ -195,7 +195,7 @@ callbacks?.onSelect?.(selectedPrompt);
 
 ### Registered Drawers
 
-A drawer is registered by the feature that owns it, not in one shared file. Each feature's `web` package exports a `UiDrawerRegistry` (built with `lazyDrawer` from `@langwatch/ui-drawer`), and `apps/ui/src/features/installed-ui-drawers.ts` composes every feature's registry into the one the application serves. See `dev/docs/best_practices/drawers.md` ("Adding a new drawer") for the full walkthrough, including the `withHost` wrapping step that happens in `apps/ui`'s own `*-drawers.tsx` files.
+A drawer is registered by the feature that owns it, not in one shared file. Each feature's `web` package exports a `UiDrawerRegistry` (built with `lazyDrawer` from `@langwatch/browser-host/drawer`), and `apps/ui/src/features/installed-ui-drawers.ts` composes every feature's registry into the one the application serves. See `dev/docs/best_practices/drawers.md` ("Adding a new drawer") for the full walkthrough, including the `withHost` wrapping step that happens in `apps/ui`'s own `*-drawers.tsx` files.
 
 ## Page Layout Components
 

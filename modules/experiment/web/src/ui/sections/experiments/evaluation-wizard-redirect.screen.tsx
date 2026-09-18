@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { ExperimentType } from "../../../model/prisma-types.ts";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useRouter } from "@langwatch/browser-host/use-router";
 
 /**
  * Redirects to the workbench when workbench-native (EVALUATIONS_V3 or a

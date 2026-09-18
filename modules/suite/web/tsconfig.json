@@ -19,6 +19,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
@@ -26,9 +29,6 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-host/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

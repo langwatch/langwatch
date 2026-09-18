@@ -4,7 +4,7 @@
 
 import { useCallback, useMemo } from "react";
 
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 
 /** Any overlay the application registers (registry untyped: not this package's). */
 export type DrawerType = string;

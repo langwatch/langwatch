@@ -19,7 +19,7 @@ import type {
 } from "@langwatch/authz-contract";
 import { AuthzApi as AuthzApiToken } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";
 import {

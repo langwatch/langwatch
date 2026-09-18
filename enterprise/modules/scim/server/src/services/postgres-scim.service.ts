@@ -1,11 +1,12 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { BrowserSessionApi } from "@langwatch/auth-contract";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserApi } from "@langwatch/user-contract";
+
 import type { ScimSyncLifecycle } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import { ScimService } from "./scim.service.ts";

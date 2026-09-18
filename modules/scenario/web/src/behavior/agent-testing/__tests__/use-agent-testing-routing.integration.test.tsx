@@ -14,7 +14,7 @@ const router = vi.hoisted(() => ({
   push: vi.fn(),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => router,
 }));
 

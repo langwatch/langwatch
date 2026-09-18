@@ -10,7 +10,7 @@ import {
   createUiScopeHost,
   UiScopeHostProvider,
   type UiScopeHost,
-} from "@langwatch/ui-host/use-organization-team-project";
+} from "@langwatch/browser-host/use-organization-team-project";
 
 /** The project every scenario read is scoped to. */
 export type ScenarioHostProject = {

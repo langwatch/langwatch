@@ -24,11 +24,11 @@ import {
 import { PASS_RATE_BAR_OPACITY } from "../../../../elements/agent-testing/shared/pass-rate-color.ts";
 import type { TargetKind } from "../../../../../model/target-kind.ts";
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
 }));
 
-vi.mock("@langwatch/ui-host/format-time-ago", () => ({
+vi.mock("@langwatch/browser-host/format-time-ago", () => ({
   formatTimeAgoCompact: () => "2h ago",
 }));
 

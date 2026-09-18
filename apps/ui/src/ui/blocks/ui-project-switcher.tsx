@@ -2,7 +2,7 @@
  * The project switcher, as this application answers it.
  */
 
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import {
   ProjectSwitcherCombobox,
   useOptionalNavigationHost,

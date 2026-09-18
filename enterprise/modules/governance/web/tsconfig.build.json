@@ -36,6 +36,9 @@
       "path": "../../../../modules/authz/web-kit/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
       "path": "../../../../dev/tsconfig.web-declarations.json"
     },
     {
@@ -55,12 +58,6 @@
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/ui-drawer/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/ui-host/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/user/web/tsconfig.build.json"

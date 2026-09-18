@@ -40,7 +40,7 @@
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "lucide-react": "catalog:"
   },
   "devDependencies": {

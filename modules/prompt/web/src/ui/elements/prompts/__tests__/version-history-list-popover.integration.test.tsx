@@ -9,16 +9,16 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { VersionHistoryListPopover } from "../version-history-list-popover.tsx";
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_1" } }),
 }));
-vi.mock("@langwatch/ui-host/toaster", () => ({
+vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
-vi.mock("@langwatch/ui-host/errors", () => ({ showErrorToast: vi.fn() }));
+vi.mock("@langwatch/browser-host/errors", () => ({ showErrorToast: vi.fn() }));
 
 const mockUseQuery = vi.fn();
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     prompts: {
       getAllVersionsForPrompt: { useQuery: (...args: unknown[]) => mockUseQuery(...args) },

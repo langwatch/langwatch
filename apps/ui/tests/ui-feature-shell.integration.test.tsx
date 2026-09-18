@@ -11,14 +11,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createUiScopeHost,
   useOrganizationTeamProject,
-} from "@langwatch/ui-host/use-organization-team-project";
-import { UiSession, useUiCapabilities } from "@langwatch/ui-host/capabilities";
+} from "@langwatch/browser-host/use-organization-team-project";
+import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import type {
   UiFeatureApiBinding,
   UiFeatureApiTransport,
 } from "../src/behavior/ui-feature-transport";
-import { createUiFeatureShell } from "../src/ui/sections/ui-feature-shell";
-import type { UiProviderShell } from "../src/ui/sections/ui-outer-providers";
+import { createUiFeatureShell } from "../src/shell/ui-feature-shell";
+import type { UiProviderShell } from "../src/shell/ui-outer-providers";
 
 class StubSession extends UiSession {
   currentUser() {

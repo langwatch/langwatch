@@ -8,7 +8,7 @@ import { showErrorToast } from "../errors/index.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../behavior/trace-api.ts";
 import { useSession } from "../../../behavior/auth-session.ts";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 
 type Annotator = { id: string; name: string };
 

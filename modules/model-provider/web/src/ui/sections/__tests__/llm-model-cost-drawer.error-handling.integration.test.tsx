@@ -33,7 +33,7 @@ const { mockCreateOrUpdateMutate, mockMutationError, mockCosts, mockCloseDrawer 
   }),
 );
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ closeDrawer: mockCloseDrawer }),
 }));
 

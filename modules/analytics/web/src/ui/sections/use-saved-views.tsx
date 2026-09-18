@@ -15,10 +15,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { availableFilters } from "../../model/filters/registry.ts";
 import type { FilterField } from "../../model/filters/types.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   type DefaultView,
   findMatchingView,
@@ -27,7 +27,7 @@ import {
 } from "./saved-views-logic.ts";
 import type { FilterParam } from "./use-filter-params.ts";
 import { useFilterParams } from "./use-filter-params.ts";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 
 // Re-export types and constants for consumers
 export {

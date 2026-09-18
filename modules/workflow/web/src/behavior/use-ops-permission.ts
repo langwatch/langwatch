@@ -1,4 +1,4 @@
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 
 // Ops scope reflects the signed-in user's grants on this project — it
 // doesn't change mid-session. Without an explicit staleTime React Query

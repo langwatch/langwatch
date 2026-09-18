@@ -24,17 +24,17 @@ import {
   setFlowCallbacks,
   useDrawer,
   useDrawerParams,
-} from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+} from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { RouterOutputs } from "@langwatch/api-client-web/workflow-api";
+import type { RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 
 /** An evaluator as this table holds one: off a query, so its instants are strings. */
 type EvaluatorWithFields = NonNullable<RouterOutputs["evaluators"]["getById"]>;
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { newTargetId,connectedTargetFields,isRowEmpty,isCellInExecution,toComparisonConfig } from "@langwatch/experiment-contract";
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";
 import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name.ts";

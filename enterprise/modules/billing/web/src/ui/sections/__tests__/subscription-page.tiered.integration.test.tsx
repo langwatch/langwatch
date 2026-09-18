@@ -7,7 +7,7 @@ import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ENTERPRISE_PLAN_FEATURES, WEBHOOK_FEATURE_LABEL } from "../../../model/billing-plans.ts";
+
 import {
   type BillingFailureNotice,
   type BillingHostOrganization,
@@ -15,6 +15,7 @@ import {
   BillingHostProvider,
   type BillingSuccessNotice,
 } from "../../../model/billing-host.ts";
+import { ENTERPRISE_PLAN_FEATURES, WEBHOOK_FEATURE_LABEL } from "../../../model/billing-plans.ts";
 import { SubscriptionPage } from "../subscription-page.tsx";
 import {
   createMockPlan,
@@ -90,7 +91,7 @@ const renderSubscriptionPage = () => {
 // ---------------------------------------------------------------------------
 // vi.mock declarations (hoisted — must be at module top-level)
 // ---------------------------------------------------------------------------
-vi.mock("@langwatch/ui-host/upgrade-modal-store", async () => {
+vi.mock("@langwatch/browser-host/upgrade-modal-store", async () => {
   const setup = await import("./subscription-test-setup.ts");
   return {
     useUpgradeModalStore: (

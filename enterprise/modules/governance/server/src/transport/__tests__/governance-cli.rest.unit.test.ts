@@ -7,6 +7,7 @@
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { PersonalSourceTypeNotAllowedError } from "@langwatch/enterprise-governance-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";
@@ -17,6 +18,7 @@ import {
 import { GovernanceCliActivityService } from "../../services/governance-cli-activity.service.ts";
 import {
   GovernanceCliCredentialService,
+  type GovernanceCliBudgetReader,
   type GovernanceCliPersonDirectory,
 } from "../../services/governance-cli-credentials.service.ts";
 import { governanceCliRest, type GovernanceCliRestApi } from "../governance-cli.rest.ts";
@@ -50,8 +52,12 @@ type World = {
   resolve?: () => Promise<typeof CALLER | null>;
   planType?: string;
   permittedOnOrganization?: boolean;
-  permittedOnProject?: ReturnType<typeof vi.fn>;
-  budgets?: { check: ReturnType<typeof vi.fn> };
+  permittedOnProject?: (input: {
+    userId: string;
+    projectId: string;
+    permission: AuthzPermission;
+  }) => Promise<boolean>;
+  budgets?: GovernanceCliBudgetReader;
   supportContact?: string | null;
   personalWorkspace?: {
     team: { id: string };

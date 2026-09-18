@@ -8,10 +8,10 @@ import {
 } from "../../../model/experiments-v3/types.ts";
 import { extractPersistedState } from "../../../model/experiments-v3/types/persistence.ts";
 import { HandledErrorAlert } from "@langwatch/workflow-web/handled-error-views";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useRouter } from "@langwatch/browser-host/use-router";
 
 /**
  * Builds a saved dataset reference from a loaded dataset, mirroring the

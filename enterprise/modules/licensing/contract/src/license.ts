@@ -1,11 +1,12 @@
-import { z } from "zod";
-import type { LicenseError } from "./license-constants.ts";
 import { planSchema } from "@langwatch/entitlement-contract";
 import {
   licenseResourceLimitsShape,
   licenseSeatsShape,
   planPublishingShape,
 } from "@langwatch/plans";
+import { z } from "zod";
+
+import type { LicenseError } from "./license-constants.ts";
 import type { PlanInfo } from "./license-plan.ts";
 
 /**

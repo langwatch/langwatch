@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useDrawerParams, useUpdateDrawerParams } from "../../../../behavior/use-drawer.ts";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import {
   type DrawerUrlState,
   type DrawerViewMode,

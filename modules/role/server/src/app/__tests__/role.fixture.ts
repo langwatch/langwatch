@@ -1,44 +1,37 @@
 import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { RoleBindingScopeType } from "@langwatch/role-contract";
+import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
-import { RoleApp, type RoleInfrastructure } from "../role.app.ts";
+import { RoleApp } from "../role.app.ts";
 
-type RoleScope = RoleInfrastructure["scope"];
-type RolePlan = RoleInfrastructure["plan"];
-type RoleBindingIds = RoleInfrastructure["bindingIds"];
-
-/** Lets every binding through: the fence has its own suite in the owning feature. */
-export class AllowingTestRoleScope implements RoleScope {
-  async assertNoPersonalTeamScope(_input: {
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-  }): Promise<void> {}
+/** A valid plan literal. ENTERPRISE by default, so custom-role writes are allowed
+ * unless a test names another type. */
+export function testPlan(overrides: Partial<Plan> = {}): Plan {
+  return {
+    planSource: "subscription",
+    type: "ENTERPRISE",
+    name: "Enterprise",
+    free: false,
+    maxMembers: 1,
+    maxMembersLite: 1,
+    maxMessagesPerMonth: 1,
+    canPublish: true,
+    prices: { USD: 0, EUR: 0 },
+    ...overrides,
+  };
 }
 
-/** A deployment whose plan carries custom roles. */
-export class AllowingTestRolePlan implements RolePlan {
-  async assertCustomRolesAllowed(_input: { organizationId: string }): Promise<void> {}
-}
-
-/** A deployment whose plan does not, refusing by the sentence the process owns. */
-export class RefusingTestRolePlan implements RolePlan {
-  async assertCustomRolesAllowed(_input: { organizationId: string }): Promise<void> {
-    throw new Error("Custom roles require an Enterprise plan");
-  }
-}
-
-/** Counting binding ids, so a test can assert which one was attached. */
-export class CountingTestRoleBindingIds implements RoleBindingIds {
-  #next = 0;
-
-  newBindingId(): string {
-    this.#next += 1;
-
-    return `binding_${this.#next}`;
-  }
+/** Answers "not personal" for every team and project lookup: the scope fence
+ * has its own suite in the owning feature. */
+export function testRolePrisma(): PrismaClient {
+  return {
+    team: { findFirst: async () => null },
+    project: { findFirst: async () => null },
+  } as unknown as PrismaClient;
 }
 
 /** One binding as the authorization boundary answers it, with nothing omitted. */
@@ -68,8 +61,8 @@ export function createRoleTestApp(
     permissions?: Partial<AuthzApi>;
     organizations?: Partial<OrganizationApi>;
     users?: Partial<UserApi>;
-    plan?: RolePlan;
-    scope?: RoleScope;
+    entitlement?: Partial<EntitlementApi>;
+    prisma?: PrismaClient;
   }> = {},
 ): { app: RoleApp; roles: MemoryRoleRepository } {
   const roles = input.roles ?? MemoryRoleRepository.create();
@@ -83,13 +76,13 @@ export function createRoleTestApp(
         "OrganizationApi",
       ),
       users: createApiFixture<UserApi>(input.users ?? {}, "UserApi"),
+      entitlement: createApiFixture<EntitlementApi>(
+        input.entitlement ?? { getActivePlan: async () => testPlan() },
+        "EntitlementApi",
+      ),
     },
     members: {
-      role: {
-        scope: input.scope ?? new AllowingTestRoleScope(),
-        plan: input.plan ?? new AllowingTestRolePlan(),
-        bindingIds: new CountingTestRoleBindingIds(),
-      },
+      prisma: input.prisma ?? testRolePrisma(),
     },
     config: void 0,
     resources: new ResourceScope(),

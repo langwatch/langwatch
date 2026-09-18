@@ -45,7 +45,7 @@ vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
   ScenarioFormDrawer: () => null,
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
   useDrawerParams: () => ({ scenarioRunId: "run_1" }),
 }));
@@ -83,7 +83,7 @@ vi.mock("../../../../behavior/use-simulation-streaming-state.ts", () => ({
 vi.mock("../../../../behavior/use-simulation-update-listener.ts", () => ({
   useSimulationUpdateListener: () => ({ isConnected: true }),
 }));
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn(), query: {}, pathname: "/" }),
 }));
 

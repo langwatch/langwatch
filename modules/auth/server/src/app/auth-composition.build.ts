@@ -9,7 +9,7 @@ import {
   type RoutingDecision,
   type SignInMethodPolicy,
 } from "@langwatch/identity-contract";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";

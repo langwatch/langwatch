@@ -3,7 +3,7 @@
  * here from hand-composition in deleted apps/api/features/user/user.composition.ts.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";

@@ -6,9 +6,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
-import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { ScenarioHostApi, ScenarioHostProvider } from "../../../../model/scenario-host.ts";
 
 const state = vi.hoisted(() => ({

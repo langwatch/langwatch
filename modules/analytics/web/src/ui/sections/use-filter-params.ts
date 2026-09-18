@@ -1,12 +1,12 @@
-import { readUiStorage } from "@langwatch/ui-host/storage";
+import { readUiStorage } from "@langwatch/browser-host/storage";
 import qs from "qs";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { URL_QS_PARSE_OPTIONS } from "../../model/utils/qs-parse-options.ts";
 import { usePeriodSelector } from "@langwatch/analytics-web-kit/period-selector";
 import { filterOutEmptyFilters } from "./analytics/utils.ts";
 import { availableFilters } from "../../model/filters/registry.ts";
 import type { FilterField } from "../../model/filters/types.ts";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 
 export type FilterParam =
   | string[]

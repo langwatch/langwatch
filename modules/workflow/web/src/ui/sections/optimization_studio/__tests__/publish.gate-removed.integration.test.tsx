@@ -30,7 +30,7 @@ vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
       checkCanCommitNewVersion: () => false,
     }),
 }));
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: {},
     push: mockRouterPush,
@@ -45,7 +45,7 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () 
   }),
 }));
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => {
+vi.mock("@langwatch/browser-trpc/workflow-api", () => {
   const queryStub = (data: unknown) => ({
     useQuery: () => ({ data, isLoading: false, refetch: vi.fn() }),
   });
@@ -176,7 +176,7 @@ vi.mock("@langwatch/design-system/tooltip", () => ({
   ),
 }));
 
-vi.mock("@langwatch/ui-host/link", () => ({
+vi.mock("@langwatch/browser-host/link", () => ({
   Link: ({
     children,
     href,

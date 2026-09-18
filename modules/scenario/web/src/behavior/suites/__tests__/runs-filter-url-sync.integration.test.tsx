@@ -16,10 +16,10 @@ vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
 
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { ScenarioHostApi, ScenarioHostProvider } from "../../../model/scenario-host.ts";
-import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { createRunHistoryStore } from "@langwatch/suite-web/run-history-store";
 import { ALL_RUNS_ID, EXTERNAL_SET_PREFIX, useSuiteRouting } from "../use-suite-routing.ts";
 

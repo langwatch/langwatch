@@ -9,12 +9,12 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router";
-import { clearFlowCallbacks, getFlowCallbacks } from "@langwatch/ui-drawer";
+import { clearFlowCallbacks, getFlowCallbacks } from "@langwatch/browser-host/drawer";
 import { AgentTestingCaseEditor } from "../../../../sections/agent-testing/cases/agent-testing-case-editor.tsx";
 import { CASE_EDITOR_DRAWER } from "../../../../sections/agent-testing/cases/drawer-keys.ts";
 import type { RunDialogProps } from "../../../../sections/agent-testing/run/run-dialog-types.ts";
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     pathname: "/test",

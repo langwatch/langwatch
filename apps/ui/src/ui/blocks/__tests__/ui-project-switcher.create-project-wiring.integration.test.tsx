@@ -13,9 +13,9 @@ const capturedProps: {
   onCreateProjectForTeam?: (args: { teamId: string; orgId: string }) => void;
 } = {};
 
-vi.mock("@langwatch/ui-drawer", async () => {
+vi.mock("@langwatch/browser-host/drawer", async () => {
   const actual =
-    await vi.importActual<typeof import("@langwatch/ui-drawer")>("@langwatch/ui-drawer");
+    await vi.importActual<typeof import("@langwatch/browser-host/drawer")>("@langwatch/browser-host/drawer");
   return {
     ...actual,
     useDrawer: () => ({ openDrawer: openDrawerMock, closeDrawer: () => {} }),

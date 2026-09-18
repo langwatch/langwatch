@@ -1,5 +1,5 @@
 import { type BoxProps, PopoverContent } from "@chakra-ui/react";
-import dynamic from "@langwatch/ui-host/compat/next-dynamic";
+import dynamic from "@langwatch/browser-host/compat/next-dynamic";
 import type {
   EmojiClickData,
   EmojiStyle,

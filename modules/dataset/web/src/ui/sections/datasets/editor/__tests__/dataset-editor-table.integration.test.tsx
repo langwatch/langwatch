@@ -11,7 +11,7 @@ import { DatasetEditorTable, type InMemoryDataset } from "../dataset-editor-tabl
 
 // ── Mocks ────────────────────────────────────────────────────────────
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme-app" },
     organization: { id: "org-1", name: "Acme" },
@@ -24,7 +24,7 @@ const updateMutate = vi.fn();
 const deleteManyMutate = vi.fn();
 const getAllQuery = vi.fn();
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     datasetRecord: {
       getAll: {

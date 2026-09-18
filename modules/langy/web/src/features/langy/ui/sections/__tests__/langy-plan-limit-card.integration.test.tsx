@@ -28,7 +28,7 @@ vi.mock("../../../../../behavior/use-plan-management-url.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push }),
 }));
 

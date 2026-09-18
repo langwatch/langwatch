@@ -36,7 +36,7 @@
       "path": "../../workflow/web-kit/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api-client-web/tsconfig.build.json"
+      "path": "../../../packages/browser-trpc/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

@@ -14,8 +14,8 @@ export const workflowScreens = {
 export type WorkflowScreenName = keyof typeof workflowScreens;
 
 export { WORKFLOWS_PAGE_PERMISSION } from "./workflows.screen.tsx";
-export { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
-export type { WorkflowApiMap, WorkflowOrganizationGraph } from "@langwatch/api-client-web/workflow-api";
+export { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
+export type { WorkflowApiMap, WorkflowOrganizationGraph } from "@langwatch/browser-trpc/workflow-api";
 export {
   WorkflowHostApi,
   WorkflowHostProvider,

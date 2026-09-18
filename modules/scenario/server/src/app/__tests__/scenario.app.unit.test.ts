@@ -1,3 +1,8 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { Encryption } from "@langwatch/process-stores/members";
+import type { ResourceOwnership } from "@langwatch/kernel";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * `ScenarioApp.queueSimulationRun` — the metadata envelope a queued run carries.
  * @vitest-environment node
@@ -10,18 +15,15 @@ import type {
   SimulationQueueRun,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import type { ResourceOwnership } from "@langwatch/kernel";
-import type { Encryption } from "@langwatch/infrastructure/members";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { AgentTestService } from "../../services/agent-test.service.ts";
 
-import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
-import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { ScenarioRepository } from "../../repositories/scenario.repository.ts";
+import type { AgentTestService } from "../../services/agent-test.service.ts";
+import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
+import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 import type {
   AgentAdapterFactory,
   CancellationPublisher,
@@ -34,7 +36,6 @@ import type {
   ScenarioProcessorServiceMetrics,
   ScenarioTabStore,
 } from "../scenario.app.ts";
-import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
 import { ScenarioApp } from "../scenario.app.ts";
 
 function harness() {
@@ -50,6 +51,7 @@ function harness() {
   const app = ScenarioApp.create({
     repositories: { scenarios: {} as ScenarioRepository },
     dependencies: {
+      agents: createApiFixture<AgentApi>(),
       users: {} as UserApi,
       projects: {} as ProjectApi,
       plans: {} as EntitlementApi,
@@ -348,6 +350,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
       const app = ScenarioApp.create({
         repositories: { scenarios: {} as ScenarioRepository },
         dependencies: {
+          agents: createApiFixture<AgentApi>(),
           users: createApiFixture<UserApi>(),
           projects: createApiFixture<ProjectApi>(),
           plans: createApiFixture<EntitlementApi>(),

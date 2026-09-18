@@ -26,7 +26,7 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -36,7 +36,7 @@ vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   },
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     currentDrawer: undefined,
     openDrawer: vi.fn(),

@@ -233,7 +233,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-web-kit": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@microlink/react-json-view": "^1.31.21",
     "@paper-design/shaders-react": "catalog:",

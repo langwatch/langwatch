@@ -132,14 +132,14 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), setFlowCallbacks: vi.fn() }),
 }));
 
 /** The address the page writes, which is where the period is held. */
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: routerState.query,
     asPath: routerState.asPath,

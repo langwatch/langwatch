@@ -5,8 +5,8 @@
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 import { toEpochMs } from "@langwatch/time";
 
-import { api as workflowApi, type WorkflowListRow } from "@langwatch/api-client-web/workflow-api";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { api as workflowApi, type WorkflowListRow } from "@langwatch/browser-trpc/workflow-api";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 import {
   WorkflowCardActions,

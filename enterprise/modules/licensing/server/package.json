@@ -39,9 +39,9 @@
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@trpc/server": "catalog:",
     "zod": "catalog:"

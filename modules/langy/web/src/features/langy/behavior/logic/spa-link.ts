@@ -6,7 +6,7 @@
  */
 import type { MouseEvent } from "react";
 
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 
 /**
  * Whether an href stays inside this app.

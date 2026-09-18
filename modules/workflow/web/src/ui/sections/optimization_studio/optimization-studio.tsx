@@ -30,10 +30,10 @@ import {
   useColorModeValue,
   useColorRawValue,
 } from "@langwatch/design-system/color-mode";
-import { Link } from "@langwatch/ui-host/link";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { Link } from "@langwatch/browser-host/link";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy.ts";
 import { titleCase } from "@langwatch/design-system/string-casing";
@@ -87,7 +87,7 @@ import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal.tsx";
 import { Publish } from "./publish.tsx";
 import { ResultsPanel } from "./results-panel.tsx";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { publishedComponentsSchema } from "../../../model/published-workflow.ts";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {

@@ -128,7 +128,7 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
     setFlowCallbacks: vi.fn(),
@@ -140,7 +140,7 @@ const mockReplace = vi.fn();
 let mockRouterQuery: Record<string, string | string[] | undefined> = {
   project: "my-project",
 };
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     pathname: "/[project]/simulations/[[...path]]",

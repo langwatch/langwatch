@@ -1,6 +1,6 @@
 import { toEpochMs, type TimeInput } from "@langwatch/time";
 import { useMemo } from "react";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 
 export interface MinimalProject {
   id: string;

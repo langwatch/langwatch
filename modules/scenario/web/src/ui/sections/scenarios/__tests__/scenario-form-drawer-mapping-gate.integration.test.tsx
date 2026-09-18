@@ -150,7 +150,7 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: mocks.mockOpenDrawer,
     closeDrawer: mocks.mockCloseDrawer,
@@ -176,7 +176,7 @@ vi.mock("../../../../behavior/use-voice-agents-enabled.ts", () => ({
   useVoiceAgentsEnabled: () => true,
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
     pathname: "/[project]/simulations/scenarios",

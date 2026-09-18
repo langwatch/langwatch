@@ -22,7 +22,7 @@ vi.mock("../attribution.ts", () => ({
   readAttribution: () => ({}),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), replace: vi.fn() }),
 }));
 

@@ -173,9 +173,6 @@
       "path": "../../modules/identity/server/tsconfig.build.json"
     },
     {
-      "path": "../../packages/process-stores/tsconfig.build.json"
-    },
-    {
       "path": "../../packages/kernel/tsconfig.build.json"
     },
     {
@@ -246,6 +243,9 @@
     },
     {
       "path": "../../packages/process-server/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/process-stores/tsconfig.build.json"
     },
     {
       "path": "../../modules/project/contract/tsconfig.build.json"

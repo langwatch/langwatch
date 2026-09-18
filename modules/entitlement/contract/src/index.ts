@@ -32,3 +32,10 @@ export {
   planTrpc,
   usageLimitsTrpc,
 } from "./entitlement.trpc.ts";
+export {
+  ENTERPRISE_FEATURE_ERRORS,
+  type EnterpriseFeature,
+  EnterprisePlanRequiredError,
+  isEnterpriseTier,
+} from "./plan-gate.errors.ts";
+export { assertEnterprisePlan, assertEnterprisePlanType, requireEnterprisePlan } from "./plan-gate.ts";

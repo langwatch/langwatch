@@ -1,3 +1,8 @@
+import {
+  ScimConnectionNotFoundError,
+  ScimConnectionRequiredError,
+} from "@langwatch/enterprise-scim-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Minting a SCIM provisioning token, and the two refusals a mint can hit
@@ -5,17 +10,13 @@
  * that belongs to a different organization.
  */
 import { describe, expect, it, vi } from "vitest";
-import {
-  ScimConnectionNotFoundError,
-  ScimConnectionRequiredError,
-} from "@langwatch/enterprise-scim-contract";
-import { ScimService } from "../scim.service.ts";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { ScimRepository } from "../../repositories/scim.repository.ts";
-import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
-import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
+import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
+import { ScimService } from "../scim.service.ts";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
 class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
   async getActivePlan() {

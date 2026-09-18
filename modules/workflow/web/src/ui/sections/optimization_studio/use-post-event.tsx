@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { describeError, showErrorToast,isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
+import { describeError, showErrorToast,isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { fetchSSE } from "../../../model/sse/fetch-sse.ts";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import type { BaseComponent,StudioClientEvent,StudioServerEvent } from "@langwatch/workflow-contract";
 import {

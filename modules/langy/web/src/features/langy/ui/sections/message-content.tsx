@@ -10,8 +10,8 @@ import {
   deriveLangyChoicesLockState,
   githubProgressFromToolParts,
 } from "@langwatch/langy-contract";
-import { isInternalHref, Markdown } from "@langwatch/ui-host/markdown";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { isInternalHref, Markdown } from "@langwatch/browser-host/markdown";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";

@@ -85,7 +85,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/api-client-web": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/authz-web-kit": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
@@ -94,8 +94,7 @@
     "@langwatch/model-provider-web-kit": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-drawer": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:",
@@ -108,6 +107,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
     "@testing-library/jest-dom": "catalog:",

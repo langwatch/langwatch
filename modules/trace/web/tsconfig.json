@@ -29,6 +29,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
       "path": "../../coding-agent/contract/tsconfig.build.json"
     },
     {
@@ -96,9 +99,6 @@
     },
     {
       "path": "../web-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-host/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"

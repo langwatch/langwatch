@@ -10,7 +10,7 @@ import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { langyChoicesTimeline } from "../../../../../model/langy-choices-timeline.ts";
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -20,11 +20,11 @@ vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   },
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 

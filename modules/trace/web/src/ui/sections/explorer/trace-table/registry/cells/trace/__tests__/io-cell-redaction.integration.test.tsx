@@ -8,7 +8,7 @@ import "@testing-library/jest-dom/vitest";
 
 // RedactedInline (rendered by the cells when redacted) looks up the org's
 // permissions to decide whether to show the "Open privacy settings" link.
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     hasPermission: () => false,

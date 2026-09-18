@@ -110,7 +110,7 @@ vi.mock("../../../../../behavior/use-can.ts", () => ({
 
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: mockOpenDrawer, setFlowCallbacks: vi.fn() }),
   useDrawerParams: () => ({}),
   setFlowCallbacks: vi.fn(),
@@ -132,7 +132,7 @@ vi.mock("../../../../../behavior/use-voice-agents-enabled.ts", () => ({
   useVoiceAgentsEnabled: () => true,
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     asPath: "/test-project/agent-testing",

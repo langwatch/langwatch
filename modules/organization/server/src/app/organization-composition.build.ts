@@ -4,8 +4,10 @@ import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   assertEnterprisePlanType,
-} from "@langwatch/enterprise-plan-gate";
-import type { EntitlementApi, Plan, PlanProviderUser } from "@langwatch/entitlement-contract";
+  type EntitlementApi,
+  type Plan,
+  type PlanProviderUser,
+} from "@langwatch/entitlement-contract";
 import {
   getRoleChangeType,
   isViewOnlyCustomRole,
@@ -14,7 +16,7 @@ import {
   type UsageMembershipRepository,
 } from "@langwatch/entitlement-server";
 import type { IdentityApi } from "@langwatch/identity-contract";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { Logger } from "@langwatch/observability";
 import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";

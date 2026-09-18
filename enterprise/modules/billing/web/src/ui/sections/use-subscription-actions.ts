@@ -1,16 +1,17 @@
+import { isGrowthSeatEventPlan } from "@langwatch/enterprise-billing-contract";
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
+// The seat-quote modal is a shared zustand singleton: opening it here and
+// mounting it in the chrome layout is one modal, not a copy.
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+
 import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
-import { isGrowthSeatEventPlan } from "@langwatch/enterprise-billing-contract";
 import {
   type BillingInterval,
   type Currency,
   resolveGrowthSeatPlanType,
 } from "../../model/billing-plans.ts";
 import { type PlannedUser } from "../../model/subscription-types.ts";
-// The seat-quote modal is a shared zustand singleton: opening it here and
-// mounting it in the chrome layout is one modal, not a copy.
-import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 
 type TRPCRefetchFn = { refetch: () => any };
 

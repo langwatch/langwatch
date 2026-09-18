@@ -35,7 +35,7 @@
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "lucide-react": "catalog:",
     "numeral": "catalog:",
     "zod": "catalog:"

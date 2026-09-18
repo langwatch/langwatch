@@ -9,7 +9,7 @@ import type {
 import { TopicApi as TopicApiToken } from "@langwatch/topic-contract";
 import type { Instant } from "@langwatch/time";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
 import { TopicService } from "../services/topic.service.ts";

@@ -19,7 +19,7 @@ const PROJECT_EVENT_TYPES = [
   { key: "thumbs_down", label: "thumbs_down" },
 ];
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
   }),

@@ -6,13 +6,13 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("@langwatch/api-client-web/workflow-api", async () =>
+vi.mock("@langwatch/browser-trpc/workflow-api", async () =>
   (await import("./online-evaluation-drawer.test-helpers.tsx")).createApiMock(),
 );
-vi.mock("@langwatch/ui-host/use-organization-team-project", async () =>
+vi.mock("@langwatch/browser-host/use-organization-team-project", async () =>
   (await import("./online-evaluation-drawer.test-helpers.tsx")).createOrgMock(),
 );
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: vi.fn(),
     openDrawer: vi.fn(),

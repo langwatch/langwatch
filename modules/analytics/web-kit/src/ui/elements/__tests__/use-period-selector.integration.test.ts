@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 let mockQuery: Record<string, string> = {};
 const mockPush = vi.fn();
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: mockQuery,
     push: mockPush,

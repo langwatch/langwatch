@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 import { evaluatorApi } from "../../behavior/evaluator-api.ts";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 
 const ACTION_META = {

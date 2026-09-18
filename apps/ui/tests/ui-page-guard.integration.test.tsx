@@ -17,8 +17,8 @@ import {
   type UiFailureNotice,
   UiFeedback,
   type UiSuccessNotice,
-} from "@langwatch/ui-host/capabilities";
-import { resolveUiPageAccess, withUiPageGuard } from "../src/ui/sections/ui-page-guard";
+} from "@langwatch/browser-host/capabilities";
+import { resolveUiPageAccess, withUiPageGuard } from "../src/shell/ui-page-guard";
 
 class SilentNavigation extends UiNavigation {
   navigate(): void {}

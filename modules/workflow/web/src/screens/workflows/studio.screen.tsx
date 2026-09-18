@@ -1,14 +1,14 @@
 import { Button } from "@chakra-ui/react";
 import { SearchX } from "lucide-react";
 import { useEffect } from "react";
-import { Link } from "@langwatch/ui-host/link";
+import { Link } from "@langwatch/browser-host/link";
 import { HandledErrorState } from "../../ui/elements/studio-host/errors.tsx";
 import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project.ts";
 import OptimizationStudio from "../../ui/sections/optimization_studio/optimization-studio.tsx";
 import { useLoadWorkflow } from "../../behavior/optimization_studio/use-load-workflow.ts";
 import { _useWorkflowStore, useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useStudioHostBinding } from "../../ui/sections/studio-host/binding.ts";
 
 export default function Studio() {

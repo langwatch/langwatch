@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModelSelector } from "../model-selector.tsx";
 import { NoModelsConfiguredCallout } from "../no-models-configured-callout.tsx";
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme-app" },
     organization: { id: "org-1", name: "Acme" },
@@ -20,7 +20,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
 
 // tRPC query returns an empty providers list to simulate a freshly
 // created project with zero configured providers.
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {

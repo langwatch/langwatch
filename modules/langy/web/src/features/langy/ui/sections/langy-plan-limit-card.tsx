@@ -3,7 +3,7 @@ import { ArrowUpRight, Crown } from "lucide-react";
 import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { usePlanManagementUrl } from "../../../../behavior/use-plan-management-url.ts";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { trackEvent } from "../../../../model/tracking.ts";
 import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-failure.ts";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";

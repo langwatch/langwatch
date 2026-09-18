@@ -5,7 +5,7 @@
  */
 import type { Readable } from "node:stream";
 
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type {
@@ -131,8 +131,7 @@ type StoredObjectDependencies = Record<never, never>;
 
 type StoredObjectSetup = FeatureSetup<
   StoredObjectDependencies,
-  Pick<ProcessMembers, "prisma" | "clickhouse" | "logger"> &
-    Readonly<{ storedObject: StoredObjectInfrastructure | undefined }>,
+  Pick<ProcessMembers, "prisma" | "clickhouse" | "logger">,
   StoredObjectAppConfig,
   StoredObjectRepositories
 >;
@@ -141,7 +140,7 @@ export class StoredObjectApp implements StoredObjectApi {
   static readonly contract = StoredObjectApi;
   static readonly dependencies = {};
   static readonly configSchema = storedObjectAppConfigSchema;
-  static readonly reads = ["prisma", "clickhouse", "logger", "storedObject"] as const;
+  static readonly reads = ["prisma", "clickhouse", "logger"] as const;
 
   /**
    * Builds this process's own {@link StoredObjectInfrastructure} from the
@@ -149,13 +148,11 @@ export class StoredObjectApp implements StoredObjectApi {
    * {@link StoredObjectApp.fromInfrastructure} does.
    */
   static create(setup: StoredObjectSetup): StoredObjectApp {
-    const infrastructure =
-      setup.members.storedObject ??
-      buildStoredObjectInfrastructure({
-        members: setup.members,
-        config: setup.config,
-        resources: setup.resources,
-      });
+    const infrastructure = buildStoredObjectInfrastructure({
+      members: setup.members,
+      config: setup.config,
+      resources: setup.resources,
+    });
 
     return StoredObjectApp.fromInfrastructure({
       infrastructure,

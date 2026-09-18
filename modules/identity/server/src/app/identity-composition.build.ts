@@ -4,7 +4,7 @@
  * reads — `prisma` and `eventing` — plus its own config.
  */
 import type { EventSourcing } from "@langwatch/eventing";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,

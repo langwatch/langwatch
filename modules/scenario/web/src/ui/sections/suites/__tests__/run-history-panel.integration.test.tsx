@@ -34,7 +34,7 @@ vi.mock("@langwatch/trace-web-kit/sse-subscription", () => ({
   })),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
     setFlowCallbacks: vi.fn(),
@@ -53,7 +53,7 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     push: mockRouterPush,
     query: {},

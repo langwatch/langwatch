@@ -9,7 +9,7 @@ import { isOnPlatformSet, type ScenarioRunData } from "@langwatch/scenario-contr
 import { isSuiteSetId } from "@langwatch/suite-contract";
 import { useCancelScenarioRun } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useCan } from "../../../../behavior/use-can.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useAgentTestingStore } from "../use-agent-testing-store.ts";

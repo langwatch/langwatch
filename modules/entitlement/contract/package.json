@@ -24,6 +24,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@trpc/server": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

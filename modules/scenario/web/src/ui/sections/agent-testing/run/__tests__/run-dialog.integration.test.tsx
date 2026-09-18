@@ -7,24 +7,27 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { targetColor } from "../../../../elements/agent-testing/shared/target-colors.ts";
+import { ScenarioWorkflowHostBridge } from "../../../workflow-host-bridge.tsx";
 import { TestCasesTab } from "../../cases/test-cases-tab.tsx";
+import { useAgentTestingStore } from "../../use-agent-testing-store.ts";
 import { COMPARE_HINT } from "../compare-agents-section.tsx";
 import { DUPLICATE_TARGETS_MESSAGE } from "../compare-rows.ts";
+import { configurationKeyOf } from "../run-configuration.ts";
 import { RunDialog, type RunDialogSubject } from "../run-dialog.tsx";
 import { LOCKED_IN_ROWS_MESSAGE } from "../run-parameters-section.tsx";
-import { configurationKeyOf } from "../run-configuration.ts";
-import { targetColor } from "../../../../elements/agent-testing/shared/target-colors.ts";
-import { useAgentTestingStore } from "../../use-agent-testing-store.ts";
-import { ScenarioWorkflowHostBridge } from "../../../workflow-host-bridge.tsx";
 
 const mockSuitesRunPlan = vi.hoisted(() => vi.fn());
 const mockSuitesUpdate = vi.hoisted(() => vi.fn());
 const mockRunScenario = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
+const mockGoBack = vi.hoisted(() => vi.fn());
+const flowCallbacksStore = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>);
 const mockRouterPush = vi.hoisted(() => vi.fn());
 const mockAgentsGetAll = vi.hoisted(() => vi.fn());
 const mockPromptsGetAll = vi.hoisted(() => vi.fn());
@@ -122,8 +125,17 @@ vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
-  useDrawer: () => ({ openDrawer: mockOpenDrawer, setFlowCallbacks: vi.fn() }),
+vi.mock("@langwatch/browser-host/drawer", () => ({
+  useDrawer: () => ({
+    openDrawer: mockOpenDrawer,
+    goBack: mockGoBack,
+    setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
+      flowCallbacksStore[drawer] = callbacks;
+    },
+  }),
+  setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
+    flowCallbacksStore[drawer] = callbacks;
+  },
   useDrawerParams: () => ({}),
   getComplexProps: () => null,
 }));
@@ -142,7 +154,7 @@ vi.mock("../../../../../behavior/use-voice-agents-enabled.ts", () => ({
   useVoiceAgentsEnabled: () => true,
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     asPath: "/test-project/agent-testing",
@@ -916,9 +928,7 @@ describe("<RunDialog/>", () => {
         }),
       );
 
-      expect(
-        screen.getByTestId("run-dialog-call-it-myself"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("run-dialog-call-it-myself")).toBeInTheDocument();
     });
 
     /** @scenario "Call it myself is offered only when one scenario is in scope" */
@@ -934,9 +944,7 @@ describe("<RunDialog/>", () => {
         }),
       );
 
-      expect(
-        screen.queryByTestId("run-dialog-call-it-myself"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("run-dialog-call-it-myself")).not.toBeInTheDocument();
     });
   });
 
@@ -1454,9 +1462,7 @@ describe("run entries on the Scenarios tab", () => {
     expect(mockRouterPush.mock.calls[0]![1]).toBe(
       "/test-project/agent-testing/results/refunds-prod-agent/batch_new",
     );
-    expect(useAgentTestingStore.getState().pendingRun?.batchRunId).toBe(
-      "batch_new",
-    );
+    expect(useAgentTestingStore.getState().pendingRun?.batchRunId).toBe("batch_new");
   });
 });
 
@@ -2565,9 +2571,7 @@ describe("the evaluators of a run", () => {
     kind: "test_suite",
     scenarioIds: ["case_1"],
     fields: [{ identifier: "golden_sql", type: "text" }],
-    evaluators: [
-      { id: "att_sql", evaluatorId: "eval_sql", required: true, mappings },
-    ],
+    evaluators: [{ id: "att_sql", evaluatorId: "eval_sql", required: true, mappings }],
   });
   const fullyMapped = {
     output: lastAgentMessage,
@@ -2613,9 +2617,9 @@ describe("the evaluators of a run", () => {
     renderDialog(suiteSubject());
 
     const block = screen.getByTestId("run-dialog-evaluators");
-    expect(
-      within(block).getByTestId("run-dialog-inherited-suite_refunds"),
-    ).toHaveTextContent("Inherited from Refunds · edit in the suite");
+    expect(within(block).getByTestId("run-dialog-inherited-suite_refunds")).toHaveTextContent(
+      "Inherited from Refunds · edit in the suite",
+    );
     const pill = within(block).getByTestId("evaluator-pill-att_sql");
     expect(pill).toHaveTextContent("SQL Query Equivalence");
     expect(pill).toHaveAttribute("data-inherited", "true");
@@ -2624,9 +2628,7 @@ describe("the evaluators of a run", () => {
       within(block).queryByRole("button", { name: "Remove the evaluators" }),
     ).not.toBeInTheDocument();
     // The block stands on its own, so no chip offers it.
-    expect(
-      screen.queryByText("Add evaluators", { selector: "button" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Add evaluators", { selector: "button" })).not.toBeInTheDocument();
   });
 
   /** @scenario "An inherited pill opens the suite editor on that evaluator" */
@@ -2636,8 +2638,8 @@ describe("the evaluators of a run", () => {
 
     await user.click(screen.getByTestId("evaluator-pill-att_sql"));
 
-    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
-      testSuiteId: "suite_refunds",
+    expect(mockOpenDrawer).toHaveBeenCalledWith("suiteEditor", {
+      urlParams: { suiteId: "suite_refunds", attachmentId: "att_sql" },
     });
   });
 
@@ -2659,11 +2661,7 @@ describe("the evaluators of a run", () => {
     });
 
     act(() => {
-      (
-        flowCallbacksStore.evaluatorList!.onSelect as (
-          evaluator: unknown,
-        ) => void
-      )(PII_EVALUATOR);
+      (flowCallbacksStore.evaluatorList!.onSelect as (evaluator: unknown) => void)(PII_EVALUATOR);
     });
 
     const pill = await screen.findByText("PII Leak Scanner");
@@ -2731,17 +2729,10 @@ describe("the evaluators of a run", () => {
         };
       }
     ).mappingsConfig.availableSources;
-    expect(sources.map((source) => source.id)).toEqual([
-      "conversation",
-      "scenario",
-      "trace",
-    ]);
+    expect(sources.map((source) => source.id)).toEqual(["conversation", "scenario", "trace"]);
     // A plan covers scenarios of several suites, so no field is offered.
     const scenario = sources.find((source) => source.id === "scenario");
-    expect(scenario?.fields.map((field) => field.name)).toEqual([
-      "situation",
-      "criteria",
-    ]);
+    expect(scenario?.fields.map((field) => field.name)).toEqual(["situation", "criteria"]);
   });
 
   /** @scenario "Run opens the evaluator that still reads nothing instead of running" */
@@ -2751,26 +2742,20 @@ describe("the evaluators of a run", () => {
       data: [refundsWith({ output: lastAgentMessage })],
       isLoading: false,
     });
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     const pill = screen.getByTestId("evaluator-pill-att_sql");
     expect(pill).toHaveAttribute("data-missing", "true");
     const run = screen.getByTestId("run-dialog-run");
     expect(run).not.toBeDisabled();
-    expect(run).toHaveAttribute(
-      "data-warning",
-      "Configure missing mappings for evaluator",
-    );
+    expect(run).toHaveAttribute("data-warning", "Configure missing mappings for evaluator");
 
     await user.click(run);
 
     expect(mockSuitesRunPlan).not.toHaveBeenCalled();
-    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
-      testSuiteId: "suite_refunds",
+    expect(mockOpenDrawer).toHaveBeenCalledWith("suiteEditor", {
+      urlParams: { suiteId: "suite_refunds", attachmentId: "att_sql" },
     });
-    expect(useSuiteEditorStore.getState().pendingAttachmentId).toBe("att_sql");
   });
 
   /** @scenario "A run the server refuses for a missing mapping says which evaluator and offers the way to it" */
@@ -2783,20 +2768,15 @@ describe("the evaluators of a run", () => {
         inputs: ["expected_contexts"],
       }),
     );
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("run-dialog-run"));
 
     const alert = await screen.findByTestId("run-dialog-error");
     expect(alert).toHaveTextContent("missing required mappings");
-    await user.click(
-      within(alert).getByRole("button", { name: "Configure the evaluator" }),
-    );
-    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
-      testSuiteId: "suite_refunds",
+    await user.click(within(alert).getByRole("button", { name: "Configure the evaluator" }));
+    expect(mockOpenDrawer).toHaveBeenCalledWith("suiteEditor", {
+      urlParams: { suiteId: "suite_refunds", attachmentId: "att_sql" },
     });
-    expect(useSuiteEditorStore.getState().pendingAttachmentId).toBe("att_sql");
   });
 });

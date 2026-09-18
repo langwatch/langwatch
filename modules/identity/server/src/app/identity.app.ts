@@ -5,7 +5,7 @@
  */
 import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 import { buildIdentityInfrastructure } from "./identity-composition.build.ts";

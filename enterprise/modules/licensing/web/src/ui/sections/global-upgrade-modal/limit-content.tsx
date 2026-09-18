@@ -1,7 +1,8 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { LIMIT_TYPE_LABELS } from "@langwatch/enterprise-licensing-contract";
-import type { UpgradeModalVariant } from "@langwatch/ui-host/upgrade-modal-store";
+import type { UpgradeModalVariant } from "@langwatch/browser-host/upgrade-modal-store";
+
 import { Link } from "../../../ui/elements/link.tsx";
 import { planManagementUrl } from "./plan-management-url.ts";
 

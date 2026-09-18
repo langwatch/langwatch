@@ -11,7 +11,7 @@ import {
   type EvaluationApi,
   reportEvaluationCommandDataSchema,
 } from "@langwatch/evaluation-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";

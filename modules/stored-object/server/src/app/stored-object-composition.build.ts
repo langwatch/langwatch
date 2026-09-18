@@ -4,7 +4,7 @@
  */
 import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { Logger } from "@langwatch/observability";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import {

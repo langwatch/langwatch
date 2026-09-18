@@ -4,13 +4,14 @@ import {
   UNLIMITED_PLAN,
 } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementSource, Plan } from "@langwatch/entitlement-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
+
 import type {
   BillingSubscriptionRecord,
-  SubscriptionRepository,
+  BillingSubscription,
 } from "../../repositories/subscription.repository.ts";
 import { DeploymentPlanSourcesService } from "../deployment-plan-sources.service.ts";
-import { Temporal } from "@langwatch/time";
 
 /**
  * Spec: enterprise/modules/billing/specs/deployment-plan-sources.feature
@@ -35,10 +36,10 @@ const subscription = (
 });
 
 /** The one read the subscription source makes; nothing else is exercised. */
-function subscriptions(active: BillingSubscriptionRecord | null): SubscriptionRepository {
+function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscription {
   return {
     findActive: async () => active,
-  } as unknown as SubscriptionRepository;
+  } as unknown as BillingSubscription;
 }
 
 describe("given the plan sources a deployment resolves through", () => {

@@ -1,5 +1,5 @@
 # Implementation:
-#   packages/ui-host/src/slots.tsx
+#   packages/browser-host/src/slots.tsx
 #   apps/ui/src/features/installed-ui-features.ts
 
 Feature: A core screen leaves a slot for a block it may not name

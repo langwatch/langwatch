@@ -3,15 +3,15 @@ import { generate } from "@langwatch/ksuid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { toaster } from "@langwatch/ui-host/toaster";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   type DatasetColumns,
   type DatasetRecordEntry,
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { CSVReaderComponent } from "./upload-csv-drawer.tsx";
 
 /**

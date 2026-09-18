@@ -5,7 +5,7 @@
  */
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,

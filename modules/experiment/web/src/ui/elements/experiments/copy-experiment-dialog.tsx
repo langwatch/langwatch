@@ -1,12 +1,12 @@
 import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-scope";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Select } from "@langwatch/design-system/select";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 
 export const CopyExperimentDialog = ({
   open,

@@ -119,7 +119,7 @@ const mockDrawerParams = vi.hoisted(() => ({
 const mockDrawerOpenFor = vi.hoisted(() => ({ current: "" }));
 const flowCallbacksStore = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>);
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
     closeDrawer: () => {
@@ -153,7 +153,7 @@ vi.mock("../../../../../behavior/use-voice-agents-enabled.ts", () => ({
   useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     asPath: "/test-project/agent-testing",

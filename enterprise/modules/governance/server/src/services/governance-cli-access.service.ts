@@ -5,8 +5,11 @@
  * the current-membership boundary the credential routes add on top.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { PlanProvider } from "@langwatch/entitlement-contract";
-import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
+import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+  type PlanProvider,
+} from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:governance-cli");

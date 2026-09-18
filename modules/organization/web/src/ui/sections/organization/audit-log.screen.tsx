@@ -18,7 +18,7 @@ import {
 } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { UiSlot } from "@langwatch/ui-host/slots";
+import { UiSlot } from "@langwatch/browser-host/slots";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 import type { WireOf } from "@langwatch/api/web";
 

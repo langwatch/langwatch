@@ -4,8 +4,8 @@
  * @see specs/features/dialog-backdrop-transparency-blur.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { UiCapabilityContextProvider, type UiCapabilities } from "@langwatch/ui-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
+import { UiCapabilityContextProvider, type UiCapabilities } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cssRulesForElement } from "./emotion-test-css.ts";

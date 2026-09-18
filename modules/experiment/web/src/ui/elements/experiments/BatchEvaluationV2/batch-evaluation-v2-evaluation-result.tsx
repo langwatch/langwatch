@@ -9,7 +9,7 @@ import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds
 import { formatMoney } from "@langwatch/design-system/format-money";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { ExpandedTextDialog, HoverableBigText } from "@langwatch/workflow-web/hoverable-big-text";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";

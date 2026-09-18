@@ -1,9 +1,9 @@
 import { EmptyState, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { keepPreviousData } from "@tanstack/react-query";
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { useFilterParams } from "../use-filter-params.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Delayed } from "@langwatch/design-system/delayed";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Checkbox } from "@langwatch/design-system/checkbox";

@@ -51,7 +51,7 @@
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-web": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:"
   },

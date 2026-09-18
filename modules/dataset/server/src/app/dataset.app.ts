@@ -42,7 +42,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ProjectApi } from "@langwatch/project-contract";

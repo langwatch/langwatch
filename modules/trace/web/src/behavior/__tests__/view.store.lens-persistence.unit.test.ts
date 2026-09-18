@@ -10,7 +10,7 @@ async function freshStore() {
   vi.resetModules();
   // The reset drops the host's installed device store along with everything
   // else, so the fresh module graph gets one before the store reads from it.
-  const { BrowserUiStorage, setUiStorage } = await import("@langwatch/ui-host/storage");
+  const { BrowserUiStorage, setUiStorage } = await import("@langwatch/browser-host/storage");
   setUiStorage(new BrowserUiStorage());
   return import("../view.store.ts");
 }

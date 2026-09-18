@@ -20,7 +20,7 @@ const putFileToPresignedUrl = vi.fn();
 const finalizeDirectUpload = vi.fn();
 const abortPendingUpload = vi.fn();
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     useUtils: () => ({
       dataset: {
@@ -48,21 +48,21 @@ vi.mock("../../../../behavior/direct-upload.ts", async (importOriginal) => ({
   abortPendingUpload: (...args: unknown[]) => abortPendingUpload(...args),
 }));
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "proj" },
   }),
 }));
 
-vi.mock("@langwatch/ui-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn() }),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("@langwatch/ui-host/toaster", () => ({
+vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 

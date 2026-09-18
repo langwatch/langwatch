@@ -34,7 +34,7 @@ import {
   gatewayServerConfigSchema,
   type GatewayServerConfig,
 } from "@langwatch/gateway-contract";
-import { type ProcessMembers } from "@langwatch/infrastructure/members";
+import { type ProcessMembers } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";

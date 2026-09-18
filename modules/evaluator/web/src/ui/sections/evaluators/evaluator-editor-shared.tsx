@@ -7,7 +7,7 @@ import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
-import { Link } from "@langwatch/ui-host/link";
+import { Link } from "@langwatch/browser-host/link";
 import { Switch } from "@langwatch/design-system/switch";
 import type {
   AvailableSource,
@@ -21,7 +21,7 @@ import type {
   TargetConfig,
 } from "@langwatch/experiment-contract";
 import { isComparisonEvaluatorType } from "@langwatch/experiment-contract";
-import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { FormServerError } from "@langwatch/workflow-web/handled-error-views";
 import {
   getComplexProps,
@@ -29,17 +29,17 @@ import {
   getFlowCallbacks,
   useDrawer,
   useDrawerParams,
-} from "@langwatch/ui-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+} from "@langwatch/browser-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web/workflow-card";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   evaluatorsSchema,getEvaluatorDefaultSettings
 } from "@langwatch/evaluator-contract";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/platform-defaults";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 

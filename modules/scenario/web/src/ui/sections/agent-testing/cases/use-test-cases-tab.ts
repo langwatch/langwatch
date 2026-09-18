@@ -12,7 +12,7 @@ import type {
   RelativePresetKey,
 } from "@langwatch/analytics-web-kit/period-selector";
 import { useScenarioPeriod } from "../../../../behavior/agent-testing/use-scenario-period.ts";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import {
   type OpenSuiteEditorParams,
   useOpenSuiteEditor,

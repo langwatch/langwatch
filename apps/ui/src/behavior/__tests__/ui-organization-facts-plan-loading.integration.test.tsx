@@ -8,7 +8,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UiCapabilityContextProvider, UiSession } from "@langwatch/ui-host/capabilities";
+import { UiCapabilityContextProvider, UiSession } from "@langwatch/browser-host/capabilities";
 import { UiRpcContextProvider, type UiRpc } from "../ui-rpc";
 import { useUiOrganizationFacts } from "../ui-organization-facts";
 

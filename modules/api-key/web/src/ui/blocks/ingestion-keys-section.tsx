@@ -5,7 +5,7 @@ import { Radio, Trash2 } from "lucide-react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { readableDate } from "../../model/display-formatters.ts";
 

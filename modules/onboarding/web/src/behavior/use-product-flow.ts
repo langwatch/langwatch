@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { PRODUCT_FLOW_CONFIG } from "./product-flow.ts";
 import {
   OnboardingFlowDirection,

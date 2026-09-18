@@ -51,7 +51,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { z } from "zod";
 import { buildAutomationInfrastructure } from "./automation-composition.build.ts";
 

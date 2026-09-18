@@ -4,7 +4,7 @@ import type {
   GovernanceOttlGateway,
   GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";

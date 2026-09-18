@@ -2,13 +2,13 @@ import { render } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { RouterProvider } from "react-router/dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { UiSession, useUiCapabilities } from "@langwatch/ui-host/capabilities";
+import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
 import type { UiFeatureApiTransport } from "../src/behavior/ui-feature-transport";
 import type { PublicEnvironment } from "../src/model/public-environment";
 import { uiRouteTable } from "../src/model/ui-route-table";
 import type { UiFeatureInstall } from "../src/behavior/ui-feature";
-import { createUiApplication, type UiApplicationInstall } from "../src/ui/sections/ui-application";
+import { createUiApplication, type UiApplicationInstall } from "../src/shell/ui-application";
 
 const publicEnvironment: PublicEnvironment = {
   BASE_HOST: "http://localhost",

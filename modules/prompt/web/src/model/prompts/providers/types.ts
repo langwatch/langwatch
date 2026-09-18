@@ -1,5 +1,5 @@
 import type { WireVersionedPrompt } from "../../wire-versioned-prompt.ts";
-import type { RouterInputs } from "@langwatch/api-client-web/workflow-api";
+import type { RouterInputs } from "@langwatch/browser-trpc/workflow-api";
 
 /**
  * Parameters for creating a new prompt configuration

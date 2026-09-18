@@ -1,7 +1,7 @@
 import { Box, HStack, Icon, IconButton, Popover, Text, VStack } from "@chakra-ui/react";
 import { parseEvaluationResult } from "@langwatch/evaluator-contract";
 import { labelNamesVariant, resolveVerdictLabel } from "@langwatch/experiment-contract";
-import { Markdown } from "@langwatch/ui-host/markdown";
+import { Markdown } from "@langwatch/browser-host/markdown";
 import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 

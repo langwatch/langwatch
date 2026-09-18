@@ -1,7 +1,7 @@
 import { Box, Field, Input, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect } from "react";
-import { UiSlot } from "@langwatch/ui-host/slots";
+import { UiSlot } from "@langwatch/browser-host/slots";
 import { fieldMetadataFor } from "../../model/model-provider-field-metadata.ts";
 import type {
   UseModelProviderFormActions,

@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import { memo, type ReactNode, useEffect } from "react";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { LangySidecar } from "./langy-panel.tsx";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";

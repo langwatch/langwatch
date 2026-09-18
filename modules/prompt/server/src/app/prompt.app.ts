@@ -4,7 +4,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
  * The prompt library's application: what its doors call.
  */
 import { NotFoundError } from "@langwatch/handled-error";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   PromptApi,

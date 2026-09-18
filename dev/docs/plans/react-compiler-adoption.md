@@ -122,7 +122,7 @@ that have to be shipped.
 ## 3. Correctness over this codebase
 
 Census run over 3,783 first-party source files (`apps/ui/src`,
-`packages/design-system/src`, `packages/api-client-web/src`, all 35
+`packages/design-system/src`, `packages/browser-trpc/src`, all 35
 `modules/*/web/src`), excluding tests, stories and `.d.ts`. 3,516 matched the
 preset's code filter. With `@babel/core@7.29.7`:
 
@@ -195,7 +195,7 @@ repo has no eslint in the JS/TS lint path and does not need one:
 `oxlint@1.78.0`.** It is in `configuration_schema.json` alongside
 `react/exhaustive-deps` and `react/rules-of-hooks`, under the `react` plugin
 that `.oxlintrc.jsonc` already enables. Measured over the whole web surface
-(`apps/ui/src`, `packages/design-system/src`, `packages/api-client-web/src`,
+(`apps/ui/src`, `packages/design-system/src`, `packages/browser-trpc/src`,
 all `modules/*/web/src`):
 
 **706 diagnostics across 414 files, in 2.6 s.**

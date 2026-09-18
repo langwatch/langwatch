@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/ui-host",
+  "name": "@langwatch/browser-host",
   "version": "0.1.0",
   "private": true,
   "description": "The framework-shaped adapters a feature-web package asks its composing application for, instead of reaching the router, a toast singleton or session storage directly.",
@@ -93,6 +93,10 @@
     "./copy-button": {
       "types": "./dist/copy-button.d.ts",
       "default": "./src/copy-button.tsx"
+    },
+    "./drawer": {
+      "types": "./dist/drawer/index.d.ts",
+      "default": "./src/drawer/index.ts"
     }
   },
   "scripts": {
@@ -101,15 +105,15 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
-    "@langwatch/api-client-web": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-drawer": "workspace:*",
     "lucide-react": "catalog:",
+    "qs": "catalog:",
     "react-error-boundary": "catalog:",
     "react-feather": "catalog:",
     "react-icons": "catalog:",
@@ -121,16 +125,22 @@
     "@emotion/react": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/qs": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "jsdom": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-router": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "react-router": "^8.0.1"
   }
 }

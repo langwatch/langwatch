@@ -630,11 +630,11 @@ function readsProcessEnvironment({ file }: { file: string }): boolean {
 
 /**
  * The two roles portable because of what they ARE: the Design System
- * (plus `ui-drawer`/`ui-host`) is React by construction; a feature
+ * (plus `browser-host`) is React by construction; a feature
  * contract is portable by ADR-004. Everything else has to prove it.
  */
 const PORTABLE_BY_ROLE =
-  /^@langwatch\/(?:design-system(?:\/|$)|ui-drawer(?:\/|$)|ui-host(?:\/|$)|[^/]+-contract(?:\/|$))/;
+  /^@langwatch\/(?:design-system(?:\/|$)|browser-host(?:\/|$)|[^/]+-contract(?:\/|$))/;
 
 export type PortableModuleOracle = {
   /** Whether a first-party specifier resolves to a provably portable module. */

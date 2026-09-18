@@ -24,7 +24,7 @@ const mockMutateAsync = vi.hoisted(() =>
 
 const mockStateFetch = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     useUtils: () => ({
       experiments: {
@@ -53,7 +53,7 @@ vi.mock("@langwatch/api-client-web/workflow-api", () => ({
 }));
 
 // Mock next/router
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: { slug: "test-slug" },
     push: vi.fn(),
@@ -62,14 +62,14 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 }));
 
 // Mock organization hook
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project-id", slug: "test-project" },
   }),
 }));
 
 // Mock toaster
-vi.mock("@langwatch/ui-host/toaster", () => ({
+vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: {
     create: vi.fn(),
   },

@@ -4,7 +4,6 @@ import type {
   ReportEvaluationCommandData,
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -19,7 +18,6 @@ import type {
   EvaluationWarmupProbe,
 } from "../../app/evaluation.members.ts";
 import type { EvaluationClickHouseClient } from "../../repositories/clickhouse/evaluation-clickhouse-client.ts";
-import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
 import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
 import type {
   EvaluationExecution,
@@ -186,9 +184,8 @@ export function createEvaluationTestApp(
     }>;
   }> = {},
 ): EvaluationApp {
-  return EvaluationApp.create({
-    repositories: MemoryEvaluationRepositories.create(),
-    members: { evaluation: createEvaluationTestInfrastructure(input.members ?? {}) },
+  return EvaluationApp.fromInfrastructure({
+    infrastructure: createEvaluationTestInfrastructure(input.members ?? {}),
     dependencies: {
       workflows: input.dependencies?.workflows ?? createApiFixture<WorkflowApi>(),
       traces: input.dependencies?.traces ?? createApiFixture<TraceApi>(),
@@ -196,7 +193,5 @@ export function createEvaluationTestApp(
         input.dependencies?.modelProviders ??
         createApiFixture<ModelProviderApi>({ getExecutionProviders: async () => ({}) }),
     },
-    config: void 0,
-    resources: new ResourceScope(),
   });
 }

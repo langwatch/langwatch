@@ -12,8 +12,8 @@ import {
   UiFeedback,
   UiSession,
   useUiCapabilities,
-} from "@langwatch/ui-host/capabilities";
-import { useActiveScope, usePermissions, useSession } from "@langwatch/ui-host/session";
+} from "@langwatch/browser-host/capabilities";
+import { useActiveScope, usePermissions, useSession } from "@langwatch/browser-host/session";
 import type { UiFeatureApiTransport } from "../src/behavior/ui-feature-transport";
 import { useBrowserUiSession } from "../src/behavior/ui-session";
 import type { UiAuthClient } from "../src/behavior/ui-session-client";
@@ -28,7 +28,7 @@ import {
   UI_SELECTED_TEAM_ID_KEY,
 } from "../src/behavior/ui-scope-storage";
 import type { UiScopeTeam } from "../src/model/ui-scope";
-import { createUiFeatureShell } from "../src/ui/sections/ui-feature-shell";
+import { createUiFeatureShell } from "../src/shell/ui-feature-shell";
 import { JANE, organizationWith, PERSONAL_TEAM, SHARED_TEAM } from "./fixtures/ui-scope-graph";
 
 type Call = { path: string; input: unknown };

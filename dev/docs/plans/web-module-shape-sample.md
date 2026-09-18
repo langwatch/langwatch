@@ -182,7 +182,7 @@ They are not one kind of thing, and routing them by kind is most of the work:
 | domain-aware shared components | `scope-picker`, `model-selector`, `period-selector`, `llm-model-display`, `trace-id-peek`, `provider-icons`, `workflow-icons` | the new shared web package |
 | a shared hook | `trace/surfaces/sse-subscription` | the new shared web package |
 | types | `experiment/workbench-types`, `prompt/surfaces/variables` | the owning **contract** package - they are not components and a contract is already framework-free |
-| an api client, published **twice** | `workflow-web/workflow-api` **and** `api-client-web/workflow-api` | `@langwatch/api-client-web`, which already exists and already has it - the workflow-web copy is a duplicate nobody noticed |
+| an api client, published **twice** | `workflow-web/workflow-api` **and** `api-client-web/workflow-api` | `@langwatch/browser-trpc`, which already exists and already has it - the workflow-web copy is a duplicate nobody noticed |
 | cross-module **state** | `langy/surfaces/langy-store`, `langy/surfaces/langy-context` | neither. Three modules read langy's store directly, and a shared package holding live state re-creates the cycle at one remove. This is the one genuine decision left, and it is about who owns the state rather than where the file sits |
 
 Domain-*free* primitives are a separate matter and do not go to the new package

@@ -15,11 +15,11 @@ import { UserAvatar } from "../../elements/user-avatar.tsx";
 
 import { HistoryIcon } from "@langwatch/model-provider-web/history-icon";
 import { Popover } from "@langwatch/design-system/popover";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
 import {

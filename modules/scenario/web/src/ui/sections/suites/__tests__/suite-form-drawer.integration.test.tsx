@@ -129,7 +129,7 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   })),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: vi.fn(() => ({
     openDrawer: vi.fn(),
     closeDrawer: vi.fn(),

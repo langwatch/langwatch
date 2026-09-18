@@ -27,7 +27,7 @@ import { findNativeSelects } from "../../../testing.tsx";
 
 const harness = vi.hoisted(() => ({ closed: 0 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
     closeDrawer: () => {
@@ -37,7 +37,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/markdown", () => ({
+vi.mock("@langwatch/browser-host/markdown", () => ({
   RenderCode: ({ code }: { code: string }) => <pre>{code}</pre>,
 }));
 

@@ -262,7 +262,7 @@
     "../modules/workflow/web/src/model/run-via-api/run-snippets.ts",
     "../modules/workflow/web/src/model/sse/fetch-sse.ts",
     "../modules/workflow/web/src/model/types.ts",
-    "../packages/api-client-web/src/workflow-api.ts",
+    "../packages/browser-trpc/src/workflow-api.ts",
     "../modules/workflow/web/src/model/workflow-host.ts",
     "../modules/workflow/web/src/workflows.ts",
     "../modules/workflow/web/src/code-agent.ts",
@@ -306,7 +306,7 @@
       "path": "../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../packages/api-client-web/tsconfig.build.json"
+      "path": "../packages/browser-trpc/tsconfig.build.json"
     },
     {
       "path": "../packages/csv/tsconfig.build.json"
@@ -420,10 +420,7 @@
       "path": "../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../packages/ui-drawer/tsconfig.build.json"
-    },
-    {
-      "path": "../packages/ui-host/tsconfig.build.json"
+      "path": "../packages/browser-host/tsconfig.build.json"
     }
   ],
   "langwatchDeclarationGroup": {

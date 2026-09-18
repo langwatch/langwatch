@@ -2,13 +2,13 @@ import { Box, Heading, HStack, Tabs, Tag, Text, VStack } from "@chakra-ui/react"
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { RenderCode } from "@langwatch/workflow-web/render-code";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { Link } from "@langwatch/ui-host/link";
+import { Link } from "@langwatch/browser-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 

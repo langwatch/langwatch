@@ -3,7 +3,7 @@
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { ScenarioSecretsUnavailableError } from "@langwatch/scenario-contract";
-import type { Encryption } from "@langwatch/infrastructure/members";
+import type { Encryption } from "@langwatch/process-stores/members";
 import type {
   ScenarioClock,
   ScenarioId,

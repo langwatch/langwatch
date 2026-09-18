@@ -11,7 +11,7 @@ import { readScenarioTarget } from "../../use-scenario-target.ts";
 import { RunDialog } from "../run/run-dialog.tsx";
 import type { RunDialogSubject } from "../run/run-dialog-types.ts";
 import { useRunStartedHandler } from "./use-case-run-actions.ts";
-import { setFlowCallbacks } from "@langwatch/ui-drawer";
+import { setFlowCallbacks } from "@langwatch/browser-host/drawer";
 import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer.tsx";
 
 export function AgentTestingCaseEditor() {

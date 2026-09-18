@@ -15,11 +15,11 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
-import { applyHandledErrorToForm, describeError, showErrorToast } from "@langwatch/ui-host/errors";
+import { applyHandledErrorToForm, describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { FormServerError } from "../../../behavior/errors.tsx";
 import type { SimulationSuite } from "../../../model/prisma-types.ts";
-import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
+import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
 import { api } from "../../../behavior/scenario-api.ts";

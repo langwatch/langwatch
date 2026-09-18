@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import qs from "qs";
 import { X } from "react-feather";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
 import { filterOutEmptyFilters } from "../analytics/utils.ts";
 import type { FilterField } from "../../../model/filters/types.ts";

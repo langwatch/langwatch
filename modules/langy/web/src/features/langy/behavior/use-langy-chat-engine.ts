@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { useCallback, useEffect, useRef } from "react";
 
-import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { api } from "../../../behavior/langy-api.ts";
 
 import type { LangyMessageDto } from "@langwatch/langy-contract";

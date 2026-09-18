@@ -32,7 +32,7 @@ vi.mock("@langwatch/model-provider-web/surfaces/model-selector", () => ({
   useModelSelectionOptions: () => ({ modelOption: { isDisabled: false } }),
 }));
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     modelProvider: {
       getResolvedDefault: {

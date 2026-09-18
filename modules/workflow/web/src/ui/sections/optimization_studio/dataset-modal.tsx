@@ -16,7 +16,7 @@ import {
   type InMemoryDataset,
 } from "@langwatch/dataset-web/dataset-editor-table";
 import { UploadCSVDrawer } from "@langwatch/dataset-web/upload-csv-drawer";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";

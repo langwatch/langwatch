@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { LoadingScreen } from "../../../ui/blocks/loading-screen.tsx";
 

@@ -3,8 +3,8 @@
  * The Langy home's development-only state switcher, inert once not a dev build.
  * Spec: specs/home/langy-home.feature
  */
-import { UiCapabilityContextProvider, type UiCapabilities } from "@langwatch/ui-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
+import { UiCapabilityContextProvider, type UiCapabilities } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { act, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";

@@ -6,7 +6,7 @@
 import { Box, chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import type { Instant } from "@langwatch/time";
 import {
   DIALOG_FIELD_STYLE,

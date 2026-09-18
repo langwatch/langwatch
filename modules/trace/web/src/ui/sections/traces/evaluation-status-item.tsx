@@ -5,7 +5,7 @@ import numeral from "numeral";
 import { useMemo } from "react";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { api } from "../../../behavior/trace-api.ts";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";

@@ -10,10 +10,7 @@
  * `prisma` off the process, none of which a transport test has a use for.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import {
-  ScimService,
-  type ScimTokenEntitlement,
-} from "@langwatch/enterprise-scim-contract";
+import { ScimService, type ScimTokenEntitlement } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { vi } from "vitest";
 

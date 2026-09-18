@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { getComplexProps, useDrawer } from "@langwatch/ui-drawer";
+import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 import {
   EvaluatorEditorBody,
   EvaluatorEditorFooter,

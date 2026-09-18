@@ -7,7 +7,7 @@ import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import type { WorkflowStore } from "../../../../behavior/workflow-store.ts";
 
 // Mock toaster
-vi.mock("@langwatch/ui-host/toaster", () => ({
+vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
@@ -21,7 +21,7 @@ vi.mock("@langwatch/observability/browser", () => ({
   }),
 }));
 
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { useHandleServerMessage } from "../use-post-event.tsx";
 
 const toastCreate = vi.mocked(toaster.create);

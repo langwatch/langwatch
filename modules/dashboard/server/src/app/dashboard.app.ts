@@ -30,7 +30,7 @@ import {
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinitionUpdate,
 } from "@langwatch/dashboard-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";

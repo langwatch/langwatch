@@ -10,7 +10,7 @@ import {
 } from "../../workflow-base-properties-panel.tsx";
 
 import { HoverableBigText } from "../../hoverable-big-text.tsx";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { ComponentIcon } from "@langwatch/workflow-web-kit/workflow-icons";
 import { OptimizationStudioLLMConfigField } from "./llm-configs/optimization-studio-llm-config-field.tsx";

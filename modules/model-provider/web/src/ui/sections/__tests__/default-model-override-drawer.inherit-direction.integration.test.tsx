@@ -20,7 +20,7 @@ const mockListAllForProjectForFrontend = vi.fn();
 const mockSave = vi.fn();
 const mockInvalidate = vi.fn();
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
     openDrawer: vi.fn(),

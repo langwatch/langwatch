@@ -16,7 +16,7 @@ const mockPush = vi.fn().mockImplementation(({ query }) => {
   }
 });
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: mockQuery,
     pathname: "/[project]/messages",

@@ -1,6 +1,6 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useState } from "react";
-import { describeError } from "@langwatch/ui-host/errors";
+import { describeError } from "@langwatch/browser-host/errors";
 import { explainSerializedError } from "@langwatch/handled-error/presentation";
 import { api } from "./model-provider-api.ts";
 

@@ -2,11 +2,11 @@ import { Alert, HStack, Skeleton, Spacer, Table, Tabs, Text, VStack } from "@cha
 import numeral from "numeral";
 import React, { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { BatchEvaluationV2EvaluationResult } from "./batch-evaluation-v2-evaluation-result.tsx";
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
 import { downloadCsv } from "@langwatch/csv/download";

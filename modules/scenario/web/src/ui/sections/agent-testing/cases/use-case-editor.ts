@@ -17,7 +17,7 @@ import {
   type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
+import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import type { Scenario } from "../../../../model/prisma-types.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import {

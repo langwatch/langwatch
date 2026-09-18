@@ -13,7 +13,7 @@ const { mockDetailState } = vi.hoisted(() => ({
   mockDetailState: { current: null as SpanDetail | null },
 }));
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "test-project" },
     hasPermission: () => true,

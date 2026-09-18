@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/ui-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({
     closeDrawer: vi.fn(),
     openDrawer: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock("@langwatch/ui-host/use-drawer", () => ({
   getFlowCallbacks: () => void 0,
 }));
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", defaultModel: "openai/gpt-5-mini" },
     organization: { id: "organization-1" },
@@ -29,7 +29,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/upgrade-modal-store", () => ({
+vi.mock("@langwatch/browser-host/upgrade-modal-store", () => ({
   useUpgradeModalStore: (selector?: (state: { open: () => void }) => unknown) => {
     const state = { open: vi.fn() };
     return typeof selector === "function" ? selector(state) : state;
@@ -80,7 +80,7 @@ vi.mock("../../../../behavior/prompts/use-latest-prompt-version.ts", () => ({
 const idleQuery = { data: void 0, isLoading: false, error: null, refetch: vi.fn() };
 const idleMutation = () => ({ mutateAsync: vi.fn(), mutate: vi.fn(), isPending: false });
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     useUtils: () => ({ prompts: { getByIdOrHandle: { invalidate: vi.fn() } } }),
     modelProvider: {

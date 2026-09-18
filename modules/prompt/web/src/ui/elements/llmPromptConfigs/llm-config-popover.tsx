@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { clampMaxTokens } from "@langwatch/model-provider-web/clamp-max-tokens";
 import {
   allModelOptions,

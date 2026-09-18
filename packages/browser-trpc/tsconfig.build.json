@@ -2,8 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@langwatch/api-client-web/workflow-api": ["./src/workflow-api.ts"],
-      "@langwatch/api-client-web/agent-client": ["./src/agent-client.ts"]
+      "@langwatch/browser-trpc/workflow-api": ["./src/workflow-api.ts"],
+      "@langwatch/browser-trpc/agent-client": ["./src/agent-client.ts"]
     },
     "composite": true,
     "declaration": true,

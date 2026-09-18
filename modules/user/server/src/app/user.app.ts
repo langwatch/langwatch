@@ -12,7 +12,7 @@ import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
 import { passwordProblem } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { ValidationError } from "@langwatch/handled-error";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { z } from "zod";
 import { buildUserInfrastructure } from "./user-composition.build.ts";
 import type {

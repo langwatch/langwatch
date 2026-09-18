@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { nowInstant } from "@langwatch/time";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;

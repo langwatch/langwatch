@@ -9,7 +9,7 @@ import {
   UiSession,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "@langwatch/ui-host/capabilities";
+} from "@langwatch/browser-host/capabilities";
 
 class RecordingNavigation extends UiNavigation {
   readonly moves: string[] = [];

@@ -18,7 +18,7 @@ import {
   allModelOptions,
   ModelSelector,
 } from "@langwatch/model-provider-web/surfaces/model-selector";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { UserRoundCog } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
@@ -183,10 +183,6 @@ export function InsightsSetupDrawer({
                 mode="chat"
                 showConfigureAction
                 forFeatureLabel="for Insights"
-                // Langy is a codex-licensed surface; without its key the
-                // picker would drop the very model Langy may be configured
-                // with and paint it as unknown.
-                featureKey={LANGY_CHAT_FEATURE_KEY}
               />
             </SettingRow>
             <SessionRows draft={draft} patch={patch} />

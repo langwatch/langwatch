@@ -28,7 +28,10 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api-client-web/tsconfig.build.json"
+      "path": "../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser-trpc/tsconfig.build.json"
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
@@ -62,12 +65,6 @@
     },
     {
       "path": "../../trace/web-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-drawer/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-host/tsconfig.build.json"
     }
   ]
 }

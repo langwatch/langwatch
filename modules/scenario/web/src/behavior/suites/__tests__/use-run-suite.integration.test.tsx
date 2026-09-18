@@ -61,7 +61,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   },
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
   }),

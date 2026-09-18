@@ -1,9 +1,9 @@
 import { type EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";
 import { EvaluatorTypePicker } from "../../blocks/evaluator-type-picker.tsx";
-import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useRouter } from "@langwatch/browser-host/use-router";
 
 export { evaluatorCategoryNames as categoryNames } from "../../../index.ts";
 

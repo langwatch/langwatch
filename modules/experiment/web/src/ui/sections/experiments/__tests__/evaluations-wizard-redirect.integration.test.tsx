@@ -19,11 +19,11 @@ const { replaceMock, routerState, experimentState } = vi.hoisted(() => ({
 
 // A new object each call, mirroring the real compat shim, so the redirect
 // effect sees an unstable `router` dependency every render.
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ query: routerState.query, replace: replaceMock }),
 }));
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "p1", slug: "test-project" },
   }),
@@ -35,7 +35,7 @@ vi.mock("@langwatch/design-system/loading-screen", () => ({
 
 // The page reads the experiment to decide where a slugged URL can open, so the
 // tRPC hook is mocked and the branch under test is driven by `experimentState`.
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     experiments: {
       getExperimentBySlugOrId: {

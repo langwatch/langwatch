@@ -42,7 +42,7 @@ vi.mock("recharts", () => {
   };
 });
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 

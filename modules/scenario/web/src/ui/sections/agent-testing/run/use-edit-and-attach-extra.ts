@@ -7,7 +7,7 @@
 
 import { useCallback } from "react";
 import type { EvaluatorAttachment, ScenarioMapping } from "@langwatch/scenario-contract";
-import type { useDrawer } from "@langwatch/ui-drawer";
+import type { useDrawer } from "@langwatch/browser-host/drawer";
 import type { api } from "../../../../behavior/scenario-api.ts";
 import {
   type AttachableEvaluator,

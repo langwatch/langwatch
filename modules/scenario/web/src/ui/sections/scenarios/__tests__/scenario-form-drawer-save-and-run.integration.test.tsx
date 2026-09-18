@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 
 vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
   PromptEditorDrawer: () => null,
@@ -153,7 +153,7 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: mocks.mockOpenDrawer,
     closeDrawer: mocks.mockCloseDrawer,
@@ -179,7 +179,7 @@ vi.mock("../../../../behavior/use-voice-agents-enabled.ts", () => ({
   useVoiceAgentsEnabled: () => true,
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
     pathname: "/[project]/simulations/scenarios",

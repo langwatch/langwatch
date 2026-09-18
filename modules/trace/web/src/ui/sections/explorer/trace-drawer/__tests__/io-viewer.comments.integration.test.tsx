@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   storedComments: [] as unknown[],
 }));
 
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },
     hasPermission: (permission: string) =>

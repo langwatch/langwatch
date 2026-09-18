@@ -152,7 +152,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: routerState.query,
     asPath: routerState.asPath,
@@ -161,7 +161,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-host/format-time-ago", () => ({
+vi.mock("@langwatch/browser-host/format-time-ago", () => ({
   formatTimeAgoCompact: () => "2h ago",
 }));
 

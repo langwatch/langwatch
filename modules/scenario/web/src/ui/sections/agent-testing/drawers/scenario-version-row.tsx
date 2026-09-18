@@ -7,7 +7,7 @@
 import { Badge, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { toEpochMs } from "@langwatch/time";
 import {
   authorOf,

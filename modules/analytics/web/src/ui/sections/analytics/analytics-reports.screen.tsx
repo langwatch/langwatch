@@ -11,12 +11,12 @@ import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
 import AnalyticsLayout from "../analytics-layout.tsx";
 import { useShowErrorToast } from "../../../behavior/analytics-feedback.ts";
 import { useWidgetGranularity } from "../../../behavior/use-widget-granularity.ts";
-import { useFeatureFlag } from "@langwatch/ui-host/feature-flag";
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { analyticsApi as api } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { ReportGrid } from "../report-grid.tsx";
 import { Link } from "../../elements/analytics-link.tsx";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { CreateDashboardWidgetDrawer } from "../create-dashboard-widget-drawer.tsx";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 

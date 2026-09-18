@@ -31,7 +31,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "react": "catalog:",
     "react-feather": "catalog:",
     "zod": "catalog:"

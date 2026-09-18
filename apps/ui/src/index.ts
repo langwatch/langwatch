@@ -4,12 +4,12 @@ export {
   UiApplicationShell,
   type UiApplicationShellProps,
   type UiOuterProvider,
-} from "./ui/sections/ui-application-shell";
+} from "./shell/ui-application-shell";
 export {
   UiDesignSystemShell,
   type UiDesignSystemShellProps,
-} from "./ui/sections/ui-design-system-shell";
-export { UiPrefixRedirect } from "./ui/elements/ui-prefix-redirect";
+} from "./shell/ui-design-system-shell";
+export { UiPrefixRedirect } from "./shell/ui-prefix-redirect";
 export {
   forceReloadOnce,
   isChunkLoadError,
@@ -35,7 +35,7 @@ export {
   type UiCapabilityInstall,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "@langwatch/ui-host/capabilities";
+} from "@langwatch/browser-host/capabilities";
 export {
   mergeUiPageLoaders,
   uiFeatureLoaders,
@@ -144,19 +144,19 @@ export {
   type UiRedirectRouteDescriptor,
   type UiRouteDescriptor,
 } from "./model/ui-route-table";
-export type { UiApplication, UiApplicationInstall } from "./ui/sections/ui-application";
-export { createUiFeatureShell, type UiFeatureShellInstall } from "./ui/sections/ui-feature-shell";
+export type { UiApplication, UiApplicationInstall } from "./shell/ui-application";
+export { createUiFeatureShell, type UiFeatureShellInstall } from "./shell/ui-feature-shell";
 export {
   createUiInnerProvider,
   type UiInnerProviderInstall,
-} from "./ui/sections/ui-inner-providers";
+} from "./shell/ui-inner-providers";
 export {
   createUiOuterProvider,
   type UiOuterProviderInstall,
   type UiProviderShell,
-} from "./ui/sections/ui-outer-providers";
-export { createUiRouteObjects, type UiRouteObjectsOptions } from "./ui/sections/ui-route-objects";
-export { createUiRootLayout, type UiRootLayoutInstall } from "./ui/sections/ui-root-layout";
+} from "./shell/ui-outer-providers";
+export { createUiRouteObjects, type UiRouteObjectsOptions } from "./shell/ui-route-objects";
+export { createUiRootLayout, type UiRootLayoutInstall } from "./shell/ui-root-layout";
 // The contract itself, the meta tag that carries it and the deployment
 // projection that builds it are `@langwatch/config/public-app-config` and its
 // `/projection` subpath: the API writes the tag and this application reads it,

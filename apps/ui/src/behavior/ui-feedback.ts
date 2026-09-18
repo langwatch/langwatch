@@ -15,8 +15,8 @@ import {
   UiFeedback,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "@langwatch/ui-host/capabilities";
-import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
+} from "@langwatch/browser-host/capabilities";
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 
 import { isServerUnreachable } from "../model/errors/isServerUnreachable";
 import { isUiNavigatingAway } from "./ui-departure";
@@ -240,7 +240,7 @@ export class BrowserUiFeedback extends UiFeedback {
       ...(failure.action
         ? { action: { label: failure.action.label, onClick: failure.action.run } }
         : {}),
-      // Read by the toaster's `renderMeta` (see `ui/elements/ui-error-actions`):
+      // Read by the toaster's `renderMeta` (see `shell/ui-error-actions`):
       // the docs link and the copyable error id, which is the whole of the
       // technical detail a customer is shown.
       meta: { docsUrl: copy.docsUrl, traceId: copy.traceId },

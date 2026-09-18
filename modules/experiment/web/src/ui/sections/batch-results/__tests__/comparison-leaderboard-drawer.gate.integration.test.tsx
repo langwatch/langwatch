@@ -17,7 +17,7 @@ vi.mock("../../../../behavior/batch-evaluation-results/use-show-comparison-leade
   useShowComparisonLeaderboard: () => rollout.enabled,
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn() }),
 }));
 

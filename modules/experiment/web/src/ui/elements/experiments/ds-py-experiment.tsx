@@ -33,10 +33,10 @@ import {
   YAxis,
 } from "recharts";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { FormatMoney } from "@langwatch/workflow-web/format-money";
 import { VersionBox } from "@langwatch/workflow-web/version-history";
-import type { WorkflowApiRouter } from "@langwatch/api-client-web/workflow-api";
+import type { WorkflowApiRouter } from "@langwatch/browser-trpc/workflow-api";
 import type {
   AppliedOptimization,
   AppliedOptimizationField,
@@ -46,9 +46,9 @@ import type {
   DSPyStepSummary,
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";

@@ -65,9 +65,6 @@
       "path": "packages/api/tsconfig.type-tests.json"
     },
     {
-      "path": "packages/api-client-web/tsconfig.json"
-    },
-    {
       "path": "modules/api-key/contract/tsconfig.json"
     },
     {
@@ -117,6 +114,12 @@
     },
     {
       "path": "packages/aws-client/tsconfig.json"
+    },
+    {
+      "path": "packages/browser-host/tsconfig.json"
+    },
+    {
+      "path": "packages/browser-trpc/tsconfig.json"
     },
     {
       "path": "packages/clickhouse-client/tsconfig.json"
@@ -188,9 +191,6 @@
       "path": "enterprise/tsconfig.json"
     },
     {
-      "path": "enterprise/packages/composition/api/tsconfig.json"
-    },
-    {
       "path": "enterprise/modules/audit-log/server/tsconfig.json"
     },
     {
@@ -230,9 +230,6 @@
       "path": "enterprise/modules/managed-provider/web/tsconfig.json"
     },
     {
-      "path": "enterprise/packages/plan-gate/tsconfig.json"
-    },
-    {
       "path": "enterprise/modules/saas/contract/tsconfig.json"
     },
     {
@@ -252,9 +249,6 @@
     },
     {
       "path": "enterprise/modules/sso/server/tsconfig.json"
-    },
-    {
-      "path": "enterprise/packages/composition/worker/tsconfig.json"
     },
     {
       "path": "modules/entitlement/contract/tsconfig.json"
@@ -339,9 +333,6 @@
     },
     {
       "path": "modules/identity/server/tsconfig.test.json"
-    },
-    {
-      "path": "packages/infrastructure/tsconfig.test.json"
     },
     {
       "path": "modules/tsconfig.json"
@@ -473,6 +464,9 @@
       "path": "packages/process-server/tsconfig.json"
     },
     {
+      "path": "packages/process-stores/tsconfig.test.json"
+    },
+    {
       "path": "modules/project/contract/tsconfig.json"
     },
     {
@@ -600,12 +594,6 @@
     },
     {
       "path": "apps/ui/tsconfig.test.json"
-    },
-    {
-      "path": "packages/ui-drawer/tsconfig.json"
-    },
-    {
-      "path": "packages/ui-host/tsconfig.json"
     },
     {
       "path": "packages/ui-kernel/tsconfig.test.json"

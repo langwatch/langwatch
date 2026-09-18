@@ -2,7 +2,7 @@ import { Box, type BoxProps, Field, HStack, Text, VStack } from "@chakra-ui/reac
 import { useCallback } from "react";
 import { SlugChangeWarningAlert } from "../../elements/slug-change-warning-alert.tsx";
 import { SlugConflictAlert } from "../../elements/slug-conflict-alert.tsx";
-import { CopyButton } from "@langwatch/ui-host/copy-button";
+import { CopyButton } from "@langwatch/browser-host/copy-button";
 import type { SlugValidationResult } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 
 /**

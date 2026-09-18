@@ -3,7 +3,7 @@ import { OrganizationUserRole } from "../model/prisma-types.ts";
 import type { MembersForm } from "../model/member-invite-form.ts";
 // The seat-quote modal is `@langwatch/workflow-web`'s singleton store; see
 // `use-license-enforcement.ts` for why the address travels and the modal does not.
-import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import { api } from "./organization-api.ts";
 import { useLicenseEnforcement } from "./use-license-enforcement.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";

@@ -33,7 +33,7 @@
         "@langwatch/workflow-web/platform-defaults",
         "@langwatch/workflow-web/redacted-field",
         "@langwatch/workflow-web/render-code",
-        "@langwatch/api-client-web/workflow-api",
+        "@langwatch/browser-trpc/workflow-api",
         "@langwatch/workflow-web/workflow-card",
         "@langwatch/workflow-web-kit/workflow-icons",
         "@langwatch/workflow-web/workflow-templates"

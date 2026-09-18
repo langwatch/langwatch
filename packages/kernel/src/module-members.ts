@@ -3,7 +3,7 @@
  * Boot builds the union of every module's member declaration, failing eagerly.
  */
 
-/** Where a process's members come from. Built by `@langwatch/infrastructure`. */
+/** Where a process's members come from. Built by `@langwatch/process-stores`. */
 export interface MemberSource<Members> {
   /** Every member this source can build, in construction order. */
   readonly order: readonly (keyof Members & string)[];

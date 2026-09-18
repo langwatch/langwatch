@@ -9,7 +9,7 @@ import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNow } from "../elements/runs/now-provider.tsx";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
-import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { RunMetricsSummary } from "../elements/runs/run-metrics-summary.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
 import type { BatchRun, BatchRunSummary } from "../../model/run-history-transforms.ts";

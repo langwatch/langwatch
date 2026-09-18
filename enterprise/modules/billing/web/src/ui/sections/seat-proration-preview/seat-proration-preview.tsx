@@ -1,10 +1,11 @@
 import { Box, Button, HStack, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
-import type { UiSlotProps } from "@langwatch/ui-host/slots";
+import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
+import type { UiSlotProps } from "@langwatch/browser-host/slots";
 import { Crown } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
+
 import { billingApi } from "../../../behavior/billing-api.ts";
 import { formatBillingPeriod } from "./billing-period.ts";
 

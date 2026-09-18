@@ -45,7 +45,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "@tanstack/react-query": "catalog:",
     "lodash-es": "catalog:",

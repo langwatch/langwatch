@@ -43,11 +43,11 @@ const { mockUseFeatureFlag, EXISTING_PROVIDER } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
 }));
 
-vi.mock("@langwatch/ui-host/feature-flag", () => ({
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: (...args: unknown[]) => mockUseFeatureFlag(...args),
 }));
 

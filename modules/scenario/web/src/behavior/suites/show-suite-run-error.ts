@@ -1,5 +1,5 @@
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 
 /**
  * The codes that mean the run plan itself has nothing left to run.

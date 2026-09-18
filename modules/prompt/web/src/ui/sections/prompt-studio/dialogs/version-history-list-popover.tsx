@@ -14,7 +14,7 @@ import {
 import { Menu } from "@langwatch/design-system/menu";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Temporal, type Instant } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";

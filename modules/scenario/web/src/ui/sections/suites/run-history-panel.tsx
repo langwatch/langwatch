@@ -9,13 +9,13 @@ import type { Period } from "@langwatch/analytics-web-kit/period-selector";
 import { SetupWithAgentButton } from "@langwatch/trace-web/surfaces/setup-with-agent-button";
 import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
 import {
   LangyContextTarget,
   scenarioContextChip,
 } from "@langwatch/langy-web/surfaces/langy-context";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
 import { useTargetNameMap } from "../../../behavior/use-target-name-map.ts";
@@ -23,7 +23,7 @@ import { isOnPlatformSet, ScenarioRunStatus } from "@langwatch/scenario-contract
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { isSuiteSetId } from "@langwatch/suite-contract";
 import { api } from "../../../behavior/scenario-api.ts";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import {
   GroupRow,
   RunHistorySkeleton,

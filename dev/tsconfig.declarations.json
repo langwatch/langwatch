@@ -104,9 +104,6 @@
       "path": "../modules/webhook/server/tsconfig.build.json"
     },
     {
-      "path": "../enterprise/packages/plan-gate/tsconfig.build.json"
-    },
-    {
       "path": "../enterprise/tsconfig.build.json"
     },
     {
@@ -518,10 +515,7 @@
       "path": "../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../packages/ui-drawer/tsconfig.build.json"
-    },
-    {
-      "path": "../packages/ui-host/tsconfig.build.json"
+      "path": "../packages/browser-host/tsconfig.build.json"
     }
   ]
 }

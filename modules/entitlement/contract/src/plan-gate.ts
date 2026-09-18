@@ -1,10 +1,10 @@
-import type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
 import { TRPCError } from "@trpc/server";
 
 import { isEnterpriseTier } from "./plan-gate.errors.ts";
+import type { PlanProvider, PlanProviderUser } from "./provider.ts";
 
 /**
- * Kept structural so this Enterprise package does not depend on the application container.
+ * Kept structural so this Enterprise check does not depend on the application container.
  */
 type EnterpriseGateMiddlewareParams = {
   ctx: {

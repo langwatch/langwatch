@@ -36,7 +36,7 @@ const mockReplace = vi.fn();
 let mockQuery: Record<string, string | string[] | undefined> = {
   project: "my-project",
 };
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: mockQuery,
     pathname: "/[project]/simulations/[[...path]]",
@@ -169,7 +169,7 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
     setFlowCallbacks: vi.fn(),

@@ -7,8 +7,8 @@ import {
   VariablesSection,
 } from "@langwatch/prompt-web-kit/variables";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/mapping-validation";
-import { useUiDeployment } from "@langwatch/ui-host/capabilities";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useProjectSpanNames } from "@langwatch/trace-web/surfaces/project-span-names";
 import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/dataset-contract";
 

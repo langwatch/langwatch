@@ -32,7 +32,7 @@ import {
   scopeHierarchyOf,
   type ScopeFilterValue,
 } from "../../model/api-key-scope-filter.ts";
-import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ProviderScopeChips, ScopeFilter } from "../elements/scope-picker.tsx";
 import { IngestionKeysSection } from "../blocks/ingestion-keys-section.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";

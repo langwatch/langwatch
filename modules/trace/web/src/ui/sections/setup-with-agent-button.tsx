@@ -4,7 +4,7 @@ import { useState } from "react";
 import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { showErrorToast } from "./errors/index.ts";
 import { useCanAskLangy } from "../../behavior/langy/use-can-ask-langy.ts";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";

@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@langwatch/ui-host": ["./src/index.ts"]
+      "@langwatch/browser-host": ["./src/index.ts"]
     },
     "composite": true,
     "declaration": true,
@@ -34,7 +34,8 @@
     "./src/period-selector.tsx",
     "./src/markdown/index.tsx",
     "./src/isolated-error-boundary.tsx",
-    "./src/copy-button.tsx"
+    "./src/copy-button.tsx",
+    "./src/drawer/index.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -51,7 +52,7 @@
   ],
   "references": [
     {
-      "path": "../api-client-web/tsconfig.build.json"
+      "path": "../browser-trpc/tsconfig.build.json"
     },
     {
       "path": "../design-system/tsconfig.build.json"
@@ -70,9 +71,6 @@
     },
     {
       "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../ui-drawer/tsconfig.build.json"
     }
   ]
 }

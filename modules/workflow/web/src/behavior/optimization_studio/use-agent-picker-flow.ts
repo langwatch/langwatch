@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { setFlowCallbacks, useDrawer } from "@langwatch/ui-host/use-drawer";
+import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/use-drawer";
 import {
   useWorkflowAgentPickerFlow,
   type AgentPicker,

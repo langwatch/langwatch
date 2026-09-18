@@ -6,7 +6,7 @@ import { Box, Separator, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
 import {

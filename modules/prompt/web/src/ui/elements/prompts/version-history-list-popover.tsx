@@ -17,11 +17,11 @@ import { LuChevronRight } from "react-icons/lu";
 import { HistoryIcon } from "@langwatch/model-provider-web/history-icon";
 import { Avatar } from "@langwatch/design-system/avatar";
 import { Popover } from "@langwatch/design-system/popover";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { showErrorToast } from "@langwatch/ui-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 
 const logger = createLogger("VersionHistoryListPopover");
 

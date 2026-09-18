@@ -100,7 +100,7 @@ export class TestClickHouseEndpoint {
 
 /**
  * The one endpoint this fixture opened, as a driver. Real routing lives in
- * `@langwatch/infrastructure`; a fixture reaches one server, so this places
+ * `@langwatch/process-stores`; a fixture reaches one server, so this places
  * every statement on it whatever tenant it named.
  */
 function singleEndpointDriver(client: ClickHouseClient): QueryDriver {

@@ -5,7 +5,7 @@
  */
 
 import { usePeriodSelector } from "@langwatch/analytics-web-kit/period-selector";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { RecentRunsMenu } from "./recent-runs-menu.tsx";

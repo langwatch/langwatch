@@ -9,7 +9,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { RateLimiter } from "@langwatch/infrastructure/members";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";

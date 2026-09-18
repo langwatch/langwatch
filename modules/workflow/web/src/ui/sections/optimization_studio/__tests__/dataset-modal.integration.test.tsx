@@ -25,7 +25,7 @@ const { mockOpenDrawer, mockDatasets } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@langwatch/ui-host/use-drawer", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
     closeDrawer: vi.fn(),
@@ -50,7 +50,7 @@ vi.mock("@xyflow/react", async (importOriginal) => {
   };
 });
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     dataset: {
       getAll: {

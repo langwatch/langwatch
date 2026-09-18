@@ -14,7 +14,7 @@ import {
   workflowVersionSchema,
   type WorkflowApi,
 } from "@langwatch/workflow-contract";
-import type { MembersRead } from "@langwatch/infrastructure/members";
+import type { MembersRead } from "@langwatch/process-stores/members";
 import { AgentApp, type AgentAppConfig } from "../agent.app.ts";
 import { memoryRedis } from "./memory-redis.ts";
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";

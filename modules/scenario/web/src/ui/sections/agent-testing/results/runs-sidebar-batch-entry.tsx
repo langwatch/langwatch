@@ -9,7 +9,7 @@ import {
   computeBatchRunSummary,
 } from "@langwatch/suite-web/run-formatters";
 import { useNow } from "../../../../behavior/use-now.ts";
-import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import {
   RunsSidebarEntry,
   type SidebarTargetRate,

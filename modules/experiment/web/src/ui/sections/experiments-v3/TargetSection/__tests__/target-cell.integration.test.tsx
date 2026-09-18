@@ -16,7 +16,7 @@ const { mockOpenDrawer, mockSetFlowCallbacks } = vi.hoisted(() => ({
   mockSetFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
   }),

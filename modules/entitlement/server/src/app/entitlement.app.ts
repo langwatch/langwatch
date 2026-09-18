@@ -17,7 +17,7 @@ import {
   type UsageLimitWarning,
   type UsageStats,type PricingModel
 } from "@langwatch/entitlement-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import {
   resolveRequestBound,
   type RequestBoundKey,

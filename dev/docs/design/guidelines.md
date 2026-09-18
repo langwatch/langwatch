@@ -107,7 +107,7 @@ LangWatch uses a drawer navigation system that allows drawers to navigate to oth
 **Implementation:**
 
 ```tsx
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 
 function ParentDrawer() {
   const { openDrawer, canGoBack, goBack, closeDrawer } = useDrawer();

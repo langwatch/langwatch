@@ -24,7 +24,7 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -51,7 +51,7 @@ vi.mock("@ai-sdk/react", () => ({
  * `ProjectLangyLayout`. Here the panel reads `currentDrawer` directly to know
  * it is riding beside one as a floating companion. */
 const currentDrawerRef = { current: undefined as string | undefined };
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     currentDrawer: currentDrawerRef.current,
     openDrawer: vi.fn(),

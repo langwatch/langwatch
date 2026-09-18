@@ -36,7 +36,7 @@ const { mockPreviewState, mockPreviewQueryInputs } = vi.hoisted(() => ({
   }[],
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn() }),
 }));
 

@@ -8,12 +8,12 @@ import { permissionSatisfiedBy } from "@langwatch/authz-contract";
 import {
   createUiScopeHost,
   type UiScopeHost,
-} from "@langwatch/ui-host/use-organization-team-project";
+} from "@langwatch/browser-host/use-organization-team-project";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import type { UiActiveScope, UiActor, UiFeedback } from "@langwatch/ui-host/capabilities";
-import { UiSession } from "@langwatch/ui-host/capabilities";
-import type { UiSessionSnapshot } from "@langwatch/ui-host/session";
+import type { UiActiveScope, UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
+import { UiSession } from "@langwatch/browser-host/capabilities";
+import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import type { UiResolvedScope, UiScopeProject } from "../model/ui-scope";
 import { useUiAddress } from "./ui-address";
 import { uiLeaveTo } from "./ui-departure";

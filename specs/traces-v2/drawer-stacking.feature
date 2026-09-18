@@ -1,6 +1,6 @@
 # Drawer back stack - Gherkin Spec
 # Implementation:
-#   packages/ui-drawer/src/behavior/use-drawer.ts
+#   packages/browser-host/src/drawer/behavior/use-drawer.ts
 #   [gone] src/components/AddDatasetRecordDrawer.tsx
 #   modules/trace/web/src/ui/sections/explorer/trace-drawer/use-trace-drawer-scaffold.ts
 #

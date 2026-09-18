@@ -7,7 +7,7 @@
         "@langwatch/prompt-web/llm-config-constants",
         "@langwatch/workflow-web/feature-flag",
         "@langwatch/workflow-web/handled-error-views",
-        "@langwatch/api-client-web/workflow-api"
+        "@langwatch/browser-trpc/workflow-api"
       ]
     }
   }

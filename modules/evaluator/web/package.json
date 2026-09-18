@@ -86,7 +86,7 @@
     "@langwatch/analytics-web": "workspace:*",
     "@langwatch/analytics-web-kit": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/api-client-web": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
@@ -101,8 +101,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
-    "@langwatch/ui-drawer": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "@langwatch/workflow-web-kit": "workspace:*",
@@ -120,6 +119,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
     "@testing-library/jest-dom": "catalog:",

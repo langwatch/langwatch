@@ -36,9 +36,6 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/infrastructure/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
@@ -52,6 +49,9 @@
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process-stores/tsconfig.build.json"
     },
     {
       "path": "../../../packages/system-migrations/tsconfig.build.json"

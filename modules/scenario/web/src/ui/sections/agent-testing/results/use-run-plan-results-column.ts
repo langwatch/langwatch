@@ -9,7 +9,7 @@ import { useExportScenarioRuns } from "../../../../behavior/suites/use-export-sc
 import { useCan } from "../../../../behavior/use-can.ts";
 import { useNow } from "../../../../behavior/use-now.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import type { PeriodControls } from "./period-controls.ts";
 import type { RunPlanDetailRun } from "./run-plan-detail-header.tsx";
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";

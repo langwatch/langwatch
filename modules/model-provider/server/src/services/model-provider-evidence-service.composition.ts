@@ -1,4 +1,4 @@
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ModelCostProject } from "../app/model-provider.members.ts";
 import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository.ts";
 import { ModelProviderEvidenceService } from "./model-provider-evidence.service.ts";

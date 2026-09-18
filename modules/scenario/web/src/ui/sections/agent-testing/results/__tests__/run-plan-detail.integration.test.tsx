@@ -156,15 +156,15 @@ vi.mock("../../../../../behavior/use-voice-agents-enabled.ts", () => ({
   useVoiceAgentsEnabled: () => true,
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: mockOpenDrawer, setFlowCallbacks: vi.fn() }),
 }));
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ query: {}, push: mockRouterPush, isReady: true }),
 }));
 
-vi.mock("@langwatch/ui-host/format-time-ago", () => ({
+vi.mock("@langwatch/browser-host/format-time-ago", () => ({
   formatTimeAgoCompact: () => "2h ago",
 }));
 

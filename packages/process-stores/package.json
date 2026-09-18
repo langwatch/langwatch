@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/infrastructure",
+  "name": "@langwatch/process-stores",
   "version": "0.1.0",
   "private": true,
   "description": "The members a process hands its modules: the closed list, and the one build from parsed config.",

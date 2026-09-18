@@ -8,7 +8,7 @@ import type { ScenarioTabNavigatePayload } from "@langwatch/scenario-contract";
 import { useScenarioTabFollow } from "../use-scenario-tab-follow.ts";
 import { useSimulationUpdateListener } from "../use-simulation-update-listener.ts";
 import { api } from "../scenario-api.ts";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { toAgentTestingRunPath } from "./results/run-plans.ts";
 
 /**

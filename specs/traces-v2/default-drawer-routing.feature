@@ -1,5 +1,5 @@
 # Trace Explorer default routing — Gherkin Spec
-# Implementation: packages/ui-drawer/src/behavior/use-drawer.ts (routeTraceDrawerForV2 +
+# Implementation: packages/browser-host/src/drawer/behavior/use-drawer.ts (routeTraceDrawerForV2 +
 # the openDrawer interception), the legacy path redirects under
 # [gone] src/pages/[project]/messages/, and the legacy drawer redirect
 # in [gone] src/components/LegacyTraceDrawerRedirect.tsx

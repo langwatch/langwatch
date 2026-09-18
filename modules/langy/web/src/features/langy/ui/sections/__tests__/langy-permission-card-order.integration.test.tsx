@@ -40,7 +40,7 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -104,7 +104,7 @@ vi.mock("@langwatch/handled-error/read-handled-error", async (importOriginal) =>
   isHandledByGlobalHandler: () => false,
 }));
 
-vi.mock("@langwatch/ui-host/markdown", () => ({
+vi.mock("@langwatch/browser-host/markdown", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 

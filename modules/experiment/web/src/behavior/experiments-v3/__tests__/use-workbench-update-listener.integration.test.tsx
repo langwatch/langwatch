@@ -23,7 +23,7 @@ vi.mock("@langwatch/trace-web-kit/sse-subscription", () => ({
 }));
 
 const fetchVersion = vi.fn();
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     useUtils: () => ({
       experiments: { getWorkbenchVersion: { fetch: fetchVersion } },

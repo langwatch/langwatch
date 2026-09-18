@@ -14,17 +14,17 @@ import { generate } from "@langwatch/ksuid";
 import { History, Lock, Play } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type FieldErrors, useFormState, useWatch } from "react-hook-form";
-import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { FormServerError, HandledErrorState } from "../../../behavior/errors.tsx";
 import type { Scenario } from "@langwatch/scenario-contract";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import {
   getComplexProps,
   setFlowCallbacks,
   useDrawer,
   useDrawerParams,
-} from "@langwatch/ui-drawer";
+} from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useRunScenario } from "../use-run-scenario.ts";
 import { useScenarioTarget } from "../use-scenario-target.ts";

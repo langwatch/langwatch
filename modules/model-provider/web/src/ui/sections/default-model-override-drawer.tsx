@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web-kit/scope-picker";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   buildCustomModelDisplayNames,

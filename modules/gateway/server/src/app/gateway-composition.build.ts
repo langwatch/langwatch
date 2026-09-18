@@ -2,7 +2,7 @@ import type { AuthzApi, ApiKeyPermissionScope } from "@langwatch/authz-contract"
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { generateWorkflowRunId,mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event.tsx";

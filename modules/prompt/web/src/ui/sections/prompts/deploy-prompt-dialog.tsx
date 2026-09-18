@@ -24,12 +24,12 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/studio-dialog";
 import { Select } from "@langwatch/design-system/select";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-scope";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
 import { usePromptTags } from "../../../behavior/prompts/use-prompt-tags.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 
 interface DeployPromptDialogProps {
   isOpen: boolean;

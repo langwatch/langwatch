@@ -3,7 +3,7 @@ import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import type { Trace } from "@langwatch/trace-contract";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useAnnotationsByTraceIds } from "../use-annotations-by-trace-ids.ts";
 import { useProjectEventTypes } from "../use-project-event-types.ts";
 import { useProjectSpanNames } from "../use-project-span-names.ts";

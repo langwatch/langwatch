@@ -47,7 +47,7 @@
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
     "papaparse": "catalog:",

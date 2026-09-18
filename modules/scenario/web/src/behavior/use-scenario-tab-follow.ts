@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { SCENARIO_TAB_QUERY_PARAM } from "@langwatch/scenario-contract";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { generate } from "@langwatch/ksuid";
 
 /**

@@ -1,7 +1,8 @@
 import { Text } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { UiSlot } from "@langwatch/ui-host/slots";
-import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
+import { UiSlot } from "@langwatch/browser-host/slots";
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+
 import { LimitContent } from "./limit-content.tsx";
 import { LiteMemberRestrictionContent } from "./lite-member-restriction-content.tsx";
 

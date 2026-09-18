@@ -9,7 +9,7 @@ import {
   type SlackChannelListing,
 } from "@langwatch/automation-contract";
 import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
-import type { Encryption, ProcessMembers } from "@langwatch/infrastructure/members";
+import type { Encryption, ProcessMembers } from "@langwatch/process-stores/members";
 import type { Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";

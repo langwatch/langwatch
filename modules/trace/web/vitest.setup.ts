@@ -2,7 +2,7 @@
  * What every test in this package needs before it renders anything.
  */
 
-import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
+import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";

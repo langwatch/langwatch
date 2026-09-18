@@ -5,7 +5,7 @@ import {
   modelProviders,
   type ModelProviderEditorValue as MaybeStoredModelProvider,type CustomModelEntry
 } from "@langwatch/model-provider-contract";
-import { describeError } from "@langwatch/ui-host/errors";
+import { describeError } from "@langwatch/browser-host/errors";
 
 import {
   useModelProviderToaster,

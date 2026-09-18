@@ -1,6 +1,6 @@
 import type { PromptScope } from "@langwatch/workflow-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 
 export const usePromptHandleCheck = () => {
   const { project } = useOrganizationTeamProject();

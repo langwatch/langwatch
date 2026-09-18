@@ -35,7 +35,7 @@ vi.mock("../../elements/studio-drawer-footer.tsx", () => ({
 }));
 
 const toast = vi.fn();
-vi.mock("@langwatch/ui-host/toaster", () => ({
+vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { create: (...args: unknown[]) => toast(...args) },
 }));
 

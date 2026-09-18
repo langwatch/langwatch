@@ -172,7 +172,7 @@ Pattern for multi-step flows (e.g., type → list → editor). See `dev/docs/bes
 import { Button, Heading, HStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 
 // Parent: Set callbacks and start flow
 export function StartFlow() {

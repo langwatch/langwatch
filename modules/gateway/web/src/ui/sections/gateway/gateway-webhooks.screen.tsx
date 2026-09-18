@@ -26,7 +26,7 @@ import {
 import { useState } from "react";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { UiSlot } from "@langwatch/ui-host/slots";
+import { UiSlot } from "@langwatch/browser-host/slots";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Menu } from "@langwatch/design-system/menu";
 import { WebhookDeliveriesDrawer } from "../../../features/webhooks/ui/sections/webhook-deliveries-drawer.tsx";

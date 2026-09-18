@@ -15,7 +15,7 @@ import {
   type EvaluatorTypes,
   evaluatorsSchema,getEvaluatorDefaultSettings
 } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../model/constants.ts";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";

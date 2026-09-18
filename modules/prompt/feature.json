@@ -25,7 +25,7 @@
         "@langwatch/workflow-web/generate-api-snippet-dialog",
         "@langwatch/workflow-web/studio-drawer-footer",
         "@langwatch/workflow-web/studio-scope",
-        "@langwatch/api-client-web/workflow-api",
+        "@langwatch/browser-trpc/workflow-api",
         "@langwatch/workflow-web/workflow-code-editor",
         "@langwatch/workflow-web-kit/workflow-icons"
       ]

@@ -8,7 +8,7 @@ import {
   useLegacySimulationsPreference,
 } from "../../../behavior/suites/use-legacy-simulations-preference.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { Temporal, nowInstant } from "@langwatch/time";
 
 /**

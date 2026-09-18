@@ -11,7 +11,7 @@ import { SuiteArchiveDialog } from "@langwatch/suite-web/run-dialogs";
 import { Menu } from "@langwatch/design-system/menu";
 import { useNow } from "../../../../behavior/use-now.ts";
 import type { ResultGroup } from "@langwatch/scenario-contract";
-import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
 import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text.tsx";

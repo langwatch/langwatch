@@ -2,7 +2,7 @@
  * Publishes the mounted host as the feedback sink the toast singleton reports to.
  */
 
-import { currentUiFeedbackHost, setUiFeedbackHost } from "@langwatch/ui-host/toaster";
+import { currentUiFeedbackHost, setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { useEffect } from "react";
 
 import { useWorkflowHost } from "../../../model/workflow-host.ts";

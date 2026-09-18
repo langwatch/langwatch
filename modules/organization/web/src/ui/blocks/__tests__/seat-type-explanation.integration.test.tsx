@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AddMembersForm } from "../../sections/add-members-form.tsx";
 import { OrganizationUserRoleField } from "../../elements/organization-user-role-field.tsx";
-import { CORE_SEAT_TYPE_COPY } from "@langwatch/ui-host/slots";
+import { CORE_SEAT_TYPE_COPY } from "@langwatch/browser-host/slots";
 
 // Rendered with no shell above it, so the forms read the core default the
 // `seatTypeCopy` slot degrades to. Spec: specs/ui/ui-slots.feature

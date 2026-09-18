@@ -1,4 +1,4 @@
-import { useUiDeployment } from "@langwatch/ui-host/capabilities";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { SeriesInputType } from "@langwatch/analytics-web/surfaces/analytics-registry";

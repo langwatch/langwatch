@@ -17,8 +17,8 @@ import {
 import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
 import { LangyEvalRunCard } from "../langy-eval-run-card.tsx";
 
-import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
-import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 
 const navigateMock = vi.fn();
 

@@ -1,7 +1,7 @@
 /**
  * The five evaluator EDITOR drawers, separate from `drawers.ts` (which
  * publishes the two overlays on this package's own `EvaluatorHostApi`):
- * these run on the STUDIO host instead, reading `@langwatch/ui-host/*`.
+ * these run on the STUDIO host instead, reading `@langwatch/browser-host/*`.
  */
 
 export { CodeEvaluatorEditorDrawer } from "./evaluators/code-evaluator-editor-drawer.tsx";

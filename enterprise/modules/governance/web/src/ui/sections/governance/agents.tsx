@@ -4,7 +4,7 @@ import type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
 } from "@langwatch/enterprise-governance-contract";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

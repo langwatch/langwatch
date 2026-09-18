@@ -100,4 +100,17 @@ describe("given a file that calls a deleted composition builder", () => {
       ).toEqual(["createTestInfrastructure"]);
     });
   });
+
+  describe("when it imports the deleted single-call process bootstrap", () => {
+    /** @scenario "A deleted process bootstrap is refused where it is imported" */
+    it("reports createProcess naming the Server and createApp replacement", () => {
+      const found = report(
+        'import { createProcess } from "@langwatch/process-stores";',
+        "apps/api/src/app/api-production.composition.ts",
+      );
+
+      expect(found.map((entry) => entry.data.name)).toEqual(["createProcess"]);
+      expect(found[0].message).toContain("Server.start");
+    });
+  });
 });

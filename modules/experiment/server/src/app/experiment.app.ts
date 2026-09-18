@@ -55,7 +55,7 @@ import {
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
 } from "@langwatch/experiment-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";

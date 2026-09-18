@@ -7,7 +7,7 @@ import { GenerateApiSnippetDialog } from "@langwatch/workflow-web/generate-api-s
 import { DataSourcePicker } from "@langwatch/workflow-web/run-via-api-data-source-picker";
 import { buildRunSnippet } from "@langwatch/workflow-web/run-snippets";
 import { useRunViaApiTabs } from "@langwatch/workflow-web/run-via-api-tabs";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";

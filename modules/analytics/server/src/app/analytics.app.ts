@@ -34,7 +34,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
 import { NotFoundError } from "@langwatch/handled-error";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";

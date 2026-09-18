@@ -90,7 +90,7 @@
   "dependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
-    "@langwatch/api-client-web": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
@@ -109,8 +109,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/trace-web-kit": "workspace:*",
-    "@langwatch/ui-drawer": "workspace:*",
-    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "@langwatch/workflow-web-kit": "workspace:*",

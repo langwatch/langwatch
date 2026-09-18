@@ -13,8 +13,8 @@ import {
   UiCapabilityContextProvider,
   useUiCapabilities,
   type UiCapabilities,
-} from "@langwatch/ui-host/capabilities";
-import { UiErrorToaster } from "../src/ui/elements/ui-error-toaster";
+} from "@langwatch/browser-host/capabilities";
+import { UiErrorToaster } from "../src/shell/ui-error-toaster";
 
 // The Design System's toaster is a module singleton, so a toast raised by one
 // case is still in its store when the next renders and every query would match

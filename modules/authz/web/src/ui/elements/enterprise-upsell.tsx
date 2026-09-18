@@ -5,7 +5,7 @@
  */
 
 import { Box } from "@chakra-ui/react";
-import { UiSlot } from "@langwatch/ui-host/slots";
+import { UiSlot } from "@langwatch/browser-host/slots";
 
 /** The sales block, framed the way both pages framed it. */
 export function EnterpriseUpsell() {

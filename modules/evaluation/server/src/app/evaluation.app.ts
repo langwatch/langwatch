@@ -23,6 +23,7 @@ import {
   type WarmupEvaluatorsInput,
 } from "@langwatch/evaluation-contract";
 import { AVAILABLE_EVALUATORS, type SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -156,10 +157,16 @@ export interface EvaluationRunner {
 
 type EvaluationSetup = FeatureSetup<
   typeof EvaluationApp.dependencies,
-  Readonly<{ evaluation: EvaluationInfrastructure }>,
+  MembersRead<typeof EvaluationApp.reads>,
   undefined,
   EvaluationRepositories
 >;
+
+/**
+ * This process composes no evaluator runtime of its own: the module answers
+ * every capability by name rather than reading a bespoke member.
+ */
+const EVALUATION_PROCESS_NAME = "the evaluation module";
 
 const logger = createLogger("langwatch:evaluation:app");
 
@@ -190,7 +197,7 @@ export class EvaluationApp implements EvaluationApiContract {
     traces: TraceApi,
     modelProviders: ModelProviderApi,
   };
-  static readonly reads = ["evaluation"] as const;
+  static readonly reads = reads();
 
   readonly #service: EvaluationService;
   readonly #modelProviders: ModelProviderApi;
@@ -236,8 +243,23 @@ export class EvaluationApp implements EvaluationApiContract {
     });
   }
 
-  static create({ members: supplied, dependencies }: EvaluationSetup): EvaluationApp {
-    const members = supplied.evaluation;
+  /**
+   * This process composes no evaluator runtime of its own, so `create` always
+   * builds the closed unavailable stub. {@link EvaluationApp.fromInfrastructure}
+   * is what a test composes a working double over instead.
+   */
+  static create({ dependencies }: EvaluationSetup): EvaluationApp {
+    return EvaluationApp.fromInfrastructure({
+      infrastructure: createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME),
+      dependencies,
+    });
+  }
+
+  static fromInfrastructure(setup: {
+    infrastructure: EvaluationInfrastructure;
+    dependencies: EvaluationSetup["dependencies"];
+  }): EvaluationApp {
+    const { infrastructure: members, dependencies } = setup;
     const repository = ClickHouseEvaluationRepository.create({
       resolveClient: members.resolveClickHouse,
       retentionFloor: members.retentionFloor,

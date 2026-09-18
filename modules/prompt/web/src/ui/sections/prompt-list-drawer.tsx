@@ -21,7 +21,7 @@ import { useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { modelProviderIcons } from "@langwatch/model-provider-web-kit/provider-icons";
-import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 
 import { useAllPromptsForProject } from "../../behavior/use-all-prompts-for-project.ts";
 import { getDisplayHandle } from "../../prompt-reference.ts";

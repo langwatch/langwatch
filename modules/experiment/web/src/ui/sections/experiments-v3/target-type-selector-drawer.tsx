@@ -7,7 +7,7 @@ import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "@langwatch/design-system/drawer";
-import { getComplexProps, useDrawer } from "@langwatch/ui-drawer";
+import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 
 import type {
   ComparisonEvaluatorConfig,

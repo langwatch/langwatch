@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SetupWithAgentButton } from "../setup-with-agent-button.tsx";
 
-// Deliberately NOT mocked: "@langwatch/ui-host/use-organization-team-project".
+// Deliberately NOT mocked: "@langwatch/browser-host/use-organization-team-project".
 // This test renders against the real hook, with no UiScopeHostProvider and no
 // TraceHostProvider mounted, to prove the non-trace path stays safe.
 

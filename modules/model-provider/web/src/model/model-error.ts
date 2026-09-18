@@ -4,7 +4,7 @@
  * the transport's own class — the way the host's `isNotFoundError` does.
  */
 
-import { markHandledGlobally } from "@langwatch/ui-host/errors";
+import { markHandledGlobally } from "@langwatch/browser-host/errors";
 
 /** Every role a feature key can resolve a model for. */
 export type ModelErrorRole = "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";

@@ -6,7 +6,7 @@ import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { FormOutputsSection } from "../../elements/outputs/form-outputs-section.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { toaster } from "@langwatch/ui-host/toaster";
+import { toaster } from "@langwatch/browser-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type AvailableSource,
@@ -16,15 +16,15 @@ import {
 import { useEvaluationMappings } from "@langwatch/experiment-web/evaluation-mappings";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
 import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/mapping-validation";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
   useDrawer,
   useDrawerParams,
-} from "@langwatch/ui-host/use-drawer";
+} from "@langwatch/browser-host/use-drawer";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRegisterDrawerFooter } from "@langwatch/workflow-web/studio-drawer-footer";
 import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
 import { PromptEditorHeader } from "./prompt-editor-header.tsx";
@@ -45,9 +45,9 @@ import {
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../../../prompt-form.ts";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
-import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import type { LlmConfigInputType } from "@langwatch/workflow-web/component-types";
-import { api } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values.ts";
 import { hasNonEmptySystemMessage, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";

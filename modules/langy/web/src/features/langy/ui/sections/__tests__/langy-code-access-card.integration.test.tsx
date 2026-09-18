@@ -18,7 +18,7 @@ let githubInstallations: {
   accountLogin: string;
 }[] = [];
 
-vi.mock("@langwatch/ui-host/use-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 

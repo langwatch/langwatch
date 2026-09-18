@@ -12,7 +12,7 @@ import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
 import { BatchEvaluationResultsTable } from "../../batch-results/batch-evaluation-results-table.tsx";
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 

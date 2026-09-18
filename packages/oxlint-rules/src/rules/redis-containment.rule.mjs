@@ -13,7 +13,7 @@ const BOOT_MEMBERS_FILE = /(?:\.members\.ts|-member\.ts|-members\.ts|\.infrastru
 // construction, the test harness, and the group queue - a Redis-native queue
 // library where the driver is the domain rather than a leak out of one.
 const REDIS_NATIVE_PACKAGE =
-  /^packages\/(?:redis-client|infrastructure|test-harness|group-queue)\//;
+  /^packages\/(?:redis-client|process-stores|test-harness|group-queue)\//;
 
 /**
  * The package a file belongs to, for the boundary rule that asks what kind of

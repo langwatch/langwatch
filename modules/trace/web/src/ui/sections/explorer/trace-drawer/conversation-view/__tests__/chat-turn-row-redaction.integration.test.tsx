@@ -48,7 +48,7 @@ vi.mock("../../../../markdown.tsx", () => ({
 }));
 
 // RedactedInline looks up org permissions for the settings link.
-vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     hasPermission: () => false,

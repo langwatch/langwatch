@@ -5,9 +5,9 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
-import { uiSlots } from "@langwatch/ui-host/slots";
-import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { uiSlots } from "@langwatch/browser-host/slots";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import {

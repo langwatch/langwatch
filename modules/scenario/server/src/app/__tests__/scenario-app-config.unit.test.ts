@@ -5,23 +5,25 @@
  */
 import { EventEmitter } from "node:events";
 
-import type { AgentTestService } from "../../services/agent-test.service.ts";
-import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
-import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
-import { ScenarioApp } from "../scenario.app.ts";
-import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { Encryption } from "@langwatch/process-stores/members";
+import type { ResourceOwnership } from "@langwatch/kernel";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   type ScenarioExecutionService,
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import type { ResourceOwnership } from "@langwatch/kernel";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { UserApi } from "@langwatch/user-contract";
-import type { Encryption } from "@langwatch/infrastructure/members";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
+
+import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
+import type { AgentTestService } from "../../services/agent-test.service.ts";
+import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
+import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
+import { ScenarioApp } from "../scenario.app.ts";
 import type {
   AgentAdapterFactory,
   CancellationPublisher,
@@ -39,6 +41,7 @@ function buildProductionApp(config: unknown, emitter = new EventEmitter()) {
   return ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
+      agents: createApiFixture<AgentApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),

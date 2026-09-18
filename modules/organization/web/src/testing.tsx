@@ -4,9 +4,9 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
-import { uiSlots } from "@langwatch/ui-host/slots";
-import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { uiSlots } from "@langwatch/browser-host/slots";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import {
@@ -162,7 +162,7 @@ export class FakeOrganizationHost extends OrganizationHostApi {
 /**
  * A composition that filled the sales slot, the way the browser application
  * does. These screens only ask for the block by name; what an application
- * without an enterprise half renders is `ui-host`'s own suite.
+ * without an enterprise half renders is `browser-host`'s own suite.
  */
 const filledSlots = {
   ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),

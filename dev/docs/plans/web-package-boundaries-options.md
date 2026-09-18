@@ -276,7 +276,7 @@ project, scenario and experiment; `experiment` already uses
 These edges are what the existing registries were built for: the drawer
 registry (`packages/ui-drawer` + catalogue install,
 `dev/docs/best_practices/drawers.md` §"The drawer registry"), `uiSlots`
-(`@langwatch/ui-host/slots`), and `langy-page-registration`.
+(`@langwatch/browser-host/slots`), and `langy-page-registration`.
 
 ### 3.4 Types and constants riding in web packages
 
@@ -332,7 +332,7 @@ already exist: `packages/design-system` (markdown, copy-button, period-selector,
 keyboard-key, format-money/milliseconds, hoverable-big-text,
 isolated-error-boundary — deduplicating the two copies),
 `packages/handled-error` (handled-error-views belongs beside the presentation
-registry), `packages/ui-host` or a new small `packages/api-client-web` (the
+registry), `packages/ui-host` or a new small `packages/browser-trpc` (the
 typed tRPC facade — it imports only contract types, so it sits below every web
 package by construction; same for `fetch-sse`/`sse-subscription`). Note
 `packages/ui-drawer` and `ui-host` prove this tier already exists for web code;
@@ -454,7 +454,7 @@ Sequenced:
    `manifests.ts` the surfaces allowance) so the corresponding
    boundary-edge-baseline entries can be *deleted* rather than expiring red.
 2. **Second — extraction (B1), `workflow-api` first.** One new
-   `packages/api-client-web` (contract-typed tRPC facade; contracts-only
+   `packages/browser-trpc` (contract-typed tRPC facade; contracts-only
    dependencies) plus moving the generic UI pieces into
    `packages/design-system` and `handled-error-views` into
    `packages/handled-error`. Deletes five SCC edges and ~120 hub imports, and

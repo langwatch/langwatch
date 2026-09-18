@@ -120,16 +120,16 @@ import {
   useModelSelectionOptions,
 } from "@langwatch/model-provider-web/surfaces/model-selector";
 import { Kbd } from "@langwatch/design-system/kbd";
-import { IsolatedErrorBoundary } from "@langwatch/ui-host/isolated-error-boundary";
+import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { Menu } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useUiDeployment } from "@langwatch/ui-host/capabilities";
-import { showErrorToast } from "@langwatch/ui-host/errors";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { LangyModelProviderSetup } from "../../../../ui/sections/model-provider-setup.tsx";
-import { useDrawer } from "@langwatch/ui-drawer";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
@@ -138,7 +138,7 @@ import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 // payload against the same source.
 import { api, trpcClient } from "../../../../behavior/langy-api.ts";
 import { LangyPlanCard } from "./langy-plan-card.tsx";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { useLangyConversationCommands } from "../../behavior/data/use-langy-conversation-commands.ts";
 import { useLangyConversationList } from "../../behavior/data/use-langy-conversation-list.ts";
 import { useLangyMessages } from "../../behavior/data/use-langy-messages.ts";

@@ -40,6 +40,9 @@
       "path": "../../authz/web-kit/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
@@ -59,9 +62,6 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-host/tsconfig.build.json"
     }
   ]
 }

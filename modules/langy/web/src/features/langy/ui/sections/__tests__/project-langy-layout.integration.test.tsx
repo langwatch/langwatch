@@ -27,7 +27,7 @@ const setGateProject = (project: GateProject) => {
 };
 
 const drawerState = { current: null as string | null };
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ currentDrawer: drawerState.current }),
 }));
 

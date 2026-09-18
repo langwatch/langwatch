@@ -299,7 +299,7 @@ Open questions, none of them papered over.
    `isUrlSerializable` into URL props and in-memory props. Typing it touches 44
    drawers and has to say which half a prop lands in. Unresolved.
 4. **Where the builder lives.** `packages/ui-composition` is free;
-   `@langwatch/ui-host` already has 28 dependents but putting `defineWebModule`
+   `@langwatch/browser-host` already has 28 dependents but putting `defineWebModule`
    there puts the installation mechanism in the package that supplies the
    capabilities the installation consumes.
 5. **What happens to the single route anchor.** `webRouteParent: "project"` has

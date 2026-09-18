@@ -4,8 +4,8 @@
  * than through the transport's own class, so REST and tRPC funnel into one modal.
  */
 
-import { markHandledGlobally } from "@langwatch/ui-host/errors";
 import type { LimitType } from "@langwatch/enterprise-licensing-contract";
+import { markHandledGlobally } from "@langwatch/browser-host/errors";
 
 /** As much of a failed call's serialised payload as the readers below name. */
 type SerializedFailure = {

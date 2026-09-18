@@ -1,6 +1,6 @@
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { IdentifierFact, SsoConnectionState } from "@langwatch/identity-contract";
-import type { RateLimiter } from "@langwatch/infrastructure";
+import type { RateLimiter } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryIdentityLookupRepository } from "../repositories/memory/memory.identity-lookup.repository.ts";
 import { MemoryIdentityStore } from "../repositories/memory/memory-identity.store.ts";

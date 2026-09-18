@@ -101,7 +101,7 @@ const projectRef = {
 // release_ui_langy_peek_dock_enabled). This suite is about conversation
 // history, not the closed state, so pin the flag off (the classic launcher) —
 // the same render path this suite had before the flag landed.
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -120,7 +120,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: toasterCreate },
 }));
 
-vi.mock("@langwatch/ui-drawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     currentDrawer: undefined,
     openDrawer: vi.fn(),

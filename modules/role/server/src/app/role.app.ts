@@ -18,7 +18,17 @@ import {
   type AuthzListManagedBindingsForUserOutput,
   type AuthzUpdateBindingInput,
 } from "@langwatch/authz-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import { KsuidAuthzBindingIdAdapter } from "@langwatch/authz-server";
+import {
+  assertEnterprisePlanType,
+  ENTERPRISE_FEATURE_ERRORS,
+  EntitlementApi,
+} from "@langwatch/entitlement-contract";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import {
+  OrganizationApi,
+  PersonalWorkspaceNotManagedHereError,
+} from "@langwatch/organization-contract";
 import {
   OrgExclusivePermissionScopeError,
   RoleApi,
@@ -49,27 +59,9 @@ import { UserApi } from "@langwatch/user-contract";
 import type { RoleRepositories } from "../repositories/role.repositories.ts";
 import { RoleService } from "../services/role.service.ts";
 
-/** What the composing process owns and this feature may not build for itself. */
-export interface RoleInfrastructure {
-  /** The personal-workspace fence a team binding is refused at. */
-  readonly scope: {
-    assertNoPersonalTeamScope(input: {
-      scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-    }): Promise<void>;
-  };
-  /** Whether the organization's plan carries custom roles. */
-  readonly plan: {
-    assertCustomRolesAllowed(input: { organizationId: string }): Promise<void>;
-  };
-  /** The identifier format a new binding is written under. */
-  readonly bindingIds: {
-    newBindingId(): string;
-  };
-}
-
 type RoleSetup = FeatureSetup<
   typeof RoleApp.dependencies,
-  Readonly<{ role: RoleInfrastructure }>,
+  MembersRead<typeof RoleApp.reads>,
   undefined,
   RoleRepositories
 >;
@@ -82,33 +74,34 @@ export class RoleApp implements RoleApi {
     permissions: AuthzApi,
     organizations: OrganizationApi,
     users: UserApi,
+    entitlement: EntitlementApi,
   };
-  static readonly reads = ["role"] as const;
+  static readonly reads = reads("prisma");
 
   #roles: RoleService;
   #permissions: AuthzApi;
   #organizations: OrganizationApi;
   #users: UserApi;
-  #scope: RoleInfrastructure["scope"];
-  #plan: RoleInfrastructure["plan"];
-  #bindingIds: RoleInfrastructure["bindingIds"];
+  #entitlement: EntitlementApi;
+  #prisma: RoleSetup["members"]["prisma"];
+  #bindingIds: KsuidAuthzBindingIdAdapter;
 
   private constructor(
     repositories: RoleRepositories,
     dependencies: RoleSetup["dependencies"],
-    members: RoleInfrastructure,
+    members: RoleSetup["members"],
   ) {
     this.#roles = RoleService.create({ repository: repositories.roles });
     this.#permissions = dependencies.permissions;
     this.#organizations = dependencies.organizations;
     this.#users = dependencies.users;
-    this.#scope = members.scope;
-    this.#plan = members.plan;
-    this.#bindingIds = members.bindingIds;
+    this.#entitlement = dependencies.entitlement;
+    this.#prisma = members.prisma;
+    this.#bindingIds = KsuidAuthzBindingIdAdapter.create();
   }
 
   static create({ repositories, dependencies, members }: RoleSetup): RoleApp {
-    return new RoleApp(repositories, dependencies, members.role);
+    return new RoleApp(repositories, dependencies, members);
   }
 
   // ── custom roles ───────────────────────────────────────────────────────────
@@ -147,7 +140,7 @@ export class RoleApp implements RoleApi {
   /** Defines a custom role, attributed to the caller who asked for it. */
   async createRole(input: { role: RoleCreate }, by: RoleCaller): Promise<Role> {
     this.#roles.assertNameAllowed(input.role.name);
-    await this.#plan.assertCustomRolesAllowed({ organizationId: input.role.organizationId });
+    await this.#assertCustomRolesAllowed({ organizationId: input.role.organizationId });
     await this.#roles.assertNameAvailable({
       organizationId: input.role.organizationId,
       name: input.role.name,
@@ -187,7 +180,7 @@ export class RoleApp implements RoleApi {
   ): Promise<Role> {
     const role = await this.#roles.getById({ roleId: input.roleId });
     await this.#assertMayReach(by, role.organizationId, "organization:manage");
-    await this.#plan.assertCustomRolesAllowed({ organizationId: role.organizationId });
+    await this.#assertCustomRolesAllowed({ organizationId: role.organizationId });
 
     return this.#write(role, input.changes, by);
   }
@@ -231,7 +224,7 @@ export class RoleApp implements RoleApi {
     // The team's organization first, so a team nobody can name reads as a
     // not-found rather than as a plan refusal.
     const organizationId = await this.getAssignmentOrganization({ teamId: input.teamId });
-    await this.#plan.assertCustomRolesAllowed({ organizationId });
+    await this.#assertCustomRolesAllowed({ organizationId });
 
     const role = await this.#roles.getById({ roleId: input.customRoleId });
     if (role.organizationId !== organizationId) throw new RoleNotAssignableError();
@@ -245,9 +238,7 @@ export class RoleApp implements RoleApi {
       throw new RoleUserNotTeamMemberError();
     }
 
-    await this.#scope.assertNoPersonalTeamScope({
-      scopes: [{ scopeType: "TEAM", scopeId: input.teamId }],
-    });
+    await this.#assertNoPersonalTeamScope([{ scopeType: "TEAM", scopeId: input.teamId }]);
     await this.#replaceTeamBinding({
       userId: input.userId,
       teamId: input.teamId,
@@ -265,9 +256,7 @@ export class RoleApp implements RoleApi {
     by: RoleCaller,
   ): Promise<RoleWriteAcknowledged> {
     const organizationId = await this.getAssignmentOrganization({ teamId: input.teamId });
-    await this.#scope.assertNoPersonalTeamScope({
-      scopes: [{ scopeType: "TEAM", scopeId: input.teamId }],
-    });
+    await this.#assertNoPersonalTeamScope([{ scopeType: "TEAM", scopeId: input.teamId }]);
     await this.#replaceTeamBinding({
       userId: input.userId,
       teamId: input.teamId,
@@ -379,6 +368,40 @@ export class RoleApp implements RoleApi {
   }
 
   // ── the checks and writes the operations above share ───────────────────────
+
+  /** The personal-workspace fence a team or project binding is refused at. */
+  async #assertNoPersonalTeamScope(
+    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[],
+  ): Promise<void> {
+    const teamIds = scopes
+      .filter((scope) => scope.scopeType === "TEAM")
+      .map((scope) => scope.scopeId);
+    const projectIds = scopes
+      .filter((scope) => scope.scopeType === "PROJECT")
+      .map((scope) => scope.scopeId);
+    const personalTeam = await this.#prisma.team.findFirst({
+      where: { id: { in: teamIds }, isPersonal: true },
+      select: { name: true },
+    });
+    const personalProject = await this.#prisma.project.findFirst({
+      where: {
+        id: { in: projectIds },
+        OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
+      },
+      select: { team: { select: { name: true } } },
+    });
+    const personalName = personalTeam?.name ?? personalProject?.team.name;
+    if (personalName) throw new PersonalWorkspaceNotManagedHereError(personalName);
+  }
+
+  /** Whether the organization's plan carries custom roles. */
+  async #assertCustomRolesAllowed({ organizationId }: { organizationId: string }): Promise<void> {
+    const plan = await this.#entitlement.getActivePlan({ organizationId });
+    assertEnterprisePlanType({
+      planType: plan.type,
+      errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+    });
+  }
 
   /** The organization decision an input could not name, run where the row is. */
   async #assertMayReach(

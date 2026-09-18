@@ -21,7 +21,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { RoleApi } from "@langwatch/role-contract";

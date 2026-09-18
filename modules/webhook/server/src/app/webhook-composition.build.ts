@@ -1,7 +1,7 @@
 import { WebhookDispatchUnavailableError } from "@langwatch/webhook-contract";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { WebhookAccessService } from "../services/webhook-access.service.ts";
 import type { WebhookHealthDeps } from "../services/webhook-health.service.ts";
 import type { WebhookTestDispatch } from "./webhook.app.ts";

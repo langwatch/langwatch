@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
-import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
+
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
+import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
+import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
+import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
-import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
-import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
-import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
-import { Temporal } from "@langwatch/time";
 
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const parse = (operations: unknown[]) =>

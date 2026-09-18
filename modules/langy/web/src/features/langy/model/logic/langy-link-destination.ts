@@ -1,4 +1,4 @@
-import { isInternalHref } from "@langwatch/ui-host/markdown";
+import { isInternalHref } from "@langwatch/browser-host/markdown";
 
 /**
  * Where a link inside the Langy panel actually goes.

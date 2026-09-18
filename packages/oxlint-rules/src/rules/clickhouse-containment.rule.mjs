@@ -18,7 +18,7 @@ const BOOT_MEMBERS_FILE = /(?:\.members\.ts|-member\.ts|-members\.ts|\.infrastru
 // boot-time member construction every process composes from, and the test
 // harness that stands endpoints up. The driver is their domain, not a leak
 // out of one.
-const CLICKHOUSE_NATIVE_PACKAGE = /^packages\/(?:clickhouse-client|infrastructure|test-harness)\//;
+const CLICKHOUSE_NATIVE_PACKAGE = /^packages\/(?:clickhouse-client|process-stores|test-harness)\//;
 
 /**
  * The package a file belongs to, for the boundary rule that asks what kind of

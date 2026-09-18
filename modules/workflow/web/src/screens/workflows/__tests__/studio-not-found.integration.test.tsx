@@ -28,7 +28,7 @@ vi.mock("../../../behavior/studio-host/use-organization-team-project.ts", () => 
   useOrganizationTeamProject: () => ({ project: { slug: "ux-review" } }),
 }));
 
-vi.mock("@langwatch/ui-host/link", () => ({
+vi.mock("@langwatch/browser-host/link", () => ({
   Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),
@@ -42,7 +42,7 @@ vi.mock("../../../ui/sections/optimization_studio/optimization-studio.tsx", () =
   default: () => <div data-testid="studio-canvas" />,
 }));
 
-vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   api: {
     useUtils: () => ({ workflow: { getById: { invalidate: vi.fn() } } }),
   },

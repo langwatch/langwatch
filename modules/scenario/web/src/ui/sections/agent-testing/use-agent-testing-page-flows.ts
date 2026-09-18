@@ -7,7 +7,7 @@
 import { useEffect } from "react";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../behavior/scenario-api.ts";
-import { useRouter } from "@langwatch/ui-host/use-router";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { useOpenNewRunPlan } from "./run/run-plan-dialog-host.tsx";
 import type { AgentTestingSelection } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { useAgentTestingStore } from "./use-agent-testing-store.ts";
