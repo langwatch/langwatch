@@ -63,5 +63,5 @@ Feature: ON_MESSAGE evaluations only re-run on real, recent messages
     Scenario: a trace alert still fires for a trace with no recorded spans
       Given a project with an active trace alert
       And a trace whose fold state holds no spans
-      When a new span arrives on that trace
+      When the trace's origin is resolved
       Then the trace alert records a match

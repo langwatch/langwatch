@@ -8,7 +8,10 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command";
 import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
-import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import {
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { createTraceAlertTriggerMatchHandler } from "../traceAlertTriggerMatch.subscriber";
 
@@ -135,6 +138,13 @@ describe("trace alert trigger match subscriber", () => {
      * and its own filters, so an alert that is due stays due whether or not
      * this replica folded the spans. Pinned so the evaluation rule cannot
      * migrate back into the shared guards and silently stop alerts.
+     *
+     * The event is origin_resolved, not span_received, because span_received
+     * cannot be observed here with spanCount 0: subscribers fire on fold
+     * COMPLETION (subscriber.types.ts:55) and the guard reads the COMMITTED
+     * state (staticBuilder.ts:730), so the arriving span is already counted
+     * (foldProjection.ts:289). A late origin resolution on a rehydrated-empty
+     * fold is the reachable case, and the one the incident produced.
      */
     /** @scenario "a trace alert still fires for a trace with no recorded spans" */
     it("still records a match, since alerting does not need folded spans", async () => {
@@ -148,7 +158,10 @@ describe("trace alert trigger match subscriber", () => {
       await createTraceAlertTriggerMatchHandler({
         triggers: triggers as never,
         recordTriggerMatch,
-      })(event(), context(traceState({ spanCount: 0, occurredAt: 0 })));
+      })(
+        event({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
+        context(traceState({ spanCount: 0, occurredAt: 0 })),
+      );
 
       expect(recordTriggerMatch.send).toHaveBeenCalledTimes(1);
       expect(recordTriggerMatch.send).toHaveBeenCalledWith(
