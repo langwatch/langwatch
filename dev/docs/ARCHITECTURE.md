@@ -1052,6 +1052,7 @@ invented:
   | `withFailureInterceptors` | **0** | built (`ui-feature-shell.tsx:162`) |
   | `withSeatTypeCopy` | **0** | built (`slots.tsx:143`) |
   | `withFlags` · `withCommands` | **0** | **none** |
+  | `publishSurfaces` | 13 | **none — superseded, below** |
 
   Only the last row is builder surface that does nothing, and only it is
   deleted. The three above it are the opposite case and stay: their consumers
@@ -1060,6 +1061,17 @@ invented:
   installed interceptor over each failed mutation so that "a failure a feature
   answers application-wide is reported once, rather than by every screen that
   happens to trip it", and no feature answers one.
+
+  **`publishSurfaces` is superseded by the kit** (ruled 2026-09-18). It is the
+  declaration-side twin of the `./surfaces/*` exports entries §3.4 just closed:
+  `organization` publishes `surfaces/department-picker` and
+  `surfaces/personal-workspace-features` — the same names its exports map
+  opened. Both halves answered the same question, "how does another module
+  reach into mine", and the kit is now the whole answer. 13 modules declare it
+  and nothing reads it at runtime, so no behaviour depends on the removal; the
+  surfaces travel to the owner's kit, or they dissolve. Found while correcting
+  this table for the third time — it was missed because a census of the
+  builder's `with*` methods does not match a method named `publish*`.
 
   **Count the consuming side, not only the declaring side** (the method note
   this table cost). A first pass read four slots as dead both ends; two of them
