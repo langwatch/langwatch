@@ -209,10 +209,10 @@ secured
         throw error;
       }
 
-      // Fire-and-forget like every other management audit, but with the
-      // rejection handled: `void` alone silences the lint rule and leaves an
-      // unhandled rejection when the audit insert fails.
-      void auditLog({
+      // Wait until issuance is recorded before returning the one-time token.
+      // Audit failure is still non-fatal: the organization and key already
+      // exist, and turning this into a 500 would make the token unrecoverable.
+      await auditLog({
         userId: "instance-admin",
         organizationId: created.organization.id,
         action: "management.organization.provision",
