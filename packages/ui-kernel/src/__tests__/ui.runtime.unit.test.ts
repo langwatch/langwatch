@@ -14,12 +14,12 @@ afterEach(() => {
 });
 
 describe("UiRuntime", () => {
-  it("prepares and mounts the browser shell once", async () => {
+  it("prepares and mounts the browser shell once", () => {
     document.body.innerHTML = '<div id="root"></div>';
     const shell = new TestUiShell();
     const runtime = UiRuntime.create({ document, shell });
 
-    await act(() => {
+    act(() => {
       runtime.start();
       runtime.start();
     });
@@ -28,7 +28,7 @@ describe("UiRuntime", () => {
     expect(shell.render).toHaveBeenCalledOnce();
     expect(document.getElementById("root")?.textContent).toBe("LangWatch");
 
-    await act(() => runtime.close());
+    act(() => runtime.close());
   });
 
   it("keeps the existing missing-root failure after preparing the shell", () => {
@@ -40,7 +40,7 @@ describe("UiRuntime", () => {
     expect(shell.render).not.toHaveBeenCalled();
   });
 
-  it("cleans up a failed render so start can be retried", async () => {
+  it("cleans up a failed render so start can be retried", () => {
     document.body.innerHTML = '<div id="root"></div>';
     const shell = new TestUiShell();
     shell.render.mockImplementationOnce(() => {
@@ -50,21 +50,21 @@ describe("UiRuntime", () => {
 
     expect(() => runtime.start()).toThrow("Shell unavailable");
 
-    await act(() => runtime.start());
+    act(() => runtime.start());
 
     expect(shell.prepare).toHaveBeenCalledTimes(2);
     expect(shell.render).toHaveBeenCalledTimes(2);
     expect(document.getElementById("root")?.textContent).toBe("LangWatch");
 
-    await act(() => runtime.close());
+    act(() => runtime.close());
   });
 
-  it("unmounts once and cannot restart after closing", async () => {
+  it("unmounts once and cannot restart after closing", () => {
     document.body.innerHTML = '<div id="root"></div>';
     const runtime = UiRuntime.create({ document, shell: new TestUiShell() });
 
-    await act(() => runtime.start());
-    await act(() => {
+    act(() => runtime.start());
+    act(() => {
       runtime.close();
       runtime.close();
     });

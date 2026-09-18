@@ -110,6 +110,18 @@
     "./route-descriptor": {
       "types": "./dist/ui-route-descriptor.d.ts",
       "default": "./src/ui-route-descriptor.ts"
+    },
+    "./public-config": {
+      "types": "./dist/public-config.d.ts",
+      "default": "./src/public-config.ts"
+    },
+    "./shell": {
+      "types": "./dist/ui-shell.d.ts",
+      "default": "./src/ui-shell.ts"
+    },
+    "./runtime": {
+      "types": "./dist/ui.runtime.d.ts",
+      "default": "./src/ui.runtime.ts"
     }
   },
   "scripts": {

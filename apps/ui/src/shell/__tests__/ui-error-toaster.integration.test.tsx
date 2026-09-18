@@ -6,12 +6,11 @@
  * UX contract: specs/components/toasts.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
 import { toaster } from "@langwatch/design-system/toaster";
 import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-import { BrowserUiFeedback } from "../../behavior/ui-feedback";
 
 beforeEach(() => {
   toaster.remove();

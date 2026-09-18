@@ -5,8 +5,7 @@
  */
 
 import type { NavigationDeployment } from "@langwatch/navigation-browser/navigation";
-
-import { readPublicAppConfig } from "../behavior/public-config";
+import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
 
 /**
  * A document with no config makes no claim about the analysis services, and

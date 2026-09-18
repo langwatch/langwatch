@@ -3,12 +3,12 @@
  * @vitest-environment jsdom
  */
 
+import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
 import { createUiRouteObjects } from "@langwatch/ui-kernel/route-objects";
 import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
 import { uiRouteTable } from "../ui-route-table";
 
 /**

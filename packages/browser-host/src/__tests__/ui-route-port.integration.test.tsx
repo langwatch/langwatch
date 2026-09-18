@@ -4,11 +4,10 @@
  */
 
 import type { UiRoute } from "@langwatch/browser-host/capabilities";
+import { useRouterUiRoute } from "@langwatch/browser-host/navigation";
 import { render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
-
-import { useRouterUiRoute } from "@langwatch/browser-host/navigation";
 
 function readRouteAt(url: string): { port: UiRoute; search: () => string } {
   let port: UiRoute | undefined;

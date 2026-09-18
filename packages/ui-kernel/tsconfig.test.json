@@ -19,6 +19,9 @@
     },
     {
       "path": "../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/auth/browser/tsconfig.build.json"
     }
   ]
 }

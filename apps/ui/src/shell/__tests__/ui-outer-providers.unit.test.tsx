@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { uiDesignSystem } from "../../behavior/design-system";
+import { uiDesignSystem } from "../../design-system";
 
 let installedSystem: unknown;
 

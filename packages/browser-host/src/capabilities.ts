@@ -10,6 +10,7 @@ import type { UiAnalytics } from "./analytics.ts";
 import { UNAVAILABLE_UI_SCOPE, UiScope, useUiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
 import type { UiSlots } from "./slots.tsx";
+import type { UiFeatureApiTransport } from "./transport.ts";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, UNAVAILABLE_UI_SCOPE, useUiScope, type UiActiveScope };
@@ -416,3 +417,17 @@ export function useUiCapabilities(): UiCapabilities {
   }
   return capabilities;
 }
+
+/** What a composition's session read yields: the two capabilities together. */
+export type UiSessionCapabilities = { session: UiSession; scope: UiScope };
+
+/**
+ * A composition's live session, built where the transport is — declared as a
+ * source (a hook, called once) rather than a port, since the answer changes as
+ * the reader navigates and the reads land.
+ */
+export type UiSessionSource = (input: {
+  transport: UiFeatureApiTransport;
+  /** Where a refused session read is told, since nobody else sees it. */
+  feedback: UiFeedback;
+}) => UiSessionCapabilities;

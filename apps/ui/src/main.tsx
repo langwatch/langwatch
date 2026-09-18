@@ -13,6 +13,7 @@ import type {
 } from "@langwatch/browser-host/capabilities";
 import { deriveUiDeployment } from "@langwatch/browser-host/deployment";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import {
   createUiFeatureApiClient,
@@ -34,16 +35,15 @@ import { GraphicsQualityProvider } from "@langwatch/ui-kernel/graphics-quality-p
 import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
 import { installedModuleScreens, type UiModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { UiPageFailure } from "@langwatch/ui-kernel/page-fallbacks";
+import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
+import { UiRuntime } from "@langwatch/ui-kernel/runtime";
+import { UiShell } from "@langwatch/ui-kernel/shell";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
 import type { FallbackProps } from "react-error-boundary";
 import { useLocation } from "react-router";
 
-import { uiDesignSystem } from "./behavior/design-system";
-import { readPublicAppConfig } from "./behavior/public-config";
-import { BrowserUiFeedback, resolveUiFailureCopy } from "./behavior/ui-feedback";
-import { UiShell } from "./behavior/ui-shell";
-import { UiRuntime } from "./behavior/ui.runtime";
+import { uiDesignSystem } from "./design-system";
 import { uiRouteTable } from "./shell/ui-route-table";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 

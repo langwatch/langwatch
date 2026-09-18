@@ -4,12 +4,6 @@
  * via `@langwatch/handled-error/presentation` — never `error.message`.
  */
 
-import {
-  UiFeedback,
-  type UiFailureNotice,
-  type UiSuccessNotice,
-} from "@langwatch/browser-host/capabilities";
-import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
 import { isServerUnreachable } from "@langwatch/handled-error/is-server-unreachable";
 import {
@@ -19,7 +13,9 @@ import {
 } from "@langwatch/handled-error/presentation";
 import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
 
-import { isUiNavigatingAway } from "@langwatch/browser-host/navigation";
+import { UiFeedback, type UiFailureNotice, type UiSuccessNotice } from "./capabilities.ts";
+import { isHandledByGlobalHandler } from "./errors.ts";
+import { isUiNavigatingAway } from "./navigation.ts";
 
 /** How long a failure stays up: long enough to read it and copy the error id. */
 const FAILURE_DURATION_MS = 12_000;

@@ -3,12 +3,14 @@ import { createLogger } from "@langwatch/observability/browser";
 import { Children, isValidElement, memo, type ReactNode, useState } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
+
 import { useRouter } from "../use-router.ts";
-import { stringifyIfObject } from "./stringify-if-object.ts";
 import { RenderCode } from "./render-code.tsx";
+import { stringifyIfObject } from "./stringify-if-object.ts";
 export { RenderCode } from "./render-code.tsx";
-import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
+
 import { Link as UiLink } from "../link.tsx";
 import { Prose } from "./prose.tsx";
 

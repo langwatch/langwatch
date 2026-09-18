@@ -1,6 +1,6 @@
 import { createRoot, type Root } from "react-dom/client";
 
-import type { UiShell } from "./ui-shell";
+import type { UiShell } from "./ui-shell.ts";
 
 export type UiRuntimeOptions = {
   document: Document;

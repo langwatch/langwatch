@@ -4,8 +4,9 @@
  * side knows where the other's file lives.
  */
 
-import type { UiRouteDescriptor } from "../shell/ui-route-table";
 import type { LazyRouteModule } from "@langwatch/browser-host/navigation";
+
+import type { UiRouteDescriptor } from "./ui-route-descriptor.ts";
 
 /** A page's dynamic import, in the shape `lazyRoute` consumes. */
 export type UiPageLoader = () => Promise<LazyRouteModule>;

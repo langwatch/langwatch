@@ -116,6 +116,9 @@
       "path": "../../modules/organization/browser/tsconfig.build.json"
     },
     {
+      "path": "../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/prompt/browser-kit/tsconfig.build.json"
     },
     {

@@ -157,6 +157,10 @@
     "./navigation-tracing": {
       "types": "./dist/navigation-tracing.d.ts",
       "default": "./src/navigation-tracing.ts"
+    },
+    "./feedback": {
+      "types": "./dist/ui-feedback.d.ts",
+      "default": "./src/ui-feedback.ts"
     }
   },
   "scripts": {

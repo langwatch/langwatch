@@ -4,20 +4,23 @@
  * `createUiApplication` mounts.
  */
 
-import type { UiCapabilityInstall, UiRpc } from "@langwatch/browser-host/capabilities";
-import type { UiSessionSource } from "@langwatch/browser-host/capabilities";
+import type {
+  UiCapabilityInstall,
+  UiRpc,
+  UiSessionSource,
+} from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import type {
   UiFeatureApiBinding,
   UiFeatureApiProvider,
   UiFeatureApiTransport,
 } from "@langwatch/browser-host/transport";
-import type { UiWebRouteParent } from "@langwatch/ui-kernel/web-installation";
 import type { QueryClient } from "@tanstack/react-query";
 import type { ComponentType, ReactNode } from "react";
 import type { RouteObject } from "react-router";
 
-import type { UiPageLoaderRegistry } from "./ui-page-loaders";
+import type { UiPageLoaderRegistry } from "./ui-page-loaders.ts";
+import type { UiWebRouteParent } from "./ui-web-installation.ts";
 
 /** What a failure interceptor may do about the failure it just read. */
 export type UiFailureHost = {

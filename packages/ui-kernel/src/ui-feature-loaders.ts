@@ -4,7 +4,7 @@
  * below decides which registry answers for it.
  */
 
-import type { UiPageLoaderRegistry } from "./ui-page-loaders";
+import type { UiPageLoaderRegistry } from "./ui-page-loaders.ts";
 
 /**
  * Every page this package serves from its own source — empty until a

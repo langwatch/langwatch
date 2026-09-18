@@ -1,4 +1,3 @@
-
 import type { AppErrorCode } from "@langwatch/handled-error/app-codes";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 

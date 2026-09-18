@@ -1,9 +1,9 @@
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   type FeatureFlagTargetId,
   type FrontendFeatureFlag,
   NOT_TARGETED,
 } from "@langwatch/feature-flag-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 
 // The service caches operator rows for five seconds. Refetching every mounted
 // hook at that cadence adds traffic without making a decision fresher, so the

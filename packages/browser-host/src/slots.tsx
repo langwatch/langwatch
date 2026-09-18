@@ -5,6 +5,7 @@
  */
 
 import type { ComponentType, ReactNode } from "react";
+
 import { useOptionalUiCapabilities } from "./capabilities.ts";
 import type { UpgradeModalSeatsVariant } from "./upgrade-modal-store.ts";
 

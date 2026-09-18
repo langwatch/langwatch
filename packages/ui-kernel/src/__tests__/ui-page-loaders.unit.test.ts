@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { UiRouteDescriptor } from "../../shell/ui-route-table";
-import { resolveUiPageLoader, uiRoutePageKeys } from "../ui-page-loaders";
+import { resolveUiPageLoader, uiRoutePageKeys } from "../ui-page-loaders.ts";
+import type { UiRouteDescriptor } from "../ui-route-descriptor.ts";
 
 const table: readonly UiRouteDescriptor[] = [
   { path: "/one", page: "pages/one" },

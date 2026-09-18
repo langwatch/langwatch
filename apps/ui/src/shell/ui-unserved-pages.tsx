@@ -4,9 +4,8 @@
  * takes the whole browser down; these keep the gap at its own address.
  */
 
+import type { UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
 import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
-
-import type { UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
 
 export function UiUnservedPage() {
   return (

@@ -8,7 +8,6 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { UiCapabilityContextProvider } from "../capabilities.ts";
-import { createUiCapabilitiesFromHost } from "../testing.ts";
 import type { UiSlots } from "../slots.tsx";
 import {
   CORE_SEAT_TYPE_COPY,
@@ -17,6 +16,7 @@ import {
   uiSlots,
   useUiSeatTypeCopy,
 } from "../slots.tsx";
+import { createUiCapabilitiesFromHost } from "../testing.ts";
 
 function EnterpriseWall() {
   return <p>Talk to sales</p>;

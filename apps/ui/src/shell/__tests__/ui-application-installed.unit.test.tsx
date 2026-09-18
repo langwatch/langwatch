@@ -5,11 +5,11 @@
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { webModules } from "@langwatch/installed-modules/web";
 import { createUiApplication } from "@langwatch/ui-kernel/application";
+import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
 import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
 import { uiRouteTable } from "../ui-route-table";
 
 const publicAppConfig: PublicAppConfig = {

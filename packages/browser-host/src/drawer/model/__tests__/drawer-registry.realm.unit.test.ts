@@ -1,4 +1,5 @@
 import { runInNewContext } from "node:vm";
+
 import { describe, expect, it } from "vitest";
 
 import { preloadDrawer, primeLazyComponent } from "../drawer-registry.ts";
