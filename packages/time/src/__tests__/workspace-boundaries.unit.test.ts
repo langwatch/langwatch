@@ -110,8 +110,8 @@ describe("the retired library cannot come back", () => {
     /** @scenario "Each process and the browser install the polyfill at its entry" */
     it("imports the polyfill module exactly once, for its side effect, as its first import", () => {
       const entrypoints = [
-        "apps/api/src/api.entrypoint.ts",
-        "apps/worker/src/worker.entrypoint.ts",
+        "apps/api/src/main.ts",
+        "apps/worker/src/main.ts",
         "apps/tasks/src/tasks.entrypoint.ts",
         "apps/ui/src/ui.entrypoint.tsx",
       ];

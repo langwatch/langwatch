@@ -230,7 +230,7 @@ EXPOSE 5560
 SHELL ["/bin/bash", "-c"]
 
 # The boot chain lives in apps/api, not here: `pnpm -s run start` is
-# `start:prepare:db && tsx src/api.entrypoint.ts`, and start:prepare:db runs
+# `start:prepare:db && tsx src/main.ts`, and start:prepare:db runs
 # the three tasks from apps/tasks in order — prisma-migrate (packages/prisma-
 # client's history), clickhouse-migrate (the goose runner, TTL reconciler and
 # ClickHouse SQL, now packages/clickhouse-migrations'), and lwql-provision. Written

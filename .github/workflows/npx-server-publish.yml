@@ -234,8 +234,8 @@ jobs:
             # each declares `tsx` as a production dependency and its `start`
             # (or `task`) script runs the entry point through it, so what the
             # tarball has to carry is the entry point and the tree it imports.
-            "package/app/apps/api/src/api.entrypoint.ts"
-            "package/app/apps/worker/src/worker.entrypoint.ts"
+            "package/app/apps/api/src/main.ts"
+            "package/app/apps/worker/src/main.ts"
             # The task launcher the first boot runs: prisma-migrate,
             # clickhouse-migrate, then lwql-provision, in that order.
             "package/app/apps/tasks/src/tasks.entrypoint.ts"

@@ -5,7 +5,7 @@ import {
   resolveWorkerConfig,
   resolveWorkerDataplaneS3Config,
   resolveWorkerTracePrivacyConfig,
-} from "../worker.config.ts";
+} from "../config.ts";
 
 describe("resolveWorkerConfig", () => {
   it("uses the worker-local environment default", () => {

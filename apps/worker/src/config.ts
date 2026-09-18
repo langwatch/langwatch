@@ -29,7 +29,10 @@ import {
   dataRetentionServerConfigDefinition,
   resolvePlatformDefaultRetentionDays,
 } from "@langwatch/data-retention-contract";
-import { evaluationServerConfigDefinition } from "@langwatch/evaluation-contract";
+import {
+  evaluationServerConfigDefinition,
+  resolveWorkerEvaluationEnvironment,
+} from "@langwatch/evaluation-contract";
 import { gatewayServerConfigDefinition } from "@langwatch/gateway-contract";
 import { githubServerConfigDefinition } from "@langwatch/github-contract";
 import { langyServerConfigDefinition } from "@langwatch/langy-contract";
@@ -61,7 +64,6 @@ import { EmailProviderService, type MailerConfiguration } from "@langwatch/notif
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import type { RequestBoundsOverrides } from "@langwatch/plans";
 import { z } from "zod";
-import { resolveWorkerEvaluationEnvironment } from "./worker-evaluation.config.ts";
 
 /** Somewhere a configured-but-unusable value can be said out loud. */
 interface ConfigReport {

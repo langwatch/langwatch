@@ -4,7 +4,7 @@ import {
   apiLoggerConfiguration,
   apiObservabilityConfiguration,
   resolveApiConfig,
-} from "../api.config.ts";
+} from "../config.ts";
 
 /**
  * The fallback model, derived rather than written down. A literal would pin

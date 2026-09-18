@@ -104,9 +104,6 @@
       "path": "../../packages/egress/tsconfig.build.json"
     },
     {
-      "path": "../../enterprise/packages/composition/api/tsconfig.build.json"
-    },
-    {
       "path": "../../enterprise/modules/billing/contract/tsconfig.build.json"
     },
     {
@@ -129,9 +126,6 @@
     },
     {
       "path": "../../enterprise/modules/managed-provider/server/tsconfig.build.json"
-    },
-    {
-      "path": "../../enterprise/packages/plan-gate/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/saas/contract/tsconfig.build.json"
@@ -200,7 +194,7 @@
       "path": "../../modules/identity/server/tsconfig.build.json"
     },
     {
-      "path": "../../packages/infrastructure/tsconfig.build.json"
+      "path": "../../packages/process-stores/tsconfig.build.json"
     },
     {
       "path": "../../packages/kernel/tsconfig.build.json"
@@ -270,6 +264,9 @@
     },
     {
       "path": "../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/process-server/tsconfig.build.json"
     },
     {
       "path": "../../modules/project/contract/tsconfig.build.json"

@@ -1,25 +1,28 @@
+// Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
+import "@langwatch/time/polyfill";
+
 import process from "node:process";
 
 import { setTraceUrlProvider } from "@langwatch/handled-error";
-import { configureLogger, createLogger, loggerConfigurationFrom } from "@langwatch/observability";
+import { configureLogger, createLogger } from "@langwatch/observability";
 import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
 import { startOtlpMetricsExport } from "@langwatch/observability/node";
 import { Server } from "@langwatch/process-server";
 import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
 import { createServerApp } from "@langwatch/installed-modules/server";
 
-import { resolveWorkerConfig } from "./platform/config/worker.config.ts";
+import { apiLoggerConfiguration, resolveApiConfig } from "./config.ts";
 
 /**
- * The worker process, whole. The same shape the api boots with: telemetry
- * first so a config parse failure is observable, then the server that owns the
- * teardown, then the application the installed modules compose.
+ * The api process, whole. Telemetry first so a config parse failure is logged
+ * and traced, then the server that owns the teardown, then the application the
+ * installed modules compose, mounted on it.
  */
-export async function startWorker(): Promise<Server> {
+export async function startApi(): Promise<Server> {
   const secrets = await SecretEnvironmentService.create({ source: process.env }).resolve();
-  const config = resolveWorkerConfig(secrets.environment);
+  const config = resolveApiConfig(secrets.environment);
 
-  configureLogger({ ...loggerConfigurationFrom(config), redactPaths: secretLogRedactPaths() });
+  configureLogger({ ...apiLoggerConfiguration(config), redactPaths: secretLogRedactPaths() });
   setTraceUrlProvider(grafanaTraceUrlFromEnv);
   startOtlpMetricsExport(config.otlpMetrics);
   const logger = createLogger(config.serviceName);
@@ -30,15 +33,11 @@ export async function startWorker(): Promise<Server> {
     shutdownDeadlineMs: config.shutdown.processDeadlineMs,
   });
 
-  const runtime = await createServerApp("worker").boot();
+  const runtime = await createServerApp("api").boot();
 
-  // Jobs drain before anything they call into is released.
-  server.host({
-    name: "worker runtime",
-    start: () => runtime.start(),
-    stop: () => runtime.stop(),
-    drain: true,
-  });
+  server.host({ name: "api runtime", start: () => runtime.start(), stop: () => runtime.stop() });
   await server.listen();
   return server;
 }
+
+void startApi();

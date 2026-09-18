@@ -94,7 +94,7 @@ jobs:
               # depends on that seam is invisible to every test that does not
               # go over a real socket.
               - 'apps/api/src/api-http.listener.ts'
-              - 'apps/api/src/api.entrypoint.ts'
+              - 'apps/api/src/main.ts'
 
   ci:
     needs: changes
