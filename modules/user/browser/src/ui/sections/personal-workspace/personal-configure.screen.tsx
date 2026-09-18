@@ -11,7 +11,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { BudgetOverviewList } from "@langwatch/gateway-browser/surfaces/budget-overview";
 import { toEpochMs } from "@langwatch/time";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
@@ -28,6 +27,7 @@ import {
 } from "../../../behavior/use-personal-context.ts";
 import { formatRelativeTime } from "../../../model/relative-time.ts";
 import { AvatarUploadControl } from "../avatar-upload-control.tsx";
+import { BudgetOverviewList } from "../budget-overview/index.ts";
 import { DevicesPanel } from "../devices-panel.tsx";
 import { HomePagePicker } from "../home-page-picker.tsx";
 import { PersonalOtlpEndpointPanel } from "../personal-otlp-endpoint-panel.tsx";

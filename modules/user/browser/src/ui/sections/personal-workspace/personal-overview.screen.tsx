@@ -1,15 +1,6 @@
 import { Box, Heading, HStack, SimpleGrid, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  type BudgetOverviewItemView,
-  BudgetExceededBanner,
-  BudgetOverviewList,
-  budgetDescription,
-  formatBudgetUsd,
-  isBudgetBreached,
-  isBudgetNearLimit,
-  spentSubline,
-} from "@langwatch/gateway-browser/surfaces/budget-overview";
+import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import numeral from "numeral";
 import { useState } from "react";
 
@@ -20,6 +11,15 @@ import {
 } from "../../blocks/personal-traces-empty-state.tsx";
 import { Link } from "../../elements/personal-link.tsx";
 import { AiToolsPortal } from "../ai-tools-portal.tsx";
+import {
+  type BudgetOverviewItemView,
+  BudgetExceededBanner,
+  BudgetOverviewList,
+  budgetDescription,
+  isBudgetBreached,
+  isBudgetNearLimit,
+  spentSubline,
+} from "../budget-overview/index.ts";
 import { CodingAgentUsageContent } from "../coding-agent-usage-content.tsx";
 import { ConnectYourAgentButton } from "../connect-your-agent-button.tsx";
 import { PersonalRecentTracesTable } from "../personal-recent-traces-table.tsx";

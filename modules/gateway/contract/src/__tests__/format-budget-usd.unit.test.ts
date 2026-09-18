@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatBudgetUsd } from "../format-budget-usd.ts";
+import { formatBudgetUsd } from "../gateway.money.ts";
 
 describe("formatBudgetUsd", () => {
   describe("when amount is exactly zero", () => {

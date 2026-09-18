@@ -10,7 +10,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { formatBudgetUsd } from "@langwatch/gateway-browser/surfaces/budget-overview";
+import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { AlertTriangle, CheckCircle2, Mail, TrendingUp } from "lucide-react";
 import { useState } from "react";
 

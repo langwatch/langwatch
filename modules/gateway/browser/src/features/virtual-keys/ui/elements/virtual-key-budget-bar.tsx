@@ -2,9 +2,8 @@ import { Box } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
-
-import { formatBudgetUsd } from "../../../../model/format-budget-usd.ts";
 
 export type VirtualKeyBudgetBarValue = {
   budgetId: string;

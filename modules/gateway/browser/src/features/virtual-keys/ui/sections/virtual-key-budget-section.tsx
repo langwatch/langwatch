@@ -1,10 +1,10 @@
 import { Badge, Box, HStack, Input, NativeSelect, Spacer, Text, VStack } from "@chakra-ui/react";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { SmallLabel } from "@langwatch/design-system/small-label";
+import { formatBudgetUsd } from "@langwatch/gateway-contract";
 
 import { api } from "../../../../behavior/gateway-api.ts";
-import { formatBudgetUsd } from "../../../../model/format-budget-usd.ts";
 
 export type VirtualKeyBudgetWindow = "DAY" | "WEEK" | "MONTH";
 

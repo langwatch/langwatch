@@ -16,6 +16,7 @@ import {
 import { neutralizeRows } from "@langwatch/csv";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
+import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { BarChart3, Bird, Download, X } from "lucide-react";
 import Parse from "papaparse";
@@ -38,7 +39,6 @@ import {
   resolveTracesHrefForKey,
   type TracesWindow,
 } from "../../../features/virtual-keys/model/traces-href-for-key.ts";
-import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";

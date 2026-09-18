@@ -11,7 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/gateway.ts", "./src/drawers.ts", "./src/ui/sections/budget-overview/index.ts"],
+  "files": ["./src/gateway.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -49,6 +49,9 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"

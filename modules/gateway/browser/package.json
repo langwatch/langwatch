@@ -14,19 +14,6 @@
       "langwatch-declaration-source": "./src/gateway.web.ts",
       "types": "./dist/gateway.web.d.ts",
       "default": "./src/gateway.web.ts"
-    },
-    "./drawers": {
-      "types": "./dist/drawers.d.ts",
-      "default": "./src/drawers.ts"
-    },
-    "./surfaces/budget-overview": {
-      "types": "./dist/ui/sections/budget-overview/index.d.ts",
-      "default": "./src/ui/sections/budget-overview/index.ts"
-    },
-    "./gateway": {
-      "langwatch-declaration-source": "./src/gateway.ts",
-      "types": "./dist/gateway.d.ts",
-      "default": "./src/gateway.ts"
     }
   },
   "scripts": {
@@ -34,7 +21,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/handled-error": "workspace:*",
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-browser-kit": "workspace:*",
@@ -44,6 +30,7 @@
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

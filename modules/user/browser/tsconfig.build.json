@@ -45,7 +45,7 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../gateway/browser/tsconfig.build.json"
+      "path": "../../gateway/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"

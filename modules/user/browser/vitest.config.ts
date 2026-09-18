@@ -38,8 +38,8 @@ export default defineConfig({
       "@langwatch/enterprise-governance-contract": fileURLToPath(
         new URL("../../../enterprise/modules/governance/contract/src/index.ts", import.meta.url),
       ),
-      "@langwatch/gateway-browser/surfaces/budget-overview": fileURLToPath(
-        new URL("../../gateway/web/src/ui/sections/budget-overview/index.ts", import.meta.url),
+      "@langwatch/gateway-contract": fileURLToPath(
+        new URL("../../gateway/contract/src/index.ts", import.meta.url),
       ),
       "@langwatch/model-provider-contract": fileURLToPath(
         new URL("../../model-provider/contract/src/index.ts", import.meta.url),

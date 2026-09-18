@@ -12,12 +12,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit/scope-picker";
+import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
 import {
   Ban,
@@ -49,7 +50,6 @@ import {
 import { VirtualKeyCreateDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-create-drawer.tsx";
 import { VirtualKeyEditDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
-import { formatBudgetUsd } from "../../../model/format-budget-usd.ts";
 import { readableDate } from "../../../model/readable-date.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";

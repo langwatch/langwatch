@@ -22,9 +22,7 @@
       "@langwatch/enterprise-governance-contract": [
         "../../../enterprise/modules/governance/contract/src/index.ts"
       ],
-      "@langwatch/gateway-browser/surfaces/budget-overview": [
-        "../../gateway/web/src/ui/sections/budget-overview/index.ts"
-      ],
+      "@langwatch/gateway-contract": ["../../gateway/contract/src/index.ts"],
       "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
       "@langwatch/user-contract": ["../contract/src/index.ts"]
     },
@@ -52,7 +50,7 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../gateway/browser/tsconfig.build.json"
+      "path": "../../gateway/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"

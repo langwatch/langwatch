@@ -1,7 +1,7 @@
-import type { BudgetOverviewItemView } from "@langwatch/gateway-browser/surfaces/budget-overview";
 import { useMemo } from "react";
 
 import { readableDate } from "../model/display-formatters.ts";
+import type { BudgetOverviewItemView } from "../ui/sections/budget-overview/index.ts";
 import { api } from "./personal-workspace-api.ts";
 import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace-session.ts";
 
