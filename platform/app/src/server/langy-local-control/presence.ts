@@ -13,8 +13,8 @@
 
 import { z } from "zod";
 import type { AgentStateStore } from "~/server/connected-agents/state-store";
-import { PRESENCE_TTL_MS } from "./constants";
-import { policyKey, presenceKey } from "./keys";
+import { CONNECT_TURN_OWED_TTL_MS, PRESENCE_TTL_MS } from "./constants";
+import { owedConnectTurnKey, policyKey, presenceKey } from "./keys";
 import { workspaceInfoSchema } from "./protocol";
 
 /** How long the skip choice outlives the socket that carried it. */
@@ -33,6 +33,15 @@ export const connectedWorkspaceSchema = z.object({
   workspace: workspaceInfoSchema,
 });
 export type ConnectedWorkspace = z.infer<typeof connectedWorkspaceSchema>;
+
+/** The connect turn a folder is owed, and whose turn it is started as. */
+export const owedConnectTurnSchema = z.object({
+  projectId: z.string(),
+  userId: z.string(),
+  requestId: z.string(),
+  owedAt: z.number(),
+});
+export type OwedConnectTurn = z.infer<typeof owedConnectTurnSchema>;
 
 /**
  * What one heartbeat did: it moved the record on, it wrote a lapsed record
@@ -123,6 +132,7 @@ export class LocalWorkspacePresence {
     if (instanceId && current.instanceId !== instanceId) return null;
     await this.store.del(presenceKey(conversationId));
     await this.store.del(policyKey(conversationId));
+    await this.store.del(owedConnectTurnKey(conversationId));
     return current;
   }
 
@@ -144,6 +154,47 @@ export class LocalWorkspacePresence {
       return;
     }
     await this.store.set(policyKey(conversationId), "1", POLICY_TTL_SECONDS);
+  }
+
+  /**
+   * Records that the folder is owed the turn that says it is connected: the
+   * terminal connected while the turn before still read as in flight, so
+   * that turn's end is what starts it.
+   */
+  async oweConnectTurn({
+    conversationId,
+    ...owed
+  }: Omit<OwedConnectTurn, "owedAt"> & {
+    conversationId: string;
+  }): Promise<void> {
+    const record: OwedConnectTurn = { ...owed, owedAt: this.now() };
+    await this.store.set(
+      owedConnectTurnKey(conversationId),
+      JSON.stringify(record),
+      Math.ceil(CONNECT_TURN_OWED_TTL_MS / 1000),
+    );
+  }
+
+  /** The connect turn this folder is owed, or nothing when none is. */
+  async readOwedConnectTurn(
+    conversationId: string,
+  ): Promise<OwedConnectTurn | null> {
+    const raw = await this.store.get(owedConnectTurnKey(conversationId));
+    if (!raw) return null;
+    try {
+      const parsed = owedConnectTurnSchema.safeParse(JSON.parse(raw));
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Forgets the owed turn: a turn placed a call on the folder, the owed turn
+   * started, or the folder is gone.
+   */
+  async settleOwedConnectTurn(conversationId: string): Promise<void> {
+    await this.store.del(owedConnectTurnKey(conversationId));
   }
 
   private ttlSeconds(): number {

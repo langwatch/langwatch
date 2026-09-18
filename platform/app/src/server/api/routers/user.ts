@@ -1200,6 +1200,7 @@ export const userRouter = createTRPCRouter({
       return await service.overviewForUser({
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
+        userEmail: ctx.session.user.email,
         includeTopModels: input.includeTopModels,
       });
     }),

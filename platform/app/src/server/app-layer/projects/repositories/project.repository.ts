@@ -1,4 +1,5 @@
 import type { Project, Team } from "~/generated/prisma/client";
+import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 
 export type ProjectWithTeam = Project & { team: Team };
 
@@ -61,6 +62,10 @@ export interface ProjectWithOrgAdmin {
   firstMessage: boolean;
   organizationId: string | null;
   adminUserId: string | null;
+  /** Which onboarding the organization went through; null before the experiment. */
+  onboardingVariant: OnboardingVariant | null;
+  /** When the organization was created, for milestones measured in days since signup. */
+  organizationCreatedAt: Date | null;
 }
 
 export interface SearchProjectsResult {

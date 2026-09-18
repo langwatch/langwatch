@@ -15,6 +15,15 @@
  * Selecting sends the answer as the NEXT USER MESSAGE (structured part +
  * readable text) through the ordinary send path — the turn machinery is
  * untouched by construction.
+ *
+ * A question is an ask, not a view Langy composed from the project's data, so
+ * it wears none of the derived frame (the dashed provenance chrome is for the
+ * timeseries, table and stats cards): it is a plain option list under the
+ * reply. A `bare` card draws its question as ordinary reply prose above the
+ * options instead of as a title: the ask is then the whole of what Langy
+ * says, so the words live in the question field and the card carries them in
+ * the reply's own typography. The prose sits beside the option buttons, never
+ * inside them, so it is no part of their accessible names.
  */
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type {
@@ -24,8 +33,8 @@ import type {
 } from "@langwatch/langy";
 import { Check, CircleSlash } from "lucide-react";
 import { useState } from "react";
+import { Markdown } from "~/components/Markdown";
 
-import { LangyDerivedCardFrame } from "./LangyDerivedCardFrame";
 import { type ChoicesRefRow, useChoicesRefRows } from "./useChoicesRefRows";
 
 /**
@@ -113,29 +122,42 @@ export function LangyChoicesCard({
   const chosen = new Set(answered ? lockState.optionIds : []);
 
   return (
-    <LangyDerivedCardFrame
-      forming={forming}
-      superseded={superseded}
-      title={
+    <VStack
+      align="stretch"
+      gap={1.5}
+      opacity={superseded ? 0.65 : 1}
+      role="group"
+      // The stable hook for the card as a whole; every other attribute is a
+      // style.
+      data-langy-choices-card
+      data-choices-bare={card.bare === true ? "true" : undefined}
+      data-choices-forming={forming ? "true" : undefined}
+    >
+      {card.bare === true ? (
+        <Box
+          data-langy-choices-prose
+          // The same offsets the reply's own paragraphs get, so the words
+          // sit on the reply's text column and read as one more paragraph.
+          paddingX="2px"
+          css={{
+            "& > div > :first-child": { marginTop: 0 },
+            "& > div > :last-child": { marginBottom: 0 },
+          }}
+        >
+          <Markdown
+            fontSize="langyAnswer"
+            linkVariant="langy"
+            color="langy.answerFg"
+          >
+            {card.question}
+          </Markdown>
+        </Box>
+      ) : (
         <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
           {card.question}
         </Text>
-      }
-      actions={
-        open && multi ? (
-          <Button
-            size="xs"
-            colorPalette="orange"
-            disabled={picked.size === 0}
-            onClick={() =>
-              answer({ blockId: card.blockId, optionIds: [...picked] })
-            }
-          >
-            <Check size={12} /> Answer
-          </Button>
-        ) : undefined
-      }
-    >
+      )}
+
       <VStack align="stretch" gap={1}>
         {card.options.map((option) => {
           const refRow = refRows.get(option.id) ?? { state: "plain" as const };
@@ -145,6 +167,45 @@ export function LangyChoicesCard({
           const selectable = open && !dead;
 
           const { primary, secondary } = optionRowText({ option, refRow });
+
+          // A quiet option is the way out, not the way forward: it reads as a
+          // link so the bordered rows keep the weight, and it answers exactly
+          // like one of them.
+          if (option.quiet === true) {
+            return (
+              <chakra.button
+                key={option.id}
+                type="button"
+                data-testid="langy-choice-option"
+                data-option-id={option.id}
+                data-quiet="true"
+                disabled={!selectable}
+                onClick={() => toggle(option.id)}
+                alignSelf="flex-start"
+                paddingX={2}
+                paddingTop={0.5}
+                textAlign="left"
+                textStyle="xs"
+                textDecoration="underline"
+                textUnderlineOffset="2px"
+                background="transparent"
+                color={
+                  isChosen || isPicked
+                    ? "purple.fg"
+                    : selectable
+                      ? "fg.muted"
+                      : "fg.subtle"
+                }
+                cursor={selectable ? "pointer" : "default"}
+                aria-disabled={!selectable}
+                aria-pressed={isChosen || isPicked}
+                _hover={selectable ? { color: "fg" } : undefined}
+                transition="color 120ms ease"
+              >
+                {primary}
+              </chakra.button>
+            );
+          }
 
           return (
             <chakra.button
@@ -289,6 +350,21 @@ export function LangyChoicesCard({
           </Text>
         ) : null}
       </VStack>
-    </LangyDerivedCardFrame>
+
+      {open && multi ? (
+        <HStack gap={2} align="center" flexWrap="wrap">
+          <Button
+            size="xs"
+            colorPalette="orange"
+            disabled={picked.size === 0}
+            onClick={() =>
+              answer({ blockId: card.blockId, optionIds: [...picked] })
+            }
+          >
+            <Check size={12} /> Answer
+          </Button>
+        </HStack>
+      ) : null}
+    </VStack>
   );
 }

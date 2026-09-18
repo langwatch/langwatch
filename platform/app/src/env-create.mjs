@@ -119,6 +119,13 @@ const optionalIfBuildTime = (schema) => {
  * what makes the alignment stick, and it leaves every other `.env`-pinned value
  * untouched.
  *
+ * `LANGWATCH_ENDPOINT` follows the same rule. It is the address the app hands
+ * out as itself: the Langy worker's callback origin (frame relay, turn
+ * finalize, credential revoke, the MCP server), the scenario child processes,
+ * and every setup snippet the UI shows. Left at the committed 5560 on a
+ * checkout serving 5580, every Langy turn posts its result to a port that is
+ * not this stack and the conversation stalls on "Reconnecting to the agent".
+ *
  * Only a plain `http://localhost:<port>` is treated as stale. Anything else is
  * someone's deliberate setup: `127.0.0.1`, a proxy in front of a preview
  * environment, a tunnel, or haven's `app.<slug>.langwatch.localhost`. Same rule
@@ -141,7 +148,7 @@ export function alignDevAuthUrlsToPort(processEnv = process.env) {
   const target = `http://localhost:${port}`;
   const realigned = [];
 
-  for (const name of ["BASE_HOST", "NEXTAUTH_URL"]) {
+  for (const name of ["BASE_HOST", "NEXTAUTH_URL", "LANGWATCH_ENDPOINT"]) {
     const current = processEnv[name];
     if (!current || current === target) continue;
 

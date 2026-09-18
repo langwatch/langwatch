@@ -51,6 +51,37 @@ describe("alignDevAuthUrlsToPort", () => {
       });
     });
 
+    describe("when the address the app hands out as itself names the committed default port", () => {
+      /** @scenario The address handed to the agent worker follows the port the app was started on */
+      it("realigns it onto the port in use", () => {
+        const env = {
+          NODE_ENV: "development",
+          PORT: "5580",
+          LANGWATCH_ENDPOINT: "http://localhost:5560",
+        };
+
+        expect(align(env)).toEqual([
+          {
+            name: "LANGWATCH_ENDPOINT",
+            from: "http://localhost:5560",
+            to: "http://localhost:5580",
+          },
+        ]);
+        expect(env.LANGWATCH_ENDPOINT).toBe("http://localhost:5580");
+      });
+
+      it("leaves a deliberately configured endpoint alone", () => {
+        const env = {
+          NODE_ENV: "development",
+          PORT: "5580",
+          LANGWATCH_ENDPOINT: "https://app.langwatch.ai",
+        };
+
+        expect(align(env)).toEqual([]);
+        expect(env.LANGWATCH_ENDPOINT).toBe("https://app.langwatch.ai");
+      });
+    });
+
     describe("when the address already names the port in use", () => {
       it("changes nothing", () => {
         const env = {

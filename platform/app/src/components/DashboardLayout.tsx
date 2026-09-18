@@ -120,6 +120,7 @@ const PublicPageFrame = ({
           minHeight="calc(100vh - 60px)"
           maxHeight="calc(100vh - 60px)"
           position="relative"
+          data-tour="main-content"
         >
           <DashboardPageBody publicPage {...props}>
             {children}

@@ -118,9 +118,10 @@ export type UserWaitBuffer = Pick<
 export interface UserWaitQuestion {
   question: string;
   header?: string;
-  options: Array<{ label: string; description?: string }>;
+  options: Array<{ label: string; description?: string; quiet?: boolean }>;
   multiple?: boolean;
   allowOther?: boolean;
+  bare?: boolean;
 }
 
 export interface UserWaitServiceOptions {

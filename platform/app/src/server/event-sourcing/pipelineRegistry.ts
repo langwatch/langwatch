@@ -73,6 +73,11 @@ import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-norma
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { featureFlagService } from "~/server/featureFlag";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { readGuidedOnboardingForProject } from "~/server/onboarding/onboarding-variant";
+import {
+  createProjectActiveDayTracker,
+  type ProjectActiveDayTracker,
+} from "~/server/onboarding/project-active-day";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
@@ -102,6 +107,7 @@ import type { LangyTokenBuffer } from "../app-layer/langy/streaming/langyTokenBu
 import type { LangyTurnHandoffStore } from "../app-layer/langy/streaming/langyTurnHandoff";
 import {
   createAgentTurnLivenessSubscriber,
+  createGuidedOnboardingTurnFailedSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
 } from "../app-layer/langy/subscribers";
@@ -129,6 +135,9 @@ import type {
   TopicClusteringOutcomeCommands,
   TopicClusteringRunPort,
 } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
+import { createLocalConnectTurnSubscriber } from "../langy-local-control/connect-turn.subscriber";
+import { getLocalControlRuntime } from "../langy-local-control/runtime";
+import { localConnectTurnStarter } from "../langy-local-control/session.core";
 import { publishCancellation } from "../scenarios/cancellation-channel";
 import { SCENARIO_EVALUATIONS_JOB } from "../scenarios/evaluations/constants";
 import {
@@ -567,6 +576,8 @@ export class PipelineRegistry {
     (projectId: string) => Promise<void>
   >("bootstrapTopicClustering");
 
+  private activeDayTracker: ProjectActiveDayTracker | null = null;
+
   private cached<State>(
     inner: FoldProjectionStore<State>,
     keyPrefix: string,
@@ -574,6 +585,18 @@ export class PipelineRegistry {
     return new RedisCachedFoldStore<State>(inner, this.deps.redis as Redis, {
       keyPrefix,
     });
+  }
+
+  /**
+   * One tracker per registry: the trace pipeline and the simulation pipeline
+   * both mark the project's active day, and they share the Redis key.
+   */
+  private projectActiveDayTracker(): ProjectActiveDayTracker {
+    this.activeDayTracker ??= createProjectActiveDayTracker({
+      redis: this.deps.redis,
+      projects: this.deps.projects,
+    });
+    return this.activeDayTracker;
   }
 
   registerAll() {
@@ -1083,6 +1106,22 @@ export class PipelineRegistry {
       createLangyTurnAdmissionLifecycleSubscriber({
         admissions: this.deps.repositories.langyTurnAdmission,
       });
+    const guidedOnboardingTurnFailedSubscriber =
+      createGuidedOnboardingTurnFailedSubscriber({
+        guidedOnboarding: {
+          read: ({ projectId }) =>
+            readGuidedOnboardingForProject({
+              prisma: this.deps.prisma,
+              projectId,
+            }),
+        },
+        conversations: conversationReader,
+      });
+    const localConnectTurnSubscriber = createLocalConnectTurnSubscriber({
+      presence: () => getLocalControlRuntime().presence,
+      conversations: conversationReader,
+      turns: localConnectTurnStarter(this.deps.prisma),
+    });
 
     const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
@@ -1097,6 +1136,8 @@ export class PipelineRegistry {
           livenessSubscriber,
           broadcastSubscriber,
           admissionLifecycleSubscriber,
+          guidedOnboardingTurnFailedSubscriber,
+          localConnectTurnSubscriber,
         ],
       }),
     );
@@ -1477,6 +1518,7 @@ export class PipelineRegistry {
       projects: this.deps.projects,
       bootstrapTopicClustering: (projectId) =>
         this.bootstrapTopicClustering.fn(projectId),
+      trackActiveDay: this.projectActiveDayTracker(),
     });
 
     const simulationMetricsSyncHandler = createSimulationMetricsSyncHandler({
@@ -1875,6 +1917,10 @@ export class PipelineRegistry {
         scenarioEvaluations: {
           loadRunAttachments: loadRunEvaluators,
           enqueue: enqueueScenarioEvaluations.fn,
+        },
+        scenarioRunMilestones: {
+          projects: this.deps.projects,
+          trackActiveDay: this.projectActiveDayTracker(),
         },
       }),
     );

@@ -825,7 +825,7 @@ langwatch scenario run <scenarioId> --target connected:support-agent@development
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
 - For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row. A name with a space is quoted whole: `--target "connected:ACME checkout"`.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
@@ -838,7 +838,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 #### 6. Run a test suite
 
 ```bash
-langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
+langwatch test-suite run "<testSuiteId|name>" --target http:<agentId> --format json
 
 langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \

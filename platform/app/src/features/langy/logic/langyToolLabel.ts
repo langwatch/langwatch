@@ -156,6 +156,7 @@ const LOCAL_TOOLS: Record<string, string> = {
   local_grep: "Searching the code",
   local_find: "Looking through files",
   local_ls: "Looking through files",
+  local_langwatch_env: "Writing LangWatch credentials",
 };
 
 /** Generic (non-LangWatch, non-GitHub) tools, by what they do. */

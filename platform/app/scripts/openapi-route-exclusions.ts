@@ -151,6 +151,11 @@ export const UNPUBLISHED = [
     why: "in-app report form intake",
   },
   {
+    match: "/api/v1/onboarding/guided",
+    category: "internal",
+    why: "the guided onboarding state of the caller's organization, read and completed by Langy through the CLI. It reports on the organization an application runs inside rather than on the application's own data, so it is not exported from the client SDK's public index and there is nothing for an API-key caller to do with it",
+  },
+  {
     match: "/api/unsubscribe",
     category: "internal",
     why: "RFC 8058 one-click unsubscribe, addressed by mail clients from a link we send",

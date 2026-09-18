@@ -77,6 +77,19 @@ export interface CioPersonTraits {
   // Billing
   plan: string;
   has_subscription: boolean;
+
+  // Guided onboarding (guidedOnboarding hook and the first-login backfill).
+  // "guided" | "classic"; absent for organizations that predate the experiment.
+  onboarding_variant?: string;
+  // Comma list of the picked paths in pick order, e.g. "gateway,llmops".
+  onboarding_paths?: string;
+  onboarding_primary_path?: string;
+  guided_onboarding_provider?: string;
+  // "completed" | "skipped"
+  guided_onboarding_tour?: string;
+  // Comma list of the paths whose setup completed.
+  guided_onboarding_completed_paths?: string;
+  guided_onboarding_completed_at?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +102,10 @@ export interface CioOrgTraits {
   company_size: string;
   member_count: number;
   project_count: number;
+  onboarding_variant?: string;
+  onboarding_paths?: string;
+  onboarding_primary_path?: string;
+  guided_onboarding_completed_paths?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +124,13 @@ export type CioEventName =
   | "first_prompt_created"
   | "first_simulation_ran"
   | "joined_via_invite"
-  | "joined_via_sso";
+  | "joined_via_sso"
+  | "onboarding_paths_selected"
+  | "onboarding_path_llmops"
+  | "onboarding_path_coding_agents"
+  | "onboarding_path_gateway"
+  | "onboarding_path_governance"
+  | "guided_onboarding_path_completed";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union

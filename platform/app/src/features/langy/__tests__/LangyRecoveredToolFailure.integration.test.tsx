@@ -50,7 +50,8 @@ describe("a failed step on a settled turn", () => {
     it("folds the failure to one line rather than a card", () => {
       const { container } = renderActivity([failedProbe, reply]);
 
-      expect(container.textContent).toContain("and Langy carried on");
+      expect(container.textContent).toContain("and Langy answered below");
+      expect(container.textContent).not.toContain("carried on");
       expect(container.textContent).not.toContain(
         "This step couldn't be completed.",
       );
@@ -78,7 +79,7 @@ describe("a failed step on a settled turn", () => {
       expect(container.textContent).toContain(
         "This step couldn't be completed.",
       );
-      expect(container.textContent).not.toContain("and Langy carried on");
+      expect(container.textContent).not.toContain("and Langy answered below");
     });
   });
 
@@ -99,7 +100,7 @@ describe("a failed step on a settled turn", () => {
         </ChakraProvider>,
       );
 
-      expect(container.textContent).toContain("and Langy carried on");
+      expect(container.textContent).toContain("and Langy answered below");
     });
   });
 

@@ -61,7 +61,7 @@ async function callWaitingOnACard(clock: { now: number }) {
     turnId,
     call: {
       tool: "local_bash",
-      params: { command: "git push -u origin HEAD", timeout: 30 },
+      params: { command: "pnpm typecheck", timeout: 30 },
     },
     timeoutMs: COMMAND_TIMEOUT_MS,
   });

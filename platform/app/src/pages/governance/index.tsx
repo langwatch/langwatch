@@ -13,6 +13,7 @@ import {
 } from "~/components/governance/sample";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
@@ -112,6 +113,8 @@ function GovernanceOverviewPage() {
               size="sm"
             />
           </HStack>
+
+          <GuidedOnboardingOffer space="governance" />
 
           {orgId && !sample.active && (
             <QuarantineFillAlert organizationId={orgId} />
