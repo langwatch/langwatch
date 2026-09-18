@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import path from "path";
 
 import {
@@ -23,6 +23,60 @@ import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
 // This package declares `"type": "module"`, so Vite bundles the config as ESM
 // and `__dirname` does not exist. `import.meta.dirname` is the same directory.
 const here = import.meta.dirname;
+const repoRoot = path.resolve(here, "../..");
+
+type PackageExportTarget = string | { default?: string };
+
+/** Every immediate directory of `base` (one level, e.g. `packages/*`). */
+function childDirectories(base: string): string[] {
+  if (!existsSync(base)) return [];
+  return readdirSync(base, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(base, entry.name));
+}
+
+function escapeForExactRegex(specifier: string): string {
+  return specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** One alias entry per real subpath a package's own exports map declares. */
+function aliasesForPackage(dir: string): { find: RegExp; replacement: string }[] {
+  const packageJsonPath = path.join(dir, "package.json");
+  if (!existsSync(packageJsonPath)) return [];
+
+  const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
+    name?: string;
+    exports?: Record<string, PackageExportTarget>;
+  };
+  if (!pkg.name?.startsWith("@langwatch/") || !pkg.exports) return [];
+
+  const aliases: { find: RegExp; replacement: string }[] = [];
+  for (const [subpath, target] of Object.entries(pkg.exports)) {
+    if (subpath.includes("*") || subpath === "./package.json") continue;
+    const relativeTarget = typeof target === "string" ? target : target.default;
+    if (!relativeTarget) continue;
+
+    const specifier = subpath === "." ? pkg.name : `${pkg.name}${subpath.slice(1)}`;
+    aliases.push({
+      find: new RegExp(`^${escapeForExactRegex(specifier)}$`),
+      replacement: path.resolve(dir, relativeTarget),
+    });
+  }
+  return aliases;
+}
+
+// Dev only (see the `resolve.alias` wiring below): resolves every
+// `@langwatch/*` workspace package straight from source, bypassing the
+// node_modules symlink `pnpm install` normally has to create first —
+// see dev-experience defect investigated 2026-09-18.
+function workspaceSourceAliases(): { find: RegExp; replacement: string }[] {
+  const packageDirs = [
+    ...childDirectories(path.join(repoRoot, "packages")),
+    ...childDirectories(path.join(repoRoot, "modules")).flatMap(childDirectories),
+    ...childDirectories(path.join(repoRoot, "enterprise", "modules")).flatMap(childDirectories),
+  ];
+  return packageDirs.flatMap(aliasesForPackage);
+}
 
 // Load .env for Vite config (matches API config source); dotenv won't override haven's vars.
 const rootEnvPath = path.resolve(here, "../../.env");
@@ -155,6 +209,9 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // z.record's key/value overload detection), so a second physical copy
       // resolved from a package's own node_modules silently mis-parses.
       dedupe: ["zod"],
+      // Dev only: see workspaceSourceAliases above. Production keeps the
+      // ordinary node_modules/exports-map resolution untouched.
+      alias: command === "serve" ? workspaceSourceAliases() : [],
     },
     define: {
       // Literal replacements for process.env references in browser code.
