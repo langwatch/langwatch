@@ -42,15 +42,25 @@
  * @see ../catalog/derivePostgresCatalog.ts — the derivation whose views this seeds
  */
 
+import type { DerivedPostgresView } from "../catalog/derivePostgresCatalog";
+import { prismaManifestEnum } from "../catalog/prismaManifest";
 import type {
   PrismaField,
   PrismaManifest,
   PrismaModel,
 } from "../catalog/prismaSchema";
 
-/** The subset of a derived view this seeder reads. Structural, to stay decoupled. */
+/**
+ * The subset of a derived view this seeder reads, structural to stay decoupled.
+ *
+ * A supertype of {@link DerivedPostgresView}: `postgres` is optional here to
+ * match its `LangWatchQLViewDefinition.postgres?` origin, so the derivation's
+ * output feeds this seeder without a cast. The seeder only ever receives real
+ * derived views, every one of which carries `postgres`, so the internals read
+ * it non-null.
+ */
 export interface SeedableView {
-  readonly postgres: {
+  readonly postgres?: {
     /** Application table the view reads. */
     readonly baseRelation: string;
     /** Column read on the last tenant-path alias to yield `TenantId`. */
@@ -126,10 +136,7 @@ function foreignKeyTargets(model: PrismaModel): Map<string, string> {
 
 /** The first value of an enum, cast to its Postgres type. */
 function enumDefault(manifest: PrismaManifest, enumName: string): CellValue {
-  const values = manifest.enums.find(
-    (entry) => entry.name === enumName,
-  )?.values;
-  const first = values?.[0];
+  const first = prismaManifestEnum(manifest, enumName).values[0];
   if (!first) return OMIT;
   return `${quoteLiteral(first)}::${quoteIdent(enumName)}`;
 }
@@ -192,11 +199,12 @@ function tenantLink(
   ids: SeedIds,
   modelByTable: ReadonlyMap<string, PrismaModel>,
 ): { column: string; value: string } {
-  const path = view.postgres.tenantPath ?? [];
+  const postgres = view.postgres!;
+  const path = postgres.tenantPath ?? [];
   if (path.length === 0) {
     // Project-scoped: the tenant-source column is a real column on the base
     // relation (`projectId`, or `id` on Project itself), set to the project.
-    return { column: view.postgres.tenantSourceColumn, value: ids.tenantId };
+    return { column: postgres.tenantSourceColumn, value: ids.tenantId };
   }
   const first = path[0]!;
   if (first.on.from === "teamId")
@@ -457,7 +465,7 @@ export function postgresModelSeedStatements({
   organizationId: string;
   teamId: string;
   userId: string;
-  views: readonly SeedableView[];
+  views: readonly DerivedPostgresView[];
   manifest: PrismaManifest;
   alreadySeeded: readonly string[];
   schema?: string;
@@ -472,6 +480,7 @@ export function postgresModelSeedStatements({
   const seen = new Set<string>();
   const toSeed: { model: PrismaModel; view: SeedableView }[] = [];
   for (const view of views) {
+    if (!view.postgres) continue;
     const model = modelByTable.get(view.postgres.baseRelation);
     if (!model || skipped.has(model.name) || seen.has(model.name)) continue;
     seen.add(model.name);

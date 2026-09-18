@@ -238,9 +238,10 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
      * only the shipped, migrated `trace_summaries` table carries `TopicId`.
      * Falling back to asserting the `topics` view alone still proves the
      * property this file owns: only the caller's own project's topics are
-     * ever reachable.
+     * ever reachable. The real JOIN binding for "Traffic by topic name" lives
+     * in `catalogStatements.integration.test.ts`, so this test carries no such
+     * annotation.
      */
-    /** @scenario "Traffic by topic name" */
     it("lists only the caller's own project's topics", async () => {
       const rows = await selectRows<{
         TopicId: string;

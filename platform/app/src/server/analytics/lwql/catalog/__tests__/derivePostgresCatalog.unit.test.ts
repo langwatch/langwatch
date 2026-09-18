@@ -28,6 +28,7 @@ import {
 import {
   assertPostgresSkipReasons,
   LWQL_POSTGRES_SKIPPED_MODELS,
+  POSTGRES_SKIP_REASON_PREFIXES,
 } from "../postgresSkippedModels";
 import { LWQL_POSTGRES_ALL_OVERRIDES } from "../postgresViews";
 import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "../prismaManifest";
@@ -250,10 +251,7 @@ describe("given the derived Postgres catalog", () => {
       expect(
         projects.columns.some((column) => column.name === "OwnerUserId"),
       ).toBe(true);
-      expect(
-        (projects as unknown as { skipColumns: Record<string, string> })
-          .skipColumns.apiKey,
-      ).toContain("secret");
+      expect(projects.skipColumns.apiKey).toContain("secret");
     });
 
     it("classifies secret, email and surviving names", () => {
@@ -262,10 +260,14 @@ describe("given the derived Postgres catalog", () => {
       expect(isStrippedByDefault("ingestSecretHash")).toBeDefined();
       expect(isStrippedByDefault("lwqlKey")).toBeDefined();
       expect(isStrippedByDefault("s3AccessKeyId")).toBeDefined();
+      // A plural key/hash suffix is a secret even with no secret word in it.
+      expect(isStrippedByDefault("customKeys")).toBeDefined();
       expect(isStrippedByDefault("email")).toBeDefined();
       expect(isStrippedByDefault("reviewerEmail")).toBeDefined();
       expect(isStrippedByDefault("parentId")).toBeUndefined();
+      // `tokens` is a count, not a credential — kept.
       expect(isStrippedByDefault("promptTokens")).toBeUndefined();
+      expect(isStrippedByDefault("completionTokens")).toBeUndefined();
       expect(isStrippedByDefault("userId")).toBeUndefined();
     });
 
@@ -449,14 +451,70 @@ describe("given the derived Postgres catalog", () => {
     });
   });
 
+  describe("when a sensitive column dodges the name rules", () => {
+    /** The column is recorded as stripped and no exposed column reads it. */
+    const assertStripped = (baseRelation: string, source: string) => {
+      const view = byModel.get(baseRelation);
+      expect(view, `${baseRelation} should be derived`).toBeDefined();
+      expect(
+        view!.skipColumns[source],
+        `${baseRelation}.${source} should be recorded as stripped`,
+      ).toBeDefined();
+      expect(
+        view!.columns.some((column) => column.sourceColumns.includes(source)),
+        `${baseRelation}.${source} must not be exposed`,
+      ).toBe(false);
+    };
+
+    it("strips WebhookEndpoint.sqsExternalId despite its Id suffix", () => {
+      assertStripped("WebhookEndpoint", "sqsExternalId");
+    });
+
+    it("strips ModelProvider.customKeys by the plural-key suffix rule", () => {
+      const view = byModel.get("ModelProvider")!;
+      expect(view.columns.some((column) => column.name === "CustomKeys")).toBe(
+        false,
+      );
+      expect(view.skipColumns.customKeys).toBeDefined();
+    });
+
+    it("strips DiscoveredPerson raw external identity", () => {
+      assertStripped("DiscoveredPerson", "rawActorId");
+      assertStripped("DiscoveredPerson", "displayText");
+    });
+
+    it("strips AuditLog request forensics and payload diffs", () => {
+      for (const source of [
+        "ipAddress",
+        "userAgent",
+        "args",
+        "before",
+        "after",
+      ]) {
+        assertStripped("AuditLog", source);
+      }
+    });
+
+    it("strips IngestionSource credential-bearing config", () => {
+      assertStripped("IngestionSource", "parserConfig");
+      assertStripped("IngestionSource", "pollerCursor");
+    });
+  });
+
   describe("when the skip list is validated", () => {
     /** @scenario "A skip needs a recorded reason" */
-    it("refuses an empty reason, an un-prefixed reason and a low-value reason", () => {
+    it("accepts every category prefix and refuses empty, low-value or unprefixed reasons", () => {
+      for (const prefix of POSTGRES_SKIP_REASON_PREFIXES) {
+        expect(
+          () => assertPostgresSkipReasons({ X: `${prefix} really` }),
+          `"${prefix}" should be an accepted category`,
+        ).not.toThrow();
+      }
       expect(() => assertPostgresSkipReasons({ X: "" })).toThrow();
       expect(() => assertPostgresSkipReasons({ X: "low value" })).toThrow();
       expect(() =>
-        assertPostgresSkipReasons({ X: "no tenant column: really none" }),
-      ).not.toThrow();
+        assertPostgresSkipReasons({ X: "some arbitrary unprefixed reason" }),
+      ).toThrow();
     });
   });
 });

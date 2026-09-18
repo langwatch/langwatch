@@ -199,6 +199,122 @@ function parseFieldLine(
   };
 }
 
+/** Mutable state threaded through the line-by-line scan in {@link parsePrismaSchema}. */
+interface ParseState {
+  readonly rawModels: RawModel[];
+  readonly enums: PrismaEnum[];
+  model: RawModel | undefined;
+  modelIgnored: boolean;
+  enumCurrent: { name: string; values: string[] } | undefined;
+  pendingDocs: string[];
+}
+
+/**
+ * Consumes a `///` doc line or a blank/`//` line that breaks a doc block from
+ * what follows. Returns `true` when the line was one of those (nothing left
+ * for the caller to do with it).
+ */
+function consumeDocOrBlankLine(trimmed: string, state: ParseState): boolean {
+  if (trimmed.startsWith("///")) {
+    state.pendingDocs.push(docLine(trimmed));
+    return true;
+  }
+  if (trimmed === "" || trimmed.startsWith("//")) {
+    state.pendingDocs = [];
+    return true;
+  }
+  return false;
+}
+
+/** A line inside `enum X { ... }`: closes the enum, or records a value. */
+function parseEnumLine(line: string, state: ParseState): void {
+  const enumCurrent = state.enumCurrent;
+  if (!enumCurrent) return;
+  if (line === "}") {
+    state.enums.push({ name: enumCurrent.name, values: enumCurrent.values });
+    state.enumCurrent = undefined;
+  } else if (!line.startsWith("@@")) {
+    const value = /^(\w+)/.exec(line);
+    if (value?.[1]) enumCurrent.values.push(value[1]);
+  }
+  state.pendingDocs = [];
+}
+
+/** A `@@map`/`@@id`/`@@ignore` block-attribute line inside a model. */
+function applyModelAttributeLine(
+  line: string,
+  model: RawModel,
+  state: ParseState,
+): void {
+  const mapMatch = /@@map\("([^"]*)"\)/.exec(line);
+  if (mapMatch?.[1]) {
+    model.tableName = mapMatch[1];
+  }
+  const idMatch = /@@id\(\[([^\]]*)\]/.exec(line);
+  if (idMatch?.[1]) {
+    model.primaryKey = idMatch[1]
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
+  }
+  if (/@@ignore\b/.test(line)) state.modelIgnored = true;
+  state.pendingDocs = [];
+}
+
+/** A field-declaration line inside a model, added unless `@ignore`d. */
+function applyModelFieldLine(
+  line: string,
+  model: RawModel,
+  state: ParseState,
+): void {
+  const parsed = parseFieldLine(line, state.pendingDocs.join("\n"));
+  state.pendingDocs = [];
+  if (!parsed || parsed.isIgnored) return;
+  model.fields.push(parsed.field);
+  if (parsed.isId && model.primaryKey.length === 0) {
+    model.primaryKey.push(parsed.field.name);
+  }
+}
+
+/** A line inside `model X { ... }`: closing brace, `@@` attribute, or field. */
+function parseModelLine(line: string, state: ParseState): void {
+  const model = state.model;
+  if (!model) return;
+  if (line === "}") {
+    if (!state.modelIgnored) state.rawModels.push(model);
+    state.model = undefined;
+    state.pendingDocs = [];
+    return;
+  }
+  if (line.startsWith("@@")) {
+    applyModelAttributeLine(line, model, state);
+    return;
+  }
+  applyModelFieldLine(line, model, state);
+}
+
+/** A top-level line: opens a `model` or `enum` block, otherwise is ignored. */
+function startModelOrEnum(line: string, state: ParseState): void {
+  const modelStart = /^model\s+(\w+)\s*\{/.exec(line);
+  if (modelStart?.[1]) {
+    state.model = {
+      name: modelStart[1],
+      tableName: modelStart[1],
+      documentation: state.pendingDocs.join("\n"),
+      primaryKey: [],
+      fields: [],
+    };
+    state.modelIgnored = false;
+    state.pendingDocs = [];
+    return;
+  }
+  const enumStart = /^enum\s+(\w+)\s*\{/.exec(line);
+  if (enumStart?.[1]) {
+    state.enumCurrent = { name: enumStart[1], values: [] };
+  }
+  state.pendingDocs = [];
+}
+
 /**
  * Parses the datamodel out of `prisma/schema.prisma` text.
  *
@@ -209,95 +325,43 @@ function parseFieldLine(
  * `@ignore` fields and `@@ignore` models are dropped so they never reach a view.
  */
 export function parsePrismaSchema(text: string): PrismaManifest {
-  const rawModels: RawModel[] = [];
-  const enums: PrismaEnum[] = [];
-
-  let model: RawModel | undefined;
-  let modelIgnored = false;
-  let enumCurrent: { name: string; values: string[] } | undefined;
-  let pendingDocs: string[] = [];
+  const state: ParseState = {
+    rawModels: [],
+    enums: [],
+    model: undefined,
+    modelIgnored: false,
+    enumCurrent: undefined,
+    pendingDocs: [],
+  };
 
   for (const rawLine of text.split("\n")) {
     const trimmed = rawLine.trim();
-
-    if (trimmed.startsWith("///")) {
-      pendingDocs.push(docLine(trimmed));
-      continue;
-    }
-    // A blank line or a `//` comment breaks a doc block from what follows.
-    if (trimmed === "" || trimmed.startsWith("//")) {
-      pendingDocs = [];
-      continue;
-    }
+    if (consumeDocOrBlankLine(trimmed, state)) continue;
 
     const line = stripLineComment(trimmed).trimEnd();
 
-    if (enumCurrent) {
-      if (line === "}") {
-        enums.push({ name: enumCurrent.name, values: enumCurrent.values });
-        enumCurrent = undefined;
-      } else if (!line.startsWith("@@")) {
-        const value = /^(\w+)/.exec(line);
-        if (value?.[1]) enumCurrent.values.push(value[1]);
-      }
-      pendingDocs = [];
+    if (state.enumCurrent) {
+      parseEnumLine(line, state);
       continue;
     }
-
-    if (model) {
-      if (line === "}") {
-        if (!modelIgnored) rawModels.push(model);
-        model = undefined;
-        pendingDocs = [];
-        continue;
-      }
-      if (line.startsWith("@@")) {
-        const mapMatch = /@@map\("([^"]*)"\)/.exec(line);
-        if (mapMatch?.[1]) {
-          model.tableName = mapMatch[1];
-        }
-        const idMatch = /@@id\(\[([^\]]*)\]/.exec(line);
-        if (idMatch?.[1]) {
-          model.primaryKey = idMatch[1]
-            .split(",")
-            .map((name) => name.trim())
-            .filter(Boolean);
-        }
-        if (/@@ignore\b/.test(line)) modelIgnored = true;
-        pendingDocs = [];
-        continue;
-      }
-      const parsed = parseFieldLine(line, pendingDocs.join("\n"));
-      pendingDocs = [];
-      if (parsed && !parsed.isIgnored) {
-        model.fields.push(parsed.field);
-        if (parsed.isId && model.primaryKey.length === 0) {
-          model.primaryKey.push(parsed.field.name);
-        }
-      }
+    if (state.model) {
+      parseModelLine(line, state);
       continue;
     }
-
-    const modelStart = /^model\s+(\w+)\s*\{/.exec(line);
-    if (modelStart?.[1]) {
-      model = {
-        name: modelStart[1],
-        tableName: modelStart[1],
-        documentation: pendingDocs.join("\n"),
-        primaryKey: [],
-        fields: [],
-      };
-      modelIgnored = false;
-      pendingDocs = [];
-      continue;
-    }
-    const enumStart = /^enum\s+(\w+)\s*\{/.exec(line);
-    if (enumStart?.[1]) {
-      enumCurrent = { name: enumStart[1], values: [] };
-    }
-    pendingDocs = [];
+    startModelOrEnum(line, state);
   }
 
+  return buildManifest(state.rawModels, state.enums);
+}
+
+/**
+ * Resolves every raw field's {@link PrismaFieldKind} against the full set of
+ * model and enum names collected during the scan, producing the final manifest.
+ */
+function buildManifest(
+  rawModels: readonly RawModel[],
+  enums: readonly PrismaEnum[],
+): PrismaManifest {
   const modelNames = new Set(rawModels.map((entry) => entry.name));
   const enumNames = new Set(enums.map((entry) => entry.name));
 
@@ -306,31 +370,40 @@ export function parsePrismaSchema(text: string): PrismaManifest {
     tableName: entry.tableName,
     documentation: entry.documentation,
     primaryKey: entry.primaryKey,
-    fields: entry.fields.map((field) => {
-      const kind = resolveKind({ field, modelNames, enumNames });
-      return {
-        name: field.name,
-        columnName: field.columnName,
-        type: field.type,
-        kind,
-        isList: field.isList,
-        isOptional: field.isOptional,
-        documentation: field.documentation,
-        ...(field.decimal ? { decimal: field.decimal } : {}),
-        ...(kind === "relation"
-          ? {
-              relation: {
-                fields: field.relationFields,
-                references: field.relationReferences,
-                to: field.type,
-              },
-            }
-          : {}),
-      };
-    }),
+    fields: entry.fields.map((field) =>
+      resolveField(field, modelNames, enumNames),
+    ),
   }));
 
   return { models, enums };
+}
+
+/** Resolves one raw field's {@link PrismaFieldKind} and attaches `relation` when applicable. */
+function resolveField(
+  field: RawField,
+  modelNames: ReadonlySet<string>,
+  enumNames: ReadonlySet<string>,
+): PrismaField {
+  const kind = resolveKind({ field, modelNames, enumNames });
+  return {
+    name: field.name,
+    columnName: field.columnName,
+    type: field.type,
+    kind,
+    isList: field.isList,
+    isOptional: field.isOptional,
+    documentation: field.documentation,
+    ...(field.decimal ? { decimal: field.decimal } : {}),
+    ...(kind === "relation"
+      ? {
+          relation: {
+            fields: field.relationFields,
+            references: field.relationReferences,
+            to: field.type,
+          },
+        }
+      : {}),
+  };
 }
 
 /**

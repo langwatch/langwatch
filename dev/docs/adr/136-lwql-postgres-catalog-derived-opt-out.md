@@ -128,8 +128,9 @@ column from being either silently invisible (dropped) or silently exposed
 
 **The cost this decision accepts.** `lwqlPostgresReaderConnectionLimit` stays
 formula-driven, but its input — the number of mapped tables — grows from six
-to roughly 85, and the formula assigns about two connections per mapped table.
-Infra has to size the reader role's `CONNECTION LIMIT` and the primary's
+to 93, and the formula assigns about two connections per mapped table, for a
+budget of roughly 189 (93 × 2 + 3). Infra has to size the reader role's
+`CONNECTION LIMIT` and the primary's
 `max_connections` for that new magnitude before this ships anywhere beyond the
 Testcontainers harness. Separately, the SaaS render-config in
 `langwatch-saas` is a third list — outside this repository — that mirrors the
@@ -147,8 +148,8 @@ change and is a known manual step, not an oversight.
 - **Negative.** The provisioning surface is bigger: more approved views, more
   engine tables, more row policies, all generated per model instead of
   hand-counted at six. The PostgreSQL connection budget grows with the
-  catalog, and a caller reading through the schema door now finds roughly
-  85 Postgres-backed views instead of six, which is more for a human to read
+  catalog, and a caller reading through the schema door now finds 93
+  Postgres-backed views instead of six, which is more for a human to read
   through even though each one follows the same shape.
 - **Neutral.** The only hand-written artifacts left in the Postgres half of
   the catalog are the override files (`catalog/postgresOverrides/*.ts`) and

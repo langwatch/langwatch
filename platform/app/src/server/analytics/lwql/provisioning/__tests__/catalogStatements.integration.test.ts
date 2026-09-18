@@ -202,6 +202,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      * matters.
      */
     /** @scenario "The catalog's declared columns match the tables the views read" */
+    /** @scenario "The catalog ground truth lists every derived view" */
     it("declares only columns the source tables have", async () => {
       // The source of a PostgreSQL-resident dataset is its engine table in the
       // LangWatchQL database, not a migrated fact table, so where to look is
@@ -236,6 +237,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
     });
 
     /** @scenario "The catalog's declared columns match the tables the views read" */
+    /** @scenario "The catalog ground truth lists every derived view" */
     it("declares the types the views actually return", async () => {
       for (const view of LWQL_VIEW_CATALOG) {
         const actual = await selectRows<{ name: string; type: string }>(
