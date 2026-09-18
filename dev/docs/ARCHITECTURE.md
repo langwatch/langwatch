@@ -243,7 +243,8 @@ const server = Server.create({ name: "langwatch-api", logger, healthPort: config
 
 const app = await createProcessApp("api", config) // resolves process AND module
   .withModules(processModules)                    //   dependencies from config
-  .withDependencies({ licenseSource })            // the one code override
+  .withModuleDependencies({ licenseSource })      // code overrides beat config; two
+                                                  //   kinds: process and module (§5)
   .boot();
 
 await server.serve(app, { ui: config.process.ui }); // worker: server.run(app)
@@ -357,8 +358,10 @@ process uses Prisma it uses it everywhere. **Module dependencies** are what
 only that module needs. A module **registers** process dependencies by name
 (strings: `registerProcessDependencies`); the app **adds** them as objects
 (`addProcessDependencies`); `createProcessApp(role, config)` resolves both
-kinds from config, with `.withDependencies({...})` as the one code
-override. Delivery is **registry-based**: a module declares what it needs
+kinds from config. The code override also comes in two, one per kind —
+`withProcessDependencies({...})` and `withModuleDependencies({...})` (exact
+spellings settle with the wave) — and an override always takes precedence
+over what config resolved. Delivery is **registry-based**: a module declares what it needs
 or supports in a registry (the `defineRepositories({ live, memory })`
 pattern generalised — the module says "for this I support these", the app
 chooses which), and every `create()` **arrives with its things already
