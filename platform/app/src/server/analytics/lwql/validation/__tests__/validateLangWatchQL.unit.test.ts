@@ -527,6 +527,27 @@ describe("validateLangWatchQL", () => {
       ],
       ["GROUP BY *", "SELECT count() FROM traces GROUP BY *"],
       ["ORDER BY t.*", "SELECT t.TraceId FROM traces AS t ORDER BY t.*"],
+      ["* APPLY (toString)", "SELECT * APPLY (toString) FROM traces"],
+      [
+        "COLUMNS('^Trace') APPLY (toString)",
+        "SELECT COLUMNS('^Trace') APPLY (toString) FROM traces",
+      ],
+      [
+        "a named WINDOW partitioned by a matcher",
+        "SELECT count(*) OVER w FROM traces WINDOW w AS (PARTITION BY COLUMNS('^bo'))",
+      ],
+      [
+        "COLUMNS('body', 'TraceId') with string-literal members",
+        "SELECT COLUMNS('body', 'TraceId') FROM traces",
+      ],
+      [
+        "t.COLUMNS('body', 'TraceId') with string-literal members",
+        "SELECT t.COLUMNS('body', 'TraceId') FROM traces AS t",
+      ],
+      [
+        "COLUMNS(TraceId, 'body') with a mixed member list",
+        "SELECT COLUMNS(TraceId, 'body') FROM traces",
+      ],
     ];
 
     /** @scenario "A wildcard is refused inside functions and in non-projection clauses" */
@@ -553,7 +574,7 @@ describe("validateLangWatchQL", () => {
       ],
       ["count(*, TraceId)", "SELECT count(*, TraceId) FROM traces"],
       ["sum(*)", "SELECT sum(*) FROM traces"],
-      ["tuple(*)", "SELECT tuple(*) FROM traces"],
+      ["count(tuple(*))", "SELECT count(tuple(*)) FROM traces"],
       [
         "count(*) OVER (PARTITION BY COLUMNS('^bo'))",
         "SELECT count(*) OVER (PARTITION BY COLUMNS('^bo')) FROM traces",
@@ -586,6 +607,45 @@ describe("validateLangWatchQL", () => {
       ],
     ])("refuses %s", (_case, sql) => {
       expect(codesOf(validate(sql))).toContain("GATED_COLUMN");
+    });
+
+    /** @scenario "A qualified path through a gated column is refused" */
+    it.each([
+      [
+        "a subfield of the gated column",
+        "SELECT TraceId, body.null FROM traces",
+      ],
+      [
+        "a table-qualified path through it",
+        "SELECT traces.body.null FROM traces",
+      ],
+      [
+        "an alias-qualified path through it",
+        "SELECT t.body.null FROM traces AS t",
+      ],
+    ])("still names the view and its usable columns for %s", (_case, sql) => {
+      const result = validate(sql, {
+        ...POLICY,
+        viewColumns: { "analytics.traces": ["TraceId", "Cost", "body"] },
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.view).toBe("analytics.traces");
+      expect(violation?.availableColumns).toEqual(["Cost", "TraceId"]);
+    });
+
+    /** @scenario "A COLUMNS() list that names every member is gated member by member" */
+    it("accepts COLUMNS(TraceId) and refuses COLUMNS(body) by the named field", () => {
+      expect(codesOf(validate("SELECT COLUMNS(TraceId) FROM traces"))).toEqual(
+        [],
+      );
+      expect(codesOf(validate("SELECT COLUMNS(body) FROM traces"))).toEqual([
+        "GATED_COLUMN",
+      ]);
     });
   });
 
@@ -718,7 +778,8 @@ describe("validateLangWatchQL", () => {
         (entry) => entry.code === "GATED_COLUMN",
       );
       expect(violation?.view).toBe("analytics.traces");
-      expect(violation?.availableColumns).toEqual(["body", "Cost", "TraceId"]);
+      // The gated field is not offered back as a suggestion.
+      expect(violation?.availableColumns).toEqual(["Cost", "TraceId"]);
     });
 
     /** @scenario "A GATED_COLUMN violation names the view's columns" */

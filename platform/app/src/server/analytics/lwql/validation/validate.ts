@@ -265,7 +265,10 @@ const METADATA_FIELDS: ReadonlySet<string> = new Set([
  * changes nothing about that, so the refusal is attached to the node kind (see
  * {@link enterColumnSet}) rather than to the projection list. `COLUMNS(a, b)`
  * is absent on purpose: it names its columns, so they are checked like any other
- * reference. The one exemption is a bare `count(*)`, resolved in
+ * reference — but only when every member parses as an identifier; a member
+ * written as a string literal names nothing the walk can check, so
+ * {@link enterColumnListMatcher} refuses that shape the same way. The one
+ * exemption is a bare `count(*)`, resolved in
  * {@link walkFunctionArguments}, where the star is a row count and names no
  * column — and only for that call's own `arguments`, never its window
  * definition.
@@ -696,35 +699,45 @@ function walkChildNodes({
  * Which view a gated reference's columns should be listed against, when the
  * walk can tell.
  *
- * A qualified reference (`t.body`) resolves through the block's alias/table
- * list; an unqualified one resolves only when the block reads exactly one
- * table — with two tables in scope an unqualified name is ambiguous between
- * them, and guessing would risk naming the wrong view's columns.
+ * The qualifier is the segment just before the gated one — `t` in `t.body`,
+ * `traces` in `traces.body.null` — and resolves through the block's
+ * alias/table list. With no qualifier (`body`, `body.null`), or one that names
+ * nothing in scope, the view resolves only when the block reads exactly one
+ * table — with two tables in scope the name is ambiguous between them, and
+ * guessing would risk naming the wrong view's columns.
+ *
+ * The columns listed are the ones the caller may actually use: the gated
+ * names are subtracted, so a refusal never echoes a withheld field back as a
+ * suggestion.
  */
 function resolveGatedColumnView({
-  name,
+  segments,
+  gatedIndex,
   frame,
   ctx,
 }: {
-  name: string;
+  segments: readonly string[];
+  gatedIndex: number;
   frame: Frame;
   ctx: WalkContext;
 }): ViolationExtra {
   const tables = frame.block?.tables ?? [];
-  const parts = name.split(".");
   const qualifier =
-    parts.length > 1 ? parts.at(-2)?.trim().toLowerCase() : undefined;
-  const matched = qualifier
+    gatedIndex > 0 ? segments[gatedIndex - 1]?.trim().toLowerCase() : undefined;
+  const byQualifier = qualifier
     ? tables.find(
         (entry) =>
           entry.alias === qualifier ||
           entry.table.split(".").at(-1) === qualifier,
       )
-    : tables.length === 1
-      ? tables[0]
-      : undefined;
+    : undefined;
+  const matched = byQualifier ?? (tables.length === 1 ? tables[0] : undefined);
   if (!matched) return {};
-  const availableColumns = ctx.policy.viewColumns.get(matched.table);
+  const availableColumns = ctx.policy.viewColumns
+    .get(matched.table)
+    ?.filter(
+      (column) => !ctx.policy.gatedColumns.has(column.trim().toLowerCase()),
+    );
   return {
     view: matched.table,
     ...(availableColumns ? { availableColumns } : {}),
@@ -755,17 +768,17 @@ function gateColumnReference({
   node: SqlAstNode;
 }): void {
   const segments = nameParts ?? name.split(".");
-  const gated = segments.some((segment) =>
+  const gatedIndex = segments.findIndex((segment) =>
     ctx.policy.gatedColumns.has(segment.trim().toLowerCase()),
   );
-  if (!gated) return;
+  if (gatedIndex === -1) return;
   report({
     ctx,
     frame,
     code: "GATED_COLUMN",
     message: `The field "${echoIdentifier(name)}" is not available to you. Remove it from the query.`,
     node,
-    extra: resolveGatedColumnView({ name, frame, ctx }),
+    extra: resolveGatedColumnView({ segments, gatedIndex, frame, ctx }),
   });
 }
 
@@ -1158,17 +1171,12 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
  * `Function` node passed in as `node`, keeps it off every other field.
  */
 function walkFunctionArguments({ value, node, frame, ctx }: FieldArgs): void {
-  if (!Array.isArray(value)) {
-    refuseUnrecognised({ node, frame, ctx });
-    return;
-  }
-  const argumentFrame: Frame = {
-    ...frame,
-    isBareCountStarArgument: isBareCountStar(node),
-  };
-  for (const element of value) {
-    walkChildNode({ value: element, node, frame: argumentFrame, ctx });
-  }
+  walkChildNodes({
+    value,
+    node,
+    frame: { ...frame, isBareCountStarArgument: isBareCountStar(node) },
+    ctx,
+  });
 }
 
 /**
@@ -1205,12 +1213,39 @@ const WILDCARD_NOT_ALLOWED_MESSAGE =
  * the refusal holds in every position rather than only the projection. With no
  * restricted fields there is nothing to withhold and the node is walked
  * normally; the sole exemption is the `Asterisk` of a bare `count(*)`, which
- * {@link enterFunction} marks on the frame.
+ * {@link walkFunctionArguments} marks on the frame.
  */
 function enterColumnSet({ node, frame, ctx }: NodeArgs): Frame | null {
   if (!UNRESOLVABLE_COLUMN_SETS.has(node.type)) return frame;
   if (ctx.policy.gatedColumns.size === 0) return frame;
   if (frame.isBareCountStarArgument === true) return frame;
+  report({
+    ctx,
+    frame,
+    code: "WILDCARD_NOT_ALLOWED",
+    message: WILDCARD_NOT_ALLOWED_MESSAGE,
+    node,
+  });
+  return null;
+}
+
+/**
+ * A `COLUMNS(a, b)` / `t.COLUMNS(a, b)` list matcher: walked normally when
+ * every member is an identifier, so each is gated like any other reference;
+ * refused like a wildcard when any member is not.
+ *
+ * The parser accepts `COLUMNS('a', 'b')` and emits the members as literals,
+ * which {@link gateColumnReference} never sees. ClickHouse itself rejects that
+ * spelling today, but the gate does not lean on that: a member the walk cannot
+ * check is treated as a column set it cannot enumerate.
+ */
+function enterColumnListMatcher({ node, frame, ctx }: NodeArgs): Frame | null {
+  if (ctx.policy.gatedColumns.size === 0) return frame;
+  const members = node.columns;
+  const isEveryMemberNamed =
+    Array.isArray(members) &&
+    members.every((member) => isNode(member) && member.type === "Identifier");
+  if (isEveryMemberNamed) return frame;
   report({
     ctx,
     frame,
@@ -1614,6 +1649,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     fields: { pattern: SCALAR, transformers: { kind: "nodes" } },
   },
   ColumnsListMatcher: {
+    enter: enterColumnListMatcher,
     fields: { columns: { kind: "nodes" }, transformers: { kind: "nodes" } },
   },
   QualifiedColumnsRegexpMatcher: {
@@ -1625,6 +1661,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   QualifiedColumnsListMatcher: {
+    enter: enterColumnListMatcher,
     fields: {
       qualifier: { kind: "identifierRef" },
       columns: { kind: "nodes" },

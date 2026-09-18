@@ -870,6 +870,41 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
   });
 
   describe("when captured content is reached through a LangWatchQL view", () => {
+    /** The gated set a caller without content permission gets. */
+    const withoutContent = lwqlGatedColumns({
+      protections: {
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+        canSeeCosts: true,
+      },
+      views: LWQL_VIEW_CATALOG,
+    });
+    /**
+     * Built per test rather than at describe time, because `database` is only
+     * known once the harness has provisioned it in `beforeAll`.
+     */
+    const policyFor = (gatedColumns: readonly string[]) => ({
+      allowedTables: lwqlAllowedTables({ database, views: LWQL_VIEW_CATALOG }),
+      gatedColumns,
+      defaultDatabase: database,
+    });
+    const withholdingPolicy = () => policyFor(withoutContent);
+    /**
+     * Derived, not hardcoded to `[]`, so the permitted-caller assertions also
+     * prove that holding every permission resolves to an empty gated set.
+     */
+    const permittedPolicy = () =>
+      policyFor(
+        lwqlGatedColumns({
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            canSeeCosts: true,
+          },
+          views: LWQL_VIEW_CATALOG,
+        }),
+      );
+
     /** @scenario "Captured content is reachable only through the gated columns" */
     it("strips every content key from the attribute maps while keeping the dimensions", async () => {
       const row = await selectRows<{
@@ -947,14 +982,6 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      */
     /** @scenario "Content-gated fields are refused in every expression position" */
     it("refuses a gated field in every expression position, over the canonical gated set", () => {
-      const withoutContent = lwqlGatedColumns({
-        protections: {
-          canSeeCapturedInput: false,
-          canSeeCapturedOutput: false,
-          canSeeCosts: true,
-        },
-        views: LWQL_VIEW_CATALOG,
-      });
       const contentColumns = LWQL_VIEW_CATALOG.flatMap((view) =>
         view.columns.filter(isContentGated).map((column) => column.name),
       );
@@ -977,16 +1004,10 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         }
       }
 
-      const policy = {
-        allowedTables: lwqlAllowedTables({
-          database,
-          views: LWQL_VIEW_CATALOG,
-        }),
-        gatedColumns: withoutContent,
-        defaultDatabase: database,
-      };
+      const withholding = withholdingPolicy();
+      const permitted = permittedPolicy();
       for (const [position, sql] of GATED_COLUMN_POSITIONS(database)) {
-        const result = validateLangWatchQL({ sql, ...policy });
+        const result = validateLangWatchQL({ sql, ...withholding });
         expect(result.ok, `${position}: a gated field was accepted`).toBe(
           false,
         );
@@ -998,17 +1019,6 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
 
       // The same queries pass for a caller who holds the permission, so the
       // refusals above are about the gate rather than about the SQL.
-      const permitted = {
-        ...policy,
-        gatedColumns: lwqlGatedColumns({
-          protections: {
-            canSeeCapturedInput: true,
-            canSeeCapturedOutput: true,
-            canSeeCosts: true,
-          },
-          views: LWQL_VIEW_CATALOG,
-        }),
-      };
       expect(
         permitted.gatedColumns,
         "a caller holding every permission still has fields withheld",
@@ -1029,30 +1039,10 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      * input back, which is why the database is not, and cannot be, the gate.
      */
     /** @scenario "The reported query is refused before it reaches the shipped views" */
+    /** @scenario "Content-gated fields are refused in every expression position" */
     it("refuses every column-set shape that would resolve to withheld content", async () => {
-      const withoutContent = lwqlGatedColumns({
-        protections: {
-          canSeeCapturedInput: false,
-          canSeeCapturedOutput: false,
-          canSeeCosts: true,
-        },
-        views: LWQL_VIEW_CATALOG,
-      });
-      const allowedTables = lwqlAllowedTables({
-        database,
-        views: LWQL_VIEW_CATALOG,
-      });
-      const withholding = {
-        allowedTables,
-        gatedColumns: withoutContent,
-        defaultDatabase: database,
-      };
-      const permitted = {
-        allowedTables,
-        gatedColumns: [] as readonly string[],
-        defaultDatabase: database,
-      };
-
+      const withholding = withholdingPolicy();
+      const permitted = permittedPolicy();
       for (const [position, sql] of COLUMN_SET_POSITIONS(database)) {
         const refused = validateLangWatchQL({ sql, ...withholding });
         expect(refused.ok, `${position}: a column set was accepted`).toBe(
