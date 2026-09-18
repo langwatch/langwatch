@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { getDisplayHandle } from "../../../../../prompt-reference.ts";
 
 describe("getDisplayHandle", () => {

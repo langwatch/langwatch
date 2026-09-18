@@ -1,4 +1,3 @@
-import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 /**
  * @vitest-environment jsdom
  * @see specs/prompts/prompt-editor-dirty-state.feature
@@ -6,6 +5,8 @@ import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.t
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 
 vi.mock("@langwatch/model-provider-browser/model-limits", () => ({
   useModelLimits: () => ({ limits: null }),

@@ -1,22 +1,23 @@
 import { Box, Popover as ChakraPopover, HStack, Skeleton } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser/no-models-configured-callout";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "@langwatch/model-provider-browser/surfaces/model-selector";
+import { LLMModelDisplay } from "@langwatch/prompt-browser-kit/llm-model-display";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import type { LlmConfigOutputType } from "@langwatch/workflow-browser/component-types";
 import React, { useCallback, useState } from "react";
 import { ChevronDown } from "react-feather";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
+
 import {
   LLMConfigPopover,
   type Output,
   type OutputType,
 } from "../../../llmPromptConfigs/llm-config-popover.tsx";
-import { LLMModelDisplay } from "@langwatch/prompt-browser-kit/llm-model-display";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser/no-models-configured-callout";
-import { Popover } from "@langwatch/design-system/popover";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { LlmConfigOutputType } from "@langwatch/workflow-browser/component-types";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 type ModelSelectFieldMiniProps = {
   /** Whether to show the structured outputs section in the config popover */

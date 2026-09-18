@@ -3,30 +3,42 @@
  * integration. Verifies request order (origin gate, session, project permission) and
  * that accepted runs stream playground events. Spec: specs/prompts/playground-conversation.feature
  */
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { createRestRuntime } from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { RateLimiter } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   PROMPT_EXECUTE_ENDPOINT,
-  PromptExecuteRateLimitedError,
-  PromptMessagesTooManyError,
+  CrossOriginRefusedError,
+  PromptApi,
+  PromptPlaygroundSignInRequiredError,
 } from "@langwatch/prompt-contract";
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { StudioClientEvent, WorkflowApi } from "@langwatch/workflow-contract";
 import type { ErrorHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  promptExecuteRest,
-  promptExecuteRestMembers,
-  type PromptExecuteRestMembers,
-  type PromptExecuteRestSession,
-} from "../prompt-execute.api.ts";
+import { PromptExecuteBoundsService } from "../../services/prompt-execute-bounds.service.ts";
+import { PromptExecutionService } from "../../services/prompt-execution.service.ts";
+import { promptExecuteRest } from "../prompt-execute.rest.ts";
 
 /** Every handled refusal wins by its own status; anything else is the generic unknown. */
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
-  if (error instanceof Error && "httpStatus" in error) {
-    const handled = error as Error & { httpStatus: number; code: string };
-    return c.json({ code: handled.code }, handled.httpStatus as 403);
+  if (!(error instanceof Error)) return c.json({ error: "Internal Server Error" }, 500);
+  if (!("httpStatus" in error && typeof error.httpStatus === "number")) {
+    return c.json({ error: "Internal Server Error" }, 500);
   }
-  return c.json({ error: "Internal Server Error" }, 500);
+  if (!("code" in error && typeof error.code === "string")) {
+    return c.json({ error: "Internal Server Error" }, 500);
+  }
+
+  {
+    return new Response(JSON.stringify({ code: error.code }), {
+      status: error.httpStatus,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 };
 
 /** The smallest form the wire schema accepts. */
@@ -47,41 +59,84 @@ const formValues = {
   },
 };
 
+type PromptExecuteRestSession = Readonly<{ user: Readonly<{ id: string }> }>;
+type TestOptions = {
+  isAllowedOrigin(): boolean;
+  findSession(request: Request): Promise<PromptExecuteRestSession | null>;
+  probeProjectPermission(
+    session: PromptExecuteRestSession,
+    projectId: string,
+    permission: string,
+  ): Promise<boolean>;
+  demoProjectId?: string;
+  rateLimitAllowed?: boolean;
+  maxMessages?: number;
+};
+
 const SESSION: PromptExecuteRestSession = { user: { id: "user_1" } };
 
-function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestSession>> = {}) {
+function buildApi(overrides: Partial<TestOptions> = {}) {
   const isAllowedOrigin = vi.fn(() => true);
   const findSession = vi.fn(async () => SESSION as PromptExecuteRestSession | null);
   const probeProjectPermission = vi.fn(async () => true);
-  const assertExecuteWithinBounds = vi.fn(async () => {});
   const prepareStudioEvent = vi.fn(async (input: { event: StudioClientEvent }) => input.event);
-  const postEvent = vi.fn(async ({ onEvent }: { onEvent: (event: { type: "done" }) => void }) => {
-    onEvent({ type: "done" });
-  });
-
-  const members = {
+  const postStudioEvent = vi.fn(
+    async ({ onEvent }: { onEvent: (event: { type: "done" }) => void }) => {
+      onEvent({ type: "done" });
+    },
+  );
+  const requestBound = vi.fn(async ({ key }: { key: string }) =>
+    key === "promptMessagesMax" ? (overrides.maxMessages ?? 100) : 100,
+  );
+  const rateLimiterCheck = vi.fn<RateLimiter["check"]>(async () => ({
+    allowed: overrides.rateLimitAllowed ?? true,
+    ...(overrides.rateLimitAllowed === false ? { retryAfterSeconds: 42 } : {}),
+  }));
+  const options = {
     isAllowedOrigin,
     findSession,
     probeProjectPermission,
-    isDemoProject: () => false,
-    assertExecuteWithinBounds,
-    prepareStudioEvent,
-    postEvent,
-    newTraceId: () => "trace_1",
     ...overrides,
-  } as unknown as PromptExecuteRestMembers<PromptExecuteRestSession>;
+  } satisfies TestOptions;
+  const bounds = PromptExecuteBoundsService.create({
+    entitlement: createApiFixture<EntitlementApi>({ requestBound }),
+    projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "organization_1" }),
+    rateLimiter: createApiFixture<RateLimiter>({ check: rateLimiterCheck }),
+  });
+  const execution = PromptExecutionService.create({
+    workflow: createApiFixture<WorkflowApi>({
+      prepareStudioEvent,
+      postStudioEvent,
+      reportStudioFailure: () => undefined,
+    }),
+    authz: createApiFixture<AuthzApi>({
+      isDemoProject: ({ projectId }) => projectId === options.demoProjectId,
+    }),
+    bounds,
+  });
+  const app = createApiFixture<PromptApi>({
+    executePlayground: (input) => execution.execute(input),
+  });
 
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
-      identify: () => ({ actor: null, scope: null }),
+      identify: async ({ request }) => {
+        if (!options.isAllowedOrigin()) throw new CrossOriginRefusedError();
+        const session = await options.findSession(request);
+        if (!session) throw new PromptPlaygroundSignInRequiredError();
+        return { actor: { type: "user", id: session.user.id }, scope: null };
+      },
+      authorize: async ({ target, permission }) => ({
+        permitted: await options.probeProjectPermission(SESSION, target.id, permission),
+        organizationRole: null,
+      }),
     },
   });
 
   const hono = runtime.mount(promptExecuteRest.router(), {
-    app: () => ({}) as never,
+    app: () => app,
     onError: boundaryErrorHandler,
-    facts: [bindRestMiddleware(promptExecuteRestMembers, () => members)],
   });
 
   const execute = (body: Record<string, unknown> = {}) =>
@@ -103,9 +158,9 @@ function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestS
     isAllowedOrigin,
     findSession,
     probeProjectPermission,
-    assertExecuteWithinBounds,
+    rateLimiterCheck,
     prepareStudioEvent,
-    postEvent,
+    postEvent: postStudioEvent,
   };
 }
 
@@ -183,7 +238,7 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
 
   describe("when the project is the demo project", () => {
     it("refuses even though the demo grants prompts:view to everyone", async () => {
-      const { execute, postEvent } = buildApi({ isDemoProject: () => true });
+      const { execute, postEvent } = buildApi({ demoProjectId: "project_1" });
 
       const response = await execute();
 
@@ -194,11 +249,7 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
 
   describe("when the project has spent its run window", () => {
     it("refuses 429 and never opens a run", async () => {
-      const { execute, prepareStudioEvent, postEvent } = buildApi({
-        assertExecuteWithinBounds: async () => {
-          throw new PromptExecuteRateLimitedError({ retryAfterSeconds: 42 });
-        },
-      });
+      const { execute, prepareStudioEvent, postEvent } = buildApi({ rateLimitAllowed: false });
 
       const response = await execute();
 
@@ -210,11 +261,7 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
 
   describe("when the message array is over the plan's bound", () => {
     it("refuses 422 and never opens a run", async () => {
-      const { execute, prepareStudioEvent, postEvent } = buildApi({
-        assertExecuteWithinBounds: async () => {
-          throw new PromptMessagesTooManyError(100);
-        },
-      });
+      const { execute, prepareStudioEvent, postEvent } = buildApi({ maxMessages: 0 });
 
       const response = await execute();
 
@@ -226,13 +273,13 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
 
   describe("when the budget check passes", () => {
     it("counts the run against the project the body names, with its message count", async () => {
-      const { execute, assertExecuteWithinBounds } = buildApi();
+      const { execute, rateLimiterCheck } = buildApi();
 
       await execute({ projectId: "project_other" });
 
-      expect(assertExecuteWithinBounds).toHaveBeenCalledWith({
-        projectId: "project_other",
-        messageCount: 1,
+      expect(rateLimiterCheck).toHaveBeenCalledWith("prompt-execute:project_other", {
+        requests: 100,
+        seconds: 60,
       });
     });
   });

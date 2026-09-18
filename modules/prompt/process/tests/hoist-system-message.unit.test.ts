@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
-
 import { hoistSystemMessage } from "@langwatch/prompt-contract";
+import { describe, expect, it } from "vitest";
 
 describe("hoistSystemMessage", () => {
   describe("given a stored prompt whose system content lives in messages", () => {

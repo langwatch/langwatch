@@ -1,7 +1,8 @@
 import { Circle, HStack, Text } from "@chakra-ui/react";
-import { PromptTabSwitcher as PromptTabSwitcherView } from "../studio-internals.ts";
 import type { RefObject } from "react";
+
 import { getDisplayHandle, getPromptFolder } from "../../../../prompt-reference.ts";
+import { PromptTabSwitcher as PromptTabSwitcherView } from "../studio-internals.ts";
 import { usePromptTabSummary } from "./tab/use-prompt-tab-summary.ts";
 
 interface PromptTabSwitcherProps {

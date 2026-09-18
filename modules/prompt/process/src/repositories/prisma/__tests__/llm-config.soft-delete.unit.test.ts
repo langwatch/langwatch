@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+
+import type { LlmConfigWithLatestVersion } from "../../prompt.repository.ts";
 import {
   PrismaLlmConfigRepository,
   type PromptConfigDatabase,
 } from "../prisma.prompt.repository.ts";
-import type { LlmConfigWithLatestVersion } from "../../prompt.repository.ts";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {

@@ -6,6 +6,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { forwardRef, useReducer } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { AvailableSource } from "../../variable-mapping-input.tsx";
 import type { Variable } from "../../variables-section.tsx";
 import { PromptTextAreaWithVariables } from "../index.ts";

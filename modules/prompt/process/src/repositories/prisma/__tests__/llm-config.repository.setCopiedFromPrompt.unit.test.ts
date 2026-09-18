@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository.ts";
+
+import {
+  PrismaLlmConfigRepository,
+  type PromptConfigDatabase,
+} from "../prisma.prompt.repository.ts";
 
 describe("PrismaLlmConfigRepository", () => {
   // Held apart from `prisma` so assertions inspect the mock's own call

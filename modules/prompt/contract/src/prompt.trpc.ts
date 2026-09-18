@@ -8,15 +8,6 @@ import { z } from "zod";
 
 import { nodeDatasetSchema } from "./prompt.field-schemas.ts";
 import {
-  copiedPromptSchema,
-  promptCopyChoiceSchema,
-  promptDeleteResultSchema,
-  promptModifyPermissionSchema,
-  promptPushToCopiesResultSchema,
-  promptTagAssignmentSchema,
-  versionedPromptSchema,
-} from "./prompt.ts";
-import {
   createPromptCreateTrpcInputSchema,
   createPromptUpdateTrpcInputSchema,
   promptAssignTagTrpcInputSchema,
@@ -30,6 +21,15 @@ import {
   promptRestoreVersionTrpcInputSchema,
   promptUpdateHandleTrpcInputSchema,
 } from "./prompt.trpc-schemas.ts";
+import {
+  copiedPromptSchema,
+  promptCopyChoiceSchema,
+  promptDeleteResultSchema,
+  promptModifyPermissionSchema,
+  promptPushToCopiesResultSchema,
+  promptTagAssignmentSchema,
+  versionedPromptSchema,
+} from "./prompt.ts";
 
 /** What a browser sends to `prompts.create`. */
 export const promptCreateTrpcInputSchema = createPromptCreateTrpcInputSchema({

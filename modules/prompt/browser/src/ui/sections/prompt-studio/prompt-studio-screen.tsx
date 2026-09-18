@@ -6,6 +6,7 @@
 
 import { HStack, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+
 import { PromptPlaygroundChatProvider } from "../../../model/prompt-chat-sync-context.tsx";
 import { PromptPlaygroundMainContent } from "./playground-main-content.tsx";
 import { PromptConfigProvider } from "./prompt-config-provider.tsx";

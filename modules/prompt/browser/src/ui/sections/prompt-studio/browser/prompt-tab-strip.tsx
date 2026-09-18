@@ -1,9 +1,10 @@
 import { HStack } from "@chakra-ui/react";
-import { type Tab, TabIdProvider, useIsOverflowing } from "../studio-internals.ts";
 import { useRef } from "react";
+
+import { type Tab, TabIdProvider, useIsOverflowing } from "../studio-internals.ts";
+import { DraggableTabsBrowser } from "./draggable-tabs-browser.tsx";
 import { PromptTabSwitcher } from "./prompt-tab-switcher-panel.tsx";
 import { PromptBrowserTab } from "./tab/prompt-browser-tab-view.tsx";
-import { DraggableTabsBrowser } from "./draggable-tabs-browser.tsx";
 
 interface PromptTabStripProps {
   tabs: Tab[];

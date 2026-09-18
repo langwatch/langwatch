@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { mergeAutoDetectedInputs } from "../prompt-merge-auto-detected-inputs.rules.ts";
 
 describe("mergeAutoDetectedInputs()", () => {

@@ -4,6 +4,9 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
+import { FakePromptHost } from "../../../../../testing.tsx";
 import {
   clearStoreInstances,
   getStoreForTesting,
@@ -13,8 +16,6 @@ import {
   type TabData,
 } from "../../studio-internals.ts";
 import { SyncedChatInput } from "../synced-chat-input.tsx";
-import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
-import { FakePromptHost } from "../../../../../testing.tsx";
 
 /**
  * One host for the whole file: nothing here asserts what the screen asked,

@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HandleGenerationError, NotFoundError } from "@langwatch/prompt-contract";
-import { type VersionedPrompt } from "../services/prompt.service.ts";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { createPromptServiceForTest } from "../repositories/prisma/__tests__/prompt-service.test-fixture.ts";
+import { type VersionedPrompt } from "../services/prompt.service.ts";
 
 const SOURCE_PROMPT: VersionedPrompt = {
   id: "prompt_1h5icu8XRkHHbaQlrOgwq",

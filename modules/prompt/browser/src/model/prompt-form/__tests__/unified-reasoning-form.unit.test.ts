@@ -1,12 +1,13 @@
+import { formSchema } from "@langwatch/prompt-contract";
 /**
  * The unified reasoning field: one `llm.reasoning` on the form, carried to
  * the save payload without any of the provider-specific names it replaced.
  * UX contract: specs/model-config/unified-reasoning-form.feature.
  */
 import { describe, expect, it } from "vitest";
+
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
 import { buildDefaultFormValues } from "../default-form-values.ts";
-import { formSchema } from "@langwatch/prompt-contract";
 
 describe("formValuesToTriggerSaveVersionParams", () => {
   describe("when form values include reasoning", () => {

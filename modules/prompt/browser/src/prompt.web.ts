@@ -28,4 +28,11 @@ export const promptWeb = defineWebModule("prompt")
     "surfaces/prompt-editor-drawer": {
       load: () => import("./ui/sections/prompts/prompt-editor-drawer.tsx"),
     },
+  })
+  .withDrawers({
+    promptList: {
+      load: async () => ({
+        default: (await import("./ui/sections/prompt-list-drawer.tsx")).PromptListDrawer,
+      }),
+    },
   });

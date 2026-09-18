@@ -4,6 +4,7 @@
  * user's first Save lands on the empty-system codepath.
  */
 import { describe, expect, it } from "vitest";
+
 import { nodeDataToLocalPromptConfig } from "../llm-prompt-config-utils.ts";
 
 describe("nodeDataToLocalPromptConfig — workflow scaffold round-trip (Issue #3196)", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { describeLocalFileUpdate } from "../prompt-describe-local-file-update.rules.ts";
 
 describe("describeLocalFileUpdate()", () => {

@@ -1,9 +1,10 @@
+import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 /**
  * The `{{input}}` binding rules, extracted as pure functions from service-adapter.test.ts.
  * Spec: specs/prompts/playground-conversation.feature
  */
 import { describe, expect, it } from "vitest";
-import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
+
 import { resolvePromptInputs } from "../prompt-execution-event.rules.ts";
 
 function formWithTemplate(

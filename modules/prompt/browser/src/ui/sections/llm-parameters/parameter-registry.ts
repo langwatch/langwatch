@@ -4,6 +4,7 @@
  * constants to be kept in sync.
  */
 
+import type { ReasoningConfig } from "@langwatch/model-provider-contract";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowUpDown,
@@ -18,7 +19,6 @@ import {
   Target,
   Thermometer,
 } from "lucide-react";
-import type { ReasoningConfig } from "@langwatch/model-provider-contract";
 
 // ============================================================================
 // Types

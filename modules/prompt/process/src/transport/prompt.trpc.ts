@@ -37,10 +37,7 @@ export const promptTrpcTransport = defineTrpcRouter(PromptApi, promptTrpc)
   .procedure("update")
   .withPermission("prompts:update")
   .handle(({ app, input, actor }) =>
-    app.update(
-      { idOrHandle: input.id, projectId: input.projectId, data: input.data },
-      actor,
-    ),
+    app.update({ idOrHandle: input.id, projectId: input.projectId, data: input.data }, actor),
   )
 
   .procedure("updateHandle")

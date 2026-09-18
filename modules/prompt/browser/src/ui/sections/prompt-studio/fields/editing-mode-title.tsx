@@ -1,6 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { LuChevronDown } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
+import { LuChevronDown } from "react-icons/lu";
+
 import { PropertySectionTitle } from "../../../../ui/elements/property-section-title.tsx";
 
 /**

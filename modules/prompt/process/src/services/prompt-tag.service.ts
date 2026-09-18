@@ -5,6 +5,7 @@ import {
   PromptTagValidationError,
   type PromptTag,
 } from "@langwatch/prompt-contract";
+
 import {
   PROTECTED_TAGS,
   PromptTagRepository,

@@ -4,6 +4,7 @@
 
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { PromptBrowserStorage } from "../../model/browser-capabilities.ts";
 import { clearStoreInstances, getStoreForTesting } from "../../model/prompt-tabs-store.ts";
 import { useCreateDraftPrompt } from "../use-create-draft-prompt.ts";

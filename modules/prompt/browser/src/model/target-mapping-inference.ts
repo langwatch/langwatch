@@ -2,7 +2,6 @@
  * Mapping Inference Utility for Evaluations V3
  */
 
-import type { Field } from "@langwatch/workflow-contract";
 import type {
   ComparisonEvaluatorConfig,
   DatasetColumn,
@@ -11,6 +10,7 @@ import type {
   FieldMapping,
   TargetConfig,
 } from "@langwatch/experiment-contract";
+import type { Field } from "@langwatch/workflow-contract";
 
 // ============================================================================
 // Semantic Mapping Dictionary

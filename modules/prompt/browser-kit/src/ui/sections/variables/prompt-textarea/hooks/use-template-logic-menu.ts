@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CaretPosition } from "rich-textarea";
+
+import { getCaretCoordinates, setTextareaValueUndoable } from "../prompt-textarea.utils.ts";
 import {
   TEMPLATE_LOGIC_CONSTRUCTS,
   type TemplateLogicConstruct,
 } from "../template-logic-constructs.ts";
-import { getCaretCoordinates, setTextareaValueUndoable } from "../prompt-textarea.utils.ts";
 
 type UseTemplateLogicMenuProps = {
   localValue: string;

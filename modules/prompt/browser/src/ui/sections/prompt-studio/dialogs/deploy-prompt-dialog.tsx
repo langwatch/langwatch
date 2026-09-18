@@ -8,11 +8,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Trash2, UnplugIcon,Info } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-
-import { DeleteConfirmationDialog } from "../../../../ui/blocks/delete-confirmation-dialog.tsx";
-import { CopyButton } from "../../../../ui/elements/copy-button.tsx";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -24,11 +19,16 @@ import {
 } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { usePromptHost } from "../../../../model/prompt-host.ts";
-import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
-import { GeneratePromptApiSnippetDialog } from "./generate-prompt-api-snippet-dialog.tsx";
-import { usePromptTags } from "../../../../behavior/use-prompt-tags.ts";
+import { Trash2, UnplugIcon, Info } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { promptApi } from "../../../../behavior/prompt-api.ts";
+import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
+import { usePromptTags } from "../../../../behavior/use-prompt-tags.ts";
+import { usePromptHost } from "../../../../model/prompt-host.ts";
+import { DeleteConfirmationDialog } from "../../../../ui/blocks/delete-confirmation-dialog.tsx";
+import { CopyButton } from "../../../../ui/elements/copy-button.tsx";
+import { GeneratePromptApiSnippetDialog } from "./generate-prompt-api-snippet-dialog.tsx";
 
 interface DeployPromptDialogProps {
   isOpen: boolean;
@@ -435,7 +435,6 @@ export function DeployPromptDialog({
                         setAddTagError("");
                       }
                     }}
-                    
                   />
                   <Button
                     size="sm"

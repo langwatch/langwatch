@@ -13,7 +13,11 @@ export type {
   PromptTextAreaOnAddMention,
   PromptTextAreaWithVariablesProps,
 } from "./ui/sections/variables/prompt-textarea/prompt-textarea.types.ts";
-export type { AvailableSource, Variable, FieldMapping } from "./ui/sections/variables/variables-section.tsx";
+export type {
+  AvailableSource,
+  Variable,
+  FieldMapping,
+} from "./ui/sections/variables/variables-section.tsx";
 export {
   VariableMappingInput,
   type FieldType,
@@ -25,8 +29,4 @@ export {
   TYPE_LABELS,
   getTypeLabel,
 } from "./ui/sections/variables/variable-type/index.ts";
-export {
-  LayoutModeContext,
-  useLayoutMode,
-  type LayoutMode,
-} from "./model/layout-mode.ts";
+export { LayoutModeContext, useLayoutMode, type LayoutMode } from "./model/layout-mode.ts";

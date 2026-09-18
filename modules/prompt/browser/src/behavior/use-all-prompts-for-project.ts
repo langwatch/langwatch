@@ -1,5 +1,5 @@
-import { usePromptProject } from "./use-prompt-project.ts";
 import { promptApi } from "./prompt-api.ts";
+import { usePromptProject } from "./use-prompt-project.ts";
 
 /**
  * useAllPromptsForProject

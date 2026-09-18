@@ -1,9 +1,10 @@
-import { useMemo } from "react";
 import {
   getModelMetadataForFrontend,
   mergeCustomModelMetadata,
   type ModelMetadataForFrontend,
 } from "@langwatch/model-provider-contract";
+import { useMemo } from "react";
+
 import { promptApi } from "./prompt-api.ts";
 
 export type { ModelMetadataForFrontend };

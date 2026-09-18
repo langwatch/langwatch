@@ -82,9 +82,9 @@ vi.mock("../../../../../behavior/prompt-api.ts", () => ({
   },
 }));
 
+import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
 // Import after mocks
 import { FakePromptHost } from "../../../../../testing.tsx";
-import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
 import { PublishedPromptActions } from "../published-prompt-actions.tsx";
 
 /**

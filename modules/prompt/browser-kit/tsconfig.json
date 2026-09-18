@@ -24,16 +24,16 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
-      "path": "../../model-provider/web-kit/tsconfig.build.json"
+      "path": "../../model-provider/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../workflow/contract/tsconfig.build.json"
+      "path": "../../workflow/browser-kit/tsconfig.build.json"
     },
     {
-      "path": "../../workflow/web-kit/tsconfig.build.json"
+      "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/browser-trpc/tsconfig.build.json"

@@ -1,8 +1,8 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
-import type { ComponentProps } from "react";
-import { Pencil } from "lucide-react";
-import type { DatasetColumns, DatasetRecordInput } from "@langwatch/dataset-contract";
 import { DatasetPreviewTable } from "@langwatch/dataset-browser/dataset-preview-table";
+import type { DatasetColumns, DatasetRecordInput } from "@langwatch/dataset-contract";
+import { Pencil } from "lucide-react";
+import type { ComponentProps } from "react";
 
 /**
  * The read-only table a prompt's demonstrations render in. The TABLE

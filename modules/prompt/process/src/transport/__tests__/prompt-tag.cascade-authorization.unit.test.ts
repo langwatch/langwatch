@@ -5,12 +5,16 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { Logger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { PromptApp } from "#app/prompt.app";
+
 import type { PromptService } from "../../services/prompt.service.ts";
 import { promptTagTrpcTransport } from "../prompt-tag.trpc.ts";
 import { promptTrpcCaller } from "./prompt-trpc.fixture.ts";
@@ -29,25 +33,28 @@ function buildCaller(options: { manageable: readonly string[] }) {
   const prompts = PromptApp.createWithPrompts(
     {
       dependencies: {
-        projects: {
+        projects: createApiFixture<ProjectApi>({
           getOrganizationId: async () => "organization_1",
           listIdsByOrganization: async () => ORGANIZATION_PROJECTS,
-        } as unknown as ProjectApi,
-        permissions: {
+        }),
+        permissions: createApiFixture<AuthzApi>({
           hasPermission,
           getApiKeyProjectDecision: async () => ({ outcome: "denied" }),
-        } as unknown as AuthzApi,
-        plans: {} as unknown as EntitlementApi,
+        }),
+        plans: createApiFixture<EntitlementApi>(),
+        workflow: createApiFixture<WorkflowApi>(),
       },
       members: {
         prisma: {} as never,
-        logger: { info: () => {} } as unknown as Logger,
+        logger: createLogger("prompt-tag-cascade-test"),
         rateLimiter: { check: async () => ({ allowed: true }) },
+        publicBaseUrl: "https://app.langwatch.test",
       },
-      config: { publicBaseUrl: "https://app.langwatch.test" },
+      config: undefined,
       resources: { own: () => {}, ownService: () => {} },
+      secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     },
-    {} as unknown as PromptService,
+    createApiFixture<PromptService>(),
   );
 
   const renameTagForProject = vi.spyOn(prompts, "renameTagForProject").mockResolvedValue({

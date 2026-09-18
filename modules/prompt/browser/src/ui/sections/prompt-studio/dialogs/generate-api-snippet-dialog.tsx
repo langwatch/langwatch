@@ -1,13 +1,13 @@
 import { Button, HStack, useDisclosure, VStack } from "@chakra-ui/react";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { CodePreview } from "@langwatch/onboarding-browser/surfaces/code-preview";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import React, { createContext, useContext, useMemo, useState } from "react";
 
 import type { Snippet, Target } from "../../../../api-snippet.ts";
 import { uppercaseFirstLetter } from "../../../../model/string-casing.ts";
-import { CodePreview } from "@langwatch/onboarding-browser/surfaces/code-preview";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { Menu } from "@langwatch/design-system/menu";
-import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 
 /**
  * A language tab for the segmented language picker. When `tabs` is provided,

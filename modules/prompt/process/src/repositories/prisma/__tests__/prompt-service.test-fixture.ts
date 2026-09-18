@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConnectionService,
   PrismaQueryGuard,
@@ -5,12 +6,13 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import { vi } from "vitest";
+
+import { PromptTagService } from "../../../services/prompt-tag.service.ts";
+import { PromptVersionService } from "../../../services/prompt-version.service.ts";
+import { PromptService } from "../../../services/prompt.service.ts";
 import { PrismaPromptTagAssignmentRepository } from "../prisma.prompt-tag-assignment.repository.ts";
 import { PrismaPromptTagRepository } from "../prisma.prompt-tag.repository.ts";
 import { PrismaLlmConfigRepository } from "../prisma.prompt.repository.ts";
-import { PromptService } from "../../../services/prompt.service.ts";
-import { PromptTagService } from "../../../services/prompt-tag.service.ts";
-import { PromptVersionService } from "../../../services/prompt-version.service.ts";
 
 /**
  * Creates a typed client that unit tests can safely spy on without opening a
@@ -25,6 +27,7 @@ class AllowAllPromptTestQueries extends PrismaQueryGuard {
 function createPromptTestDatabase() {
   return PrismaConnectionService.create({
     guard: new AllowAllPromptTestQueries(),
+    logger: createLogger("langwatch:prompt:test"),
   }).connect({
     databaseUrl: "postgresql://prompt-test:prompt-test@127.0.0.1:1/prompt_test",
     log: [],

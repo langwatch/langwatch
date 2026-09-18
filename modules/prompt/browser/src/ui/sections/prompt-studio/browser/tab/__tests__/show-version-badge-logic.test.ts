@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, expect, it } from "vitest";
+
 import { shouldShowVersionBadge } from "../../../studio-internals.ts";
 
 describe("showVersionBadge logic", () => {

@@ -4,10 +4,11 @@
  * is mocked; the tab renders for real, so it fails with no room for a folder name or close button.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TabIdProvider } from "../../../studio-internals.ts";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { TabIdProvider } from "../../../studio-internals.ts";
 import { PromptBrowserTab } from "../prompt-browser-tab-view.tsx";
 import { usePromptBrowserTabController } from "../use-prompt-browser-tab-controller.ts";
 

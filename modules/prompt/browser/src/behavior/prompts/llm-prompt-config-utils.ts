@@ -1,7 +1,18 @@
-import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt.ts";
-import type { Node } from "@xyflow/react";
-import type { DeepPartial } from "react-hook-form";
+import { kebabCase } from "@langwatch/design-system/string-casing";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import {
+  generateUniqueIdentifier,
+  type PromptConfigFormValues,
+  versionMetadataToFormFormat,
+  versionMetadataToNodeFormat,
+} from "@langwatch/prompt-contract";
+import {
+  type LlmConfigInputType,
+  LlmConfigInputTypes,
+  type LlmConfigOutputType,
+  LlmConfigOutputTypes,
+} from "@langwatch/workflow-browser/component-types";
 import {
   type Component,
   type LLMConfig,
@@ -11,23 +22,12 @@ import {
   PromptScope,
   type Signature,
 } from "@langwatch/workflow-contract";
-import { inputsAndOutputsToDemostrationColumns } from "../../prompt-form.ts";
-import type { SaveVersionParams } from "../../model/prompts/providers/types.ts";
-import {
-  type LlmConfigInputType,
-  LlmConfigInputTypes,
-  type LlmConfigOutputType,
-  LlmConfigOutputTypes,
-} from "@langwatch/workflow-browser/component-types";
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { kebabCase } from "@langwatch/design-system/string-casing";
+import type { Node } from "@xyflow/react";
+import type { DeepPartial } from "react-hook-form";
 
-import {
-  generateUniqueIdentifier,
-  type PromptConfigFormValues,
-  versionMetadataToFormFormat,
-  versionMetadataToNodeFormat,
-} from "@langwatch/prompt-contract";
+import type { SaveVersionParams } from "../../model/prompts/providers/types.ts";
+import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt.ts";
+import { inputsAndOutputsToDemostrationColumns } from "../../prompt-form.ts";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues,

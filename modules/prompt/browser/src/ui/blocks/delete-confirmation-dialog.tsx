@@ -52,7 +52,7 @@ export function DeleteConfirmationDialog({
             <Input
               placeholder="Type 'delete' to confirm"
               value={confirmationText}
-              
+
               onChange={(event) => {
                 event.stopPropagation();
                 setConfirmationText(event.target.value);

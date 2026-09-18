@@ -43,5 +43,8 @@ export {
   ParameterPopoverContent,
   type ParameterPopoverContentProps,
 } from "./ui/sections/llm-parameters/parameter-popover-content.tsx";
-export { ParameterRow, type ParameterRowProps } from "./ui/sections/llm-parameters/parameter-row.tsx";
+export {
+  ParameterRow,
+  type ParameterRowProps,
+} from "./ui/sections/llm-parameters/parameter-row.tsx";
 export type { LLMConfigValues } from "./ui/sections/llm-parameters/llm-config-values.types.ts";

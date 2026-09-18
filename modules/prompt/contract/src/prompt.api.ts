@@ -1,4 +1,5 @@
 import { moduleApi } from "@langwatch/kernel";
+
 import type {
   CopyPromptCommand,
   CreatePromptCommand,
@@ -7,6 +8,7 @@ import type {
   UpdatePromptCommand,
   UpdatePromptHandleCommand,
 } from "./prompt.commands.ts";
+import type { PlaygroundStreamEvent, PromptExecuteRequest } from "./prompt.playground-execute.ts";
 import type {
   PromptCopyChoice,
   PromptCopySource,
@@ -53,6 +55,8 @@ export type PromptUpdateInput = {
 
 /** Callable prompt operations shared by process peers after composition. */
 export interface PromptApi {
+  /** Runs one browser playground request after transport authentication and authorization. */
+  executePlayground(input: PromptExecuteRequest): Promise<AsyncIterable<PlaygroundStreamEvent>>;
   /** The deep link back into the prompt library for this project. */
   promptsPlatformUrl(input: { projectSlug: string }): string;
   getAllPrompts(input: {

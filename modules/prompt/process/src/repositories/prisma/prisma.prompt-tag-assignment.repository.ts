@@ -1,5 +1,4 @@
 import { createLogger } from "@langwatch/observability";
-import { nanoid } from "nanoid";
 import type {
   Prisma,
   PrismaClient,
@@ -7,6 +6,8 @@ import type {
   PromptTagAssignment,
 } from "@langwatch/prisma-client/generated";
 import { NotFoundError } from "@langwatch/prompt-contract";
+import { nanoid } from "nanoid";
+
 import {
   PromptTagAssignmentRepository,
   TagValidationError,

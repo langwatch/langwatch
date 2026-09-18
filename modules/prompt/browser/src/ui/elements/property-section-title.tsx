@@ -1,6 +1,6 @@
 import { Box, HStack, type StackProps, Text } from "@chakra-ui/react";
-import { Info } from "lucide-react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Info } from "lucide-react";
 
 export type PropertySectionTitleProps = {
   children: React.ReactNode;

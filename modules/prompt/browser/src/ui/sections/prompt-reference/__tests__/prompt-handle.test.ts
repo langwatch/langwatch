@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { getDisplayHandle, getPromptFolder, NEW_PROMPT_TITLE } from "../index.ts";
 
 describe("getDisplayHandle", () => {

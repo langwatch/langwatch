@@ -11,8 +11,9 @@ vi.mock("@langwatch/model-provider-browser/model-limits", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 
-import { usePromptConfigForm } from "../use-prompt-config-form.ts";
 import { hasNonEmptySystemMessage } from "@langwatch/prompt-contract";
+
+import { usePromptConfigForm } from "../use-prompt-config-form.ts";
 
 interface MutationCall {
   systemContent: string | undefined;

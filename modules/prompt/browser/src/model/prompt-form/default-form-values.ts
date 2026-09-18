@@ -1,8 +1,6 @@
-import merge from "lodash-es/merge";
-
 import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
-
 import { FALLBACK_MAX_TOKENS, type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import merge from "lodash-es/merge";
 
 type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;
 

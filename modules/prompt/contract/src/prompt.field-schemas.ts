@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { SchemaVersion, datasetColumnTypeSchema } from "./prompt.enums.ts";
 
 /** Parameter types a prompt input may declare; shared between studio and contract. */

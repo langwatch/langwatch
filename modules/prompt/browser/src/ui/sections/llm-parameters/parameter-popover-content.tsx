@@ -6,12 +6,13 @@
 import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
 import { Slider } from "@langwatch/design-system/slider";
-import { useSliderControl } from "./use-slider-control.ts";
+
 import type {
   ParameterConfig,
   SelectParameterConfig,
   SliderParameterConfig,
 } from "./parameter-config.ts";
+import { useSliderControl } from "./use-slider-control.ts";
 
 // ============================================================================
 // Types
@@ -131,7 +132,6 @@ function SelectControl({ config, value, onChange, onClose }: SelectControlProps)
             colorPalette={isSelected ? "blue" : "gray"}
             onClick={() => handleSelect(option)}
             fontWeight="medium"
-            
           >
             {option.charAt(0).toUpperCase() + option.slice(1)}
           </Button>

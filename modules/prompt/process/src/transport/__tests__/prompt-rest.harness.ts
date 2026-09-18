@@ -2,11 +2,7 @@
  * The `/api/prompts` family over the runtime a process mounts it on, with the
  * two facts the process resolves bound to fixed answers.
  */
-import {
-  bindRestMiddleware,
-  createRestRuntime,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { HTTPException } from "hono/http-exception";

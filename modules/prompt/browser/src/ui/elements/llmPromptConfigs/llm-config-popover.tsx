@@ -1,14 +1,14 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Popover } from "@langwatch/design-system/popover";
 import { clampMaxTokens } from "@langwatch/model-provider-browser/clamp-max-tokens";
+import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import {
   allModelOptions,
   ModelSelector,
 } from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { type Output, OutputsSection, type OutputType } from "../outputs/outputs-section.tsx";
-import { Popover } from "@langwatch/design-system/popover";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import {
   buildModelChangeValues,
   DEFAULT_SUPPORTED_PARAMETERS,
@@ -21,6 +21,7 @@ import {
   toFormKey,
 } from "../../../llm-parameters.ts";
 import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";
+import { type Output, OutputsSection, type OutputType } from "../outputs/outputs-section.tsx";
 
 // Default output when structured outputs is disabled
 const DEFAULT_OUTPUT: Output = { identifier: "output", type: "str" };

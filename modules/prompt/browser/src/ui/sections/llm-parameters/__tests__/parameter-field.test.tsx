@@ -6,8 +6,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ParameterField } from "../parameter-field.tsx";
+
 import type { SelectParameterConfig } from "../parameter-config.ts";
+import { ParameterField } from "../parameter-field.tsx";
 
 function renderWithChakra(ui: React.ReactElement) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);

@@ -1,7 +1,11 @@
 import { useMemo } from "react";
-import { usePromptProject } from "./use-prompt-project.ts";
-import { areFormValuesEqual, computeInitialFormValuesForPrompt } from "../model/prompt-form/index.ts";
+
+import {
+  areFormValuesEqual,
+  computeInitialFormValuesForPrompt,
+} from "../model/prompt-form/index.ts";
 import { promptApi } from "./prompt-api.ts";
+import { usePromptProject } from "./use-prompt-project.ts";
 import { useTabById } from "./use-tab-by-id.ts";
 
 /**

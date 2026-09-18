@@ -1,7 +1,6 @@
+import type { LlmPromptConfigComponent, NodeDataset } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import isEqual from "lodash-es/isEqual";
-
-import type { LlmPromptConfigComponent, NodeDataset } from "@langwatch/workflow-contract";
 
 /**
  * Checks if a demonstrations dataset has any records.

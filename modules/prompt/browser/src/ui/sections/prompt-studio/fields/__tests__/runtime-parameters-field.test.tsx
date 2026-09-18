@@ -2,12 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { RuntimeParametersField } from "../runtime-parameters-field.tsx";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 function FormValueProbe() {
   const methods = useFormContext<PromptConfigFormValues>();

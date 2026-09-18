@@ -1,5 +1,4 @@
 import { Textarea, type TextareaProps } from "@chakra-ui/react";
-
 import { forwardRef } from "react";
 
 export interface ChatTextAreaProps extends TextareaProps {

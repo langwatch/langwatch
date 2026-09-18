@@ -4,6 +4,7 @@
  * Spec: specs/prompts/playground-conversation.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { playgroundConversationLabels } from "../playground-conversation-labels.ts";
 
 describe("playgroundConversationLabels", () => {

@@ -1,6 +1,6 @@
+import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import isEqual from "lodash-es/isEqual";
 import type { DeepPartial } from "react-hook-form";
-import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * Compare two form values for deep equality after JSON normalization.

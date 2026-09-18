@@ -4,9 +4,10 @@
  * @vitest-environment node
  */
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { PromptExecuteBoundsService } from "../prompt-execute-bounds.service.ts";
@@ -20,13 +21,13 @@ const TIER_PLAN_TYPE: Record<string, string> = {
 };
 
 /** The plan each organization answers, resolved exactly as the entitlement peer resolves it. */
-function tieredEntitlement(calls: RequestBoundKey[]): Pick<EntitlementApi, "requestBound"> {
-  return {
+function tieredEntitlement(calls: RequestBoundKey[]): EntitlementApi {
+  return createApiFixture<EntitlementApi>({
     requestBound: ({ key, organizationId }) => {
       calls.push(key);
       return Promise.resolve(resolveRequestBound(key, TIER_PLAN_TYPE[organizationId] ?? "FREE"));
     },
-  };
+  });
 }
 
 /** A real fixed window: each key counts its own checks, refused past the allowance named. */
@@ -51,10 +52,10 @@ function harness() {
   const boundKeysAsked: RequestBoundKey[] = [];
   const service = PromptExecuteBoundsService.create({
     entitlement: tieredEntitlement(boundKeysAsked),
-    projects: {
+    projects: createApiFixture<ProjectApi>({
       getOrganizationId: (projectId) =>
         Promise.resolve(projectId === "project-enterprise" ? ENTERPRISE_TIER_ORG : FREE_TIER_ORG),
-    } as Pick<ProjectApi, "getOrganizationId">,
+    }),
     rateLimiter: windowLimiter(),
   });
 

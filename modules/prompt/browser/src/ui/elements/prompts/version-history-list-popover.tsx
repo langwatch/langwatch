@@ -1,4 +1,3 @@
-import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import {
   Box,
   type BoxProps,
@@ -11,17 +10,19 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { Avatar } from "@langwatch/design-system/avatar";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { HistoryIcon } from "@langwatch/model-provider-browser/history-icon";
 import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
-import { HistoryIcon } from "@langwatch/model-provider-browser/history-icon";
-import { Avatar } from "@langwatch/design-system/avatar";
-import { Popover } from "@langwatch/design-system/popover";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { showErrorToast } from "@langwatch/browser-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 
 const logger = createLogger("VersionHistoryListPopover");
 

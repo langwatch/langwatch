@@ -5,7 +5,6 @@ import {
   RemoveMessageButton,
 } from "@langwatch/design-system/messages";
 import { VerticalFormControl } from "@langwatch/design-system/vertical-form-control";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import {
   type AvailableSource,
   type PromptTextAreaOnAddMention,
@@ -13,6 +12,7 @@ import {
   type Variable,
 } from "@langwatch/prompt-browser-kit/variables";
 import { useLayoutMode } from "@langwatch/prompt-browser-kit/variables";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,

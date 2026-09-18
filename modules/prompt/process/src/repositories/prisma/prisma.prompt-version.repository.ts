@@ -1,4 +1,3 @@
-import { nanoid } from "nanoid";
 import type {
   LlmPromptConfig,
   LlmPromptConfigVersion,
@@ -6,8 +5,14 @@ import type {
   PrismaClient,
   User,
 } from "@langwatch/prisma-client/generated";
+import {
+  NotFoundError,
+  type SchemaVersion,
+  getVersionValidator,
+  parseRuntimeParameters,
+} from "@langwatch/prompt-contract";
+import { nanoid } from "nanoid";
 
-import { NotFoundError, type SchemaVersion,getVersionValidator,parseRuntimeParameters } from "@langwatch/prompt-contract";
 import {
   LlmConfigVersionsRepository,
   type LlmConfigVersionDTO,

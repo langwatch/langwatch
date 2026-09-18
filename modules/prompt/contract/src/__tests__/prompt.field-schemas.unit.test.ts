@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import {
   deriveResponseFormatFromOutputs,
   outputsSchema,
   responseFormatSchema,
 } from "@langwatch/prompt-contract";
+import { describe, expect, it } from "vitest";
 
 describe("responseFormatSchema", () => {
   describe("when json_schema contains a full schema with properties", () => {

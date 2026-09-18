@@ -14,10 +14,10 @@ import {
   type PlaygroundMessage,
   usePromptExecution,
 } from "../../../../behavior/playground/use-prompt-execution.ts";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
-import { usePromptHost } from "../../../../model/prompt-host.ts";
+import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { playgroundConversationLabels } from "../../../../model/playground-conversation-labels.ts";
+import { usePromptHost } from "../../../../model/prompt-host.ts";
 import { useTabId } from "../studio-internals.ts";
 import { PlaygroundTurnSeparator } from "./playground-turn-separator.tsx";
 import { SyncedChatInput } from "./synced-chat-input.tsx";

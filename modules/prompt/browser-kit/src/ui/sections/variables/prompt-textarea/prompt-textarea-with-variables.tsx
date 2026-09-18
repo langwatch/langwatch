@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { extractLiquidVariables, tokenizeLiquidTemplate } from "@langwatch/prompt-contract";
 import {
   type ChangeEvent,
   type KeyboardEvent,
@@ -8,7 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { type CaretPosition,RichTextarea,type RichTextareaHandle } from "rich-textarea";
+import { type CaretPosition, RichTextarea, type RichTextareaHandle } from "rich-textarea";
+
 import { useLayoutMode } from "../../../../model/layout-mode.ts";
 import { VariableInsertMenu } from "../variable-insert-menu.tsx";
 import type { AvailableSource } from "../variable-mapping-input.tsx";
@@ -21,7 +23,6 @@ import { useParagraphDragDrop } from "./hooks/use-paragraph-drag-drop.ts";
 import { useTemplateLogicMenu } from "./hooks/use-template-logic-menu.ts";
 import { useTextareaResize } from "./hooks/use-textarea-resize.ts";
 import { useVariableMenu } from "./hooks/use-variable-menu.ts";
-import { extractLiquidVariables, tokenizeLiquidTemplate } from "@langwatch/prompt-contract";
 import type { PromptTextAreaWithVariablesProps } from "./prompt-textarea.types.ts";
 import {
   findJustCompletedVariable,

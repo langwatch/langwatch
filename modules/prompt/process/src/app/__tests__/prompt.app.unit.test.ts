@@ -1,15 +1,18 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  */
 import type { UpdatePromptCommand, VersionedPrompt } from "@langwatch/prompt-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { Logger } from "@langwatch/observability";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { PromptApp } from "../prompt.app.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
+import { PromptApp } from "../prompt.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -49,29 +52,32 @@ function harness() {
   );
 
   // Only `updatePrompt` is reached: the copy rule reads its source from the
-  // argument it was given rather than looking one up. A reach for any other
-  // method throws on the missing property, which is the loud failure we want.
-  const prompts: Partial<PromptService> = { updatePrompt };
+  // argument it was given rather than looking one up. The fixture rejects a
+  // reach for every other method.
+  const prompts = createApiFixture<PromptService>({ updatePrompt });
 
   const app = PromptApp.createWithPrompts(
     {
       dependencies: {
-        projects: {
+        projects: createApiFixture<ProjectApi>({
           getOrganizationId: async () => "org-1",
           listIdsByOrganization: async () => ["project-copy"],
-        } as unknown as ProjectApi,
-        permissions: {} as unknown as AuthzApi,
-        plans: {} as unknown as EntitlementApi,
+        }),
+        permissions: createApiFixture<AuthzApi>(),
+        plans: createApiFixture<EntitlementApi>(),
+        workflow: createApiFixture<WorkflowApi>(),
       },
       members: {
         prisma: {} as never,
-        logger: { info: () => {} } as unknown as Logger,
+        logger: createTestLogger().logger,
         rateLimiter: { check: async () => ({ allowed: true }) },
+        publicBaseUrl: "https://app.langwatch.test",
       },
-      config: { publicBaseUrl: "https://app.langwatch.test" },
+      config: undefined,
       resources: { own: () => {}, ownService: () => {} },
+      secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     },
-    prompts as PromptService,
+    prompts,
   );
 
   const apply = (source: VersionedPrompt) =>
@@ -308,24 +314,27 @@ describe("PromptApp.create", () => {
       const fakePrisma = {
         llmPromptConfig: { findMany: vi.fn(async () => []) },
       } as never;
-      const fakeLogger = { info: vi.fn() } as unknown as Logger;
+      const { logger: fakeLogger, lines } = createTestLogger();
 
       const app = PromptApp.create({
         dependencies: {
-          projects: {
+          projects: createApiFixture<ProjectApi>({
             getOrganizationId: async () => "org-1",
             listIdsByOrganization: async () => [],
-          } as unknown as ProjectApi,
-          permissions: {} as unknown as AuthzApi,
-          plans: {} as unknown as EntitlementApi,
+          }),
+          permissions: createApiFixture<AuthzApi>(),
+          plans: createApiFixture<EntitlementApi>(),
+          workflow: createApiFixture<WorkflowApi>(),
         },
         members: {
           prisma: fakePrisma,
           logger: fakeLogger,
           rateLimiter: { check: async () => ({ allowed: true }) },
+          publicBaseUrl: "https://app.langwatch.test",
         },
-        config: { publicBaseUrl: "https://app.langwatch.test" },
+        config: undefined,
         resources: { own: () => {}, ownService: () => {} },
+        secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
       });
 
       await expect(
@@ -333,10 +342,12 @@ describe("PromptApp.create", () => {
       ).resolves.toEqual([]);
 
       app.announceCreated({ projectId: "project-1", userId: "user-1" });
-      expect(fakeLogger.info).toHaveBeenCalledWith(
-        { projectId: "project-1", userId: "user-1" },
-        "prompt created; no product-analytics sink is composed on this process",
-      );
+      expect(
+        lines.findLine(
+          "info",
+          "prompt created; no product-analytics sink is composed on this process",
+        ),
+      ).toMatchObject({ projectId: "project-1", userId: "user-1" });
     });
   });
 });

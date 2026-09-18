@@ -5,15 +5,15 @@
  * the section title, and the toolbar's offer to start a new prompt.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AddPromptButton } from "../sidebar/add-prompt-button.tsx";
 import { EditingModeTitle } from "../fields/editing-mode-title.tsx";
 import { SavePromptButton } from "../save-prompt-button.tsx";
+import { AddPromptButton } from "../sidebar/add-prompt-button.tsx";
 
 const latestVersion = vi.hoisted(() => vi.fn());
 

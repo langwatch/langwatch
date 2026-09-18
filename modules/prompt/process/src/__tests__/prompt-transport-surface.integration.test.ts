@@ -6,8 +6,9 @@
  */
 import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
 import { describe, expect, it } from "vitest";
-import { promptRest } from "../transport/prompt.rest.ts";
+
 import { promptTagTrpcTransport } from "../transport/prompt-tag.trpc.ts";
+import { promptRest } from "../transport/prompt.rest.ts";
 import { promptTrpcTransport } from "../transport/prompt.trpc.ts";
 
 /** The names the browser calls; a rename here breaks every caller of them. */
@@ -40,7 +41,9 @@ describe("given the prompt transports declared by the module", () => {
       expect(promptTrpcTransport.namespace).toBe("prompts");
       expect(promptTagTrpcTransport.namespace).toBe("promptTags");
       expect(Object.keys(promptTrpc.members).toSorted()).toEqual([...PROMPT_PROCEDURES].toSorted());
-      expect(Object.keys(promptTagTrpc.members).toSorted()).toEqual([...PROMPT_TAG_PROCEDURES].toSorted());
+      expect(Object.keys(promptTagTrpc.members).toSorted()).toEqual(
+        [...PROMPT_TAG_PROCEDURES].toSorted(),
+      );
     });
   });
 

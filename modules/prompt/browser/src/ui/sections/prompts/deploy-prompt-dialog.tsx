@@ -8,12 +8,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Trash2, UnplugIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Info } from "react-feather";
-
+import { toaster } from "@langwatch/browser-host/toaster";
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
-import { CopyButton } from "@langwatch/workflow-browser/surfaces/copy-button";
+import { Select } from "@langwatch/design-system/select";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -23,13 +21,15 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/studio-dialog";
-import { Select } from "@langwatch/design-system/select";
-import { toaster } from "@langwatch/browser-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "@langwatch/workflow-browser/studio-scope";
-import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
+import { CopyButton } from "@langwatch/workflow-browser/surfaces/copy-button";
+import { Trash2, UnplugIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Info } from "react-feather";
+
 import { usePromptTags } from "../../../behavior/prompts/use-prompt-tags.ts";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
 
 interface DeployPromptDialogProps {
   isOpen: boolean;
@@ -433,7 +433,6 @@ export function DeployPromptDialog({
                         setAddTagError("");
                       }
                     }}
-                    
                   />
                   <Button
                     size="sm"

@@ -1,11 +1,12 @@
 import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { Database, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Popover } from "@langwatch/design-system/popover";
 import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
 import type { ComponentType } from "@langwatch/workflow-contract";
-import { VariableTypeBadge, VariableTypeIcon } from "./variable-type/index.ts";
-import { Popover } from "@langwatch/design-system/popover";
+import { Database, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import type { AvailableSource, FieldType, SourceType } from "./variable-mapping-input.tsx";
+import { VariableTypeBadge, VariableTypeIcon } from "./variable-type/index.ts";
 
 // ============================================================================
 // Types
@@ -153,12 +154,14 @@ export const VariableInsertMenu = ({
 
   // Flatten for keyboard navigation - fields FIRST, then "create" LAST
   const flattenedOptions = useMemo(() => {
-    const options: (| {
+    const options: (
+      | {
           type: "field";
           source: AvailableSource;
           field: { name: string; type: FieldType };
         }
-      | { type: "create"; name: string })[] = [];
+      | { type: "create"; name: string }
+    )[] = [];
 
     // Add fields FIRST
     filteredSources.forEach((source) => {
@@ -236,7 +239,7 @@ export const VariableInsertMenu = ({
       }}
       // Only allow auto-focus when in editable mode (has search input)
       // When onQueryChange is NOT provided (readonly mode), don't steal focus
-      
+
       lazyMount
       unmountOnExit
     >

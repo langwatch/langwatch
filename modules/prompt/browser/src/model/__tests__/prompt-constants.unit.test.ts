@@ -1,10 +1,11 @@
+import { getLatestOpenAIChatFlagship, getModelById } from "@langwatch/model-provider-contract";
 /**
  * `DEFAULT_MODEL` is auto-derived from the model registry, so drift is impossible by
  * construction.
  * @see specs/prompts/prompt-sync-fidelity.feature
  */
 import { describe, expect, it } from "vitest";
-import { getLatestOpenAIChatFlagship, getModelById } from "@langwatch/model-provider-contract";
+
 import { DEFAULT_MODEL } from "../prompt-constants.ts";
 
 describe("prompt sync fidelity — default prompt model", () => {

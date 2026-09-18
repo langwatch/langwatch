@@ -2,6 +2,7 @@
  * Spec: specs/prompts/prompt-api-snippet-dialog.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { getGetPromptSnippets } from "../get-prompt-snippets.ts";
 
 const python = (snippets: ReturnType<typeof getGetPromptSnippets>) =>

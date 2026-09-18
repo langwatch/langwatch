@@ -14,7 +14,11 @@ export {
   type SourceType,
   VariableMappingInput,
 } from "./variable-mapping-input.tsx";
-export { type Variable, VariablesSection, type VariablesSectionProps } from "./variables-section.tsx";
+export {
+  type Variable,
+  VariablesSection,
+  type VariablesSectionProps,
+} from "./variables-section.tsx";
 export { PromptTextAreaWithVariables } from "./prompt-textarea/index.ts";
 export type {
   PromptTextAreaOnAddMention,

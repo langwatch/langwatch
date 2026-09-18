@@ -1,11 +1,12 @@
 import { Button, Field, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building, Check, ChevronDown, Users } from "lucide-react";
-import { useCallback, useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PromptScope } from "@langwatch/prompt-contract";
+import { Building, Check, ChevronDown, Users } from "lucide-react";
+import { useCallback, useEffect } from "react";
+import { Controller, useForm } from "react-hook-form";
+
 import { usePromptHandleCheck } from "../../../../behavior/use-prompt-handle-check.ts";
 import {
   type ChangeHandleFormValues,
@@ -110,7 +111,7 @@ export function ChangeHandleDialog({
                 <Field.Label>Prompt Identifier</Field.Label>
                 <Input
                   placeholder="prompt-name"
-                  
+
                   data-1p-ignore
                   {...handleHandler}
                   onChange={(e) => {

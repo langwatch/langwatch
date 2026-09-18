@@ -1,7 +1,5 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { PromptService } from "../services/prompt.service.ts";
-import { PromptTagService } from "../services/prompt-tag.service.ts";
-import { PromptVersionService } from "../services/prompt-version.service.ts";
+
 import {
   PrismaPromptTagAssignmentRepository,
   type PromptTagAssignmentDatabase,
@@ -10,11 +8,14 @@ import {
   PrismaPromptTagRepository,
   type PromptTagDatabase,
 } from "../repositories/prisma/prisma.prompt-tag.repository.ts";
+import type { PromptVersionDatabase } from "../repositories/prisma/prisma.prompt-version.repository.ts";
 import {
   PrismaLlmConfigRepository,
   type PromptConfigDatabase,
 } from "../repositories/prisma/prisma.prompt.repository.ts";
-import type { PromptVersionDatabase } from "../repositories/prisma/prisma.prompt-version.repository.ts";
+import { PromptTagService } from "../services/prompt-tag.service.ts";
+import { PromptVersionService } from "../services/prompt-version.service.ts";
+import { PromptService } from "../services/prompt.service.ts";
 
 /**
  * Everything Prompt persistence touches, as the four private repositories below declare

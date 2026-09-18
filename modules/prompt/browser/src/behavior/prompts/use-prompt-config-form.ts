@@ -1,19 +1,20 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import isEqual from "lodash-es/isEqual";
-import { useEffect, useMemo, useRef } from "react";
-import { type DeepPartial, useForm } from "react-hook-form";
-import { useModelLimits } from "@langwatch/model-provider-browser/model-limits";
-import {
-  buildDefaultFormValues,
-  inputsAndOutputsToDemostrationColumns,
-} from "../../prompt-form.ts";
 import { salvageValidData } from "@langwatch/design-system/zod-salvage";
+import { useModelLimits } from "@langwatch/model-provider-browser/model-limits";
 import {
   formSchema,
   formSchemaForSave,
   type PromptConfigFormValues,
   refinedFormSchemaWithModelLimits,
 } from "@langwatch/prompt-contract";
+import isEqual from "lodash-es/isEqual";
+import { useEffect, useMemo, useRef } from "react";
+import { type DeepPartial, useForm } from "react-hook-form";
+
+import {
+  buildDefaultFormValues,
+  inputsAndOutputsToDemostrationColumns,
+} from "../../prompt-form.ts";
 
 interface UsePromptConfigFormProps {
   configId?: string;

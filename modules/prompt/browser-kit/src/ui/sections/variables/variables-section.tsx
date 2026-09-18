@@ -1,25 +1,17 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
-import { Info, Plus, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { Box, Button, HStack, Input, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "./variable-type/index.ts";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
+import { Info, Plus, X } from "lucide-react";
+import { useCallback, useState } from "react";
+
 import {
   type AvailableSource,
   type FieldMapping,
   type FieldType,
   VariableMappingInput,
 } from "./variable-mapping-input.tsx";
+import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "./variable-type/index.ts";
 
 // ============================================================================
 // Types
@@ -373,7 +365,7 @@ const VariableRow = ({
           width="100px"
           fontFamily="mono"
           fontSize="13px"
-          
+
           borderColor={hasError ? "border.error" : undefined}
           data-testid={`variable-name-input-${variable.identifier}`}
         />

@@ -4,6 +4,7 @@
  * Tests for PromptBrowserWindowContent layout mode switching
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   clearStoreInstances,
   getStoreForTesting,

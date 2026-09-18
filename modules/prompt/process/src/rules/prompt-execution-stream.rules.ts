@@ -6,8 +6,8 @@
 import type { PlaygroundStreamEvent } from "@langwatch/prompt-contract";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
-import { extractStreamableOutput, type OutputConfig } from "./prompt-output-format.rules.ts";
 import { PROMPT_NODE_ID } from "./prompt-execution-event.rules.ts";
+import { extractStreamableOutput, type OutputConfig } from "./prompt-output-format.rules.ts";
 
 /**
  * The new text since the last chunk sent. The engine reports the field's

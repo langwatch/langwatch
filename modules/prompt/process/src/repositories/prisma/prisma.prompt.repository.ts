@@ -1,13 +1,12 @@
-import { createLogger } from "@langwatch/observability";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { nanoid } from "nanoid";
+import { createLogger } from "@langwatch/observability";
+import { uniqueConstraintTargets } from "@langwatch/prisma-client/errors";
 import type {
   LlmPromptConfig,
   LlmPromptConfigVersion,
   Prisma,
   PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { uniqueConstraintTargets } from "@langwatch/prisma-client/errors";
 import {
   SchemaVersion,
   NotFoundError,
@@ -21,15 +20,17 @@ import {
   type LatestConfigVersionSchema,
   parseLlmConfigVersion,
   parseRuntimeParameters,
-  sortKeysDeep
+  sortKeysDeep,
 } from "@langwatch/prompt-contract";
+import { nanoid } from "nanoid";
+
 import type { CreateLlmConfigVersionParams } from "../prompt-version.repository.ts";
-import { PrismaLlmConfigVersionsRepository } from "./prisma.prompt-version.repository.ts";
 import {
   LlmConfigRepository,
   type CreateLlmConfigParams,
   type LlmConfigWithLatestVersion,
 } from "../prompt.repository.ts";
+import { PrismaLlmConfigVersionsRepository } from "./prisma.prompt-version.repository.ts";
 
 const logger = createLogger("langwatch:prompt-config:prisma.prompt.repository");
 

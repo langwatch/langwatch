@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { tokenizeLiquidTemplate } from "@langwatch/prompt-contract";
+import { describe, expect, it } from "vitest";
 
 describe("tokenizeLiquidTemplate()", () => {
   describe("when text contains if/endif tags", () => {

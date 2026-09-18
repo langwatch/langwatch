@@ -1,6 +1,5 @@
-import type { UseFormReturn } from "react-hook-form";
-
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
+import type { UseFormReturn } from "react-hook-form";
 
 /**
  * Picks the message for the "Validation error" toast when a save is blocked

@@ -1,10 +1,9 @@
 import { Button, Field, Input } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 const saveVersionFormSchema = z.object({
   commitMessage: z
@@ -82,7 +81,7 @@ export function SaveVersionDialog({
               <Field.Label>Description</Field.Label>
               <Input
                 placeholder="Enter a description for this version"
-                
+
                 maxLength={200}
                 {...register("commitMessage", {
                   required: "Description is required",

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { PromptStudioSpanResult } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
 import { DEFAULT_MODEL } from "../../model/prompt-constants.ts";
 import {
   coerceToNumber,

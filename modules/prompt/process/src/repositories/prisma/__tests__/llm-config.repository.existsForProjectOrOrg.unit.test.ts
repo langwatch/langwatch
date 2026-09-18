@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository.ts";
+
+import {
+  PrismaLlmConfigRepository,
+  type PromptConfigDatabase,
+} from "../prisma.prompt.repository.ts";
 
 function makeMockPrisma(findFirstResult: unknown = null) {
   // `findFirst` is kept apart from the typed `prisma` value so assertions

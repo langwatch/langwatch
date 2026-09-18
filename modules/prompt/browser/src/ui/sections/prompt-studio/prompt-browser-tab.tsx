@@ -1,6 +1,7 @@
 import { Box, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
 import { useState, type MouseEvent } from "react";
 import { LuX } from "react-icons/lu";
+
 import { getDisplayHandle } from "../../../prompt-reference.ts";
 import { VersionBadge } from "../../../prompt-version.ts";
 

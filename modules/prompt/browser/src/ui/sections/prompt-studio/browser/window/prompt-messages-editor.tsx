@@ -1,6 +1,7 @@
-import { useFieldArray, useFormContext } from "react-hook-form";
-import { PromptMessagesField } from "../../fields/prompt-messages-field.tsx";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { useFieldArray, useFormContext } from "react-hook-form";
+
+import { PromptMessagesField } from "../../fields/prompt-messages-field.tsx";
 
 export function PromptMessagesEditor() {
   const form = useFormContext<PromptConfigFormValues>();

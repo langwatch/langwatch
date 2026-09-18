@@ -1,9 +1,10 @@
 import { useCallback } from "react";
-import { useTabId } from "../../studio-internals.ts";
-import { usePrompts } from "../../../../../behavior/use-prompts.ts";
-import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../../prompt-form.ts";
+
 import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { usePrompts } from "../../../../../behavior/use-prompts.ts";
 import { useTabById } from "../../../../../behavior/use-tab-by-id.ts";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../../prompt-form.ts";
+import { useTabId } from "../../studio-internals.ts";
 import { usePromptTabSummary } from "./use-prompt-tab-summary.ts";
 
 /**

@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 import { handleSchema, runtimeParametersSchema, scopeSchema } from "./prompt.field-schemas.ts";
-import { getLatestConfigVersionSchema } from "./prompt.version-schema.ts";
 import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "./prompt.token-limits.ts";
 import { versionMetadataSchema } from "./prompt.version-metadata.ts";
+import { getLatestConfigVersionSchema } from "./prompt.version-schema.ts";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 

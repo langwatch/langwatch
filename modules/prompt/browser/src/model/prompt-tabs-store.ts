@@ -1,4 +1,6 @@
 "use client";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { chatMessageSchema } from "@langwatch/trace-contract";
 import { current } from "immer";
 import cloneDeep from "lodash-es/cloneDeep";
 import type { DeepPartial } from "react-hook-form";
@@ -7,10 +9,9 @@ import { create } from "zustand";
 import type { PersistStorage, StorageValue } from "zustand/middleware";
 import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import { chatMessageSchema } from "@langwatch/trace-contract";
+
 import type { PromptTabsCapabilities } from "./browser-capabilities.ts";
 import { createTabId, createWindowId } from "./tab-id-generators.ts";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * Zod schema for the data associated with a tab in the prompt playground browser.

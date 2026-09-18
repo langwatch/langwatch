@@ -1,12 +1,12 @@
 import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { MODEL_ICON_SIZE } from "../../../../model/model-selection-constants.ts";
 import { modelProviderIcons } from "./model-provider-icons.tsx";
 import { allModelOptions, useModelSelectionOptions } from "./model-selector.tsx";
 import { OverflownTextWithTooltip } from "./overflown-text.tsx";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { MODEL_ICON_SIZE } from "../../../../model/model-selection-constants.ts";
 
 export interface LLMModelDisplayProps extends StackProps {
   model: string;

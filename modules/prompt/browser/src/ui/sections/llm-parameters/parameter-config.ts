@@ -5,8 +5,9 @@
  * @see parameter-registry.ts for the canonical parameter definitions
  */
 
-import type { LucideIcon } from "lucide-react";
 import type { ReasoningConfig } from "@langwatch/model-provider-contract";
+import type { LucideIcon } from "lucide-react";
+
 import { type ParameterDefinition, parameterRegistry } from "./parameter-registry.ts";
 
 // ============================================================================

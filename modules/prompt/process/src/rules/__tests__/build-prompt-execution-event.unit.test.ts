@@ -1,11 +1,12 @@
+import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { studioClientEventSchema } from "@langwatch/workflow-contract";
 /**
  * The shape of the `execute_component` event the playground sends. Used to
  * be cast to `StudioClientEvent`, letting an undeclared field ride along
  * unnoticed; parsing the real event against the schema keeps the two honest.
  */
 import { describe, expect, it } from "vitest";
-import { studioClientEventSchema } from "@langwatch/workflow-contract";
-import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
+
 import { buildPromptExecutionEvent } from "../prompt-execution-event.rules.ts";
 
 const formValues = {

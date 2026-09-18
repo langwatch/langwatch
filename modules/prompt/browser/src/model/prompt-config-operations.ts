@@ -1,11 +1,11 @@
-import type { WireVersionedPrompt } from "./wire-versioned-prompt.ts";
+import type { PromptCreateTrpcInput, PromptUpdateTrpcInput } from "@langwatch/prompt-contract";
 /**
  * What the three prompt dialogs are asked to do, and what they answer with.
  * Declared against `@langwatch/prompt-contract`'s `PromptCreateTrpcInput`/
  * `PromptUpdateTrpcInput`, not a router inference a browser package may not name.
  */
 
-import type { PromptCreateTrpcInput, PromptUpdateTrpcInput } from "@langwatch/prompt-contract";
+import type { WireVersionedPrompt } from "./wire-versioned-prompt.ts";
 
 /** Parameters for creating a new prompt configuration. */
 export type CreatePromptParams = {

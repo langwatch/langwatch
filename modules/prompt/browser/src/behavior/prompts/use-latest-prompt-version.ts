@@ -1,6 +1,6 @@
-import { useRef } from "react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { api } from "@langwatch/browser-trpc/workflow-api";
+import { useRef } from "react";
 
 type UseLatestPromptVersionResult = {
   /** The current version number */

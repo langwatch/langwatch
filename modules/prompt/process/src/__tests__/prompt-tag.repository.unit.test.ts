@@ -1,11 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
 import { PromptTagValidationError } from "@langwatch/prompt-contract";
-import { PromptTagService } from "../services/prompt-tag.service.ts";
-import { PROTECTED_TAGS } from "../repositories/prompt-tag.repository.ts";
+import { describe, expect, it, vi } from "vitest";
+
 import {
   PrismaPromptTagRepository,
   type PromptTagDatabase,
 } from "../repositories/prisma/prisma.prompt-tag.repository.ts";
+import { PROTECTED_TAGS } from "../repositories/prompt-tag.repository.ts";
+import { PromptTagService } from "../services/prompt-tag.service.ts";
 
 function makeTag(overrides: Record<string, unknown> = {}) {
   return {

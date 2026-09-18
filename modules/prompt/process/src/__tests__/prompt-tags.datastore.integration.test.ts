@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 /**
  * @vitest-environment node
  * @see specs/features/prompts/custom-prompt-tags.feature
@@ -12,12 +13,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaLlmConfigRepository } from "../repositories/prisma/prisma.prompt.repository.ts";
 import { PrismaPromptTagAssignmentRepository } from "../repositories/prisma/prisma.prompt-tag-assignment.repository.ts";
 import { PrismaPromptTagRepository } from "../repositories/prisma/prisma.prompt-tag.repository.ts";
+import { PrismaLlmConfigRepository } from "../repositories/prisma/prisma.prompt.repository.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
-import { PromptService } from "../services/prompt.service.ts";
 import type { PromptVersionService } from "../services/prompt-version.service.ts";
+import { PromptService } from "../services/prompt.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
@@ -29,6 +30,7 @@ const unusedVersions = {} as PromptVersionService;
 describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", () => {
   const connection: PrismaConnection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger("langwatch:prompt:test"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
 

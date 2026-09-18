@@ -8,27 +8,31 @@ import {
   Skeleton,
   Text,
 } from "@chakra-ui/react";
-import { AlertTriangle, Search } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
-import { LuSettings2 } from "react-icons/lu";
-import { modelProviderIcons, ProviderIconGlyph } from "./model-provider-icons.tsx";
-import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
-import { isCodexModel, isModelAllowedForFeature,
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Select } from "@langwatch/design-system/select";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  isCodexModel,
+  isModelAllowedForFeature,
   buildCustomModelDisplayNames,
   modelDisplayLabel,
   allLitellmModels,
-  type ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
+import { AlertTriangle, Search } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { LuSettings2 } from "react-icons/lu";
+
 import { promptApi } from "../../../../behavior/prompt-api.ts";
-import { titleCase } from "../../../../model/string-casing.ts";
+import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
 } from "../../../../model/model-selection-constants.ts";
-import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
-import { InputGroup } from "@langwatch/design-system/input-group";
+import { titleCase } from "../../../../model/string-casing.ts";
 import { Link } from "../../../../ui/elements/prompt-link.tsx";
-import { Select } from "@langwatch/design-system/select";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { modelProviderIcons, ProviderIconGlyph } from "./model-provider-icons.tsx";
+import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
 
 export type ModelOption = {
   label: string;

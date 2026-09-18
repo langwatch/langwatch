@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { parsePromptTraceReference as parsePromptReference } from "../index.ts";
 
 describe("parsePromptReference()", () => {

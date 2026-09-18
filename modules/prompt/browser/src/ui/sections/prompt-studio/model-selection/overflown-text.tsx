@@ -1,7 +1,7 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export function OverflownTextWithTooltip({
   children,

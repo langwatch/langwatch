@@ -1,21 +1,24 @@
 import { Box, Button, HStack, Input, Spacer, Text, useDisclosure, VStack } from "@chakra-ui/react";
-import Ajv from "ajv";
-import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { LuBraces } from "react-icons/lu";
-import { fromZodError } from "zod-validation-error";
-
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { WorkflowCodeEditor } from "@langwatch/workflow-browser/workflow-code-editor";
-import type { Field } from "@langwatch/workflow-contract";
 import {
   FieldTypeSelect,
   TYPE_LABELS,
   VariableTypeIcon,
 } from "@langwatch/prompt-browser-kit/variables";
-import { outputsSchema,generateUniqueIdentifier,normalizeIdentifier } from "@langwatch/prompt-contract";
+import {
+  outputsSchema,
+  generateUniqueIdentifier,
+  normalizeIdentifier,
+} from "@langwatch/prompt-contract";
+import { WorkflowCodeEditor } from "@langwatch/workflow-browser/workflow-code-editor";
+import type { Field } from "@langwatch/workflow-contract";
+import Ajv from "ajv";
+import { Plus, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { LuBraces } from "react-icons/lu";
+import { fromZodError } from "zod-validation-error";
 
 // ============================================================================
 // Types

@@ -13,12 +13,13 @@ import {
   parseRuntimeParameters,
 } from "@langwatch/prompt-contract";
 import type { z } from "zod";
-import { transformCamelToSnake } from "../rules/prompt-transform-db.rules.ts";
+
 import type {
   LlmConfigRepository,
   LlmConfigWithLatestVersion,
 } from "../repositories/prompt.repository.ts";
 import { normalizeSystemMessage, withLatestTag } from "../rules/prompt-shape.rules.ts";
+import { transformCamelToSnake } from "../rules/prompt-transform-db.rules.ts";
 import type { PromptReadService } from "./prompt-read.service.ts";
 import type { PromptTagLookupService } from "./prompt-tag-lookup.service.ts";
 import type { PromptVersionService } from "./prompt-version.service.ts";

@@ -6,10 +6,7 @@
 const PROMPTS_PATH = "/prompts";
 
 /** `${publicBaseUrl}/${projectSlug}/prompts`, trailing slash trimmed. */
-export function promptsPlatformUrl(input: {
-  publicBaseUrl: string;
-  projectSlug: string;
-}): string {
+export function promptsPlatformUrl(input: { publicBaseUrl: string; projectSlug: string }): string {
   const base = input.publicBaseUrl.replace(/\/+$/, "");
 
   return `${base}/${input.projectSlug}${PROMPTS_PATH}`;

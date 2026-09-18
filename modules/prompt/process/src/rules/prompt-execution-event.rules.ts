@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 /**
  * Builds the workflow event for running a prompt from the playground. Extracted from
  * CopilotKit's PromptStudioAdapter as a pure function. The {{input}} binding has
@@ -16,7 +17,6 @@ import {
   type StudioClientEvent,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { generate } from "@langwatch/ksuid";
 
 /** Matches a `{{ input }}` Liquid placeholder (whitespace tolerated). */
 const TEMPLATE_INPUT_PLACEHOLDER_RE = /\{\{\s*input\s*\}\}/;

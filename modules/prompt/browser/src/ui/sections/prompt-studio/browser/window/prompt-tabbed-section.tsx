@@ -1,23 +1,24 @@
 import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
-import { ResizableDivider, useTabId } from "../../studio-internals.ts";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { type Variable, VariablesSection } from "@langwatch/prompt-browser-kit/variables";
+import type { LayoutMode } from "@langwatch/prompt-browser-kit/variables";
+import { type LlmConfigInputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type Variable, VariablesSection } from "@langwatch/prompt-browser-kit/variables";
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
-import { RuntimeParametersField } from "../../fields/runtime-parameters-field.tsx";
-import { type LlmConfigInputType,type PromptConfigFormValues } from "@langwatch/prompt-contract";
+
 import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { usePromptHost } from "../../../../../model/prompt-host.ts";
+import { PromptPlaygroundChatUnavailable } from "../../chat/prompt-playground-chat-unavailable.tsx";
 import {
   PromptPlaygroundChat,
   type PromptPlaygroundChatRef,
 } from "../../chat/prompt-playground-chat.tsx";
-import { PromptPlaygroundChatUnavailable } from "../../chat/prompt-playground-chat-unavailable.tsx";
-import { usePromptHost } from "../../../../../model/prompt-host.ts";
+import { RuntimeParametersField } from "../../fields/runtime-parameters-field.tsx";
+import { ResizableDivider, useTabId } from "../../studio-internals.ts";
 import { DemonstrationsTabContent } from "./demonstrations-tab-content.tsx";
-import type { LayoutMode } from "@langwatch/prompt-browser-kit/variables";
 
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);

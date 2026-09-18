@@ -1,12 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PromptTagConflictError,
   PromptTagNotFoundError,
   PromptTagProtectedError,
   PromptTagValidationError,
 } from "@langwatch/prompt-contract";
-import { PromptTagService } from "../services/prompt-tag.service.ts";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { PROTECTED_TAGS, type PromptTagRepository } from "../repositories/prompt-tag.repository.ts";
+import { PromptTagService } from "../services/prompt-tag.service.ts";
 
 /**
  * A stored tag as the catalogue itself hands one back, read off the repository
@@ -31,7 +32,9 @@ function makeTag(overrides: Partial<StoredPromptTag> = {}): StoredPromptTag {
  * can hold a mock directly, rather than extracting the abstract class's
  * method as an unbound value through `repo.<method>`.
  */
-function makeRepo(overrides: Partial<PromptTagRepository> = {}) {
+function makeRepo(
+  overrides: Partial<Record<keyof PromptTagRepository, ReturnType<typeof vi.fn>>> = {},
+) {
   const mocks = {
     findAll: vi.fn().mockResolvedValue([]),
     findById: vi.fn().mockResolvedValue(null),

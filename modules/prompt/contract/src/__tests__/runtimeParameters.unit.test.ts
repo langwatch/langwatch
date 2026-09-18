@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { runtimeParametersSchema } from "@langwatch/prompt-contract";
+import { describe, expect, it } from "vitest";
 
 describe("runtimeParametersSchema", () => {
   describe("when validating valid configs", () => {

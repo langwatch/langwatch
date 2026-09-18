@@ -1,14 +1,15 @@
 import { HStack } from "@chakra-ui/react";
-import { TabIdProvider } from "../studio-internals.ts";
-import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { LuColumns2 } from "react-icons/lu";
+
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { AddPromptButton } from "../sidebar/add-prompt-button.tsx";
+import { TabIdProvider } from "../studio-internals.ts";
+import { DraggableTabsBrowser } from "./draggable-tabs-browser.tsx";
 import { ExperimentFromPlaygroundButton } from "./experiment-from-playground-button.tsx";
 import { PromptTabStrip } from "./prompt-tab-strip.tsx";
 import { PromptBrowserWindowContent } from "./window/prompt-browser-window-content.tsx";
-import { DraggableTabsBrowser } from "./draggable-tabs-browser.tsx";
 
 /** Tabbed browser for the prompt playground, with draggable tabs and split-pane support. */
 export function PromptPlaygroundBrowser() {
@@ -16,12 +17,8 @@ export function PromptPlaygroundBrowser() {
   const splitTab = useDraggableTabsBrowserStore((state) => state.splitTab);
   const moveTab = useDraggableTabsBrowserStore((state) => state.moveTab);
   const setActiveTab = useDraggableTabsBrowserStore((state) => state.setActiveTab);
-  const activeWindowId = useDraggableTabsBrowserStore(
-    (state) => state.activeWindowId,
-  );
-  const setActiveWindow = useDraggableTabsBrowserStore(
-    (state) => state.setActiveWindow,
-  );
+  const activeWindowId = useDraggableTabsBrowserStore((state) => state.activeWindowId);
+  const setActiveWindow = useDraggableTabsBrowserStore((state) => state.setActiveWindow);
 
   function handleTabMove(params: {
     tabId: string;

@@ -1,6 +1,7 @@
 import { useCallback } from "react";
-import { usePromptProject } from "./use-prompt-project.ts";
+
 import { promptApi } from "./prompt-api.ts";
+import { usePromptProject } from "./use-prompt-project.ts";
 
 /**
  * Custom hook to abstract the logic of prompts operations that require refreshes.

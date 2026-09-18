@@ -1,4 +1,5 @@
 import { HStack } from "@chakra-ui/react";
+
 import { useLoadSpanIntoPromptPlayground } from "../../../behavior/use-load-span-into-prompt-studio.ts";
 import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
 import { PromptPlaygroundBrowser } from "./browser/prompt-playground-browser.tsx";

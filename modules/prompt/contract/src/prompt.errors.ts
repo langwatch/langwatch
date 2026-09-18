@@ -186,6 +186,19 @@ export class PromptPlaygroundNotPermittedError extends HandledError {
   }
 }
 
+/** The read-only prompt process deliberately has no execution engine or workflow peer. */
+export class PromptPlaygroundUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "Prompt playground execution is not available on this process", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "PromptPlaygroundUnavailableError";
+  }
+}
+
 export class CrossOriginRefusedError extends HandledError {
   declare readonly code: "cross_origin_refused";
 

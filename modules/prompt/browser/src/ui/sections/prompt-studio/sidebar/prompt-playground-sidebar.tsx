@@ -1,5 +1,5 @@
-import { PublishedPromptsList } from "./published-prompts-list.tsx";
 import { Sidebar } from "../studio-internals.ts";
+import { PublishedPromptsList } from "./published-prompts-list.tsx";
 
 /**
  * The Prompt Playground sidebar component.

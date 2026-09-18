@@ -5,8 +5,9 @@ import {
   HandleGenerationError,
   type PromptScope,
 } from "@langwatch/prompt-contract";
-import { toHandleSlug } from "../rules/prompt-handle-slug.rules.ts";
+
 import type { LlmConfigRepository } from "../repositories/prompt.repository.ts";
+import { toHandleSlug } from "../rules/prompt-handle-slug.rules.ts";
 import type { PromptReadService } from "./prompt-read.service.ts";
 import type { PromptWriteService } from "./prompt-write.service.ts";
 import type { VersionedPrompt } from "./prompt.service.ts";

@@ -1,11 +1,3 @@
-/**
- * Runs a prompt from the playground and streams the reply, replacing
- * `useCopilotChat`. Deltas buffer and flush on an animation frame
- * (`useDeltaBuffer`) instead of re-persisting the whole conversation per token.
- */
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { z } from "zod";
-import type { ChatMessage } from "@langwatch/trace-contract";
 import { generate } from "@langwatch/ksuid";
 import {
   type ParsedLLMError,
@@ -14,7 +6,16 @@ import {
   type PromptConfigFormValues,
   type runtimeInputsSchema,
 } from "@langwatch/prompt-contract";
+import type { ChatMessage } from "@langwatch/trace-contract";
 import { fetchSSE } from "@langwatch/workflow-browser/fetch-sse";
+/**
+ * Runs a prompt from the playground and streams the reply, replacing
+ * `useCopilotChat`. Deltas buffer and flush on an animation frame
+ * (`useDeltaBuffer`) instead of re-persisting the whole conversation per token.
+ */
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { z } from "zod";
+
 import { useConversationState } from "./use-conversation-state.ts";
 import { useDeltaBuffer } from "./use-delta-buffer.ts";
 

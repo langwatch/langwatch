@@ -1,8 +1,9 @@
 import { Box, HStack } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import { useEffect, useRef, useState } from "react";
+
 import { useIsTabActive } from "../../../../behavior/use-is-tab-active.ts";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
-import { nowInstant } from "@langwatch/time";
 import {
   ChatSendButton,
   ChatSyncCheckbox,

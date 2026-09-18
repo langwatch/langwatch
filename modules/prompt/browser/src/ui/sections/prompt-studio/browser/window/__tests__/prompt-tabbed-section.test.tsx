@@ -2,12 +2,16 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { type Variable, VariablesSection } from "@langwatch/prompt-browser-kit/variables";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Profiler } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Variable, VariablesSection } from "@langwatch/prompt-browser-kit/variables";
+
+import { PromptHostProvider } from "../../../../../../model/prompt-host.ts";
+import { FakePromptHost } from "../../../../../../testing.tsx";
 import {
   clearStoreInstances,
   PromptPlaygroundChatProvider,
@@ -16,9 +20,6 @@ import {
   type TabData,
 } from "../../../studio-internals.ts";
 import { PromptTabbedSection } from "../prompt-tabbed-section.tsx";
-import { PromptHostProvider } from "../../../../../../model/prompt-host.ts";
-import { FakePromptHost } from "../../../../../../testing.tsx";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * One host for the whole file: nothing here asserts on what the screen asked the

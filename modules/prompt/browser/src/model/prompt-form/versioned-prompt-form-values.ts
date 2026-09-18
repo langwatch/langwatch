@@ -1,6 +1,6 @@
-import type { WireVersionedPrompt } from "../wire-versioned-prompt.ts";
-import { handleSchema,formSchema,type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { handleSchema, formSchema, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
+import type { WireVersionedPrompt } from "../wire-versioned-prompt.ts";
 import { withDerivedDemonstrationColumns } from "./demonstration-columns.ts";
 
 /**

@@ -1,14 +1,14 @@
 import { Box, Popover as ChakraPopover, HStack } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
+import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser/no-models-configured-callout";
+import { LLMModelDisplay } from "@langwatch/prompt-browser-kit/llm-model-display";
+import type { ModelOption } from "@langwatch/topic-contract";
+import { AddModelProviderKey } from "@langwatch/workflow-browser/add-model-provider-key";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import { LLMConfigPopover, type Output } from "./llm-config-popover.tsx";
-import { AddModelProviderKey } from "@langwatch/workflow-browser/add-model-provider-key";
-import type { LLMConfig } from "@langwatch/workflow-contract";
-import type { ModelOption } from "@langwatch/topic-contract";
-import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser/no-models-configured-callout";
-import { Popover } from "@langwatch/design-system/popover";
-import { LLMModelDisplay } from "@langwatch/prompt-browser-kit/llm-model-display";
 
 type LLMConfigFieldProps = {
   llmConfig: LLMConfig;

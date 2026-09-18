@@ -2,12 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type Tab, useIsOverflowing, useTabId } from "../../studio-internals.ts";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { type Tab, useIsOverflowing, useTabId } from "../../studio-internals.ts";
+import { DraggableTabsBrowser } from "../draggable-tabs-browser.tsx";
 import { PromptTabStrip } from "../prompt-tab-strip.tsx";
 import { usePromptBrowserTabController } from "../tab/use-prompt-browser-tab-controller.ts";
-import { DraggableTabsBrowser } from "../draggable-tabs-browser.tsx";
 
 vi.mock("../../studio-internals.ts", async () => {
   const actual =

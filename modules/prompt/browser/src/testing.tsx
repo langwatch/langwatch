@@ -7,6 +7,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
+
 import type { PromptBrowserStorage, PromptTabsCapabilities } from "./model/browser-capabilities.ts";
 import {
   PromptHostApi,

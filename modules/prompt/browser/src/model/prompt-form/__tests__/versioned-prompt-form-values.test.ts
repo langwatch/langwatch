@@ -1,6 +1,6 @@
-import type { WireVersionedPrompt } from "../../wire-versioned-prompt.ts";
 import { describe, expect, it } from "vitest";
 
+import type { WireVersionedPrompt } from "../../wire-versioned-prompt.ts";
 import { versionedPromptToPromptConfigFormValues } from "../versioned-prompt-form-values.ts";
 
 describe("versionedPromptToPromptConfigFormValues", () => {

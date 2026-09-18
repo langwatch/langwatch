@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import { nanoid } from "nanoid";
 import type { PrismaClient, PromptTag } from "@langwatch/prisma-client/generated";
+import { nanoid } from "nanoid";
+
 import { PromptTagRepository } from "../prompt-tag.repository.ts";
 
 const SEEDED_TAGS = ["production", "staging"] as const;

@@ -1,7 +1,11 @@
 import { Box, Popover as ChakraPopover, HStack, Skeleton } from "@chakra-ui/react";
-import React, { useCallback, useState } from "react";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { type LlmConfigOutputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { ChevronDown } from "lucide-react";
+import React, { useCallback, useState } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
+
 import {
   LLMConfigPopover,
   type Output,
@@ -10,9 +14,6 @@ import {
 import { LLMModelDisplay } from "../model-selection/llm-model-display.tsx";
 import { allModelOptions, useModelSelectionOptions } from "../model-selection/model-selector.tsx";
 import { NoModelsConfiguredCallout } from "../model-selection/no-models-configured-callout.tsx";
-import { Popover } from "@langwatch/design-system/popover";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type LlmConfigOutputType,type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 type ModelSelectFieldMiniProps = {
   /** Whether to show the structured outputs section in the config popover */

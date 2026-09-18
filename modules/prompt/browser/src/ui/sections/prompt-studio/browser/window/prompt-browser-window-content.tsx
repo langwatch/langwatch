@@ -1,19 +1,17 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import {
-  type LayoutMode,
-  LayoutModeContext,
-} from "@langwatch/prompt-browser-kit/variables";
-import { type TabData, useTabId } from "../../studio-internals.ts";
+import { type LayoutMode, LayoutModeContext } from "@langwatch/prompt-browser-kit/variables";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import cloneDeep from "lodash-es/cloneDeep";
 import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type DeepPartial, FormProvider } from "react-hook-form";
+
 import { usePromptConfigForm } from "../../../../../behavior/use-prompt-config-form.ts";
 import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { type TabData, useTabId } from "../../studio-internals.ts";
 import { PromptBrowserHeader } from "./prompt-browser-header.tsx";
 import { PromptMessagesEditor } from "./prompt-messages-editor.tsx";
 import { PromptTabbedSection } from "./prompt-tabbed-section.tsx";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /** Height of tabs header (32px) + divider (16px) + minimum chat area (200px) */
 const TABS_AND_DIVIDER_HEIGHT = 48;

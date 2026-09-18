@@ -1,13 +1,15 @@
 import { z } from "zod";
+
+import { SchemaVersion } from "./prompt.enums.ts";
 import {
   inputsSchema,
   messageSchema,
   outputsSchema,
   promptingTechniqueSchema,
   responseFormatSchema,
-  versionSchema,nodeDatasetSchema
+  versionSchema,
+  nodeDatasetSchema,
 } from "./prompt.field-schemas.ts";
-import { SchemaVersion } from "./prompt.enums.ts";
 import { sortKeysDeep } from "./prompt.sort-keys.ts";
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;

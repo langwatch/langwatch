@@ -1,12 +1,11 @@
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import type {
   LlmConfigInputType,
   LlmConfigOutputType,
   NodeDataset,
 } from "@langwatch/workflow-contract";
 import isEqual from "lodash-es/isEqual";
-
-import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 export function inputsAndOutputsToDemostrationColumns(
   inputs: PromptConfigFormValues["version"]["configData"]["inputs"],

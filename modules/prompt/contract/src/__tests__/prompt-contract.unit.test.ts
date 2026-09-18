@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { createPromptCommandSchema, promptConfigDataSchema, promptHandleSchema } from "../index.ts";
 
 describe("Prompt contract", () => {

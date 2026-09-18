@@ -1,42 +1,40 @@
-import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import { Box, Button, Circle, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
-import debounce from "lodash-es/debounce";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
-import { LuArrowLeft, LuPencil } from "react-icons/lu";
-import { FormOutputsSection } from "../../elements/outputs/form-outputs-section.tsx";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  type AvailableSource,
-  type FieldMapping,
-  FormVariablesSection,
-} from "@langwatch/prompt-browser-kit/variables";
-import { useEvaluationMappings } from "@langwatch/experiment-browser/evaluation-mappings";
-import type { LocalPromptConfig } from "@langwatch/experiment-contract";
-import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-browser/mapping-validation";
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import {
   getComplexProps,
   getFlowCallbacks,
   useDrawer,
   useDrawerParams,
 } from "@langwatch/browser-host/use-drawer";
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRegisterDrawerFooter } from "@langwatch/workflow-browser/studio-drawer-footer";
-import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
-import { PromptEditorHeader } from "./prompt-editor-header.tsx";
-import { VersionBadge } from "../../../prompt-version.ts";
-import { ChangeHandleDialog } from "./forms/change-handle-dialog.tsx";
-import { PromptMessagesField } from "../../elements/prompts/forms/fields/message-history-fields/prompt-messages-field.tsx";
+import { api } from "@langwatch/browser-trpc/workflow-api";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useEvaluationMappings } from "@langwatch/experiment-browser/evaluation-mappings";
+import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-browser/mapping-validation";
+import type { LocalPromptConfig } from "@langwatch/experiment-contract";
+import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import {
-  type SaveDialogFormValues,
-  SaveVersionDialog,
-} from "../../elements/prompts/forms/save-version-dialog.tsx";
+  type AvailableSource,
+  type FieldMapping,
+  FormVariablesSection,
+} from "@langwatch/prompt-browser-kit/variables";
+import { hasNonEmptySystemMessage, type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import type { LlmConfigInputType } from "@langwatch/workflow-browser/component-types";
+import { useRegisterDrawerFooter } from "@langwatch/workflow-browser/studio-drawer-footer";
+import debounce from "lodash-es/debounce";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
+import { LuArrowLeft, LuPencil } from "react-icons/lu";
+
+import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
 import { useLatestPromptVersion } from "../../../behavior/prompts/use-latest-prompt-version.ts";
 import { usePromptConfigForm } from "../../../behavior/prompts/use-prompt-config-form.ts";
+import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";
+import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values.ts";
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import {
   areFormValuesEqual,
   buildDefaultFormValues,
@@ -44,13 +42,16 @@ import {
   getSaveBlockerMessage,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../../../prompt-form.ts";
-import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
-import type { LlmConfigInputType } from "@langwatch/workflow-browser/component-types";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values.ts";
-import { hasNonEmptySystemMessage, type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";
+import { VersionBadge } from "../../../prompt-version.ts";
+import { FormOutputsSection } from "../../elements/outputs/form-outputs-section.tsx";
+import { PromptMessagesField } from "../../elements/prompts/forms/fields/message-history-fields/prompt-messages-field.tsx";
+import {
+  type SaveDialogFormValues,
+  SaveVersionDialog,
+} from "../../elements/prompts/forms/save-version-dialog.tsx";
+import { ChangeHandleDialog } from "./forms/change-handle-dialog.tsx";
+import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
+import { PromptEditorHeader } from "./prompt-editor-header.tsx";
 
 export type PromptEditorDrawerProps = {
   open?: boolean;

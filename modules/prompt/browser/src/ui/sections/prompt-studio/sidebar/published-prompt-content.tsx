@@ -1,5 +1,6 @@
-import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
 import { Box, HStack, Text } from "@chakra-ui/react";
+
+import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
 import { getDisplayHandle, OrganizationBadge } from "../../../../prompt-reference.ts";
 import { PublishedPromptActions } from "./published-prompt-actions.tsx";
 

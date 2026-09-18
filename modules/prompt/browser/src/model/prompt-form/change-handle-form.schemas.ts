@@ -1,6 +1,5 @@
-import { z } from "zod";
-
 import { isValidHandle, type PromptScope, scopeSchema } from "@langwatch/prompt-contract";
+import { z } from "zod";
 
 export const changeHandleFormSchema = z.object({
   handle: z

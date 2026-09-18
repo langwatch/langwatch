@@ -5,6 +5,7 @@
  */
 
 import { useCallback } from "react";
+
 import { usePromptHost } from "../model/prompt-host.ts";
 
 export function usePromptIdQueryParam() {

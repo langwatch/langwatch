@@ -1,3 +1,4 @@
+import { formSchemaForSave } from "@langwatch/prompt-contract";
 /**
  * Unit tests for the system-prompt-required refinement - the client-side
  * counterpart to the server's `SystemPromptRequiredError` (#3196), so Save
@@ -6,7 +7,6 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_FORM_VALUES } from "../default-form-values.ts";
-import { formSchemaForSave } from "@langwatch/prompt-contract";
 
 describe("formSchemaForSave — system prompt required refinement (Issue #3196)", () => {
   function valuesWithMessages(

@@ -1,7 +1,8 @@
 import { Box, HStack, Input, Link, Text, VStack } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Popover } from "@langwatch/design-system/popover";
+
 import {
   TEMPLATE_SYNTAX_DOCS_URL,
   type TemplateLogicConstruct,
@@ -113,7 +114,7 @@ export const TemplateLogicMenu = ({
         flip: true,
         slide: true,
       }}
-      
+
       lazyMount
       unmountOnExit
     >

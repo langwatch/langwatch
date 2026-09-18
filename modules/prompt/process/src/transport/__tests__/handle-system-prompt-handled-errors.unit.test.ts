@@ -4,10 +4,9 @@
  * `error.message`, which is why the "friendly message, no stack trace" assertion lives here.
  */
 
+import { SystemPromptConflictError, SystemPromptRequiredError } from "@langwatch/prompt-contract";
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it } from "vitest";
-
-import { SystemPromptConflictError, SystemPromptRequiredError } from "@langwatch/prompt-contract";
 
 import { handleSystemPromptHandledErrors } from "../prompt.rest.ts";
 

@@ -1,7 +1,8 @@
 /** Unit tests for parameter configuration (unified reasoning field). */
 
-import { beforeEach, describe, expect, it } from "vitest";
 import type { ReasoningConfig } from "@langwatch/model-provider-contract";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,

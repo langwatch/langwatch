@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CaretPosition } from "rich-textarea";
+
 import type { SelectedField } from "../../variable-insert-menu.tsx";
 import type { AvailableSource, FieldType } from "../../variable-mapping-input.tsx";
 import type { Variable } from "../../variables-section.tsx";
@@ -71,12 +72,14 @@ export const useVariableMenu = ({
       source.fields.some((field) => field.name.toLowerCase() === normalizedQuery),
     );
 
-    const options: (| {
+    const options: (
+      | {
           type: "field";
           source: AvailableSource;
           field: { name: string; type: FieldType };
         }
-      | { type: "create"; name: string })[] = [];
+      | { type: "create"; name: string }
+    )[] = [];
 
     // Add fields FIRST
     filteredSources.forEach((source) => {

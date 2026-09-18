@@ -3,12 +3,16 @@
  * Integration tests for creating an experiment from the prompt playground.
  */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import userEvent from "@testing-library/user-event";
 import type { DeepPartial } from "react-hook-form";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
+import { FakePromptHost } from "../../../../../testing.tsx";
 import {
   clearStoreInstances,
   getStoreForTesting,
@@ -16,9 +20,6 @@ import {
   type TabData,
 } from "../../studio-internals.ts";
 import { ExperimentFromPlaygroundButton } from "../experiment-from-playground-button.tsx";
-import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
-import { FakePromptHost } from "../../../../../testing.tsx";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * One host for the whole file: nothing here asserts what the screen asked,

@@ -1,3 +1,4 @@
+import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 /**
  * @vitest-environment jsdom
  *
@@ -5,7 +6,7 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
+
 import { usePromptExecution } from "../use-prompt-execution.ts";
 
 const { fetchSSEMock } = vi.hoisted(() => ({ fetchSSEMock: vi.fn() }));

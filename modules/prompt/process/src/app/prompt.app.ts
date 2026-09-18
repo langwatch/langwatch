@@ -4,7 +4,8 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
  * The prompt library's application: what its doors call.
  */
 import { NotFoundError } from "@langwatch/handled-error";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/kernel";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   PromptApi,
@@ -19,6 +20,7 @@ import {
   PromptTagNotFoundError,
   PromptTagProtectedError,
   PromptTagValidationError,
+  PromptPlaygroundUnavailableError,
   type CreatePromptCommand,
   type PromptCopySource,
   type PromptCopySummary,
@@ -32,12 +34,14 @@ import {
   type VersionedPrompt,
   type PromptCopyChoice,
   type PromptPushToCopiesResult,
+  type PromptExecuteRequest,
+  type PlaygroundStreamEvent,
 } from "@langwatch/prompt-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { z } from "zod";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
+import { PromptExecutionService } from "../services/prompt-execution.service.ts";
 import type { PromptService } from "../services/prompt.service.ts";
 import { PostgresPromptAdapter } from "./prompt-composition.build.ts";
 
@@ -83,20 +87,19 @@ type PromptDependencies = Readonly<{
   permissions: typeof AuthzApi;
   /** The plan the playground door's run counter and message cap resolve through. */
   plans: typeof EntitlementApi;
+  /** Owns studio-event preparation and execution for the playground. */
+  workflow: typeof WorkflowApi;
 }>;
 
 /**
- * The one thing this application needs from the deployment rather than from a
- * peer: its own public origin, which every REST answer's `platformUrl` deep
- * link into the prompt library is built on.
+ * The store members this process opens, plus the public origin the process
+ * itself knows. Absent where the deployment named no `BASE_HOST`, which the
+ * platform-link read below already refuses on.
  */
-const promptAppConfigSchema = z.object({ publicBaseUrl: z.url() });
+type PromptMembers = MembersRead<readonly ["prisma", "logger", "rateLimiter"]> &
+  Readonly<{ publicBaseUrl: string | undefined }>;
 
-type PromptSetup = FeatureSetup<
-  PromptDependencies,
-  MembersRead<typeof PromptApp.reads>,
-  z.infer<typeof promptAppConfigSchema>
->;
+type PromptSetup = FeatureSetup<PromptDependencies, PromptMembers, undefined>;
 
 /** No such tag in the organization's catalog. */
 export class PromptTagMissingError extends NotFoundError {
@@ -127,11 +130,8 @@ type PromptAppDependencies = Readonly<{
   projects: ProjectApi;
   permissions: AuthzApi | null;
   members: PromptInfrastructure;
-  /**
-   * The playground door's tier-effective run counter and message cap. Absent
-   * only on the read-only twin, which serves no execution door.
-   */
-  executeBounds: PromptExecuteBoundsService | null;
+  /** Absent only on the read-only twin, which deliberately has no executor. */
+  execution: PromptExecutionService | null;
   /**
    * Absent only on the read-only twin, which serves no REST family and so is
    * never asked for a deep link.
@@ -145,14 +145,14 @@ export class PromptApp implements PromptApi {
     projects: ProjectApi,
     permissions: AuthzApi,
     plans: EntitlementApi,
+    workflow: WorkflowApi,
   };
-  static readonly configSchema = promptAppConfigSchema;
   /**
    * The one member the engine is built over; becomes a declared `repositories`
    * bundle once the four repositories behind `PostgresPromptAdapter` move onto
    * `defineRepositories`. `rateLimiter` is the playground door's run counter.
    */
-  static readonly reads = reads("prisma", "logger", "rateLimiter");
+  static readonly reads = ["prisma", "logger", "rateLimiter", "publicBaseUrl"] as const;
 
   static create(setup: PromptSetup): PromptApp {
     const prompts: PromptService = PostgresPromptAdapter.create({
@@ -168,15 +168,19 @@ export class PromptApp implements PromptApi {
    * seam, not a process member (see {@link PromptInfrastructure.prompts}).
    */
   static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptApp {
-    const { config, dependencies, members } = setup;
+    const { dependencies, members } = setup;
     return new PromptApp({
       prompts,
       projects: dependencies.projects,
       permissions: dependencies.permissions,
-      executeBounds: PromptExecuteBoundsService.create({
-        entitlement: dependencies.plans,
-        projects: dependencies.projects,
-        rateLimiter: members.rateLimiter,
+      execution: PromptExecutionService.create({
+        workflow: dependencies.workflow,
+        authz: dependencies.permissions,
+        bounds: PromptExecuteBoundsService.create({
+          entitlement: dependencies.plans,
+          projects: dependencies.projects,
+          rateLimiter: members.rateLimiter,
+        }),
       }),
       members: {
         prompts,
@@ -187,7 +191,7 @@ export class PromptApp implements PromptApi {
           );
         },
       },
-      publicBaseUrl: config.publicBaseUrl,
+      publicBaseUrl: members.publicBaseUrl,
     });
   }
 
@@ -201,7 +205,7 @@ export class PromptApp implements PromptApi {
       prompts: input.prompts,
       projects: input.projects,
       permissions: null,
-      executeBounds: null,
+      execution: null,
       members: { prompts: input.prompts, afterPromptCreated: () => undefined },
       publicBaseUrl: undefined,
     });
@@ -213,21 +217,6 @@ export class PromptApp implements PromptApi {
       throw new Error("The prompt reader holds no permission peer on this process");
     }
     return permissions;
-  }
-
-  /**
-   * The playground door's one budget question, answered before any LLM work.
-   * Refuses by name on the read-only twin, which serves no execution door.
-   */
-  assertExecuteWithinBounds(input: { projectId: string; messageCount: number }): Promise<void> {
-    const bounds = this.#dependencies.executeBounds;
-    if (!bounds) {
-      throw new Error(
-        "The prompt reader holds no execute bounds: assertExecuteWithinBounds is not available on this process",
-      );
-    }
-
-    return bounds.assertExecuteWithinBounds(input);
   }
 
   /**
@@ -250,6 +239,13 @@ export class PromptApp implements PromptApi {
 
   private constructor(dependencies: PromptAppDependencies) {
     this.#dependencies = dependencies;
+  }
+
+  executePlayground(input: PromptExecuteRequest): Promise<AsyncIterable<PlaygroundStreamEvent>> {
+    const execution = this.#dependencies.execution;
+    if (!execution) throw new PromptPlaygroundUnavailableError();
+
+    return execution.execute(input);
   }
 
   // -- the library -----------------------------------------------------------

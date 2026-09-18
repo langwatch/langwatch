@@ -13,20 +13,26 @@ import {
  */
 export class PromptExecuteBoundsService {
   static create(deps: {
-    entitlement: Pick<EntitlementApi, "requestBound">;
-    projects: Pick<ProjectApi, "getOrganizationId">;
+    entitlement: EntitlementApi;
+    projects: ProjectApi;
     rateLimiter: RateLimiter;
   }): PromptExecuteBoundsService {
     return new PromptExecuteBoundsService(deps);
   }
 
-  private constructor(
-    private readonly deps: Readonly<{
-      entitlement: Pick<EntitlementApi, "requestBound">;
-      projects: Pick<ProjectApi, "getOrganizationId">;
-      rateLimiter: RateLimiter;
-    }>,
-  ) {}
+  readonly #entitlement: EntitlementApi;
+  readonly #projects: ProjectApi;
+  readonly #rateLimiter: RateLimiter;
+
+  private constructor(deps: {
+    entitlement: EntitlementApi;
+    projects: ProjectApi;
+    rateLimiter: RateLimiter;
+  }) {
+    this.#entitlement = deps.entitlement;
+    this.#projects = deps.projects;
+    this.#rateLimiter = deps.rateLimiter;
+  }
 
   /**
    * Counts one run against the project's window and refuses a message array
@@ -36,13 +42,13 @@ export class PromptExecuteBoundsService {
     projectId: string;
     messageCount: number;
   }): Promise<void> {
-    const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
+    const organizationId = await this.#projects.getOrganizationId(input.projectId);
 
-    const requests = await this.deps.entitlement.requestBound({
+    const requests = await this.#entitlement.requestBound({
       key: "promptExecutePerMinute",
       organizationId,
     });
-    const decision = await this.deps.rateLimiter.check(`prompt-execute:${input.projectId}`, {
+    const decision = await this.#rateLimiter.check(`prompt-execute:${input.projectId}`, {
       requests,
       seconds: 60,
     });
@@ -50,7 +56,7 @@ export class PromptExecuteBoundsService {
       throw new PromptExecuteRateLimitedError({ retryAfterSeconds: decision.retryAfterSeconds });
     }
 
-    const maxMessages = await this.deps.entitlement.requestBound({
+    const maxMessages = await this.#entitlement.requestBound({
       key: "promptMessagesMax",
       organizationId,
     });
