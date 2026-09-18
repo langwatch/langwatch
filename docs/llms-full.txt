@@ -67164,7 +67164,12 @@ GROUP BY ConversationId
 LIMIT 100
 ```
 
-Judging is metered and charged per query. A run reads at most 1,000 distinct texts, the same shape of cap the extraction functions carry, and a query whose text volume would go past the per-query budget answers `422` with the code `instant_eval_query_budget_exceeded` rather than spending the money. Lower the `LIMIT`, ask the extraction function for a smaller token budget, or run the statement as a job.
+Judging is metered and charged per query. Two separate ceilings apply, and each one refuses the run rather than returning part of it:
+
+- A run judges at most 1,000 distinct texts, the same shape of cap the extraction functions carry. Past it the answer is `422` with the code `lwql_app_function_key_cap`, naming the cap and how many texts the query needed.
+- A run whose texts together would exceed the per-query token budget answers `422` with the code `instant_eval_query_budget_exceeded`, before anything is sent to the judge.
+
+For either one: lower the `LIMIT`, ask the extraction function for a smaller token budget, or run the statement as a job.
 
 A text longer than the judge takes is cut before it is sent, keeping the start. Pass a token budget to the extraction function to choose what survives instead.
 

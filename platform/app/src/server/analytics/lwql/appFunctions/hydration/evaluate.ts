@@ -26,6 +26,7 @@
  */
 
 import type {
+  InstantEvalClassifierLimits,
   InstantEvalJudgement,
   InstantEvalQuestion,
 } from "~/server/app-layer/instant-evals/classifier/classifier";
@@ -77,7 +78,14 @@ export async function evaluateCalls({
   }
 
   const units = await buildUnits({ evalCalls, traces });
-  assertQueryBudget({ units, budget: support.queryTokenBudget });
+  assertQueryBudget({
+    units,
+    budget: support.queryTokenBudget,
+    // The classifier's own, not the shipped constant: the contract says limits
+    // are published by the implementation and never assumed, so a classifier
+    // with a smaller state cap must be budgeted against that.
+    limits: support.classifier.limits,
+  });
 
   const usage = {
     requests: 0,
@@ -98,6 +106,20 @@ export async function evaluateCalls({
       });
       if (judgement === null) {
         failures += 1;
+        // Not an unresolved key: this key found its text and the text was
+        // sent. Recording it as a skip with a reason is what keeps the null
+        // cell explained by the diagnostic that describes what happened.
+        record({
+          unit,
+          judgement: {
+            verdicts: [],
+            skippedReason: "classifier_failed",
+            inputTokens: 0,
+            isTextTruncated: false,
+          },
+          values,
+          usage,
+        });
         return;
       }
       record({ unit, judgement, values, usage });
@@ -234,15 +256,18 @@ async function textFor({
 function assertQueryBudget({
   units,
   budget,
+  limits,
 }: {
   units: readonly JudgementUnit[];
   budget: number;
+  limits: InstantEvalClassifierLimits;
 }): void {
   let estimatedTokens = 0;
   for (const unit of units) {
     estimatedTokens += estimateInstantEvalRequestTokens({
       text: unit.text,
       questions: unit.questions,
+      limits,
     });
   }
   if (estimatedTokens > budget) {

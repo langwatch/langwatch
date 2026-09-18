@@ -153,7 +153,14 @@ export interface InstantEvalPricing {
 }
 
 export interface InstantEvalClassifyRequest {
-  /** The text to judge, already cut to the text budget by the caller. */
+  /**
+   * The text to judge, as long as the caller has it.
+   *
+   * Deliberately not pre-cut. The budget is a property of the classifier, and
+   * only the classifier knows how many tokens its own questions cost, so an
+   * implementation cuts the text to its own budget and reports having done so
+   * through {@link InstantEvalJudgement.isTextTruncated}.
+   */
   readonly text: string;
   /** Every question about that text, asked in one request. */
   readonly questions: readonly InstantEvalQuestion[];

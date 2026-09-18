@@ -116,12 +116,16 @@ describe("given the shared bucket", () => {
       clock.now += 3_600_000;
       let granted = 0;
       const startedAt = clock.now;
-      while (clock.now === startedAt && granted < CAPACITY + 50) {
+      while (granted < CAPACITY + 50) {
         await limiter.acquire();
+        // The acquisition that had to wait is the one past capacity, so it is
+        // not counted: what is being asserted is how many the bucket handed
+        // out without the clock moving.
+        if (clock.now !== startedAt) break;
         granted += 1;
       }
 
-      expect(granted).toBeLessThanOrEqual(CAPACITY + 8);
+      expect(granted).toBe(CAPACITY);
     });
   });
 });

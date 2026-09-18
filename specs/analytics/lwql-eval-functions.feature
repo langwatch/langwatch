@@ -105,11 +105,11 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: eval takes two or three arguments and nothing else
-    Given a statement calling eval with one argument
+  Scenario: eval takes two arguments, and the criteria form is its own function
+    Given a statement calling eval with a criteria argument
     When the statement is validated
     Then it is refused with APP_FUNCTION_ARGUMENT
-    And the message names both accepted forms
+    And the message names eval_criteria as the function that takes one
 
   @unit
   Scenario: The criteria argument is two strings, what counts as yes and what does not
@@ -210,6 +210,14 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Then that row's judged columns are null
     And the result carries the INSTANT_EVAL_SKIPPED diagnostic naming one row
     And the other four rows hold their answers
+
+  @unit
+  Scenario: A text the classifier failed on is skipped, not reported as a missing key
+    Given a classifier that drops one text of two and answers the other
+    When the statement is hydrated
+    Then the dropped row's judged column is null
+    And the result reports one skipped judgement naming the classifier failure
+    And no key is reported as unresolved, because both keys found their text
 
   @unit
   Scenario: A cancelled query stops judging instead of paying out the rest

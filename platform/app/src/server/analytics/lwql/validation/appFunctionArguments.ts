@@ -35,7 +35,11 @@ export type AppFunctionArgumentsOutcome =
   | { readonly ok: false; readonly message: string };
 
 /** The default bounds for a numeric option: a positive whole number. */
-const DEFAULT_NUMERIC = { min: 1, max: Number.MAX_SAFE_INTEGER, integer: true };
+const DEFAULT_NUMERIC = {
+  min: 1,
+  max: Number.MAX_SAFE_INTEGER,
+  isInteger: true,
+};
 
 /**
  * Most levels a score range may ask the classifier to weigh.
@@ -126,7 +130,7 @@ function expectedShape(parameter: LangWatchQLAppFunctionParameter): string {
 
 function numericShape(parameter: LangWatchQLAppFunctionParameter): string {
   const numeric = parameter.numeric ?? DEFAULT_NUMERIC;
-  const whole = numeric.integer ? "whole " : "";
+  const whole = numeric.isInteger ? "whole " : "";
   return numeric.max === Number.MAX_SAFE_INTEGER
     ? `a positive ${whole}number`
     : `a ${whole}number between ${numeric.min} and ${numeric.max}`;
@@ -203,7 +207,7 @@ function numberLiteral({
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return null;
   const numeric = parameter.numeric ?? DEFAULT_NUMERIC;
-  if (numeric.integer && !Number.isInteger(parsed)) return null;
+  if (numeric.isInteger && !Number.isInteger(parsed)) return null;
   if (parsed < numeric.min || parsed > numeric.max) return null;
   return parsed;
 }
@@ -264,8 +268,8 @@ function isNameAndDescription(entry: string): boolean {
  * The one rule a single parameter cannot state: a score range runs upwards, and
  * not for ever.
  *
- * Each level is an option the classifier weighs, and it takes at most 255 of
- * them — the same ceiling a category has, for the same reason.
+ * Each level is an option the classifier weighs, and it takes at most
+ * {@link MAX_SCORE_LEVELS} of them, which is far fewer than a category's.
  */
 function checkAcrossOptions({
   definition,

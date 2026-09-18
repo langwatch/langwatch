@@ -147,7 +147,7 @@ describe("given nesting the validator does not allow", () => {
 
 describe("given arguments that do not match a signature", () => {
   describe("when eval is called with a criteria argument", () => {
-    /** @scenario "eval takes two or three arguments and nothing else" */
+    /** @scenario "eval takes two arguments, and the criteria form is its own function" */
     it("refuses the arity and names the function that takes one", () => {
       const result = validate("eval(CapturedOutput, 'a', ['yes', 'no']) AS x");
 
@@ -248,6 +248,24 @@ describe("given arguments that do not match a signature", () => {
       expect(
         codesOf(validate("eval_passed(CapturedOutput, 'a', 0.7) AS x")),
       ).toEqual([]);
+    });
+  });
+
+  describe("when a score scale runs below zero", () => {
+    it("accepts a negative bound, which the parser reports as a signed literal", () => {
+      // The parser reports `-3` as one `Literal` of type `Int64` with the
+      // value "-3" rather than as a negation applied to `3`, so the bound is
+      // read straight off the literal. Pinned because a parser that changed
+      // that would silently refuse every scale below zero.
+      expect(
+        codesOf(validate("eval_score(CapturedOutput, 'a', -3, 2) AS x")),
+      ).toEqual([]);
+    });
+
+    it("still refuses a negative bound that runs the scale downwards", () => {
+      expect(
+        codesOf(validate("eval_score(CapturedOutput, 'a', -3, -9) AS x")),
+      ).toContain("APP_FUNCTION_ARGUMENT");
     });
   });
 

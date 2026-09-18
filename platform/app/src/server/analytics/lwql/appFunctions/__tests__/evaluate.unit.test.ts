@@ -397,3 +397,32 @@ describe("given a caller that cancels mid-query", () => {
     });
   });
 });
+
+describe("given a classifier that fails on one text and answers the rest", () => {
+  describe("when the statement is hydrated", () => {
+    /** @scenario "A text the classifier failed on is skipped, not reported as a missing key" */
+    it("reports it as a skipped judgement rather than as an unresolved key", async () => {
+      const classifier = classifierAnswering((request) => {
+        if (request.text.includes("second")) {
+          throw new Error("the classifier dropped this one");
+        }
+        return judged([{ questionId: "annoyed", probability: 0.4 }]);
+      });
+
+      const result = await hydrate({
+        calls: [{ column: "annoyed", function: "eval", options: ["Annoyed"] }],
+        columns: [{ name: "annoyed", type: "Nullable(String)" }],
+        rows: [{ annoyed: "the first one" }, { annoyed: "the second one" }],
+        traceSource: sourceOf(),
+        instantEvals: support(classifier),
+      });
+
+      expect(result.rows).toEqual([{ annoyed: 0.4 }, { annoyed: null }]);
+      // The reason matters: the key resolved and the text was sent, so
+      // reporting it as a key that named nothing would send the caller to
+      // check their conversation ids.
+      expect(result.evalUsage?.skipped).toEqual({ classifier_failed: 1 });
+      expect(result.unresolvedKeys).toEqual([]);
+    });
+  });
+});

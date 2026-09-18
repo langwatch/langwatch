@@ -93,7 +93,7 @@ export interface LangWatchQLAppFunctionParameter {
   readonly numeric?: {
     readonly min: number;
     readonly max: number;
-    readonly integer: boolean;
+    readonly isInteger: boolean;
   };
   /**
    * Fewest characters a text option may carry.
@@ -424,7 +424,7 @@ const EXTRACTION_FUNCTIONS: readonly Omit<
 ];
 
 /** The extraction functions, each carrying the kind this whole list shares. */
-export const LWQL_EXTRACTION_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefinition[] =
+const LWQL_EXTRACTION_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefinition[] =
   EXTRACTION_FUNCTIONS.map((definition) => ({
     ...definition,
     kind: "extraction" as const,
@@ -440,13 +440,6 @@ export const LWQL_EXTRACTION_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDe
  */
 export const LWQL_APP_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefinition[] =
   [...LWQL_EXTRACTION_FUNCTION_CATALOG, ...LWQL_EVAL_FUNCTION_CATALOG];
-
-/** Whether this function's value is judged rather than read. */
-export function isLangWatchQLEvalFunction(
-  definition: LangWatchQLAppFunctionDefinition,
-): boolean {
-  return definition.kind === "eval";
-}
 
 /** Every declared name, in catalog order. */
 export function lwqlAppFunctionNames(

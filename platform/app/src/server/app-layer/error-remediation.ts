@@ -213,7 +213,7 @@ const registry = {
   },
   instant_eval_query_budget_exceeded: {
     tips: [
-      "Read `meta.estimatedTokens` against `meta.budget`; the query would send that much text to be judged in one request",
+      "Read `meta.estimatedTokens` against `meta.budget`; that is the text the whole query would send to be judged, summed across its rows",
       "Lower the query's LIMIT, or extract less text per row by passing a smaller token budget to the extraction function inside the eval call",
       "To judge the whole selection rather than a sample, run the same statement as a job instead of on this endpoint",
     ],

@@ -158,7 +158,7 @@ export const LWQL_EVAL_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefiniti
           name: "threshold",
           role: "option",
           type: "number",
-          numeric: { min: 0, max: 1, integer: false },
+          numeric: { min: 0, max: 1, isInteger: false },
           description:
             "The probability at or above which the answer counts as yes, between 0 and 1.",
         },
@@ -187,14 +187,14 @@ export const LWQL_EVAL_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefiniti
           name: "min",
           role: "option",
           type: "number",
-          numeric: { min: -1_000, max: 1_000, integer: true },
+          numeric: { min: -1_000, max: 1_000, isInteger: true },
           description: "The lowest level of the scale.",
         },
         {
           name: "max",
           role: "option",
           type: "number",
-          numeric: { min: -1_000, max: 1_000, integer: true },
+          numeric: { min: -1_000, max: 1_000, isInteger: true },
           description:
             "The highest level of the scale, above the lowest. A scale holds at most 10 levels, so the two ends may be at most 9 apart.",
         },

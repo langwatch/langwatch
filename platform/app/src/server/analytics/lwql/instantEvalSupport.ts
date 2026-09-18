@@ -16,7 +16,10 @@ import { env } from "~/env.mjs";
 import { instantEvalsEnabled } from "~/server/app-layer/instant-evals/access";
 import { getInstantEvalClassifier } from "~/server/app-layer/instant-evals/classifier";
 import type { InstantEvalClassifier } from "~/server/app-layer/instant-evals/classifier/classifier";
-import type { InstantEvalCostRecord } from "~/server/app-layer/instant-evals/instant-eval-cost.recorder";
+import type {
+  InstantEvalCostRecord,
+  InstantEvalCostRecorder,
+} from "~/server/app-layer/instant-evals/instant-eval-cost.recorder";
 import { PrismaInstantEvalCostRecorder } from "~/server/app-layer/instant-evals/instant-eval-cost.recorder";
 import { prisma } from "~/server/db";
 
@@ -50,8 +53,18 @@ export interface LangWatchQLInstantEvalSupport {
   recordCost(record: InstantEvalCostRecord): Promise<void>;
 }
 
-export function createLangWatchQLInstantEvalSupport(): LangWatchQLInstantEvalSupport {
-  const recorder = new PrismaInstantEvalCostRecorder(prisma);
+/**
+ * The default wiring, and the only place a concrete recorder is named.
+ *
+ * `recorder` is the port rather than the class so a caller can hand in another
+ * one, and so the default is chosen here — in the factory whose job is wiring
+ * — instead of being reached for from inside the query service.
+ */
+export function createLangWatchQLInstantEvalSupport({
+  recorder = new PrismaInstantEvalCostRecorder(prisma),
+}: {
+  recorder?: InstantEvalCostRecorder;
+} = {}): LangWatchQLInstantEvalSupport {
   return {
     isEnabled: ({ projectId }) => instantEvalsEnabled({ prisma, projectId }),
     classifier: getInstantEvalClassifier,
