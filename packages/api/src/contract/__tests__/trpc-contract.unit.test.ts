@@ -8,6 +8,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -54,9 +55,17 @@ describe("defineTrpcContract", () => {
 
     /** @scenario "A contract declares a procedure once, in a browser-safe module" */
     it("reaches no server framework, tRPC runtime or Node API from its own module", () => {
+      // Every file this surface offers, and each one a leaf. A module contract
+      // is imported by every browser that installs it, so one server import
+      // here is `node:async_hooks` in the browser bundle — which is what
+      // `defineRestMiddleware` living in rest/request.ts actually did.
       expect(valueImports(sourceOf("trpc-contract.ts"))).toEqual([]);
+      expect(valueImports(sourceOf("rest-middleware.ts"))).toEqual([]);
 
-      expect(valueImports(sourceOf("index.ts"))).toEqual(["./trpc-contract.ts"]);
+      expect(valueImports(sourceOf("index.ts"))).toEqual([
+        "./trpc-contract.ts",
+        "./rest-middleware.ts",
+      ]);
     });
   });
 

@@ -3,6 +3,7 @@
  * workbench's tRPC mutation and `POST /api/v1/query`. The ceiling and the
  * accepted steps ARE the published contract, so both doors read one copy.
  */
+import { defineRestMiddleware } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
@@ -20,6 +21,16 @@ export const langWatchQLProtectionsSchema: z.ZodType<LangWatchQLProtections> = z
     canSeeCapturedOutput: z.boolean().nullable().optional(),
   })
   .strict();
+
+/**
+ * What this credential may see of its project's content. A fact rather than
+ * an operation: the answer is the KEY's own cut, shared by every REST family
+ * that layers LangWatchQL content gates over its own routes.
+ */
+export const langWatchQLCallerProtections = defineRestMiddleware(
+  "langWatchQLCallerProtections",
+  langWatchQLProtectionsSchema,
+);
 
 /**
  * Longest statement any LangWatchQL surface accepts. A shape ceiling rather

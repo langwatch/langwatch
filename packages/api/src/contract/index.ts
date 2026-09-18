@@ -12,3 +12,5 @@ export {
   type TrpcContractMembers,
   type TrpcContractOutputBuilder,
 } from "./trpc-contract.ts";
+
+export { defineRestMiddleware, type RestTransportMiddleware } from "./rest-middleware.ts";

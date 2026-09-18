@@ -24,6 +24,7 @@ import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z, ZodIssue, ZodSchema } from "zod";
 
+import { defineRestMiddleware, type RestTransportMiddleware } from "../contract/rest-middleware.ts";
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
@@ -880,22 +881,13 @@ function runAfterSSECompletion({
 // input, resolved once at the composition root.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface RestTransportMiddleware<Schema extends z.ZodType = z.ZodType> {
-  readonly name: string;
-  readonly schema: Schema;
-  readonly source?: "headers";
-}
+// The declaration itself lives on the browser-safe half; this re-export keeps
+// the server's one import site unchanged. See contract/rest-middleware.ts.
+export { defineRestMiddleware, type RestTransportMiddleware };
 
 export interface RestTransportMiddlewareBinding {
   readonly middleware: RestTransportMiddleware;
   resolve(context: Context): unknown | Promise<unknown>;
-}
-
-export function defineRestMiddleware<Schema extends z.ZodType>(
-  name: string,
-  schema: Schema,
-): RestTransportMiddleware<Schema> {
-  return Object.freeze({ name, schema });
 }
 
 /** A composition root binds request access; handlers receive only the parsed result. */
