@@ -6155,6 +6155,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@langwatch/workflow-browser':
         specifier: workspace:*
         version: link:../../workflow/browser

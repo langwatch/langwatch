@@ -22,10 +22,10 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
-      "path": "../../analytics/contract/tsconfig.build.json"
+      "path": "../../analytics/browser-kit/tsconfig.build.json"
     },
     {
-      "path": "../../analytics/web-kit/tsconfig.build.json"
+      "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
@@ -58,7 +58,7 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
-      "path": "../../prompt/web-kit/tsconfig.build.json"
+      "path": "../../prompt/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
@@ -67,10 +67,13 @@
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
-      "path": "../../workflow/contract/tsconfig.build.json"
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
-      "path": "../../workflow/web-kit/tsconfig.build.json"
+      "path": "../../workflow/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

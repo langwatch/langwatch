@@ -2,6 +2,18 @@
  * What `apps/ui` mounts around every routed page.
  */
 
+import {
+  BrowserUiDocumentTitle,
+  resolveUiCapabilities,
+  UiCapabilityContextProvider,
+  UNAVAILABLE_UI_FEEDBACK,
+  UNAVAILABLE_UI_SESSION,
+  type UiCapabilityInstall,
+  type UiSession,
+} from "@langwatch/browser-host/capabilities";
+import { CurrentDrawer, type UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
+import { UiSlot } from "@langwatch/browser-host/slots";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { UiScopeHostProvider } from "@langwatch/browser-host/use-organization-team-project";
@@ -12,28 +24,18 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { useContext, useMemo, useState, type ReactNode } from "react";
-import {
-  BrowserUiDocumentTitle,
-  resolveUiCapabilities,
-  UiCapabilityContextProvider,
-  UNAVAILABLE_UI_FEEDBACK,
-  UNAVAILABLE_UI_SESSION,
-  type UiCapabilityInstall,
-  type UiSession,
-} from "@langwatch/browser-host/capabilities";
-import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
-import { UiSlot } from "@langwatch/browser-host/slots";
+
+import type { UiFailureHost, UiFailureInterceptor } from "../behavior/ui-feature";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "../behavior/ui-feature-transport";
-import type { UiFailureHost, UiFailureInterceptor } from "../behavior/ui-feature";
-import { BrowserUiRpc, UiRpcContextProvider } from "../behavior/ui-rpc";
 import { useRouterUiNavigation, useRouterUiRoute } from "../behavior/ui-router-navigation";
+import { BrowserUiRpc, UiRpcContextProvider } from "../behavior/ui-rpc";
 import type { UiSessionSource } from "../behavior/ui-session";
-import type { UiProviderShell } from "./ui-outer-providers";
 import { UiApiWaitingGate } from "./ui-api-waiting-gate";
+import type { UiProviderShell } from "./ui-outer-providers";
 
 /** The device store the shell publishes to every feature. */
 const SHELL_UI_STORAGE = new BrowserUiStorage();
@@ -43,6 +45,8 @@ export type UiFeatureShellInstall = {
   apis: readonly UiFeatureApiBinding[];
   /** The capability ports the composing application answers itself. */
   capabilities: UiCapabilityInstall;
+  /** Every installed module's drawers, as one registry. */
+  drawers?: UiDrawerRegistry;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
   /**
@@ -66,6 +70,7 @@ const useUnavailableUiSession: UiSessionSource = () => UNAVAILABLE_UI_SESSION;
 export function createUiFeatureShell({
   apis,
   capabilities,
+  drawers = {},
   transport,
   failures = [],
   session,
@@ -121,6 +126,7 @@ export function createUiFeatureShell({
           {/* Always mounted, one gate for every routed page — a surface
               without this reach opened a limit dialog nobody ever saw. */}
           <UiSlot name="globalUpgradeModal" props={{}} />
+          <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
         </UiScopeHostProvider>
       </UiCapabilityContextProvider>
     );

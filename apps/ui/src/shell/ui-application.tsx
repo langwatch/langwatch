@@ -2,10 +2,12 @@
  * The browser application, composed once.
  */
 
+import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import type { ComponentType } from "react";
 import type { FallbackProps } from "react-error-boundary";
-import { mergeUiPageLoaders, uiFeatureLoaders } from "../behavior/ui-feature-loaders";
+
 import type { UiFeatureInstall } from "../behavior/ui-feature";
+import { mergeUiPageLoaders, uiFeatureLoaders } from "../behavior/ui-feature-loaders";
 import type { UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
 import { createUiRouter, type UiRouter } from "../behavior/ui-router";
 import { uiRouteTable } from "../model/ui-route-table";
@@ -16,8 +18,8 @@ import {
   type UiOuterProviderInstall,
   type UiProviderShell,
 } from "./ui-outer-providers";
-import { createUiRouteObjects } from "./ui-route-objects";
 import { createUiRootLayout } from "./ui-root-layout";
+import { createUiRouteObjects } from "./ui-route-objects";
 
 export type UiApplicationInstall = {
   providers: UiOuterProviderInstall & UiInnerProviderInstall;
@@ -31,6 +33,8 @@ export type UiApplicationInstall = {
   };
   /** What this package contributes. Defaults to its standing declaration. */
   features?: UiFeatureInstall;
+  /** Composed by installedModuleDrawers(installed.modules). */
+  drawers?: UiDrawerRegistry;
 };
 
 export type UiApplication = {
@@ -41,6 +45,7 @@ export type UiApplication = {
 export function createUiApplication({
   providers,
   pages,
+  drawers = {},
   features = {},
 }: UiApplicationInstall): UiApplication {
   const loaders = mergeUiPageLoaders({
@@ -61,6 +66,7 @@ export function createUiApplication({
         featureShell: createUiFeatureShell({
           apis: features.apis ?? [],
           capabilities: features.capabilities ?? {},
+          drawers,
           failures: features.failures ?? [],
           isDevelopment: providers.isDevelopment,
           ...(features.transport ? { transport: features.transport } : {}),

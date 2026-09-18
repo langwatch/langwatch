@@ -38,7 +38,16 @@ export type WebScreen = Readonly<{
 }>;
 
 export type WebScreens = Readonly<Record<string, WebScreen>>;
-export type WebDrawers = readonly string[] | Readonly<Record<string, unknown>>;
+
+/**
+ * One URL-routed drawer, named by the key the address bar carries
+ * (`?drawer.open=<key>`). `load` resolves the component, as a screen's does.
+ */
+export type WebDrawer = Readonly<{
+  load: () => Promise<unknown>;
+}>;
+
+export type WebDrawers = Readonly<Record<string, WebDrawer>>;
 export type WebSurfacePublication = Readonly<{
   load: () => Promise<unknown>;
   provider?: unknown;
@@ -56,7 +65,7 @@ type WebModuleDeclaration = Readonly<{
 
 type EmptyDeclaration = Readonly<{
   screens: Empty;
-  drawers: readonly [];
+  drawers: Empty;
   publications: Empty;
   mounts: readonly [];
   flags: readonly [];
@@ -102,9 +111,6 @@ type CheckedLiteralTuple<Values extends readonly string[]> = number extends Valu
     ? never
     : unknown;
 type CheckedKeyedRecord<Value extends object> = string extends keyof Value ? never : unknown;
-type CheckedDrawers<Drawers extends WebDrawers> = Drawers extends readonly string[]
-  ? CheckedLiteralTuple<Drawers>
-  : CheckedKeyedRecord<Drawers>;
 
 declare const webModuleState: unique symbol;
 
@@ -139,7 +145,7 @@ export class WebModule<
       name,
       requirements: [],
       screens: {},
-      drawers: [],
+      drawers: {},
       publications: {},
       mounts: [],
       flags: [],
@@ -188,7 +194,7 @@ export class WebModule<
 
   withDrawers<const Drawers extends WebDrawers>(
     drawers: Drawers,
-    ..._checked: [CheckedDrawers<Drawers>] extends [never] ? [never] : []
+    ..._checked: [CheckedKeyedRecord<Drawers>] extends [never] ? [never] : []
   ): WebModule<
     Name,
     Requirements,

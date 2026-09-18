@@ -10,6 +10,7 @@ export {
   type UiDocument,
   type UiRenderResult,
 } from "./ui-supply.ts";
+export { installedDrawerLoaders, type InstalledDrawerLoaders } from "./installed-drawers.ts";
 export { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 export type {
   MissingUiSupplyFields,
@@ -25,6 +26,7 @@ export {
   type UiShellName,
   type UiSupplyName,
   type UiSupplyRequirements,
+  type WebDrawer,
   type WebDrawers,
   type WebModuleConfig,
   type WebModuleInstallation,

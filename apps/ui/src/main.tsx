@@ -1,5 +1,6 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
+import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { configureDocsRuntime } from "@langwatch/config/docs-url";
 import { webModules } from "@langwatch/installed-modules/web";
 import { createUi } from "@langwatch/ui-kernel";
@@ -7,12 +8,12 @@ import type { ReactNode } from "react";
 
 import { registerChunkReloadListener } from "./behavior/chunk-reload";
 import { readPublicAppConfig } from "./behavior/public-config";
+import { toPublicEnvironment } from "./behavior/public-environment";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiTransport,
 } from "./behavior/ui-feature-transport";
 import { installedModuleScreens, type UiModuleScreens } from "./behavior/ui-module-screens";
-import { toPublicEnvironment } from "./behavior/public-environment";
 import { UiShell } from "./behavior/ui-shell";
 import { UiRuntime } from "./behavior/ui.runtime";
 import type { PublicEnvironment } from "./model/public-environment";
@@ -20,6 +21,7 @@ import { GraphicsQualityProvider } from "./shell/graphics-quality-provider";
 import { createUiApplication, type UiApplication } from "./shell/ui-application";
 import { UiApplicationShell } from "./shell/ui-application-shell";
 import { UiErrorToaster } from "./shell/ui-error-toaster";
+import { installedModuleDrawers } from "./shell/ui-module-drawers";
 
 import "nprogress/nprogress.css";
 import "./styles/globals.scss";
@@ -56,10 +58,12 @@ class BrowserUiShell extends UiShell {
     environment: PublicEnvironment,
     isDevelopment: boolean,
     screens: UiModuleScreens,
+    drawers: UiDrawerRegistry,
     transport: UiFeatureApiTransport,
   ): BrowserUiShell {
     return new BrowserUiShell(
       createUiApplication({
+        drawers,
         features: { loaders: screens.loaders, routes: screens.routes, transport },
         providers: {
           attribution: UiPendingProvider,
@@ -102,9 +106,8 @@ class BrowserUiShell extends UiShell {
 
 /**
  * The browser, whole: the supply validates the injected config against every
- * installed web module's declaration before a single component renders, and
- * the shell mounts over what it returns. Installing a module edits the
- * catalogue, never this file.
+ * installed web module's declaration before a component renders; the shell
+ * mounts over what it returns. Installing a module edits the catalogue.
  */
 export async function startUi(): Promise<void> {
   const config = readPublicAppConfig(document);
@@ -125,6 +128,7 @@ export async function startUi(): Promise<void> {
       environment,
       config.mode === "development",
       installedModuleScreens(installed.modules),
+      installedModuleDrawers(installed.modules),
       transport,
     ),
   }).start();

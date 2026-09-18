@@ -10,6 +10,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/evaluator.web.ts",
+      "types": "./dist/evaluator.web.d.ts",
+      "default": "./src/evaluator.web.ts"
+    },
     ".": {
       "langwatch-declaration-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
@@ -102,6 +107,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",

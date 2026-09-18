@@ -65,6 +65,7 @@
     "@langwatch/entitlement-process": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluation-process": "workspace:*",
+    "@langwatch/evaluator-browser": "workspace:*",
     "@langwatch/evaluator-process": "workspace:*",
     "@langwatch/experiment-process": "workspace:*",
     "@langwatch/feature-flag-browser": "workspace:*",
