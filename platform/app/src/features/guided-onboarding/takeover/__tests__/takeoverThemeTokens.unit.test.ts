@@ -75,16 +75,14 @@ describe("the takeover and sign-in screens' brand colours", () => {
   });
 
   describe("when a value card is picked", () => {
-    it("fills its order square with the deepened brand orange on paper", () => {
+    it("fills its order square with the deepened brand orange in both modes", () => {
       const system = createSystem(defaultConfig, authThemeConfig);
       const tokenCss = JSON.stringify(system.getTokenCss());
       expect(system.token("colors.auth.badge")).toBe(
         "var(--chakra-colors-auth-badge)",
       );
       expect(tokenCss).toContain('"--chakra-colors-auth-badge":"#c2510a"');
-      expect(tokenCss).toContain(
-        '"--chakra-colors-auth-badge":"rgba(245, 107, 26, 0.92)"',
-      );
+      expect(tokenCss).not.toMatch(/"--chakra-colors-auth-badge":"rgba\(/);
     });
   });
 

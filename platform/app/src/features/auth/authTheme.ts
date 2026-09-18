@@ -105,10 +105,10 @@ export const authThemeConfig = defineConfig({
           /**
            * A small filled marker that carries white text, such as the pick
            * order on the guided onboarding's value cards: the brand deepened
-           * on paper so the white digit stays readable, the solid orange on
-           * ink.
+           * in both modes, since white on the solid orange falls near 3:1 and
+           * brand[600] keeps the digit above 4.5:1.
            */
-          badge: mode(brand[600], orange(0.92)),
+          badge: mode(brand[600], brand[600]),
           focusRing: mode(orange(0.22), orange300(0.22)),
           glow: mode(orange(0.28), orange300(0.22)),
           /**
