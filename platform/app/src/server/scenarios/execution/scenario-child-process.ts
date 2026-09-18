@@ -26,12 +26,18 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
+import { createCallLimitTimer } from "../voice/call-limit-timer";
+import {
+	type CallerVoiceConfig,
+	DEFAULT_CALLER_VOICE,
+} from "../voice/caller-voice.config";
+import { buildCallerVoiceSimulatorConfig } from "../voice/caller-voice.simulator";
 import { buildAgentTestRun } from "./agent-test-script";
 import { createChildProcessLogger } from "./child-logger";
 import { selectRoleModelParams } from "./job-model-params";
 import {
-  createJudgeModelFromParams,
-  createModelFromParams,
+	createJudgeModelFromParams,
+	createModelFromParams,
 } from "./model.factory";
 import { buildRemoteTraceRunConfig } from "./remote-trace-run-config";
 import { createAdapter } from "./serialized-adapter.registry";
@@ -50,7 +56,7 @@ const logger = createChildProcessLogger("langwatch:scenarios:child");
  * exist on the SDK's TracerProvider but not on the API's TracerProvider interface.
  */
 interface DelegatingTracerProvider {
-  getDelegate?(): TracerProvider;
+	getDelegate?(): TracerProvider;
 }
 
 /**
@@ -62,39 +68,39 @@ interface DelegatingTracerProvider {
  * whether the provider implements these methods.
  */
 interface FlushableTracerProvider extends TracerProvider {
-  forceFlush?(): Promise<void>;
-  shutdown?(): Promise<void>;
+	forceFlush?(): Promise<void>;
+	shutdown?(): Promise<void>;
 }
 
 async function main(): Promise<void> {
-  const jobData = await readJobDataFromStdin();
-  await executeScenario(jobData);
+	const jobData = await readJobDataFromStdin();
+	await executeScenario(jobData);
 }
 
 async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
-  return new Promise((resolve, reject) => {
-    let data = "";
+	return new Promise((resolve, reject) => {
+		let data = "";
 
-    process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (chunk) => {
-      data += chunk;
-    });
-    process.stdin.on("end", () => {
-      try {
-        // A real .parse(), not an unchecked cast: every model-params field
-        // is individually optional (workflow/code/http targets resolve no
-        // adapter model; a pre-split payload carries only modelParams), so
-        // the schema's refinement is what guarantees each role can be built.
-        // A payload that fails it must fail loudly here with a named Zod
-        // error rather than as an opaque "undefined has no properties" crash
-        // three layers into model construction (issue #6634).
-        resolve(ChildProcessJobDataSchema.parse(JSON.parse(data)));
-      } catch (error) {
-        reject(new Error(`Failed to parse job data: ${error}`));
-      }
-    });
-    process.stdin.on("error", reject);
-  });
+		process.stdin.setEncoding("utf8");
+		process.stdin.on("data", (chunk) => {
+			data += chunk;
+		});
+		process.stdin.on("end", () => {
+			try {
+				// A real .parse(), not an unchecked cast: every model-params field
+				// is individually optional (workflow/code/http targets resolve no
+				// adapter model; a pre-split payload carries only modelParams), so
+				// the schema's refinement is what guarantees each role can be built.
+				// A payload that fails it must fail loudly here with a named Zod
+				// error rather than as an opaque "undefined has no properties" crash
+				// three layers into model construction (issue #6634).
+				resolve(ChildProcessJobDataSchema.parse(JSON.parse(data)));
+			} catch (error) {
+				reject(new Error(`Failed to parse job data: ${error}`));
+			}
+		});
+		process.stdin.on("error", reject);
+	});
 }
 
 /**
@@ -104,128 +110,173 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
  * scenario.processor.ts) and they come from prefetchScenarioData telemetry.
  */
 function readTelemetryEnv(): {
-  langwatchEndpoint: string;
-  langwatchApiKey: string;
+	langwatchEndpoint: string;
+	langwatchApiKey: string;
 } {
-  const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
-  const langwatchApiKey = process.env.LANGWATCH_API_KEY;
-  if (!langwatchEndpoint || !langwatchApiKey) {
-    throw new Error(
-      "LANGWATCH_ENDPOINT and LANGWATCH_API_KEY must be set in child process env",
-    );
-  }
-  return { langwatchEndpoint, langwatchApiKey };
+	const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
+	const langwatchApiKey = process.env.LANGWATCH_API_KEY;
+	if (!langwatchEndpoint || !langwatchApiKey) {
+		throw new Error(
+			"LANGWATCH_ENDPOINT and LANGWATCH_API_KEY must be set in child process env",
+		);
+	}
+	return { langwatchEndpoint, langwatchApiKey };
 }
 
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-  const {
-    context,
-    scenario,
-    parameters,
-    adapterData,
-    modelParams,
-    nlpServiceUrl,
-    target,
-  } = jobData;
+	const {
+		context,
+		scenario,
+		parameters,
+		adapterData,
+		modelParams,
+		nlpServiceUrl,
+		target,
+	} = jobData;
 
-  const { langwatchEndpoint, langwatchApiKey } = readTelemetryEnv();
+	const { langwatchEndpoint, langwatchApiKey } = readTelemetryEnv();
 
-  // The platform API key rides the same telemetry channel every child
-  // process already gets (buildChildProcessEnv in scenario.processor.ts
-  // sets LANGWATCH_API_KEY from prefetchScenarioData's telemetry.apiKey) —
-  // no need to duplicate it onto the job payload. The workflow/code
-  // factories consume it as workflow.api_key; prompt and http ignore it.
-  const adapter = createAdapter({
-    adapterData,
-    modelParams,
-    nlpServiceUrl,
-    projectApiKey: langwatchApiKey,
-    parameters,
-  });
-  const cast = buildRunCast({ jobData, adapter });
+	// The platform API key rides the same telemetry channel every child
+	// process already gets (buildChildProcessEnv in scenario.processor.ts
+	// sets LANGWATCH_API_KEY from prefetchScenarioData's telemetry.apiKey) —
+	// no need to duplicate it onto the job payload. The workflow/code
+	// factories consume it as workflow.api_key; prompt and http ignore it.
+	const adapter = createAdapter({
+		adapterData,
+		modelParams,
+		nlpServiceUrl,
+		projectApiKey: langwatchApiKey,
+		parameters,
+	});
+	const cast = buildRunCast({ jobData, adapter });
 
-  // Results are reported via LangWatch SDK automatically
-  const verbose = process.env.SCENARIO_VERBOSE === "true";
+	// Results are reported via LangWatch SDK automatically
+	const verbose = process.env.SCENARIO_VERBOSE === "true";
 
-  const result = await ScenarioRunner.run(
-    {
-      id: scenario.id,
-      name: scenario.name,
-      description: scenario.situation,
-      setId: context.setId,
-      agents: cast.agents,
-      ...(cast.script ? { script: cast.script } : {}),
-      verbose,
-      // An http target's own spans land in the trace each turn propagates,
-      // so the judge fetches them back from the platform's trace API before
-      // any verdict. The wait budget comes from the prefetcher's per-project
-      // ingest-lag measurement.
-      ...buildRemoteTraceRunConfig({
-        targetType: target.type,
-        traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
-        langwatchEndpoint,
-        langwatchApiKey,
-      }),
-      ...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
-      ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
-      metadata: {
-        langwatch: {
-          targetReferenceId: target.referenceId,
-          targetType: target.type,
-        },
-        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
-      },
-    },
-    {
-      batchRunId: context.batchRunId,
-      runId: jobData.scenarioRunId,
-      langwatch: {
-        endpoint: langwatchEndpoint,
-        apiKey: langwatchApiKey,
-      },
-    },
-  );
+	// For a voice target, record the effective caller config on the run (AC20,
+	// AC24) and arm the whole-call timer that ends the call at the limit so the
+	// judge still runs on what was said (AC28).
+	const isVoiceRun = target.type === "voice" && adapterData.type === "voice";
+	const callerVoice: CallerVoiceConfig =
+		jobData.callerVoice ?? DEFAULT_CALLER_VOICE;
+	const effectiveCaller = buildCallerVoiceSimulatorConfig(callerVoice);
+	const voiceMetadata = isVoiceRun
+		? {
+				callerKind: "simulated" as const,
+				caller: {
+					voice: effectiveCaller.voice,
+					interruptProbability: callerVoice.interruptProbability,
+					effects: callerVoice.effects,
+				},
+			}
+		: {};
 
-  // A failed test is still a successful execution — results are reported via SDK.
-  if (result.success) {
-    logger.info("scenario passed");
-  } else {
-    logger.warn({ reasoning: result.reasoning }, "scenario failed");
-  }
+	const callLimitTimer =
+		isVoiceRun && adapterData.type === "voice"
+			? createCallLimitTimer({
+					maxCallSeconds: adapterData.maxCallSeconds,
+					onLimit: () => {
+						logger.warn("voice call reached the max duration; ending the call");
+						// End the transport gracefully so the drained transcript is judged.
+						void (adapter as { disconnect?: () => Promise<void> })
+							.disconnect?.()
+							?.catch(() => {
+								// Cleanup failure must not mask the run result.
+							});
+					},
+				})
+			: null;
 
-  // Flush OTEL traces before exiting
-  // The scenario SDK doesn't expose the observability handle, so we access
-  // the global TracerProvider directly and call forceFlush/shutdown
-  await flushOtelTraces();
+	const result = await ScenarioRunner.run(
+		{
+			id: scenario.id,
+			name: scenario.name,
+			description: scenario.situation,
+			setId: context.setId,
+			agents: cast.agents,
+			...(cast.script ? { script: cast.script } : {}),
+			verbose,
+			// An http target's own spans land in the trace each turn propagates,
+			// so the judge fetches them back from the platform's trace API before
+			// any verdict. The wait budget comes from the prefetcher's per-project
+			// ingest-lag measurement.
+			...buildRemoteTraceRunConfig({
+				targetType: target.type,
+				traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
+				langwatchEndpoint,
+				langwatchApiKey,
+			}),
+			...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
+			...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
+			metadata: {
+				langwatch: {
+					targetReferenceId: target.referenceId,
+					targetType: target.type,
+					...voiceMetadata,
+				},
+				...(Object.keys(parameters).length > 0 ? { parameters } : {}),
+			},
+		},
+		{
+			batchRunId: context.batchRunId,
+			runId: jobData.scenarioRunId,
+			langwatch: {
+				endpoint: langwatchEndpoint,
+				apiKey: langwatchApiKey,
+			},
+		},
+	);
 
-  // Output JSON result to stdout for parent process to parse
-  // Only stdout contains the JSON result; all other output goes to stderr
-  const outputResult: {
-    success: boolean;
-    reasoning?: string;
-    error?: string;
-    agentInstance?: { hostname: string; label: string | null };
-  } = {
-    success: result.success,
-  };
-  if (result.reasoning) {
-    outputResult.reasoning = result.reasoning;
-  }
-  // The connected agent instance that answered the run's turns, for the
-  // parent's record of which process served the run.
-  if (
-    adapter instanceof SerializedConnectedAgentAdapter &&
-    adapter.servedInstance
-  ) {
-    outputResult.agentInstance = adapter.servedInstance;
-  }
-  // The result line is the last thing the child says. Exit once it is
-  // written rather than wait for the event loop to drain: the run's adapters
-  // and the SDK can leave handles open after the run, and a child that stays
-  // up keeps the parent from reading the result until its timeout.
-  process.stdout.write(JSON.stringify(outputResult) + "\n", () => {
-    process.exit(0);
-  });
+	// The call finished on its own (or the run returned) — stop the limit timer
+	// so it cannot fire after the fact.
+	callLimitTimer?.clear();
+
+	// A failed test is still a successful execution — results are reported via SDK.
+	if (result.success) {
+		logger.info("scenario passed");
+	} else {
+		logger.warn({ reasoning: result.reasoning }, "scenario failed");
+	}
+
+	// Flush OTEL traces before exiting
+	// The scenario SDK doesn't expose the observability handle, so we access
+	// the global TracerProvider directly and call forceFlush/shutdown
+	await flushOtelTraces();
+
+	// Output JSON result to stdout for parent process to parse
+	// Only stdout contains the JSON result; all other output goes to stderr
+	const outputResult: {
+		success: boolean;
+		reasoning?: string;
+		error?: string;
+		agentInstance?: { hostname: string; label: string | null };
+		cutAtLimit?: boolean;
+	} = {
+		success: result.success,
+	};
+	if (result.reasoning) {
+		outputResult.reasoning = result.reasoning;
+	}
+	// The run was ended by LangWatch at the max call duration (AC28); the parent
+	// records the marker so the run header can show "Cut at the call limit".
+	if (callLimitTimer?.wasCut()) {
+		outputResult.cutAtLimit = true;
+	}
+	// The connected agent instance that answered the run's turns, for the
+	// parent's record of which process served the run.
+	if (
+		adapter instanceof SerializedConnectedAgentAdapter &&
+		adapter.servedInstance
+	) {
+		outputResult.agentInstance = adapter.servedInstance;
+	}
+	// The result line is the last thing the child says. Exit once it is
+	// written rather than wait for the event loop to drain: the run's adapters
+	// and the SDK can leave handles open after the run, and a child that stays
+	// up keeps the parent from reading the result until its timeout.
+	process.stdout.write(JSON.stringify(outputResult) + "\n", () => {
+		process.exit(0);
+	});
 }
 
 /**
@@ -239,38 +290,52 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
  * back to it, preserving the previous single-model behavior across a deploy.
  */
 function buildRunCast({
-  jobData,
-  adapter,
+	jobData,
+	adapter,
 }: {
-  jobData: ChildProcessJobData;
-  adapter: ScenarioRunner.AgentAdapter;
+	jobData: ChildProcessJobData;
+	adapter: ScenarioRunner.AgentAdapter;
 }): {
-  agents: ScenarioRunner.AgentAdapter[];
-  script?: ScenarioRunner.ScriptStep[];
+	agents: ScenarioRunner.AgentAdapter[];
+	script?: ScenarioRunner.ScriptStep[];
 } {
-  if (jobData.script) {
-    return buildAgentTestRun({ adapter, script: jobData.script });
-  }
-  const { nlpServiceUrl, scenario } = jobData;
-  const roleModelParams = selectRoleModelParams(jobData);
-  const simulatorModel = createModelFromParams({
-    litellmParams: roleModelParams.simulator,
-    nlpServiceUrl,
-  });
-  const judgeModel = createJudgeModelFromParams({
-    litellmParams: roleModelParams.judge,
-    nlpServiceUrl,
-  });
-  return {
-    agents: [
-      adapter,
-      ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-      ScenarioRunner.judgeAgent({
-        criteria: scenario.criteria,
-        model: judgeModel,
-      }),
-    ],
-  };
+	if (jobData.script) {
+		return buildAgentTestRun({ adapter, script: jobData.script });
+	}
+	const { nlpServiceUrl, scenario } = jobData;
+	const roleModelParams = selectRoleModelParams(jobData);
+	const simulatorModel = createModelFromParams({
+		litellmParams: roleModelParams.simulator,
+		nlpServiceUrl,
+	});
+	const judgeModel = createJudgeModelFromParams({
+		litellmParams: roleModelParams.judge,
+		nlpServiceUrl,
+	});
+
+	// A voice target's user simulator speaks: the scenario's caller voice, its
+	// interrupt probability and audio effects ride on the simulator so the caller
+	// turns are voiced. The judge and adapter are unchanged from a text run.
+	const voiceSimConfig =
+		jobData.target.type === "voice"
+			? buildCallerVoiceSimulatorConfig(
+					jobData.callerVoice ?? DEFAULT_CALLER_VOICE,
+				)
+			: null;
+
+	return {
+		agents: [
+			adapter,
+			ScenarioRunner.userSimulatorAgent({
+				model: simulatorModel,
+				...(voiceSimConfig ?? {}),
+			}),
+			ScenarioRunner.judgeAgent({
+				criteria: scenario.criteria,
+				model: judgeModel,
+			}),
+		],
+	};
 }
 
 /**
@@ -278,32 +343,32 @@ function buildRunCast({
  * This ensures all traces are sent before the process exits.
  */
 async function flushOtelTraces(): Promise<void> {
-  try {
-    const provider = trace.getTracerProvider();
+	try {
+		const provider = trace.getTracerProvider();
 
-    // The provider might be a ProxyTracerProvider wrapping the real one.
-    // We need the concrete provider to access forceFlush/shutdown methods.
-    const delegating = provider as DelegatingTracerProvider;
-    const concreteProvider = (delegating.getDelegate?.() ??
-      provider) as FlushableTracerProvider;
+		// The provider might be a ProxyTracerProvider wrapping the real one.
+		// We need the concrete provider to access forceFlush/shutdown methods.
+		const delegating = provider as DelegatingTracerProvider;
+		const concreteProvider = (delegating.getDelegate?.() ??
+			provider) as FlushableTracerProvider;
 
-    // Try forceFlush first (preferred), then shutdown
-    if (concreteProvider.forceFlush) {
-      logger.debug("flushing otel traces");
-      await concreteProvider.forceFlush();
-      logger.debug("otel traces flushed");
-    } else if (concreteProvider.shutdown) {
-      logger.debug("shutting down otel provider");
-      await concreteProvider.shutdown();
-      logger.debug("otel provider shutdown complete");
-    }
-  } catch (error) {
-    // Don't fail the scenario if OTEL flush fails
-    logger.warn(
-      { err: error instanceof Error ? error.message : String(error) },
-      "otel flush warning",
-    );
-  }
+		// Try forceFlush first (preferred), then shutdown
+		if (concreteProvider.forceFlush) {
+			logger.debug("flushing otel traces");
+			await concreteProvider.forceFlush();
+			logger.debug("otel traces flushed");
+		} else if (concreteProvider.shutdown) {
+			logger.debug("shutting down otel provider");
+			await concreteProvider.shutdown();
+			logger.debug("otel provider shutdown complete");
+		}
+	} catch (error) {
+		// Don't fail the scenario if OTEL flush fails
+		logger.warn(
+			{ err: error instanceof Error ? error.message : String(error) },
+			"otel flush warning",
+		);
+	}
 }
 
 /**
@@ -317,35 +382,35 @@ async function flushOtelTraces(): Promise<void> {
  * include any error `code` so the classification is accurate.
  */
 function formatErrorWithCauses(error: unknown): string {
-  const parts: string[] = [];
-  const seen = new Set<unknown>();
-  let current: unknown = error;
-  while (current && !seen.has(current)) {
-    seen.add(current);
-    if (current instanceof Error) {
-      const code = (current as { code?: unknown }).code;
-      parts.push(
-        typeof code === "string"
-          ? `${current.message} (${code})`
-          : current.message,
-      );
-      current = (current as { cause?: unknown }).cause;
-    } else {
-      parts.push(String(current));
-      break;
-    }
-  }
-  return parts.filter((p) => p.length > 0).join(": ");
+	const parts: string[] = [];
+	const seen = new Set<unknown>();
+	let current: unknown = error;
+	while (current && !seen.has(current)) {
+		seen.add(current);
+		if (current instanceof Error) {
+			const code = (current as { code?: unknown }).code;
+			parts.push(
+				typeof code === "string"
+					? `${current.message} (${code})`
+					: current.message,
+			);
+			current = (current as { cause?: unknown }).cause;
+		} else {
+			parts.push(String(current));
+			break;
+		}
+	}
+	return parts.filter((p) => p.length > 0).join(": ");
 }
 
 main().catch(async (error) => {
-  const errorMessage = formatErrorWithCauses(error);
-  logger.error({ err: errorMessage }, "scenario execution failed");
-  // Still flush traces on error so we capture what happened
-  await flushOtelTraces();
-  // Output JSON error result to stdout for parent process to parse
-  process.stdout.write(
-    JSON.stringify({ success: false, error: errorMessage }) + "\n",
-  );
-  process.exit(1);
+	const errorMessage = formatErrorWithCauses(error);
+	logger.error({ err: errorMessage }, "scenario execution failed");
+	// Still flush traces on error so we capture what happened
+	await flushOtelTraces();
+	// Output JSON error result to stdout for parent process to parse
+	process.stdout.write(
+		JSON.stringify({ success: false, error: errorMessage }) + "\n",
+	);
+	process.exit(1);
 });

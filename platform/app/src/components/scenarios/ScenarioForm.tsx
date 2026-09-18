@@ -1,21 +1,40 @@
 import {
-  Collapsible,
-  Field,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  Textarea,
-  VStack,
+	Collapsible,
+	Field,
+	HStack,
+	Input,
+	NativeSelect,
+	Text,
+	Textarea,
+	VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Controller, type UseFormReturn, useForm } from "react-hook-form";
+import {
+	type Control,
+	Controller,
+	type UseFormReturn,
+	useForm,
+} from "react-hook-form";
 import { z } from "zod";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
+import {
+	CALLER_VOICE_EFFECTS,
+	type CallerVoiceEffect,
+	callerVoiceConfigSchema,
+	DEFAULT_CALLER_VOICE,
+} from "~/server/scenarios/voice/caller-voice.config";
+import { CallerVoiceModelSelect } from "./CallerVoiceModelSelect";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
+
+/** The words a person reads for each caller-voice effect. */
+const EFFECT_LABELS: Record<CallerVoiceEffect, string> = {
+	none: "None",
+	phone_line: "Phone line",
+	background_noise: "Background noise",
+};
 
 /**
  * Zod schema for scenario form validation.
@@ -25,16 +44,19 @@ import { SectionHeader } from "./ui/SectionHeader";
  * form rejects exactly what the save would.
  */
 export const scenarioFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  situation: z.string(),
-  criteria: z.array(z.string()),
-  labels: z.array(z.string()),
-  parameters: scenarioParameterDefinitionsSchema,
-  maxTurns: z.number().int().min(1).max(100).nullish(),
-  minTurns: z.number().int().min(0).max(100).nullish(),
-  // The test suite the scenario is filed in. Absent keeps the suite the scenario has,
-  // null files it nowhere. Only the Agent Testing editor offers the field.
-  testSuiteId: z.string().nullish(),
+	name: z.string().min(1, "Name is required"),
+	situation: z.string(),
+	criteria: z.array(z.string()),
+	labels: z.array(z.string()),
+	parameters: scenarioParameterDefinitionsSchema,
+	maxTurns: z.number().int().min(1).max(100).nullish(),
+	minTurns: z.number().int().min(0).max(100).nullish(),
+	// The simulated caller's voice. Only shown (and only meaningful) for a voice
+	// target; kept at defaults otherwise.
+	callerVoice: callerVoiceConfigSchema.default(DEFAULT_CALLER_VOICE),
+	// The test suite the scenario is filed in. Absent keeps the suite the scenario has,
+	// null files it nowhere. Only the Agent Testing editor offers the field.
+	testSuiteId: z.string().nullish(),
 });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
@@ -50,17 +72,23 @@ export const UNFILED_OPTION_LABEL = "No test suite";
  * a new scenario. The scenario is NOT persisted until the user clicks Save.
  */
 export interface ScenarioInitialData {
-  initialFormData: Partial<ScenarioFormData>;
+	initialFormData: Partial<ScenarioFormData>;
 }
 
 type ScenarioFormProps = {
-  defaultValues?: Partial<ScenarioFormData>;
-  formRef?: (form: UseFormReturn<ScenarioFormData> | null) => void;
-  /**
-   * The test suites the scenario can be filed in. Absent hides the field, which
-   * is what every surface outside Agent Testing does.
-   */
-  testSuiteOptions?: ScenarioTestSuiteOption[];
+	defaultValues?: Partial<ScenarioFormData>;
+	formRef?: (form: UseFormReturn<ScenarioFormData> | null) => void;
+	/**
+	 * The test suites the scenario can be filed in. Absent hides the field, which
+	 * is what every surface outside Agent Testing does.
+	 */
+	testSuiteOptions?: ScenarioTestSuiteOption[];
+	/**
+	 * The type of the currently selected target agent. The Caller voice group is
+	 * shown only when it is "voice"; the target itself lives outside this form
+	 * (in the drawer), so its type is lifted in as a prop.
+	 */
+	targetType?: string;
 };
 
 /**
@@ -69,130 +97,239 @@ type ScenarioFormProps = {
  * Submit is handled externally via formRef.
  */
 export function ScenarioForm({
-  defaultValues,
-  formRef,
-  testSuiteOptions,
+	defaultValues,
+	formRef,
+	testSuiteOptions,
+	targetType,
 }: ScenarioFormProps) {
-  const form = useForm<ScenarioFormData>({
-    defaultValues: {
-      name: "",
-      situation: "",
-      criteria: [],
-      labels: [],
-      parameters: [],
-      ...defaultValues,
-    },
-    resolver: zodResolver(scenarioFormSchema),
-  });
+	const form = useForm<ScenarioFormData>({
+		defaultValues: {
+			name: "",
+			situation: "",
+			criteria: [],
+			labels: [],
+			parameters: [],
+			callerVoice: DEFAULT_CALLER_VOICE,
+			...defaultValues,
+		},
+		resolver: zodResolver(scenarioFormSchema),
+	});
 
-  const {
-    register,
-    control,
-    reset,
-    formState: { errors },
-  } = form;
+	const {
+		register,
+		control,
+		reset,
+		formState: { errors },
+	} = form;
 
-  // Expose form to parent, and take it back on unmount. Whoever holds the
-  // reference renders against it, so a reference that outlives this form
-  // points them at a form nobody is typing in.
-  useEffect(() => {
-    formRef?.(form);
-    return () => formRef?.(null);
-  }, [form, formRef]);
+	// Expose form to parent, and take it back on unmount. Whoever holds the
+	// reference renders against it, so a reference that outlives this form
+	// points them at a form nobody is typing in.
+	useEffect(() => {
+		formRef?.(form);
+		return () => formRef?.(null);
+	}, [form, formRef]);
 
-  useResetOnDefaultsChange({ reset, defaultValues });
+	useResetOnDefaultsChange({ reset, defaultValues });
 
-  return (
-    <VStack align="stretch" gap={6}>
-      {/* SCENARIO Section */}
-      <VStack align="stretch" gap={3}>
-        {/* Name */}
-        <Field.Root invalid={!!errors.name}>
-          <SectionHeader>Name</SectionHeader>
-          <Input
-            {...register("name")}
-            placeholder="e.g., Angry refund request"
-          />
-          <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
-        </Field.Root>
-      </VStack>
+	return (
+		<VStack align="stretch" gap={6}>
+			{/* SCENARIO Section */}
+			<VStack align="stretch" gap={3}>
+				{/* Name */}
+				<Field.Root invalid={!!errors.name}>
+					<SectionHeader>Name</SectionHeader>
+					<Input
+						{...register("name")}
+						placeholder="e.g., Angry refund request"
+					/>
+					<Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+				</Field.Root>
+			</VStack>
 
-      {testSuiteOptions && (
-        <VStack align="stretch" gap={3}>
-          <Field.Root>
-            <SectionHeader>Test suite</SectionHeader>
-            <Controller
-              name="testSuiteId"
-              control={control}
-              render={({ field }) => (
-                <NativeSelect.Root size="sm">
-                  <NativeSelect.Field
-                    aria-label="Test suite"
-                    value={field.value ?? ""}
-                    onChange={(event) =>
-                      field.onChange(event.target.value || null)
-                    }
-                  >
-                    <option value="">{UNFILED_OPTION_LABEL}</option>
-                    {testSuiteOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              )}
-            />
-          </Field.Root>
-        </VStack>
-      )}
+			{testSuiteOptions && (
+				<VStack align="stretch" gap={3}>
+					<Field.Root>
+						<SectionHeader>Test suite</SectionHeader>
+						<Controller
+							name="testSuiteId"
+							control={control}
+							render={({ field }) => (
+								<NativeSelect.Root size="sm">
+									<NativeSelect.Field
+										aria-label="Test suite"
+										value={field.value ?? ""}
+										onChange={(event) =>
+											field.onChange(event.target.value || null)
+										}
+									>
+										<option value="">{UNFILED_OPTION_LABEL}</option>
+										{testSuiteOptions.map((option) => (
+											<option key={option.id} value={option.id}>
+												{option.name}
+											</option>
+										))}
+									</NativeSelect.Field>
+									<NativeSelect.Indicator />
+								</NativeSelect.Root>
+							)}
+						/>
+					</Field.Root>
+				</VStack>
+			)}
 
-      {/* SITUATION Section */}
-      <VStack align="stretch" gap={3}>
-        <VStack align="stretch" gap={1}>
-          <SectionHeader>Situation</SectionHeader>
-          <Text fontSize="13px" color="fg.muted">
-            Describe the user, their context, and what they're trying to
-            accomplish. Think about a critical path or a complex edge case.
-          </Text>
-        </VStack>
-        <Field.Root invalid={!!errors.situation}>
-          <Textarea
-            {...register("situation")}
-            placeholder="e.g., A frustrated premium subscriber who was charged twice..."
-            rows={5}
-            _placeholder={{ color: "gray.400", fontStyle: "italic" }}
-          />
-          <Field.ErrorText>{errors.situation?.message}</Field.ErrorText>
-        </Field.Root>
-      </VStack>
+			{/* SITUATION Section */}
+			<VStack align="stretch" gap={3}>
+				<VStack align="stretch" gap={1}>
+					<SectionHeader>Situation</SectionHeader>
+					<Text fontSize="13px" color="fg.muted">
+						Describe the user, their context, and what they're trying to
+						accomplish. Think about a critical path or a complex edge case.
+					</Text>
+				</VStack>
+				<Field.Root invalid={!!errors.situation}>
+					<Textarea
+						{...register("situation")}
+						placeholder="e.g., A frustrated premium subscriber who was charged twice..."
+						rows={5}
+						_placeholder={{ color: "gray.400", fontStyle: "italic" }}
+					/>
+					<Field.ErrorText>{errors.situation?.message}</Field.ErrorText>
+				</Field.Root>
+			</VStack>
 
-      {/* CRITERIA Section */}
-      <VStack align="stretch" gap={3}>
-        <VStack align="stretch" gap={1}>
-          <SectionHeader>Criteria</SectionHeader>
-          <Text fontSize="13px" color="fg.muted">
-            What must the agent DO or NOT DO? e.g. "Must remain empathetic",
-            "Must NOT offer refund without manager approval"
-          </Text>
-        </VStack>
-        <Controller
-          name="criteria"
-          control={control}
-          render={({ field }) => (
-            <CriteriaInput
-              value={field.value}
-              onChange={field.onChange}
-              placeholder="e.g., Must apologize for the inconvenience"
-            />
-          )}
-        />
-      </VStack>
+			{/* CRITERIA Section */}
+			<VStack align="stretch" gap={3}>
+				<VStack align="stretch" gap={1}>
+					<SectionHeader>Criteria</SectionHeader>
+					<Text fontSize="13px" color="fg.muted">
+						What must the agent DO or NOT DO? e.g. "Must remain empathetic",
+						"Must NOT offer refund without manager approval"
+					</Text>
+				</VStack>
+				<Controller
+					name="criteria"
+					control={control}
+					render={({ field }) => (
+						<CriteriaInput
+							value={field.value}
+							onChange={field.onChange}
+							placeholder="e.g., Must apologize for the inconvenience"
+						/>
+					)}
+				/>
+			</VStack>
 
-      <AdvancedSection register={register} errors={errors} />
-    </VStack>
-  );
+			{targetType === "voice" && <CallerVoiceSection control={control} />}
+
+			<AdvancedSection register={register} errors={errors} />
+		</VStack>
+	);
+}
+
+/**
+ * The collapsed "Caller voice" group, shown only for a voice target. Offers the
+ * caller's Voice (an audio-model picker), Interrupts (0-100 %, step 5) and
+ * Effects. Values persist on the scenario's `callerVoice` (AC17).
+ */
+function CallerVoiceSection({
+	control,
+}: {
+	control: Control<ScenarioFormData>;
+}) {
+	const [open, setOpen] = useState(false);
+	const ChevronIcon = open ? ChevronDown : ChevronRight;
+
+	return (
+		<Collapsible.Root
+			open={open}
+			onOpenChange={({ open }) => setOpen(open)}
+			data-testid="caller-voice-group"
+		>
+			<Collapsible.Trigger asChild>
+				<HStack
+					cursor="pointer"
+					userSelect="none"
+					_hover={{ color: "fg.emphasized" }}
+				>
+					<ChevronIcon size={14} />
+					<SectionHeader>Caller voice</SectionHeader>
+				</HStack>
+			</Collapsible.Trigger>
+			<Collapsible.Content>
+				<VStack align="stretch" gap={4} pt={3}>
+					<Field.Root>
+						<Text fontSize="13px" fontWeight="medium">
+							Voice
+						</Text>
+						<Controller
+							name="callerVoice.voiceModel"
+							control={control}
+							render={({ field }) => (
+								<CallerVoiceModelSelect
+									value={field.value ?? null}
+									onChange={field.onChange}
+									size="full"
+								/>
+							)}
+						/>
+					</Field.Root>
+
+					<Controller
+						name="callerVoice.interruptProbability"
+						control={control}
+						render={({ field }) => {
+							const percent = Math.round((field.value ?? 0) * 100);
+							return (
+								<Field.Root>
+									<Text fontSize="13px" fontWeight="medium">
+										Interrupts: {percent}%
+									</Text>
+									<Input
+										type="range"
+										min={0}
+										max={100}
+										step={5}
+										aria-label="Interrupts"
+										value={percent}
+										onChange={(event) =>
+											field.onChange(Number(event.target.value) / 100)
+										}
+									/>
+								</Field.Root>
+							);
+						}}
+					/>
+
+					<Field.Root>
+						<Text fontSize="13px" fontWeight="medium">
+							Effects
+						</Text>
+						<Controller
+							name="callerVoice.effects"
+							control={control}
+							render={({ field }) => (
+								<NativeSelect.Root size="sm">
+									<NativeSelect.Field
+										aria-label="Effects"
+										value={field.value ?? "none"}
+										onChange={(event) => field.onChange(event.target.value)}
+									>
+										{CALLER_VOICE_EFFECTS.map((effect) => (
+											<option key={effect} value={effect}>
+												{EFFECT_LABELS[effect]}
+											</option>
+										))}
+									</NativeSelect.Field>
+									<NativeSelect.Indicator />
+								</NativeSelect.Root>
+							)}
+						/>
+					</Field.Root>
+				</VStack>
+			</Collapsible.Content>
+		</Collapsible.Root>
+	);
 }
 
 /**
@@ -203,111 +340,113 @@ export function ScenarioForm({
  * form under the user mid-edit.
  */
 function useResetOnDefaultsChange({
-  reset,
-  defaultValues,
+	reset,
+	defaultValues,
 }: {
-  reset: UseFormReturn<ScenarioFormData>["reset"];
-  defaultValues?: Partial<ScenarioFormData>;
+	reset: UseFormReturn<ScenarioFormData>["reset"];
+	defaultValues?: Partial<ScenarioFormData>;
 }) {
-  const prevDefaultsRef = useRef<string | null>(null);
-  useEffect(() => {
-    const currentDefaults = defaultValues
-      ? JSON.stringify([
-          defaultValues.name,
-          defaultValues.situation,
-          defaultValues.criteria,
-          defaultValues.labels,
-          defaultValues.parameters,
-          defaultValues.maxTurns,
-          defaultValues.minTurns,
-          defaultValues.testSuiteId,
-        ])
-      : null;
-    if (currentDefaults !== prevDefaultsRef.current) {
-      prevDefaultsRef.current = currentDefaults;
-      if (defaultValues) {
-        reset({
-          name: "",
-          situation: "",
-          criteria: [],
-          labels: [],
-          parameters: [],
-          testSuiteId: null,
-          ...defaultValues,
-        });
-      }
-    }
-  }, [defaultValues, reset]);
+	const prevDefaultsRef = useRef<string | null>(null);
+	useEffect(() => {
+		const currentDefaults = defaultValues
+			? JSON.stringify([
+					defaultValues.name,
+					defaultValues.situation,
+					defaultValues.criteria,
+					defaultValues.labels,
+					defaultValues.parameters,
+					defaultValues.maxTurns,
+					defaultValues.minTurns,
+					defaultValues.testSuiteId,
+					defaultValues.callerVoice,
+				])
+			: null;
+		if (currentDefaults !== prevDefaultsRef.current) {
+			prevDefaultsRef.current = currentDefaults;
+			if (defaultValues) {
+				reset({
+					name: "",
+					situation: "",
+					criteria: [],
+					labels: [],
+					parameters: [],
+					callerVoice: DEFAULT_CALLER_VOICE,
+					testSuiteId: null,
+					...defaultValues,
+				});
+			}
+		}
+	}, [defaultValues, reset]);
 }
 
 function AdvancedSection({
-  register,
-  errors,
+	register,
+	errors,
 }: {
-  register: ReturnType<typeof useForm<ScenarioFormData>>["register"];
-  errors: ReturnType<typeof useForm<ScenarioFormData>>["formState"]["errors"];
+	register: ReturnType<typeof useForm<ScenarioFormData>>["register"];
+	errors: ReturnType<typeof useForm<ScenarioFormData>>["formState"]["errors"];
 }) {
-  const [open, setOpen] = useState(false);
-  const ChevronIcon = open ? ChevronDown : ChevronRight;
+	const [open, setOpen] = useState(false);
+	const ChevronIcon = open ? ChevronDown : ChevronRight;
 
-  return (
-    <Collapsible.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
-      <Collapsible.Trigger asChild>
-        <HStack
-          cursor="pointer"
-          userSelect="none"
-          _hover={{ color: "fg.emphasized" }}
-        >
-          <ChevronIcon size={14} />
-          <SectionHeader>Advanced</SectionHeader>
-        </HStack>
-      </Collapsible.Trigger>
-      <Collapsible.Content>
-        <VStack align="stretch" gap={3} pt={3}>
-          <HStack gap={4} align="start">
-            <Field.Root invalid={!!errors.maxTurns} flex={1}>
-              <Text fontSize="13px" fontWeight="medium">
-                Max Turns
-              </Text>
-              <Input
-                {...register("maxTurns", {
-                  setValueAs: (v) =>
-                    v == null || v === ""
-                      ? null
-                      : Number.isNaN(Number(v))
-                        ? null
-                        : Number(v),
-                })}
-                type="number"
-                placeholder="Default: 10"
-              />
-              <Field.ErrorText>{errors.maxTurns?.message}</Field.ErrorText>
-            </Field.Root>
-            <Field.Root invalid={!!errors.minTurns} flex={1}>
-              <Text fontSize="13px" fontWeight="medium">
-                Min Turns
-              </Text>
-              <Input
-                {...register("minTurns", {
-                  setValueAs: (v) =>
-                    v == null || v === ""
-                      ? null
-                      : Number.isNaN(Number(v))
-                        ? null
-                        : Number(v),
-                })}
-                type="number"
-                placeholder="Default: none"
-              />
-              <Field.ErrorText>{errors.minTurns?.message}</Field.ErrorText>
-            </Field.Root>
-          </HStack>
-          <Text fontSize="12px" color="fg.muted">
-            Max Turns caps the conversation length. Min Turns prevents the judge
-            from ending the test early.
-          </Text>
-        </VStack>
-      </Collapsible.Content>
-    </Collapsible.Root>
-  );
+	return (
+		<Collapsible.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+			<Collapsible.Trigger asChild>
+				<HStack
+					cursor="pointer"
+					userSelect="none"
+					_hover={{ color: "fg.emphasized" }}
+				>
+					<ChevronIcon size={14} />
+					<SectionHeader>Advanced</SectionHeader>
+				</HStack>
+			</Collapsible.Trigger>
+			<Collapsible.Content>
+				<VStack align="stretch" gap={3} pt={3}>
+					<HStack gap={4} align="start">
+						<Field.Root invalid={!!errors.maxTurns} flex={1}>
+							<Text fontSize="13px" fontWeight="medium">
+								Max Turns
+							</Text>
+							<Input
+								{...register("maxTurns", {
+									setValueAs: (v) =>
+										v == null || v === ""
+											? null
+											: Number.isNaN(Number(v))
+												? null
+												: Number(v),
+								})}
+								type="number"
+								placeholder="Default: 10"
+							/>
+							<Field.ErrorText>{errors.maxTurns?.message}</Field.ErrorText>
+						</Field.Root>
+						<Field.Root invalid={!!errors.minTurns} flex={1}>
+							<Text fontSize="13px" fontWeight="medium">
+								Min Turns
+							</Text>
+							<Input
+								{...register("minTurns", {
+									setValueAs: (v) =>
+										v == null || v === ""
+											? null
+											: Number.isNaN(Number(v))
+												? null
+												: Number(v),
+								})}
+								type="number"
+								placeholder="Default: none"
+							/>
+							<Field.ErrorText>{errors.minTurns?.message}</Field.ErrorText>
+						</Field.Root>
+					</HStack>
+					<Text fontSize="12px" color="fg.muted">
+						Max Turns caps the conversation length. Min Turns prevents the judge
+						from ending the test early.
+					</Text>
+				</VStack>
+			</Collapsible.Content>
+		</Collapsible.Root>
+	);
 }

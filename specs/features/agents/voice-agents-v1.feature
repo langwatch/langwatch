@@ -166,7 +166,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   # ---------------------------------------------------------------------------
 
   # AC17
-  @integration @unimplemented
+  @integration
   Scenario: Caller voice group appears only for a voice target and its values persist
     Given a scenario editor with "Support line" chosen as the target
     When the editor is drawn
@@ -177,7 +177,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then the reloaded editor shows the saved values
 
   # AC18
-  @integration @unimplemented
+  @integration
   Scenario: The Voice picker lists only audio and realtime models the project has credentials for
     Given the project has credentials for one audio-tagged model and one chat-only model
     When the Voice picker of the Caller voice group is opened
@@ -185,7 +185,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And a chat model picker elsewhere in the project is unchanged
 
   # AC21
-  @integration @unimplemented
+  @integration
   Scenario: A run with a wrong agent id or a removed key fails without hanging the pool
     Given a voice agent with an invalid agent id, and a second voice agent whose project key was removed
     When a run is started against each
@@ -194,14 +194,14 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then it completes normally
 
   # AC22
-  @integration @unimplemented
+  @integration
   Scenario: At most the concurrency cap of voice runs execute at once
     Given the project's voice run concurrency cap is 2
     When 4 voice runs are started at once
     Then 2 runs execute and 2 runs wait in the queue with status "Queued"
 
   # AC24
-  @integration @unimplemented
+  @integration
   Scenario: The results table shows a Caller column for both simulated and panel runs
     Given a batch containing a pool run against "Support line" and a panel run against "Support line"
     When the results table is drawn
@@ -252,7 +252,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then it is rejected
 
   # AC18
-  @unit @unimplemented
+  @unit
   Scenario: The voice model filter predicate keeps only credentialed audio or realtime models
     Given a model tagged audio with project credentials, a model tagged realtime with project credentials, and a chat model with credentials
     When the voice model filter predicate runs over the list
