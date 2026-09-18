@@ -280,34 +280,9 @@ export async function migrationPassCohort(): Promise<
 }
 
 /**
- * The user-rooted pass's cohort. For a migration still paced by enrollment -
- * every user-rooted migration registered today - the ops page enrolls
- * ORGANIZATIONS, and a user is in the cohort when any organization they
- * belong to is enrolled for it. Self-hosted admits every user, as it admits
- * every organization. Enrollment is read once, fresh, at the start of each
- * pass; membership is answered per candidate user by reading that user's own
- * organization ids (a handful of rows behind one parameter) and intersecting
- * them in memory with the enrolled set. It used to ride the enrolled set
- * along as an IN list instead, which read the same rows but made Postgres
- * PLAN a many-thousand-parameter statement per user per pass - a cost that
- * scales with every enrolled organization and that execution-time stats
- * never show (pg_stat_statements.track_planning is off by default). A user
- * outside
- * every organization has nothing to enroll them on cloud and stays on the
- * legacy path until they join one; their sign-in is unaffected (the write
- * gate answers false; the D03 read fork falls back to legacy routing).
- *
- * A user-rooted migration declaring `enrolledAutomatically` admits every
- * user instead.
- *
- * Membership of a private-dataplane organization is NOT a reason to leave
- * somebody out, and used to be: a user tenant could not be placed at all, so
- * excluding them was the only way to avoid writing somewhere wrong. It can
- * be placed now - user data lands on the shared instance, whoever they
- * belong to, because what these events record is how a person signs in
- * rather than any organization's data. Excluding them would strand exactly
- * those people on the legacy path forever, which is the same reason the
- * organization cohort never excluded their organizations.
+ * Builds the user cohort once per pass. Automatic migrations admit every
+ * user. Paced migrations admit members of enrolled organizations, querying
+ * one user's memberships at a time to avoid a growing SQL `IN` list.
  */
 export async function userMigrationPassCohort(): Promise<
   (args: { tenantId: string; migrationName: string }) => Promise<boolean>

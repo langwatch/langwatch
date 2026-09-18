@@ -24,8 +24,9 @@ export class SystemMigrationPreflightError extends Error {
  *
  * One pass cannot observe events it just emitted. A later pass is therefore
  * required to prove the resulting projections and finalize each tenant. The
- * A no-progress pass proves quiescence only after its queue effects drain,
- * every tenant outcome is visible, and no finite migration remains held.
+ * first no-progress pass proves quiescence after its queue effects drain.
+ * Held and parked tenants keep their migration gates closed, so they can stay
+ * on the legacy path without preventing the rest of the application starting.
  *
  * Runner failures and failure to converge are startup failures. They reject
  * this promise so the one-shot task exits non-zero and no runtime lane starts.
@@ -34,15 +35,11 @@ export async function runSystemMigrationsToQuiescence({
   redis,
   signal = new AbortController().signal,
   awaitPassEffects,
-  requireNoParked = false,
 }: {
   redis?: Redis | Cluster | null;
   signal?: AbortSignal;
   awaitPassEffects?: () => Promise<void>;
-  requireNoParked?: boolean;
 } = {}): Promise<MigrationPassSummary> {
-  let settlementProofPending = false;
-
   for (let pass = 1; pass <= MAX_PASSES; pass++) {
     signal.throwIfAborted();
     const summary = await runMigrationPass({ pass, redis, signal });
@@ -50,25 +47,12 @@ export async function runSystemMigrationsToQuiescence({
     signal.throwIfAborted();
 
     await settlePassEffects({ pass, settle: awaitPassEffects });
-    assertPassCanConverge({
-      summary,
-      pass,
-      settlementProofPending,
-      requireNoParked,
-    });
-
-    if (settlementStalled({ summary, requireNoParked })) {
-      settlementProofPending = true;
-      logger.info(
-        { summary, pass },
-        "required migrations remain unsettled after effect drain; a proof pass follows",
-      );
-      continue;
-    }
-    settlementProofPending = false;
 
     if (converged(summary)) {
-      logger.info({ summary, passes: pass }, "system migrations converged; startup may continue");
+      logger.info(
+        { summary, passes: pass },
+        "system migrations converged; startup may continue",
+      );
       return summary;
     }
 
@@ -95,9 +79,12 @@ async function runMigrationPass({
     return await runSystemMigrationPass({ signal, redis });
   } catch (error) {
     logger.error({ error, pass }, "system migration preflight pass failed");
-    throw new SystemMigrationPreflightError(`System migration preflight failed on pass ${pass}`, {
-      cause: error,
-    });
+    throw new SystemMigrationPreflightError(
+      `System migration preflight failed on pass ${pass}`,
+      {
+        cause: error,
+      },
+    );
   }
 }
 
@@ -116,39 +103,6 @@ async function settlePassEffects({
       { cause: error },
     );
   }
-}
-
-/** Cloud tolerates a parked tenant; self-hosted startup requires every tenant to settle. */
-function assertPassCanConverge({
-  summary,
-  pass,
-  settlementProofPending,
-  requireNoParked,
-}: {
-  summary: MigrationPassSummary;
-  pass: number;
-  settlementProofPending: boolean;
-  requireNoParked: boolean;
-}): void {
-  if (settlementStalled({ summary, requireNoParked }) && settlementProofPending) {
-    const finiteHeld = summary.finiteHeld ?? summary.held;
-    const parked = requireNoParked ? summary.parked : 0;
-    throw new SystemMigrationPreflightError(
-      `System migration preflight left ${finiteHeld} finite migrations held and ${parked} migrations parked on pass ${pass}`,
-    );
-  }
-}
-
-function settlementStalled({
-  summary,
-  requireNoParked,
-}: {
-  summary: MigrationPassSummary;
-  requireNoParked: boolean;
-}): boolean {
-  const finiteHeld = summary.finiteHeld ?? summary.held;
-  const parked = requireNoParked ? summary.parked : 0;
-  return (finiteHeld > 0 || parked > 0) && summary.advanced === 0;
 }
 
 function continuingBecause(summary: MigrationPassSummary): string {
@@ -174,7 +128,13 @@ async function waitForNextPass({
   }
 }
 
-function sleep({ ms, signal }: { ms: number; signal: AbortSignal }): Promise<void> {
+function sleep({
+  ms,
+  signal,
+}: {
+  ms: number;
+  signal: AbortSignal;
+}): Promise<void> {
   signal.throwIfAborted();
 
   return new Promise<void>((resolve, reject) => {

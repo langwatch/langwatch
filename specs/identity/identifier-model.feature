@@ -455,13 +455,12 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And an operator rollback closes it again
 
   @unit
-  Scenario: Organization enrollment is what puts a user in the backfill's cohort
+  Scenario: Identifier backfill automatically includes every user
     Given the installation is cloud
-    And "acme" is enrolled in the identifier backfill and "globex" is not
+    And the identifier backfill is enrolled automatically
     When a migration pass computes its user cohort
-    Then every member of "acme" is in the cohort
-    And a user who belongs only to "globex" is not
-    And a user outside every organization is not, and stays on the legacy path
+    Then every user is in the cohort
+    And organization membership is not read
 
 
   @unit @regression
@@ -480,10 +479,10 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And a fresh refused or waiting user is not adopted
 
   @unit @regression
-  Scenario: User-targeted adoption preserves rollout enrollment and leases
-    Given the arriving user has no membership in an enrolled organization
+  Scenario: User-targeted automatic adoption preserves per-user scope and leases
+    Given the identifier backfill is enrolled automatically
     When a user-targeted adoption pass runs
-    Then it leaves the user's migration state untouched
+    Then it attempts the arriving user's migration without enrollment
     And it never scans the other users
     And an adoption pass cannot bypass another pass's user lease
 

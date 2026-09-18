@@ -11,10 +11,6 @@ const stubs = vi.hoisted(() => {
   };
 });
 
-const deployment = vi.hoisted(() => ({ IS_SAAS: false }));
-
-vi.mock("~/env.mjs", () => ({ env: deployment }));
-
 vi.mock("@langwatch/ksuid", () => ({
   setEnvironment: () => stubs.order.push("environment"),
 }));
@@ -48,17 +44,6 @@ describe("system-migrations task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stubs.order.length = 0;
-    deployment.IS_SAAS = false;
-  });
-
-  it("does not fail the Cloud fleet when one tenant parks", async () => {
-    deployment.IS_SAAS = true;
-
-    await runSystemMigrations();
-
-    expect(stubs.run).toHaveBeenCalledWith(
-      expect.objectContaining({ requireNoParked: false }),
-    );
   });
 
   it("initializes the migration app and waits for quiescence", async () => {
@@ -73,7 +58,6 @@ describe("system-migrations task", () => {
     expect(stubs.run).toHaveBeenCalledWith({
       redis: stubs.redis,
       awaitPassEffects: expect.any(Function),
-      requireNoParked: true,
     });
     await stubs.run.mock.calls[0]?.[0].awaitPassEffects();
     expect(stubs.idle).toHaveBeenCalledOnce();

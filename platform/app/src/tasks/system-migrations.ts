@@ -4,19 +4,13 @@ import { setEnvironment } from "@langwatch/ksuid";
 export default async function runSystemMigrations(): Promise<void> {
   setEnvironment(process.env.ENVIRONMENT ?? "local");
 
-  const [
-    { env },
-    { getApp },
-    { initializeMigrationApp },
-    { assertRedisReady },
-    boot,
-  ] = await Promise.all([
-    import("~/env.mjs"),
-    import("~/server/app-layer/app"),
-    import("~/server/app-layer/presets"),
-    import("~/server/app-layer/redis-readiness"),
-    import("~/server/app-layer/system-migrations/boot"),
-  ]);
+  const [{ getApp }, { initializeMigrationApp }, { assertRedisReady }, boot] =
+    await Promise.all([
+      import("~/server/app-layer/app"),
+      import("~/server/app-layer/presets"),
+      import("~/server/app-layer/redis-readiness"),
+      import("~/server/app-layer/system-migrations/boot"),
+    ]);
 
   initializeMigrationApp();
   await assertRedisReady();
@@ -32,6 +26,5 @@ export default async function runSystemMigrations(): Promise<void> {
   await boot.runSystemMigrationsToQuiescence({
     redis: app.redis,
     awaitPassEffects: () => waitUntilIdle.call(queue),
-    requireNoParked: env.IS_SAAS !== true,
   });
 }
