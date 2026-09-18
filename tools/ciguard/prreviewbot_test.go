@@ -224,6 +224,20 @@ func TestPRReviewBotRejectsAPinWithNoVersionComment(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "no version comment")
 }
 
+// @scenario "Local composite actions are left out of the pin check"
+func TestPRReviewBotAcceptsALocalCompositeAction(t *testing.T) {
+	withLocalAction := strings.Replace(goodPRReviewBotWorkflow,
+		"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
+		"      - uses: ./.github/actions/go-build-cache\n"+
+			"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n", 1)
+	root := writePRReviewBotWorkflow(t, withLocalAction)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
 func TestPRReviewBotReportsMissingTriggerTypes(t *testing.T) {
 	broken := strings.Replace(goodPRReviewBotWorkflow,
 		"\n    types: [opened, synchronize, reopened, ready_for_review]", "", 1)

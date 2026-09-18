@@ -181,6 +181,12 @@ func workflowUses(workflow *ciscan.Workflow) []string {
 // pinProblem reports the single pinning problem a `uses:` value has, if any: a
 // ref that is not a full commit SHA, or a full-SHA pin with no version comment.
 func pinProblem(use string, commented map[string]bool) (problem string, bad bool) {
+	if strings.HasPrefix(use, "./") {
+		// Local composite/reusable actions resolve from the checked-out repo,
+		// not a registry ref, so there is nothing to pin.
+		return "", false
+	}
+
 	action, ref, found := strings.Cut(use, "@")
 	if !found || !fullSHAPattern.MatchString(ref) {
 		return fmt.Sprintf(
