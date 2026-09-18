@@ -135,6 +135,13 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
       When they ask the LangWatchQL door to describe itself
       Then every derived Postgres view is listed with its columns
 
+    @unit
+    Scenario: The schema's example query for a dataset without a time column is runnable
+      Given a derived model with no CreatedAt and no DateTime64 column, so its time column is an opaque key
+      When the LangWatchQL schema publishes that dataset's example query
+      Then the example has no WHERE clause comparing the time column to a date
+      And the example orders by the time column instead
+
   Rule: Topics are the proving slice
 
     @integration
