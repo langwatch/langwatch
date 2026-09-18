@@ -467,20 +467,70 @@ async function writeJudgedPage({
   return { mapping, insertMs: Date.now() - startedInsert };
 }
 
+/**
+ * The page this intent asked for, and the next one started behind it.
+ *
+ * The read-ahead is started here rather than after judging because the point
+ * of it is to overlap the two: by the time this returns, the next page's key
+ * pass and trace read are already under way against services the classifier
+ * does not contend with. `prefetched` says whether this page came off that
+ * read, which is what tells the profile its key and query time was paid before
+ * the intent arrived.
+ */
+async function takePageAndReadAhead({
+  deps,
+  prefetches,
+  input,
+  row,
+  caller,
+  parameters,
+}: {
+  deps: InstantEvalRunExecutorDependencies;
+  prefetches: InstantEvalPrefetches;
+  input: Parameters<InstantEvalRunPort["judgePage"]>[0];
+  row: Awaited<ReturnType<typeof loadRun>>["row"];
+  caller: Awaited<ReturnType<typeof loadRun>>["caller"];
+  parameters: Awaited<ReturnType<typeof loadRun>>["parameters"];
+}): Promise<PrefetchedPage & { prefetched: boolean }> {
+  const { runId, projectId, afterTraceId, afterSpanId, pageSize, remaining } =
+    input;
+  const limit = Math.max(1, Math.min(pageSize, remaining));
+  const read = (after: PageCursor) =>
+    readPage({
+      deps,
+      projectId,
+      row,
+      caller,
+      parameters,
+      keyColumns: input.keyColumns,
+      after,
+    });
+
+  const taken = await prefetches.take({
+    runId,
+    afterTraceId,
+    afterSpanId,
+    limit,
+  });
+  const current = taken ?? (await read({ afterTraceId, afterSpanId, limit }));
+  startNextPageRead({
+    prefetches,
+    runId,
+    read,
+    last: current.keyPage.keys.at(-1),
+    hasMore: current.keyPage.hasMore,
+    remaining: remaining - current.keyPage.keys.length,
+    pageSize,
+  });
+  return { ...current, prefetched: taken !== null };
+}
+
 async function judgeRunPageOrThrow(
   deps: InstantEvalRunExecutorDependencies,
   prefetches: InstantEvalPrefetches,
   input: Parameters<InstantEvalRunPort["judgePage"]>[0],
 ): Promise<InstantEvalPageOutcome> {
-  const {
-    runId,
-    projectId,
-    page,
-    afterTraceId,
-    afterSpanId,
-    pageSize,
-    remaining,
-  } = input;
+  const { runId, projectId, page, remaining } = input;
   const { row, caller, questions, parameters } = await loadRun({
     deps,
     projectId,
@@ -496,39 +546,16 @@ async function judgeRunPageOrThrow(
   }
 
   const startedPage = Date.now();
-  const limit = Math.max(1, Math.min(pageSize, remaining));
-  const read = (after: PageCursor) =>
-    readPage({
-      deps,
-      projectId,
-      row,
-      caller,
-      parameters,
-      keyColumns: input.keyColumns,
-      after,
-    });
-
-  const prefetched = await prefetches.take({
-    runId,
-    afterTraceId,
-    afterSpanId,
-    limit,
-  });
-  const current =
-    prefetched ?? (await read({ afterTraceId, afterSpanId, limit }));
-  const { keyPage, prepared, keyMs } = current;
-  if (keyPage.keys.length === 0 || prepared === null) return emptyPage();
-
-  const last = keyPage.keys.at(-1);
-  startNextPageRead({
+  const { keyPage, prepared, keyMs, prefetched } = await takePageAndReadAhead({
+    deps,
     prefetches,
-    runId,
-    read,
-    last,
-    hasMore: keyPage.hasMore,
-    remaining: remaining - keyPage.keys.length,
-    pageSize,
+    input,
+    row,
+    caller,
+    parameters,
   });
+  if (keyPage.keys.length === 0 || prepared === null) return emptyPage();
+  const last = keyPage.keys.at(-1);
 
   const judged = await judgeUnderCancellation({
     deps,
@@ -553,7 +580,7 @@ async function judgeRunPageOrThrow(
     page,
     rows: mapping.counters.rows,
     startedPage,
-    prefetched: prefetched !== null,
+    prefetched,
     keyMs,
     insertMs,
     judged,
