@@ -3769,6 +3769,9 @@ function LangyPanel({
                                     index === displayMessages.length - 1 &&
                                     message.role === "assistant"
                                   }
+                                  isLatest={
+                                    index === displayMessages.length - 1
+                                  }
                                   interrupted={
                                     interruptedConversationId != null &&
                                     interruptedConversationId ===
