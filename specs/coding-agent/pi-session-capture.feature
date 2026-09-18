@@ -167,6 +167,31 @@ Feature: pi session capture
     And the folder we looked in is the one pi makes for the working directory, not its parent
 
   @unit
+  # Resolving the right DIRECTORY is not the whole job, because pi can be told
+  # to open one specific FILE. `--session <path>` opens that exact file and pi
+  # keeps writing to it where it lies, rather than copying it into the session
+  # directory, so a capture that watches only a directory sends nothing and says
+  # nothing — the same silent miss the resolver was written to close, one door
+  # down.
+  #
+  # `--session` also takes a session id, and pi tells a path from an id by shape
+  # alone: a value containing a separator or ending in `.jsonl` is a path,
+  # resolved against the launch directory. The id routes need nothing here,
+  # because each of them ends inside the session directory already — a local
+  # match is there, and a match in another project is forked into this one
+  # rather than opened in place.
+  #
+  # The named file is watched ALONGSIDE the directory, not instead of it, since
+  # a run can open a named session and still create others. It is held to the
+  # same window as everything else: a file pi has not appended to since the run
+  # began is not this run's, however it was named.
+  Scenario: A session pi was told to open by path is captured where it lies
+    Given a launch that names one session file outside the session directory
+    When capture runs and pi writes to that file
+    Then the turns in it are recorded
+    And a file nothing has written to since the run began is still left alone
+
+  @unit
   # pi keeps two settings files, not one: a global one in its agent directory
   # and a project one at `.pi/settings.json` in the directory pi was launched
   # from. pi merges them project-over-global, so a project that moves its own

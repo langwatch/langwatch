@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   defaultPiProjectSessionsDir,
   encodePiCwdDirName,
+  explicitSessionFileFromArgs,
   PI_AGENT_DIR_ENV,
   PI_SESSION_DIR_ENV,
   piAgentDir,
@@ -705,5 +706,124 @@ describe("reading the session directory out of pi's arguments", () => {
     expect(
       sessionDirFromArgs(["--session-dir", "/real", "trailing"]),
     ).toBe("/real");
+  });
+});
+
+/**
+ * `--session` takes a path OR a session id, and pi tells them apart by shape
+ * alone, never by asking the filesystem. Only the path route matters here: pi
+ * opens that exact file and keeps writing to it where it lies, so a capture
+ * watching a directory never sees it. Every id route ends inside the session
+ * directory — a local match is already there, and a match in another project is
+ * forked into this one — so an id needs nothing from this function.
+ *
+ * The shape test is pi's, in pi's own order, and the branches are walked
+ * separately below so a rewrite that collapses them fails here.
+ */
+describe("reading an explicitly named session file out of pi's arguments", () => {
+  const launchedIn = "/work/project";
+
+  /** @scenario "A session pi was told to open by path is captured where it lies" */
+  it("finds nothing when the flag is absent", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--model", "sonnet"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+  });
+
+  /** @scenario "A session pi was told to open by path is captured where it lies" */
+  it("names the file when the value carries a separator", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "/other/session.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBe("/other/session.jsonl");
+  });
+
+  /**
+   * The separator and the extension are separate branches of pi's test, so a
+   * bare file name in the launch directory counts on the extension alone.
+   *
+   * @scenario "A session pi was told to open by path is captured where it lies"
+   */
+  it("names the file when the value only ends in pi's extension", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "picked.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBe(join(launchedIn, "picked.jsonl"));
+  });
+
+  /** @scenario "A session pi was told to open by path is captured where it lies" */
+  it("resolves a relative path against the directory pi was launched in", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "../sessions/picked.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBe("/work/sessions/picked.jsonl");
+  });
+
+  /**
+   * An id is not a path, and treating one as a path would hand capture a file
+   * name that does not exist while the real session sits in the directory.
+   *
+   * @scenario "A session pi was told to open by path is captured where it lies"
+   */
+  it("finds nothing when the value is a session id", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "abc123"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "44444444-4444-4444-8444-444444444444"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+  });
+
+  /** @scenario "A directory named in a spelling pi ignores does not move capture" */
+  it("ignores spellings pi does not accept", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session=/other/session.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--", "--session", "/other/session.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
+  });
+
+  /**
+   * `--session-id` names an id pi gives a NEW session in its own directory, and
+   * it shares a prefix with `--session`. Matching on the prefix would turn a
+   * new local session into a file path that does not exist.
+   *
+   * @scenario "A session pi was told to open by path is captured where it lies"
+   */
+  it("does not match the flag that merely starts with the same letters", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session-id", "/not/a/path.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBeNull();
   });
 });

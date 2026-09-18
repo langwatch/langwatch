@@ -52,7 +52,7 @@
  */
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** The variable pi itself reads, second in its own precedence order. */
@@ -71,6 +71,9 @@ export const PI_AGENT_DIR_ENV = "PI_CODING_AGENT_DIR";
 
 /** The flag pi itself accepts, first in its own precedence order. */
 const SESSION_DIR_FLAG = "--session-dir";
+
+/** The flag that names one session to open, by path or by id. */
+const SESSION_FLAG = "--session";
 
 /**
  * pi's agent directory — the root every other path here hangs off.
@@ -165,9 +168,10 @@ export function defaultPiProjectSessionsDir({
 }
 
 /**
- * A directory named on the command line, or null.
+ * The value pi's parser would end up with for a flag that takes one, or null.
  *
- * Only the spelling pi accepts is read, and that is narrower than it looks.
+ * Shared by every flag this file reads, so pi's parsing rules are written down
+ * once. Only the spelling pi accepts is read, and that is narrower than it looks.
  * pi's parser has one branch per flag, each of the shape
  * `arg === "--session-dir" && i + 1 < args.length` (`cli/args.js:88-90`); there
  * is no pass that splits `--flag=value` first. So `--session-dir=/x` is not a
@@ -196,13 +200,25 @@ export function defaultPiProjectSessionsDir({
  *
  * The last occurrence wins, the way pi's loop leaves the final assignment
  * standing.
+ *
+ * One known divergence, stated rather than mirrored: pi walks every flag in one
+ * pass, so a flag left without its value swallows the next token whatever it is.
+ * `pi --model --session /x.jsonl` gives pi a model called `--session` and leaves
+ * `/x.jsonl` as a message, while this scan sees `--session` and reads `/x.jsonl`
+ * after it. Mirroring that would mean carrying the arity of every flag pi has,
+ * which is a copy of someone else's parser that goes stale silently. The cost of
+ * the divergence is bounded: on a malformed command line we may offer the reader
+ * one extra path, which is a file pi is not writing and yields no events.
  */
-export function sessionDirFromArgs(args: readonly string[]): string | null {
+function lastFlagValue(
+  args: readonly string[],
+  flag: string,
+): string | null {
   let found: string | null = null;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--") break;
-    if (arg !== SESSION_DIR_FLAG) continue;
+    if (arg !== flag) continue;
     const next = args[i + 1];
     // pi's own guard: a flag that ends the arguments names nothing.
     if (next === undefined) continue;
@@ -210,6 +226,53 @@ export function sessionDirFromArgs(args: readonly string[]): string | null {
     i++;
   }
   return found;
+}
+
+/** A directory named on the command line, read pi's way. */
+export function sessionDirFromArgs(args: readonly string[]): string | null {
+  return lastFlagValue(args, SESSION_DIR_FLAG);
+}
+
+/**
+ * The exact session FILE pi was told to open, or null.
+ *
+ * `--session` takes either a path or a session id, and the two land in very
+ * different places. pi decides between them by shape, not by looking at the
+ * filesystem (`main.js:192-195`): a value containing a separator or ending in
+ * `.jsonl` is a path, resolved against the working directory, and pi then opens
+ * that exact file and keeps writing to it where it lies
+ * (`core/session-manager.js:1216-1237` resolves the path and hands it straight
+ * to the session it returns). Anything else is an id, and every id route ends
+ * inside the session directory: a local match is already there, and a match in
+ * another project is forked into this one rather than opened in place
+ * (`main.js:296-320`).
+ *
+ * So the id routes need nothing from this function and the path route needs
+ * everything: a file named this way can sit anywhere on the disk, and capture
+ * that watches only a directory never sees it. That was a silent miss —
+ * `langwatch pi --session /elsewhere/session.jsonl` recorded nothing, with no
+ * warning that the file it was given was outside what it was watching.
+ *
+ * The returned path is absolute, resolved the way pi resolves it
+ * (`utils/paths.js:81-85`: absolute stays, relative resolves against the
+ * launch directory). No tilde expansion, because pi does none here — an
+ * unquoted `~` is the shell's to expand and a quoted one is a directory called
+ * `~` to pi as much as to us.
+ */
+export function explicitSessionFileFromArgs({
+  toolArgs,
+  cwd = process.cwd(),
+}: {
+  toolArgs: readonly string[];
+  cwd?: string;
+}): string | null {
+  const named = lastFlagValue(toolArgs, SESSION_FLAG);
+  if (named === null || named.trim() === "") return null;
+  // pi's own shape test, in pi's own order.
+  const looksLikePath =
+    named.includes("/") || named.includes("\\") || named.endsWith(".jsonl");
+  if (!looksLikePath) return null;
+  return isAbsolute(named) ? resolve(named) : resolve(cwd, named);
 }
 
 /**

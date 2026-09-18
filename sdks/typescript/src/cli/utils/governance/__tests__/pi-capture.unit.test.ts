@@ -832,3 +832,158 @@ describe("given a resumed session whose current turn is past the first window", 
     });
   });
 });
+
+describe("given pi was pointed at one session file by name", () => {
+  /**
+   * `--session <path>` opens that exact file and pi keeps writing to it where
+   * it lies, rather than copying it into the session directory. Capture that
+   * watches only a directory therefore never sees it: the run ends having sent
+   * nothing, with no warning that the file it was handed was outside what it
+   * was watching — the silent miss this feature exists to close, one door down
+   * from the resolver that closed the others.
+   *
+   * The named file goes in a SECOND temporary directory, so no widening of the
+   * directory walk can reach it by accident and make this pass for the wrong
+   * reason.
+   */
+  describe("when the named file sits outside the session directory", () => {
+    let elsewhere: string;
+    let named: string;
+
+    beforeEach(async () => {
+      elsewhere = await mkdtemp(join(tmpdir(), "pi-elsewhere-"));
+      named = join(elsewhere, "picked.jsonl");
+      await writeFile(named, sessionLines("aaaaaaaa"), "utf8");
+    });
+
+    afterEach(async () => {
+      await rm(elsewhere, { recursive: true, force: true });
+    });
+
+    /** @scenario "A session pi was told to open by path is captured where it lies" */
+    it("captures the turns pi wrote to it", async () => {
+      const bodies: string[] = [];
+      const fetchImpl = vi.fn(
+        async (_url: unknown, init?: { body?: string }) => {
+          if (init?.body) bodies.push(init.body);
+          return { ok: true, status: 200 } as Response;
+        },
+      ) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: 0,
+        sessionsDir: dir,
+        sessionFiles: [named],
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      });
+
+      expect(await capture.harvest()).toBeGreaterThan(0);
+      expect(bodies.join("")).toContain(SESSION_ID);
+    });
+
+    /**
+     * The defect itself, kept as a test so the fix cannot be read as cosmetic:
+     * with the same file on disk and the same directory watched, not naming it
+     * sends nothing at all. If this ever starts passing turns through, the
+     * directory walk has widened into somewhere it was never meant to reach.
+     *
+     * @scenario "A session pi was told to open by path is captured where it lies"
+     */
+    it("records nothing from it when capture is not told its name", async () => {
+      const fetchImpl = vi.fn(async () => {
+        throw new Error("nothing should be posted");
+      }) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: 0,
+        sessionsDir: dir,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      });
+
+      expect(await capture.harvest()).toBe(0);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    /**
+     * A file pi has not appended to since the run began is not this run's, and
+     * naming it must not change that — otherwise `--session` on an old session
+     * would ship a conversation the user never launched through us.
+     *
+     * @scenario "A session pi was told to open by path is captured where it lies"
+     */
+    it("still leaves a file untouched since the run began alone", async () => {
+      const startedMs = Date.now();
+      const longBefore = new Date(startedMs - 60 * 60 * 1000);
+      await utimes(named, longBefore, longBefore);
+
+      const fetchImpl = vi.fn(async () => {
+        throw new Error("nothing should be posted");
+      }) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: startedMs,
+        sessionsDir: dir,
+        sessionFiles: [named],
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      });
+
+      expect(await capture.harvest()).toBe(0);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Naming a file that is ALSO inside the watched directory is an ordinary
+   * thing to type, and this is the no-harm guard for it: the run keeps working
+   * exactly as it did when the directory was the only source.
+   *
+   * Stated as a guard rather than as a defect test on purpose. The first draft
+   * of this test claimed to prove that a duplicated path corrupts the reader's
+   * cursor, and that claim was false — deliberately duplicating the path leaves
+   * the suite green, because the second read of a pass finds the cursor already
+   * at the end of the file and returns nothing. The de-duplication in the source
+   * is an efficiency. Real cursor damage needs two passes running at once, which
+   * is the wrapper's re-entrancy guard's problem and is tested there.
+   */
+  describe("when the named file is inside the session directory too", () => {
+    /** @scenario "A session pi was told to open by path is captured where it lies" */
+    it("keeps picking up what pi appends after the first pass", async () => {
+      const inside = join(dir, "s.jsonl");
+      await writeFile(inside, sessionLines("aaaaaaaa"), "utf8");
+
+      const bodies: string[] = [];
+      const fetchImpl = vi.fn(
+        async (_url: unknown, init?: { body?: string }) => {
+          if (init?.body) bodies.push(init.body);
+          return { ok: true, status: 200 } as Response;
+        },
+      ) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: 0,
+        sessionsDir: dir,
+        sessionFiles: [inside],
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      });
+
+      expect(await capture.harvest()).toBe(1);
+
+      await appendFile(inside, messageLine("bbbbbbbb"), "utf8");
+
+      // Exactly the appended turn. A pass that offered this file twice would
+      // have moved the reader's cursor past the end of the file, and this would
+      // be 0 — the append lost with nothing said. The row id is not in the
+      // payload, so the count is what carries the claim.
+      expect(await capture.harvest()).toBe(1);
+      expect(bodies).toHaveLength(2);
+    });
+  });
+});

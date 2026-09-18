@@ -31,7 +31,10 @@ import {
 } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
 import { createPiCapture, type PiCapture } from "./pi-capture";
-import { resolvePiSessionDir } from "./pi-session-dir";
+import {
+	explicitSessionFileFromArgs,
+	resolvePiSessionDir,
+} from "./pi-session-dir";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import {
 	maybeOfferIngestionShellRcPersist,
@@ -904,6 +907,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 					env: process.env,
 					cwd: process.cwd(),
 				}),
+				// A session named by path is opened where it lies rather than copied
+				// into the directory above, so it needs naming separately or it is
+				// never read. Empty when pi was given an id or nothing, because every
+				// id route ends inside that directory already.
+				sessionFiles: [
+					explicitSessionFileFromArgs({ toolArgs, cwd: process.cwd() }),
+				].filter((path): path is string => path !== null),
 				// Events, never spans: a pi turn on both lanes would be counted twice.
 				logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
 				token: modeResult.ingestionToken,

@@ -69,6 +69,8 @@
  *
  * Spec: specs/coding-agent/pi-session-capture.feature
  */
+import { stat } from "node:fs/promises";
+
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import {
   findFilesModifiedSince,
@@ -177,9 +179,12 @@ export interface PiCapture {
  */
 async function sessionFilesTouchedSince({
   dir,
+  files,
   sinceMs,
 }: {
   dir: string;
+  /** Exact files pi was told to open, which may sit outside `dir`. */
+  files: readonly string[];
   sinceMs: number;
 }): Promise<string[]> {
   const touched = await findFilesModifiedSince({
@@ -197,11 +202,40 @@ async function sessionFilesTouchedSince({
     sinceMs: sinceMs - FS_CLOCK_SKEW_GRACE_MS,
     matchesName: (name) => name.endsWith(SESSION_FILE_SUFFIX),
   });
+  // A file pi was pointed at by name is offered on its own terms: it can be
+  // anywhere on the disk, so no walk reaches it, and the same window decides
+  // whether it counts. Statting it rather than trusting the name keeps one rule
+  // for both sources — and it self-heals, because a session pi has not appended
+  // to yet simply fails the window on this tick and passes on a later one.
+  //
+  // A Set, because the named file is very often inside the watched directory
+  // too: `--session` with a path under pi's own session folder is an ordinary
+  // thing to type. This is an efficiency, not a correctness guard, and saying so
+  // matters because the first draft of this comment claimed otherwise. Offering
+  // the same path twice in one pass is harmless — the second read finds the
+  // reader's cursor already at the end of the file and returns nothing — which
+  // was established by deliberately duplicating the path and watching the suite
+  // stay green. The cursor damage that DOES exist needs two passes running at
+  // once, and the wrapper's re-entrancy guard is what holds that.
+  const offered = new Set(touched);
+  for (const file of files) {
+    if (offered.has(file)) continue;
+    try {
+      const s = await stat(file);
+      if (s.isFile() && s.mtimeMs >= sinceMs - FS_CLOCK_SKEW_GRACE_MS) {
+        offered.add(file);
+      }
+    } catch {
+      // Not written yet, or gone. Both are ordinary: pi defers its first write
+      // until the first assistant reply, so an absent file is the normal state
+      // at the start of a run.
+    }
+  }
   // The shared walker yields newest-name-first, which is what a caller
   // searching for one recent session wants. This caller posts all of them, in
   // the order they were created, so it re-sorts ascending rather than reading
   // a run's sessions backwards.
-  return touched.sort();
+  return [...offered].sort();
 }
 
 /**
@@ -249,6 +283,17 @@ export interface PiCaptureOptions {
   /** The run's start. Sessions untouched since are left alone. */
   sinceMs: number;
   sessionsDir: string;
+  /**
+   * Session files pi was told to open by name, which the directory walk will
+   * not reach.
+   *
+   * `pi --session /elsewhere/session.jsonl` opens that exact file and keeps
+   * writing to it where it lies, so a capture watching only `sessionsDir` sees
+   * nothing and reports nothing. These are watched alongside the directory
+   * rather than instead of it: pi can open a named file and still create other
+   * sessions in the directory during the same run.
+   */
+  sessionFiles?: readonly string[];
   /** The OTLP logs endpoint, spelled out — pi emits events, never spans. */
   logsEndpoint: string;
   token: string;
@@ -284,6 +329,7 @@ export interface PiCaptureOptions {
 export function createPiCapture({
   sinceMs,
   sessionsDir,
+  sessionFiles = [],
   logsEndpoint,
   token,
   scopeVersion = LANGWATCH_SDK_VERSION,
@@ -307,6 +353,7 @@ export function createPiCapture({
     async harvest(): Promise<number> {
       const paths = await sessionFilesTouchedSince({
         dir: sessionsDir,
+        files: sessionFiles,
         sinceMs,
       });
 
