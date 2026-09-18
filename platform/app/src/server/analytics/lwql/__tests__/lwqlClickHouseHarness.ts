@@ -2360,6 +2360,14 @@ export function postgresTenantSeedStatements({
       views: LWQL_HARNESS_DERIVED_POSTGRES_VIEWS,
       manifest: LWQL_PRISMA_MANIFEST,
       alreadySeeded: LWQL_EXPLICITLY_SEEDED_MODELS,
+      // `promptId` is caller-chosen, so a generic row's foreign key to
+      // `LlmPromptConfig`/`LlmPromptConfigVersion` must point at the id this
+      // call's explicit seed actually wrote above, not the fixed
+      // `<tenant>-prompt`/`<tenant>-prompt-v1` convention.
+      explicitIds: {
+        LlmPromptConfig: promptId,
+        LlmPromptConfigVersion: `${promptId}-v1`,
+      },
       schema: PG_SCHEMA,
     }),
   ];
