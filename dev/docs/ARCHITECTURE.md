@@ -229,8 +229,15 @@ exported at `./declaration`; the generated `browserModules` list installs it.
 
 ```
 apps/api/src/
-└── main.ts       # everything below, ~40 lines — the WHOLE app
+├── main.ts       # everything below, ~40 lines
+├── hosting/      # HttpMux · ApiForward · BrowserBundle — tiny classes
+└── policy/       # SecurityHeaders · ContentSecurityPolicy · ClientAddress · RequestPreamble
 ```
+
+**The hosting composition lives in the api app, not in `@langwatch/api`**
+(ruled 2026-09-18): the dependency points the other way — these classes USE
+the api package (`ApiForward` forwards into its mounted surface); the api
+package never contains its own front door.
 
 There is no app config file (ruled 2026-09-18): config comes from the
 installed server modules' own declared schemas, composed by the generated
