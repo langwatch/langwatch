@@ -5,13 +5,14 @@ import {
   explainHandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/handled-error/presentation";
+import { UserAvatarRateLimitedError, UserAvatarTooLargeError } from "@langwatch/user-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   AVATAR_MAX_SOURCE_BYTES,
   AvatarImageProcessingFailedError,
   processAvatarImage,
-} from "@langwatch/user-browser";
-import { UserAvatarRateLimitedError, UserAvatarTooLargeError } from "@langwatch/user-contract";
-import { describe, expect, it } from "vitest";
+} from "../model/process-avatar-image.ts";
 
 /**
  * The pre-flight cases here are the ones that decide before the canvas is

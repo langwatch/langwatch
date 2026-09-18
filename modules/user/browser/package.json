@@ -10,19 +10,10 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
     "./declaration": {
       "langwatch-declaration-source": "./src/user.web.ts",
       "types": "./dist/user.web.d.ts",
       "default": "./src/user.web.ts"
-    },
-    "./personal-workspace": {
-      "langwatch-declaration-source": "./src/personal-workspace.ts",
-      "types": "./dist/personal-workspace.d.ts",
-      "default": "./src/personal-workspace.ts"
     },
     "./surfaces/tile-icon": {
       "types": "./dist/ui/elements/tile-icon.d.ts",

@@ -14,7 +14,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts", "./src/personal-workspace.ts", "./src/user.web.ts"],
+  "files": ["./src/user.web.ts", "./src/ui/elements/tile-icon.tsx"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

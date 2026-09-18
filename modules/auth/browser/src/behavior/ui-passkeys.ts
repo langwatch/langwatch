@@ -5,14 +5,14 @@
  */
 
 import { passkeyClient } from "@better-auth/passkey/client";
-import type { HeldPasskey } from "@langwatch/user-browser/personal-workspace";
+import type { TimeInput } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
 
 /** One passkey, as the plugin stores it and the screen reads it. */
 export type UiPasskey = {
   id: string;
   name?: string | null;
-  createdAt: HeldPasskey["createdAt"];
+  createdAt: TimeInput;
   transports?: string | null;
 };
 
