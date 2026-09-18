@@ -61,6 +61,13 @@ vi.mock("../voice/useVoiceAgentsEnabled", () => ({
   useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
 }));
 
+/** Overridden per test; false by default so the phone option stays gated off
+ * for the editor's own behavior tests. */
+let mockPhoneTargetsEnabled = false;
+vi.mock("../voice/useVoicePhoneTargetsEnabled", () => ({
+  useVoicePhoneTargetsEnabled: () => mockPhoneTargetsEnabled,
+}));
+
 /** What `agents.getById` answers with, so a test can open a saved agent. */
 let mockAgentById: {
   id: string;
@@ -156,6 +163,7 @@ describe("AgentVoiceEditorDrawer", () => {
     mockAgentById = null;
     mockProviders = [];
     mockVoiceAgentsEnabled = true;
+    mockPhoneTargetsEnabled = false;
     mockDrawerParams = {};
     try {
       sessionStorage.clear();
@@ -176,6 +184,43 @@ describe("AgentVoiceEditorDrawer", () => {
       expect(
         screen.queryByTestId("voice-agent-name-input"),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the phone targets flag gates the Phone number option", () => {
+    /** @scenario "The phone option is hidden until the phone targets flag is on" */
+    it("hides the Phone number option while off and offers it once on", async () => {
+      mockPhoneTargetsEnabled = false;
+      const { unmount } = renderVoiceDrawer();
+      await screen.findByTestId("voice-agent-transport-select");
+      expect(
+        screen.queryByRole("option", { name: "Phone number" }),
+      ).not.toBeInTheDocument();
+      unmount();
+
+      mockPhoneTargetsEnabled = true;
+      renderVoiceDrawer();
+      await screen.findByTestId("voice-agent-transport-select");
+      expect(
+        screen.getByRole("option", { name: "Phone number" }),
+      ).toBeInTheDocument();
+    });
+
+    it("still renders an existing phone target's fields with the flag off", async () => {
+      mockPhoneTargetsEnabled = false;
+      mockAgentById = {
+        id: "agent_phone",
+        name: "Hotline",
+        config: { transport: "phone", phoneNumber: "+14155550123" },
+      };
+      renderVoiceDrawer({ agentId: "agent_phone" });
+      const input = (await screen.findByTestId(
+        "voice-agent-phone-input",
+      )) as HTMLInputElement;
+      expect(input.value).toBe("+14155550123");
+      expect(
+        screen.getByRole("option", { name: "Phone number" }),
+      ).toBeInTheDocument();
     });
   });
 

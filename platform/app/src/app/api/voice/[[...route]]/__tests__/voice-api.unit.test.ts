@@ -57,6 +57,9 @@ const appStub = {
     messageSnapshot: vi.fn(async () => {}),
     finishRun: vi.fn(async () => {}),
   },
+  // No-op span recording: a finish records one trace per exchange before the
+  // run write; the authz tests only care about who is let in.
+  traces: { recordSpan: vi.fn(async () => {}) },
 };
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => appStub,
@@ -404,6 +407,41 @@ describe("Feature: Voice session HTTP door", () => {
 
         expect(res.status).toBe(200);
         expect(mintSession).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a drawer finish that names no scenario", () => {
+    describe("when the finish is handled", () => {
+      /** @scenario "A drawer Talk to it call writes no run" */
+      it("succeeds with no run id, since a drawer call writes no run", async () => {
+        const token = signVoiceSessionToken({
+          payload: {
+            sessionId: "sess_1",
+            projectId: PROJECT_ID,
+            agentId: "agent_row",
+            agentExternalId: "el_agent",
+            transport: "elevenlabs_convai",
+            exp: Date.now() + 60_000,
+          },
+        });
+        fetchCallRecord.mockResolvedValue(null);
+
+        const res = await post("/api/voice/session/conv_1/finish", {
+          projectId: PROJECT_ID,
+          sessionToken: token,
+          conversationId: "conv_1",
+          transcript: [{ role: "caller", text: "hi" }],
+          startedAt: 1,
+          endedAt: 2,
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        // A drawer call is not persisted as a run (#8020): the response carries
+        // no run id and no scenario set id.
+        expect(body.runId).toBe("");
+        expect(body.scenarioSetId).toBeUndefined();
       });
     });
   });

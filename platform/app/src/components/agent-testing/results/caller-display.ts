@@ -10,8 +10,28 @@ import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 export type CallerKind = "simulated" | "human";
 
+/** The slice of run/scenario-state metadata this module actually reads. */
+type CallerMetadata =
+  | { langwatch?: { callerKind?: CallerKind | null } | null }
+  | null
+  | undefined;
+
+function callerKindOf(metadata: CallerMetadata): CallerKind | null {
+  return metadata?.langwatch?.callerKind ?? null;
+}
+
 export function runCallerKind(run: ScenarioRunData): CallerKind | null {
-  return run.metadata?.langwatch?.callerKind ?? null;
+  return callerKindOf(run.metadata);
+}
+
+/**
+ * True when a run's caller is a real person (a voice "Call it myself" call),
+ * so their turns render as "You" rather than the LLM "User Simulator"
+ * (#8020). Takes just the metadata slice so both a run row and a live
+ * drawer's scenario-state stream can call it directly.
+ */
+export function isHumanCallerRun(metadata: CallerMetadata): boolean {
+  return callerKindOf(metadata) === "human";
 }
 
 /**

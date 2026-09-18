@@ -26,6 +26,7 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
 import {
+  E164_PHONE_PATTERN,
   VOICE_TRANSPORT_LABELS,
   VOICE_TRANSPORTS,
   type VoiceTransport,
@@ -33,6 +34,7 @@ import {
 import { api } from "~/utils/api";
 import { TalkToItPanel } from "./voice/TalkToItPanel";
 import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
+import { useVoicePhoneTargetsEnabled } from "./voice/useVoicePhoneTargetsEnabled";
 
 // ============================================================================
 // Constants
@@ -52,6 +54,7 @@ type VoiceAgentDraft = {
   name: string;
   transport: VoiceTransport;
   agentId: string;
+  phoneNumber: string;
 };
 
 const draftKey = (projectId: string) => `voice-agent-draft:${projectId}`;
@@ -69,7 +72,13 @@ function readDraft(projectId: string): VoiceAgentDraft | null {
     )
       ? (parsed.transport as VoiceTransport)
       : DEFAULT_TRANSPORT;
-    return { name: parsed.name, transport, agentId: parsed.agentId };
+    return {
+      name: parsed.name,
+      transport,
+      agentId: parsed.agentId,
+      phoneNumber:
+        typeof parsed.phoneNumber === "string" ? parsed.phoneNumber : "",
+    };
   } catch {
     return null;
   }
@@ -108,7 +117,12 @@ export type AgentVoiceEditorDrawerProps = {
 // Pure helpers
 // ============================================================================
 
-type VoiceForm = { name: string; transport: VoiceTransport; agentId: string };
+type VoiceForm = {
+  name: string;
+  transport: VoiceTransport;
+  agentId: string;
+  phoneNumber: string;
+};
 
 /**
  * The values the form initializes to: the saved agent when editing, the draft
@@ -129,11 +143,13 @@ function resolveInitialForm({
     const config = (agentData.config ?? {}) as {
       transport?: VoiceTransport;
       agentId?: string;
+      phoneNumber?: string;
     };
     return {
       name: agentData.name ?? "",
       transport: config.transport ?? DEFAULT_TRANSPORT,
       agentId: config.agentId ?? "",
+      phoneNumber: config.phoneNumber ?? "",
     };
   }
   if (isCreating && isOpen && projectId) {
@@ -142,6 +158,7 @@ function resolveInitialForm({
       name: draft?.name ?? "",
       transport: draft?.transport ?? DEFAULT_TRANSPORT,
       agentId: draft?.agentId ?? "",
+      phoneNumber: draft?.phoneNumber ?? "",
     };
   }
   return null;
@@ -212,12 +229,20 @@ function addKeyHref(): string {
   return `${MODEL_PROVIDERS_ROUTE}?returnTo=${returnTo}`;
 }
 
-/** Both required fields are filled, so the agent can be saved. */
+/** The name and the transport's own required field are filled, so the agent
+ *  can be saved. Phone validates the number in E.164 form; ElevenLabs needs a
+ *  non-empty agent id. */
 function isVoiceFormValid(form: {
   name: string;
+  transport: VoiceTransport;
   voiceAgentId: string;
+  phoneNumber: string;
 }): boolean {
-  return form.name.trim().length > 0 && form.voiceAgentId.trim().length > 0;
+  if (form.name.trim().length === 0) return false;
+  if (form.transport === "phone") {
+    return E164_PHONE_PATTERN.test(form.phoneNumber.trim());
+  }
+  return form.voiceAgentId.trim().length > 0;
 }
 
 /** The tooltip naming whichever "Talk to it" prerequisite is still missing. */
@@ -256,6 +281,7 @@ function useVoiceFormState({
   const [name, setName] = useState("");
   const [transport, setTransport] = useState<VoiceTransport>(DEFAULT_TRANSPORT);
   const [voiceAgentId, setVoiceAgentId] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const formInitializedRef = useRef(false);
   const lastAgentIdRef = useRef<string | undefined>(undefined);
 
@@ -276,6 +302,7 @@ function useVoiceFormState({
     setName(initial.name);
     setTransport(initial.transport);
     setVoiceAgentId(initial.agentId);
+    setPhoneNumber(initial.phoneNumber);
     formInitializedRef.current = true;
   }, [agentData, agentId, isCreating, isOpen, projectId]);
 
@@ -290,8 +317,21 @@ function useVoiceFormState({
     if (!isCreating || !isOpen || !projectId || !formInitializedRef.current) {
       return;
     }
-    writeDraft(projectId, { name, transport, agentId: voiceAgentId });
-  }, [isCreating, isOpen, projectId, name, transport, voiceAgentId]);
+    writeDraft(projectId, {
+      name,
+      transport,
+      agentId: voiceAgentId,
+      phoneNumber,
+    });
+  }, [
+    isCreating,
+    isOpen,
+    projectId,
+    name,
+    transport,
+    voiceAgentId,
+    phoneNumber,
+  ]);
 
   return {
     name,
@@ -300,6 +340,8 @@ function useVoiceFormState({
     setTransport,
     voiceAgentId,
     setVoiceAgentId,
+    phoneNumber,
+    setPhoneNumber,
   };
 }
 
@@ -383,15 +425,20 @@ function submitVoiceAgent({
   isValid: boolean;
   agentId: string | undefined;
   createdAgentRowId: string | undefined;
-  form: { name: string; transport: VoiceTransport; voiceAgentId: string };
+  form: {
+    name: string;
+    transport: VoiceTransport;
+    voiceAgentId: string;
+    phoneNumber: string;
+  };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
 }): void {
   if (!projectId || !isValid) return;
-  const config = {
-    transport: form.transport,
-    agentId: form.voiceAgentId.trim(),
-  };
+  const config =
+    form.transport === "phone"
+      ? { transport: form.transport, phoneNumber: form.phoneNumber.trim() }
+      : { transport: form.transport, agentId: form.voiceAgentId.trim() };
   const savedAgentId = agentId ?? createdAgentRowId;
   if (savedAgentId) {
     updateMutation.mutate({
@@ -425,7 +472,12 @@ function useSaveVoiceAgent({
   isValid: boolean;
   agentId: string | undefined;
   createdAgentRowId: string | undefined;
-  form: { name: string; transport: VoiceTransport; voiceAgentId: string };
+  form: {
+    name: string;
+    transport: VoiceTransport;
+    voiceAgentId: string;
+    phoneNumber: string;
+  };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
 }): { handleSave: () => void; hasAttemptedSubmit: boolean } {
@@ -481,6 +533,8 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
   const [isTalkOpen, setIsTalkOpen] = useState(drawerParams.talk === "1");
   const [createdAgentRowId, setCreatedAgentRowId] = useState<string>();
 
+  const phoneTargetsEnabled = useVoicePhoneTargetsEnabled();
+
   const { agentQuery, hasElevenLabsKey } = useVoiceAgentData({
     agentId,
     projectId,
@@ -527,6 +581,7 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
     projectId,
     form,
     hasElevenLabsKey,
+    phoneTargetsEnabled,
     isSaving,
     isValid,
     hasAttemptedSubmit,
@@ -639,6 +694,9 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
               setTransport={form.setTransport}
               voiceAgentId={form.voiceAgentId}
               setVoiceAgentId={form.setVoiceAgentId}
+              phoneNumber={form.phoneNumber}
+              setPhoneNumber={form.setPhoneNumber}
+              phoneTargetsEnabled={editor.phoneTargetsEnabled}
               hasElevenLabsKey={editor.hasElevenLabsKey}
               hasAttemptedSubmit={editor.hasAttemptedSubmit}
             />
@@ -750,6 +808,24 @@ function VoiceAgentTalkView({
   );
 }
 
+/**
+ * The transports offered in the "Reached via" select. Phone stays hidden until
+ * the `release_voice_phone_targets_enabled` flag is on, but an agent already
+ * configured as phone still lists it so its own transport renders (the gate is
+ * on the OPTION, not on an existing target).
+ */
+function visibleTransportsFor({
+  phoneTargetsEnabled,
+  transport,
+}: {
+  phoneTargetsEnabled: boolean;
+  transport: VoiceTransport;
+}): readonly VoiceTransport[] {
+  return VOICE_TRANSPORTS.filter(
+    (t) => t !== "phone" || phoneTargetsEnabled || transport === "phone",
+  );
+}
+
 function VoiceAgentForm({
   name,
   setName,
@@ -757,6 +833,9 @@ function VoiceAgentForm({
   setTransport,
   voiceAgentId,
   setVoiceAgentId,
+  phoneNumber,
+  setPhoneNumber,
+  phoneTargetsEnabled,
   hasElevenLabsKey,
   hasAttemptedSubmit,
 }: {
@@ -766,13 +845,23 @@ function VoiceAgentForm({
   setTransport: (value: VoiceTransport) => void;
   voiceAgentId: string;
   setVoiceAgentId: (value: string) => void;
+  phoneNumber: string;
+  setPhoneNumber: (value: string) => void;
+  phoneTargetsEnabled: boolean;
   hasElevenLabsKey: boolean;
   hasAttemptedSubmit: boolean;
 }) {
   const nameInvalid = hasAttemptedSubmit && name.trim().length === 0;
   const voiceAgentIdInvalid =
     hasAttemptedSubmit && voiceAgentId.trim().length === 0;
-  const transportOptionsDisabled = VOICE_TRANSPORTS.length <= 1;
+  const phoneNumberInvalid =
+    hasAttemptedSubmit && !E164_PHONE_PATTERN.test(phoneNumber.trim());
+  const isPhone = transport === "phone";
+  const visibleTransports = visibleTransportsFor({
+    phoneTargetsEnabled,
+    transport,
+  });
+  const transportOptionsDisabled = visibleTransports.length <= 1;
   return (
     <VStack
       gap={4}
@@ -801,7 +890,7 @@ function VoiceAgentForm({
             onChange={(e) => setTransport(e.target.value as VoiceTransport)}
             data-testid="voice-agent-transport-select"
           >
-            {VOICE_TRANSPORTS.map((t) => (
+            {visibleTransports.map((t) => (
               <option key={t} value={t}>
                 {VOICE_TRANSPORT_LABELS[t]}
               </option>
@@ -811,23 +900,45 @@ function VoiceAgentForm({
         </NativeSelect.Root>
       </Field.Root>
 
-      <Field.Root required invalid={voiceAgentIdInvalid}>
-        <Field.Label>Agent id</Field.Label>
-        <Input
-          value={voiceAgentId}
-          onChange={(e) => setVoiceAgentId(e.target.value)}
-          placeholder="agent_..."
-          data-testid="voice-agent-id-input"
-        />
-        <Field.HelperText>
-          From the ElevenLabs dashboard: Agents, your agent, Agent ID
-        </Field.HelperText>
-        {voiceAgentIdInvalid && (
-          <Field.ErrorText>Agent id is required</Field.ErrorText>
-        )}
-      </Field.Root>
+      {isPhone ? (
+        <Field.Root required invalid={phoneNumberInvalid}>
+          <Field.Label>Phone number</Field.Label>
+          <Input
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="+14155550123"
+            data-testid="voice-agent-phone-input"
+          />
+          <Field.HelperText>
+            In E.164 form: a plus sign, the country code, then the number.
+          </Field.HelperText>
+          {phoneNumberInvalid && (
+            <Field.ErrorText>
+              Enter the number in E.164 form, like +14155550123
+            </Field.ErrorText>
+          )}
+        </Field.Root>
+      ) : (
+        <>
+          <Field.Root required invalid={voiceAgentIdInvalid}>
+            <Field.Label>Agent id</Field.Label>
+            <Input
+              value={voiceAgentId}
+              onChange={(e) => setVoiceAgentId(e.target.value)}
+              placeholder="agent_..."
+              data-testid="voice-agent-id-input"
+            />
+            <Field.HelperText>
+              From the ElevenLabs dashboard: Agents, your agent, Agent ID
+            </Field.HelperText>
+            {voiceAgentIdInvalid && (
+              <Field.ErrorText>Agent id is required</Field.ErrorText>
+            )}
+          </Field.Root>
 
-      <CredentialsLine hasElevenLabsKey={hasElevenLabsKey} />
+          <CredentialsLine hasElevenLabsKey={hasElevenLabsKey} />
+        </>
+      )}
     </VStack>
   );
 }
