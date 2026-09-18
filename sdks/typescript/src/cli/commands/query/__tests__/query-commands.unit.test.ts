@@ -210,13 +210,10 @@ describe("runQueryCommand", () => {
   });
 
   describe("when the format is the default", () => {
-    /**
-     * The payload is the rows array, so `-o json` prints exactly one JSON
-     * array. The columns reach a reader through the table renderer, which the
-     * command hands back alongside it.
-     *
-     * @scenario "The table format prints the result's own columns"
-     */
+    // The payload is the rows array, so `-o json` prints exactly one JSON
+    // array. The columns reach a reader through the table renderer, which the
+    // command hands back alongside it.
+    /** @scenario "The table format prints the result's own columns" */
     it("returns the rows for the table renderer to print", async () => {
       const result = await runQueryCommand("SELECT 1", {});
       const { data, table } = result as {

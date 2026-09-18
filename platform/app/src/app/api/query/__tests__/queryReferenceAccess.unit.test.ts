@@ -180,14 +180,11 @@ describe("GET /reference", () => {
       });
     });
 
-    /**
-     * An empty scope is a valid credential, not a refusal (#8085): the run door
-     * reads zero rows for it. Publishing the catalog to a key that can query
-     * nothing would describe a surface it cannot reach, so the half closes for
-     * the same reason it closes for a `traces:view` key.
-     *
-     * @scenario "A key entitled only to traces still reads the filter vocabulary"
-     */
+    // An empty scope is a valid credential, not a refusal (#8085): the run door
+    // reads zero rows for it. Publishing the catalog to a key that can query
+    // nothing would describe a surface it cannot reach, so the half closes for
+    // the same reason it closes for a `traces:view` key.
+    /** @scenario "A key entitled only to traces still reads the filter vocabulary" */
     it("closes the LangWatchQL half and keeps the filter half", async () => {
       const response = await readReference();
       expect(response.status).toBe(200);

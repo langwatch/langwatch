@@ -12963,7 +12963,7 @@
       "get": {
         "operationId": "getApiV1QueryReference",
         "summary": "Discover both query languages",
-        "description": "Describes both query languages in one payload: LangWatchQL (SQL over the analytics datasets) with its schema, limits and endpoints, and the trace filter (a Lucene-flavored string over the trace list) with its syntax, its fields and their static value vocabularies, and the open-ended attribute namespaces.\n\nIt also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator and the real translator before it ships, so a published example parses and compiles; whether THIS key can run one is its own `available` flag.\n\nPure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory rather than from the database.\n\nIt answers `Cache-Control: private, no-store`, because the document is shaped by the calling credential: `available`, the embedded schema and the gated columns all differ between keys, and a cache keyed on the URL or the project would replay one key's document to another. Ask for it again rather than storing it.\n\nThe values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.\n\nAn example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.\n\nAny credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema. `GET /api/v1/query/schema` is stricter and refuses that key outright, which is why this document withholds the catalog rather than repeating it.",
+        "description": "Describes both query languages in one payload: LangWatchQL (SQL over the analytics views) with its schema, limits and endpoints, and the trace filter (a Lucene-flavored string over the trace list) with its syntax, its fields and their static value vocabularies, and the open-ended attribute namespaces.\n\nIt also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator and the real translator before it ships, so a published example parses and compiles; whether THIS key can run one is its own `available` flag.\n\nPure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory rather than from the database.\n\nIt answers `Cache-Control: private, no-store`, because the document is shaped by the calling credential: `available`, the embedded schema and the gated columns all differ between keys, and a cache keyed on the URL or the project would replay one key's document to another. Ask for it again rather than storing it.\n\nThe values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.\n\nAn example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.\n\nAny credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema. `GET /api/v1/query/schema` is stricter and refuses that key outright, which is why this document withholds the catalog rather than repeating it.",
         "tags": [
           "Query"
         ],
@@ -12990,7 +12990,7 @@
                             "database": {
                               "type": "string"
                             },
-                            "datasets": {
+                            "views": {
                               "type": "array",
                               "items": {
                                 "type": "object",
@@ -13083,11 +13083,18 @@
                                   "exampleSql"
                                 ]
                               }
+                            },
+                            "functions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             }
                           },
                           "required": [
                             "database",
-                            "datasets"
+                            "views",
+                            "functions"
                           ]
                         },
                         "limits": {
@@ -59469,7 +59476,7 @@
       "get": {
         "operationId": "getProject",
         "summary": "Get a project",
-        "description": "Get a project by ID, including its API key. Requires project:view permission.",
+        "description": "Get a project by ID without secret keys. Requires project:view permission.",
         "security": [
           {
             "admin_api_key": []
@@ -59637,7 +59644,8 @@
       "get": {
         "operationId": "getProjectApiKey",
         "summary": "Get the project API key",
-        "description": "Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with. Requires an admin API key holding project:update on this project.",
+        "deprecated": true,
+        "description": "Deprecated. Project base keys can be revealed only by a signed-in project administrator in the browser or an approved device flow. Organization API keys are always refused with 403.",
         "security": [
           {
             "admin_api_key": []
@@ -59655,33 +59663,11 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "The project's API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "apiKey": {
-                      "type": "string",
-                      "description": "Send as X-Auth-Token, Bearer, or Basic"
-                    }
-                  },
-                  "required": [
-                    "apiKey"
-                  ]
-                }
-              }
-            }
-          },
           "401": {
             "description": "Invalid or missing API key token"
           },
           "403": {
-            "description": "Insufficient permissions for this operation"
-          },
-          "404": {
-            "description": "No project with that id in this organization"
+            "description": "A signed-in project administrator is required; API-key principals cannot reveal base keys"
           }
         }
       }
@@ -59690,7 +59676,8 @@
       "post": {
         "operationId": "regenerateProjectApiKey",
         "summary": "Regenerate the project API key",
-        "description": "Issue a new API key for the project and invalidate the previous one immediately. Anything still sending the old key starts failing authentication as soon as this returns, so roll it out before calling this. Requires an admin API key holding project:manage.",
+        "deprecated": true,
+        "description": "Deprecated. Project base keys can be rotated only by a signed-in project administrator in the browser. Organization API keys are always refused with 403.",
         "security": [
           {
             "admin_api_key": []
@@ -59708,33 +59695,11 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "The new API key. The previous one no longer authenticates.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "apiKey": {
-                      "type": "string",
-                      "description": "Send as X-Auth-Token, Bearer, or Basic"
-                    }
-                  },
-                  "required": [
-                    "apiKey"
-                  ]
-                }
-              }
-            }
-          },
           "401": {
             "description": "Invalid or missing API key token"
           },
           "403": {
-            "description": "Insufficient permissions for this operation"
-          },
-          "404": {
-            "description": "No project with that id in this organization"
+            "description": "A signed-in project administrator is required; API-key principals cannot rotate base keys"
           }
         }
       }

@@ -98,7 +98,7 @@ langwatch query --sql-file report.sql --param days=30 -f json
 
 `--format jsonl` writes one JSON object per row and parses JSON-typed columns
 back into real values, which is the shape a training-data reader expects.
-`--format csv` writes a header row with RFC 4180 escaping. `-o` writes to a file.
+`--format csv` writes a header row with RFC 4180 escaping. `--out` writes to a file.
 
 ```bash
 langwatch query --sql-file export.sql --format jsonl --out train.jsonl

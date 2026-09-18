@@ -38540,7 +38540,7 @@ reaches attribute keys, span events and evaluator verdicts.
 
 Analytics SQL (LangWatchQL) answers questions about many traces at once: a
 count, a rate, a percentile, any of them grouped or over time, and joins across
-datasets. It returns columns, not traces.
+views. It returns columns, not traces.
 
 | When you want | Use |
 | --- | --- |
@@ -38554,7 +38554,7 @@ datasets. It returns columns, not traces.
 ## One reference for both
 
 `GET /api/v1/query/reference` describes both languages in one payload: the SQL
-datasets and columns, the filter fields and syntax, worked examples in each, and
+views and columns, the filter fields and syntax, worked examples in each, and
 the decision table above.
 
 Every example goes through the real validator and the real translator on every
@@ -38627,10 +38627,10 @@ langwatch query --sql-file report.sql --param days=30 -f json
 
 `--format jsonl` writes one JSON object per row and parses JSON-typed columns
 back into real values, which is the shape a training-data reader expects.
-`--format csv` writes a header row with RFC 4180 escaping. `-o` writes to a file.
+`--format csv` writes a header row with RFC 4180 escaping. `--out` writes to a file.
 
 ```bash
-langwatch query --sql-file export.sql --format jsonl -o train.jsonl
+langwatch query --sql-file export.sql --format jsonl --out train.jsonl
 ```
 
 The query endpoint has no cursor of its own, so a result larger than one
@@ -38648,7 +38648,7 @@ LIMIT 1000
 ```
 
 ```bash
-langwatch query --sql-file export.sql --page-by keyset --format jsonl -o train.jsonl
+langwatch query --sql-file export.sql --page-by keyset --format jsonl --out train.jsonl
 ```
 
 ## From an MCP client
