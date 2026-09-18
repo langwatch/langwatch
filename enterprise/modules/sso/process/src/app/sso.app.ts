@@ -108,6 +108,22 @@ export class SsoApp implements SsoApiContract {
   }
 
   static create({ dependencies, members, config }: SsoSetup): SsoApp {
+    // A peer may not be invoked while the process constructs, so the ledger
+    // forwards to identity per call rather than being fetched here.
+    const backoffice = () => dependencies.identity.ssoBackoffice();
+    const connections: SsoConnectionLedger = {
+      list: (input) => backoffice().list(input),
+      findById: (input) => backoffice().findById(input),
+      registerConnection: (input) => backoffice().registerConnection(input),
+      claimDomain: (input) => backoffice().claimDomain(input),
+      approveDomainClaim: (input) => backoffice().approveDomainClaim(input),
+      rejectDomainClaim: (input) => backoffice().rejectDomainClaim(input),
+      attestDomain: (input) => backoffice().attestDomain(input),
+      activateConnection: (input) => backoffice().activateConnection(input),
+      suspendConnection: (input) => backoffice().suspendConnection(input),
+      resumeConnection: (input) => backoffice().resumeConnection(input),
+      requestTeardown: (input) => backoffice().requestTeardown(input),
+    };
     return new SsoApp(
       SsoGateService.create({
         configuration: config,
@@ -115,7 +131,7 @@ export class SsoApp implements SsoApiContract {
         logger: members.logger,
         providerMountInspector: BetterAuthSsoProviderMount.create(),
       }),
-      dependencies.identity.ssoBackoffice(),
+      connections,
       dependencies,
     );
   }
