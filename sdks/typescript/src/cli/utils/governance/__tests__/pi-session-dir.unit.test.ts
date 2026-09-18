@@ -397,16 +397,21 @@ describe("resolving pi's session directory", () => {
     });
 
     /**
-     * The mark is written as a real leading character rather than as an escape
-     * in the JSON body, because the defect is in decoding the file's first
-     * bytes: a body-level escape parses fine and would prove nothing.
+     * The mark leads the file's bytes rather than sitting inside the JSON body,
+     * because the defect is in decoding those first bytes: an escape within the
+     * body parses fine and would prove nothing.
+     *
+     * Spelled as the escape rather than as the character itself. Both put the
+     * same byte in the file under test, but the character is invisible in this
+     * source, where it reads as an ordinary space to every reader and is an
+     * error to the repo's lint.
      */
     /** @scenario "A settings file written with a byte order mark still moves capture" */
     it("reads a project settings file that begins with a byte order mark", async () => {
       const projectCwd = makeProject();
       writeProjectSettings(
         projectCwd,
-        `﻿${JSON.stringify({ sessionDir: "/from-project" })}`,
+        `\uFEFF${JSON.stringify({ sessionDir: "/from-project" })}`,
       );
 
       const resolved = await resolvePiSessionDir({
@@ -426,7 +431,7 @@ describe("resolving pi's session directory", () => {
     /** @scenario "A settings file written with a byte order mark still moves capture" */
     it("reads a global settings file that begins with a byte order mark", async () => {
       const projectCwd = makeProject();
-      writeSettings(`﻿${JSON.stringify({ sessionDir: "/from-global" })}`);
+      writeSettings(`\uFEFF${JSON.stringify({ sessionDir: "/from-global" })}`);
 
       const resolved = await resolvePiSessionDir({
         toolArgs: [],
