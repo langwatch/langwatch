@@ -124,3 +124,9 @@ Feature: PR Review Bot workflow
     When the workflow runs
     Then every "uses:" step references a full 40-character commit SHA, never a tag or branch
     And every pinned step carries a trailing comment documenting what the pin means
+
+  @unit
+  Scenario: Local composite actions are left out of the pin check
+    Given a step whose "uses:" value starts with "./"
+    When the workflow runs
+    Then the pin check reports nothing for that step, because a local action has no ref to pin
