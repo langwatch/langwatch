@@ -3,19 +3,21 @@
  * Spec: specs/langy/langy-mount-scope.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { uiRouteTable, type UiRouteDescriptor } from "../src/model/ui-route-table";
 
-const LANGY_LAYOUT = "features/langy/ProjectLangyLayout";
-const APP_CHROME = "features/chrome/UiAppChrome";
+const LANGY_LAYOUT = "layouts/project-langy";
+const APP_CHROME = "chrome";
 
 /** How many routes carrying `layout` a path sits under in the descriptor table. */
 function layoutAncestors({ path, layout }: { path: string; layout: string }): number | null {
   function walk(routes: readonly UiRouteDescriptor[], depth: number): number | null {
     for (const route of routes) {
-      const isLayout = "page" in route && route.page === layout;
+      const isLayout =
+        "layout" in route ? route.layout === layout : "page" in route && route.page === layout;
       const below = depth + (isLayout ? 1 : 0);
       if (route.path === path) return below;
-      const children = "page" in route ? route.children : undefined;
+      const children = "redirect" in route ? undefined : route.children;
       const found = children ? walk(children, below) : null;
       if (found !== null) return found;
     }

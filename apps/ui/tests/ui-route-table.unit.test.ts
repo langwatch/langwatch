@@ -1,5 +1,6 @@
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
+
 import { uiRoutePageKeys } from "../src/behavior/ui-page-loaders";
 import {
   uiLegacyRedirectRoutes,
@@ -31,6 +32,12 @@ function transcribe(table: readonly UiRouteDescriptor[], depth = 0): string[] {
           `${pairs("pin", pinParams)}${pairs("map", mapSegment)}`,
       ];
     }
+    if ("layout" in descriptor) {
+      return [
+        `${indent}layout -> ${descriptor.layout}`,
+        ...transcribe(descriptor.children ?? [], depth + 1),
+      ];
+    }
     const line =
       descriptor.path === void 0
         ? `${indent}layout -> ${descriptor.page}`
@@ -52,7 +59,8 @@ describe("given the packaged route table", () => {
 
       expect(new Set(keys).size).toBe(keys.length);
       expect(keys[0]).toBe("pages/auth/signin");
-      expect(keys).toContain("features/langy/ProjectLangyLayout");
+      expect(keys).toContain("layouts/project-langy");
+      expect(keys).not.toContain("chrome");
       expect(keys).toContain("pages/not-found");
     });
 

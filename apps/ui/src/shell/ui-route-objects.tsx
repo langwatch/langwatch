@@ -3,11 +3,28 @@
  */
 
 import { Outlet, useMatches, type RouteObject } from "react-router";
+
 import { lazyRoute } from "../behavior/lazy-route";
-import { resolveUiPageLoader, type UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
-import { uiRouteDescriptors, type UiRouteDescriptor } from "../model/ui-route-table";
+import {
+  resolveUiPageLoader,
+  type UiPageLoader,
+  type UiPageLoaderRegistry,
+} from "../behavior/ui-page-loaders";
 import type { UiWebRouteParent } from "../behavior/ui-web-installation";
+import {
+  uiRouteDescriptors,
+  type UiRouteDescriptor,
+  type UiShellLayout,
+} from "../model/ui-route-table";
 import { UiPrefixRedirect } from "./ui-prefix-redirect";
+
+/**
+ * The layouts the shell draws itself, lazily so the chrome and everything it
+ * frames stay out of the entry chunk. Named here, never in a loader registry.
+ */
+const UI_SHELL_LAYOUTS = {
+  chrome: () => import("./ui-app-chrome"),
+} as const satisfies Record<UiShellLayout, UiPageLoader>;
 
 /** What a materialised page route carries on its match. */
 export type UiRouteHandle = { page: string };
@@ -70,13 +87,16 @@ function materializeRoutes({
       };
     }
 
-    const route: RouteObject = {
-      ...lazyRoute(resolveUiPageLoader({ registry: loaders, key: descriptor.page })),
-      // The key travels onto the match, so a LAYOUT route above the page can ask which
-      // half of the product serves it.
-      handle: { page: descriptor.page } satisfies UiRouteHandle,
-    };
-    if (descriptor.path !== void 0) route.path = descriptor.path;
+    const route: RouteObject =
+      "layout" in descriptor
+        ? { ...lazyRoute(UI_SHELL_LAYOUTS[descriptor.layout]) }
+        : {
+            ...lazyRoute(resolveUiPageLoader({ registry: loaders, key: descriptor.page })),
+            // The key travels onto the match, so a LAYOUT route above the page can ask
+            // which half of the product serves it.
+            handle: { page: descriptor.page } satisfies UiRouteHandle,
+          };
+    if ("path" in descriptor && descriptor.path !== void 0) route.path = descriptor.path;
     const children = descriptor.children
       ? materializeRoutes({
           table: descriptor.children,
@@ -84,7 +104,7 @@ function materializeRoutes({
           installedRoutes,
         })
       : [];
-    if (descriptor.webRouteParent === "project") {
+    if ("webRouteParent" in descriptor && descriptor.webRouteParent === "project") {
       children.push(...(installedRoutes?.project ?? []));
     }
     if (children.length > 0) {

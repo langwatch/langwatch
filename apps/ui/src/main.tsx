@@ -22,6 +22,7 @@ import { createUiApplication, type UiApplication } from "./shell/ui-application"
 import { UiApplicationShell } from "./shell/ui-application-shell";
 import { UiErrorToaster } from "./shell/ui-error-toaster";
 import { installedModuleDrawers } from "./shell/ui-module-drawers";
+import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 
 import "nprogress/nprogress.css";
 import "./styles/globals.scss";
@@ -78,7 +79,7 @@ class BrowserUiShell extends UiShell {
           isDevelopment,
         },
         pages: {
-          loaders: {},
+          loaders: uiUnservedPageLoaders,
           errorFallback: UiBootPageError,
           rootErrorBoundary: UiBootPageError,
         },

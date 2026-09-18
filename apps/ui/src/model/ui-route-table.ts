@@ -36,13 +36,31 @@ export type UiPageRouteDescriptor = {
   readonly children?: readonly UiRouteDescriptor[];
 };
 
+/** A pathless layout the SHELL draws itself: chrome is composition, not a module page. */
+export type UiShellLayout = "chrome";
+
+/**
+ * A layout route the shell resolves from its own source. It carries no page
+ * key deliberately - a key is an address a MODULE answers for, and no module
+ * owns the frame the application draws around every one of them.
+ */
+export type UiLayoutRouteDescriptor = {
+  readonly layout: UiShellLayout;
+  /** Always absent: this layout is pathless, and stating it keeps the union readable. */
+  readonly path?: undefined;
+  readonly children?: readonly UiRouteDescriptor[];
+};
+
 /** A retired address that forwards to its new home. */
 export type UiRedirectRouteDescriptor = {
   readonly path: string;
   readonly redirect: UiRedirectDescriptor;
 };
 
-export type UiRouteDescriptor = UiPageRouteDescriptor | UiRedirectRouteDescriptor;
+export type UiRouteDescriptor =
+  | UiPageRouteDescriptor
+  | UiRedirectRouteDescriptor
+  | UiLayoutRouteDescriptor;
 
 /**
  * Every descriptor, flattened into match order — nesting only joins a
@@ -203,13 +221,13 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
 
   // Everything behind a session, wrapped in the application chrome.
   {
-    page: "features/chrome/UiAppChrome",
+    layout: "chrome",
     children: [
       // Settings, wrapped in the same Langy layout as the project routes
       // (keyed by the AMBIENT project), so the panel survives hopping between
       // a project page and settings instead of vanishing.
       {
-        page: "features/langy/ProjectLangyLayout",
+        page: "layouts/project-langy",
         children: [
           { path: "/settings", page: "pages/settings" },
           {
@@ -504,7 +522,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       // above the swapping page, so the panel + composer draft + any in-flight response
       // survive navigation between project pages.
       {
-        page: "features/langy/ProjectLangyLayout",
+        page: "layouts/project-langy",
         webRouteParent: "project",
         children: [
           {

@@ -20,7 +20,7 @@ export function uiRoutePageKeys(table: readonly UiRouteDescriptor[]): string[] {
   const visit = (descriptors: readonly UiRouteDescriptor[]): void => {
     for (const descriptor of descriptors) {
       if ("redirect" in descriptor) continue;
-      if (!keys.includes(descriptor.page)) keys.push(descriptor.page);
+      if (!("layout" in descriptor) && !keys.includes(descriptor.page)) keys.push(descriptor.page);
       if (descriptor.children) visit(descriptor.children);
     }
   };
