@@ -25,7 +25,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: langwatch/langwatch-pr-review-bot@bf0dde6b7ab4099db06484e6a775ab4339af355d # main 2026-09-18
+      - uses: langwatch/langwatch-pr-review-bot@3b0a47e67927b9666da148f44f892de63d2feba7 # main 2026-09-18
         with:
           slack_notify: "false"
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
