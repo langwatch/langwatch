@@ -1,12 +1,23 @@
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
+  BASH_TOOL_NAME,
   CODE_ACCESS_TOOL_NAME,
+  isLangwatchCliCommand,
   LOCAL_TOOL_NAMES,
   CALL_LOST_PUSHBACK,
   OFFLINE_PUSHBACK,
+  SANDBOX_FILE_TOOL_NAMES,
+  activeToolsFor,
   createLocalWorkspaceExtension,
+  ranInFolder,
+  readCodeAccess,
+  renderWorkspaceFacts,
 } from "./local-workspace.js";
+import { TurnEventMapper } from "../events.js";
 import { createTurnContext, type TurnContext } from "./turn-context.js";
 
 type RegisteredTool = {
@@ -21,13 +32,21 @@ type RegisteredTool = {
   ) => Promise<{ content: { type: string; text: string }[] }>;
 };
 
+/** A sandbox directory of its own for each extension under test. */
+function sandboxDir(): string {
+  return mkdtempSync(join(tmpdir(), "langy-sandbox-"));
+}
+
 function registeredTools(turnContext: TurnContext = turnInFlight()): Map<string, RegisteredTool> {
   const tools = new Map<string, RegisteredTool>();
   const pi = {
     registerTool: (tool: RegisteredTool) => tools.set(tool.name, tool),
     on: () => undefined,
   };
-  const extension = createLocalWorkspaceExtension({ turnContext }) as {
+  const extension = createLocalWorkspaceExtension({
+    turnContext,
+    sandboxCwd: sandboxDir(),
+  }) as {
     factory: (pi: ExtensionAPI) => void;
   };
   extension.factory(pi as unknown as ExtensionAPI);
@@ -88,14 +107,326 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * A fake pi that records the turn-start handler, the registered tools and
+ * the active tool set.
+ */
+function piWithActiveTools(active: string[], sandboxCwd = sandboxDir()) {
+  let onTurnStart: (() => Promise<void>) | undefined;
+  const tools = new Map<string, RegisteredTool>();
+  const pi = {
+    registerTool: (tool: RegisteredTool) => tools.set(tool.name, tool),
+    on: (event: string, handler: () => Promise<void>) => {
+      if (event === "before_agent_start") onTurnStart = handler;
+    },
+    getActiveTools: () => [...active],
+    setActiveTools: (names: string[]) => {
+      active.splice(0, active.length, ...names);
+    },
+  };
+  const extension = createLocalWorkspaceExtension({
+    turnContext: turnInFlight(),
+    sandboxCwd,
+  }) as {
+    factory: (pi: ExtensionAPI) => void;
+  };
+  extension.factory(pi as unknown as ExtensionAPI);
+  if (!onTurnStart) throw new Error("the extension did not register a turn-start handler");
+  return { active, tools, startTurn: onTurnStart };
+}
+
+/** A `langwatch` executable of its own on the PATH, so the CLI path is observable. */
+function fakeLangwatchOnPath(): { dir: string; restore: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), "langy-cli-"));
+  const script = join(dir, "langwatch");
+  writeFileSync(script, '#!/bin/sh\necho "cli ok: $*"\n');
+  chmodSync(script, 0o755);
+  const previous = process.env.PATH ?? "";
+  process.env.PATH = `${dir}:${previous}`;
+  return {
+    dir,
+    restore: () => {
+      process.env.PATH = previous;
+    },
+  };
+}
+
+describe("the shell the model gets while a folder is connected", () => {
+  /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */
+  it("runs a command on the user's machine through local_bash, permission flow and all", async () => {
+    const { calls } = fakeApp({
+      "/api/langy/local/workspace": [
+        { connected: true, workspace: { root: "/home/dev/acme", name: "acme" } },
+      ],
+      "/api/langy/local/calls": [{ callId: "call_9" }],
+      "/api/langy/local/calls/call_9": [
+        { callId: "call_9", state: "done", ok: true, text: "On branch main" },
+      ],
+    });
+    const { tools, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+    await startTurn();
+
+    const result = await tools.get(BASH_TOOL_NAME)!.execute("t9", {
+      command: "git status --short",
+      timeout: 30,
+    });
+
+    expect(textOf(result)).toBe("On branch main");
+    const posted = calls.find((call) => call.url.endsWith("/api/langy/local/calls"));
+    expect(posted?.body).toEqual({
+      conversationId: "langyconv_1",
+      turnId: "turn_1",
+      toolCallId: "t9",
+      tool: "local_bash",
+      params: { command: "git status --short", timeout: 30 },
+    });
+    expect(ranInFolder(result)).toBe(true);
+  });
+
+  /** @scenario "A push or gh command in the shared folder never raises the GitHub install card" */
+  it("marks a delegated command as run in the folder, so the GitHub gate stands down on it", async () => {
+    const { calls } = fakeApp({
+      "/api/langy/local/workspace": [
+        { connected: true, workspace: { root: "/home/dev/acme", name: "acme" } },
+      ],
+      "/api/langy/local/calls": [{ callId: "call_12" }],
+      "/api/langy/local/calls/call_12": [
+        { callId: "call_12", state: "done", ok: true, text: "branch pushed" },
+      ],
+    });
+    const { tools, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+    await startTurn();
+
+    const result = await tools.get(BASH_TOOL_NAME)!.execute("t12", {
+      command: "git push -u origin HEAD && gh pr create --fill",
+    });
+
+    expect(textOf(result)).toBe("branch pushed");
+    expect(calls.some((call) => call.url.endsWith("/api/langy/local/calls"))).toBe(true);
+    expect((result as { details?: unknown }).details).toEqual({ local: true });
+    const mapper = new TurnEventMapper("turn_1");
+    mapper.map({ type: "tool_execution_start", toolCallId: "t12", toolName: "bash", args: {} });
+    const [end] = mapper.map({
+      type: "tool_execution_end",
+      toolCallId: "t12",
+      toolName: "bash",
+      isError: false,
+      result,
+    });
+    expect(end).toMatchObject({ type: "tool_end", name: "bash", local: true });
+  });
+
+  /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */
+  it("still runs a langwatch command in the sandbox, where the CLI has this conversation's login", async () => {
+    const cli = fakeLangwatchOnPath();
+    try {
+      const { calls } = fakeApp({
+        "/api/langy/local/workspace": [
+          { connected: true, workspace: { root: "/home/dev/acme", name: "acme" } },
+        ],
+      });
+      const { tools, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+      await startTurn();
+
+      const result = await tools.get(BASH_TOOL_NAME)!.execute("t10", {
+        command: "langwatch scenario list --format json",
+      });
+
+      expect(textOf(result)).toContain("cli ok: scenario list --format json");
+      expect(calls.some((call) => call.url.endsWith("/api/langy/local/calls"))).toBe(false);
+      expect(ranInFolder(result)).toBe(false);
+    } finally {
+      cli.restore();
+    }
+  });
+
+  /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */
+  it("is the sandbox shell when no folder is connected", async () => {
+    const { calls } = fakeApp({ "/api/langy/local/workspace": [{ connected: false }] });
+    const sandbox = sandboxDir();
+    const { tools, startTurn } = piWithActiveTools([...EVERY_TOOL], sandbox);
+    await startTurn();
+
+    const result = await tools.get(BASH_TOOL_NAME)!.execute("t11", { command: "pwd" });
+
+    expect(textOf(result)).toContain(sandbox.split("/").at(-1)!);
+    expect(calls.some((call) => call.url.endsWith("/api/langy/local/calls"))).toBe(false);
+    expect(ranInFolder(result)).toBe(false);
+  });
+
+  /** @scenario "The shell runs in the folder while it is connected, and the CLI still runs here" */
+  it("tells a langwatch invocation from the rest of the shell", () => {
+    expect(isLangwatchCliCommand("langwatch agent list --format json")).toBe(true);
+    expect(isLangwatchCliCommand("  LANGWATCH_ENDPOINT=http://x langwatch docs a/b")).toBe(true);
+    expect(isLangwatchCliCommand("npx langwatch@latest onboarding state")).toBe(true);
+    expect(isLangwatchCliCommand("langwatch trace search | head")).toBe(true);
+    expect(isLangwatchCliCommand("git status && ls")).toBe(false);
+    expect(isLangwatchCliCommand("uv run uvicorn app.main:app")).toBe(false);
+    expect(isLangwatchCliCommand("cat langwatch.md")).toBe(false);
+  });
+});
+
+const EVERY_TOOL = [
+  "read",
+  "bash",
+  "edit",
+  "write",
+  "grep",
+  "find",
+  "ls",
+  "todowrite",
+  "question",
+  "say",
+  CODE_ACCESS_TOOL_NAME,
+  ...LOCAL_TOOL_NAMES,
+];
+
+describe("the sandbox file tools while a folder is connected", () => {
+  /** @scenario "The sandbox file tools are withdrawn while a folder is connected" */
+  it("withdraws read, edit, write, grep, find and ls at the start of a turn, and keeps bash and the local tools", async () => {
+    fakeApp({
+      "/api/langy/local/workspace": [
+        { connected: true, workspace: { root: "/home/dev/acme", name: "acme" } },
+      ],
+    });
+    const { active, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+
+    await startTurn();
+
+    for (const name of SANDBOX_FILE_TOOL_NAMES) expect(active).not.toContain(name);
+    expect(active).toContain("bash");
+    for (const name of LOCAL_TOOL_NAMES) expect(active).toContain(name);
+    expect(active).toContain("question");
+    expect(active).toContain(CODE_ACCESS_TOOL_NAME);
+  });
+
+  /** @scenario "The sandbox file tools are withdrawn while a folder is connected" */
+  it("puts them back at the start of a turn once no folder is connected", async () => {
+    fakeApp({ "/api/langy/local/workspace": [{ connected: false }] });
+    const { active, startTurn } = piWithActiveTools(
+      EVERY_TOOL.filter((name) => !(SANDBOX_FILE_TOOL_NAMES as readonly string[]).includes(name)),
+    );
+
+    await startTurn();
+
+    for (const name of SANDBOX_FILE_TOOL_NAMES) expect(active).toContain(name);
+    expect(new Set(active)).toEqual(new Set(EVERY_TOOL));
+  });
+
+  /** @scenario "The sandbox file tools are withdrawn while a folder is connected" */
+  it("keeps the sandbox tools when the app cannot say whether a folder is connected", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("connection refused");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { active, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+
+    await startTurn();
+
+    expect(new Set(active)).toEqual(new Set(EVERY_TOOL));
+  });
+
+  /** @scenario "The sandbox file tools are withdrawn while a folder is connected" */
+  it("changes only the sandbox file tools, whatever else the set holds", () => {
+    expect(activeToolsFor({ connected: true, active: ["read", "bash", "local_read", "skill"] })).toEqual([
+      "bash",
+      "local_read",
+      "skill",
+    ]);
+    expect(activeToolsFor({ connected: false, active: ["bash", "local_read", "ls"] })).toEqual([
+      "bash",
+      "local_read",
+      "ls",
+      "read",
+      "edit",
+      "write",
+      "grep",
+      "find",
+    ]);
+  });
+});
+
+describe("the folder facts code_access renders", () => {
+  const folder = {
+    root: "/Users/dev/acme-app",
+    name: "acme-app",
+    os: "darwin",
+    nodeVersion: "v22.14.0",
+    ghAuthenticated: true,
+    packageManager: "pnpm",
+  };
+
+  describe("when the folder is a repository", () => {
+    it("names the branch, the remote and the dirty flag", () => {
+      const text = renderWorkspaceFacts({
+        ...folder,
+        gitRepository: true,
+        gitBranch: "main",
+        gitRemote: "git@github.com:acme/acme-app.git",
+        gitDirty: false,
+      });
+      expect(text).toContain("git branch: main");
+      expect(text).toContain("git remote: git@github.com:acme/acme-app.git");
+      expect(text).toContain("uncommitted changes: no");
+      expect(text).not.toContain("not a repository");
+    });
+  });
+
+  describe("when uv manages the folder", () => {
+    /** @scenario "A folder uv manages names uv as its package manager" */
+    it("names uv as the package manager, the first rung of the install ladder", () => {
+      const text = renderWorkspaceFacts({ ...folder, packageManager: "uv" });
+      expect(text).toContain("package manager: uv");
+    });
+  });
+
+  describe("when the folder is not a repository", () => {
+    /** @scenario "A folder that is not a repository says so in its facts" */
+    it("says so in one line and leaves out the branch, remote and dirty lines", () => {
+      const text = renderWorkspaceFacts({ ...folder, gitRepository: false });
+      expect(text).toContain("git: not a repository");
+      expect(text).not.toContain("git branch:");
+      expect(text).not.toContain("git remote:");
+      expect(text).not.toContain("uncommitted changes:");
+      expect(text).toContain("package manager: pnpm");
+    });
+  });
+
+  describe("when the repository has no remote", () => {
+    /** @scenario "A repository with no remote branches from the local default" */
+    it("says the remote is none, which is what sends the skill to a branch with no start point", () => {
+      const text = renderWorkspaceFacts({
+        ...folder,
+        gitRepository: true,
+        gitBranch: "main",
+        gitDirty: false,
+      });
+      expect(text).toContain("git branch: main");
+      expect(text).toContain("git remote: none");
+      expect(text).not.toContain("not a repository");
+    });
+  });
+
+  describe("when the command line could not run git", () => {
+    it("keeps the unknown lines rather than calling the folder a non-repository", () => {
+      const text = renderWorkspaceFacts(folder);
+      expect(text).toContain("git branch: unknown");
+      expect(text).toContain("git remote: none");
+      expect(text).toContain("uncommitted changes: unknown");
+      expect(text).not.toContain("not a repository");
+    });
+  });
+});
+
 describe("the local workspace tools", () => {
   describe("given the extension is registered", () => {
     /** @scenario "The worker carries one local tool for each built-in it mirrors" */
     it("carries one local tool for each built-in, with the built-in's parameters", () => {
       const tools = registeredTools();
 
+      // Plus the shell under its standard name, which this extension owns.
       expect([...tools.keys()].sort()).toEqual(
-        [CODE_ACCESS_TOOL_NAME, ...LOCAL_TOOL_NAMES].sort(),
+        [BASH_TOOL_NAME, CODE_ACCESS_TOOL_NAME, ...LOCAL_TOOL_NAMES].sort(),
       );
 
       const parameterNames = (name: string) =>
@@ -115,6 +446,13 @@ describe("the local workspace tools", () => {
       ]);
       expect(parameterNames("local_find")).toEqual(["limit", "path", "pattern"]);
       expect(parameterNames("local_ls")).toEqual(["limit", "path"]);
+      expect(parameterNames("local_langwatch_env")).toEqual(["path"]);
+      // The quiet third way out is opt-in: a skill with a fallback for it
+      // passes `offer_describe`, an ordinary ask leaves it off.
+      expect(parameterNames(CODE_ACCESS_TOOL_NAME)).toEqual([
+        "offer_describe",
+        "reason",
+      ]);
 
       for (const name of LOCAL_TOOL_NAMES) {
         expect(tools.get(name)!.description).toContain("on the user's machine");
@@ -299,6 +637,51 @@ describe("the local workspace tools", () => {
     }, 15_000);
   });
 
+  describe("when the app refuses the call before it reaches the machine", () => {
+    /** @scenario "A validation refusal reaches Langy as the issues, not as a lost call" */
+    it("returns the issues so the model fixes the parameters", async () => {
+      const fetchMock = vi.fn(async (url: string) => {
+        const path = new URL(url).pathname;
+        if (path === "/api/langy/local/calls") {
+          return {
+            ok: false,
+            status: 400,
+            json: async () => ({
+              error: {
+                type: "bad_request",
+                code: "langy_api_request_invalid",
+                message: "Invalid request body.",
+                meta: {
+                  issues: [
+                    {
+                      path: ["params", "edits", 0, "oldText"],
+                      message: "String must contain at least 1 character(s)",
+                    },
+                  ],
+                },
+              },
+            }),
+          };
+        }
+        throw new Error(`unexpected request to ${path}`);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const text = textOf(
+        await registeredTools()
+          .get("local_edit")!
+          .execute("t_refused", { path: ".env", edits: [{ oldText: "", newText: "X=1" }] }),
+      );
+
+      expect(text).toContain("params.edits.0.oldText");
+      expect(text).toContain("at least 1 character");
+      expect(text).toContain("call the tool again");
+      expect(text).not.toContain(CALL_LOST_PUSHBACK);
+      expect(text).not.toContain("not connected any more");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when the turn is stopped", () => {
     /** @scenario "Stopping the turn cancels the command on the machine" */
     it("cancels the call on the machine and reads cancelled", async () => {
@@ -321,9 +704,78 @@ describe("the local workspace tools", () => {
     });
   });
 
+  describe("when code access is asked for in the conversation's first seconds", () => {
+    /** One app whose workspace read says "not found" a given number of times first. */
+    function appWithLaggingProjection(notFoundReads: number) {
+      let workspaceReads = 0;
+      const fetchMock = vi.fn(async (url: string) => {
+        const path = new URL(url).pathname;
+        if (path === "/api/langy/local/workspace") {
+          workspaceReads += 1;
+          if (workspaceReads <= notFoundReads) {
+            return {
+              ok: false,
+              status: 404,
+              json: async () => ({ error: { code: "langy_conversation_not_found" } }),
+            };
+          }
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              connected: false,
+              codeAccessPreference: null,
+              github: { installed: false },
+            }),
+          };
+        }
+        if (path === "/api/langy/local/requests") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              request: { id: "req_1", expiresAt: "2026-09-03T10:00:00.000Z" },
+              command: "npx langwatch@latest langy --share-control",
+            }),
+          };
+        }
+        throw new Error(`no fake answer for ${path}`);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      return { fetchMock, workspaceReads: () => workspaceReads };
+    }
+
+    /** @scenario "A code access check that beats the conversation projection waits for it" */
+    it("repeats the read until the projection answers, then raises the card", async () => {
+      const app = appWithLaggingProjection(2);
+
+      const text = await readCodeAccess({ retry: { windowMs: 2_000, beatMs: 5 } });
+
+      expect(app.workspaceReads()).toBe(3);
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(true);
+      expect(text).toContain("npx langwatch@latest langy --share-control");
+    });
+
+    /** @scenario "A code access check whose conversation never appears says the app did not answer" */
+    it("gives the usual pushback once the window is over", async () => {
+      const app = appWithLaggingProjection(Number.MAX_SAFE_INTEGER);
+
+      const text = await readCodeAccess({ retry: { windowMs: 40, beatMs: 5 } });
+
+      expect(app.workspaceReads()).toBeGreaterThan(1);
+      expect(text).toBe(
+        "LangWatch did not answer the code access check. Tell the user in one line and end your turn.",
+      );
+      expect(
+        app.fetchMock.mock.calls.some(([url]) => String(url).includes("/api/langy/local/requests")),
+      ).toBe(false);
+    });
+  });
+
   describe("when code access is asked for", () => {
-    it("gives the folder facts when the folder is connected", async () => {
-      fakeApp({
+    /** @scenario "A folder connected to this conversation answers with its facts, not a card" */
+    it("gives the folder facts when the folder is connected, and records no request", async () => {
+      const { calls } = fakeApp({
         "/api/langy/local/workspace": [
           {
             connected: true,
@@ -353,6 +805,8 @@ describe("the local workspace tools", () => {
       expect(text).toContain("main");
       expect(text).toContain("pnpm");
       expect(text).toContain("local_* tools");
+      expect(calls.map((call) => call.method)).toEqual(["GET"]);
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(false);
     });
 
     it("points at the github skill when the user remembered GitHub", async () => {
@@ -413,6 +867,39 @@ describe("the local workspace tools", () => {
       );
       expect(text).toContain("npx langwatch@latest langy --share-control");
       expect(text).toContain("END YOUR TURN");
+      expect(text).toContain("Say in one line what you will change");
+    });
+
+    /** @scenario "With the describe offer the turn ends on the card without a word" */
+    it("ends the turn without a word when the describe option is offered", async () => {
+      fakeApp({
+        "/api/langy/local/workspace": [
+          {
+            connected: false,
+            codeAccessPreference: null,
+            github: { installed: false },
+          },
+        ],
+        "/api/langy/local/requests": [
+          {
+            request: { id: "req_2", expiresAt: "2026-09-03T10:00:00.000Z" },
+            command: "npx langwatch@latest langy --share-control",
+          },
+        ],
+      });
+
+      const text = textOf(
+        await registeredTools()
+          .get(CODE_ACCESS_TOOL_NAME)!
+          .execute("t10", { reason: "wire tracing in", offer_describe: true }),
+      );
+
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(
+        true,
+      );
+      expect(text).toContain("END YOUR TURN now, without another word");
+      expect(text).not.toContain("Say in one line");
+      expect(text).toContain("would rather describe the agent");
     });
   });
 });

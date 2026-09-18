@@ -62,6 +62,7 @@ vi.mock("@ai-sdk/react", async () => {
         stop: () => undefined,
         clearError: () => undefined,
         regenerate: () => undefined,
+        resumeStream: () => Promise.resolve(),
       };
     },
   };

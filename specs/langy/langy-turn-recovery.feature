@@ -360,6 +360,34 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then only the first terminal is recorded
     And the second is collapsed as a duplicate, like a tool call's terminals
 
+  # The coding agent runs with its own retry off, so the relay is what retries
+  # a burst rate limit: it re-sends the call a bounded number of times inside
+  # the same call, waiting what the provider's Retry-After names, or a short
+  # fixed backoff when it names nothing. Only then does the 429 reach the
+  # agent, and the cut rules below apply to it.
+
+  @unit
+  Scenario: A rate-limited call is re-sent by the relay after the provider's Retry-After
+    Given the model provider answers a relayed call with a burst rate limit and a Retry-After
+    When the relay reads the answer
+    Then it waits the Retry-After, or a short fixed backoff when none is named, and sends the same call again
+    And a call that lands on the re-send answers the agent as if nothing happened
+    And at most two re-sends are made inside one call
+
+  @unit
+  Scenario: A rate limit that outlasts the relay's retries passes through
+    Given the model provider keeps rate-limiting a relayed call through the relay's re-sends
+    When the re-sends are spent
+    Then the 429 reaches the agent with its headers and body unchanged
+    And the captured cause names the rate limit
+
+  @unit
+  Scenario: A hard limit, a long Retry-After or a body too large to hold is not re-sent
+    Given the model provider rejects a relayed call with a rate limit that names a plan limit, asks for a wait past the relay's bound, or the call's body is past the size the relay holds
+    When the relay reads the answer
+    Then it does not wait and does not re-send
+    And the answer passes through at once
+
   # A provider rate limit is retryable by every SDK's book, and for a burst
   # (tokens-per-minute) that is right: back off a little and the call lands.
   # But a PLAN limit ("usage limit reached until next week") answers every

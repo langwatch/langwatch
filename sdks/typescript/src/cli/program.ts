@@ -16,6 +16,7 @@
  */
 
 import { Command, Option } from "commander";
+import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -389,19 +390,49 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   // AI Gateway governance — read identity, deep-link, request budget increase.
-  program
-    .command("whoami")
-    .description("Print the identity persisted by `langwatch login --device` (governance plane).")
-    .action(async () => {
+  // Speaks the output port: `-o json|yaml`, `--json <fields>` and `--jq` all
+  // project from the returned `data`. No bespoke boolean `--json` — that spelling
+  // is the port's own projection flag and a boolean would collide with it.
+  emitsResult(
+    program
+      .command("whoami")
+      .description(
+        "Print the identity persisted by `langwatch login --device` (governance plane).",
+      ),
+    async () => {
       try {
         const { whoamiCommand } = await import("./commands/whoami.js");
-        await whoamiCommand();
+        return await whoamiCommand();
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
         process.exit(1);
       }
-    });
+    },
+  );
+
+  // LangWatchQL query — the door a headless coding agent runs analytics SQL
+  // through. Project-implicit: no `--project` flag, no `X-Project-Id`
+  // header, the configured API key alone decides the reachable rows. Speaks
+  // the output port: `data` is the rows array, so `-o json` is the primary
+  // spelling; `table` is the human fallback.
+  emitsResult(
+    program
+      .command("query <sql>")
+      .description(
+        "Run a read-only LangWatchQL SELECT against your analytics data and print the rows.",
+      ),
+    async (sql: string) => {
+      try {
+        const { queryCommand } = await import("./commands/query.js");
+        return await queryCommand(sql);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
 
   // AI Gateway governance — wrapped tool runners.
   // Each `langwatch <tool>` exec's the underlying binary with the
@@ -1908,10 +1939,24 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     agentCmd
       .command("list")
       .description("List all agents in the project")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option(
+        "--wait-online <agent>",
+        "Read the list again every few seconds until the agent with this name or id reports online, then print it",
+      )
+      .option(
+        "--timeout <seconds>",
+        "How long --wait-online waits before failing",
+        "120",
+      )
+      // No positional argument here, so a stray word is a name with a space
+      // passed bare after --wait-online: the refusal says to quote it.
+      .configureOutput({
+        outputError: (message, write) => write(withQuotedNameHint(message)),
+      }),
+    async (options: { waitOnline?: string; timeout?: string }) => {
       const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
-      return impl();
+      return impl(options);
     },
   );
 
@@ -2235,6 +2280,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--budget-window <w>", "Budget window for --budget-limit: day | week | month")
       .option("--budget-breach <action>", "block (default) or warn when the key's budget is hit")
       .option("--providers-allowed <ids>", "Comma-separated ModelProvider ids the key may dispatch to (default: every provider in scope)")
+      .option("--reveal-once", "Do not print the secret; print a one-time reveal id instead, which shows the secret once through the app to the person the key is for")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       name: string;
@@ -2248,6 +2294,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       budgetWindow?: string;
       budgetBreach?: "block" | "warn";
       providersAllowed?: string;
+      revealOnce?: boolean;
     }) => {
       const { createVirtualKeyCommand: impl } = await import("./commands/virtual-keys/create.js");
       return impl(options);
@@ -3891,6 +3938,39 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { navigateOpenCommand: impl } = await import("./commands/navigate/open.js");
       await impl(resourceId);
     });
+
+  // The guided onboarding state of the organization this project belongs to.
+  // Agent plumbing like `navigate`: Langy reads it to know which path it is
+  // guiding and marks a path done at the end of a guided setup, so the Home
+  // offer and the campaigns see it finish.
+  // See specs/features/onboarding/guided-onboarding-variant.feature.
+  const onboardingCmd = program
+    .command("onboarding")
+    .description("Read and update the guided onboarding of this organization");
+
+  emitsResult(
+    onboardingCmd
+      .command("state")
+      .description("Show the guided onboarding state: paths picked, current, done, provider, tour")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { onboardingStateCommand: impl } = await import("./commands/onboarding/state.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    onboardingCmd
+      .command("complete-path <path>")
+      .description("Mark a guided onboarding path as done: llmops, coding, gateway or governance")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (path: string) => {
+      const { onboardingCompletePathCommand: impl } = await import(
+        "./commands/onboarding/complete-path.js"
+      );
+      return impl(path);
+    },
+  );
 
   // Drive the page the user has open with typed UI actions. Agent plumbing
   // like `navigate`: only works mid-turn, when the platform can reach the

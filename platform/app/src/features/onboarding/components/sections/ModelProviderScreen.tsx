@@ -1,14 +1,12 @@
 import { Box, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
+import { providersForSurface } from "../../regions/model-providers/providersForSurface";
 import type {
   ModelProviderKey,
   ModelProviderSurface,
 } from "../../regions/model-providers/types";
-import {
-  ModelProviderGrid,
-  providersForSurface,
-} from "./model-provider/ModelProviderGrid";
+import { ModelProviderGrid } from "./model-provider/ModelProviderGrid";
 import { ModelProviderSetup } from "./model-provider/ModelProviderSetup";
 
 interface ModelProviderScreenProps {

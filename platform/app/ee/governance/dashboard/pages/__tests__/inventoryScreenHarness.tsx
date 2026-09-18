@@ -227,11 +227,16 @@ function ButtonReferences() {
       <Button size="sm" colorPalette="orange">
         reference solid small
       </Button>
-      {/* Add tool is not a bare button: it is this menu's trigger, and the
+      {/* Add source is not a bare button: it is this menu's trigger, and the
           trigger composition adds a class and its own emitted style. Comparing
-          it against a bare solid button fails on the wrapper rather than on
-          the variant, which would be a false alarm. So the reference wears the
+          it against a bare button fails on the wrapper rather than on the
+          variant, which would be a false alarm. So the references wear the
           same wrapper, and the comparison stays about the button. */}
+      <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
+        <Button size="sm" variant="outline">
+          reference outline small trigger
+        </Button>
+      </AddIngestionSourceMenu>
       <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
         <Button size="sm" colorPalette="orange">
           reference solid small trigger

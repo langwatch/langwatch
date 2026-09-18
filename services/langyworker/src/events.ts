@@ -10,6 +10,7 @@
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 
 import { boundJsonValue, boundText, type WorkerEvent } from "./protocol.js";
+import { ranInFolder } from "./tools/local-workspace.js";
 import { normalizeTodos, TODOWRITE_TOOL_NAME } from "./tools/todowrite.js";
 
 export type SessionEventLike = {
@@ -144,6 +145,7 @@ export class TurnEventMapper {
             input: boundJsonValue({ value: input }),
             isError,
             output: boundText({ text: settledToolOutput(event.result) }),
+            ...(ranInFolder(event.result) ? { local: true } : {}),
           },
         ];
         if (!isError && name.toLowerCase() === TODOWRITE_TOOL_NAME) {

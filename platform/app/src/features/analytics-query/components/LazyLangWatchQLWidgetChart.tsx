@@ -16,7 +16,7 @@
  * Type re-exports below are type-only, so they are erased at build and pull
  * nothing eagerly.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { HStack, Spinner, Text } from "@chakra-ui/react";

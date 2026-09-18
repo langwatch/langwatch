@@ -45,6 +45,7 @@ type frame struct {
 	Input   json.RawMessage `json:"input"`
 	Output  *string         `json:"output"`
 	IsError *bool           `json:"isError"`
+	Local   bool            `json:"local"`
 }
 
 // Observe folds one output frame into the final. Best-effort: an unrecognized or
@@ -91,6 +92,9 @@ func (a *Accumulator) upsertTool(f frame) {
 	}
 	if f.IsError != nil {
 		call.IsError = f.IsError
+	}
+	if f.Local {
+		call.Local = true
 	}
 }
 

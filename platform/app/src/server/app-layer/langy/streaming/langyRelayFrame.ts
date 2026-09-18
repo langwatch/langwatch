@@ -130,6 +130,7 @@ export const langyRelayToolCallSchema = z.object({
   output: z.string().optional(),
   isError: z.boolean().optional(),
   result: cliToolResultSchema.optional(),
+  local: z.boolean().optional(),
 });
 
 /**
@@ -198,7 +199,15 @@ export const langyRelayFrameSchema = z.discriminatedUnion("type", [
     detail: z.string().optional(),
     data: z.unknown().optional(),
   }),
-  /** Tool-call lifecycle — a live card AND a durable milestone event. */
+  /**
+   * Tool-call lifecycle: a live card and a durable milestone event.
+   *
+   * `local` on a settled call means it ran in the folder the developer shared
+   * from their own machine (ADR-129), not in the sandbox. The shell that
+   * delegates there is registered as `bash`, so the name alone cannot say where
+   * a command ran; this marker can, and the panel reads it to leave the
+   * developer's own git and gh alone.
+   */
   z.object({
     type: z.literal("tool"),
     id: langyToolCallIdSchema,
@@ -211,6 +220,7 @@ export const langyRelayFrameSchema = z.discriminatedUnion("type", [
     isError: z.boolean().optional(),
     result: cliToolResultSchema.optional(),
     durationMs: z.number().optional(),
+    local: z.boolean().optional(),
   }),
   /** Terminal success — carries the durable final answer. */
   z.object({

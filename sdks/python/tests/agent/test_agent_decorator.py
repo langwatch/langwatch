@@ -18,7 +18,7 @@ import langwatch
 from langwatch.agent import AgentCall, AgentReply, ConnectedAgent, connect_agent
 from langwatch.agent import client as client_module
 from langwatch.agent.decorator import coerce_reply
-from langwatch.agent.schema import AgentParameterInvalid
+from langwatch.agent.schema import AgentParameterInvalid, AgentReplyInvalid
 
 
 @pytest.fixture(autouse=True)
@@ -445,6 +445,47 @@ def test_other_return_shapes_are_coerced():
     assert coerce_reply(Answer(role="assistant", content="x")) == AgentReply(
         output={"role": "assistant", "content": "x"}
     )
+
+
+# @scenario "A dict without a role is refused as a reply"
+def test_a_dict_without_a_role_is_refused():
+    with pytest.raises(AgentReplyInvalid) as raised:
+        coerce_reply({"output": "pong", "thread_id": "t-1", "order_number": None})
+
+    message = str(raised.value)
+    assert "order_number, output, thread_id" in message
+    assert "no role" in message
+    assert "a string" in message
+    assert "a message dict with a role" in message
+    assert "a list of such messages" in message
+    assert "AgentReply(output, session=...)" in message
+    assert raised.value.code == "agent_call_failed"
+
+
+# @scenario "A dict without a role is refused as a reply"
+def test_a_model_without_a_role_and_an_empty_role_are_refused():
+    class Fields(BaseModel):
+        output: str
+
+    with pytest.raises(AgentReplyInvalid):
+        coerce_reply(Fields(output="pong"))
+    with pytest.raises(AgentReplyInvalid):
+        coerce_reply({"role": "", "content": "x"})
+    with pytest.raises(AgentReplyInvalid):
+        coerce_reply(AgentReply(output={"content": "x"}))
+
+
+# @scenario "A list with an item that is not a message is refused as a reply"
+def test_a_list_with_a_non_message_item_is_refused():
+    message = {"role": "assistant", "content": "hello"}
+
+    with pytest.raises(AgentReplyInvalid) as raised:
+        coerce_reply([message, "plain text"])
+    assert "a str item" in str(raised.value)
+
+    with pytest.raises(AgentReplyInvalid):
+        coerce_reply([message, {"output": "x"}])
+    assert coerce_reply([]) == AgentReply(output=[])
 
 
 # @scenario "The session is echoed on the next turn of the same thread"

@@ -72,6 +72,7 @@ function context(projectId: string): ProjectionStoreContext {
 }
 
 describe("PrismaLangyConversationProjectionRepository", () => {
+  /** @scenario "Every conversation read is scoped to the project" */
   it("loads solely through the project-scoped conversation key", async () => {
     const { findUnique, repository } = setup(async (args) => {
       const key = args.where.projectId_ConversationId;

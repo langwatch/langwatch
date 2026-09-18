@@ -82,4 +82,27 @@ describe("given a folder connected to the conversation", () => {
       expect((await presence.read(conversationId))?.instanceId).toBe("lci_2");
     });
   });
+
+  describe("when it is owed the connect turn", () => {
+    /** @scenario "A folder connected as a turn ends is answered once the turn's end is folded" */
+    it("keeps the debt with the share, and drops it when the share ends", async () => {
+      await presence.register(workspace());
+      await presence.oweConnectTurn({
+        conversationId,
+        projectId: "proj_1",
+        userId: "user_1",
+        requestId: "lcr_1",
+      });
+
+      expect(await presence.readOwedConnectTurn(conversationId)).toEqual({
+        projectId: "proj_1",
+        userId: "user_1",
+        requestId: "lcr_1",
+        owedAt: now,
+      });
+
+      await presence.deregister({ conversationId, instanceId: "lci_1" });
+      expect(await presence.readOwedConnectTurn(conversationId)).toBeNull();
+    });
+  });
 });

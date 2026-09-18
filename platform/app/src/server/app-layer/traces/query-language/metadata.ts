@@ -468,6 +468,7 @@ export const FIELD_VALUES: Record<string, string[]> = {
     "workflow",
     "coding_agent",
     "ai_tool",
+    "langy",
   ],
   has: HAS_NONE_VALUES,
   none: HAS_NONE_VALUES,

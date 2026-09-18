@@ -121,11 +121,11 @@ describe("given no folder and nothing remembered", () => {
     renderCard();
 
     expect(screen.getByText("How should I reach your code?")).toBeDefined();
-    expect(screen.getByText("Share my local folder")).toBeDefined();
+    expect(screen.getByText("Share local folder")).toBeDefined();
     expect(
       screen.getByText("Fastest: I run the toolchain you already have"),
     ).toBeDefined();
-    expect(screen.getByText("Use GitHub")).toBeDefined();
+    expect(screen.getByText("Connect to GitHub")).toBeDefined();
     expect(
       screen.getByText(
         "I open a pull request through the LangWatch GitHub App",
@@ -135,13 +135,74 @@ describe("given no folder and nothing remembered", () => {
     expect(screen.getByText("Installed on acme")).toBeDefined();
   });
 
+  /** @scenario "The code access card shows the folder and GitHub actions" */
+  it("draws a folder icon on the local action and the GitHub mark on the other", () => {
+    renderCard();
+
+    const options = screen.getAllByTestId("langy-code-access-option");
+    expect(options).toHaveLength(2);
+    expect(options[0]!.querySelector("svg.lucide-folder-open")).not.toBeNull();
+    expect(options[1]!.querySelector("svg")?.getAttribute("viewBox")).toBe(
+      "0 0 98 96",
+    );
+  });
+
+  /** @scenario "A code access call without the offer shows no describe option" */
+  it("offers no describe link unless the tool asked for it", () => {
+    renderCard();
+    expect(screen.queryByText("I'd rather describe it")).toBeNull();
+  });
+
+  /** @scenario "The describe option shows only when the tool offered it" */
+  it("draws the quiet describe link under the two actions when offered", () => {
+    renderCard({ offerDescribe: true });
+
+    const describe = screen.getByTestId("langy-code-access-describe");
+    expect(describe.textContent).toBe("I'd rather describe it");
+    // The link sits below the two bordered actions, and is not one of them.
+    const options = screen.getAllByTestId("langy-code-access-option");
+    expect(options).toHaveLength(2);
+    expect(
+      options[1]!.compareDocumentPosition(describe) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  /** @scenario "Picking describe answers as my own message" */
+  it("answers the describe pick through the choices path, requesting no folder", () => {
+    const onChoiceSelect = vi.fn();
+    renderCard({ offerDescribe: true, onChoiceSelect });
+
+    fireEvent.click(screen.getByTestId("langy-code-access-describe"));
+
+    expect(onChoiceSelect).toHaveBeenCalledTimes(1);
+    const [{ selection, card }] = onChoiceSelect.mock.calls[0]!;
+    expect(selection).toEqual({
+      blockId: "code-access:call-1",
+      optionIds: ["describe"],
+    });
+    expect(card.options.map((option: { id: string }) => option.id)).toEqual([
+      "local",
+      "github",
+      "describe",
+    ]);
+    expect(card.options[2]).toMatchObject({
+      label: "I'd rather describe it",
+      quiet: true,
+    });
+    // No folder was picked, so the card is not waiting on the terminal.
+    expect(
+      screen.queryByText("Run this in the folder you want me to work in:"),
+    ).toBeNull();
+  });
+
   /** @scenario "The local folder is never remembered" */
   it("stores nothing when the folder is shared with the box ticked", () => {
     const onChoiceSelect = vi.fn();
     renderCard({ onChoiceSelect });
 
     fireEvent.click(screen.getByTestId("langy-remember-code-access"));
-    fireEvent.click(screen.getByText("Share my local folder"));
+    fireEvent.click(screen.getByText("Share local folder"));
 
     expect(setPreference).not.toHaveBeenCalled();
   });
@@ -149,7 +210,7 @@ describe("given no folder and nothing remembered", () => {
   /** @scenario "Choosing the local folder turns the card into the waiting state" */
   it("turns into the waiting state, with the command and the countdown", () => {
     renderCard();
-    fireEvent.click(screen.getByText("Share my local folder"));
+    fireEvent.click(screen.getByText("Share local folder"));
 
     expect(
       screen.getByText("Run this in the folder you want me to work in:"),
@@ -167,7 +228,7 @@ describe("given no folder and nothing remembered", () => {
     const onChoiceSelect = vi.fn();
     renderCard({ onChoiceSelect });
 
-    fireEvent.click(screen.getByText("Use GitHub"));
+    fireEvent.click(screen.getByText("Connect to GitHub"));
 
     expect(onChoiceSelect).toHaveBeenCalledTimes(1);
     expect(onChoiceSelect.mock.calls[0]?.[0]).toMatchObject({
@@ -181,7 +242,7 @@ describe("given no folder and nothing remembered", () => {
     renderCard({ onChoiceSelect });
 
     fireEvent.click(screen.getByTestId("langy-remember-code-access"));
-    fireEvent.click(screen.getByText("Use GitHub"));
+    fireEvent.click(screen.getByText("Connect to GitHub"));
 
     expect(setPreference).toHaveBeenCalledWith({
       projectId: "p_1",
@@ -201,7 +262,7 @@ describe("given no folder and nothing remembered", () => {
       renderCard({ onChoiceSelect });
 
       expect(screen.getByText("Install the app first")).toBeDefined();
-      fireEvent.click(screen.getByText("Use GitHub"));
+      fireEvent.click(screen.getByText("Connect to GitHub"));
 
       expect(
         screen.getByText(
@@ -216,7 +277,7 @@ describe("given no folder and nothing remembered", () => {
       renderCard();
 
       fireEvent.click(screen.getByTestId("langy-remember-code-access"));
-      fireEvent.click(screen.getByText("Use GitHub"));
+      fireEvent.click(screen.getByText("Connect to GitHub"));
 
       expect(setPreference).toHaveBeenCalledWith({
         projectId: "p_1",
@@ -247,7 +308,7 @@ describe("given a request the terminal has not approved yet", () => {
     renderCard({ now: () => 10_000 });
 
     expect(screen.getByText("How should I reach your code?")).toBeDefined();
-    expect(screen.getByText("Use GitHub")).toBeDefined();
+    expect(screen.getByText("Connect to GitHub")).toBeDefined();
     expect(
       screen.queryByText("npx langwatch@latest langy --share-control"),
     ).toBeNull();
@@ -255,7 +316,7 @@ describe("given a request the terminal has not approved yet", () => {
 
   it("shows the command and the countdown once the folder is chosen", () => {
     renderCard({ now: () => 10_000 });
-    fireEvent.click(screen.getByText("Share my local folder"));
+    fireEvent.click(screen.getByText("Share local folder"));
 
     expect(
       screen.getByText(/Waiting for you to approve in the terminal/),
@@ -266,7 +327,7 @@ describe("given a request the terminal has not approved yet", () => {
   /** @scenario "A card left waiting is still waiting after a reload" */
   it("opens on the waiting state again after the card is remounted", () => {
     const first = renderCard({ now: () => 10_000 });
-    fireEvent.click(screen.getByText("Share my local folder"));
+    fireEvent.click(screen.getByText("Share local folder"));
     first.unmount();
 
     renderCard({ now: () => 10_000 });
@@ -281,7 +342,7 @@ describe("given a request the terminal has not approved yet", () => {
     it("says so and offers to ask again", () => {
       const onAskAgain = vi.fn();
       renderCard({ now: () => 10_000 + 20 * 60_000, onAskAgain });
-      fireEvent.click(screen.getByText("Share my local folder"));
+      fireEvent.click(screen.getByText("Share local folder"));
 
       expect(screen.getByText("Request expired, ask again")).toBeDefined();
       fireEvent.click(screen.getByText("Ask again"));
@@ -302,8 +363,8 @@ describe("given Langy asked again further down the conversation", () => {
     expect(
       screen.getByText("Asked again further down. Answer the newer card."),
     ).toBeDefined();
-    expect(screen.queryByText("Share my local folder")).toBeNull();
-    expect(screen.queryByText("Use GitHub")).toBeNull();
+    expect(screen.queryByText("Share local folder")).toBeNull();
+    expect(screen.queryByText("Connect to GitHub")).toBeNull();
     expect(screen.queryByTestId("langy-remember-code-access")).toBeNull();
     expect(container.querySelector('[data-superseded="true"]')).not.toBeNull();
   });
@@ -369,7 +430,7 @@ describe("given GitHub was remembered", () => {
   it("reads as a status line, with a way to change it", () => {
     renderCard();
     expect(screen.getByText("Using GitHub (remembered)")).toBeDefined();
-    expect(screen.queryByText("Share my local folder")).toBeNull();
+    expect(screen.queryByText("Share local folder")).toBeNull();
     expect(screen.getByText("Change")).toBeDefined();
   });
 

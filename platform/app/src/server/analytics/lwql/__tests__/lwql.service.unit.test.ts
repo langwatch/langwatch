@@ -3,23 +3,21 @@
  * never touches.
  *
  * A fake executor rather than a mock, because the interesting claims are about
- * *what reached the database* — the statement, the tenant capability, the fact
- * that nothing reached it at all — and those are artifacts to inspect, not call
- * sequences to verify. The fake records; the tests read the record.
+ * *what reached the database* — the statement (including the default `LIMIT`
+ * the service appends), the tenant capability, the fact that nothing reached it
+ * at all — and those are artifacts to inspect, not call sequences to verify.
+ * The fake records; the tests read the record.
  *
- * The capping the executor itself does is asserted against
- * {@link applyLangWatchQLResultLimits} directly, because a fake that implemented
- * its own truncation would prove only that the fake truncates.
- *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it, vi } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
+import { lwqlTenantCapability } from "../capability";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
-  applyLangWatchQLResultLimits,
+  DEFAULT_LWQL_RESULT_LIMITS,
   type LangWatchQLExecutor,
 } from "../executor";
 import { recordingExecutor } from "../executor.testFakes";
@@ -113,26 +111,66 @@ async function metaOf(
 
 describe("given the LangWatchQL service", () => {
   describe("when a permitted query is submitted", () => {
-    it("hands the executor the submitted statement, byte for byte", async () => {
+    it("hands the executor the submitted statement, verbatim but for the appended default LIMIT", async () => {
       const executor = recordingExecutor();
       const sql =
         "SELECT   TraceId,\n  count() AS n\nFROM analytics.traces\nGROUP BY TraceId";
 
       await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql,
       });
 
       expect(executor.calls).toHaveLength(1);
+      // The statement was not named a LIMIT, so the cap is appended and nothing
+      // else is changed: the submitted text is a prefix of what ran.
+      expect(executor.calls[0]!.sql).toBe(`${sql}\nLIMIT 10000`);
+    });
+
+    it("leaves a statement that already names a LIMIT exactly as written", async () => {
+      const executor = recordingExecutor();
+      const sql =
+        "SELECT TraceId FROM analytics.traces " +
+        "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3) " +
+        "ORDER BY TraceId LIMIT 50";
+
+      await serviceWith(executor).execute({
+        projects: [PROJECT],
+        protections: FULLY_PERMITTED,
+        sql,
+      });
+
       expect(executor.calls[0]!.sql).toBe(sql);
+    });
+
+    /**
+     * `OFFSET` alone does not page a result — `OFFSET 5` with no `LIMIT`
+     * still returns every remaining row — so the default is appended, and it
+     * must land *before* the `OFFSET`: ClickHouse only accepts
+     * `LIMIT n OFFSET m` in that order, so appending it at the end of the
+     * statement (this API's usual move) would be a syntax error here.
+     */
+    it("inserts the default LIMIT before a bare OFFSET, not after it", async () => {
+      const executor = recordingExecutor();
+      const sql = "SELECT TraceId FROM analytics.traces OFFSET 40";
+
+      await serviceWith(executor).execute({
+        projects: [PROJECT],
+        protections: FULLY_PERMITTED,
+        sql,
+      });
+
+      expect(executor.calls[0]!.sql).toBe(
+        `SELECT TraceId FROM analytics.traces LIMIT ${DEFAULT_LWQL_RESULT_LIMITS.maxRows} OFFSET 40`,
+      );
     });
 
     it("carries the project's key digest as the tenant capability", async () => {
       const executor = recordingExecutor();
 
       await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: "SELECT count() FROM analytics.traces",
       });
@@ -163,7 +201,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       await serviceWith(executor).execute({
-        project: PROJECT_WITH_API_KEY,
+        projects: [PROJECT_WITH_API_KEY],
         protections: FULLY_PERMITTED,
         sql: "SELECT count() FROM analytics.traces",
       });
@@ -181,9 +219,36 @@ describe("given the LangWatchQL service", () => {
       );
     });
 
+    /**
+     * A key that reaches several projects sends the SET of their capabilities,
+     * so the row policy admits the union of their tenants. One caller, one
+     * setting value, every project's hash inside it.
+     */
+    /** @scenario "The tenant capability is the sorted set of the caller's project key hashes" */
+    it("sends the sorted, comma-joined capability set for a multi-project caller", async () => {
+      const executor = recordingExecutor();
+
+      await serviceWith(executor).execute({
+        projects: [
+          { id: "project-b", lwqlKey: "secret-b" },
+          { id: "project-a", lwqlKey: "secret-a" },
+          // A duplicate secret must not double-count in the set.
+          { id: "project-a-again", lwqlKey: "secret-a" },
+        ],
+        protections: FULLY_PERMITTED,
+        sql: "SELECT count() FROM analytics.traces",
+      });
+
+      const expected = [
+        lwqlTenantCapability({ secret: "secret-a" }),
+        lwqlTenantCapability({ secret: "secret-b" }),
+      ].sort();
+      expect(executor.calls[0]!.tenantCapability.split(",")).toEqual(expected);
+    });
+
     it("returns the executor's typed columns, rows and statistics with no diagnostics", async () => {
       const result = await serviceWith(recordingExecutor()).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: BOUNDED_COUNT,
       });
@@ -191,28 +256,65 @@ describe("given the LangWatchQL service", () => {
       expect(result.columns).toEqual([{ name: "value", type: "UInt64" }]);
       expect(result.rows).toEqual([{ value: 1 }]);
       expect(result.statistics.rowsRead).toBe(10);
-      expect(result.truncated).toBe(false);
       expect(result.diagnostics).toEqual([]);
     });
   });
 
-  describe("when the executor reports the result was cut short", () => {
-    it("marks truncation and carries a diagnostic naming the ceiling", async () => {
-      const result = await serviceWith(
-        recordingExecutor({ truncated: true }),
-      ).execute({
-        project: PROJECT,
-        protections: FULLY_PERMITTED,
-        sql:
-          "SELECT TraceId FROM analytics.traces " +
-          "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3)",
+  describe("when the result outgrows the byte ceiling", () => {
+    /** @scenario "Overflow throws and never silently truncates" */
+    it("refuses it outright, naming the byte cap, rather than cutting it", async () => {
+      const wideRows = [...Array(20).keys()].map((index) => ({
+        index,
+        value: "x".repeat(500),
+      }));
+      const service = new LangWatchQLService({
+        executor: recordingExecutor({ rows: wideRows }),
+        database: DATABASE,
+        limits: {
+          maxRows: DEFAULT_LWQL_RESULT_LIMITS.maxRows,
+          maxResultBytes: 500,
+        },
       });
 
-      expect(result.truncated).toBe(true);
-      expect(result.diagnostics.map((entry) => entry.code)).toEqual([
-        "RESULT_TRUNCATED",
-      ]);
-      expect(result.diagnostics[0]!.meta).toMatchObject({ maxRows: 10_000 });
+      expect(
+        await codeOf(() =>
+          service.execute({
+            projects: [PROJECT],
+            protections: FULLY_PERMITTED,
+            sql: BOUNDED_COUNT,
+          }),
+        ),
+      ).toBe("lwql_result_too_large");
+      expect(
+        await metaOf(() =>
+          service.execute({
+            projects: [PROJECT],
+            protections: FULLY_PERMITTED,
+            sql: BOUNDED_COUNT,
+          }),
+        ),
+      ).toMatchObject({ maxResultBytes: 500 });
+    });
+
+    it("returns the whole result when it fits under the byte ceiling", async () => {
+      const result = await new LangWatchQLService({
+        executor: recordingExecutor({
+          rows: [{ value: 1 }, { value: 2 }],
+          statistics: {
+            elapsedMs: 1,
+            rowsRead: 2,
+            bytesRead: 8,
+            rowsReturned: 2,
+          },
+        }),
+        database: DATABASE,
+      }).execute({
+        projects: [PROJECT],
+        protections: FULLY_PERMITTED,
+        sql: BOUNDED_COUNT,
+      });
+
+      expect(result.rows).toEqual([{ value: 1 }, { value: 2 }]);
     });
   });
 
@@ -224,7 +326,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: "INSERT INTO analytics.traces VALUES (1)",
           }),
@@ -246,7 +348,7 @@ describe("given the LangWatchQL service", () => {
         expect(
           await codeOf(() =>
             service.execute({
-              project: PROJECT,
+              projects: [PROJECT],
               protections: FULLY_PERMITTED,
               sql,
             }),
@@ -262,7 +364,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: "SELECT FROM WHERE )(",
           }),
@@ -273,7 +375,7 @@ describe("given the LangWatchQL service", () => {
     it("carries every violation in meta so an agent can fix them in one pass", async () => {
       const meta = await metaOf(() =>
         serviceWith(recordingExecutor()).execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: "SELECT * FROM analytics.nowhere SETTINGS max_threads = 1",
         }),
@@ -295,7 +397,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: WITHOUT_CONTENT,
             sql,
           }),
@@ -306,7 +408,7 @@ describe("given the LangWatchQL service", () => {
       // above is about the gate rather than about the SQL.
       await expect(
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql,
         }),
@@ -319,7 +421,7 @@ describe("given the LangWatchQL service", () => {
 
       const meta = await metaOf(() =>
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: WITHOUT_CONTENT,
           sql,
         }),
@@ -339,7 +441,7 @@ describe("given the LangWatchQL service", () => {
     it("permits the same wildcard for a fully-permitted caller", async () => {
       await expect(
         serviceWith(recordingExecutor()).execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: "SELECT * FROM analytics.traces",
         }),
@@ -357,7 +459,7 @@ describe("given the LangWatchQL service", () => {
       ]) {
         expect(
           await codeOf(() =>
-            service.execute({ project: PROJECT, protections: {}, sql }),
+            service.execute({ projects: [PROJECT], protections: {}, sql }),
           ),
           sql,
         ).toBe("lwql_not_permitted");
@@ -385,7 +487,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           serviceWithTranscripts(executor).execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: WITHOUT_CONTENT,
             sql,
           }),
@@ -396,7 +498,7 @@ describe("given the LangWatchQL service", () => {
           (
             await metaOf(() =>
               serviceWithTranscripts(executor).execute({
-                project: PROJECT,
+                projects: [PROJECT],
                 protections: WITHOUT_CONTENT,
                 sql,
               }),
@@ -415,7 +517,7 @@ describe("given the LangWatchQL service", () => {
 
       await expect(
         serviceWithTranscripts(executor).execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql,
         }),
@@ -437,7 +539,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql,
             parameters: { name: "checkout" },
@@ -447,7 +549,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await metaOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql,
             parameters: { name: "checkout" },
@@ -464,7 +566,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: "SELECT count() FROM analytics.traces WHERE TraceName = {name:String}",
         parameters: { name: "checkout" },
@@ -488,7 +590,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       const result = await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: PERIOD_SQL,
         timeWindow: TIME_WINDOW,
@@ -498,8 +600,9 @@ describe("given the LangWatchQL service", () => {
         dashboard_context_period_start: "2026-02-20 00:00:00",
         dashboard_context_period_end: "2026-02-27 00:00:00",
       });
-      // The statement itself is never rewritten to carry them.
-      expect(executor.calls[0]!.sql).toBe(PERIOD_SQL);
+      // The window is carried in the bound parameters, never injected into the
+      // statement; the only edit to the text is the appended default LIMIT.
+      expect(executor.calls[0]!.sql).toBe(`${PERIOD_SQL}\nLIMIT 10000`);
       expect(result.followsTimeWindow).toBe(true);
     });
 
@@ -510,7 +613,7 @@ describe("given the LangWatchQL service", () => {
 
       for (const start of ["2026-02-20", "2026-03-20"]) {
         await service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: PERIOD_SQL,
           timeWindow: { ...TIME_WINDOW, start: new Date(`${start}T00:00:00Z`) },
@@ -530,7 +633,7 @@ describe("given the LangWatchQL service", () => {
       const service = serviceWith(executor);
       const run = () =>
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: PERIOD_SQL,
           parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
@@ -557,7 +660,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql,
             timeWindow: TIME_WINDOW,
@@ -587,7 +690,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: PERIOD_SQL,
           }),
@@ -596,7 +699,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await metaOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: PERIOD_SQL,
           }),
@@ -665,7 +768,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       const result = await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: BOUNDED_COUNT,
         timeWindow: {
@@ -675,7 +778,7 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(result.followsTimeWindow).toBe(false);
-      expect(executor.calls[0]!.sql).toBe(BOUNDED_COUNT);
+      expect(executor.calls[0]!.sql).toBe(`${BOUNDED_COUNT}\nLIMIT 10000`);
       expect(
         executor.calls[0]!.parameters,
         "a window was injected into a statement that never asked for one",
@@ -701,7 +804,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       const result = await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: GRANULARITY_SQL,
         timeWindow: TIME_WINDOW,
@@ -726,7 +829,7 @@ describe("given the LangWatchQL service", () => {
       const service = serviceWith(executor);
       const run = () =>
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: GRANULARITY_SQL,
           timeWindow: TIME_WINDOW,
@@ -761,7 +864,7 @@ describe("given the LangWatchQL service", () => {
       const service = serviceWith(executor);
       const run = () =>
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: GRANULARITY_SQL,
           timeWindow: TIME_WINDOW,
@@ -784,7 +887,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       const result = await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: BOUNDED_COUNT,
         granularitySeconds: 60,
@@ -803,7 +906,7 @@ describe("given the LangWatchQL service", () => {
         expect(
           await codeOf(() =>
             serviceWith(recordingExecutor()).execute({
-              project: PROJECT,
+              projects: [PROJECT],
               protections: FULLY_PERMITTED,
               sql: GRANULARITY_SQL,
               timeWindow: TIME_WINDOW,
@@ -826,7 +929,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           serviceWith(null).execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: "SELECT count() FROM analytics.traces",
           }),
@@ -837,7 +940,7 @@ describe("given the LangWatchQL service", () => {
     it("still describes the schema, which discloses nothing a caller could read", () => {
       expect(
         serviceWith(null).describeSchema({ protections: FULLY_PERMITTED })
-          .datasets,
+          .views,
       ).toHaveLength(LWQL_VIEW_CATALOG.length);
     });
   });
@@ -858,7 +961,7 @@ describe("given the LangWatchQL service", () => {
 
       await expect(
         serviceWith(executor).execute({
-          project: PROJECT_WITHOUT_LWQL_KEY,
+          projects: [PROJECT_WITHOUT_LWQL_KEY],
           protections: FULLY_PERMITTED,
           sql: "SELECT count() FROM analytics.traces",
         }),
@@ -869,51 +972,6 @@ describe("given the LangWatchQL service", () => {
       // Nothing reached the database: the refusal is before execution, not a
       // query that ran and quietly answered nothing.
       expect(executor.calls).toHaveLength(0);
-    });
-  });
-});
-
-describe("given the result ceilings", () => {
-  const rows = [...Array(50).keys()].map((index) => ({
-    index,
-    value: "x".repeat(100),
-  }));
-
-  describe("when the row ceiling is reached", () => {
-    it("cuts the result at the ceiling and reports that it did", () => {
-      const capped = applyLangWatchQLResultLimits({
-        rows,
-        limits: { maxRows: 10, maxResultBytes: 10_000_000 },
-      });
-
-      expect(capped.rows).toHaveLength(10);
-      expect(capped.truncated).toBe(true);
-      expect(capped.rows[0]).toEqual(rows[0]);
-    });
-  });
-
-  describe("when the byte ceiling is reached first", () => {
-    it("cuts the result short of the row ceiling and reports that it did", () => {
-      const capped = applyLangWatchQLResultLimits({
-        rows,
-        limits: { maxRows: 1_000, maxResultBytes: 500 },
-      });
-
-      expect(capped.rows.length).toBeGreaterThan(0);
-      expect(capped.rows.length).toBeLessThan(rows.length);
-      expect(capped.truncated).toBe(true);
-    });
-  });
-
-  describe("when the result fits", () => {
-    it("returns every row and reports no truncation", () => {
-      const capped = applyLangWatchQLResultLimits({
-        rows,
-        limits: { maxRows: 1_000, maxResultBytes: 10_000_000 },
-      });
-
-      expect(capped.rows).toEqual(rows);
-      expect(capped.truncated).toBe(false);
     });
   });
 });

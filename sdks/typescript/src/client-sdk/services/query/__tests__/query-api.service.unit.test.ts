@@ -65,7 +65,6 @@ describe("given a QueryApiService", () => {
           bytesRead: 128,
           rowsReturned: 1,
         },
-        truncated: false,
         followsTimeWindow: true,
         followsGranularity: false,
         diagnostics: [],

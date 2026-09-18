@@ -22,7 +22,7 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
   `savedWorkbenchCharts.getById`/`run` procedures it calls.
   The backend owns SQL parsing, validation, tenant isolation, content gating,
   resource limits, result truncation, and analytical diagnostics. The
-  frontend half that remains owns Vega-Lite policy, named-dataset injection,
+  frontend half that remains owns Vega-Lite policy, named-view injection,
   theming, accessibility, and chart runtime containment.
 
   Background:
@@ -118,13 +118,13 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
     And nothing is silently converted to the supported version
 
   @unit
-  Scenario: Every data source must resolve to a registered named dataset
+  Scenario: Every data source must resolve to a registered named view
     When a spec references a data name that is not registered
-    Then it is rejected naming the unknown dataset and the registered names
+    Then it is rejected naming the unknown view and the registered names
 
   @unit
-  Scenario: Caller-supplied datasets and inline values are rejected
-    When a spec carries a top-level datasets property or inline data values
+  Scenario: Caller-supplied views and inline values are rejected
+    When a spec carries a top-level views property or inline data values
     Then each is rejected before reaching Vega
 
   @unit
@@ -139,8 +139,8 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
     Then it is rejected before reaching Vega
 
   @unit
-  Scenario: Lookup is admitted only between registered datasets within limits
-    When a lookup transform names another registered dataset within the row and transform limits
+  Scenario: Lookup is admitted only between registered views within limits
+    When a lookup transform names another registered view within the row and transform limits
     Then it is admitted
     And a lookup naming an unregistered source or exceeding those limits is rejected
 
@@ -150,17 +150,17 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
     Then it is rejected until reviewed, never passed through untested
 
   @unit
-  Scenario: Field references are validated against the dataset that feeds them
-    Given a spec whose branches read different registered datasets
-    When a field reference does not exist in the dataset feeding its branch
-    Then the rejection names the dataset and lists its available columns
+  Scenario: Field references are validated against the view that feeds them
+    Given a spec whose branches read different registered views
+    When a field reference does not exist in the view feeding its branch
+    Then the rejection names the view and lists its available columns
     And fields created by allowed transforms are recognized downstream
 
   @unit
   Scenario: Every named complexity limit refuses just past its ceiling
     Given the centralized complexity limits for spec size, nesting depth, unit
       views, layers, transforms, expression sizes, interactive parameters, and
-      dataset rows
+      view rows
     When a spec sits at a ceiling and another sits just past it
     Then the one at the ceiling is admitted and the one past it is refused
     And each refusal names the limit that was exceeded
@@ -168,17 +168,17 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
   @unit
   Scenario: The adversarial corpus is refused
     Given fixtures for deep composition, excessive layers, facets and repeats,
-      long expressions, oversized datasets, nested resource-loading paths,
+      long expressions, oversized views, nested resource-loading paths,
       lookup bypasses, and caller runtime options
     When each fixture is validated
     Then every one is refused with its structured error
 
   @unit
-  Scenario: The renderer contract accepts multiple registered named datasets
-    Given a renderer given several registered named datasets and their columns
+  Scenario: The renderer contract accepts multiple registered named views
+    Given a renderer given several registered named views and their columns
     When a spec reads more than one of them
     Then validation and rendering resolve each by name
-    And today's only caller (the dashboard widget) still supplies just the query result dataset
+    And today's only caller (the dashboard widget) still supplies just the query result view
 
   # ---------------------------------------------------------------------------
   # Chart runtime containment
@@ -205,8 +205,8 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
   @e2e
   Scenario: A categorical LangWatchQL result renders as a chart in a real browser
     Given a successful categorical LangWatchQL result
-    When the member provides a valid bar specification over the query result dataset
-    Then the chart renders from the registered dataset
+    When the member provides a valid bar specification over the query result view
+    Then the chart renders from the registered view
 
   @integration
   Scenario: A time-bucketed multi-series result renders responsively with tooltips
@@ -218,7 +218,7 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
   Scenario: A data-only Reload updates the chart through the live view
     Given a rendered chart and a Reload returning changed rows
     When the new result arrives
-    Then the registered dataset is updated through the running view
+    Then the registered view is updated through the running view
     And the working view is not torn down and rebuilt
     And no prior view or its resources leak
 
@@ -245,7 +245,7 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
   @integration
   Scenario: Chart failures are distinct intentional states, never a blank chart
     When a spec is invalid JSON, fails the schema, is rejected by policy, names
-      an unknown dataset or field, exceeds a complexity limit, encodes only
+      an unknown view or field, exceeds a complexity limit, encodes only
       empty or missing values, or fails in Vega at compile or runtime
     Then each case renders its own intentional state naming the cause
     And no case renders a blank chart or crashes the page
@@ -516,22 +516,22 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 #   → Scenario: A spec validates against the bundled official Vega-Lite v6 schema
 # AC "only parsed JSON objects for the supported schema version"
 #   → Scenario: Only a parsed JSON object of the supported version is accepted
-# AC "all data sources resolve to registered named datasets"
-#   → Scenario: Every data source must resolve to a registered named dataset
-# AC "caller datasets, inline values, URL data/config/patches, external lookup
+# AC "all data sources resolve to registered named views"
+#   → Scenario: Every data source must resolve to a registered named view
+# AC "caller views, inline values, URL data/config/patches, external lookup
 #    data, images/URL encodings, spec-controlled embed options rejected"
-#   → Scenario: Caller-supplied datasets and inline values are rejected
+#   → Scenario: Caller-supplied views and inline values are rejected
 #   → Scenario: Every resource-loading path is rejected recursively
 #   → Scenario: Spec-controlled runtime options are rejected
-#   → Scenario: Lookup is admitted only between registered datasets within limits
+#   → Scenario: Lookup is admitted only between registered views within limits
 # AC "no-network loader prevents outbound/file loads even if static validation misses"
 #   → Scenario: A repository-owned loader refuses all network and file loading
 # AC "actions disabled, no editor/export/source surface"
 #   → Scenario: No embed actions are exposed
 # AC "Vega expressions use CSP interpreter mode under a browser test with the real policy"
 #   → Scenario: The chart renders under a CSP that forbids eval
-# AC "source and transform-created fields validated against the correct dataset"
-#   → Scenario: Field references are validated against the dataset that feeds them
+# AC "source and transform-created fields validated against the correct view"
+#   → Scenario: Field references are validated against the view that feeds them
 # AC "unknown transforms and expression features fail closed"
 #   → Scenario: Unknown transforms and expression features fail closed
 # AC "every named complexity limit has boundary and adversarial tests"
@@ -541,8 +541,8 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 #    Table-mode fallback half of this AC no longer applies (no Table mode);
 #    the refuse-rather-than-sample half is covered by the complexity-limit
 #    and adversarial-corpus scenarios above.
-# AC "renderer accepts multiple registered named datasets"
-#   → Scenario: The renderer contract accepts multiple registered named datasets
+# AC "renderer accepts multiple registered named views"
+#   → Scenario: The renderer contract accepts multiple registered named views
 #
 # Rendering and UX:
 # AC "categorical LangWatchQL result renders from query_result"
@@ -566,7 +566,7 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 # AC "unit tests cover request-state transitions, schema mapping, table
 #    formatting, every visualization policy rule" → the @unit scenarios above.
 # AC "adversarial fixtures cover deep composition, layers/facets/repeats, long
-#    expressions, large datasets, nested resource paths, lookup bypasses,
+#    expressions, large views, nested resource paths, lookup bypasses,
 #    caller runtime options" → Scenario: The adversarial corpus is refused
 # AC "component tests cover virtualization, structured values, themes,
 #    data/spec updates, cleanup, empty/error states, stale results,

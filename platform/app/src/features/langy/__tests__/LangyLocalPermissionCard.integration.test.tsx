@@ -273,7 +273,7 @@ describe("given a card that already settled", () => {
 
 describe("given a long command chain", () => {
   const CHAIN =
-    'git add app/agent.py README.md && git commit -m "feat: add tracing" && git push -u origin HEAD && gh pr create --base main --title "Add tracing"';
+    'uv sync && uv run pytest -s tests/test_agent.py && pnpm typecheck && gh pr create --base main --title "Add tracing"';
 
   /** @scenario "The card shows the whole command, wrapped" */
   it("shows every character of it, wrapped rather than clipped", () => {
@@ -292,17 +292,16 @@ describe("given a long command chain", () => {
     renderCard({
       card: {
         ...PENDING,
-        command:
-          "git fetch origin && git checkout -b langy/tracing origin/main",
-        pattern: "git fetch",
-        patterns: ["git fetch", "git checkout"],
+        command: "uv sync && uv run pytest -s",
+        pattern: "uv sync",
+        patterns: ["uv sync", "uv run"],
       },
     });
 
     expect(
-      screen.getByText('Allow "git fetch" and "git checkout" this session'),
+      screen.getByText('Allow "uv sync" and "uv run" this session'),
     ).toBeDefined();
-    expect(screen.queryByText('Allow "git fetch" this session')).toBeNull();
+    expect(screen.queryByText('Allow "uv sync" this session')).toBeNull();
   });
 
   /** @scenario "A pattern grant names the pattern it covers on the settled card" */
@@ -312,13 +311,13 @@ describe("given a long command chain", () => {
         ...PENDING,
         status: "answered",
         decision: "allow_pattern",
-        patterns: ["git fetch", "git checkout", "git push"],
+        patterns: ["uv sync", "uv run", "gh pr"],
       },
     });
 
     expect(
       screen.getByText(
-        'You allowed "git fetch", "git checkout" and "git push" for the session',
+        'You allowed "uv sync", "uv run" and "gh pr" for the session',
       ),
     ).toBeDefined();
     expect(screen.queryByText("You answered this card")).toBeNull();

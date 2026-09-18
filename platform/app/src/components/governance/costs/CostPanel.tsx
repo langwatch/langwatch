@@ -19,16 +19,20 @@ export function CostPanel({
   title,
   sample = false,
   action,
+  tourId,
   children,
 }: {
   title: string;
   sample?: boolean;
   action?: ReactNode;
+  /** The `data-tour` target the guided tour spotlights on this panel. */
+  tourId?: string;
   children: ReactNode;
 }) {
   return (
     <VStack
       data-testid="cost-panel"
+      data-tour={tourId}
       align="stretch"
       gap={3}
       borderWidth="1px"
