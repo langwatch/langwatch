@@ -12,11 +12,8 @@ import type { UiModuleHostMount } from "./ui-host-mounts.ts";
 type UiHostProvider = ComponentType<{ children?: ReactNode }>;
 
 /**
- * A chunk that will not load throws `Failed to fetch dynamically imported
- * module: <url>` and names no module, so every mount's failure reads the same
- * and the stack is at the ROOT — the blank page is the whole application, not
- * one screen. Saying which mount it was is the difference between a URL and an
- * address in the tree.
+ * A chunk that will not load names no module, and this stack is at the ROOT —
+ * so the blank page is the whole application, not one screen.
  */
 function loadHostProvider(mount: UiModuleHostMount): Promise<{ default: UiHostProvider }> {
   const named = `Module ${JSON.stringify(mount.module)} mounts ${mount.host}`;
