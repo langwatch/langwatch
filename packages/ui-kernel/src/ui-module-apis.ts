@@ -14,7 +14,11 @@ import type { SupplyModule } from "./web-module.ts";
  * a module declaring the wrong shape until a screen rendered.
  */
 function isApiBinding(value: unknown): value is { Provider: UiFeatureApiBinding["Provider"] } {
-  return typeof value === "object" && value !== null && "Provider" in value;
+  // `createTRPCReact()` is a Proxy that reports as a FUNCTION, traps no `has`
+  // and owns no keys, so `typeof === "object"` and `"Provider" in value` both
+  // say no while `.Provider` is a real component. Ask for the thing we mount.
+  if (value === null || (typeof value !== "object" && typeof value !== "function")) return false;
+  return typeof (value as { Provider?: unknown }).Provider === "function";
 }
 
 export function installedModuleApis(
