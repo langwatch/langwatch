@@ -39,8 +39,18 @@ export class NoAddressToConfirmError extends HandledError {
 }
 
 export class FrontDoorRateLimitedError extends HandledError {
-  constructor(message: string) {
-    super("auth_rate_limited", message, { httpStatus: 429, retryable: true });
+  declare readonly code: "auth_rate_limited";
+
+  /** `retryAfterSeconds` is what `auth_rate_limited`'s presentation entry
+   *  reads to name the wait; without it the customer is told "a few minutes". */
+  constructor(message: string, input: { retryAfterSeconds?: number | undefined } = {}) {
+    super("auth_rate_limited", message, {
+      httpStatus: 429,
+      retryable: true,
+      ...(input.retryAfterSeconds !== undefined
+        ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+        : {}),
+    });
     this.name = "FrontDoorRateLimitedError";
   }
 }

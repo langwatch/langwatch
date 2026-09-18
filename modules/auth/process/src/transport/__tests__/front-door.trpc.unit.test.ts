@@ -4,7 +4,7 @@
  * @see specs/auth/signup-does-not-strand-an-account.feature
  */
 import { bindTrpcFact, callerAddressFact, createTrpcRuntime } from "@langwatch/api/trpc";
-import type { AuthApi } from "@langwatch/auth-contract";
+import { type AuthApi, FrontDoorRateLimitedError } from "@langwatch/auth-contract";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -63,7 +63,7 @@ const visitor = router.createCaller({ address: "203.0.113.7" });
 describe("the signed-out front door", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    isWithinBudget.mockResolvedValue(true);
+    isWithinBudget.mockResolvedValue({ allowed: true });
   });
 
   describe("given the mounted router", () => {
@@ -124,12 +124,38 @@ describe("the signed-out front door", () => {
     });
 
     it("refuses past the budget rather than asking the router again", async () => {
-      isWithinBudget.mockResolvedValue(false);
+      isWithinBudget.mockResolvedValue({ allowed: false });
 
       await expect(
         visitor.route({ identifier: "ana@acme.com", breakGlass: undefined }),
       ).rejects.toThrow("Too many sign-in attempts. Please try again later.");
       expect(route).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A throttled door says how long the wait is */
+    it("refuses with the throttle's own code, never as an absent collaborator", async () => {
+      isWithinBudget.mockResolvedValue({ allowed: false, retryAfterSeconds: 90 });
+
+      const refusal = await visitor
+        .route({ identifier: "ana@acme.com", breakGlass: undefined })
+        .catch((error: unknown) => error);
+
+      expect((refusal as { cause?: FrontDoorRateLimitedError }).cause?.code).toBe(
+        "auth_rate_limited",
+      );
+    });
+
+    /** @scenario A throttled door says how long the wait is */
+    it("carries the seconds to wait, which is what names the minutes", async () => {
+      isWithinBudget.mockResolvedValue({ allowed: false, retryAfterSeconds: 90 });
+
+      const refusal = await visitor
+        .route({ identifier: "ana@acme.com", breakGlass: undefined })
+        .catch((error: unknown) => error);
+
+      expect((refusal as { cause?: FrontDoorRateLimitedError }).cause?.meta).toMatchObject({
+        retryAfterSeconds: 90,
+      });
     });
   });
 

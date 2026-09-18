@@ -51,10 +51,11 @@ export interface AuthApi {
   revokeBrowserSession(input: { sessionId: string }): Promise<void>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
 
-  /** Whether this attempt is inside the budget the door asked for. */
+  /** Whether this attempt is inside the budget the door asked for, and how
+   *  long to wait when it is not — the refusal's words name the seconds. */
   isWithinBudget(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-  ): Promise<boolean>;
+  ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number | undefined }>>;
   /** Where this address signs in. The decision object IS the contract. */
   route(
     input: Readonly<{ identifier: string | null; breakGlass: boolean }>,

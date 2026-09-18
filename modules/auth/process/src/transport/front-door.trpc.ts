@@ -174,13 +174,15 @@ export const frontDoorTrpcTransport = defineTrpcRouter(AuthApi, frontDoorTrpc)
       throw new NoAddressToConfirmError();
     }
 
-    const withinBudget = await app.isWithinBudget({
+    const budget = await app.isWithinBudget({
       key: `frontDoor.sendMyAddressConfirmation:${actor.id}`,
       windowSeconds: HOUR_SECONDS,
       max: 10,
     });
 
-    if (!withinBudget) throw throttled("Too many attempts. Please try again later.");
+    if (!budget.allowed) {
+      throw throttled("Too many attempts. Please try again later.", budget.retryAfterSeconds);
+    }
 
     await app.requestSignUpVerification({ email });
 
@@ -206,16 +208,17 @@ async function spend({
   max: number;
   refusal: string;
 }): Promise<void> {
-  const withinBudget = await app.isWithinBudget({
+  const budget = await app.isWithinBudget({
     key: `frontDoor.${procedure}:${address ?? "unknown"}`,
     windowSeconds: HOUR_SECONDS,
     max,
   });
 
-  if (!withinBudget) throw throttled(refusal);
+  if (!budget.allowed) throw throttled(refusal, budget.retryAfterSeconds);
 }
 
-/** The refusal every throttle here raises, with the surface's own wording. */
-function throttled(message: string): FrontDoorRateLimitedError {
-  return new FrontDoorRateLimitedError(message);
+/** The refusal every throttle here raises, with the surface's own wording and
+ *  the wait the counter measured, which is what names the minutes. */
+function throttled(message: string, retryAfterSeconds?: number): FrontDoorRateLimitedError {
+  return new FrontDoorRateLimitedError(message, { retryAfterSeconds });
 }

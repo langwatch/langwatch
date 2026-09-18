@@ -22,6 +22,7 @@ import type { IdentityEmailService, RoutingDecision } from "@langwatch/identity-
 import type { FeatureSetup } from "@langwatch/kernel";
 import { resolveRequestBound } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -90,14 +91,6 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
      * service — the session read then falls back to the stored user's own
      * address, which is the documented chain, not a degraded one. */
     identityEmails: IdentityEmailService | undefined;
-    /** The shared counter every front-door throttle meters through.
-     * `undefined` until the front-door wiring lane supplies it; the throttled
-     * operations then refuse by name rather than crash. */
-    rateLimit:
-      | ((
-          input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-        ) => Promise<Readonly<{ allowed: boolean }>>)
-      | undefined;
     /** Where an address signs in. The decision object IS the contract.
      * `undefined` until the front-door wiring lane supplies it. */
     route:
@@ -147,7 +140,11 @@ export class AuthApp implements AuthApiContract {
   static readonly config = authServerConfig;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
    * process's own fact. A process that cannot supply one refuses at boot. */
-  static readonly reads = [...AUTH_CLOSED_READS, "publicBaseUrl"] as const;
+  static readonly reads = [...AUTH_CLOSED_READS, "publicBaseUrl", "isSaas"] as const;
+  /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
+  static readonly secrets = {
+    session: Secret.load("NEXTAUTH_SECRET", { optional: true }),
+  } as const;
 
   readonly #sessions: BrowserSessionService;
   readonly #cliSessions: CliDeviceSessionService;
@@ -184,7 +181,7 @@ export class AuthApp implements AuthApiContract {
     this.#dependencies = dependencies;
   }
 
-  static create(setup: AuthSetup): AuthApp {
+  static create(setup: AuthSetup): Promise<AuthApp> {
     const { members, repositories, dependencies, config } = setup;
     const now = members.now ?? nowInstant;
 
@@ -206,41 +203,42 @@ export class AuthApp implements AuthApiContract {
 
     app.#offersPasskeys = config.passkeysEnabled;
 
-    const sessionSecret = members.secrets.find("NEXTAUTH_SECRET");
-    assertAuthServerConfig(config, sessionSecret);
+    return setup.secrets.into(AuthApp.secrets.session, (sessionSecret) => {
+      assertAuthServerConfig(config, sessionSecret);
 
-    const identity: BetterAuthDeploymentIdentity | undefined =
-      config.sessionUrl && sessionSecret
-        ? {
-            secret: sessionSecret,
-            baseUrl: config.sessionUrl,
-            publicBaseUrl: members.publicBaseUrl,
-            mfaEnrollmentOpen: config.mfaEnrollmentOpen,
-            passkeysEnabled: config.passkeysEnabled,
-            passkeyHandleSecret: config.passkeyHandleSecret ?? sessionSecret,
-          }
-        : undefined;
-    app.#browserSession = identity;
+      const identity: BetterAuthDeploymentIdentity | undefined =
+        config.sessionUrl && sessionSecret
+          ? {
+              secret: sessionSecret,
+              baseUrl: config.sessionUrl,
+              publicBaseUrl: members.publicBaseUrl,
+              mfaEnrollmentOpen: config.mfaEnrollmentOpen,
+              passkeysEnabled: config.passkeysEnabled,
+              passkeyHandleSecret: config.passkeyHandleSecret ?? sessionSecret,
+            }
+          : undefined;
+      app.#browserSession = identity;
 
-    if (identity) {
-      app.#betterAuth = buildBetterAuth({
-        identity,
-        prisma: members.prisma,
-        redis: members.redis,
-        auth: app,
-        users: dependencies.users,
-        authProvider: members.federatedProvider,
-        isSaas: members.isSaas,
-        logger: members.logger,
-      });
-    } else {
-      members.logger.info(
-        { module: "auth" },
-        "This process named no browser-session identity (NEXTAUTH_SECRET and NEXTAUTH_URL), so it composes no Better Auth instance: every browser caller reads as signed out and the sign-in door refuses",
-      );
-    }
+      if (identity) {
+        app.#betterAuth = buildBetterAuth({
+          identity,
+          prisma: members.prisma,
+          redis: members.redis,
+          auth: app,
+          users: dependencies.users,
+          authProvider: members.federatedProvider,
+          isSaas: members.isSaas,
+          logger: members.logger,
+        });
+      } else {
+        members.logger.info(
+          { module: "auth" },
+          "This process named no browser-session identity (NEXTAUTH_SECRET and NEXTAUTH_URL), so it composes no Better Auth instance: every browser caller reads as signed out and the sign-in door refuses",
+        );
+      }
 
-    return app;
+      return app;
+    });
   }
 
   /** The deployment's ONE Better Auth instance, or the refusal that names why there is none. */
@@ -392,17 +390,18 @@ export class AuthApp implements AuthApiContract {
     return this.#sessions.revokeOtherBrowserSessions(input);
   }
 
+  /** Meters through the counter every process supplies, the same one the token
+   *  check counts against — a throttle refuses by its own code, never as an
+   *  absent collaborator. specs/identity/signin-signup-screens.feature. */
   async isWithinBudget(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-  ): Promise<boolean> {
-    const rateLimit = this.#members.rateLimit;
-    if (!rateLimit) {
-      throw new AuthUnavailableError({
-        capability: "rate-limit counter, so it cannot meter this operation",
-        processName: this.#members.processName,
-      });
-    }
-    return (await rateLimit(input)).allowed;
+  ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number | undefined }>> {
+    const decision = await this.#members.rateLimiter.check(input.key, {
+      requests: input.max,
+      seconds: input.windowSeconds,
+    });
+
+    return { allowed: decision.allowed, retryAfterSeconds: decision.retryAfterSeconds };
   }
 
   route(
