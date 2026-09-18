@@ -95,6 +95,16 @@ void describe("shouldIgnoreWatchPath", () => {
     assert.equal(shouldIgnoreWatchPath("../../packages/kernel/src/a.ts"), false);
   });
 
+  /** @scenario "A build tool's own temp config leaves the backend lane alone" */
+  void it("ignores a build tool's bundled config written beside the package", () => {
+    assert.equal(shouldIgnoreWatchPath("../../packages/ksuid/tsup.config.bundled_py25.mjs"), true);
+    assert.equal(
+      shouldIgnoreWatchPath("../../packages/ksuid/vite.config.ts.timestamp-1758.mjs"),
+      true,
+    );
+    assert.equal(shouldIgnoreWatchPath("../../packages/ksuid/tsup.config.ts"), false);
+  });
+
   void it("ignores dist and generated churn", () => {
     assert.equal(shouldIgnoreWatchPath("../../modules/trace/process/dist/index.js"), true);
     assert.equal(shouldIgnoreWatchPath("src/generated/types.ts"), true);

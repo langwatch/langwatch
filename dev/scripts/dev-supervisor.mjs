@@ -46,6 +46,13 @@ const WATCH_IGNORE_PATTERNS = [
   // A test's scratch directory (`.tmp-rest-handler-tQBUui/fixture.ts`): a
   // suite running beside the stack must not restart it once per fixture.
   /(^|\/)\.tmp-[^/]+(\/|$)/,
+  // A build tool bundling its own config beside it: tsup writes
+  // `tsup.config.bundled_<hash>.mjs` and vite `vite.config.ts.timestamp-<n>.mjs`,
+  // then deletes it. `ensure-built.mjs` runs on every lane's predev and every
+  // scoped test, so on a shared checkout one session's build bounced another's
+  // api. specs/setup/dev-process-topology.feature.
+  /(^|\/)[^/]*\.config\.bundled_[^/]*\.mjs$/,
+  /(^|\/)[^/]*\.config\.[cm]?[jt]s\.timestamp-[^/]*\.mjs$/,
   // A module's browser half, which no api/worker code may import (the
   // enforcer's frontend/server separation). Reloading for it is pure churn,
   // and on a shared checkout it lets one session's screen work bounce

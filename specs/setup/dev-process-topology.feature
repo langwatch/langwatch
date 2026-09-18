@@ -133,6 +133,17 @@ Feature: The local development process topology
     When a file changes in a module's browser package
     Then the change is not worth a restart
 
+  # tsup and vite bundle their own config into a temp file beside it
+  # (`tsup.config.bundled_<hash>.mjs`) and delete it when the build ends. It is
+  # not source, nothing imports it, and `ensure-built.mjs` runs on every lane's
+  # predev and every scoped test — so on a shared checkout one session's build
+  # restarted another session's api, once per build.
+  @unit
+  Scenario: A build tool's own temp config leaves the backend lane alone
+    Given the backend lane running under a debounced watch
+    When a build tool writes its bundled config beside the package
+    Then the change is not worth a restart
+
   # --- The worker drains before a restart takes it down ---
 
   # A restart is a takedown-and-respawn: SIGTERM, then SIGKILL only after a
