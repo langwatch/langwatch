@@ -203,13 +203,11 @@ async function runFinish({
   props,
   refs,
   dispatch,
-  isCutAtLimit,
   nameOverride,
 }: {
   props: TalkToItPanelProps;
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
-  isCutAtLimit: boolean;
   nameOverride?: string;
 }): Promise<void> {
   // Read off the ref, not a closed-over `state` param: a provider-initiated
@@ -223,9 +221,10 @@ async function runFinish({
     name: nameOverride ?? props.name,
     conversationId: refs.conversationId.current,
     transcript,
+    // Whether the limit ended the call is the server's finding from this span
+    // (#8028); the panel keeps its own flag only for what it shows.
     startedAt: refs.startedAt.current || Date.now(),
     endedAt: Date.now(),
-    isCutAtLimit,
     ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
   };
   let res: Response;
@@ -264,7 +263,7 @@ async function runEndCall({
 }: {
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
-  finish: (args: { isCutAtLimit: boolean }) => Promise<void>;
+  finish: () => Promise<void>;
   isCutAtLimit: boolean;
 }): Promise<void> {
   stopTick(refs);
@@ -274,7 +273,7 @@ async function runEndCall({
   } catch {
     // The socket may already be closed; the finish still runs.
   }
-  await finish({ isCutAtLimit });
+  await finish();
 }
 
 /**
@@ -490,13 +489,8 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   refs.stateRef.current = state;
 
   const finish = useCallback(
-    ({
-      isCutAtLimit,
-      nameOverride,
-    }: {
-      isCutAtLimit: boolean;
-      nameOverride?: string;
-    }) => runFinish({ props, refs, dispatch, isCutAtLimit, nameOverride }),
+    ({ nameOverride }: { nameOverride?: string } = {}) =>
+      runFinish({ props, refs, dispatch, nameOverride }),
     [props, refs],
   );
   const endCall = useCallback(
@@ -517,9 +511,9 @@ function useTalkToItCall(props: TalkToItPanelProps) {
     });
   }, [props, refs, endCall]);
   const saveWithName = useCallback(
-    ({ isCutAtLimit, name }: { isCutAtLimit: boolean; name: string }) => {
+    ({ name }: { name: string }) => {
       dispatch({ type: "HANG_UP" }); // back to saving
-      void finish({ isCutAtLimit, nameOverride: name });
+      void finish({ nameOverride: name });
     },
     [finish],
   );
@@ -657,7 +651,7 @@ function NeedsNameView({
   state: Extract<TalkState, { kind: "needsName" }>;
   pendingName: string;
   setPendingName: (value: string) => void;
-  onSave: (args: { isCutAtLimit: boolean; name: string }) => void;
+  onSave: (args: { name: string }) => void;
 }) {
   return (
     <VStack align="stretch" gap={2} data-testid="talk-needs-name">
@@ -671,9 +665,7 @@ function NeedsNameView({
       <Button
         colorPalette="blue"
         disabled={pendingName.trim().length === 0}
-        onClick={() =>
-          onSave({ isCutAtLimit: state.isCutAtLimit, name: pendingName.trim() })
-        }
+        onClick={() => onSave({ name: pendingName.trim() })}
         data-testid="talk-name-save"
       >
         Save
