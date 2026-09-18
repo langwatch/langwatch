@@ -408,16 +408,20 @@ Feature: pi session capture
     When the list of tools the tile offers is read
     Then pi is among them
 
-  # The catalog answers "who makes this and how is it paid for" from per-tool
-  # maps that fall back rather than fail. A tool the maps do not name still
-  # renders, reading "Vendor not recorded" with no payment rows, so offering a
-  # tool in the picker without teaching the maps about it is a silent gap.
+  # Both facts are named outright rather than as "not the fall-back". A card
+  # reading a blank maker is as useless to the person holding the renewal as one
+  # reading "Vendor not recorded", and only the exact strings tell the two apart.
+  #
+  # Earendil Works rather than "Open source", which is what opencode carries: pi
+  # has a company a customer can put on a renewal, and the licence is a separate
+  # fact from who publishes it. Consumption because pi runs on a key the person
+  # supplies — there is no pi plan and no pi seat to count.
   @unit
-  Scenario: The catalog says who makes pi and how it is paid for
+  Scenario: The catalog names Earendil Works as pi's maker and bills it on use
     Given an organisation that registered pi from the tool tile
     When its catalog card is read
-    Then the card names pi's maker rather than saying the vendor is not recorded
-    And the card states how pi is paid for rather than leaving it unknown
+    Then the card names Earendil Works as pi's maker
+    And the card says pi is billed on what it consumed
 
   @unit
   Scenario: A pi policy chosen in the tile is accepted when saved

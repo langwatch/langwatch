@@ -106,25 +106,40 @@ describe("given a registered tool", () => {
     });
   });
 
+  describe("when the tool is pi", () => {
+    /**
+     * The exact two strings, not merely "not the fall-back". Nothing else in
+     * the repo pins either of them, so without this a vendor of three spaces
+     * renders a blank maker line on the card and every test still passes.
+     */
+    /** @scenario "The catalog names Earendil Works as pi's maker and bills it on use" */
+    it("names Earendil Works and bills pi on what it consumed", () => {
+      expect(vendorForTool(assistant("pi"))).toBe("Earendil Works");
+      expect(billingForTool(assistant("pi"))).toBe("consumption");
+    });
+  });
+
   /**
-   * Both maps fall back rather than throw when a kind is missing from them, so
-   * a kind added to the picker without them drifts silently: the tile renders,
-   * and it reads "Vendor not recorded" with no payment rows on a tool whose
-   * maker and billing model are both perfectly well known. Reading the picker's
-   * own list is what makes adding an option and forgetting the maps fail here
-   * instead of in the catalog.
+   * The maps are now total over the kinds the picker offers, so a missing kind
+   * is a compile error rather than something to test for. What typing cannot
+   * see is a kind that is present and useless — an empty string, or a
+   * deliberate `unknown` — which reaches the card as a blank maker line or a
+   * tool with no payment rows. That is what these read the picker's own list
+   * for.
    */
   describe("when every kind the tile picker offers is looked up", () => {
     const offeredKinds = ASSISTANT_OPTIONS.map((option) => option.value).filter(
       (kind) => kind !== "custom",
     );
 
-    /** @scenario "The catalog says who makes pi and how it is paid for" */
-    it.each(offeredKinds)("names who makes %s", (kind) => {
-      expect(vendorForTool(assistant(kind))).not.toBe(VENDOR_UNKNOWN);
+    /** @scenario "Every assistant the picker offers carries a maker and a billing model" */
+    it.each(offeredKinds)("gives %s a maker a customer could read", (kind) => {
+      const vendor = vendorForTool(assistant(kind));
+      expect(vendor).not.toBe(VENDOR_UNKNOWN);
+      expect(vendor.trim()).not.toBe("");
     });
 
-    /** @scenario "The catalog says who makes pi and how it is paid for" */
+    /** @scenario "Every assistant the picker offers carries a maker and a billing model" */
     it.each(offeredKinds)("knows how %s is paid for", (kind) => {
       expect(billingForTool(assistant(kind))).not.toBe("unknown");
     });
