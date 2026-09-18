@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@langwatch/plans": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "zod": "catalog:",
     "zod-validation-error": "catalog:"
   },

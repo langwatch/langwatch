@@ -391,6 +391,44 @@ function resolveDefinition(
   return { value: resolve(definition, []), bindings };
 }
 
+/**
+ * Which variable a compiled leaf reads, carried by the schema itself: a
+ * process composes modules from their declared SCHEMAS, so the binding has to
+ * survive compilation or the one parse could not read the environment at all.
+ */
+const environmentBindings = z.registry<{ readonly env: string }>();
+
+/**
+ * Records the binding on an instance of its own, because declarations
+ * legitimately share a spelling. A canonical leaf is still one instance: the
+ * copy is made where the leaf is declared, not where it is read.
+ */
+function bindEnvironment<Schema extends z.ZodType>(schema: Schema, env: string | undefined): Schema {
+  if (env === undefined) return schema;
+
+  const bound = schema.clone();
+  environmentBindings.add(bound, { env });
+  return bound;
+}
+
+/** The variable a compiled leaf reads, when its declaration named one. */
+export function configEnvironmentBinding(schema: unknown): string | undefined {
+  return schema instanceof z.ZodType ? environmentBindings.get(schema)?.env : undefined;
+}
+
+/** The variable a leaf reads when its declaration named none: its path, shouted. */
+export function environmentNameFor(path: readonly string[]): string {
+  return envName(path);
+}
+
+/** Empty string reads as absent, so `FOO=` in a dotenv means "not configured". */
+export function readEnvironmentSource(
+  source: Readonly<Record<string, unknown>>,
+  binding: string,
+): unknown {
+  return readSource(source, binding);
+}
+
 function configValue<T>(value: z.ZodType<T>, options?: { env?: string }): ConfigLeaf<T>;
 function configValue<const T extends boolean | number | string>(
   value: T,
@@ -400,7 +438,7 @@ function configValue<T>(value: z.ZodType<T> | T, options?: { env?: string }): Co
   const schema = isSchema(value) ? value : primitiveSchema(value as never);
   return {
     _configLeaf: true,
-    schema: schema as z.ZodType<T>,
+    schema: bindEnvironment(schema as z.ZodType<T>, options?.env),
     env: options?.env,
   };
 }
@@ -414,27 +452,39 @@ type WidenPrimitive<Value> = Value extends string
       : Value;
 
 function configUrl(options?: { env?: string }): ConfigLeaf<string> {
-  return { _configLeaf: true, schema: z.string().url(), env: options?.env };
+  return { _configLeaf: true, schema: bindEnvironment(z.string().url(), options?.env), env: options?.env };
 }
 
 /** The same URL, absent where the deployment does not set it. */
 function configOptionalUrl(options?: { env?: string }): ConfigLeaf<string | undefined> {
-  return { _configLeaf: true, schema: z.string().url().optional(), env: options?.env };
+  return {
+    _configLeaf: true,
+    schema: bindEnvironment(z.string().url().optional(), options?.env),
+    env: options?.env,
+  };
 }
 
 /** The same secret, absent where the deployment does not set it. */
 function configOptionalSecret(options?: { env?: string }): ConfigLeaf<string | undefined> {
-  return { _configLeaf: true, schema: z.string().min(1).optional(), env: options?.env };
+  return {
+    _configLeaf: true,
+    schema: bindEnvironment(z.string().min(1).optional(), options?.env),
+    env: options?.env,
+  };
 }
 
 function configSecret(options?: { env?: string }): ConfigLeaf<string> {
-  return { _configLeaf: true, schema: z.string().min(1), env: options?.env };
+  return {
+    _configLeaf: true,
+    schema: bindEnvironment(z.string().min(1), options?.env),
+    env: options?.env,
+  };
 }
 
 function configInteger(defaultValue?: number, options?: { env?: string }): ConfigLeaf<number> {
   const base = z.coerce.number().int();
   const schema = defaultValue === undefined ? base : base.default(defaultValue);
-  return { _configLeaf: true, schema, env: options?.env };
+  return { _configLeaf: true, schema: bindEnvironment(schema, options?.env), env: options?.env };
 }
 
 function configEnum<const Values extends readonly [string, ...string[]]>(
@@ -443,7 +493,7 @@ function configEnum<const Values extends readonly [string, ...string[]]>(
 ): ConfigLeaf<Values[number]> {
   return {
     _configLeaf: true,
-    schema: z.enum(values),
+    schema: bindEnvironment(z.enum(values), options?.env),
     env: options?.env,
   };
 }

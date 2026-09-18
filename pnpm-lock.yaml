@@ -3061,9 +3061,15 @@ importers:
 
   modules:
     dependencies:
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:agent/contract
       '@langwatch/agent-process':
         specifier: workspace:*
         version: link:agent/process
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:analytics/contract
       '@langwatch/analytics-process':
         specifier: workspace:*
         version: link:analytics/process
@@ -3076,21 +3082,33 @@ importers:
       '@langwatch/api-key-browser':
         specifier: workspace:*
         version: link:api-key/browser
+      '@langwatch/api-key-contract':
+        specifier: workspace:*
+        version: link:api-key/contract
       '@langwatch/api-key-process':
         specifier: workspace:*
         version: link:api-key/process
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:auth/contract
       '@langwatch/auth-process':
         specifier: workspace:*
         version: link:auth/process
       '@langwatch/authz-browser':
         specifier: workspace:*
         version: link:authz/browser
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:authz/contract
       '@langwatch/authz-process':
         specifier: workspace:*
         version: link:authz/process
       '@langwatch/automation-browser':
         specifier: workspace:*
         version: link:automation/browser
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:automation/contract
       '@langwatch/automation-process':
         specifier: workspace:*
         version: link:automation/process
@@ -3103,12 +3121,18 @@ importers:
       '@langwatch/data-privacy-browser':
         specifier: workspace:*
         version: link:data-privacy/browser
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:data-privacy/contract
       '@langwatch/data-privacy-process':
         specifier: workspace:*
         version: link:data-privacy/process
       '@langwatch/data-retention-browser':
         specifier: workspace:*
         version: link:data-retention/browser
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:data-retention/contract
       '@langwatch/data-retention-process':
         specifier: workspace:*
         version: link:data-retention/process
@@ -3118,15 +3142,30 @@ importers:
       '@langwatch/dataset-process':
         specifier: workspace:*
         version: link:dataset/process
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../enterprise/modules/billing/contract
       '@langwatch/enterprise-governance-process':
         specifier: workspace:*
         version: link:../enterprise/modules/governance/process
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../enterprise/modules/licensing/contract
       '@langwatch/enterprise-licensing-process':
         specifier: workspace:*
         version: link:../enterprise/modules/licensing/process
+      '@langwatch/enterprise-managed-provider-contract':
+        specifier: workspace:*
+        version: link:../enterprise/modules/managed-provider/contract
       '@langwatch/enterprise-managed-provider-process':
         specifier: workspace:*
         version: link:../enterprise/modules/managed-provider/process
+      '@langwatch/enterprise-saas-contract':
+        specifier: workspace:*
+        version: link:../enterprise/modules/saas/contract
+      '@langwatch/enterprise-scim-contract':
+        specifier: workspace:*
+        version: link:../enterprise/modules/scim/contract
       '@langwatch/enterprise-scim-process':
         specifier: workspace:*
         version: link:../enterprise/modules/scim/process
@@ -3136,6 +3175,9 @@ importers:
       '@langwatch/entitlement-process':
         specifier: workspace:*
         version: link:entitlement/process
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:evaluation/contract
       '@langwatch/evaluation-process':
         specifier: workspace:*
         version: link:evaluation/process
@@ -3145,15 +3187,24 @@ importers:
       '@langwatch/experiment-process':
         specifier: workspace:*
         version: link:experiment/process
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:feature-flag/contract
       '@langwatch/feature-flag-process':
         specifier: workspace:*
         version: link:feature-flag/process
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:gateway/contract
       '@langwatch/gateway-process':
         specifier: workspace:*
         version: link:gateway/process
       '@langwatch/github-browser':
         specifier: workspace:*
         version: link:github/browser
+      '@langwatch/github-contract':
+        specifier: workspace:*
+        version: link:github/contract
       '@langwatch/github-process':
         specifier: workspace:*
         version: link:github/process
@@ -3166,18 +3217,30 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../packages/kernel
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:langy/contract
       '@langwatch/langy-process':
         specifier: workspace:*
         version: link:langy/process
+      '@langwatch/log-contract':
+        specifier: workspace:*
+        version: link:log/contract
       '@langwatch/log-process':
         specifier: workspace:*
         version: link:log/process
+      '@langwatch/metric-contract':
+        specifier: workspace:*
+        version: link:metric/contract
       '@langwatch/metric-process':
         specifier: workspace:*
         version: link:metric/process
       '@langwatch/model-provider-browser':
         specifier: workspace:*
         version: link:model-provider/browser
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:model-provider/contract
       '@langwatch/model-provider-process':
         specifier: workspace:*
         version: link:model-provider/process
@@ -3190,12 +3253,18 @@ importers:
       '@langwatch/notification-browser':
         specifier: workspace:*
         version: link:notification/browser
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:notification/contract
       '@langwatch/notification-process':
         specifier: workspace:*
         version: link:notification/process
       '@langwatch/onboarding-browser':
         specifier: workspace:*
         version: link:onboarding/browser
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:ops/contract
       '@langwatch/ops-process':
         specifier: workspace:*
         version: link:ops/process
@@ -3205,6 +3274,9 @@ importers:
       '@langwatch/organization-process':
         specifier: workspace:*
         version: link:organization/process
+      '@langwatch/platform-health-contract':
+        specifier: workspace:*
+        version: link:platform-health/contract
       '@langwatch/platform-health-process':
         specifier: workspace:*
         version: link:platform-health/process
@@ -3232,12 +3304,18 @@ importers:
       '@langwatch/secret-browser':
         specifier: workspace:*
         version: link:secret/browser
+      '@langwatch/secret-contract':
+        specifier: workspace:*
+        version: link:secret/contract
       '@langwatch/secret-process':
         specifier: workspace:*
         version: link:secret/process
       '@langwatch/share-process':
         specifier: workspace:*
         version: link:share/process
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:stored-object/contract
       '@langwatch/stored-object-process':
         specifier: workspace:*
         version: link:stored-object/process
@@ -3250,6 +3328,9 @@ importers:
       '@langwatch/topic-process':
         specifier: workspace:*
         version: link:topic/process
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:trace/contract
       '@langwatch/trace-process':
         specifier: workspace:*
         version: link:trace/process
@@ -3259,9 +3340,15 @@ importers:
       '@langwatch/user-process':
         specifier: workspace:*
         version: link:user/process
+      '@langwatch/webhook-contract':
+        specifier: workspace:*
+        version: link:webhook/contract
       '@langwatch/webhook-process':
         specifier: workspace:*
         version: link:webhook/process
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:workflow/contract
       '@langwatch/workflow-process':
         specifier: workspace:*
         version: link:workflow/process

@@ -5,6 +5,12 @@ import { Config, RuntimeConfig, type ConfigValue } from "./runtime-config.ts";
 export { deploymentCredentialsSecret, deploymentPublicBaseUrl } from "./deployment-facts.ts";
 
 export {
+  defineProcessConfig,
+  type ProcessConfig,
+  type ProcessConfigDeclaration,
+} from "./process-config.ts";
+
+export {
   nodeEnvironmentSchema,
   environmentBooleanSchema,
   environmentPresenceSchema,

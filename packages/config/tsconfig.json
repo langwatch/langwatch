@@ -27,6 +27,9 @@
     },
     {
       "path": "../plans/tsconfig.build.json"
+    },
+    {
+      "path": "../secrets/tsconfig.build.json"
     }
   ]
 }

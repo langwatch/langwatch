@@ -473,7 +473,7 @@ export const githubConfig = Config.define({
 });
 
 // apps/api/src/config.ts — the whole file
-export const apiConfig = defineAppConfig({
+export const apiConfig = defineProcessConfig({
   process: {                                  // global config, beside the modules
     port:               Config.value(z.coerce.number().default(6560), { env: ["API_PORT", "PORT"] }),
     serviceName:        Config.value(z.string().default("langwatch-api")),

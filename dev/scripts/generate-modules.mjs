@@ -10,6 +10,7 @@ const REPOSITORY_ROOT = resolve(import.meta.dirname, "../..");
 const SERVER_LIST = "modules/server-modules.generated.ts";
 const WEB_LIST = "modules/web-modules.generated.ts";
 const SERVER_MEMBERS = "modules/server-module-members.generated.ts";
+const MODULE_CONFIGS = "modules/installed-module-configs.generated.ts";
 const MODULES_PACKAGE = "modules/package.json";
 
 /** `api-key` reads as `apiKey`, which is how a module names its declaration. */
@@ -108,6 +109,64 @@ function memberSourceFor({ root, catalogue }) {
   ].join("\n");
 }
 
+/**
+ * Every installed module that declares a config schema, in name order. Found
+ * the way the declaration lists are: by the name a module's contract exports,
+ * so a module that declares none contributes no key and no slice.
+ */
+function moduleConfigsFor({ root, catalogue }) {
+  const configs = [];
+  for (const entry of catalogue.features) {
+    const packagePath = resolve(root, entry.root, "contract", "package.json");
+    const configPath = resolve(root, entry.root, "contract", "src", `${entry.id}.config.ts`);
+    const indexPath = resolve(root, entry.root, "contract", "src", "index.ts");
+    if (!existsSync(packagePath)) continue;
+    if (!existsSync(configPath)) continue;
+    if (!existsSync(indexPath)) continue;
+
+    const symbol = `${camelCase(entry.id)}ServerConfigSchema`;
+    if (!new RegExp(`export const ${symbol}\\b`).test(readFileSync(configPath, "utf8"))) continue;
+    if (!readFileSync(indexPath, "utf8").includes(`./${entry.id}.config`)) continue;
+
+    configs.push({
+      id: entry.id,
+      symbol,
+      specifier: JSON.parse(readFileSync(packagePath, "utf8")).name,
+    });
+  }
+  return configs.toSorted((one, other) => one.id.localeCompare(other.id));
+}
+
+/** The map `defineProcessConfig` composes a process's whole parse from. */
+function moduleConfigSourceFor({ configs }) {
+  const imports = configs
+    .map((config) => `import { ${config.symbol} } from "${config.specifier}";`)
+    .toSorted((one, other) => one.localeCompare(other));
+  const entries = configs.map((config) => {
+    const key = /^[a-z][a-zA-Z0-9]*$/.test(config.id) ? config.id : JSON.stringify(config.id);
+    return `  ${key}: ${config.symbol},`;
+  });
+
+  return [
+    "/** Generated from modules/catalogue.json. Do not edit by hand. */",
+    "/** Run `pnpm generate:modules` to rewrite it. */",
+    "",
+    ...imports,
+    imports.length === 0 ? "" : "",
+    "/**",
+    " * Every installed module that declares a config schema, in name order,",
+    " * re-exported from the module's own declaration. A module that declares",
+    " * none contributes no key here and no root key on the parsed config.",
+    " */",
+    "export const installedModuleConfigs = {",
+    ...entries,
+    "} as const;",
+    "",
+  ]
+    .filter((line, index, all) => !(line === "" && all[index - 1] === ""))
+    .join("\n");
+}
+
 /** The generated source for one list, imports first and the array last. */
 function sourceFor({ declarations, constant, half }) {
   const imports = [
@@ -171,11 +230,12 @@ function sourceFor({ declarations, constant, half }) {
   ].join("\n");
 }
 
-function packageSourceFor({ root, catalogue }) {
+function packageSourceFor({ root, catalogue, configs }) {
   const manifest = JSON.parse(readFileSync(resolve(root, MODULES_PACKAGE), "utf8"));
   const installed = [
     ...declarationsFor({ root, catalogue, half: "server", suffix: "Server" }),
     ...declarationsFor({ root, catalogue, half: "web", suffix: "Web" }),
+    ...configs.map((config) => ({ package: config.specifier })),
   ];
 
   // The generated chain imports createApp from the kernel, so the manifest
@@ -325,6 +385,7 @@ function pairingSource({ root, catalogue }) {
 /** Both lists, as the text that belongs on disk. */
 export function generateModuleLists({ root = REPOSITORY_ROOT } = {}) {
   const catalogue = JSON.parse(readFileSync(resolve(root, "modules/catalogue.json"), "utf8"));
+  const configs = moduleConfigsFor({ root, catalogue });
 
   return {
     [SERVER_LIST]: sourceFor({
@@ -339,7 +400,8 @@ export function generateModuleLists({ root = REPOSITORY_ROOT } = {}) {
         half: "web",
       }) + pairingSource({ root, catalogue }),
     [SERVER_MEMBERS]: memberSourceFor({ root, catalogue }),
-    [MODULES_PACKAGE]: packageSourceFor({ root, catalogue }),
+    [MODULE_CONFIGS]: moduleConfigSourceFor({ configs }),
+    [MODULES_PACKAGE]: packageSourceFor({ root, catalogue, configs }),
     ...generateBrowserRenderers({ root }),
   };
 }
