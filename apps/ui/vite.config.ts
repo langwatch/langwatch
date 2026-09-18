@@ -13,7 +13,7 @@ import react from "@vitejs/plugin-react";
 import dotenv from "dotenv";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
 
-import { UI_ASSET_URL_GLOBAL } from "./src/model/ui-asset-base";
+import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
 import { havenHmrGate } from "./vite/havenHmrGate";
@@ -204,7 +204,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     experimental: {
       // ADR-086: the base for content-hashed assets is chosen at container start, not
       // build time. JS-referenced assets call the runtime resolver
-      // (src/model/ui-asset-base.ts); CSS-referenced assets stay relative to the CSS
+      // (vite/asset-base.ts); CSS-referenced assets stay relative to the CSS
       // file; HTML entry refs stay base-absolute for the server to rewrite; public/
       // assets stay same-origin.
       renderBuiltUrl(filename, { type, hostType }) {

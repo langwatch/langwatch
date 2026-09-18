@@ -1,9 +1,9 @@
 /** Create-project drawer: inline error (no toast), hard nav after create. */
 
 import { Heading } from "@chakra-ui/react";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Drawer } from "@langwatch/design-system/drawer";
 import type React from "react";
-import { useAnalytics } from "react-contextual-analytics";
 
 import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
@@ -50,7 +50,7 @@ export function CreateProjectDrawer({
   const { organization: currentOrganization } = useOrganizationTeamProject();
   const host = useOrganizationHost();
   const toaster = useOrganizationToaster();
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
 
   const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
   const { closeDrawer } = useDrawer();
@@ -90,10 +90,14 @@ export function CreateProjectDrawer({
         onSuccess: (result) => {
           invalidateProjectListQueries(queryClient);
 
-          emit("created", "project", {
-            project_slug: result.projectSlug,
-            language: data.language,
-            framework: data.framework,
+          analytics.track({
+            action: "created",
+            name: "project",
+            attributes: {
+              project_slug: result.projectSlug,
+              language: data.language,
+              framework: data.framework,
+            },
           });
 
           toaster.create({

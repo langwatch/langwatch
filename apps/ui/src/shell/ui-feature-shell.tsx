@@ -2,6 +2,7 @@
  * What `apps/ui` mounts around every routed page.
  */
 
+import { BrowserUiRpc } from "@langwatch/browser-host/browser-rpc";
 import {
   BrowserUiDocumentTitle,
   resolveUiCapabilities,
@@ -17,19 +18,18 @@ import { createUiQueryClient } from "@langwatch/browser-host/query-client";
 import { UiSlot } from "@langwatch/browser-host/slots";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
+import {
+  createUiFeatureApiClient,
+  type UiFeatureApiBinding,
+  type UiFeatureApiTransport,
+} from "@langwatch/browser-host/transport";
 import { UiScopeHostProvider } from "@langwatch/browser-host/use-organization-team-project";
 import { QueryClientContext, QueryClientProvider } from "@tanstack/react-query";
 import { useContext, useMemo, useState, type ReactNode } from "react";
 
 import type { UiFailureHost, UiFailureInterceptor } from "../behavior/ui-feature";
-import {
-  createUiFeatureApiClient,
-  type UiFeatureApiBinding,
-  type UiFeatureApiTransport,
-} from "../behavior/ui-feature-transport";
-import { useRouterUiNavigation, useRouterUiRoute } from "../behavior/ui-router-navigation";
-import { BrowserUiRpc } from "../behavior/ui-rpc";
-import type { UiSessionCapabilities, UiSessionSource } from "../behavior/ui-session";
+import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host/navigation";
+import type { UiSessionCapabilities, UiSessionSource } from "@langwatch/browser-host/capabilities";
 import { UiApiWaitingGate } from "./ui-api-waiting-gate";
 import type { UiProviderShell } from "./ui-outer-providers";
 

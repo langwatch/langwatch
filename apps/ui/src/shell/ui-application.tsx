@@ -9,7 +9,7 @@ import type { FallbackProps } from "react-error-boundary";
 import type { UiFeatureInstall } from "../behavior/ui-feature";
 import { mergeUiPageLoaders, uiFeatureLoaders } from "../behavior/ui-feature-loaders";
 import type { UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
-import { createUiRouter, type UiRouter } from "../behavior/ui-router";
+import { createUiRouter, type UiRouter } from "@langwatch/browser-host/navigation";
 import { createUiFeatureShell } from "./ui-feature-shell";
 import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers";
 import {

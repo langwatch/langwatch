@@ -8,7 +8,7 @@ import { render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { useRouterUiRoute } from "../ui-router-navigation";
+import { useRouterUiRoute } from "@langwatch/browser-host/navigation";
 
 function readRouteAt(url: string): { port: UiRoute; search: () => string } {
   let port: UiRoute | undefined;

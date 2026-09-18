@@ -7,7 +7,7 @@
 import { hashKey, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
 
-import { useUiApiWait, UI_API_HEALTH_PATH } from "../behavior/ui-api-reachability";
+import { useUiApiWait, UI_API_HEALTH_PATH } from "@langwatch/browser-host/navigation";
 import { UI_SESSION_QUERY_KEY, type UiSessionReading } from "@langwatch/auth-browser/session";
 import { UiApiWaitingScreen } from "./ui-api-waiting-screen";
 

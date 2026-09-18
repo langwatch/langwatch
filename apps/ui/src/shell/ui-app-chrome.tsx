@@ -6,8 +6,8 @@
 
 import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-browser/chrome";
+import { useUiOrgQueryParamSelection } from "@langwatch/organization-browser/surfaces/scope-capability";
 
-import { useUiOrgQueryParamSelection } from "../behavior/ui-scope-org-param";
 import { UiNavigationHost } from "./navigation-host-provider";
 import { UiRouteOutlet } from "./ui-route-objects";
 

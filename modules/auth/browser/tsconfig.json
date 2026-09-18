@@ -33,7 +33,13 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
@@ -43,6 +49,9 @@
     },
     {
       "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

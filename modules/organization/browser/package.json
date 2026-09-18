@@ -41,6 +41,10 @@
     "./surfaces/organization-facts": {
       "types": "./dist/behavior/ui-organization-facts.d.ts",
       "default": "./src/behavior/ui-organization-facts.ts"
+    },
+    "./surfaces/scope-capability": {
+      "types": "./dist/behavior/scope-capability.d.ts",
+      "default": "./src/behavior/scope-capability.ts"
     }
   },
   "scripts": {
@@ -48,11 +52,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tanstack/react-query": "catalog:",
-    "@langwatch/config": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-browser": "workspace:*",
@@ -61,10 +64,12 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
+    "@tanstack/react-query": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
     "papaparse": "catalog:",
     "react-hook-form": "catalog:",
+    "react-router": "catalog:",
     "use-debounce": "catalog:"
   },
   "devDependencies": {

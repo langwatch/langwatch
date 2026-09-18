@@ -6,12 +6,21 @@
  * @see specs/projects/project-creation-flow.feature
  */
 
+import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-const { mockCreate, mockCreateState, mockTeams, invalidations, mockEmit } = vi.hoisted(() => ({
+class RecordingUiAnalytics extends UiAnalytics {
+  readonly tracked: UiAnalyticsEvent[] = [];
+
+  track(event: UiAnalyticsEvent): void {
+    this.tracked.push(event);
+  }
+}
+
+const { mockCreate, mockCreateState, mockTeams, invalidations } = vi.hoisted(() => ({
   mockCreate: vi.fn(),
   mockCreateState: { current: { isPending: false, error: null as unknown } },
   mockTeams: {
@@ -27,7 +36,6 @@ const { mockCreate, mockCreateState, mockTeams, invalidations, mockEmit } = vi.h
     ] as Record<string, unknown>[],
   },
   invalidations: { current: [] as string[] },
-  mockEmit: vi.fn(),
 }));
 
 const invalidator = (name: string) => ({
@@ -61,10 +69,6 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
       },
     },
   },
-}));
-
-vi.mock("react-contextual-analytics", () => ({
-  useAnalytics: () => ({ emit: mockEmit }),
 }));
 
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
@@ -170,19 +174,32 @@ describe("given the create-project drawer", () => {
 
     /** @scenario "Track project creation event" */
     it("records the creation as a product event", async () => {
-      renderWithOrganizationHost(<CreateProjectDrawer defaultTeamId="team-2" />);
+      const analytics = new RecordingUiAnalytics();
+      renderWithOrganizationHost(
+        <CreateProjectDrawer defaultTeamId="team-2" />,
+        new FakeOrganizationHost(),
+        { analytics },
+      );
 
       const user = await typeName("Checkout Bot");
       await user.click(screen.getByRole("button", { name: "Create" }));
 
       await waitFor(() => expect(mockCreate).toHaveBeenCalled());
-      mockCreate.mock.calls[0]?.[1]?.onSuccess?.({ projectSlug: "checkout-bot" });
+      mockCreate.mock.calls[0]?.[1]?.onSuccess?.({
+        projectSlug: "checkout-bot",
+      });
 
-      expect(mockEmit).toHaveBeenCalledWith(
-        "created",
-        "project",
-        expect.objectContaining({ project_slug: "checkout-bot" }),
-      );
+      expect(analytics.tracked).toEqual([
+        {
+          action: "created",
+          name: "project",
+          attributes: {
+            project_slug: "checkout-bot",
+            language: "other",
+            framework: "other",
+          },
+        },
+      ]);
     });
   });
 

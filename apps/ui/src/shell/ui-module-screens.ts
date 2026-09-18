@@ -7,7 +7,7 @@
 import type { SupplyModule, WebScreen } from "@langwatch/ui-kernel";
 import type { RouteObject } from "react-router";
 
-import { lazyRoute, type LazyRouteModule } from "../behavior/lazy-route";
+import { lazyRoute, type LazyRouteModule } from "@langwatch/browser-host/navigation";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
 import type { UiWebRouteParent } from "./ui-web-installation";
 

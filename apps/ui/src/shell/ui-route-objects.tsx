@@ -4,7 +4,7 @@
 
 import { Outlet, useMatches, type RouteObject } from "react-router";
 
-import { lazyRoute } from "../behavior/lazy-route";
+import { lazyRoute } from "@langwatch/browser-host/navigation";
 import {
   resolveUiPageLoader,
   type UiPageLoader,

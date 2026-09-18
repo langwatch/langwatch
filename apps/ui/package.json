@@ -7,13 +7,7 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
-    },
     "./public-config": {
       "types": "./src/behavior/public-config.ts",
       "default": "./src/behavior/public-config.ts"
@@ -21,34 +15,6 @@
     "./design-system": {
       "types": "./src/behavior/design-system.ts",
       "default": "./src/behavior/design-system.ts"
-    },
-    "./langy-theme": {
-      "types": "./src/model/langy-theme.ts",
-      "default": "./src/model/langy-theme.ts"
-    },
-    "./analytics-client": {
-      "types": "./src/behavior/analytics-client.ts",
-      "default": "./src/behavior/analytics-client.ts"
-    },
-    "./posthog-analytics": {
-      "types": "./src/behavior/posthog-analytics.ts",
-      "default": "./src/behavior/posthog-analytics.ts"
-    },
-    "./gtag-readiness": {
-      "types": "./src/behavior/gtag-readiness.ts",
-      "default": "./src/behavior/gtag-readiness.ts"
-    },
-    "./browser-tracing": {
-      "types": "./src/behavior/browser-tracing.ts",
-      "default": "./src/behavior/browser-tracing.ts"
-    },
-    "./navigation-tracing": {
-      "types": "./src/behavior/navigation-tracing.ts",
-      "default": "./src/behavior/navigation-tracing.ts"
-    },
-    "./poll-for-global": {
-      "types": "./src/behavior/poll-for-global.ts",
-      "default": "./src/behavior/poll-for-global.ts"
     }
   },
   "scripts": {
@@ -61,25 +27,26 @@
   "dependencies": {
     "@better-auth/passkey": "catalog:",
     "@chakra-ui/react": "catalog:",
-    "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-browser": "workspace:*",
+    "@langwatch/agent-contract": "workspace:*",
     "@langwatch/analytics-browser": "workspace:*",
     "@langwatch/annotation-browser": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/api-key-browser": "workspace:*",
-    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/auth-browser": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-browser": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/automation-browser": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/data-privacy-browser": "workspace:*",
     "@langwatch/data-retention-browser": "workspace:*",
     "@langwatch/dataset-browser": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-billing-browser": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-governance-browser": "workspace:*",
     "@langwatch/enterprise-licensing-browser": "workspace:*",
     "@langwatch/enterprise-managed-provider-browser": "workspace:*",
@@ -87,42 +54,42 @@
     "@langwatch/enterprise-scim-browser": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-browser": "workspace:*",
-    "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/experiment-browser": "workspace:*",
-    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/gateway-browser": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/github-browser": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/installed-modules": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
-    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/monitor-browser": "workspace:*",
     "@langwatch/navigation-browser": "workspace:*",
-    "@langwatch/notification-contract": "workspace:*",
     "@langwatch/notification-browser": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
     "@langwatch/onboarding-browser": "workspace:*",
-    "@langwatch/ops-contract": "workspace:*",
     "@langwatch/ops-browser": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-browser": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/project-browser": "workspace:*",
     "@langwatch/prompt-browser": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
-    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-browser": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/secret-browser": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-browser": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
-    "@langwatch/user-contract": "workspace:*",
     "@langwatch/user-browser": "workspace:*",
-    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@trpc/client": "catalog:",
     "@trpc/react-query": "catalog:",

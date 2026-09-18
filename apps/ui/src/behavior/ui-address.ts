@@ -1,12 +1,7 @@
 /**
- * The whole address, as a string — `UiRoute` answers only path and
- * query, but Deja View keeps its workspace state in the URL FRAGMENT, so
- * the ops host reads `asPath()` from here instead.
+ * Moved to `@langwatch/browser-host/address` — framework, not feature; the
+ * record (§10.1, amended 2026-09-18) says `apps/ui` holds only `main.tsx` and
+ * `styles/`. This re-export stays until every importer here repoints.
  */
 
-import { useLocation } from "react-router";
-
-export function useUiAddress(): string {
-  const location = useLocation();
-  return `${location.pathname}${location.search}${location.hash}`;
-}
+export { useUiAddress } from "@langwatch/browser-host/address";

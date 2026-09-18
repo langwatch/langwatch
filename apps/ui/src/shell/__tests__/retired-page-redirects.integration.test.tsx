@@ -62,10 +62,16 @@ function open(address: string) {
 async function expectLands({ from, at }: { from: string; at: string }) {
   const router = open(from);
 
-  await waitFor(() => {
-    const { pathname, search, hash } = router.state.location;
-    expect(`${pathname}${search}${hash}`).toBe(at);
-  });
+  await waitFor(
+    () => {
+      const { pathname, search, hash } = router.state.location;
+      expect(`${pathname}${search}${hash}`).toBe(at);
+    },
+    // The chrome layout above these routes is lazy, and resolving its chunk on
+    // the FIRST case in this file costs more than waitFor's 1s default — which
+    // failed only the first test and read as a route-table bug.
+    { timeout: 5000 },
+  );
   return router;
 }
 

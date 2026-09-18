@@ -12,27 +12,69 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const departures = vi.hoisted(() => ({ to: [] as string[] }));
 
-vi.mock("../ui-departure", () => ({
+// Partial: departure is recorded, the rest of the navigation surface stays
+// real — the router hooks moved into this module, and a mock that replaced it
+// wholesale took them out with it.
+vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/browser-host/navigation")>()),
   uiLeaveTo: (url: string) => departures.to.push(url),
   uiOpenExternal: () => {
     throw new Error("The waiting screen opened a tab.");
   },
 }));
 
+import type { UiAuthClient } from "@langwatch/auth-browser/session";
+import {
+  useBrowserUiSession,
+  useUiSessionReading,
+} from "@langwatch/auth-browser/session-capability";
 import {
   UiFeedback,
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "@langwatch/browser-host/capabilities";
+import { useUiApiWait, UI_API_WAIT_HINT_AFTER_MS } from "@langwatch/browser-host/navigation";
+import type { UiFeatureApiTransport } from "@langwatch/browser-host/transport";
+import { UI_ORGANIZATIONS_PROCEDURE } from "@langwatch/organization-browser/surfaces/organization-facts";
+import {
+  createBrowserUiScope,
+  isUiPublicRoute,
+  useUiScopeReading,
+} from "@langwatch/organization-browser/surfaces/scope-capability";
+import type { UiScopeOrganization, UiScopeTeam } from "@langwatch/organization-contract";
 
 import { UiApiWaitingScreen, UI_API_DEV_COMMAND } from "../../shell/ui-api-waiting-screen";
 import { createUiFeatureShell } from "../../shell/ui-feature-shell";
-import { useUiApiWait, UI_API_WAIT_HINT_AFTER_MS } from "../ui-api-reachability";
-import type { UiFeatureApiTransport } from "../ui-feature-transport";
-import { useBrowserUiSession } from "../ui-session";
-import type { UiAuthClient } from "@langwatch/auth-browser/session";
-import { UI_ORGANIZATIONS_PROCEDURE } from "../ui-session-queries";
-import { JANE, organizationWith, PERSONAL_TEAM, SHARED_TEAM } from "./ui-scope-graph";
+
+/** The graph `organization.getAll` returns, only as far as this gate reads it. */
+const JANE = "user-jane";
+
+const PERSONAL_TEAM: UiScopeTeam = {
+  id: "team-personal",
+  slug: "personal-jane",
+  isPersonal: true,
+  ownerUserId: JANE,
+  members: [{ userId: JANE }],
+  projects: [{ id: "proj-personal", slug: "personal-jane-abc123", name: "Personal Workspace" }],
+};
+
+const SHARED_TEAM: UiScopeTeam = {
+  id: "team-shared",
+  slug: "acme",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: JANE }],
+  projects: [{ id: "proj-app", slug: "acme-app", name: "ACME App" }],
+};
+
+const ACME: readonly UiScopeOrganization[] = [
+  {
+    id: "org-acme",
+    slug: "acme",
+    members: [{ role: "ADMIN" }],
+    teams: [PERSONAL_TEAM, SHARED_TEAM],
+  },
+];
 
 const refusesToSignOut = (): Promise<unknown> => {
   throw new Error("A session read ended the session.");
@@ -87,7 +129,7 @@ class RecordingFeedback extends UiFeedback {
 const answeringTransport = {
   query: (path: string) =>
     path === UI_ORGANIZATIONS_PROCEDURE
-      ? Promise.resolve(organizationWith({ teams: [PERSONAL_TEAM, SHARED_TEAM] }))
+      ? Promise.resolve(ACME)
       : Promise.resolve({ permissions: [], enabled: false }),
 } as unknown as UiFeatureApiTransport;
 
@@ -122,8 +164,22 @@ function renderShell({
     apis: [],
     capabilities: { feedback },
     transport: answeringTransport,
-    session: ({ transport: mounted, feedback: told }) =>
-      useBrowserUiSession({ transport: mounted, feedback: told, authClient }),
+    // The composition root's four calls, with the recorded session client
+    // drilled in — see `useBrowserUiCapabilities` in main.tsx.
+    session: ({ transport: mounted, feedback: told }) => {
+      const sessionReading = useUiSessionReading({
+        feedback: told,
+        isPublicRoute: isUiPublicRoute(path),
+        authClient,
+      });
+      const scopeReading = useUiScopeReading({ transport: mounted, session: sessionReading });
+      const session = useBrowserUiSession({
+        transport: mounted,
+        session: sessionReading,
+        scope: scopeReading.scope,
+      });
+      return { session, scope: createBrowserUiScope({ reading: scopeReading, session }) };
+    },
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(

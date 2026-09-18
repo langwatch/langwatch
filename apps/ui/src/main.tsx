@@ -1,27 +1,39 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
-import type { UiDeployment } from "@langwatch/browser-host/capabilities";
+import {
+  useBrowserUiSession,
+  useUiSessionReading,
+} from "@langwatch/auth-browser/session-capability";
+import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
+import type {
+  UiDeployment,
+  UiFeedback,
+  UiSessionCapabilities,
+} from "@langwatch/browser-host/capabilities";
 import { deriveUiDeployment } from "@langwatch/browser-host/deployment";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
-import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
-import { webModules } from "@langwatch/installed-modules/web";
-import { createUi } from "@langwatch/ui-kernel";
-import posthog from "posthog-js";
-import type { ReactNode } from "react";
-
-import { createBrowserUiAnalytics } from "./behavior/analytics-client";
-import { registerChunkReloadListener } from "./behavior/chunk-reload";
-import { readPublicAppConfig } from "./behavior/public-config";
-import { toPublicEnvironment } from "./behavior/public-environment";
+import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiTransport,
-} from "./behavior/ui-feature-transport";
+} from "@langwatch/browser-host/transport";
+import type { PublicAppConfig } from "@langwatch/config/public-app-config";
+import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
+import { webModules } from "@langwatch/installed-modules/web";
+import {
+  createBrowserUiScope,
+  isUiPublicRoute,
+  useUiScopeReading,
+} from "@langwatch/organization-browser/surfaces/scope-capability";
+import { createUi } from "@langwatch/ui-kernel";
+import posthog from "posthog-js";
+import type { ReactNode } from "react";
+import { useLocation } from "react-router";
+
+import { readPublicAppConfig } from "./behavior/public-config";
 import { BrowserUiFeedback } from "./behavior/ui-feedback";
-import { useBrowserUiSession } from "./behavior/ui-session";
 import { UiShell } from "./behavior/ui-shell";
 import { UiRuntime } from "./behavior/ui.runtime";
-import type { PublicEnvironment } from "./model/public-environment";
 import { GraphicsQualityProvider } from "./shell/graphics-quality-provider";
 import { createUiApplication, type UiApplication } from "./shell/ui-application";
 import { UiApplicationShell } from "./shell/ui-application-shell";
@@ -60,9 +72,37 @@ function UiBootPageError() {
   );
 }
 
+/**
+ * Where the two capabilities meet, and the only place they do. Four calls in
+ * the order ruling (a) fixes: who is here, where they are standing, the
+ * session port over both, then the scope port over the grants the session
+ * answered. `auth` and `organization` never import each other.
+ */
+function useBrowserUiCapabilities({
+  transport,
+  feedback,
+}: {
+  transport: UiFeatureApiTransport;
+  feedback: UiFeedback;
+}): UiSessionCapabilities {
+  const { pathname } = useLocation();
+  const sessionReading = useUiSessionReading({
+    feedback,
+    isPublicRoute: isUiPublicRoute(pathname),
+  });
+  const scopeReading = useUiScopeReading({ transport, session: sessionReading });
+  const session = useBrowserUiSession({
+    transport,
+    session: sessionReading,
+    scope: scopeReading.scope,
+  });
+
+  return { session, scope: createBrowserUiScope({ reading: scopeReading, session }) };
+}
+
 class BrowserUiShell extends UiShell {
   static create(
-    environment: PublicEnvironment,
+    config: PublicAppConfig,
     isDevelopment: boolean,
     deployment: UiDeployment,
     screens: UiModuleScreens,
@@ -78,7 +118,7 @@ class BrowserUiShell extends UiShell {
           transport,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
-          session: useBrowserUiSession,
+          session: useBrowserUiCapabilities,
           capabilities: {
             feedback: BrowserUiFeedback.create(),
             deployment,
@@ -101,7 +141,7 @@ class BrowserUiShell extends UiShell {
           commandBar: UiPendingProvider,
           toaster: UiErrorToaster,
           footer: UiNoFooter,
-          usePublicEnvironment: () => ({ data: environment }),
+          usePublicAppConfig: () => ({ data: config }),
           useNavigationTracking: useNoNavigationTracking,
           isDevelopment,
         },
@@ -149,11 +189,10 @@ export async function startUi(): Promise<void> {
     .render();
 
   configureDocsRuntime({ mode: config.mode, hostname: window.location.hostname });
-  const environment = toPublicEnvironment(config);
   UiRuntime.create({
     document,
     shell: BrowserUiShell.create(
-      environment,
+      config,
       config.mode === "development",
       deriveUiDeployment(config),
       installedModuleScreens(installed.modules),

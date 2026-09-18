@@ -8,8 +8,10 @@ import type {
   NavigationOrganization,
   NavigationTeam,
 } from "@langwatch/navigation-browser/navigation";
-
-import { selectAmbientTeam, userCanOpenTeam } from "../behavior/ui-scope-resolution";
+import {
+  selectAmbientTeam,
+  userCanOpenTeam,
+} from "@langwatch/organization-browser/surfaces/scope-capability";
 
 /** `organization.getAll` as it arrives, including what only presence reads. */
 export type NavigationGraphRead = readonly {

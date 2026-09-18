@@ -65,6 +65,10 @@
       "langwatch-declaration-source": "./src/langy.ts",
       "types": "./dist/langy.d.ts",
       "default": "./src/langy.ts"
+    },
+    "./surfaces/langy-theme": {
+      "types": "./src/ui/elements/langy-theme.ts",
+      "default": "./src/ui/elements/langy-theme.ts"
     }
   },
   "scripts": {
@@ -110,6 +114,7 @@
   },
   "devDependencies": {
     "@langwatch/skills": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",

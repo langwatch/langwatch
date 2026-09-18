@@ -9,9 +9,6 @@ import {
   type PublicAppConfig,
 } from "@langwatch/config/public-app-config";
 
-export { type PublicEnvironment } from "../model/public-environment";
-export { toPublicEnvironment } from "./public-environment";
-
 export function readPublicAppConfig(
   documentRoot: {
     querySelector(selector: string): { getAttribute(name: string): string | null } | null;

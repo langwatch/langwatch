@@ -21,6 +21,10 @@
       "langwatch-declaration-source": "./src/auth.ts",
       "types": "./dist/auth.d.ts",
       "default": "./src/auth.ts"
+    },
+    "./session-capability": {
+      "types": "./dist/behavior/ui-session.d.ts",
+      "default": "./src/behavior/ui-session.ts"
     }
   },
   "scripts": {
@@ -28,19 +32,22 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/browser-host": "workspace:*",
-    "@langwatch/handled-error": "workspace:*",
-    "@tanstack/react-query": "catalog:",
     "@better-auth/passkey": "catalog:",
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/user-browser": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
     "motion": "catalog:",

@@ -3,20 +3,19 @@
  * browser instrumentation that runs beside them.
  */
 
+import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import type { ComponentType, ReactNode } from "react";
 
-import { useBrowserTracing } from "../behavior/browser-tracing";
-import { useIsGtagReady } from "../behavior/gtag-readiness";
-import { useNavigationTracing } from "../behavior/navigation-tracing";
-import { usePostHog } from "../behavior/posthog-analytics";
-import type { PublicEnvironment } from "../model/public-environment";
+import { useBrowserTracing } from "@langwatch/browser-host/browser-tracing";
+import { useNavigationTracing } from "@langwatch/browser-host/navigation-tracing";
+import { usePostHog } from "@langwatch/browser-host/posthog";
 import type { UiProviderShell } from "./ui-outer-providers";
 
 export type UiInnerProviderInstall = {
   /** The application's public configuration, as the application resolves it. */
-  usePublicEnvironment: () => { data: PublicEnvironment | undefined };
+  usePublicAppConfig: () => { data: PublicAppConfig | undefined };
   /** Product-memory and settings-return write points, mounted once. */
   useNavigationTracking: () => void;
   commandBar: UiProviderShell;
@@ -31,25 +30,23 @@ export type UiInnerProviderInstall = {
 };
 
 export function createUiInnerProvider({
-  usePublicEnvironment,
+  usePublicAppConfig,
   useNavigationTracking,
   commandBar: CommandBar,
   toaster: Toaster,
   footer: Footer,
-  isDevelopment,
 }: UiInnerProviderInstall): UiProviderShell {
   return function UiInnerProviders({ children }: { children: ReactNode }) {
-    const publicEnv = usePublicEnvironment();
-    const postHog = usePostHog(publicEnv.data);
-    const isGtagReady = useIsGtagReady();
+    const publicConfig = usePublicAppConfig();
+    usePostHog(publicConfig.data);
     useBrowserTracing({
-      enabled: publicEnv.data?.RUM_ENABLED,
-      environment: publicEnv.data?.NODE_ENV,
-      sampleRatio: publicEnv.data?.RUM_SAMPLE_RATIO,
+      enabled: publicConfig.data?.telemetry.browserTracing,
+      environment: publicConfig.data?.mode,
+      sampleRatio: publicConfig.data?.telemetry.sampleRatio,
     });
     // Router context is available here — the inner providers render inside
     // RouterProvider — which is what a navigation span needs.
-    useNavigationTracing({ enabled: !!publicEnv.data?.RUM_ENABLED });
+    useNavigationTracing({ enabled: !!publicConfig.data?.telemetry.browserTracing });
     useNavigationTracking();
 
     return (

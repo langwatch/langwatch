@@ -1,4 +1,5 @@
 import { UiScope, UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import type { UiFeatureApiBinding, UiFeatureApiTransport } from "@langwatch/browser-host/transport";
 import {
   createUiScopeHost,
   useOrganizationTeamProject,
@@ -14,10 +15,6 @@ import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type {
-  UiFeatureApiBinding,
-  UiFeatureApiTransport,
-} from "../../behavior/ui-feature-transport";
 import { createUiFeatureShell } from "../ui-feature-shell";
 import type { UiProviderShell } from "../ui-outer-providers";
 

@@ -1,31 +1,23 @@
+import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { PublicEnvironment } from "../../model/public-environment";
 import { createUiInnerProvider } from "../ui-inner-providers";
 
 let root: Root | undefined;
 
-const publicEnvironment: PublicEnvironment = {
-  BASE_HOST: "http://localhost",
-  DEMO_PROJECT_SLUG: void 0,
-  NODE_ENV: "test",
-  NEXTAUTH_PROVIDER: void 0,
-  IDENTITY_FRONT_DOOR: false,
-  PASSKEYS_ENABLED: false,
-  HAS_EMAIL_PROVIDER_KEY: false,
-  IS_SAAS: false,
-  GATEWAY_BASE_URL: "http://localhost:5563",
-  POSTHOG_KEY: void 0,
-  POSTHOG_HOST: void 0,
-  RUM_ENABLED: false,
-  RUM_SAMPLE_RATIO: 0,
-  HAS_LANGWATCH_NLP_SERVICE: false,
-  HAS_LANGEVALS_ENDPOINT: false,
-  STRIPE_LICENSE_PAYMENT_LINK_URL: void 0,
+const publicAppConfig: PublicAppConfig = {
+  appBaseUrl: "http://localhost",
+  gatewayBaseUrl: "http://localhost:5563",
+  deployment: "self-hosted",
+  mode: "test",
+  telemetry: { browserTracing: false, sampleRatio: 0 },
+  capabilities: { email: false, nlp: false, langevals: false },
+  passkeys: false,
+  identityFrontDoor: false,
 };
 
 afterEach(async () => {
@@ -39,7 +31,7 @@ describe("given the providers that need router context", () => {
     it("keeps the page inside the command bar, with the toaster beside it and the footer after it", async () => {
       const navigationWrites: string[] = [];
       const InnerProvider = createUiInnerProvider({
-        usePublicEnvironment: () => ({ data: publicEnvironment }),
+        usePublicAppConfig: () => ({ data: publicAppConfig }),
         useNavigationTracking: () => {
           navigationWrites.push("mounted");
         },

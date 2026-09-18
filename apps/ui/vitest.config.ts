@@ -2,6 +2,11 @@ import { defineModuleVitestConfig } from "../../packages/test-harness/src/vitest
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
+  // This suite shares module-level singletons across files — the capability
+  // host, the feedback host, the posthog client — so a shared worker lets one
+  // file's state decide another's result. The failing SET changed between
+  // identical runs, which is how it was found. Correctness over speed here.
+  isolate: true,
   test: {
     fsModuleCache: true,
     environment: "jsdom",

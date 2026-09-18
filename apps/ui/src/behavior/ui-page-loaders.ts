@@ -5,7 +5,7 @@
  */
 
 import type { UiRouteDescriptor } from "../shell/ui-route-table";
-import type { LazyRouteModule } from "./lazy-route";
+import type { LazyRouteModule } from "@langwatch/browser-host/navigation";
 
 /** A page's dynamic import, in the shape `lazyRoute` consumes. */
 export type UiPageLoader = () => Promise<LazyRouteModule>;

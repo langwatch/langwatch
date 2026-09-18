@@ -11,6 +11,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
+import { isServerUnreachable } from "@langwatch/handled-error/is-server-unreachable";
 import {
   explainHandledError,
   explainUnhandledError,
@@ -18,8 +19,7 @@ import {
 } from "@langwatch/handled-error/presentation";
 import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
 
-import { isServerUnreachable } from "../model/errors/isServerUnreachable";
-import { isUiNavigatingAway } from "./ui-departure";
+import { isUiNavigatingAway } from "@langwatch/browser-host/navigation";
 
 /** How long a failure stays up: long enough to read it and copy the error id. */
 const FAILURE_DURATION_MS = 12_000;

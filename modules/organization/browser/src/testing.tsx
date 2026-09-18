@@ -4,6 +4,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { uiSlots } from "@langwatch/browser-host/slots";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
@@ -178,12 +179,15 @@ const filledSlots = {
 export function renderWithOrganizationHost(
   element: ReactElement,
   host: FakeOrganizationHost = new FakeOrganizationHost(),
+  { analytics }: { analytics?: UiAnalytics } = {},
 ) {
   return {
     host,
     ...render(
       <ChakraProvider value={defaultSystem}>
-        <UiCapabilityContextProvider value={filledSlots}>
+        <UiCapabilityContextProvider
+          value={{ ...filledSlots, ...(analytics ? { analytics } : {}) }}
+        >
           <OrganizationHostProvider value={host}>{element}</OrganizationHostProvider>
         </UiCapabilityContextProvider>
       </ChakraProvider>,

@@ -5,7 +5,9 @@
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { signOutUi } from "@langwatch/auth-browser/session";
+import { useUiAddress } from "@langwatch/browser-host/address";
+import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-browser/surfaces/langy-mark";
 import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
@@ -26,18 +28,18 @@ import {
   UI_ORGANIZATIONS_PROCEDURE,
   useUiOrganizationFacts,
 } from "@langwatch/organization-browser/surfaces/organization-facts";
+import {
+  organizationRoleOf,
+  rememberUiScopeSelection,
+  useUiRouteReading,
+  useUiScopeMemory,
+} from "@langwatch/organization-browser/surfaces/scope-capability";
 import { useLegacySimulationsPreference } from "@langwatch/scenario-browser/surfaces/simulations-preference";
 import { PresenceMenuItem } from "@langwatch/trace-browser/surfaces/presence-menu-item";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
 
-import { routePatternOf } from "../behavior/navigation-tracing";
-import { useUiAddress } from "../behavior/ui-address";
-import { useUiRpc } from "../behavior/ui-rpc";
-import { organizationRoleOf } from "../behavior/ui-scope-resolution";
-import { useUiRouteReading } from "../behavior/ui-scope-route";
-import { rememberUiScopeSelection, useUiScopeMemory } from "../behavior/ui-scope-storage";
-import { signOutUi } from "@langwatch/auth-browser/session";
+import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { BrowserNavigationHost } from "./navigation-host";
 import { readNavigationDeployment } from "./navigation-host-deployment";
 import { offersLangyAsk, offersPresenceMenuItem, opsAccessOf } from "./navigation-host-gates";

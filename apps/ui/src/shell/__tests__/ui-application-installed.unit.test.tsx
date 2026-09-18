@@ -2,34 +2,26 @@
  * The application a composing host actually gets from `@langwatch/ui`.
  */
 
+import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { webModules } from "@langwatch/installed-modules/web";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
-import type { PublicEnvironment } from "../../model/public-environment";
 import { createUiApplication } from "../ui-application";
 import { installedModuleScreens } from "../ui-module-screens";
 import { uiRouteTable } from "../ui-route-table";
 
-const publicEnvironment = {
-  BASE_HOST: "http://localhost",
-  DEMO_PROJECT_SLUG: void 0,
-  NODE_ENV: "test",
-  NEXTAUTH_PROVIDER: void 0,
-  IDENTITY_FRONT_DOOR: false,
-  PASSKEYS_ENABLED: false,
-  HAS_EMAIL_PROVIDER_KEY: false,
-  IS_SAAS: false,
-  GATEWAY_BASE_URL: "http://localhost:5563",
-  POSTHOG_KEY: void 0,
-  POSTHOG_HOST: void 0,
-  RUM_ENABLED: false,
-  RUM_SAMPLE_RATIO: 0,
-  HAS_LANGWATCH_NLP_SERVICE: false,
-  HAS_LANGEVALS_ENDPOINT: false,
-  STRIPE_LICENSE_PAYMENT_LINK_URL: void 0,
-} satisfies PublicEnvironment;
+const publicAppConfig: PublicAppConfig = {
+  appBaseUrl: "http://localhost",
+  gatewayBaseUrl: "http://localhost:5563",
+  deployment: "self-hosted",
+  mode: "test",
+  telemetry: { browserTracing: false, sampleRatio: 0 },
+  capabilities: { email: false, nlp: false, langevals: false },
+  passkeys: false,
+  identityFrontDoor: false,
+};
 
 function PassThrough({ children }: { children: ReactNode }) {
   return <>{children}</>;
@@ -59,7 +51,7 @@ function applicationFromPackageEntry() {
       commandBar: PassThrough,
       toaster: () => null,
       footer: () => null,
-      usePublicEnvironment: () => ({ data: publicEnvironment }),
+      usePublicAppConfig: () => ({ data: publicAppConfig }),
       useNavigationTracking: () => void 0,
       isDevelopment: false,
     },
