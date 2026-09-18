@@ -5,6 +5,7 @@ import {
   simulationRunCancelRequestedEventDataSchema,
   simulationRunCutAtLimitRecordedEventDataSchema,
   simulationRunDeletedEventDataSchema,
+  simulationRunMetadataRefreshedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
   simulationTextMessageEndEventDataSchema,
@@ -120,6 +121,24 @@ export const RecordCutAtLimitCommand = defineCommand({
     "payload.scenarioRun.id": d.scenarioRunId,
   }),
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-cut-at-limit`,
+});
+export const RefreshMetadataCommand = defineCommand({
+  commandType: "lw.simulation_run.refresh_metadata",
+  eventType: "lw.simulation_run.metadata_refreshed",
+  eventVersion: "2026-09-18",
+  aggregateType: "simulation_run",
+  schema: simulationRunMetadataRefreshedEventDataSchema,
+  aggregateId: (d) => d.scenarioRunId,
+  // Keyed on the attempt (occurredAt), NOT on the run: a per-run key like
+  // recordCutAtLimit's would dedupe a second refresh carrying different
+  // values, which is exactly the retry this event exists to land (#8032).
+  // Mirrors MessageSnapshotCommand, the other event a re-drive re-emits.
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.scenarioRunId}:refreshMetadata:${d.occurredAt}`,
+  spanAttributes: (d) => ({
+    "payload.scenarioRun.id": d.scenarioRunId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:refresh-metadata`,
 });
 
 export const CancelRunCommand = defineCommand({

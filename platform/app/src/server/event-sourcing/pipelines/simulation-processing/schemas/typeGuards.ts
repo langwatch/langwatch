@@ -11,6 +11,7 @@ import type {
   SimulationRunDeletedEvent,
   SimulationRunEvaluatedEvent,
   SimulationRunFinishedEvent,
+  SimulationRunMetadataRefreshedEvent,
   SimulationRunMetricsComputedEvent,
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
@@ -77,6 +78,11 @@ export function isSimulationRunCutAtLimitRecordedEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationRunCutAtLimitRecordedEvent {
   return event.type === SIMULATION_RUN_EVENT_TYPES.CUT_AT_LIMIT_RECORDED;
+}
+export function isSimulationRunMetadataRefreshedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunMetadataRefreshedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED;
 }
 
 export function isSimulationRunCancelRequestedEvent(
