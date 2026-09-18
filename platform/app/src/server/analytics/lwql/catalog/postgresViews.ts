@@ -33,6 +33,7 @@ import {
 import { CONTENT_POSTGRES_OVERRIDES } from "./postgresOverrides/content";
 import { CORE_POSTGRES_OVERRIDES } from "./postgresOverrides/core";
 import { PARENTS_POSTGRES_OVERRIDES } from "./postgresOverrides/parents";
+import { SENSITIVE_POSTGRES_OVERRIDES } from "./postgresOverrides/sensitive";
 import { TOPICS_POSTGRES_OVERRIDES } from "./postgresOverrides/topics";
 import { LWQL_POSTGRES_SKIPPED_MODELS } from "./postgresSkippedModels";
 import { LWQL_PRISMA_MANIFEST } from "./prismaManifest";
@@ -47,6 +48,7 @@ export const LWQL_POSTGRES_ALL_OVERRIDES: Record<
   ...TOPICS_POSTGRES_OVERRIDES,
   ...PARENTS_POSTGRES_OVERRIDES,
   ...CONTENT_POSTGRES_OVERRIDES,
+  ...SENSITIVE_POSTGRES_OVERRIDES,
 };
 
 /**

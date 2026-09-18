@@ -1,17 +1,24 @@
 /**
- * Models with a JSON column whose *name* collides with a label of the same name
- * elsewhere in the catalog.
+ * Name-global gating fixes: an alias moves a JSON body off a label name, and a
+ * gate entry adopts the gates a same-named ClickHouse column already carries.
  *
  * The validator gates a column by its lowercased bare name across the whole
  * catalog, so two views cannot disagree about a name: if `Value` is gated
  * `output` on `analytics` it is withheld on every other `Value`, and if it is
- * open on one it is open on all. These three columns are genuine free-text
- * bodies (a metric payload, a tool-call transcript, a suite configuration blob)
- * that must stay gated — but their bare names (`value`, `scope`) are labels
- * elsewhere. Renaming each to a name that says what it is keeps its `output`
- * gate without forcing that gate onto the unrelated label columns.
+ * open on one it is open on all. Two shapes fall out of that rule:
+ *  - a JSON column here is a genuine free-text body (a metric payload, a
+ *    tool-call transcript, a suite configuration blob) that must stay gated,
+ *    but its bare name (`value`, `toolCalls`, `plan`, `action`, `scope`) is a
+ *    label elsewhere in the catalog. Renaming it to a name that says what it
+ *    is keeps its `output` gate without forcing that gate onto the unrelated
+ *    label columns;
+ *  - a column here shares a bare name with a ClickHouse column that already
+ *    carries a gate (`Title` on `coding_sessions`, gated on `input`). A
+ *    `columnGates` entry gives this column the same gate so the two views
+ *    agree on what `Title` withholds, rather than one publishing what the
+ *    other gates.
  *
- * @see ../derivePostgresCatalog.ts#POSTGRES_LABEL_NAME — the label suffixes these avoid
+ * @see ../derivePostgresCatalog.ts#POSTGRES_LABEL_NAME — the label suffixes the aliases avoid
  * @see specs/lwql/postgres-catalog.feature
  */
 

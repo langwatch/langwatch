@@ -99,6 +99,13 @@ describe("given every model in the committed Prisma manifest", () => {
   describe("when a new tenant-scoped model is neither derived, overridden nor skipped", () => {
     /** @scenario "A new tenant-scoped model that is neither derived, overridden nor skipped fails the build" */
     it("fails the build and names the model", () => {
+      // The model carries a `tenantId` column — a tenant column, but the
+      // internal process-manager/migration one the derivation refuses to treat
+      // as an owning project. So it is genuinely tenant-scoped (the scenario's
+      // "a tenant column that no view, override or skip entry names") yet has no
+      // *owning* tenant column, exercising the coverage failure rather than the
+      // plain no-column one. (A `projectId` column would silently auto-derive,
+      // which is the opt-out contract, so it could not demonstrate the failure.)
       const manifest: PrismaManifest = {
         models: [
           {
@@ -110,6 +117,15 @@ describe("given every model in the committed Prisma manifest", () => {
               {
                 name: "id",
                 columnName: "id",
+                type: "String",
+                kind: "scalar",
+                isList: false,
+                isOptional: false,
+                documentation: "",
+              },
+              {
+                name: "tenantId",
+                columnName: "tenantId",
                 type: "String",
                 kind: "scalar",
                 isList: false,
@@ -132,6 +148,8 @@ describe("given every model in the committed Prisma manifest", () => {
         message = (error as Error).message;
       }
       expect(message).toContain("BrandNewThing");
+      expect(message).toContain("owning tenant column");
+      expect(message).toContain("catalogue it");
       expect(message).toContain("skip it");
     });
   });
