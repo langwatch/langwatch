@@ -17,7 +17,7 @@
  * is imported. It is reached only from the lazily loaded chart component, which
  * is what keeps Vega out of every other route's bundle.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
 import { type RefObject, useEffect, useRef, useState } from "react";

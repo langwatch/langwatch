@@ -5,7 +5,7 @@
  * error goes through so neither secret, nor the connection strings, reaches
  * the log.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";

@@ -77,7 +77,6 @@ export interface ChartQueryResult {
   readonly columns: readonly { readonly name: string; readonly type: string }[];
   readonly rows: readonly Record<string, unknown>[];
   readonly statistics: Record<string, unknown>;
-  readonly truncated: boolean;
   readonly diagnostics: readonly Record<string, unknown>[];
   readonly followsTimeWindow: boolean;
   readonly followsGranularity: boolean;
@@ -227,7 +226,6 @@ export function toChartQueryResult(result: {
   readonly columns: readonly { readonly name: string; readonly type: string }[];
   readonly rows: readonly Record<string, unknown>[];
   readonly statistics: unknown;
-  readonly truncated: boolean;
   readonly diagnostics: readonly unknown[];
   readonly followsTimeWindow: boolean;
   readonly followsGranularity: boolean;
@@ -241,7 +239,6 @@ export function toChartQueryResult(result: {
     })),
     rows: result.rows,
     statistics: (result.statistics ?? {}) as Record<string, unknown>,
-    truncated: result.truncated,
     diagnostics: result.diagnostics as readonly Record<string, unknown>[],
     followsTimeWindow: result.followsTimeWindow,
     followsGranularity: result.followsGranularity,

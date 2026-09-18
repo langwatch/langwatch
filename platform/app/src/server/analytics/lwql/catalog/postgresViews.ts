@@ -8,7 +8,7 @@
  * PostgreSQL-engine table in the LangWatchQL database, its row policy, and the
  * LangWatchQL view a caller names.
  *
- * ## Why these five datasets and no others
+ * ## Why these five views and no others
  *
  * They are what the three question classes the catalog could not answer need,
  * and nothing else. Cost by *name* needs `projects`, `prompts` and
@@ -44,13 +44,13 @@
  *
  * @see ./types.ts — the shapes
  * @see ../provisioning/accessModel.ts — the approved views, the engine tables and the role
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { LangWatchQLViewDefinition } from "./types";
 
 /**
- * How far behind the application's writes these datasets can be.
+ * How far behind the application's writes these views can be.
  *
  * They are read live off the primary through the named collection, so there is
  * no pipeline to lag: a row committed in PostgreSQL is visible to the next
@@ -64,7 +64,7 @@ const LIVE_FRESHNESS = "live — read from PostgreSQL at query time";
  *
  * The application's schema calls it `projectId` on most tables and `id` on
  * `Project` itself. Reconciling both to `TenantId` in the approved view is what
- * lets a caller join a PostgreSQL-resident dataset to a ClickHouse-resident one
+ * lets a caller join a PostgreSQL-resident view to a ClickHouse-resident one
  * without knowing which is which, and it is what lets one row policy shape
  * serve every LangWatchQL object.
  */
@@ -137,7 +137,7 @@ const ANNOTATIONS: LangWatchQLViewDefinition = {
 /**
  * Projects: the caller's own project, one row.
  *
- * The row policy resolves the tenant to exactly one project, so this dataset is
+ * The row policy resolves the tenant to exactly one project, so this view is
  * a single row by construction. It is here because a caller reporting cost "by
  * project" wants the name in the output, and because a multi-project report
  * assembled by a client needs somewhere to read that name from.
@@ -161,7 +161,7 @@ const PROJECTS: LangWatchQLViewDefinition = {
     {
       name: TENANT_COLUMN,
       type: "String",
-      description: "Project identifier. Join key to every other dataset.",
+      description: "Project identifier. Join key to every other view.",
       gates: [],
       sourceColumns: ["id"],
     },
@@ -505,7 +505,7 @@ const BATCH_EVALUATIONS: LangWatchQLViewDefinition = {
 };
 
 /**
- * The PostgreSQL-resident datasets, in the order the schema endpoint lists
+ * The PostgreSQL-resident views, in the order the schema endpoint lists
  * them: the entity a question is about, then the dimensions that name it.
  */
 export const LWQL_POSTGRES_CATALOG: readonly LangWatchQLViewDefinition[] = [

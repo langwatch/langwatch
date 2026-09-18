@@ -487,7 +487,7 @@ test_app() {
 #
 # The PostgreSQL-engine tables, the lwql_ro reader role and the approved
 # PostgreSQL views are NOT asserted here: they are the full-model scenario
-# deferred to tracking issue #7387 (specs/analytics/lwql-api.feature, "Clustered
+# deferred to tracking issue #7387 (specs/lwql/api.feature, "Clustered
 # chart-managed ClickHouse provisions the full LangWatchQL access model",
 # @unimplemented), and the reader role has no chart-managed creation path — it
 # belongs to the app's external self-provision path, covered by its own tests.

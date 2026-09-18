@@ -81,7 +81,6 @@ export const lwqlResultSchema = z.object({
     bytesRead: z.number(),
     rowsReturned: z.number(),
   }),
-  truncated: z.boolean(),
   // Whether the statement DECLARED the reserved time-window parameters and was
   // therefore given the surface's window. It is not a claim about the rows: the
   // author writes the comparison, so a statement that declares the names and
@@ -110,7 +109,7 @@ export const lwqlResultSchema = z.object({
 
 export const lwqlSchemaSchema = z.object({
   database: z.string(),
-  datasets: z.array(
+  views: z.array(
     z.object({
       name: z.string(),
       description: z.string(),
@@ -135,4 +134,7 @@ export const lwqlSchemaSchema = z.object({
       exampleSql: z.string(),
     }),
   ),
+  // The function names a query may call, equal to the validator's allowlist.
+  // Permission-independent, so it is the same for every caller.
+  functions: z.array(z.string()),
 });

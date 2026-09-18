@@ -9,7 +9,7 @@
  * versus fed, and that every failure has a state of its own. What Vega draws
  * from those options is Vega's, and is proven in a real browser instead.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: specs/lwql/workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
