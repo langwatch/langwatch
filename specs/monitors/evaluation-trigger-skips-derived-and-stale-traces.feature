@@ -27,3 +27,23 @@ Feature: ON_MESSAGE evaluations only re-run on real, recent messages
     Given a recent trace
     When a new span arrives on that trace
     Then an evaluation is dispatched
+
+  Rule: a trace with no recorded spans never re-runs evaluations
+
+    # The trace-age cutoff compares the trace's first-span time against now.
+    # A trace whose stored summary sits outside the fold's read window loads
+    # as an empty state: no spans, no first-span time. A late origin
+    # resolution for such a trace must not slip past the cutoff just because
+    # there is no start time to compare. The signal is "no spans folded", not
+    # "no start time": a recent span without valid timing also leaves the
+    # start time unknown, and that trace must still be evaluated.
+
+    Scenario: a late origin resolution on a trace with no recorded spans does not re-run evaluations
+      Given a trace whose fold state holds no spans
+      When the trace's origin is resolved
+      Then no evaluation is dispatched
+
+    Scenario: a late origin resolution on a recent trace whose span has no valid timing still re-runs evaluations
+      Given a recent trace with one recorded span whose first-span time is unknown
+      When the trace's origin is resolved
+      Then an evaluation is dispatched

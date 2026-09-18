@@ -30,6 +30,7 @@ function fold(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
     traceId: "trace-1",
     occurredAt: NOW,
+    spanCount: 1,
     blockedByGuardrail: false,
     computedOutput: "answer",
     attributes: { "langwatch.origin": "application" },
@@ -93,6 +94,29 @@ describe("passesTraceOriginGuards", () => {
         passesTraceOriginGuards(
           event(),
           fold({ occurredAt: NOW - 24 * 60 * 60 * 1000 + 1 }),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("given a fold state with no recorded spans", () => {
+    // A trace summary outside the fold's read window rehydrates empty:
+    // spanCount 0, occurredAt 0. The trace-age cap cannot fire on a zero
+    // start time, so a late origin resolution must be rejected on its own.
+    it("rejects a late origin resolution even though the origin is set", () => {
+      expect(
+        passesTraceOriginGuards(
+          event({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
+          fold({ spanCount: 0, occurredAt: 0 }),
+        ),
+      ).toBe(false);
+    });
+
+    it("still admits a recent trace whose only span left the start time unknown", () => {
+      expect(
+        passesTraceOriginGuards(
+          event({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
+          fold({ spanCount: 1, occurredAt: 0 }),
         ),
       ).toBe(true);
     });

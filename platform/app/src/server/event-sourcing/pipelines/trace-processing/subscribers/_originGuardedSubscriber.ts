@@ -65,6 +65,14 @@ export function passesTraceOriginGuards(
     return false;
   }
 
+  // 3b. Guard 3 cannot fire on a fold with no spans: a trace summary outside
+  //     the fold's read window rehydrates EMPTY (spanCount 0, occurredAt 0),
+  //     so a late origin_resolved on it would look brand new. No folded span
+  //     means nothing to evaluate, whatever the origin says. Keyed on
+  //     spanCount, not occurredAt: a recent span without valid timing also
+  //     leaves occurredAt at 0 and must still dispatch.
+  if (foldState.spanCount === 0) return false;
+
   if (foldState.blockedByGuardrail && !foldState.computedOutput) return false;
 
   const attrs = foldState.attributes ?? {};
@@ -101,7 +109,8 @@ type ExtraGuard = (event: TraceProcessingEvent) => boolean;
  *   1. the event is recent (<1h old, skips replay/resync floods),
  *   2. the event is a message event (span_received / origin_resolved) — derived
  *      enrichment events like topic_assigned do not re-run side effects,
- *   3. the trace itself is not older than MAX_TRACE_AGE_MS,
+ *   3. the trace itself is not older than MAX_TRACE_AGE_MS, and has at least
+ *      one folded span (an empty rehydrated fold cannot be age-checked),
  *   4. the trace is not blocked by guardrail with no output, and
  *   5. `langwatch.origin` is resolved on the fold state.
  *
