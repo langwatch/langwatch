@@ -38,7 +38,44 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const skillsRoot = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(skillsRoot, "..");
 const DEFAULT_OUT = path.join(skillsRoot, "_compiled", "native");
+
+/**
+ * Skills that bake docs playbooks into their compiled directory.
+ *
+ * Maps a skill slug to the repo-relative docs directory holding its `*.mdx`
+ * playbooks. Each playbook is copied VERBATIM to
+ * `<out>/<slug>/playbooks/<name>.md`, byte for byte, because the pod reads it
+ * as markdown and a branch under test must be judged against its OWN playbook,
+ * not the published one. Generic on purpose: a future skill bakes its own
+ * playbooks by adding one entry here.
+ */
+const PLAYBOOK_SOURCES: Record<string, string> = {
+  "how-do-i": "docs/playbooks/how-do-i",
+};
+
+/**
+ * Copy a skill's docs playbooks into its compiled directory, byte-identical,
+ * and drop any compiled playbook whose docs source no longer exists.
+ */
+function bakePlaybooks(slug: string, skillOutDir: string): void {
+  const relDir = PLAYBOOK_SOURCES[slug];
+  if (!relDir) return;
+  const srcDir = path.join(repoRoot, relDir);
+  const outDir = path.join(skillOutDir, "playbooks");
+  const sources = fs.existsSync(srcDir)
+    ? fs.readdirSync(srcDir).filter((f) => f.endsWith(".mdx"))
+    : [];
+  fs.mkdirSync(outDir, { recursive: true });
+  const wanted = new Set(sources.map((f) => f.replace(/\.mdx$/, ".md")));
+  for (const f of sources) {
+    fs.copyFileSync(path.join(srcDir, f), path.join(outDir, f.replace(/\.mdx$/, ".md")));
+  }
+  for (const f of fs.readdirSync(outDir)) {
+    if (f.endsWith(".md") && !wanted.has(f)) fs.rmSync(path.join(outDir, f));
+  }
+}
 
 /**
  * Setup partials the in-product agent must not be given.
@@ -73,6 +110,7 @@ function main() {
     const dir = path.join(outDir, skill.slug); // flattened — recipes included
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, "SKILL.md"), renderSkill(skill));
+    bakePlaybooks(skill.slug, dir);
   }
   console.log(`Generated ${skills.length} native skills in ${outDir}/`);
   for (const skill of skills) {

@@ -109,6 +109,31 @@ are deleted in `afterAll`, because a monitor left behind keeps evaluating live
 traffic and spending money; the evaluators are inert and stay as the evidence
 trail.
 
+## How do I improve my agent's latency (langy-how-do-i-latency.scenario.test.ts)
+
+Binds the six `@e2e` scenarios in `specs/langy/langy-how-do-i-latency.feature`
+(the BDD acceptance block from `langwatch/langwatch#8178`, verbatim). Each
+scenario engineers a project's telemetry into one branch of the playbook —
+this is the first suite in the folder that needs several LIVE projects at
+once, so `projects.ts`'s `createScratchProject` mints scratch projects through
+the same tRPC calls the "new project" UI flow uses, and `langwatch-api.ts`'s
+`seedApplicationTraces` grew a `shape: "healthy" | "broken"` option to seed
+either real timed LLM spans or untyped, zero-duration, model-less ones.
+
+| Scenario | Project | Traces |
+|---|---|---|
+| Telemetry not set up | scratch, empty | none |
+| Telemetry set up incorrectly | scratch | 12 `broken` spans |
+| Telemetry correct and spans good enough for insights | the suite's default project | 20 `healthy` spans |
+| The parent goal stays open during a prerequisite branch | reuses the first project's conversation | — |
+| The plan checklist survives a reload | reuses the third project's conversation | — |
+| The playbook cannot be loaded | not exercised — `it.skip`, see the file for why and how it would be proved | — |
+
+The plan-checklist assertions read `langy.messages` and fold it with the
+panel's own `langyPlan` (`~/features/langy/logic/langyPlan.ts`) rather than
+re-parsing `todowrite` tool parts — the same function the browser uses to
+render the checklist after a reload.
+
 ## Boundaries (langy-boundary.scenario.test.ts)
 
 `langy-boundary.scenario.test.ts` asserts the standing rule rather than a filed
