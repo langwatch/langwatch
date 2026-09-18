@@ -175,16 +175,26 @@ export function defaultPiProjectSessionsDir({
  * pi's parser has one branch per flag, each of the shape
  * `arg === "--session-dir" && i + 1 < args.length` (`cli/args.js:88-90`); there
  * is no pass that splits `--flag=value` first. So `--session-dir=/x` is not a
- * relocated directory to pi at all — it lands in pi's `unknownFlags` map and pi
- * writes to its default. Verified by calling pi's own `parseArgs` on 0.85.1:
+ * relocated directory to pi at all — it lands in pi's `unknownFlags` map
+ * (`cli/args.js:216-231`). Verified by calling pi's own `parseArgs` on 0.85.1:
  * `["--session-dir","/space/form"]` yields `/space/form`, while
  * `["--session-dir=/joined/form"]` yields `undefined` and
  * `unknownFlags: ["session-dir"]`.
  *
- * This function used to accept the joined-up spelling, and accepting it was a
- * silent miss of the kind this whole file exists to close: the user's directory
- * was honoured by us and ignored by pi, so we watched an empty directory while
- * pi filled its default, captured nothing, and said nothing.
+ * pi does not carry on with its default after that. The unknown-flag map is
+ * handed to `createAgentSessionServices` (`main.js:587`), every unregistered
+ * name becomes a diagnostic of type `error`
+ * (`core/agent-session-services.js:40-45`), and `main.js:722-730` exits 1 on any
+ * runtime error before a session exists. Measured on 0.85.1, in both plain and
+ * terminal-attached runs: `pi --session-dir=/tmp/pi-probe-A` prints
+ * `Error: Unknown option: --session-dir`, exits 1, and `/tmp/pi-probe-A` is
+ * never created. The space form on the same build reached the model.
+ *
+ * So the joined-up spelling produces no session anywhere, and the only honest
+ * thing a reader can do is decline to treat it as a relocation. This function
+ * used to accept it, which was a silent miss of the kind this whole file exists
+ * to close: we pointed capture at a directory the user had typed, pi never ran,
+ * and we waited on a file that could not arrive.
  *
  * The same correction runs the other way for a value that looks like a flag.
  * pi takes `args[++i]` unconditionally, so `--session-dir --verbose` really does

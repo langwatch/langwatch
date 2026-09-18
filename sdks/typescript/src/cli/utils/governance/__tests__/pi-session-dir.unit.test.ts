@@ -81,9 +81,14 @@ describe("resolving pi's session directory", () => {
      * Honouring it here pointed capture at a directory pi never filled and
      * reported nothing, so the joined-up form must resolve to the default.
      *
-     * The assertion names the default rather than merely "not /elsewhere", so
-     * a resolver that threw the argument away and then went wrong somewhere
-     * else still fails.
+     * The outcome is compared against a launch with no arguments at all rather
+     * than against `defaultPiProjectSessionsDir`, because calling that helper
+     * here asks the resolver to confirm its own arithmetic: the resolver calls
+     * the same function, so the assertion holds even when the function itself
+     * is wrong. Sabotaging the default to its own parent — a directory that
+     * holds no session file at any time — left an assertion of that shape
+     * green. Comparing two launches pins the only thing this scenario claims:
+     * that the spelling changed nothing.
      *
      * @scenario "A directory named in a spelling pi ignores does not move capture"
      */
@@ -94,16 +99,21 @@ describe("resolving pi's session directory", () => {
         home,
         cwd,
       });
+      const withoutTheSpelling = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
 
-      expect(resolved).toBe(
-        defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }),
-      );
+      expect(resolved).toBe(withoutTheSpelling);
       expect(resolved).not.toBe("/elsewhere/sessions");
     });
 
     /**
      * pi stops reading flags at `--`, so a `--session-dir` behind it is a
-     * message, not a relocation.
+     * message, not a relocation. Compared against an argument-free launch for
+     * the reason given above.
      *
      * @scenario "A directory named in a spelling pi ignores does not move capture"
      */
@@ -114,10 +124,15 @@ describe("resolving pi's session directory", () => {
         home,
         cwd,
       });
+      const withoutTheTerminator = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
 
-      expect(resolved).toBe(
-        defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }),
-      );
+      expect(resolved).toBe(withoutTheTerminator);
+      expect(resolved).not.toBe("/elsewhere/sessions");
     });
 
     /** @scenario "A session kept somewhere other than the default place is still found" */
@@ -836,8 +851,21 @@ describe("reading an explicitly named session file out of pi's arguments", () =>
     ).toBeNull();
   });
 
-  /** @scenario "A directory named in a spelling pi ignores does not move capture" */
-  it("ignores spellings pi does not accept", () => {
+  /**
+   * The accepted spelling is asserted alongside the rejected ones, on the same
+   * path, so that a reader which accepts nothing at all fails here. Without it
+   * the test states only that three calls returned nothing, which is satisfied
+   * by a function that always returns nothing.
+   *
+   * @scenario "A directory named in a spelling pi ignores does not move capture"
+   */
+  it("ignores spellings pi does not accept, while taking the one it does", () => {
+    expect(
+      explicitSessionFileFromArgs({
+        toolArgs: ["--session", "/other/session.jsonl"],
+        cwd: launchedIn,
+      }),
+    ).toBe("/other/session.jsonl");
     expect(
       explicitSessionFileFromArgs({
         toolArgs: ["--session=/other/session.jsonl"],
@@ -974,7 +1002,14 @@ describe("deciding whether a resume can reach another project's sessions", () =>
     ).resolves.toBeNull();
   });
 
-  /** @scenario "A directory named in a spelling pi ignores does not move capture" */
+  /**
+   * Tagged to the resume scenario rather than to the spelling one: what the
+   * terminator decides here is whether the search widens to other projects,
+   * which is the resume scenario's claim. The spelling scenario is about the
+   * directory capture reads, and nothing about that moves in this test.
+   *
+   * @scenario "A session resumed from another project is captured where it lives"
+   */
   it("does not read a resume flag behind the argument terminator", () => {
     expect(offersCrossProjectSessionPicker(["--", "--resume"])).toBe(false);
     expect(offersCrossProjectSessionPicker(["-r", "--", "--resume"])).toBe(true);

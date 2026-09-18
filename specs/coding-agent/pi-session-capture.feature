@@ -263,21 +263,28 @@ Feature: pi session capture
   # nothing, and says nothing.
   #
   # pi's parser matches whole tokens, one branch per flag, with no pass that
-  # splits `--flag=value` first. So `--session-dir=/x` is an unknown flag to pi
-  # and pi writes to its default; we honoured it and watched an empty directory.
+  # splits `--flag=value` first. So `--session-dir=/x` is an unknown flag to pi,
+  # and an unknown flag is fatal: pi prints the error and exits before any
+  # session exists. It writes nothing, anywhere. We honoured the spelling and
+  # waited on a file that could not arrive.
+  #
   # The reverse case is the same bug from the other side: pi takes the token
   # after the flag unconditionally, so `--session-dir --verbose` names a
   # directory called `--verbose` to pi, and refusing to read it left capture on
   # the default while pi wrote somewhere else. `--` ends pi's flag parsing, so a
   # flag behind it names nothing.
   #
-  # Settled by calling pi 0.85.1's own parser on each spelling rather than by
-  # reading its source: the space form yields the directory, the joined-up form
-  # yields nothing and lands in pi's unknown-flag map.
+  # Settled by running pi 0.85.1 rather than by reading it: the joined-up form
+  # exits 1 with `Error: Unknown option: --session-dir` and never creates the
+  # directory named, in both plain and terminal-attached runs, while the space
+  # form on the same build starts normally.
+  #
+  # The outcome is stated as a comparison rather than as a place, because naming
+  # the place invites a test that asks the resolver to confirm its own answer.
   Scenario: A directory named in a spelling pi ignores does not move capture
     Given a launch whose session directory is written in a spelling pi does not accept
     When capture works out where to look
-    Then it looks where pi will actually write, not where the spelling pointed
+    Then it looks exactly where it would have looked had the spelling been absent
 
   # --- Naming the agent, not the provider -----------------------------------
 
