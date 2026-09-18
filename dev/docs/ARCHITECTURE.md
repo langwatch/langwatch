@@ -296,8 +296,14 @@ SecurityHeaders.strict()).route("/api", api).route("/", spa)` — middleware
 runs before routing on every request; `/` is a route, not a fallback,
 because longest prefix wins; `.use`/`.route` are internal (boot() writes
 the composition, prefixes stay library constants, no app code ever holds
-the mux). `SinglePageApp` serves the bundle side. There is no public
-Router class, no mount API, no scoped router object anywhere. **The mux
+the mux). `SinglePageApp` serves the bundle side. **The mux is backed by
+Hono internally** (ruled 2026-09-18): the framework's `/api` surface is
+already a Hono app, so the mount is a native sub-app and one router tree
+serves the request end to end, with Hono owning the HTTP edge cases a
+hand-rolled prefix match gets wrong — but Hono never leaks from the
+hosting layer's public surface; it is an implementation detail confined to
+the mux's own file. There is no public Router class, no mount API, no
+scoped router object anywhere. **The mux
 carries the last-resort error boundary, and error presentation follows the
 path prefix** (ruled 2026-09-18): an error anywhere in the chain on an
 `/api` request answers the canonical JSON envelope (generic "unknown" +
