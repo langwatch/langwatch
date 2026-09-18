@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Plan } from "../plan.ts";
 import {
   assertEnterprisePlan,
   assertEnterprisePlanType,
   ENTERPRISE_FEATURE_ERRORS,
   isEnterpriseTier,
 } from "../index.ts";
+import type { Plan } from "../plan.ts";
 
 const BASE_PLAN: Plan = {
   planSource: "free",
@@ -55,7 +55,7 @@ describe("the Enterprise plan gate", () => {
     });
 
     describe("when plan type is not ENTERPRISE", () => {
-      it("throws FORBIDDEN with the provided error message", () => {
+      it("throws a handled enterprise plan refusal", () => {
         expect(() =>
           assertEnterprisePlanType({
             planType: "FREE",
@@ -63,8 +63,9 @@ describe("the Enterprise plan gate", () => {
           }),
         ).toThrow(
           expect.objectContaining({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
+            code: "enterprise_plan_required",
+            httpStatus: 403,
+            fault: "customer",
           }),
         );
       });
@@ -95,7 +96,7 @@ describe("the Enterprise plan gate", () => {
 
     describe("when plan is not ENTERPRISE", () => {
       it.each(["FREE", "OPEN_SOURCE", "PRO", "GROWTH"])(
-        "throws FORBIDDEN for %s plan",
+        "throws a handled refusal for %s plan",
         async (planType) => {
           const plan: Plan = { ...BASE_PLAN, type: planType };
           mockGetActivePlan.mockResolvedValue(plan);
@@ -107,13 +108,14 @@ describe("the Enterprise plan gate", () => {
               errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
             }),
           ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
+            code: "enterprise_plan_required",
+            httpStatus: 403,
+            fault: "customer",
           });
         },
       );
 
-      it("uses the provided errorMessage", async () => {
+      it("uses the stable handled code for every feature", async () => {
         mockGetActivePlan.mockResolvedValue({ ...BASE_PLAN, type: "FREE" });
 
         await expect(
@@ -123,8 +125,9 @@ describe("the Enterprise plan gate", () => {
             errorMessage: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
           }),
         ).rejects.toMatchObject({
-          code: "FORBIDDEN",
-          message: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
+          code: "enterprise_plan_required",
+          httpStatus: 403,
+          fault: "customer",
         });
       });
     });

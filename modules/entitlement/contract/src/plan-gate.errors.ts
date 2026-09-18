@@ -17,16 +17,20 @@ export const ENTERPRISE_FEATURE_ERRORS = {
 
 export type EnterpriseFeature = keyof typeof ENTERPRISE_FEATURE_ERRORS;
 
-/** Refuses plan status (402) not request validity (403/422); tRPC uses
- * requireEnterprisePlan which answers FORBIDDEN with same copy.
- */
+function isEnterpriseFeature(value: string): value is EnterpriseFeature {
+  return Object.hasOwn(ENTERPRISE_FEATURE_ERRORS, value);
+}
+
 export class EnterprisePlanRequiredError extends HandledError {
   declare readonly code: "enterprise_plan_required";
 
-  constructor(feature: EnterpriseFeature) {
-    super("enterprise_plan_required", ENTERPRISE_FEATURE_ERRORS[feature], {
-      httpStatus: 402,
-      meta: { feature },
+  constructor(featureOrMessage: string) {
+    const feature = isEnterpriseFeature(featureOrMessage) ? featureOrMessage : undefined;
+    const message = feature ? ENTERPRISE_FEATURE_ERRORS[feature] : featureOrMessage;
+
+    super("enterprise_plan_required", message, {
+      httpStatus: 403,
+      ...(feature ? { meta: { feature } } : {}),
       fault: "customer",
       ...remediation("enterprise_plan_required"),
     });

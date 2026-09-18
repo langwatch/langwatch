@@ -1,18 +1,16 @@
-import { TRPCError } from "@trpc/server";
-
-import { isEnterpriseTier } from "./plan-gate.errors.ts";
+import { EnterprisePlanRequiredError, isEnterpriseTier } from "./plan-gate.errors.ts";
 import type { PlanProvider, PlanProviderUser } from "./provider.ts";
 
 /**
  * Kept structural so this Enterprise check does not depend on the application container.
  */
-type EnterpriseGateMiddlewareParams = {
+type EnterpriseGateMiddlewareParams<TNextReturn> = {
   ctx: {
     app: { planProvider: PlanProvider };
     session?: { user?: PlanProviderUser } | null;
   };
   input: { organizationId: string };
-  next: () => any;
+  next: () => TNextReturn;
 };
 
 /** Fail-closed check: refuses all non-Enterprise plans (unknown tiers included). */
@@ -24,7 +22,7 @@ export function assertEnterprisePlanType({
   errorMessage: string;
 }): void {
   if (!isEnterpriseTier(planType)) {
-    throw new TRPCError({ code: "FORBIDDEN", message: errorMessage });
+    throw new EnterprisePlanRequiredError(errorMessage);
   }
 }
 
@@ -55,7 +53,11 @@ export async function assertEnterprisePlan({
  */
 export const requireEnterprisePlan =
   (errorMessage: string) =>
-  async ({ ctx, input, next }: EnterpriseGateMiddlewareParams) => {
+  async <TNextReturn>({
+    ctx,
+    input,
+    next,
+  }: EnterpriseGateMiddlewareParams<TNextReturn>): Promise<TNextReturn> => {
     await assertEnterprisePlan({
       planProvider: ctx.app.planProvider,
       organizationId: input.organizationId,
