@@ -7,6 +7,10 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const traceWeb = defineWebModule("trace")
+  .withHosts({
+    requires: ["TraceHostApi"],
+    mounts: { TraceHostApi: { load: () => import("./behavior/trace-host-mount.tsx") } },
+  })
   .withScreens({
     "pages/[project]/traces": {
       load: () => import("./ui/sections/traces/traces-screen.tsx"),
