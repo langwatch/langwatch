@@ -47,6 +47,15 @@ import {
   type RestRawResult,
   type RestTransportMiddleware,
 } from "./request.ts";
+import {
+  defaultProducesFor,
+  kindNeedsReason,
+  type RestProducedFor,
+  type RestProducerFor,
+  type RestResponseDeclaration,
+  type RestResponseDeclared,
+  type RestResponseKind,
+} from "./response-kind.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // `defineRestRouter`: one complete declaration per route, under a namespace and
@@ -235,6 +244,8 @@ export type StoredHandlerArguments<Api> = Readonly<{
   raw: string | Uint8Array | undefined;
   /** The file parts a multipart route named; undefined everywhere else. */
   files: Readonly<Record<string, File>> | undefined;
+  /** The producer for the kind a route declared; undefined everywhere else. */
+  response: RestProducerFor<RestResponseKind> | undefined;
   request: Request;
 }>;
 type StoredHandler<Api> = {
@@ -286,14 +297,63 @@ type OutputResultCheck<Output extends RouteAnswer, Result> = Output extends Outp
  * `{ status, body }` of the several a route declared, or nothing. The answer
  * slot holds exactly one of those, so a route states its answers in one place.
  */
-type RouteResult<Output extends RouteAnswer> = Output extends RestRawAnswerDeclared
+type RouteResult<Output extends RouteAnswer> =
+  Output extends RestResponseDeclared<infer Kind>
+    ? RestProducedFor<Kind> | Promise<RestProducedFor<Kind>>
+    : SerialisedRouteResult<Output>;
+/** The answers the framework itself writes: its own bytes, one schema's, or several. */
+type SerialisedRouteResult<Output extends RouteAnswer> = Output extends RestRawAnswerDeclared
   ? RestRawResult | Promise<RestRawResult>
   : Output extends OutputSchema
     ? z.infer<Output> | Promise<z.infer<Output>>
     : Output extends RestRouteAnswers
       ? AnswerResult<Output> | Promise<AnswerResult<Output>>
       : void | Promise<void>;
-type RouteAnswer = OutputSchema | RestRouteAnswers | RestRawAnswerDeclared | Missing;
+type RouteAnswer =
+  | OutputSchema
+  | RestRouteAnswers
+  | RestRawAnswerDeclared
+  | RestResponseDeclared
+  | Missing;
+
+/**
+ * What a declared kind needs said about it: the media types a bytes or
+ * protocol answer publishes, and the reason the two kinds that write a wire we
+ * do not own are written at all.
+ */
+export type RestResponseOptions<
+  Kind extends RestResponseKind,
+  Produces extends string | readonly string[],
+> = Readonly<{ produces?: Produces; because?: string }> &
+  (Kind extends "bytes" | "protocol" ? Readonly<{ produces: Produces }> : unknown) &
+  (Kind extends "protocol" | "forwarded" ? Readonly<{ because: string }> : unknown);
+
+/** Those same options once the kind is gone: what the declaration reads off them. */
+type DeclaredResponseOptions = Readonly<{
+  produces?: string | readonly string[];
+  because?: string;
+}>;
+
+function declaredProduces(options: DeclaredResponseOptions): readonly string[] | undefined {
+  if (options.produces === undefined) return undefined;
+
+  return typeof options.produces === "string" ? [options.produces] : options.produces;
+}
+
+function declaredReason(options: DeclaredResponseOptions): string | undefined {
+  return options.because;
+}
+
+/**
+ * The producer a declared kind hands the handler, beside its input, and the
+ * request the two forwarding kinds read for themselves. A route with no
+ * declared kind is handed no producer, so it has no way to write bytes.
+ */
+type ResponseArguments<Answer extends RouteAnswer> =
+  Answer extends RestResponseDeclared<infer Kind, infer Produces>
+    ? Readonly<{ response: RestProducerFor<Kind, Produces> }> &
+        (Kind extends "protocol" | "forwarded" ? Readonly<{ request: Request }> : unknown)
+    : unknown;
 
 /** The bytes a route that declared a raw body is handed, beside its input. */
 type RawBodyArguments<Body extends RouteSource> =
@@ -362,6 +422,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
   readonly rawResponse?: RestRawResponse;
+  /** Present exactly when the route declared the kind of answer it gives. */
+  readonly response?: RestResponseDeclaration;
   /** Every method this one declaration answers; the declared method alone by default. */
   readonly methods?: readonly HttpMethod[];
   /** True for the one route of a path that answers whatever method arrives. */
@@ -413,6 +475,8 @@ type RouteState = Readonly<{
   entitlement?: ApiEntitlement;
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
+  /** Present exactly when the route declared the kind of answer it gives. */
+  response?: RestResponseDeclaration;
   methods?: readonly HttpMethod[];
   anyMethod?: boolean;
   permission?: AuthzPermission;
@@ -450,7 +514,13 @@ type HasJsonDeclarations<
 type JsonRouteExempt<
   Access extends RouteAccessKind,
   Output extends RouteAnswer,
-> = Access extends "public" ? true : Output extends RestRawAnswerDeclared ? true : false;
+> = Access extends "public"
+  ? true
+  : Output extends RestRawAnswerDeclared
+    ? true
+    : Output extends RestResponseDeclared
+      ? true
+      : false;
 type JsonDeclarationsReady<
   Strict extends boolean,
   Body extends RouteSource,
@@ -462,98 +532,79 @@ type JsonDeclarationsReady<
     : HasJsonDeclarations<Body, Output>
   : true;
 
-class RouteBuilder<
-  Api,
-  Method extends HttpMethod,
-  Path extends string,
-  Params extends RouteSource = Missing,
-  Body extends RouteSource = Missing,
-  Query extends RouteSource = Missing,
-  Output extends RouteAnswer = Missing,
-  Permission extends boolean = false,
-  Middleware extends readonly RestTransportMiddleware[] = [],
-  Access extends RouteAccessKind = "scoped",
-  Family extends RestDoorCredential = "project",
-  Door extends RestDoorCredential = Family,
-  StrictJsonSchemas extends boolean = false,
-> {
+/**
+ * Everything a half-declared route knows about itself, as one record. The
+ * builder carries it as a single type parameter, so an option is a field here
+ * and one return type on the method that sets it, not a line on all of them.
+ */
+type RouteShape = Readonly<{
+  method: HttpMethod;
+  path: string;
+  params: RouteSource;
+  body: RouteSource;
+  query: RouteSource;
+  /** What the route answers with: a schema, several, its own bytes, or nothing. */
+  answer: RouteAnswer;
+  /** Whether the route has said how it is reached - a permission or an access kind. */
+  permission: boolean;
+  middleware: readonly RestTransportMiddleware[];
+  access: RouteAccessKind;
+  /** The family's door, which a route may narrow to its own. */
+  family: RestDoorCredential;
+  door: RestDoorCredential;
+  strict: boolean;
+}>;
+
+/** `S` with the fields `Changes` names replaced: one declaration, one move. */
+type With<S extends RouteShape, Changes extends Partial<RouteShape>> = Readonly<{
+  [Field in keyof RouteShape]: Field extends keyof Changes ? Changes[Field] : S[Field];
+}>;
+
+class RouteBuilder<Api, S extends RouteShape> {
   constructor(
-    private readonly router: RestTransportRouter<Api, Family, StrictJsonSchemas>,
-    private readonly method: Method,
-    private readonly path: Path,
+    private readonly router: RestTransportRouter<Api, S["family"], S["strict"]>,
+    private readonly method: S["method"],
+    private readonly path: S["path"],
     private readonly operation: string,
     private readonly state: RouteState = {},
   ) {}
 
   withParams<Schema extends z.ZodObject>(
-    schema: ExactPathSchema<Path, Schema> &
-      DistinctSchema<Schema, Body> &
-      DistinctSchema<Schema, Query>,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Schema,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+    schema: ExactPathSchema<S["path"], Schema> &
+      DistinctSchema<Schema, S["body"]> &
+      DistinctSchema<Schema, S["query"]>,
+  ): RouteBuilder<Api, With<S, { params: Schema }>> {
     assertSourceUnset("params", this.state.params);
     assertPathParameters(this.path, schema);
     assertDistinctSources(schema, this.state.input);
     assertDistinctSources(schema, this.state.query);
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      params: schema,
-    });
+    return new RouteBuilder<Api, With<S, { params: Schema }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        params: schema,
+      },
+    );
   }
 
   withInput<Schema extends SourceSchema>(
-    this: RouteBuilder<
-      Api,
-      Exclude<HttpMethod, "get" | "head">,
-      Path,
-      Params,
-      Body,
-      Query,
-      Output,
-      Permission,
-      Middleware,
-      Access,
-      Family,
-      Door,
-      StrictJsonSchemas
-    >,
-    schema: Schema & DistinctSchema<Schema, Params> & DistinctSchema<Schema, Query>,
-  ): RouteBuilder<
-    Api,
-    Exclude<HttpMethod, "get" | "head">,
-    Path,
-    Params,
-    Schema,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
+    schema: Schema & DistinctSchema<Schema, S["params"]> & DistinctSchema<Schema, S["query"]>,
+  ): RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head">; body: Schema }>> {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("input", this.state.input);
     assertParsedBodyFree({ operation: this.operation, state: this.state });
     assertDistinctSources(this.state.params, schema);
     assertDistinctSources(this.state.query, schema);
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<
+      Api,
+      With<S, { method: Exclude<HttpMethod, "get" | "head">; body: Schema }>
+    >(this.router, this.method, this.path, this.operation, {
       ...this.state,
       input: schema,
     });
@@ -565,43 +616,21 @@ class RouteBuilder<
    * and query input. The declared body cap still runs first.
    */
   withRawBody<Form extends RestRawBodyForm>(
-    this: RouteBuilder<
-      Api,
-      Exclude<HttpMethod, "get" | "head">,
-      Path,
-      Params,
-      Body,
-      Query,
-      Output,
-      Permission,
-      Middleware,
-      Access,
-      Family,
-      Door,
-      StrictJsonSchemas
-    >,
+    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     form: Form,
     options: Readonly<{ mediaType?: string }> = {},
   ): RouteBuilder<
     Api,
-    Exclude<HttpMethod, "get" | "head">,
-    Path,
-    Params,
-    RestRawBodyDeclared<Form>,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
+    With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestRawBodyDeclared<Form> }>
   > {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("rawBody", this.state.rawBody);
     assertParsedBodyFree({ operation: this.operation, state: this.state });
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<
+      Api,
+      With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestRawBodyDeclared<Form> }>
+    >(this.router, this.method, this.path, this.operation, {
       ...this.state,
       rawBody: { form, mediaType: options.mediaType ?? DEFAULT_RAW_MEDIA_TYPE[form] },
     });
@@ -613,36 +642,14 @@ class RouteBuilder<
    * and each file part the route named is handed over beside it.
    */
   withMultipart<Fields extends z.ZodObject, const Files extends RestMultipartFiles>(
-    this: RouteBuilder<
-      Api,
-      Exclude<HttpMethod, "get" | "head">,
-      Path,
-      Params,
-      Body,
-      Query,
-      Output,
-      Permission,
-      Middleware,
-      Access,
-      Family,
-      Door,
-      StrictJsonSchemas
-    >,
+    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     multipart: Readonly<{ fields: Fields; files: Files }>,
   ): RouteBuilder<
     Api,
-    Exclude<HttpMethod, "get" | "head">,
-    Path,
-    Params,
-    RestMultipartDeclared<Fields, Files>,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
+    With<
+      S,
+      { method: Exclude<HttpMethod, "get" | "head">; body: RestMultipartDeclared<Fields, Files> }
+    >
   > {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("multipart", this.state.multipart);
@@ -651,7 +658,13 @@ class RouteBuilder<
     assertDistinctSources(this.state.params, multipart.fields);
     assertDistinctSources(this.state.query, multipart.fields);
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<
+      Api,
+      With<
+        S,
+        { method: Exclude<HttpMethod, "get" | "head">; body: RestMultipartDeclared<Fields, Files> }
+      >
+    >(this.router, this.method, this.path, this.operation, {
       ...this.state,
       multipart: { fields: multipart.fields, files: multipart.files },
     });
@@ -662,23 +675,7 @@ class RouteBuilder<
    * never decides who is limited; a policy names its window whole or not at
    * all, since one number alone would miscount against the default.
    */
-  withRateLimit(
-    policy: RestRateLimitPolicy = {},
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  withRateLimit(policy: RestRateLimitPolicy = {}): RouteBuilder<Api, S> {
     assertSourceUnset("rateLimit", this.state.rateLimit);
 
     if ((policy.requests === undefined) !== (policy.seconds === undefined)) {
@@ -688,7 +685,7 @@ class RouteBuilder<
       );
     }
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       rateLimit: policy,
     });
@@ -699,27 +696,11 @@ class RouteBuilder<
    * entries under. Only the validated bytes are stored, so a route that writes
    * its own answer, or declares none, cannot be cached.
    */
-  withCache(
-    policy: RestCachePolicy,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  withCache(policy: RestCachePolicy): RouteBuilder<Api, S> {
     assertSourceUnset("cache", this.state.cache);
     assertCachePolicy({ operation: this.operation, policy });
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       cache: policy,
     });
@@ -730,26 +711,10 @@ class RouteBuilder<
    * after access is decided, at the scope access resolved, so a caller who may
    * not do this at all is refused before the plan is ever looked up.
    */
-  withEntitlement(
-    entitlement: ApiEntitlement,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  withEntitlement(entitlement: ApiEntitlement): RouteBuilder<Api, S> {
     assertSourceUnset("entitlement", this.state.entitlement);
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       entitlement,
     });
@@ -760,56 +725,32 @@ class RouteBuilder<
    * key is unique within is the scope access resolved, never a callback, so a
    * route cannot key a create outside the door it answers behind.
    */
-  withIdempotency(
-    idempotency: RestIdempotency,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  withIdempotency(idempotency: RestIdempotency): RouteBuilder<Api, S> {
     assertSourceUnset("idempotency", this.state.idempotency);
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       idempotency,
     });
   }
 
   withQuery<Schema extends z.ZodObject>(
-    schema: Schema & DistinctSchema<Schema, Params> & DistinctSchema<Schema, Body>,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Schema,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+    schema: Schema & DistinctSchema<Schema, S["params"]> & DistinctSchema<Schema, S["body"]>,
+  ): RouteBuilder<Api, With<S, { query: Schema }>> {
     assertSourceUnset("query", this.state.query);
     assertDistinctSources(this.state.params, schema);
     assertDistinctSources(this.state.input, schema);
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      query: schema,
-    });
+    return new RouteBuilder<Api, With<S, { query: Schema }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        query: schema,
+      },
+    );
   }
 
   /**
@@ -820,26 +761,18 @@ class RouteBuilder<
   withPermission(
     permission: AuthzPermission,
     target?: RestPermissionTarget,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    true,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      permission,
-      ...(target ? { permissionTarget: target } : {}),
-    });
+  ): RouteBuilder<Api, With<S, { permission: true }>> {
+    return new RouteBuilder<Api, With<S, { permission: true }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        permission,
+        ...(target ? { permissionTarget: target } : {}),
+      },
+    );
   }
 
   /**
@@ -849,94 +782,38 @@ class RouteBuilder<
    */
   withAccess<Kind extends RouteAccess>(
     access: Kind,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    true,
-    Middleware,
-    Kind["kind"],
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      access,
-    });
+  ): RouteBuilder<Api, With<S, { permission: true; access: Kind["kind"] }>> {
+    return new RouteBuilder<Api, With<S, { permission: true; access: Kind["kind"] }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        access,
+      },
+    );
   }
 
-  withVersion(
-    version: DateVersion,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  withVersion(version: DateVersion): RouteBuilder<Api, S> {
     assertVersionLabel(version);
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       version,
     });
   }
 
-  withDocs(
-    docs: RestTransportDocs,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+  withDocs(docs: RestTransportDocs): RouteBuilder<Api, S> {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       docs,
     });
   }
 
   /** Marks this one route superseded, whatever the family declared. */
-  withDeprecated(
-    deprecated: RestDeprecation,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+  withDeprecated(deprecated: RestDeprecation): RouteBuilder<Api, S> {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       deprecated,
     });
@@ -944,28 +821,20 @@ class RouteBuilder<
 
   withOutput<Schema extends OutputSchema>(
     schema: Schema,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Schema,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  ): RouteBuilder<Api, With<S, { answer: Schema }>> {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
     assertSchemaAnswerFree({ operation: this.operation, state: this.state });
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      output: schema,
-    });
+    return new RouteBuilder<Api, With<S, { answer: Schema }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        output: schema,
+      },
+    );
   }
 
   /**
@@ -975,29 +844,21 @@ class RouteBuilder<
    */
   responds<const Answers extends RestRouteAnswers>(
     answers: Answers,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Answers,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  ): RouteBuilder<Api, With<S, { answer: Answers }>> {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
     assertSchemaAnswerFree({ operation: this.operation, state: this.state });
     assertDeclaredAnswers({ operation: this.operation, answers });
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      answers,
-    });
+    return new RouteBuilder<Api, With<S, { answer: Answers }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        answers,
+      },
+    );
   }
 
   /**
@@ -1007,21 +868,7 @@ class RouteBuilder<
    */
   withRawResponse(
     options: Readonly<{ produces: string | readonly string[] }>,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    RestRawAnswerDeclared,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  ): RouteBuilder<Api, With<S, { answer: RestRawAnswerDeclared }>> {
     assertSourceUnset("rawResponse", this.state.rawResponse);
     assertSchemaAnswerFree({ operation: this.operation, state: this.state });
 
@@ -1029,10 +876,57 @@ class RouteBuilder<
 
     assertProduces({ operation: this.operation, produces });
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      rawResponse: { produces: [...produces] },
+    return new RouteBuilder<Api, With<S, { answer: RestRawAnswerDeclared }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        rawResponse: { produces: [...produces] },
+      },
+    );
+  }
+
+  /**
+   * The kind of answer this route gives when it is not JSON. The handler is
+   * handed the one producer that makes that kind, and can return nothing else:
+   * there is no second way to write bytes, events, a redirect or a foreign wire.
+   */
+  withResponse<
+    const Kind extends RestResponseKind,
+    const Produces extends string | readonly string[] = string,
+  >(
+    kind: Kind,
+    options: RestResponseOptions<Kind, Produces>,
+  ): RouteBuilder<Api, With<S, { answer: RestResponseDeclared<Kind, Produces> }>> {
+    assertSourceUnset("response", this.state.response);
+    assertSchemaAnswerFree({ operation: this.operation, state: this.state });
+
+    const declared = declaredProduces(options);
+    const named = declared === undefined ? defaultProducesFor(kind) : declared;
+
+    assertResponseKind({
+      operation: this.operation,
+      kind,
+      produces: named,
+      because: declaredReason(options),
     });
+
+    return new RouteBuilder<Api, With<S, { answer: RestResponseDeclared<Kind, Produces> }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        response: {
+          kind,
+          produces: [...named],
+          ...(declaredReason(options) === undefined ? {} : { because: declaredReason(options) }),
+        },
+      },
+    );
   }
 
   /**
@@ -1040,29 +934,13 @@ class RouteBuilder<
    * reader publishes: Hono answers HEAD from the GET route, and the runtime
    * drops the body it would have written rather than leaving the stream open.
    */
-  methods(
-    names: readonly RestMethodName[],
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  methods(names: readonly RestMethodName[]): RouteBuilder<Api, S> {
     const methods = names.map((name) => name.toLowerCase() as HttpMethod);
 
     assertSourceUnset("methods", this.state.methods);
     assertDeclaredMethods({ operation: this.operation, method: this.method, methods });
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       methods,
     });
@@ -1073,56 +951,34 @@ class RouteBuilder<
    * handshake whose own library terminates the request. It publishes no
    * operation, because it has none to publish, and writes its own answer.
    */
-  anyMethod(): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+  anyMethod(): RouteBuilder<Api, S> {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       anyMethod: true,
     });
   }
 
-  handle<TResult extends RouteResult<Output>>(
+  handle<TResult extends RouteResult<S["answer"]>>(
     this: [
-      RouteReady<Path, Params, Permission>,
-      JsonDeclarationsReady<StrictJsonSchemas, Body, Output, Access>,
+      RouteReady<S["path"], S["params"], S["permission"]>,
+      JsonDeclarationsReady<S["strict"], S["body"], S["answer"], S["access"]>,
     ] extends [true, true]
-      ? RouteBuilder<
-          Api,
-          Method,
-          Path,
-          Params,
-          Body,
-          Query,
-          Output,
-          Permission,
-          Middleware,
-          Access,
-          Family,
-          Door,
-          StrictJsonSchemas
-        >
+      ? RouteBuilder<Api, S>
       : never,
     handler: (
-      args: HandlerArgumentsFor<Access, RouteInput<Params, Query, Body>, Api, Door> &
-        RawBodyArguments<Body> &
-        MultipartArguments<Body> &
-        RawResponseArguments<Output>,
-      ...facts: MiddlewareFacts<Middleware>
-    ) => TResult & OutputResultCheck<Output, TResult>,
-  ): RestTransportRouter<Api, Family, StrictJsonSchemas> {
+      args: HandlerArgumentsFor<
+        S["access"],
+        RouteInput<S["params"], S["query"], S["body"]>,
+        Api,
+        S["door"]
+      > &
+        RawBodyArguments<S["body"]> &
+        MultipartArguments<S["body"]> &
+        RawResponseArguments<S["answer"]> &
+        ResponseArguments<S["answer"]>,
+      ...facts: MiddlewareFacts<S["middleware"]>
+    ) => TResult & OutputResultCheck<S["answer"], TResult>,
+  ): RestTransportRouter<Api, S["family"], S["strict"]> {
     assertRouteReady({
       method: this.method,
       path: this.path,
@@ -1167,56 +1023,24 @@ class RouteBuilder<
     return this.router;
   }
 
-  withStatus(
-    status: ContentfulStatusCode,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  withStatus(status: ContentfulStatusCode): RouteBuilder<Api, S> {
     if (!Number.isInteger(status) || status < 200 || status > 299) {
       throw new Error(
         "REST JSON success status must be 200–299 except 204; omit output for no content",
       );
     }
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       status,
     });
   }
 
-  withBodyLimit(
-    limit: Readonly<{ maxBytes: number; onExceeded(): Error }>,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  withBodyLimit(limit: Readonly<{ maxBytes: number; onExceeded(): Error }>): RouteBuilder<Api, S> {
     if (!Number.isSafeInteger(limit.maxBytes) || limit.maxBytes < 0)
       throw new Error("REST body limit must be a non-negative safe integer");
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       bodyLimit: limit,
     });
@@ -1224,25 +1048,17 @@ class RouteBuilder<
 
   withMiddleware<const Added extends readonly RestTransportMiddleware[]>(
     ...middleware: Added
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    [...Middleware, ...Added],
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      middleware: [...(this.state.middleware ?? []), ...middleware],
-    });
+  ): RouteBuilder<Api, With<S, { middleware: [...S["middleware"], ...Added] }>> {
+    return new RouteBuilder<Api, With<S, { middleware: [...S["middleware"], ...Added] }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        middleware: [...(this.state.middleware ?? []), ...middleware],
+      },
+    );
   }
 
   /**
@@ -1252,27 +1068,19 @@ class RouteBuilder<
    */
   withCredential<NewDoor extends RestDoorCredential>(
     credential: NewDoor,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    NewDoor,
-    StrictJsonSchemas
-  > {
+  ): RouteBuilder<Api, With<S, { door: NewDoor }>> {
     assertSourceUnset("credential", this.state.credential);
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      credential,
-    });
+    return new RouteBuilder<Api, With<S, { door: NewDoor }>>(
+      this.router,
+      this.method,
+      this.path,
+      this.operation,
+      {
+        ...this.state,
+        credential,
+      },
+    );
   }
 
   /**
@@ -1280,27 +1088,11 @@ class RouteBuilder<
    * route's own parameters and the answer's id, so the App carries none of it;
    * a declared action with no audit sink on the runtime is refused at mount.
    */
-  withAudit(
-    action: string,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    Permission,
-    Middleware,
-    Access,
-    Family,
-    Door,
-    StrictJsonSchemas
-  > {
+  withAudit(action: string): RouteBuilder<Api, S> {
     assertAuditAction(action);
     assertSourceUnset("audit", this.state.audit);
 
-    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
       audit: action,
     });
@@ -1331,6 +1123,7 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
     ...(state.entitlement ? { entitlement: state.entitlement } : {}),
     ...(state.idempotency ? { idempotency: state.idempotency } : {}),
     ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
+    ...(state.response ? { response: state.response } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.audit ? { audit: state.audit } : {}),
   };
@@ -1345,18 +1138,20 @@ type OpenRoute<
   StrictJsonSchemas extends boolean,
 > = RouteBuilder<
   Api,
-  Method,
-  Path,
-  Missing,
-  Missing,
-  Missing,
-  Missing,
-  false,
-  [],
-  "scoped",
-  Door,
-  Door,
-  StrictJsonSchemas
+  {
+    method: Method;
+    path: Path;
+    params: Missing;
+    body: Missing;
+    query: Missing;
+    answer: Missing;
+    permission: false;
+    middleware: [];
+    access: "scoped";
+    family: Door;
+    door: Door;
+    strict: StrictJsonSchemas;
+  }
 >;
 
 class RestTransportRouter<
@@ -1697,12 +1492,7 @@ function assertRouteReady({
 
   if (state.permissionTarget) assertPermissionTarget({ operation, state });
 
-  if (state.anyMethod && !state.rawResponse) {
-    throw new Error(
-      `REST ${operation} answers every method, and no one schema describes what each of them ` +
-        "answers with; it must declare withRawResponse()",
-    );
-  }
+  assertAnyMethodAnswer({ operation, state });
 
   if (state.anyMethod && state.methods) {
     throw new Error(`REST ${operation} answers every method and also names some of them`);
@@ -1786,6 +1576,27 @@ function assertDeclaredFiles({
   }
 }
 
+/**
+ * A route that answers every method answers each of them differently, so no one
+ * schema describes it: it forwards whatever it was handed.
+ */
+function assertAnyMethodAnswer({
+  operation,
+  state,
+}: {
+  operation: string;
+  state: RouteState;
+}): void {
+  const forwards = state.rawResponse !== undefined || state.response?.kind === "forwarded";
+
+  if (!state.anyMethod || forwards) return;
+
+  throw new Error(
+    `REST ${operation} answers every method, and no one schema describes what each of them ` +
+      'answers with; it must declare withResponse("forwarded")',
+  );
+}
+
 /** A route answers with a schema or with its own bytes, never with both. */
 function assertSchemaAnswerFree({
   operation,
@@ -1796,11 +1607,40 @@ function assertSchemaAnswerFree({
 }): void {
   const schema = state.output ?? state.answers;
 
-  if (!schema && !state.rawResponse) return;
+  if (!schema && !state.rawResponse && !state.response) return;
 
-  throw new Error(
-    `REST ${operation} declares both an output schema and a raw response; it answers one way`,
-  );
+  throw new Error(`REST ${operation} declares its answer twice; a route answers one way`);
+}
+
+/**
+ * What a declared kind must say for itself: the media types a published kind
+ * names, and the reason a wire we do not own is written here at all.
+ */
+function assertResponseKind({
+  operation,
+  kind,
+  produces,
+  because,
+}: {
+  operation: string;
+  kind: RestResponseKind;
+  produces: readonly string[];
+  because: string | undefined;
+}): void {
+  if (produces.some((mediaType) => mediaType.trim() === "")) {
+    throw new Error(`REST ${operation} publishes a blank media type for its ${kind} answer`);
+  }
+
+  if (kind === "bytes" && produces.length === 0) {
+    throw new Error(`REST ${operation} answers with bytes and names no media type it produces`);
+  }
+
+  if (kindNeedsReason(kind) && (because ?? "").trim() === "") {
+    throw new Error(
+      `REST ${operation} writes a ${kind} answer, which is a wire this framework does not own, ` +
+        "and says no reason why",
+    );
+  }
 }
 
 /** The media types a raw answer publishes: at least one, each of them written. */

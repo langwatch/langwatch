@@ -218,6 +218,22 @@ export {
   type ServiceContext,
 } from "./response.ts";
 
+// The answer kinds a route may declare when it does not answer with JSON, and
+// the producers that make them. A transport file names the type it returns and
+// nothing else here: the producer arrives in the handler's own arguments.
+export type {
+  RestAnswer,
+  RestBytesProducer,
+  RestEvent,
+  RestEventsProducer,
+  RestForwardedProducer,
+  RestProducedFor,
+  RestProducerFor,
+  RestProtocolProducer,
+  RestRedirectProducer,
+  RestResponseKind,
+} from "./response-kind.ts";
+
 // The document half. Spec generation must come from the same hono-openapi
 // package instance that attached the route metadata, so the generator and the
 // schema wrapper are re-exported here: a transport file never reaches for

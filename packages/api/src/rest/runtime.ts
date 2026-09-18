@@ -8,9 +8,9 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { mergePath } from "hono/utils/url";
 import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
+import type { ContentfulStatusCode, StatusCode } from "hono/utils/http-status";
+import { mergePath } from "hono/utils/url";
 import type { z } from "zod";
 
 import {
@@ -79,6 +79,7 @@ import {
   type RestRawBody,
   type RestTransportMiddlewareBinding,
 } from "./request.ts";
+import { isProducedAnswer, producedKind, producerFor, type RestEvent } from "./response-kind.ts";
 import { DECLARED_ANSWER, ENDPOINT_ROUTE, isDeclined, REQUEST_FAMILY } from "./response.ts";
 import { registerRoutePolicy } from "./security.ts";
 
@@ -1177,6 +1178,7 @@ function handlerArguments<Api>({
     files: route.multipart
       ? (context.get(ROUTE_FILES) as Readonly<Record<string, File>>)
       : undefined,
+    response: route.response ? producerFor(route.response.kind) : undefined,
   };
 }
 
@@ -1196,9 +1198,13 @@ async function answerWith<Api>({
   route: RestTransportRoute<Api>;
   result: unknown;
 }): Promise<Response | undefined> {
-  if (!route.rawResponse) return respond({ context, route, result });
-
-  if (!isDeclined(result)) return respondRaw({ context, route, result });
+  if (route.response) {
+    if (!isDeclined(result)) return respondProduced({ context, route, result });
+  } else if (!route.rawResponse) {
+    return respond({ context, route, result });
+  } else if (!isDeclined(result)) {
+    return respondRaw({ context, route, result });
+  }
 
   if (!route.anyMethod) {
     throw new Error(
@@ -1492,6 +1498,109 @@ function respondRaw({
   }
 
   return context.body(answer.body as never, status, headers);
+}
+
+/**
+ * The answer a declared kind's producer made. The handler could make no other:
+ * the runtime's own check here is for a handler that reached the framework
+ * some way the compiler could not see.
+ */
+function respondProduced({
+  context,
+  route,
+  result,
+}: {
+  context: Context;
+  route: RestTransportRoute<unknown>;
+  result: unknown;
+}): Response {
+  if (!isProducedAnswer(result)) {
+    throw new Error(
+      `REST ${route.operation} declares a ${route.response?.kind} answer and returned something ` +
+        "no response producer made",
+    );
+  }
+
+  const kind = producedKind(result);
+
+  if (kind !== route.response?.kind) {
+    throw new Error(
+      `REST ${route.operation} declares a ${route.response?.kind} answer and produced a ${kind} one`,
+    );
+  }
+
+  if (result.body.form === "response") return result.body.response;
+
+  const headers = { ...result.headers };
+  const carrying = contentfulStatus(result.status);
+
+  // Hono answers HEAD from the GET route, so the twin's body is dropped here
+  // rather than left for a garbage collector to close.
+  if (context.req.method === "HEAD" || carrying === null) {
+    if (result.body.form === "stream") void result.body.stream.cancel();
+
+    return context.body(null, result.status, headers);
+  }
+
+  if (result.body.form === "events") {
+    return context.body(eventStreamOf(result.body.events), carrying, headers);
+  }
+
+  if (result.body.form === "stream") return context.body(result.body.stream, carrying, headers);
+
+  const bytes = result.body.bytes;
+
+  return bytes === null
+    ? context.body(null, result.status, headers)
+    : context.body(bytes, carrying, headers);
+}
+
+/** The statuses that carry no body at all, so nothing may be written under them. */
+function contentfulStatus(status: StatusCode): ContentfulStatusCode | null {
+  if (status === 101 || status === 204 || status === 205 || status === 304) return null;
+
+  return status;
+}
+
+/**
+ * The framing of a server-sent event stream, which is the framework's job and
+ * not a handler's: one `data:` line per line of the payload, the optional
+ * fields before it, and a blank line ending every event.
+ */
+function eventStreamOf(events: AsyncIterable<RestEvent>): ReadableStream {
+  const encoder = new TextEncoder();
+  const reading = events[Symbol.asyncIterator]();
+
+  return new ReadableStream({
+    async pull(controller) {
+      const next = await reading.next();
+
+      if (next.done === true) {
+        controller.close();
+
+        return;
+      }
+
+      controller.enqueue(encoder.encode(frameOf(next.value)));
+    },
+    // A caller that hung up ends the handler's own loop, rather than leaving it
+    // producing events with nowhere to put them.
+    async cancel(reason: unknown) {
+      await reading.return?.(reason);
+    },
+  });
+}
+
+/** One event on the wire: its optional fields, then a `data:` line per line. */
+function frameOf(event: RestEvent): string {
+  const fields = [
+    ...(event.id === undefined ? [] : [`id: ${event.id}`]),
+    ...(event.event === undefined ? [] : [`event: ${event.event}`]),
+    ...(event.retryMs === undefined ? [] : [`retry: ${event.retryMs}`]),
+    ...event.data.split("\n").map((line) => `data: ${line}`),
+  ];
+
+  return `${fields.join("\n")}\n\n`;
 }
 
 /**

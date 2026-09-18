@@ -5,7 +5,6 @@
  */
 import type { MiddlewareHandler } from "hono";
 import { describeRoute, resolver, type DescribeRouteOptions } from "hono-openapi";
-
 import { z, type ZodType } from "zod";
 
 import type { CredentialClass } from "../access-policy.ts";
@@ -210,7 +209,7 @@ function documentedAnswers(route: RestTransportRoute<unknown>): Record<string, R
  * reading the document sees exactly the statuses the handler is typed to return.
  */
 function declaredAnswers(route: RestTransportRoute<unknown>): Record<string, RouteResponse> {
-  if (route.rawResponse) return rawAnswer(route);
+  if (route.rawResponse || route.response) return rawAnswer(route);
 
   const answers = route.answers ?? { [route.status ?? 200]: route.output };
   const published: Record<string, RouteResponse> = {};
@@ -227,10 +226,12 @@ function declaredAnswers(route: RestTransportRoute<unknown>): Record<string, Rou
 
 /** What a route that writes its own body publishes: the media types, no shape. */
 function rawAnswer(route: RestTransportRoute<unknown>): Record<string, RouteResponse> {
-  const status = String(route.status ?? 200);
+  const status = String(route.status ?? (route.response?.kind === "redirect" ? 303 : 200));
   const content: RouteResponse["content"] = {};
 
-  for (const mediaType of route.rawResponse?.produces ?? []) content[mediaType] = {};
+  const produces = route.rawResponse?.produces ?? route.response?.produces ?? [];
+
+  for (const mediaType of produces) content[mediaType] = {};
 
   return { [status]: { description: answerDescription(Number(status)), content } };
 }

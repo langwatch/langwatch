@@ -356,11 +356,11 @@ describe("defineRestRouter", () => {
      */
     it("refuses a route that declares both a schema and a raw answer, or names no media type", () => {
       expect(() => hook().withOutput(answer).withRawResponse({ produces: "text/plain" })).toThrow(
-        /both an output schema and a raw response/,
+        /declares its answer twice/,
       );
 
       expect(() => hook().withRawResponse({ produces: "text/plain" }).withOutput(answer)).toThrow(
-        /both an output schema and a raw response/,
+        /declares its answer twice/,
       );
 
       expect(() => hook().withRawResponse({ produces: [] })).toThrow(/names no media type/);
@@ -405,7 +405,7 @@ describe("defineRestRouter", () => {
           .anyMethod()
           .withOutput(answer)
           .handle(() => ({ ok: true })),
-      ).toThrow(/it must declare withRawResponse/);
+      ).toThrow(/it must declare withResponse\("forwarded"\)/);
     });
   });
 
