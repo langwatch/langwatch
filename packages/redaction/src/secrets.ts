@@ -369,6 +369,36 @@ const RECORD_ID_PREFIXES = new Set([
 ]);
 
 /**
+ * The one stored-object id shape the platform mints. Edge media extraction
+ * rewrites span media to `/api/files/{projectId}/so_<id>` references, and the
+ * id is a KSUID derived with a FIXED zero timestamp (`deriveStoredObjectId`):
+ * 21 bytes whose first 8 are zero, so its 29 base62 digits always open with a
+ * run of at least eleven zeros, a shape no vendor's key generator produces.
+ *
+ * `so` stays OUT of the global leading-prefix exemption on purpose — two
+ * letters is exactly the shape a vendor mints keys in, and a bare `so_…` value
+ * that looks like a key must keep the generic shape rule's protection. For the
+ * same reason the tail exemption below does not trust the `so_` prefix alone:
+ * the terminal segment has to BE a stored-object id, or a benign path head
+ * followed by a key-shaped `so_` value would smuggle that value past the rule
+ * that redacts it on its own.
+ */
+const STORED_OBJECT_ID_RE = /^so_0{11}[0-9A-Za-z]{18}$/;
+
+/**
+ * Does the LAST path segment of a span name a record the span points at?
+ * That is the tail exemption's whole vocabulary (see `shaped_api_key`): a
+ * segment carrying one of {@link RECORD_ID_PREFIXES}, whose values the rule
+ * never redacts anyway, or a segment that is a stored-object id (#8077).
+ */
+function isRecordReferenceTail(segment: string): boolean {
+  const prefix = /^([A-Za-z][A-Za-z0-9]{1,11})[_-]/.exec(segment)?.[1];
+  if (!prefix) return false;
+  if (RECORD_ID_PREFIXES.has(prefix.toLowerCase())) return true;
+  return STORED_OBJECT_ID_RE.test(segment);
+}
+
+/**
  * Keys that are published on purpose. PostHog's `phc_` is a client-side project
  * key that ships inside web bundles by design, so blanking it hides legitimate
  * telemetry configuration and protects nothing. The vendor-list comment has
@@ -696,9 +726,42 @@ const VALUE_RULES: ValueRule[] = [
       `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_+/-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
-    accept: (groups) =>
-      !isNonCredentialPrefix(groups[1] ?? "") &&
-      isKeyShapedBody(groups[2] ?? ""),
+    accept: (groups) => {
+      if (isNonCredentialPrefix(groups[1] ?? "")) return false;
+      const body = groups[2] ?? "";
+      // The body class crosses `/`, so a URL path can be swallowed as one
+      // token: `/api/files/local-dev-project/so_<id>` matches with prefix
+      // `local` and a body that runs across the slash, and eating it turns a
+      // media reference into a 404 (#8077). A span whose LAST path segment
+      // names itself a record id is treated as a reference to that record —
+      // but only when the path in FRONT of it is benign. The record id says
+      // what the span POINTS AT, not what the earlier segments carry: a
+      // key-shaped segment ahead of it is still key material
+      // (`acme_<secret>/so_<id>`), and that span is redacted whole, record
+      // reference included — the safe direction, and what this rule always
+      // did to that shape. The guard stays narrow on the tail too — RECORD
+      // ids only, not the wider non-credential family: a digest or uuid
+      // prefix on the terminal segment says nothing about the rest of the
+      // span, and a slash-containing credential that happens to end in
+      // `sha_…` must keep its protection. Nor is a `so_` prefix taken as
+      // proof: the segment has to be a stored-object id in full, else
+      // `<benign path>/so_<key-shaped value>` would carry out a value the
+      // rule redacts when it stands alone.
+      const lastSlash = body.lastIndexOf("/");
+      if (
+        lastSlash !== -1 &&
+        isRecordReferenceTail(body.slice(lastSlash + 1))
+      ) {
+        // Key material ahead of the reference keeps its protection whether
+        // it reads as one segment or many: a slash is a valid character in
+        // the bodies this rule accepts, so a credential may itself be split
+        // across segments that are each under the shape floor while the
+        // joint head is unmistakably a key. Check both views.
+        const head = body.slice(0, lastSlash);
+        return isKeyShapedBody(head) || head.split("/").some(isKeyShapedBody);
+      }
+      return isKeyShapedBody(body);
+    },
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {

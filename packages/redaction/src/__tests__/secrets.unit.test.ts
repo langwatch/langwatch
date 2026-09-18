@@ -1200,3 +1200,164 @@ describe("detectSecretsInText", () => {
     });
   });
 });
+
+describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
+  const STORED_OBJECT_ID = "so_000000000002Ckax9GYtOrWQlpTOa";
+
+  describe("given an /api/files reference whose project id has no allowlisted prefix", () => {
+    it("keeps the URL intact instead of eating the path as one token", () => {
+      const url = `/api/files/local-dev-project/${STORED_OBJECT_ID}`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+      expect(redactedCount).toBe(0);
+    });
+
+    it("keeps it intact inside span content too", () => {
+      const content = `{"type":"audio","url":"/api/files/local-dev-project/${STORED_OBJECT_ID}"}`;
+
+      const { text } = redactSecretsInText({ text: content });
+
+      expect(text).toBe(content);
+    });
+  });
+
+  describe("given the production and legacy URL shapes", () => {
+    it("keeps a project_-prefixed reference intact", () => {
+      const url = `/api/files/project_awkQTIH4hwMYdL8KsHbo1/${STORED_OBJECT_ID}`;
+
+      const { text } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+    });
+
+    it("keeps a legacy id-only reference intact", () => {
+      // No path tail to exempt here — what protects the bare reference is
+      // the shape floor: stored-object ids are minted content-addressed with
+      // a FIXED zero timestamp (deriveStoredObjectId), so every real id
+      // leads with a long run of zeros and can never read as key material.
+      const url = `/api/files/${STORED_OBJECT_ID}`;
+
+      const { text } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+    });
+  });
+
+  describe("given a bare so_-prefixed value that IS key-shaped", () => {
+    // `so` earns no GLOBAL prefix exemption: two letters is exactly the
+    // shape vendors mint keys in, and a stored-object id can never look
+    // like this (fixed zero timestamp = leading zeros, low entropy). The
+    // record-reference exemption applies only to the LAST path segment of
+    // a slash-carrying span, and only when that segment IS a stored-object
+    // id — the prefix alone proves nothing.
+    it("redacts it like any other unknown-vendor key", () => {
+      const input = "creds so_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("still redacts it behind a benign path head", () => {
+      // The outer match spans the whole token, and declining it on the tail
+      // prefix alone would consume the key-shaped value unredacted — a costume
+      // the bare value cannot wear, so the path must not lend it one.
+      const input =
+        "path local-dev-project/so_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("given a shaped key that carries a slash but no record-id tail", () => {
+    it("still redacts it, so the guard costs no recall", () => {
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/Yb3Ke6Ng1Jd5Hf0Cu here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("given a credential followed by a record reference in one span", () => {
+    // The record id says what the span points at, not what the earlier
+    // segments carry. Exempting the whole span on the tail alone would hand
+    // any secret a costume: append `/so_<id>` and walk past the detector.
+    it("redacts the span whole — the reference does not launder the key ahead of it", () => {
+      const input = `creds acme_Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M/${STORED_OBJECT_ID} here`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("redacts a credential the slashes split into sub-floor fragments", () => {
+      // A slash is a valid character INSIDE the bodies this rule accepts, so
+      // a key can arrive pre-split: each fragment under the 26-char shape
+      // floor, the joint head unmistakably a key. Per-segment checks alone
+      // would wave the whole span through on the record tail.
+      const input = `creds acme_Zx9Qm2Lp7Rt4/Vw8sBn6Dc3Fy5Hj1Kq0M/${STORED_OBJECT_ID} here`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Vw8sBn6Dc3Fy5Hj1Kq0M");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("redacts a key-shaped fragment padded with low-entropy segments", () => {
+      // The joint head's entropy can be dragged under the floor by filler;
+      // the per-segment view still catches the fragment that IS a key.
+      const input = `creds acme_Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/${STORED_OBJECT_ID} here`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("given a slash-carrying key whose tail apes a digest or uuid prefix", () => {
+    // The tail bypass is RECORD ids only, not the wider non-credential
+    // family: `sha`/`uuid`/`phc` on the terminal segment say nothing about
+    // the rest of the span, and treating them as a pass would hand any
+    // credential a costume — end it in `sha_…` and walk past the filter.
+    it("still redacts a key whose last segment starts with sha_", () => {
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/sha_Ke6Ng1Jd5Hf0Cu3Tb9 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("still redacts a key whose last segment starts with uuid-", () => {
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/uuid-Ke6Ng1Jd5Hf0Cu3Tb9 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("still redacts a key whose last segment starts with so_ but is no stored-object id", () => {
+      // The `so_` twin of the `sha_` case: a 16-char head under the shape
+      // floor, a tail that borrows the prefix without the fixed-timestamp
+      // zeros every real id carries. The full 38-char body is key-shaped and
+      // that is the judgment that must stand.
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/so_Ke6Ng1Jd5Hf0Cu3Tb9 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+});
