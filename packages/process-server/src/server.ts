@@ -357,7 +357,18 @@ function installFatalHandlers(options: {
   };
 }
 
-function bindHttpServer(listener: http.Server, port: number): Promise<void> {
+/**
+ * How long a successor waits for its predecessor's socket. A restart is a
+ * handover: the outgoing process drains in-flight work before it lets go.
+ */
+const BIND_HANDOVER_MS = 10_000;
+const BIND_RETRY_MS = 250;
+
+function isAddressInUse(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === "EADDRINUSE";
+}
+
+function listenOnce(listener: http.Server, port: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const onError = (error: Error): void => reject(error);
     listener.once("error", onError);
@@ -366,6 +377,29 @@ function bindHttpServer(listener: http.Server, port: number): Promise<void> {
       resolve();
     });
   });
+}
+
+/**
+ * Two different failures share `EADDRINUSE`: another program owns the port,
+ * and our predecessor has not let go yet — only the first is worth dying for.
+ * Spec: specs/setup/boot-sequence.feature
+ */
+export async function bindHttpServer(
+  listener: http.Server,
+  port: number,
+  handoverMs: number = BIND_HANDOVER_MS,
+): Promise<void> {
+  // Monotonic: a deadline must not move when the wall clock does.
+  const deadline = performance.now() + handoverMs;
+  for (;;) {
+    try {
+      await listenOnce(listener, port);
+      return;
+    } catch (error) {
+      if (!isAddressInUse(error) || performance.now() >= deadline) throw error;
+      await new Promise((resume) => setTimeout(resume, BIND_RETRY_MS));
+    }
+  }
 }
 
 function closeHttpServer(listener: http.Server): Promise<void> {

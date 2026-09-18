@@ -160,3 +160,24 @@ Feature: The stack migrates once, quietly, under a lock
     When the API process starts
     Then preparation runs to completion first
     And a failed preparation means the entry point never runs
+
+  # Locally the api lane hosts the worker beside the API, so a restart is a
+  # handover: the successor boots while the predecessor is still draining
+  # in-flight work and still holding its metrics port. Treating the first
+  # EADDRINUSE as fatal killed the new worker, haven restarted it a second
+  # later, and the whole lane was unreachable for the gap — three times in one
+  # evening on this checkout. Another program owning the port is still fatal;
+  # the two are indistinguishable except by waiting.
+  @unit
+  Scenario: A listener waits for its predecessor to let go of the port
+    Given a port its previous owner has not released yet
+    When the successor binds
+    Then it retries rather than failing at once
+    And it binds as soon as the port is free
+
+  @unit
+  Scenario: A port another program owns is still a boot failure
+    Given a port held by something that never releases it
+    When the successor binds
+    Then it gives up once the handover window has passed
+    And the failure names the address already in use

@@ -1,8 +1,9 @@
+import http from "node:http";
 import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Server, type HealthRoute } from "../server.ts";
+import { bindHttpServer, Server, type HealthRoute } from "../server.ts";
 
 const logger = { info: vi.fn(), error: vi.fn() };
 
@@ -148,6 +149,40 @@ describe("Server", () => {
 
         expect(chained).toBe(server);
       });
+    });
+  });
+});
+
+describe("binding a port a predecessor still holds", () => {
+  describe("given the previous owner releases it shortly after", () => {
+    /** @scenario "A listener waits for its predecessor to let go of the port" */
+    it("binds as soon as it is free rather than failing at once", async () => {
+      const predecessor = http.createServer();
+      await new Promise<void>((resolve) => predecessor.listen(0, resolve));
+      const port = (predecessor.address() as AddressInfo).port;
+      setTimeout(() => predecessor.close(), 400);
+
+      const successor = http.createServer();
+      await bindHttpServer(successor, port, 5_000);
+
+      expect((successor.address() as AddressInfo).port).toBe(port);
+      successor.close();
+    });
+  });
+
+  describe("given something that never releases it", () => {
+    /** @scenario "A port another program owns is still a boot failure" */
+    it("gives up once the handover window has passed, naming the address", async () => {
+      const squatter = http.createServer();
+      await new Promise<void>((resolve) => squatter.listen(0, resolve));
+      const port = (squatter.address() as AddressInfo).port;
+
+      // The errno, not the prose: the message is Node's to word.
+      await expect(bindHttpServer(http.createServer(), port, 300)).rejects.toMatchObject({
+        code: "EADDRINUSE",
+      });
+
+      squatter.close();
     });
   });
 });
