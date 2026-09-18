@@ -290,7 +290,13 @@ hashed assets — the surface is auth-capable, not auth-enforcing, until a
 policy such as a private-instance gate says otherwise), then serving —
 immutable assets, `index.html` with the injected meta tag, CSP overlaid on
 the stamped base. There is no Router class, no mount API, no scoped router
-object anywhere. **Each expose member sets up only the base**: headers and
+object anywhere. **The code's physical shape matches** (ruled 2026-09-18):
+concept-named directories (`policy/`, `hosting/`), at most three classes
+each, and each class takes the previous one in its constructor — the
+request is followed by following `create` calls, never by knowing which of
+eighteen `thing.otherthing.ts` fragments to open next. Helpers live inside
+the class file they serve; a fourth class in a directory means the concept
+is wrongly cut. **Each expose member sets up only the base**: headers and
 general security, as named CLASSES from `@langwatch/api`, never inline
 data — `HeaderPolicy.strict()` (the floor no surface drops below; `.with`/
 `.merge` overlay, `.without` is the loud exception), `ContentSecurityPolicy
