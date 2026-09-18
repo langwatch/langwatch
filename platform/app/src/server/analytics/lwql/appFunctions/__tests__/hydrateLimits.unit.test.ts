@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 
 import { LWQL_APP_FUNCTION_KEY_CAPS } from "../catalog";
+import type { LangWatchQLAppFunctionTraceSource } from "../traceSource";
 import { hydrate, LIMITS, sourceOf, trace } from "./hydrateFixtures";
 
 describe("given a finished LangWatchQL result", () => {
