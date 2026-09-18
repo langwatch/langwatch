@@ -55,26 +55,20 @@ type Concurrency struct {
 	CancelInProgress any    `yaml:"cancel-in-progress"`
 }
 
-// CancelsInProgress reads cancel-in-progress as a bool, accepting YAML's
-// unquoted form and the quoted string form.
-//
-// isValid is false when the key is absent or set to anything not recognizably
-// true or false, so a guard can tell "set to false" apart from "not set" —
-// both leave a superseded run alive, but only one is a typo.
-func (c Concurrency) CancelsInProgress() (value, isValid bool) {
+// CancelsInProgress reports whether cancel-in-progress is set to true,
+// accepting YAML's unquoted form and the quoted string form. Anything absent,
+// false, or not recognizably true — a typo like `ture` included — reads as
+// false, which is exactly what the guard needs to know: a superseded run is
+// left alive.
+func (c Concurrency) CancelsInProgress() bool {
 	switch typed := c.CancelInProgress.(type) {
 	case bool:
-		return typed, true
+		return typed
 	case string:
-		switch {
-		case strings.EqualFold(typed, "true"):
-			return true, true
-		case strings.EqualFold(typed, "false"):
-			return false, true
-		}
+		return strings.EqualFold(typed, "true")
 	}
 
-	return false, false
+	return false
 }
 
 // Workflow is a single .yml file under .github/workflows.

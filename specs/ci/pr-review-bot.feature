@@ -99,15 +99,15 @@ Feature: PR Review Bot workflow
   # Concurrency
   # ============================================================================
 
+  # The guard cannot observe a run being canceled; it asserts the workflow
+  # configuration that makes GitHub cancel one — a concurrency group keyed on
+  # the PR number, with cancel-in-progress: true.
   @unit
   Scenario: In-progress review is canceled for the same PR
-    Given a review is in progress for pull request #123
-    And the same PR receives a new commit
-    And the workflow is triggered again for #123
-    When the new workflow run starts
-    Then the previous review run is canceled
-    And only the latest review run proceeds
-    And exactly one review result is posted for #123
+    Given the concurrency group is keyed on github.event.pull_request.number
+    And cancel-in-progress is set to true
+    When a new run for a PR starts while an earlier run for that same PR is in progress
+    Then GitHub cancels the earlier run for that PR
 
   # ============================================================================
   # Action Pinning

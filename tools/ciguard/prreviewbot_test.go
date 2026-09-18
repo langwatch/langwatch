@@ -106,6 +106,17 @@ func TestPRReviewBotGatesOnDraft(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "draft")
 }
 
+func TestPRReviewBotReportsAMissingReviewJob(t *testing.T) {
+	renamed := strings.Replace(goodPRReviewBotWorkflow, "  review:", "  reviewer:", 1)
+	root := writePRReviewBotWorkflow(t, renamed)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `has no "review" job to gate`)
+}
+
 // @scenario "Review runs on pull request opened"
 func TestPRReviewBotTriggersOnOpened(t *testing.T) {
 	broken := strings.Replace(goodPRReviewBotWorkflow,
