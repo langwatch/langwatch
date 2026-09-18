@@ -8,7 +8,6 @@
     "OTEL_METRICS_EXPORTER": "otlp",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
-    "OTEL_RESOURCE_ATTRIBUTES": "project.repo=langwatch/langwatch,cost_center=eng",
-    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1"
+    "OTEL_RESOURCE_ATTRIBUTES": "project.repo=langwatch/langwatch,cost_center=eng"
   }
 }

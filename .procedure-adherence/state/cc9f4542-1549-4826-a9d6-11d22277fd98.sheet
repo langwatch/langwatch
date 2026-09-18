@@ -1,0 +1,12 @@
+GOVERNING PROCEDURE: none
+
+The user request is a task notification indicating that a background command ("Background-watch CodeQL run to completion") has already completed with exit code 0. This is a status report, not a request for action.
+
+None of the candidate procedures apply:
+- **proc.fleet-session.launch** — governs launching new Claude sessions for GitHub issues; this is a completion notification, not a launch request.
+- **proc.github.drive-pr** — governs driving a PR to mergeable state; no PR context is present.
+- **proc.codex-meta.aside** — governs capturing and dispatching asides; this is a completed task report, not a new aside.
+- **proc.remote.remmy** — governs local/remote session handoff; no handoff is requested.
+- **proc.orchardist.orchard-watch** — governs fleet state monitoring; this is a single task completion, not a watch setup.
+
+**Action:** Acknowledge the completion. The CodeQL run finished successfully. If further work is needed (e.g., reviewing CodeQL results, acting on findings), that would require a new, explicit request with clear intent.

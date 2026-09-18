@@ -1,0 +1,12 @@
+GOVERNING PROCEDURE: none
+
+The task notification indicates a completed background command ("Bounded CI watcher for the final commit") with exit code 0. This is a status report, not a request for action.
+
+No candidate procedure governs this notification:
+- `proc.fleet-session.launch` — creates worktrees and launches Claude sessions for GitHub issues; not applicable to a completed CI watcher task.
+- `proc.github.drive-pr` — drives PRs to mergeable state via ralph loop; the notification is a completion report, not a request to drive a PR.
+- `proc.remote.remmy` — hands off sessions between local and remote; not applicable to a CI watcher completion.
+- `proc.git-tree.refactor` — restructures code; not applicable.
+- `proc.fleet-session.lifecycle` — manages session creation, migration, recovery, and triage; the notification is a status update, not a lifecycle operation request.
+
+**Recommended action:** Acknowledge the completion. If the CI watcher was part of a larger workflow (e.g., a PR drive or issue implementation), check the next step in that workflow's procedure.
