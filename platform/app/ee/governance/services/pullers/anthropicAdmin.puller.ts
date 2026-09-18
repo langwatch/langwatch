@@ -35,10 +35,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import {
-  DispatchError,
-  parseRetryAfterMs,
-} from "~/server/event-sourcing/queues/dispatchError";
+
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
 import type {
@@ -387,15 +384,6 @@ const costResultSchema = z
     cost_type: z.string().nullable().default(null),
     model: z.string().nullable().default(null),
   })
-  // Coordinates the cost key does NOT carry (context_window, service_tier,
-  // token_type, inference_geo, and whatever the provider adds next) ride
-  // through here under the provider's own names into `raw_payload`. They are
-  // deliberately NOT declared: a declaration narrows the accepted contract,
-  // so one unexpected value type would throw out of `bucketEvents` and wedge
-  // the whole run, and a `.default(null)` would write keys into `raw_payload`
-  // that the provider never sent. `assertRowsAreDistinguishable` names them
-  // from the stored payload when two rows collide, which is all they are for.
-  // They never widen the key, which is the restatement identity.
   .passthrough();
 
 /**
@@ -451,58 +439,6 @@ const pageSchema = z.object({
 });
 
 /**
- * The later of two instants, ignoring one that cannot be parsed.
- *
- * `newestBucketStart` orders a page against itself. Anthropic promises no
- * order ACROSS pages either, so the run needs the same maximum one level up:
- * without it the last page read wins, and a final page whose newest bucket is
- * older than an earlier page's lowers the resume point below buckets this run
- * has already emitted.
- */
-function laterInstant(a: string | null, b: string | null): string | null {
-  if (a === null) return b;
-  if (b === null) return a;
-  const aMs = Date.parse(a);
-  const bMs = Date.parse(b);
-  if (Number.isNaN(bMs)) return a;
-  if (Number.isNaN(aMs)) return b;
-  return bMs > aMs ? b : a;
-}
-
-/**
- * The newest bucket start in one page.
- *
- * NOT the last element of the array. Anthropic does not promise an order
- * within a page, and reading the last bucket as the newest is only correct
- * while the page happens to ascend. On an out-of-order page it hands back an
- * earlier instant than one already emitted, so the watermark it mints re-reads
- * the window. Under an unchanged query that re-read restates rather than
- * duplicating — the ids carry the bucket and its dimensions — and the cost is
- * a window that stops advancing; it becomes duplicated spend on the usage
- * report only once a query change moves the keys (see `cursorSchema`). The
- * maximum is the only value every bucket on the page is at or behind, which is
- * exactly what a watermark has to mean.
- *
- * Instants that do not parse are ignored rather than compared as strings: a
- * value we cannot order cannot be certified as a resume point. A page where
- * none parse yields null, and null resumes from the window start — a re-read,
- * never a skip.
- */
-function newestBucketStart(
-  buckets: z.infer<typeof bucketSchema>[],
-): string | null {
-  let newest: string | null = null;
-  let newestMs = Number.NEGATIVE_INFINITY;
-  for (const bucket of buckets) {
-    const ms = Date.parse(bucket.starting_at);
-    if (Number.isNaN(ms) || ms <= newestMs) continue;
-    newest = bucket.starting_at;
-    newestMs = ms;
-  }
-  return newest;
-}
-
-/**
  * Dimension values are the identity of a bucket, so an absent one has to be a
  * STABLE token rather than an omitted key: dropping "workspace_id" from one
  * pull and including it as null on the next would mint two keys for one
@@ -528,176 +464,6 @@ function dimension(value: string | null): string {
  */
 function dimensionPath(dimensions: Record<string, string>): string {
   return Object.values(dimensions).map(encodeURIComponent).join(":");
-}
-
-/** The hint this adapter attaches under `PULLED_USAGE_HINT_KEY`, read back. */
-interface EmittedUsageHint {
-  dimensions?: Record<string, string>;
-  tokensCacheRead?: number;
-  tokensCacheWrite?: number;
-}
-
-/**
- * The hint off an event this adapter emitted. `extra` is an untyped bag on the
- * shared event shape, so reading our own hint back needs the cast; every event
- * built below carries one.
- */
-function emittedHint(event: NormalizedPullEvent): EmittedUsageHint | undefined {
-  return event.extra?.[PULLED_USAGE_HINT_KEY] as EmittedUsageHint | undefined;
-}
-
-/**
- * Everything a row contributes to the ledger, with none of its identity.
- *
- * Two rows sharing a key AND this signature are interchangeable: whichever one
- * survives the upsert, the money and the quantities recorded are the same, so
- * a provider that repeats a row costs nothing. Two rows sharing a key and
- * differing here are two different figures competing for one cell, and only
- * the last one written survives.
- */
-function amountSignature(event: NormalizedPullEvent): string {
-  const hint = emittedHint(event);
-  return JSON.stringify([
-    event.cost_usd,
-    event.tokens_input,
-    event.tokens_output,
-    hint?.tokensCacheRead ?? 0,
-    hint?.tokensCacheWrite ?? 0,
-  ]);
-}
-
-/**
- * Refuse a page whose own rows cannot be told apart.
- *
- * A row is stored under the dimensions `usageEvent`/`costEvent` build, and on
- * the cost report that set is narrower than what the endpoint hands back:
- * `costResultSchema` parses a `model` that no dimension carries, and the schema
- * is `passthrough`, so any further coordinate Anthropic breaks a row out by
- * without being asked — a tier, a token type, a region — is outside the key
- * too. Two such rows collapse onto one `source_event_id`, which is the sink's
- * dedup key, and the second silently overwrites the first: spend that was
- * fetched, parsed, and then dropped with nothing anywhere reporting a loss.
- *
- * WIDENING the key is not the fix, and deliberately not done here. The
- * dimensions ARE the restatement identity: adding one re-keys every cell
- * already stored, so every later correction would land beside the figure it
- * corrects instead of replacing it. That migration is owned separately. Until
- * it lands, the page fails loudly — the run records an error and an operator
- * sees a figure that is missing rather than one that is quietly wrong.
- *
- * A plain `Error`, not a `HandledError`: there is no named cause a caller can
- * act on, only a provider contract we did not anticipate.
- *
- * The message carries the count, the dimension NAMES, and the names of the
- * fields the colliding rows actually disagree on. Never the values — workspace
- * ids and free-text descriptions are customer billing coordinates, and this
- * string travels into logs and the source's error state. Naming the fields is
- * what turns "something outside the key" into a lead: the operator reads which
- * coordinate the provider split the row by without seeing whose spend it was.
- */
-function assertRowsAreDistinguishable({
-  events,
-  report,
-}: {
-  events: NormalizedPullEvent[];
-  report: AnthropicAdminPullConfig["report"];
-}): void {
-  const colliding = collidingRowsByKey(events);
-  if (colliding.size === 0) return;
-  const dimensionNames = Object.keys(emittedHint(events[0]!)?.dimensions ?? {});
-  // Per key, never across keys: rows under two different keys differ in the
-  // dimensions BY DESIGN, and naming those would report the key as its own
-  // explanation.
-  const differingNames = new Set<string>();
-  for (const rows of colliding.values()) {
-    for (const name of differingFieldNames(rows)) differingNames.add(name);
-  }
-  const differingClause =
-    differingNames.size === 0
-      ? ""
-      : `; the colliding rows differ in ${[...differingNames].sort().join(", ")}`;
-  throw new Error(
-    `anthropic ${report}_report returned one page holding ${colliding.size} restatement key(s) shared by rows reporting different amounts; the key is built from ${dimensionNames.join(", ")}, so the provider is distinguishing these rows by something outside it and recording the page would drop spend${differingClause}`,
-  );
-}
-
-/**
- * The rows behind each key that two or more of them report different amounts
- * under. Keys whose rows agree are not here: a provider repeating a row costs
- * nothing, whichever copy survives the upsert.
- */
-function collidingRowsByKey(
-  events: NormalizedPullEvent[],
-): Map<string, NormalizedPullEvent[]> {
-  const rowsByKey = new Map<string, NormalizedPullEvent[]>();
-  const amountByKey = new Map<string, string>();
-  const collidingKeys = new Set<string>();
-  for (const event of events) {
-    const key = event.source_event_id;
-    const group = rowsByKey.get(key);
-    if (group) group.push(event);
-    else rowsByKey.set(key, [event]);
-    const amount = amountSignature(event);
-    const seen = amountByKey.get(key);
-    if (seen === undefined) amountByKey.set(key, amount);
-    else if (seen !== amount) collidingKeys.add(key);
-  }
-  return new Map(
-    [...collidingKeys].map((key) => [key, rowsByKey.get(key) ?? []]),
-  );
-}
-
-/**
- * The provider field NAMES on which rows sharing one key disagree.
- *
- * Read off `raw_payload`, which is the parsed provider row — the only place
- * the coordinates outside the key survive, since the dimensions are exactly
- * what the key already carries. `amount` will normally be among them: that is
- * the premise of the refusal rather than noise, and listing it costs a word
- * where suppressing it would need a hardcoded list of money fields to drift.
- *
- * A payload that does not parse into an object is skipped rather than guessed
- * at — an unnameable field is better than a wrong name, and the refusal
- * already stands on the key alone.
- */
-function differingFieldNames(events: NormalizedPullEvent[]): string[] {
-  const rows = events
-    .map(parsedRawPayload)
-    .filter((row): row is Record<string, unknown> => row !== null);
-  const first = rows[0];
-  if (first === undefined) return [];
-  const names = new Set<string>();
-  for (const row of rows.slice(1)) {
-    for (const name of new Set([...Object.keys(first), ...Object.keys(row)])) {
-      // Compared by serialized content rather than by identity, so a nested
-      // object (the usage report's `cache_creation`) counts as equal when it
-      // holds the same keys in the same order. Key order is not normalized:
-      // a reordered-but-equal object would be named as differing, which only
-      // adds a word to a message the amount mismatch already justified.
-      // `undefined` and an explicit null are the same absence here.
-      if (
-        JSON.stringify(first[name] ?? null) !==
-        JSON.stringify(row[name] ?? null)
-      ) {
-        names.add(name);
-      }
-    }
-  }
-  return [...names];
-}
-
-/** The parsed provider row an event carries, or null if it is not an object. */
-function parsedRawPayload(
-  event: NormalizedPullEvent,
-): Record<string, unknown> | null {
-  try {
-    const value: unknown = JSON.parse(event.raw_payload);
-    return typeof value === "object" && value !== null && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -765,21 +531,6 @@ export class AnthropicAdminPuller
     const query = queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
-    /**
-     * The newest bucket emitted across EVERY page this run read, which is what
-     * a drained window resumes from.
-     *
-     * Separate from `watermark` on purpose. `watermark` is the resume point a
-     * run that was CUT OFF leaves behind, and pages beyond the cut are unread,
-     * so raising it to a cross-page maximum could carry the next run past
-     * buckets nobody has fetched. At the drain there is no unread page left in
-     * the window, so the maximum is simply the newest thing emitted — and
-     * taking it is what stops a trailing out-of-order page from lowering the
-     * window start. Left lowered, a provider whose page order is stable
-     * re-mints the same low start every run, the window never advances, and it
-     * grows until it needs more than MAX_PAGES_PER_RUN to drain.
-     */
-    let newestEmitted = cursor.watermark;
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
       if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
@@ -800,17 +551,15 @@ export class AnthropicAdminPuller
       }
       events.push(...read.events);
       watermark = read.watermark ?? watermark;
-      newestEmitted = laterInstant(newestEmitted, read.watermark);
 
       if (read.nextPage === null) {
-        // Drained. The next run starts from the newest bucket this run
-        // emitted across all of its pages, so the window start only ever
-        // moves forward — and the in-window watermark is retired:
-        // `startingAt` itself is now the resume point.
+        // Drained. The next run starts from the newest bucket read, so the
+        // watermark only ever moves forward — and the in-window watermark is
+        // retired: `startingAt` itself is now the resume point.
         return {
           events,
           cursor: encodeCursor({
-            startingAt: newestEmitted ?? startingAt,
+            startingAt: watermark ?? startingAt,
             page: null,
             query,
             watermark: null,
@@ -863,10 +612,6 @@ export class AnthropicAdminPuller
     try {
       body = await this.fetchPage({ config, startingAt, page, options });
     } catch (error) {
-      // Keep Retry-After on the thrown error: the durable outbox already
-      // schedules its next attempt no earlier than this provider minimum.
-      // Returning only errorCount would discard both the wait and the cause.
-      if (error instanceof DispatchError) throw error;
       logger.error(
         {
           adapter: this.id,
@@ -893,14 +638,11 @@ export class AnthropicAdminPuller
     const events = parsed.data.flatMap((bucket) =>
       this.bucketEvents({ bucket, config }),
     );
-    // Same class of refusal as the `has_more` check above: not a window to
-    // retry, a shape whose rows we cannot store without losing one of them.
-    assertRowsAreDistinguishable({ events, report: config.report });
     return {
       ok: true,
       events,
       nextPage: parsed.next_page,
-      watermark: newestBucketStart(parsed.data),
+      watermark: parsed.data.at(-1)?.starting_at ?? null,
     };
   }
 
@@ -943,21 +685,6 @@ export class AnthropicAdminPuller
       // host, so a redirect would hand the key to wherever it points.
       followRedirects: false,
     });
-    if (response.status === 429) {
-      // Draining the body keeps undici's connection poolable, but it is only
-      // housekeeping and must never become the error that leaves this branch:
-      // an unguarded reject would propagate INSTEAD of the DispatchError
-      // below, and a plain Error fails the `instanceof DispatchError` guard in
-      // the caller, so the run degrades to a generic failure and the outbox
-      // falls back to its default backoff — throwing away the one thing this
-      // branch exists to carry.
-      await response.body?.cancel().catch(() => void 0);
-      throw new DispatchError({
-        message: "Anthropic rate limit exceeded (HTTP 429).",
-        retryable: true,
-        retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
-      });
-    }
     if (!response.ok) {
       throw await fetchPageError(response, config.report);
     }

@@ -62,12 +62,8 @@ const hoistedHarness = vi.hoisted(() => ({
     isLoading: false,
     error: null as unknown,
   },
-  /** What `aiTools.adminList` answers — the organization's tool registry. */
-  tools: {
-    data: undefined as unknown,
-    isLoading: false,
-    error: null as unknown,
-  },
+  /** What `activityMonitor.ingestionSourcesHealth` answers. */
+  health: { data: undefined as unknown },
 }));
 
 /**
@@ -136,10 +132,6 @@ vi.mock("~/utils/api", () => {
     api: {
       useUtils: () => ({
         ingestionSources: { list: { invalidate: vi.fn() } },
-        aiTools: {
-          adminList: { invalidate: vi.fn(), setData: vi.fn() },
-          list: { invalidate: vi.fn() },
-        },
       }),
       ingestionSources: {
         list: { useQuery: () => hoistedHarness.sources },
@@ -152,21 +144,8 @@ vi.mock("~/utils/api", () => {
         },
         validateOttl: mutation(),
       },
-      aiTools: {
-        adminList: { useQuery: () => hoistedHarness.tools },
-        setEnabled: mutation(),
-        remove: mutation(),
-        create: mutation(),
-        update: mutation(),
-        providerOptions: {
-          useQuery: () => ({ data: undefined, isLoading: false, error: null }),
-        },
-        routingPolicyOptions: {
-          useQuery: () => ({ data: undefined, isLoading: false, error: null }),
-        },
-      },
-      departments: {
-        list: { useQuery: () => ({ data: [], isLoading: false, error: null }) },
+      activityMonitor: {
+        ingestionSourcesHealth: { useQuery: () => hoistedHarness.health },
       },
     },
   };
@@ -174,21 +153,16 @@ vi.mock("~/utils/api", () => {
 
 import { AddIngestionSourceMenu } from "../../components/AddIngestionSourceMenu";
 import InventoryPage from "../inventory";
-import { CONNECTED_SOURCES, REGISTERED_TOOLS } from "./inventoryFixtures";
+import { CONNECTED_SOURCES } from "./inventoryFixtures";
 
 /** The real org-admin bag, not a hand-written list that could drift from it. */
 export const ORG_ADMIN_PERMISSIONS =
   getOrganizationRolePermissions("ADMIN").slice();
 
-export function renderScreen({
-  at = "/governance/inventory",
-}: {
-  /** The address to land on, for the suites that assert a deep link. */
-  at?: string;
-} = {}) {
+export function renderScreen() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <MemoryRouter initialEntries={[at]}>
+      <MemoryRouter initialEntries={["/governance/inventory"]}>
         <InventoryPage />
       </MemoryRouter>
     </ChakraProvider>,
@@ -271,7 +245,7 @@ export async function openTab(name: RegExp) {
 beforeEach(() => {
   hoistedHarness.permissions = ORG_ADMIN_PERMISSIONS;
   hoistedHarness.sources = { data: [], isLoading: false, error: null };
-  hoistedHarness.tools = { data: [], isLoading: false, error: null };
+  hoistedHarness.health = { data: undefined };
   window.sessionStorage.clear();
 });
 
@@ -296,25 +270,14 @@ export function emptyWithSamplesOff() {
   window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
 }
 
-/**
- * The screen with two sources connected and three tools registered, so sample
- * mode stays off by itself.
- *
- * The two lists are deliberately unrelated. A source is not a tool, no card is
- * derived from one, and a fixture where the two lined up would let a test pass
- * against the exact confusion the catalog was rebuilt to remove.
- */
+/** The screen with two tools connected, so sample mode stays off by itself. */
 export function connectTools() {
   hoistedHarness.sources = {
     data: CONNECTED_SOURCES,
     isLoading: false,
     error: null,
   };
-  hoistedHarness.tools = {
-    data: REGISTERED_TOOLS,
-    isLoading: false,
-    error: null,
-  };
+  hoistedHarness.health = { data: [{ id: "src-genie", eventsLast24h: 1234 }] };
 }
 
 /*
@@ -325,4 +288,4 @@ export function connectTools() {
  */
 export { findNativeSelects } from "~/components/governance/filters";
 export { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
-export { CONNECTED_SOURCES, REGISTERED_TOOLS } from "./inventoryFixtures";
+export { CONNECTED_SOURCES } from "./inventoryFixtures";

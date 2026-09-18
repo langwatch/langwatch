@@ -74,9 +74,6 @@ export interface SourceTypeOption {
   /**
    * True when this source type may no longer be chosen for a new source,
    * but rows already configured on it still exist and must keep rendering.
-   * Covers both a type that was retired and one that was offered before it
-   * worked: either way, choosing it buys an admin a source that stays
-   * silent, so it leaves the picker and keeps its definition.
    *
    * Deprecating rather than deleting is deliberate. The completeness guard
    * below requires every `SourceType` to appear here, and `SOURCE_TYPE_LABEL`
@@ -85,37 +82,6 @@ export interface SourceTypeOption {
    * would turn an existing source's name into a blank.
    */
   deprecated?: boolean;
-  /**
-   * True when the thing this type reads is gone or was never worth reading,
-   * so no amount of work on our side would make it deliver data. Retired
-   * types are always deprecated too; the extra flag says WHY, and the why is
-   * load-bearing: a deprecated type that merely has not been finished is one
-   * we still owe a working configuration path, and the builder-coverage
-   * guard holds us to that. A retired one we owe nothing but a way to
-   * archive the rows already on it.
-   *
-   * Not a place to park a type that is broken. "Broken" is the case the
-   * guard exists to catch.
-   */
-  retired?: boolean;
-  /**
-   * True when this type is left out of the sample Sources table, while
-   * staying fully on offer everywhere else.
-   *
-   * NOT A DEPRECATION, and the distinction matters to whoever reads this
-   * next: a type flagged here is current, is pickable in the Add source
-   * menu, and keeps its icon, its blurb and its configuration path. The
-   * only thing it loses is a row in a mock-up. Do not "finish the job" by
-   * adding `deprecated` alongside it.
-   *
-   * The reason is that the sample table and the menu answer different
-   * questions. The menu answers "what can I connect", and should be
-   * complete. The sample answers "what does a connected fleet look like",
-   * and is illustrative — so a type whose presence there reads as a claim
-   * about this deployment rather than as an example can be held back
-   * without being withdrawn from the product.
-   */
-  shouldOmitFromSample?: boolean;
 }
 
 // `satisfies` (not a type annotation) so each entry's `value` keeps its
@@ -144,13 +110,6 @@ export const SOURCE_TYPE_OPTIONS = [
     blurb:
       "Claude Cowork pushes telemetry via OTLP. Configure under Anthropic Admin Console → Cowork → Telemetry.",
     icon: <Anthropic />,
-    // Held out of the sample table by product decision, not retired: the
-    // type is live and stays in the Add source menu. The sample previously
-    // carried a row invented from a tool card and called it "Claude Cowork",
-    // a name the product uses nowhere, and the owner read the mock-up as a
-    // claim that this deployment had such a connection. Keeping it off the
-    // sample settles that without touching what customers can configure.
-    shouldOmitFromSample: true,
   },
   {
     value: "workato",
@@ -170,12 +129,6 @@ export const SOURCE_TYPE_OPTIONS = [
     // Kept so existing rows keep their label and the guards below still
     // compile; filtered out of the picker by `gatedSourceTypeOptions`.
     deprecated: true,
-    // Retired rather than unfinished: directory audit has never carried a
-    // Copilot conversation, so there is no version of this source that
-    // works. Its setup form asks for an app registration the frozen adapter
-    // config cannot use either — and neither will be fixed, because the
-    // source that replaced it reads the conversations directly.
-    retired: true,
   },
   {
     value: "copilot_studio_dataverse",
@@ -190,13 +143,9 @@ export const SOURCE_TYPE_OPTIONS = [
     value: "openai_compliance",
     label: "OpenAI Enterprise Compliance",
     mode: "s3",
-    blurb: "Not available. Choosing this source would never deliver any data.",
+    blurb:
+      "Pulls compliance JSONL drops from an S3 bucket OpenAI writes to (Enterprise Compliance API).",
     icon: <OpenAI />,
-    // Offered before the path behind it was finished, so an admin who picked
-    // it got a source that stayed silent. Kept rather than deleted for the
-    // same reason as the Copilot entry above: the completeness guard below
-    // and `SOURCE_TYPE_LABEL` both need it.
-    deprecated: true,
   },
   {
     value: "openai_admin",
@@ -210,15 +159,8 @@ export const SOURCE_TYPE_OPTIONS = [
     value: "claude_compliance",
     label: "Anthropic Claude Enterprise Compliance",
     mode: "pull",
-    blurb: "Not offered for new sources.",
+    blurb: "Polls Anthropic's compliance API with a workspace API key.",
     icon: <Anthropic />,
-    // Not retired: the workspace key now reaches the adapter as the token it
-    // reads, so the path behind this type is whole. It stays out of the
-    // picker because nothing has yet pulled a real tenant's compliance log
-    // end to end, and offering it is a separate call from fixing it. The
-    // blurb no longer says a source here would never deliver data, because
-    // after the fix that is not true.
-    deprecated: true,
   },
   {
     value: "anthropic_admin",
@@ -330,36 +272,6 @@ export function routesConversations(sourceType: SourceType): boolean {
   return option?.routesConversations === true;
 }
 
-/**
- * The source types the product actually offers today, in catalog order.
- *
- * The one place a retired type is filtered out, so every surface asking "what
- * can a customer have" gets the same answer: the Add source menu through
- * `gatedSourceTypeOptions`, and the Sources tab's sample rows through
- * {@link sampleSourceTypeOptions}, which narrows this list further rather
- * than re-deriving it. A second filter written at a callsite is how a retired
- * type reappears on one screen after being pulled from another.
- */
-export function offeredSourceTypeOptions(): SourceTypeOption[] {
-  return SOURCE_TYPE_OPTIONS.filter((option) => !option.deprecated);
-}
-
-/**
- * The source types the sample Sources table shows, in catalog order.
- *
- * A strict subset of {@link offeredSourceTypeOptions}: derived from it, so a
- * type can never reach the sample without being on offer, and narrowed by
- * `shouldOmitFromSample` so a type can be held back from the mock-up while staying
- * in the Add source menu. Read this from the sample and the wider helper from
- * the menu — the gap between the two is the point, and collapsing them would
- * put a held-back type back on screen.
- */
-export function sampleSourceTypeOptions(): SourceTypeOption[] {
-  return offeredSourceTypeOptions().filter(
-    (option) => !option.shouldOmitFromSample,
-  );
-}
-
 export interface GatedSourceTypeOption extends SourceTypeOption {
   /** Locked types render in the menu but cannot be picked. */
   locked: boolean;
@@ -378,10 +290,12 @@ export function gatedSourceTypeOptions({
 }: {
   isEnterprise: boolean;
 }): GatedSourceTypeOption[] {
-  return offeredSourceTypeOptions().map((option) => ({
-    ...option,
-    locked: !isEnterprise && option.value !== "otel_generic",
-  }));
+  return SOURCE_TYPE_OPTIONS.filter((option) => !option.deprecated).map(
+    (option) => ({
+      ...option,
+      locked: !isEnterprise && option.value !== "otel_generic",
+    }),
+  );
 }
 
 /**

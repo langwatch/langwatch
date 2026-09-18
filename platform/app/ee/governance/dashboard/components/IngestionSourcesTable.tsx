@@ -11,10 +11,10 @@ import {
 } from "@chakra-ui/react";
 import type { Source } from "@ee/governance/dashboard/pages/ingestionSourceForms";
 import { MoreVertical, Pencil, RotateCw, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { ListTable } from "~/components/ui/ListTable";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
-import { confirmArchiveSource } from "../logic/confirmArchiveSource";
 import { shortPullCadence } from "../logic/pullCadence";
 import { sourceBadge } from "../logic/sourceHealthDisplay";
 import {
@@ -95,14 +95,36 @@ export function sortSourcesForTable(sources: readonly Source[]): Source[] {
 }
 
 /**
- * The fleet itself.
- *
- * A "Connectors · N sources · N active" heading used to sit above it. Both of
- * its figures moved into the Inventory page's resume strip, above the tab
- * strip, where they sit beside the other two panes' counts and a reader gets
- * them without opening this pane. Saying them twice on one screen is what the
- * strip was added to stop.
+ * The row above the table: what this list is, how many there are and how
+ * many are live, and the add control on the right. Counts come from the
+ * loaded list only; while the list is unknown the subline stays quiet.
  */
+export function ConnectorsHeader({
+  sources,
+  action,
+}: {
+  sources: readonly Source[] | undefined;
+  action?: ReactNode;
+}) {
+  const total = sources?.length;
+  const active = sources?.filter((s) => s.status === "active").length;
+  return (
+    <HStack alignItems="start">
+      <VStack align="start" gap={0}>
+        <Text fontSize="md" fontWeight="semibold">
+          Connectors
+        </Text>
+        {total !== undefined && active !== undefined && (
+          <Text fontSize="sm" color="fg.muted">
+            {total} {total === 1 ? "source" : "sources"} · {active} active
+          </Text>
+        )}
+      </VStack>
+      <Box marginLeft="auto">{action}</Box>
+    </HStack>
+  );
+}
+
 export function IngestionSourcesTable({
   isSample = false,
   sources,
@@ -181,7 +203,7 @@ function SourceTableRow({
 }) {
   const sourceType = source.sourceType as SourceType;
   // Health wins over configured status (a source whose last runs all failed
-  // is "Pulls failing", not "Active"); see sourceHealthDisplay.
+  // is "Not pulling", not "Active"); see sourceHealthDisplay.
   const status = sourceBadge({
     status: source.status,
     errorCount: source.errorCount,
@@ -213,15 +235,9 @@ function SourceTableRow({
                 </Text>
               </Link>
             )}
-            {/* The type sits under the name to say what a source the admin
-                named "Anthropic spend" actually is. A source named after its
-                own type has nothing left to explain, so the line is dropped
-                rather than printed twice. */}
-            {typeLabel !== source.name && (
-              <Text fontSize="xs" color="fg.muted">
-                {typeLabel}
-              </Text>
-            )}
+            <Text fontSize="xs" color="fg.muted">
+              {typeLabel}
+            </Text>
           </VStack>
         </HStack>
       </Table.Cell>
@@ -298,7 +314,6 @@ function SourceTableRow({
                 color="red.500"
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (!confirmArchiveSource({ name: source.name })) return;
                   onArchive();
                 }}
               >

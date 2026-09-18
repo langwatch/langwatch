@@ -21,7 +21,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { isHumanCallerRun } from "~/components/agent-testing/results/caller-display";
 import { nextSpeakerOf } from "~/components/simulations/next-speaker";
 import { RunDetailSection } from "~/components/simulations/RunDetailSection";
 import { ScenarioMessageRenderer } from "~/components/simulations/ScenarioMessageRenderer";
@@ -166,7 +165,8 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
   // A voice "Call it myself" run's caller is a real person, so their turns read
   // as "You", not the LLM "User Simulator" (#8020). Same metadata field the
   // results-table caller badge reads (caller-display.ts).
-  const isHumanCaller = isHumanCallerRun(scenarioState.metadata);
+  const isHumanCaller =
+    scenarioState.metadata?.langwatch?.callerKind === "human";
 
   if (!detail.hasConversation) {
     return (

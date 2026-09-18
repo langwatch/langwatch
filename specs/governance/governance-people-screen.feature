@@ -54,9 +54,8 @@ Feature: The People screen shows who the providers named
     And a linked person whose department comes only from their member
     When the observed departments are grouped
     Then only the directory's departments are counted
-    # The discovered half of the Departments tab reports what the connected
-    # directories say. Counting our own assignments into it would be reporting
-    # our answers back to us.
+    # A panel headed "departments the providers see" that counted our own
+    # assignments would be reporting our answers back to us.
 
   @integration
   Scenario: An erased person shows a stand-in, never the identifier

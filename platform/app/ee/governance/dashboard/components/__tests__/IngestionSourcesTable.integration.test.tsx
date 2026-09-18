@@ -8,8 +8,7 @@
  *
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  *       ("The sources table shows delivery as a column",
- *        "Row actions live in the overflow menu",
- *        "Archiving from the row asks the same question the detail page asks")
+ *        "Row actions live in the overflow menu")
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -20,6 +19,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Source } from "../../pages/ingestionSourceForms";
 import {
+  ConnectorsHeader,
   IngestionSourcesTable,
   sortSourcesForTable,
 } from "../IngestionSourcesTable";
@@ -80,6 +80,7 @@ function renderTable({
   };
   render(
     <Providers>
+      <ConnectorsHeader sources={sources} />
       <IngestionSourcesTable
         sources={sources}
         canManage={canManage}
@@ -92,19 +93,7 @@ function renderTable({
   return handlers;
 }
 
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
-});
-
-/**
- * jsdom leaves `window.confirm` unimplemented — calling it throws "not
- * implemented" rather than returning — so every test that reaches the archive
- * action has to say what the admin answered.
- */
-function stubConfirm(answer: boolean) {
-  return vi.spyOn(window, "confirm").mockReturnValue(answer);
-}
+afterEach(() => cleanup());
 
 describe("given the ingestion sources table", () => {
   describe("when the fleet mixes real-time and scheduled sources", () => {
@@ -151,6 +140,14 @@ describe("given the ingestion sources table", () => {
         within(pushRow).queryByText(/Hourly|Every/),
       ).not.toBeInTheDocument();
     });
+
+    /** @scenario "The sources table shows delivery as a column" */
+    it("counts the fleet in the header from the loaded list", () => {
+      renderTable();
+
+      expect(screen.getByText("Connectors")).toBeVisible();
+      expect(screen.getByText("3 sources · 1 active")).toBeVisible();
+    });
   });
 
   describe("when an admin opens a row's actions", () => {
@@ -166,7 +163,6 @@ describe("given the ingestion sources table", () => {
         await screen.findByRole("menuitem", { name: /Rotate secret/ }),
       ).toBeVisible();
       expect(screen.getByRole("menuitem", { name: /Edit/ })).toBeVisible();
-      stubConfirm(true);
       await user.click(screen.getByRole("menuitem", { name: /Archive/ }));
       expect(handlers.onArchive).toHaveBeenCalledWith("src-workato");
       // No inline buttons anywhere in the row.
@@ -191,85 +187,6 @@ describe("given the ingestion sources table", () => {
       expect(
         screen.queryByRole("menuitem", { name: /Rotate secret/ }),
       ).not.toBeInTheDocument();
-    });
-  });
-
-  describe("when an admin picks Archive from a row", () => {
-    async function openArchive() {
-      const user = userEvent.setup();
-      const handlers = renderTable();
-      await user.click(
-        screen.getByRole("button", { name: "Actions for Workato prod" }),
-      );
-      const item = await screen.findByRole("menuitem", { name: /Archive/ });
-      return { user, handlers, item };
-    }
-
-    /** @scenario "Archiving from the row asks the same question the detail page asks" */
-    it("asks a question that names the source and what survives", async () => {
-      const confirmed = stubConfirm(false);
-      const { user, item } = await openArchive();
-
-      await user.click(item);
-
-      expect(confirmed).toHaveBeenCalledTimes(1);
-      const asked = confirmed.mock.calls[0]?.[0] ?? "";
-      expect(asked).toContain("Workato prod");
-      expect(asked).toContain("Historical events stay readable");
-    });
-
-    /** @scenario "Archiving from the row asks the same question the detail page asks" */
-    it("leaves the source alone when the admin declines", async () => {
-      stubConfirm(false);
-      const { user, handlers, item } = await openArchive();
-
-      await user.click(item);
-
-      expect(handlers.onArchive).not.toHaveBeenCalled();
-    });
-
-    /** @scenario "Archiving from the row asks the same question the detail page asks" */
-    it("archives once the admin confirms", async () => {
-      stubConfirm(true);
-      const { user, handlers, item } = await openArchive();
-
-      await user.click(item);
-
-      expect(handlers.onArchive).toHaveBeenCalledWith("src-workato");
-    });
-  });
-
-  describe("when a source is named after its own type", () => {
-    /**
-     * The sample rows are exactly this shape — they carry the catalog's label
-     * as the name — so without the guard the Sources tab printed every
-     * connector's name twice, one line above the other.
-     *
-     * Spec: specs/ai-governance/dashboard/inventory-catalog.feature
-     */
-    /** @scenario "A source named after its own type does not say so twice" */
-    it("writes the type once", () => {
-      renderTable({
-        sources: [
-          makeSource({
-            id: "src-named-after-type",
-            name: "Workato",
-            sourceType: "workato",
-          }),
-        ],
-      });
-
-      const row = screen.getByTestId("source-row-src-named-after-type");
-      expect(within(row).getAllByText("Workato")).toHaveLength(1);
-    });
-
-    /** @scenario "A source named after its own type does not say so twice" */
-    it("still writes the type under a name of the admin's own", () => {
-      renderTable({ sources: [WORKATO] });
-
-      const row = screen.getByTestId("source-row-src-workato");
-      expect(within(row).getByText("Workato prod")).toBeVisible();
-      expect(within(row).getByText("Workato")).toBeVisible();
     });
   });
 

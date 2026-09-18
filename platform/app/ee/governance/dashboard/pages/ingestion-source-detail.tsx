@@ -13,9 +13,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { confirmArchiveSource } from "@ee/governance/dashboard/logic/confirmArchiveSource";
 import {
-  SOURCE_HEALTH_REFRESH,
+  noDataSinceNotice,
   sourceBadge,
 } from "@ee/governance/dashboard/logic/sourceHealthDisplay";
 import {
@@ -189,7 +188,12 @@ function SourceDetailHeader({
             variant="ghost"
             colorPalette="red"
             onClick={() => {
-              if (!confirmArchiveSource({ name: source.name })) return;
+              if (
+                !confirm(
+                  `Archive "${source.name}"? Historical events stay readable.`,
+                )
+              )
+                return;
               onArchive();
             }}
             loading={isArchiving}
@@ -202,55 +206,34 @@ function SourceDetailHeader({
   );
 }
 
-/** Pull completion time and provider record time answer different questions. */
-function SourcePullStatus({ source }: { source: Source }) {
-  if (!source.pullSchedule) return null;
-  const pull = source.pullStatus;
-  const retrying = source.status !== "disabled" && !source.archivedAt;
+/**
+ * Where the numbers below stop being trustworthy.
+ *
+ * A source that has failed three runs in a row has not been asked about
+ * anything since its last successful pull, so every day after that is
+ * unknown -- not a day it spent nothing. Saying so here is what stops a
+ * reader taking an empty chart for a cheap week (ADR-128).
+ */
+function NoDataSinceCallout({ source }: { source: Source }) {
+  const notice = noDataSinceNotice({
+    status: source.status,
+    errorCount: source.errorCount,
+    lastSuccessAt: source.lastSuccessAt,
+  });
+  if (!notice) return null;
   return (
-    <VStack
-      align="stretch"
-      gap={2}
+    <Box
       borderWidth="1px"
-      borderRadius="md"
+      borderColor="red.200"
+      borderRadius="sm"
+      background="red.50"
       padding={3}
     >
-      <Text fontSize="sm">
-        Last successful pull:{" "}
-        {source.lastSuccessAt
-          ? new Date(source.lastSuccessAt).toLocaleString()
-          : "No successful pull yet"}
+      <Text fontSize="sm" color="red.700">
+        No data since {fmtRelative(notice.lastSuccessIso)}. This source is
+        failing to pull, so spend after that point is unknown rather than zero.
       </Text>
-      {pull?.lastRunAt && (
-        <Text fontSize="sm">
-          Last attempt: {new Date(pull.lastRunAt).toLocaleString()} (
-          {pull.outcome})
-        </Text>
-      )}
-      {pull?.error && (
-        <Text fontSize="sm" color="red.600">
-          {pull.error}{" "}
-          {retrying
-            ? "The next scheduled pull will retry."
-            : "This source is disabled."}{" "}
-          Saved records may be incomplete.
-        </Text>
-      )}
-      {pull?.backfillThrough && (
-        <Text fontSize="sm">
-          Backfill reached: {new Date(pull.backfillThrough).toLocaleString()}.
-          This is the latest saved checkpoint.
-        </Text>
-      )}
-      {pull?.hasMore && (
-        <Text fontSize="sm" color="fg.muted">
-          More history remains.
-          {retrying
-            ? " The next scheduled pull continues from the saved checkpoint."
-            : " Resume the source to continue."}
-        </Text>
-      )}
-    </VStack>
+    </Box>
   );
 }
 
@@ -341,7 +324,7 @@ function SourceActivityPanels({
   const health = healthQuery.data;
   return (
     <>
-      <SourcePullStatus source={source} />
+      <NoDataSinceCallout source={source} />
       <SourceHealthCards
         health={health}
         error={healthQuery.error}
@@ -479,16 +462,13 @@ function useIngestionSourceDetailPage() {
 
   const sourceQuery = api.ingestionSources.get.useQuery(
     { organizationId: orgId, id: sourceId ?? "" },
-    {
-      enabled: !!orgId && !!sourceId && canRead,
-      ...SOURCE_HEALTH_REFRESH,
-    },
+    { enabled: !!orgId && !!sourceId && canRead, refetchOnWindowFocus: false },
   );
   const healthQuery = api.activityMonitor.sourceHealthMetrics.useQuery(
     { organizationId: orgId, sourceId: sourceId ?? "" },
     {
-      enabled: !!orgId && !!sourceId && canRead && canReadActivity,
-      ...SOURCE_HEALTH_REFRESH,
+      enabled: !!orgId && !!sourceId && canReadActivity,
+      refetchOnWindowFocus: false,
     },
   );
   // The events table walks the timestamp cursor itself (see
@@ -719,6 +699,13 @@ function StaleTimestampCallout({
   health: SourceHealthMetrics | null;
   eventsCount: number;
 }) {
+  // F-OTEL-2 frontend leg (Sergey diagnosis): if health metrics show 0
+  // events across 24h/7d/30d but the events list has rows, the user
+  // most likely sent test events with stale `startTimeUnixNano`. CH
+  // health queries filter by EventTimestamp, the events list does not
+  // - they appear contradictory. Surface a callout that names the
+  // diagnosis + the fix (use Date.now() at the moment you fire the
+  // event).
   if (!health) return null;
   const all30dZero =
     (health.events24h ?? 0) === 0 &&
@@ -726,11 +713,24 @@ function StaleTimestampCallout({
     (health.events30d ?? 0) === 0;
   if (!all30dZero || eventsCount === 0) return null;
   return (
-    <Box borderWidth="1px" borderColor="border" padding={3} borderRadius="md">
-      <Text fontSize="sm" color="fg.muted">
-        The table contains older records outside the last 30 days. Recent
-        counters use each record's original date, so historical imports can show
-        records here while those counters remain zero.
+    <Box
+      borderWidth="1px"
+      borderColor="amber.300"
+      backgroundColor="amber.50"
+      padding={3}
+      borderRadius="md"
+    >
+      <Text fontSize="sm" color="amber.900">
+        <strong>Heads up:</strong> the events table below has loaded{" "}
+        {eventsCount} event
+        {eventsCount === 1 ? "" : "s"}, but the rolling
+        24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d health windows are all zero. Your
+        events likely have a stale <Code fontSize="xs">startTimeUnixNano</Code>{" "}
+        (timestamps before today). When firing test events, set{" "}
+        <Code fontSize="xs">startTimeUnixNano</Code> to{" "}
+        <Code fontSize="xs">String(Date.now() * 1_000_000)</Code> so the event
+        lands inside the rolling window. The secret-reveal modal&apos;s
+        &quot;Test it now&quot; curl already does this for you.
       </Text>
     </Box>
   );

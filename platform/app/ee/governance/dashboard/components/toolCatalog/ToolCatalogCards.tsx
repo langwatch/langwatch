@@ -1,49 +1,133 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Badge, Box, HStack, SimpleGrid, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { Badge, Box, Circle, HStack, SimpleGrid, Text } from "@chakra-ui/react";
 
-import { ToolCardFigure, ToolCardMark } from "./ToolCardFigure";
-import { ToolCatalogTable } from "./ToolCatalogTable";
+import { Tooltip } from "~/components/ui/tooltip";
+
+import { SourceTypeIconGlyph } from "../ingestionSourceCatalog";
 import {
+  exactCardCount,
+  formatCardCount,
   TOOL_CARD_BADGE_LABEL,
   TOOL_CARD_ROW_META,
+  TOOL_CARD_ROWS,
   type ToolCard,
   toolCardMissingReason,
+  toolInitials,
 } from "./toolCards";
 
 /**
  * The registered-tools catalog, drawn.
  *
- * Two layouts over one list, and they are genuinely different components. A
- * grid of tiles is for scanning the estate — one tool at a time, every row it
- * has, stacked. A list is for reading one tool's figures against the next, and
- * that is a table: same question asked of every row, one column per answer.
- * The list used to be the same tall card in a single column, which spent the
- * whole width on one tool and made the comparison the list exists for
- * impossible.
- *
- * A CARD DRAWS ONLY THE ROWS ITS TOOL HAS. The table cannot do that — its
- * columns are fixed for every row — so a cell for a row the tool does not have
- * draws an em dash saying exactly that. Both dashes go through the same
- * figure component, so neither layout can quietly drop the sentence behind it.
+ * Two layouts over one card: a grid of tiles for scanning the estate, and a
+ * single-column list for reading one tool's figures against the next. The
+ * layout choice changes nothing about what a card says — which is the point of
+ * keeping the card itself layout-agnostic.
  *
  * Spec: specs/ai-governance/dashboard/inventory-catalog.feature
  */
 
 export type ToolCatalogLayout = "grid" | "list";
 
-/** The per-tool overflow menu, when the reader may act on the tool. */
-export type ToolCardActions = (card: ToolCard) => ReactNode;
-
-export function ToolCatalogCard({
-  card,
-  renderActions,
+/**
+ * One figure on a card.
+ *
+ * An absent value draws an em dash carrying the sentence that says what would
+ * fill it. Rendering the dash as a `Tooltip` trigger rather than a `title=`
+ * attribute is deliberate: the sentences are the honest half of this screen
+ * and they have to survive on touch, where `title` never opens.
+ */
+function ToolCardMetric({
+  label,
+  value,
+  filledBy,
 }: {
-  card: ToolCard;
-  renderActions?: ToolCardActions;
+  label: string;
+  value: string | number | undefined;
+  filledBy: string;
 }) {
-  const actions = renderActions?.(card);
+  // A count arrives as a number and is shortened here; anything already shaped
+  // for reading arrives as the string it should show.
+  const compact =
+    typeof value === "number" ? formatCardCount(value) : undefined;
+  const exact = typeof value === "number" ? exactCardCount(value) : undefined;
+
+  return (
+    <HStack justify="space-between" gap={3} width="full">
+      <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+        {label}
+      </Text>
+      {value === undefined ? (
+        <Tooltip
+          content={filledBy}
+          showArrow
+          positioning={{ placement: "top" }}
+        >
+          <Text
+            fontSize="xs"
+            color="fg.subtle"
+            cursor="help"
+            textDecoration="underline"
+            textDecorationStyle="dotted"
+            textUnderlineOffset="3px"
+            aria-label={`${label} not measured. ${filledBy}`}
+          >
+            —
+          </Text>
+        </Tooltip>
+      ) : compact !== undefined && exact !== undefined ? (
+        // Shortened on the card, exact on hover and to a screen reader: the
+        // compact form is a reading aid, never the only place the figure lives.
+        <Tooltip
+          content={`${exact} exactly`}
+          showArrow
+          positioning={{ placement: "top" }}
+        >
+          <Text
+            fontSize="xs"
+            fontWeight="medium"
+            fontVariantNumeric="tabular-nums"
+            textAlign="end"
+            cursor="help"
+            aria-label={`${label}: ${exact}`}
+          >
+            {compact}
+          </Text>
+        </Tooltip>
+      ) : (
+        <Text
+          fontSize="xs"
+          fontWeight="medium"
+          fontVariantNumeric="tabular-nums"
+          textAlign="end"
+        >
+          {value}
+        </Text>
+      )}
+    </HStack>
+  );
+}
+
+/** The vendor's own mark where we ship one, and initials where we do not. */
+function ToolCardMark({ card }: { card: ToolCard }) {
+  if (card.sourceType) {
+    return <SourceTypeIconGlyph sourceType={card.sourceType} size="20px" />;
+  }
+  return (
+    <Circle
+      size="20px"
+      background="bg.emphasized"
+      color="fg.muted"
+      fontSize="9px"
+      fontWeight="bold"
+      flexShrink={0}
+    >
+      {toolInitials(card.name)}
+    </Circle>
+  );
+}
+
+export function ToolCatalogCard({ card }: { card: ToolCard }) {
   return (
     <Box
       data-testid={`tool-card-${card.id}`}
@@ -71,26 +155,15 @@ export function ToolCatalogCard({
             sample
           </Badge>
         )}
-        {actions}
       </HStack>
 
-      {(card.badges.length > 0 || card.enabled === false) && (
-        <HStack gap={1.5} wrap="wrap">
-          {card.badges.map((badge) => (
-            <Badge key={badge} size="xs" variant="surface" colorPalette="gray">
-              {TOOL_CARD_BADGE_LABEL[badge]}
-            </Badge>
-          ))}
-          {/* Registered but not published, so nobody can launch it. Said on
-              the card because an inventory that hid it would report a tool
-              the organization is paying for as one it is using. */}
-          {card.enabled === false && (
-            <Badge size="xs" variant="surface" colorPalette="gray">
-              not published
-            </Badge>
-          )}
-        </HStack>
-      )}
+      <HStack gap={1.5} wrap="wrap">
+        {card.badges.map((badge) => (
+          <Badge key={badge} size="xs" variant="surface" colorPalette="gray">
+            {TOOL_CARD_BADGE_LABEL[badge]}
+          </Badge>
+        ))}
+      </HStack>
 
       <Box
         display="flex"
@@ -100,17 +173,13 @@ export function ToolCatalogCard({
         borderColor="border.subtle"
         paddingTop={3}
       >
-        {card.applicableRows.map((row) => (
-          <HStack key={row} justify="space-between" gap={3} width="full">
-            <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-              {TOOL_CARD_ROW_META[row].label}
-            </Text>
-            <ToolCardFigure
-              label={TOOL_CARD_ROW_META[row].label}
-              value={card.values[row]}
-              emptyReason={toolCardMissingReason(card, row)}
-            />
-          </HStack>
+        {TOOL_CARD_ROWS.map((row) => (
+          <ToolCardMetric
+            key={row}
+            label={TOOL_CARD_ROW_META[row].label}
+            value={card.values[row]}
+            filledBy={toolCardMissingReason(card, row)}
+          />
         ))}
       </Box>
     </Box>
@@ -118,39 +187,29 @@ export function ToolCatalogCard({
 }
 
 /**
- * The catalog, in whichever layout the reader picked.
+ * The cards, laid out.
  *
- * One entry point rather than two, so the pane picks a layout and nothing
- * else: the choice of grid or table is the only difference between them, and
- * pushing it up to the pane would put the same branch in three callers.
+ * `SimpleGrid` in both modes rather than a second component: the list is one
+ * column of the same card, so the two layouts cannot drift apart in anything
+ * but width.
  */
 export function ToolCatalogCards({
   cards,
   layout,
-  renderActions,
 }: {
   cards: readonly ToolCard[];
   layout: ToolCatalogLayout;
-  renderActions?: ToolCardActions;
 }) {
-  if (layout === "list") {
-    return <ToolCatalogTable cards={cards} renderActions={renderActions} />;
-  }
-
   return (
     <SimpleGrid
       data-testid="tool-catalog-cards"
       data-layout={layout}
-      columns={{ base: 1, md: 2, xl: 3 }}
+      columns={layout === "grid" ? { base: 1, md: 2, xl: 3 } : 1}
       gap={4}
       width="full"
     >
       {cards.map((card) => (
-        <ToolCatalogCard
-          key={card.id}
-          card={card}
-          renderActions={renderActions}
-        />
+        <ToolCatalogCard key={card.id} card={card} />
       ))}
     </SimpleGrid>
   );

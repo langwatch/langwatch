@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -20,7 +12,6 @@ import {
   DEFAULT_INSIGHTS_SETTINGS,
   InsightsSetupDrawer,
 } from "~/components/governance/platform/InsightsSetupDrawer";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { LangyPanelSurface } from "~/features/asaplangy/components/LangyPanelSurface";
@@ -34,8 +25,7 @@ import { useLangyStore } from "~/features/langy/stores/langyStore";
  * A placeholder for the brief Langy will write: one card that says what
  * will land here and offers the two ways in. The Setup drawer's values
  * live in this page's state for the sitting and nowhere else — there is
- * no store behind them yet, and nothing here says otherwise. The page
- * carries the Preview badge and offers no control that cannot act.
+ * no store behind them yet, and nothing here says otherwise.
  *
  * Spec: specs/governance/governance-platform-placeholders.feature
  */
@@ -49,15 +39,10 @@ function InsightsPage() {
     <GovernanceLayout pageTitle="Insights · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full">
         <VStack align="start" gap={1}>
-          <HStack gap={2}>
-            <Heading size="md">Insights</Heading>
-            <Badge colorPalette="purple" size="sm" variant="surface">
-              Preview
-            </Badge>
-          </HStack>
+          <Heading size="md">Insights</Heading>
           <Text color="fg.muted">
-            A preview of the inbox where Langy will file the few things worth
-            acting on. Nothing is filed yet.
+            Langy&apos;s brief: a few things worth acting on, kept fresh, never
+            a feed. Alerts and notifications ride on top.
           </Text>
         </VStack>
 
@@ -134,7 +119,7 @@ function InboxEmptyBrief({
             textAlign="center"
             marginTop={4}
           >
-            Langy will write your brief here
+            Langy writes your brief here
           </Text>
           <Text
             textStyle="sm"
@@ -145,37 +130,26 @@ function InboxEmptyBrief({
             maxWidth="380px"
             marginTop={2}
           >
-            A couple of things worth acting on each day, never a feed of
-            fifteen. Nothing has been filed here yet.
+            Every morning a background job reads yesterday&apos;s traffic and
+            files a couple of high-signal insights: not fifteen a day.
           </Text>
-          {/* An empty pane's two ways out. Neither is solid, per the rule.
-
-              Set up data takes the house header button, but be clear about
-              what it does today: onSetup opens InsightsSetupDrawer, and that
-              drawer's Save calls back into local useState on this page. There
-              is no mutation behind it and nothing survives a reload. The
-              drawer's model row does read live data over tRPC, which makes it
-              look more finished than it is. So the most prominent action on
-              this empty pane does not yet do what its label promises.
-
-              It keeps the heavier weight regardless, for two reasons:
-              demoting it would leave the pane with no primary way out, which
-              is worse than one that is ahead of its backend; and this is the
-              action that will fill the inbox once the mutation lands. The
-              weight anticipates that rather than describing the present.
-
-              Open Langy is ghost because it only changes what is on screen.
-              That distinction is thinner than it looks right now, since
-              neither button persists anything — it rests on what Set up data
-              is for, not on what it currently achieves. */}
           <HStack gap={2} marginTop={6}>
-            <PageLayout.HeaderButton onClick={onSetup}>
+            <Button size="sm" colorPalette="orange" onClick={onSetup}>
               Set up data
-            </PageLayout.HeaderButton>
-            <Button size="sm" variant="ghost" onClick={onOpenLangy}>
+            </Button>
+            <Button size="sm" variant="subtle" onClick={onOpenLangy}>
               Open Langy
             </Button>
           </HStack>
+          <Button
+            variant="plain"
+            size="xs"
+            fontWeight="400"
+            color="fg.subtle"
+            marginTop={3}
+          >
+            or preview a sample inbox
+          </Button>
         </VStack>
       </LangyPanelSurface>
     </>

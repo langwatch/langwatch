@@ -19,7 +19,6 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { DepartmentService } from "../department/department.service";
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../pullers/dataverseEnvironment";
 import { DIRECTORY_REPORT_ACTION } from "../pullers/microsoftGraphDirectory";
 import type { NormalizedPullEvent } from "../pullers/pullerAdapter";
 
@@ -34,9 +33,6 @@ const JONAS_OID = "f6481ec4-0000-4000-8000-000000000002";
 const STRANGER_OID = "f6481ec4-0000-4000-8000-000000000003";
 
 const service = () => DirectoryDepartmentSyncService.create(prisma);
-
-/** The source type the same pull records its discovered people under. */
-const PROVIDER = COPILOT_STUDIO_DATAVERSE_ADAPTER_ID;
 
 const directoryEvent = (over: {
   actor: string;
@@ -159,7 +155,6 @@ describe("Feature: directory departments land on the entities we already have", 
 
     const outcome = await service().applyDirectoryEvents({
       organizationId,
-      provider: PROVIDER,
       events: [
         directoryEvent({
           actor: MARIA_OID,
@@ -179,7 +174,6 @@ describe("Feature: directory departments land on the entities we already have", 
   it("creates a department the organization has not created yet — the SCIM costCenter call", async () => {
     await service().applyDirectoryEvents({
       organizationId,
-      provider: PROVIDER,
       events: [
         directoryEvent({
           actor: MARIA_OID,
@@ -197,7 +191,6 @@ describe("Feature: directory departments land on the entities we already have", 
   it("assigns through the SSO connection's directory id when no address is confirmed", async () => {
     const outcome = await service().applyDirectoryEvents({
       organizationId,
-      provider: PROVIDER,
       events: [
         directoryEvent({
           actor: JONAS_OID,
@@ -243,7 +236,6 @@ describe("Feature: directory departments land on the entities we already have", 
 
       const outcome = await service().applyDirectoryEvents({
         organizationId,
-        provider: PROVIDER,
         events: [
           directoryEvent({
             actor: JONAS_OID,
@@ -262,7 +254,6 @@ describe("Feature: directory departments land on the entities we already have", 
   it("assigns nobody from a row that proves nobody, and creates no department for it", async () => {
     const outcome = await service().applyDirectoryEvents({
       organizationId,
-      provider: PROVIDER,
       events: [
         directoryEvent({
           actor: STRANGER_OID,
@@ -288,7 +279,6 @@ describe("Feature: directory departments land on the entities we already have", 
 
     await service().applyDirectoryEvents({
       organizationId,
-      provider: PROVIDER,
       events: [
         directoryEvent({
           actor: MARIA_OID,
@@ -312,12 +302,10 @@ describe("Feature: directory departments land on the entities we already have", 
 
     const first = await service().applyDirectoryEvents({
       organizationId,
-      provider: PROVIDER,
       events,
     });
     const second = await service().applyDirectoryEvents({
       organizationId,
-      provider: PROVIDER,
       events,
     });
 
@@ -341,7 +329,6 @@ describe("Feature: directory departments land on the entities we already have", 
 
     const outcome = await service().applyDirectoryEvents({
       organizationId,
-      provider: PROVIDER,
       events: [
         directoryEvent({
           actor: MARIA_OID,
