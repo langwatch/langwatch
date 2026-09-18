@@ -4,16 +4,6 @@
  * cards behind it. The owning frontend feature mounts the host port below it.
  */
 
-import type { ComponentType } from "react";
-
-export type DataRetentionScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const dataRetentionScreens = {
-  dataRetention: () => import("./ui/sections/data-retention.screen.tsx"),
-} as const satisfies Record<string, DataRetentionScreenLoader>;
-
-export type DataRetentionScreenName = keyof typeof dataRetentionScreens;
-
 export { dataRetentionApi, type DataRetentionApiMap } from "./behavior/data-retention-api.ts";
 export {
   DataRetentionHostApi,

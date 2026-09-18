@@ -1,16 +1,4 @@
-import type { ComponentType } from "react";
-
 import type { AnnotationView } from "./model/annotation-view.ts";
-
-export type AnnotationScreenLoader = () => Promise<{
-  default: ComponentType<{ view: AnnotationView }>;
-}>;
-
-export const annotationScreens = {
-  annotations: () => import("./ui/sections/annotations-screen.tsx"),
-} as const satisfies Record<string, AnnotationScreenLoader>;
-
-export type AnnotationScreenName = keyof typeof annotationScreens;
 
 export { annotationApi } from "./behavior/annotation-api.ts";
 export { annotationViewCopy } from "./model/annotation-view.ts";

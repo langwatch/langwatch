@@ -7,6 +7,9 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const analyticsWeb = defineWebModule("analytics")
+  // These screens qualify for `@langwatch/dashboard-process` under the
+  // transport-ownership rule, but stay here under its own type exception:
+  // moving would duplicate the 1,700-line `CustomGraph` renderer they share.
   .withScreens({
     "pages/[project]/analytics/index": {
       load: () => import("./ui/sections/analytics/analytics-overview.screen.tsx"),

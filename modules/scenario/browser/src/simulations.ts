@@ -1,15 +1,4 @@
 import "./model/types/ambient.d.ts";
-import type { ComponentType } from "react";
-
-export type ScenarioScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const scenarioScreens = {
-  simulations: () => import("./ui/sections/simulations/simulations.screen.tsx"),
-  scenarioLibrary: () => import("./ui/sections/simulations/scenario-library.screen.tsx"),
-  agentTesting: () => import("./ui/sections/simulations/agent-testing.screen.tsx"),
-} as const satisfies Record<string, ScenarioScreenLoader>;
-
-export type ScenarioScreenName = keyof typeof scenarioScreens;
 
 export { api as scenarioApi, api as scenarioApiHooks } from "./behavior/scenario-api.ts";
 export type {

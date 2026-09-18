@@ -4,16 +4,6 @@
  * frontend feature mounts the tRPC Provider and the host port below it.
  */
 
-import type { ComponentType } from "react";
-
-export type TopicScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const topicScreens = {
-  topicClustering: () => import("./ui/sections/topic-clustering.screen.tsx"),
-} as const satisfies Record<string, TopicScreenLoader>;
-
-export type TopicScreenName = keyof typeof topicScreens;
-
 export { topicApi, type TopicApiMap } from "./behavior/topic-api.ts";
 export {
   TOPIC_CLUSTERING_PAGE_PERMISSION,

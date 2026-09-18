@@ -4,16 +4,6 @@
  * port answering for project, grant, notices and switcher.
  */
 
-import type { ComponentType } from "react";
-
-export type SecretScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const secretScreens = {
-  secrets: () => import("./ui/sections/secrets-screen.tsx"),
-} as const satisfies Record<string, SecretScreenLoader>;
-
-export type SecretScreenName = keyof typeof secretScreens;
-
 export { secretApi } from "./behavior/secret-api.ts";
 export {
   SECRET_REFUSAL_CODES,

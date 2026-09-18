@@ -3,16 +3,6 @@
  * reader/scope/grants/rollouts through ProjectHomeHost.
  */
 
-import type { ComponentType } from "react";
-
-export type ProjectHomeScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const projectHomeScreens = {
-  home: () => import("./ui/sections/home/home-screen.tsx"),
-} as const satisfies Record<string, ProjectHomeScreenLoader>;
-
-export type ProjectHomeScreenName = keyof typeof projectHomeScreens;
-
 export {
   homeApi,
   type HomeApiMap,

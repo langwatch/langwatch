@@ -4,16 +4,6 @@
  * the cache stays shared with the unsubscribe pair the mail client hits.
  */
 
-import type { ComponentType } from "react";
-
-export type NotificationScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const notificationScreens = {
-  emailSuppressions: () => import("./ui/sections/email-suppressions-screen.tsx"),
-} as const satisfies Record<string, NotificationScreenLoader>;
-
-export type NotificationScreenName = keyof typeof notificationScreens;
-
 export {
   notificationApi,
   type EmailSuppressionRow,

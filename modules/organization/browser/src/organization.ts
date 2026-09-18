@@ -1,19 +1,5 @@
 /** Five settings screens: audit-log, members, teams, team detail, groups. */
 
-import type { ComponentType } from "react";
-
-export type OrganizationScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const organizationScreens = {
-  auditLog: () => import("./ui/sections/organization/audit-log.screen.tsx"),
-  groups: () => import("./ui/sections/organization/groups.screen.tsx"),
-  members: () => import("./ui/sections/organization/members.screen.tsx"),
-  teams: () => import("./ui/sections/organization/teams.screen.tsx"),
-  teamDetail: () => import("./ui/sections/organization/team-detail.screen.tsx"),
-} as const satisfies Record<string, OrganizationScreenLoader>;
-
-export type OrganizationScreenName = keyof typeof organizationScreens;
-
 export { organizationApi } from "./behavior/organization-api.ts";
 export type {
   AuditLogFilters,

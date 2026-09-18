@@ -4,16 +4,6 @@
  * the rule drawer and audience picker stay out of the app's own chunk.
  */
 
-import type { ComponentType } from "react";
-
-export type DataPrivacyScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const dataPrivacyScreens = {
-  dataPrivacy: () => import("./ui/sections/data-privacy-screen.tsx"),
-} as const satisfies Record<string, DataPrivacyScreenLoader>;
-
-export type DataPrivacyScreenName = keyof typeof dataPrivacyScreens;
-
 export {
   privacyRuleAddress,
   privacyRuleForAddress,

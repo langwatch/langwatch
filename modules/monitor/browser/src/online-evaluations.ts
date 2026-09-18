@@ -3,16 +3,6 @@
  * monitors.* transported by monitor-server.
  */
 
-import type { ComponentType } from "react";
-
-export type MonitorScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const monitorScreens = {
-  onlineEvaluations: () => import("./ui/sections/online-evaluations.screen.tsx"),
-} as const satisfies Record<string, MonitorScreenLoader>;
-
-export type MonitorScreenName = keyof typeof monitorScreens;
-
 export { monitorApi } from "./behavior/monitor-api.ts";
 export type { MonitorApiMap, MonitorExperimentRow } from "./behavior/monitor-api.ts";
 export {

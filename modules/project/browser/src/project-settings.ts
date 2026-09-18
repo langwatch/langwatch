@@ -3,16 +3,6 @@
  * that serves organization, project, and related dependencies.
  */
 
-import type { ComponentType } from "react";
-
-export type ProjectScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const projectScreens = {
-  projectSettings: () => import("./ui/sections/project-settings/project-settings-screen.tsx"),
-} as const satisfies Record<string, ProjectScreenLoader>;
-
-export type ProjectScreenName = keyof typeof projectScreens;
-
 export { projectApi, type ProjectApiMap } from "./behavior/project-api.ts";
 export {
   PROJECT_SETTINGS_PAGE_PERMISSION,

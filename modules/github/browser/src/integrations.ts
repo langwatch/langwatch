@@ -3,16 +3,6 @@
  * mount the tRPC Provider, settings chrome, guards, and host port.
  */
 
-import type { ComponentType } from "react";
-
-export type GithubScreenLoader = () => Promise<{ default: ComponentType }>;
-
-export const githubScreens = {
-  integrations: () => import("./ui/sections/integrations.screen.tsx"),
-} as const satisfies Record<string, GithubScreenLoader>;
-
-export type GithubScreenName = keyof typeof githubScreens;
-
 export { githubApi } from "./behavior/github-api.ts";
 export type { GithubApiMap } from "./behavior/github-api.ts";
 export {
