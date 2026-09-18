@@ -35,6 +35,16 @@ Feature: A module mounts the host its screens read
     # This is what per-screen wrapping cannot do, and why the stack sits at the
     # router root rather than around the declaring module's own loaders.
 
+  @integration
+  Scenario: A mounted host answers the reading its screen renders from
+    Given a module whose host mount resolves its organization from its own read
+    When a customer opens the screen that renders from that organization
+    Then the screen renders the organization rather than nothing
+    # Mounting is necessary and not sufficient. Project's mount was installed
+    # and answered organization() and project() with a hardcoded undefined, so
+    # Settings > General hit its own `if (!organization) return null` on every
+    # load: a framed, empty pane, no console error and no failed request.
+
   @unit
   Scenario: A mount with nothing to render is refused by name
     Given an installed module whose host mount resolves to no component

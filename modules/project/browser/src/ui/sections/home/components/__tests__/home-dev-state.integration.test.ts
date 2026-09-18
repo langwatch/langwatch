@@ -31,7 +31,15 @@ function withDeployment(isDevelopment: boolean) {
       route: () => ({ params: {}, query: {} }),
       navigate: () => void 0,
     }),
-    deployment: { isDevelopment },
+    // Only `isDevelopment` is under test; the rest are what the port requires
+    // of any deployment, so the hook reads a whole one rather than a stub.
+    deployment: {
+      isDevelopment,
+      isSaaS: false,
+      appBaseUrl: "https://app.langwatch.test",
+      hasNlpService: true,
+      hasLangevals: true,
+    },
   };
   return ({ children }: { children: ReactNode }) =>
     createElement(UiCapabilityContextProvider, { value: capabilities }, children);

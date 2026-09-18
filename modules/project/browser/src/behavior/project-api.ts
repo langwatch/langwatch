@@ -16,11 +16,16 @@ export type ProjectApiMap = {
     getAll: {
       query: {
         input: { isDemo: boolean };
-        output: (ProjectHostOrganization & {
+        // `teams` is declared ONCE: intersecting a second `teams` with the
+        // port's own resolves property access to the left side, which silently
+        // hides `projects` from every reader.
+        output: (Omit<ProjectHostOrganization, "teams"> & {
           slug: string;
           teams: {
             id: string;
             name: string;
+            slug: string;
+            isPersonal: boolean;
             projects: ProjectHostProject[];
           }[];
         })[];

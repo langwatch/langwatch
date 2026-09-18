@@ -1,7 +1,7 @@
 /**
- * Project's answer to the port its settings screen declares: every method
- * projects a `@langwatch/browser-host` capability, so the module mounts it,
- * not the application. ARCHITECTURE.md §10.1.
+ * Project's answer to the port its settings screen declares: the organization
+ * graph comes from this module's own tRPC read, everything else projects a
+ * `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
  */
 
 import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
@@ -16,9 +16,18 @@ import {
   type ProjectHostProject,
   type ProjectSuccessNotice,
 } from "../model/project-host.ts";
+import { api, type ProjectApiMap } from "./project-api.ts";
+
+/** The graph as the read answers it: richer than the port's own organization. */
+type ProjectOrganizationGraph = ProjectApiMap["organization"]["getAll"]["query"]["output"][number];
+
+/** A stable reference, so a query still loading never re-triggers a memo below it. */
+const NO_ORGANIZATIONS: readonly ProjectOrganizationGraph[] = [];
 
 class CapabilityProjectHost extends ProjectHostApi {
   constructor(
+    private readonly organization_: ProjectHostOrganization | undefined,
+    private readonly project_: ProjectHostProject | undefined,
     private readonly hasPermissionOf: (permission: string) => boolean,
     private readonly isFeatureEnabledOf: (flag: string) => boolean,
     private readonly scopeHost: UiScopeHost | undefined,
@@ -28,17 +37,12 @@ class CapabilityProjectHost extends ProjectHostApi {
     super();
   }
 
-  /**
-   * The rich settings row (S3 config, teams) is not a browser-host
-   * capability — undefined is the honest reading until a real data source
-   * answers it.
-   */
   organization(): ProjectHostOrganization | undefined {
-    return void 0;
+    return this.organization_;
   }
 
   project(): ProjectHostProject | undefined {
-    return void 0;
+    return this.project_;
   }
 
   hasPermission(permission: string): boolean {
@@ -79,17 +83,41 @@ class CapabilityProjectHost extends ProjectHostApi {
  */
 export default function ProjectHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback } = useUiCapabilities();
-  const scopeHost = useUiScope().scopeHost();
+  const scope = useUiScope();
+  const { organizationId, projectId } = scope.activeScope();
+  const scopeHost = scope.scopeHost();
+
+  const organizations = api.organization.getAll.useQuery({ isDemo: false });
+  const orgs = organizations.data ?? NO_ORGANIZATIONS;
+
+  const organization = useMemo(
+    () => (organizationId ? orgs.find((candidate) => candidate.id === organizationId) : void 0),
+    [orgs, organizationId],
+  );
+
+  const project = useMemo(
+    () =>
+      projectId === null
+        ? void 0
+        : orgs
+            .flatMap((candidate) => candidate.teams)
+            .flatMap((team) => team.projects)
+            .find((candidate) => candidate.id === projectId),
+    [orgs, projectId],
+  );
+
   const host = useMemo(
     () =>
       new CapabilityProjectHost(
+        organization,
+        project,
         (permission) => session.hasPermission(permission),
         (flag) => session.isFeatureEnabled(flag),
         scopeHost,
         (notice) => feedback.succeeded(notice),
         (notice) => feedback.failed(notice),
       ),
-    [session, scopeHost, feedback],
+    [organization, project, session, scopeHost, feedback],
   );
   return <ProjectHostProvider value={host}>{children}</ProjectHostProvider>;
 }
