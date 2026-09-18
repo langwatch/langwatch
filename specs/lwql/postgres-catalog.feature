@@ -120,6 +120,15 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
       Then it carries a non-empty reason
       And an override without one fails the build
 
+    @unit @integration
+    Scenario: Per-user visibility is enforced at the approved view
+      Given a Langy model whose application repository restricts reads to the caller's own or shared conversations
+      When the Postgres catalog derives that model's view
+      Then the approved view carries a rowFilter referencing the base alias
+      And two conversations in the same project, one private and one shared
+      And a caller who queries the view sees only the shared conversation's rows
+      And the private conversation's ids and message content never appear
+
   Rule: Everything derived is discoverable
 
     @unit
@@ -157,6 +166,16 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
       When its columns are listed
       Then Centroid, EmbeddingsModel and P95Distance are absent
       And TopicId, TopicName, ParentTopicId and TenantId are present
+
+  Rule: Re-provisioning converges an already-provisioned installation
+
+    @integration
+    Scenario: Re-provisioning an upgraded installation converges the approved views
+      Given a Postgres view already provisioned in a column order the current catalog no longer matches
+      When provisioning runs the current approved-view and reader statements against that same database
+      Then no error occurs
+      And the view's columns match the derived catalog's order
+      And the reader role can still select from it
 
   Rule: The gap list burns down to zero
 

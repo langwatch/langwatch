@@ -15,7 +15,10 @@
  *
  * `ModelProvider.customKeys` is *not* here: it ends in `keys`, so
  * {@link ../derivePostgresCatalog#isStrippedByDefault}'s suffix rule already
- * strips it. This file names only the columns that rule cannot see.
+ * strips it. `ModelProvider.extraHeaders` (raw provider auth headers, masked
+ * only by the service layer's read path, never by name) is here because the
+ * name rules cannot see it. This file names only the columns those rules
+ * cannot see.
  *
  * @see ../derivePostgresCatalog.ts#isStrippedByDefault — the name rules these back-stop
  * @see specs/lwql/postgres-catalog.feature
@@ -62,6 +65,15 @@ export const SENSITIVE_POSTGRES_OVERRIDES: Record<
     skipColumns: {
       parserConfig: "config JSON nests credential hashes",
       pollerCursor: "config JSON nests credential hashes",
+    },
+  },
+
+  ModelProvider: {
+    skipColumns: {
+      // providerConfig was checked and stays exposed: routing hints only
+      // (endpoint, deployment, region), never masked by modelProvider.service.ts.
+      extraHeaders:
+        "raw provider auth headers; the service masks every value on read",
     },
   },
 };

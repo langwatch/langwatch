@@ -176,19 +176,128 @@ export const DEFAULT_POSTGRES_ENGINE_POOL_SIZE = 2;
  * one row-policy shape serve every LangWatchQL object and lets a caller join
  * across residences without knowing which side is which.
  *
- * `CREATE OR REPLACE` rather than `IF NOT EXISTS`, matching the ClickHouse
- * views: re-provisioning after the catalog changed must converge, and a view
- * that silently kept an older column list would keep exposing a column the
- * catalog no longer claims. PostgreSQL refuses to `REPLACE` a view whose
- * existing columns are not a prefix of the new ones, so a removed or retyped
- * column fails loudly at provisioning time instead.
+ * One statement, a `DO` block that tries `CREATE OR REPLACE VIEW` first and
+ * falls back to `DROP VIEW IF EXISTS` + `CREATE VIEW` only on the two
+ * SQLSTATEs PostgreSQL raises when the new column list is not a
+ * superset-in-order of the old one (`feature_not_supported`,
+ * `invalid_table_definition` — confirmed against a real server: a reorder, a
+ * drop, a rename or a retype all raise `42P16`/`invalid_table_definition`).
+ * The common no-change path stays `CREATE OR REPLACE`: atomic, and it never
+ * touches privileges, so it never needs a re-grant. Only the fallback drops
+ * the view and can lose the reader role's `SELECT` — the whole reason it
+ * carries its own guarded re-grant via {@link readerRole} — and the whole
+ * block runs as one statement, one transaction, so a caller running
+ * statements on separate connections (`provisionLwql.ts`) never observes the
+ * view missing or ungranted mid-provision. A prior version emitted
+ * `DROP VIEW IF EXISTS` then `CREATE VIEW` as two separate statements on
+ * every run: unconditionally atomic across a reorder, but non-transactional
+ * across the two statements and grant-losing on every boot, which is exactly
+ * the window this version closes for the common case.
  */
+/** A defined-but-blank `rowFilter` is refused — see {@link postgresApprovedViewStatement}. */
+function assertRowFilterNotBlank({
+  view,
+  rowFilter,
+}: {
+  view: string;
+  rowFilter: string | undefined;
+}): void {
+  if (rowFilter !== undefined && rowFilter.trim().length === 0) {
+    throw new Error(
+      `lwql provisioning: approved view "${view}" has a blank rowFilter`,
+    );
+  }
+}
+
+/**
+ * The base alias is fixed, so a hop reusing it would make `<m>.<from>`
+ * ambiguous between the base relation and that hop; two hops sharing an alias
+ * are the same ambiguity between themselves. Caught here rather than left to
+ * PostgreSQL so the message names the mapping, not a generated relation.
+ */
+function assertJoinAliasesDistinct({
+  view,
+  joins,
+}: {
+  view: string;
+  joins: readonly PostgresApprovedViewJoin[];
+}): void {
+  const seen = new Set<string>([POSTGRES_BASE_ALIAS]);
+  for (const hop of joins) {
+    if (hop.relation.length === 0) {
+      throw new Error(
+        `lwql provisioning: approved view "${view}" has a tenant-path hop with an empty relation`,
+      );
+    }
+    if (seen.has(hop.alias)) {
+      throw new Error(
+        hop.alias === POSTGRES_BASE_ALIAS
+          ? `lwql provisioning: approved view "${view}" tenant-path hop reuses the base alias "${POSTGRES_BASE_ALIAS}"`
+          : `lwql provisioning: approved view "${view}" tenant-path reuses alias "${hop.alias}"`,
+      );
+    }
+    seen.add(hop.alias);
+  }
+}
+
+/**
+ * The `DO` block's dollar-quote tag. The view body it wraps is itself SQL
+ * text (a `rowFilter` is caller-authored, not identifier-safe like the other
+ * interpolations here), so a tag this specific is what keeps a body that
+ * happens to contain `$$` from closing the block early.
+ */
+const APPROVED_VIEW_DOLLAR_TAG = "$lwql$";
+
+/**
+ * Refuses a view body that already contains the outer `DO` block's own
+ * dollar-quote tag — the one input to this function not already constrained
+ * to a safe identifier shape, so it is the one thing checked directly rather
+ * than trusted.
+ */
+function assertNoDollarTagCollision({
+  view,
+  body,
+}: {
+  view: string;
+  body: string;
+}): void {
+  if (body.includes(APPROVED_VIEW_DOLLAR_TAG)) {
+    throw new Error(
+      `lwql provisioning: approved view "${view}" body contains the reserved ` +
+        `dollar-quote tag ${APPROVED_VIEW_DOLLAR_TAG}`,
+    );
+  }
+}
+
+/**
+ * The fallback branch's guarded re-grant, run only when the `DROP`+`CREATE`
+ * path actually drops the view. Empty when {@link readerRole} is omitted —
+ * the caller does not always know the reader role at statement-build time
+ * (see {@link postgresApprovedViewStatement}).
+ */
+function readerRegrantClause({
+  readerRole,
+  qualifiedView,
+}: {
+  readerRole: string | undefined;
+  qualifiedView: string;
+}): string {
+  if (!readerRole) return "";
+  return (
+    `\n    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(readerRole)}) THEN\n` +
+    `      GRANT SELECT ON ${qualifiedView} TO ${postgresQuoted(readerRole)};\n` +
+    `    END IF;`
+  );
+}
+
 export function postgresApprovedViewStatement({
   schema,
   view,
   baseRelation,
   columns,
   joins = [],
+  rowFilter,
+  readerRole,
 }: {
   schema: string;
   /** Name of the view to create. */
@@ -209,34 +318,36 @@ export function postgresApprovedViewStatement({
    * new base-alias qualifier.
    */
   joins?: readonly PostgresApprovedViewJoin[];
+  /**
+   * {@link LangWatchQLPostgresMapping.rowFilter}, ANDed into the view's WHERE
+   * clause when present. A defined-but-blank filter is refused rather than
+   * silently ignored, since that would otherwise read as "no restriction"
+   * exactly when the caller most likely meant to restrict something. May
+   * contain the literal token `{{schema}}`, replaced with this call's quoted
+   * `schema` — the one way a filter written once at catalog-definition time
+   * can still name a sibling relation correctly under any deployment's schema.
+   */
+  rowFilter?: string;
+  /**
+   * The reader role to re-grant `SELECT` to if this run takes the fallback
+   * `DROP`+`CREATE` path — the only path that can lose the grant, since
+   * `CREATE OR REPLACE VIEW` never touches privileges. Omit when the caller
+   * does not know the reader role at this point (a pure catalog-derivation
+   * step with no runtime reader identity); the common no-change path needs no
+   * re-grant regardless.
+   */
+  readerRole?: string;
 }): string {
   const quotedSchema = postgresQuoted(schema);
   const quotedView = postgresQuoted(view);
+  const qualifiedView = `${quotedSchema}.${quotedView}`;
   if (columns.length === 0) {
     throw new Error(
       `lwql provisioning: approved view "${view}" needs at least one column`,
     );
   }
-  // The base alias is fixed, so a hop reusing it would make `<m>.<from>`
-  // ambiguous between the base relation and that hop; two hops sharing an alias
-  // are the same ambiguity between themselves. Caught here rather than left to
-  // PostgreSQL so the message names the mapping, not a generated relation.
-  const seen = new Set<string>([POSTGRES_BASE_ALIAS]);
-  for (const hop of joins) {
-    if (hop.relation.length === 0) {
-      throw new Error(
-        `lwql provisioning: approved view "${view}" has a tenant-path hop with an empty relation`,
-      );
-    }
-    if (seen.has(hop.alias)) {
-      throw new Error(
-        hop.alias === POSTGRES_BASE_ALIAS
-          ? `lwql provisioning: approved view "${view}" tenant-path hop reuses the base alias "${POSTGRES_BASE_ALIAS}"`
-          : `lwql provisioning: approved view "${view}" tenant-path reuses alias "${hop.alias}"`,
-      );
-    }
-    seen.add(hop.alias);
-  }
+  assertRowFilterNotBlank({ view, rowFilter });
+  assertJoinAliasesDistinct({ view, joins });
   const projection = columns
     .map(
       (column) =>
@@ -254,10 +365,29 @@ export function postgresApprovedViewStatement({
       return clause;
     })
     .join("");
-  return (
-    `CREATE OR REPLACE VIEW ${quotedSchema}.${quotedView} AS\nSELECT\n${projection}\n` +
+  // The catalog author writes `rowFilter` once, at definition time, before any
+  // deployment's schema is known — so a filter that names a sibling relation
+  // (an EXISTS subquery) cannot spell that relation's schema literally. The
+  // `{{schema}}` token defers it to this call's actual `schema`, the same one
+  // every other qualified name in this statement already uses.
+  const resolvedRowFilter = rowFilter?.replaceAll("{{schema}}", quotedSchema);
+  const whereClause = resolvedRowFilter ? `\nWHERE (${resolvedRowFilter})` : "";
+  const body =
+    `SELECT\n${projection}\n` +
     `FROM ${quotedSchema}.${postgresQuoted(baseRelation)} AS ${postgresQuoted(POSTGRES_BASE_ALIAS)}` +
-    joinClause
+    joinClause +
+    whereClause;
+  assertNoDollarTagCollision({ view, body });
+  const regrant = readerRegrantClause({ readerRole, qualifiedView });
+  return (
+    `DO ${APPROVED_VIEW_DOLLAR_TAG}\n` +
+    `BEGIN\n` +
+    `  CREATE OR REPLACE VIEW ${qualifiedView} AS\n${body};\n` +
+    `EXCEPTION\n` +
+    `  WHEN feature_not_supported OR invalid_table_definition THEN\n` +
+    `    DROP VIEW IF EXISTS ${qualifiedView};\n` +
+    `    CREATE VIEW ${qualifiedView} AS\n${body};${regrant}\n` +
+    `END\n${APPROVED_VIEW_DOLLAR_TAG}`
   );
 }
 

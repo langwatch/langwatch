@@ -363,6 +363,22 @@ export interface LangWatchQLPostgresMapping {
      */
     readonly on: { readonly from: string; readonly to: string };
   }[];
+  /**
+   * A visibility rule the application's own repository enforces in code
+   * (e.g. "only rows the caller owns or that are shared"), rendered into the
+   * approved view's WHERE clause because the reader role sees only the view —
+   * there is no other layer left to enforce it at.
+   *
+   * A boolean predicate over the base alias `"m"` (see
+   * `POSTGRES_BASE_ALIAS` in `../provisioning/postgresMapping.ts`), ANDed
+   * onto the view's join chain. May reference a sibling relation via the
+   * `{{schema}}` token (resolved to the deploying schema at provisioning
+   * time — see `postgresApprovedViewStatement`), since this predicate is
+   * written once, before any deployment's actual schema is known. Absent
+   * means the base relation's rows are visible to every project member the
+   * tenant predicate already admits.
+   */
+  readonly rowFilter?: string;
 }
 
 /**

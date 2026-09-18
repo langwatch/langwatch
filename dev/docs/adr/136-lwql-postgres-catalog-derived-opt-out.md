@@ -157,6 +157,16 @@ change and is a known manual step, not an oversight.
   pure function of the Prisma manifest plus its override, the same relationship
   the ClickHouse half already has between `derivedViews.ts` and
   `skippedTables.ts`.
+- **Per-user visibility.** A model whose *application* repository already
+  restricts which rows a caller may read — Langy's conversations, visible to
+  their owner plus anyone the owner shared with, never to every other project
+  member — cannot rely on the catalog's tenant predicate alone: that predicate
+  is project-scoped, and the reader role sees whichever rows the approved view
+  admits regardless of which project member is asking. Such a model gets a
+  `rowFilter` override (`PostgresDatasetOverride.rowFilter`), not a skip: the
+  filter is rendered into the approved view's `WHERE` clause, which is the one
+  layer downstream of the application code that can still enforce it once the
+  data is reachable through LWQL.
 
 ## References
 
