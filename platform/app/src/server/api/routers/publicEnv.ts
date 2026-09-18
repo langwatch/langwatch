@@ -2,6 +2,7 @@ import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
+import { isEmailPasswordEnabled } from "~/server/better-auth/config/email-and-password";
 import {
   deploymentOffersPasskeys,
   deploymentOffersTwoStepVerification,
@@ -58,6 +59,12 @@ export const publicEnvRouter = publicProcedure
       // endpoint behind the button", and this is the same read the plugin
       // registration and the method policy make.
       PASSKEYS_ENABLED: deploymentOffersPasskeys(),
+      // Whether this deployment lets an account set and use a local password —
+      // the same server rule that mounts /sign-up/email. Derived, not the raw
+      // provider: self-hosted mounts it even behind an enterprise IdP (ADR-027),
+      // so a passkey-only admin can still set the password break-glass needs. A
+      // browser that keyed off NEXTAUTH_PROVIDER alone hid that door.
+      EMAIL_PASSWORD_ENABLED: isEmailPasswordEnabled(env),
       // The federated providers this deployment actually offers — mounted AND
       // licensed — as the sign-in method policy's own answer, so the
       // linked-accounts offer and the sign-in rail can never disagree. Ids
