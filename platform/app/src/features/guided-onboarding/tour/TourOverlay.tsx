@@ -9,10 +9,7 @@
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  LangyMark,
-  LangyMarkGradientDefs,
-} from "~/features/langy/components/LangyMark";
+import { ThemedLogoIcon } from "~/components/icons/LogoIcon";
 import type { TourHandoff } from "./guidedTourStore";
 import {
   EASING,
@@ -23,12 +20,6 @@ import {
   TOUR_TRAVEL_MS,
 } from "./tourGeometry";
 import { readMs, type TourStep } from "./tourSteps";
-
-/**
- * The tour paints Langy's mark outside the Langy panel, so it carries its own
- * paint server rather than borrowing the panel's, which is not mounted here.
- */
-const TOUR_MARK_GRADIENT_ID = "langy-tour-mark-grad";
 
 /* ---------- the circle-timer on the Next button ---------- */
 
@@ -251,8 +242,7 @@ export function TourCaption({
           alignItems="center"
           justifyContent="center"
         >
-          <LangyMarkGradientDefs id={TOUR_MARK_GRADIENT_ID} />
-          <LangyMark size={22} gradientId={TOUR_MARK_GRADIENT_ID} />
+          <ThemedLogoIcon height={22} />
         </Box>
         <Text fontSize="13px" lineHeight="1.6">
           {step.text}

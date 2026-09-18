@@ -27,6 +27,7 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
+import { LOGO_LINES_PATH, LOGO_PLATE_PATH } from "~/components/icons/LogoIcon";
 import { useGuidedTourStore } from "../guidedTourStore";
 import { TourLayer } from "../TourLayer";
 import {
@@ -69,6 +70,25 @@ function renderLayer() {
       <TourLayer />
     </ChakraProvider>,
   );
+}
+
+/**
+ * The fill an element gets on each ground, read from the rules Chakra emitted
+ * for its class: jsdom computes no styles, and a colour-mode condition only
+ * exists as a `.dark` rule.
+ */
+function fillOf(el: Element | undefined) {
+  const cls = el?.getAttribute("class") ?? "";
+  const css = [...document.querySelectorAll("style")]
+    .map((style) => style.textContent)
+    .join("\n");
+  const light = css.match(
+    new RegExp(`(?:^|})\\s*\\.${cls}\\{fill:([^;}]+)`),
+  )?.[1];
+  const dark = css
+    .match(new RegExp(`\\.dark \\.${cls}[^{]*\\{fill:([^;}]+)`))?.[1]
+    ?.replace(/^var\(--chakra-colors-(.+)\)$/, "$1");
+  return { light, dark };
 }
 
 /** From a step's start to its caption being on screen. */
@@ -213,6 +233,20 @@ describe("TourLayer", () => {
         path: "llmops",
         step: 0,
       });
+    });
+
+    /** @scenario the caption carries the LangWatch logo in the colour mode's own version */
+    it("draws the LangWatch logo in the caption, navy on white and off-white on dark", () => {
+      renderLayer();
+      act(() => useGuidedTourStore.getState().start("llmops"));
+      landStep(true);
+      const paths = [
+        ...screen.getByTestId("tour-caption").querySelectorAll("path"),
+      ];
+      const plate = paths.find((p) => p.getAttribute("d") === LOGO_PLATE_PATH);
+      const lines = paths.find((p) => p.getAttribute("d") === LOGO_LINES_PATH);
+      expect(fillOf(plate)).toEqual({ light: "#fff", dark: "transparent" });
+      expect(fillOf(lines)).toEqual({ light: "#213B41", dark: "#F1F5F9" });
     });
 
     /** @scenario the step counter doubles as Back */
