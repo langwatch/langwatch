@@ -464,10 +464,14 @@ describe("the api-keys REST family", () => {
   });
 
   describe("when keys are listed", () => {
+    /** @scenario A view-only member lists only their own API keys */
     it("lists the caller's own keys, without the secret or its lookup id", async () => {
       const list = vi.fn(async () => [apiKey()]);
       const listAll = vi.fn(async () => [apiKey()]);
-      const { send } = mountApiKeyRest({ apiKeys: { list, listAll } });
+      const { send } = mountApiKeyRest({
+        apiKeys: { list, listAll },
+        granted: ["organization:view"],
+      });
 
       const response = await send("/api/api-keys");
 
@@ -502,6 +506,7 @@ describe("the api-keys REST family", () => {
       const listAll = vi.fn(async () => [apiKey()]);
       const { send } = mountApiKeyRest({
         apiKeys: { listAll, credentialCanManageOrganization: vi.fn(async () => false) },
+        granted: ["organization:view"],
       });
 
       const response = await send("/api/api-keys", { as: AS_SERVICE });

@@ -105,16 +105,11 @@ export {
   experimentWorkbenchCredential,
 } from "./transport/experiment-v3.rest.ts";
 export type {
-  ExperimentV3RestSession,
   ExperimentV3RunLoop,
   ExperimentV3StartRunInput,
   ExperimentWorkbenchObserver,
-  ExperimentWorkbenchPermissions,
 } from "./app/experiment-workbench.members.ts";
-export {
-  experimentWorkbenchRunRest,
-  experimentWorkbenchCaller,
-} from "./transport/experiment-workbench-run.rest.ts";
+export { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
 export type { ExperimentFindOrCreateInput } from "./services/experiment-find-or-create.service.ts";
 export { experimentInitRest, experimentInitCaller } from "./transport/experiment-init.rest.ts";
 export {

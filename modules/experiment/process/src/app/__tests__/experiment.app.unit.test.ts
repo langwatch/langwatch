@@ -174,7 +174,6 @@ function harness({
     getTenantEmitter: vi.fn(),
     cleanupTenantEmitter: vi.fn(),
   };
-  const workbenchPermissions = { permitted: vi.fn(async () => true) };
   const workbenchObserver = { recordExperimentRan: vi.fn(), reportError: vi.fn() };
   const runLoop: ExperimentV3RunLoop = {
     ports: null,
@@ -200,7 +199,6 @@ function harness({
     experiments: experimentService,
     workflows: workflowService,
     monitors,
-    workbenchPermissions,
     workbenchObserver,
     runLoop,
     app: ExperimentApp.createForTesting({
@@ -215,7 +213,6 @@ function harness({
       people,
       modelCosts,
       slugify: (value: string) => value,
-      workbenchPermissions,
       runLoop,
       workbenchObserver,
     }),
@@ -485,12 +482,11 @@ describe("given the workbench's own doors", () => {
   describe("when the family asks the App for what it declares", () => {
     it("answers every required member of the workbench REST family", () => {
       const { app } = harness();
-      // The compiler is the assertion: the family's three required members are
-      // `probeProjectPermission`, `experiments()` and `run()`, and a missing
-      // one fails here rather than at the first request.
+      // The compiler is the assertion: the family's required application and
+      // run-loop members must remain callable from the declared family.
       const answered: ExperimentV3RestApi = app;
 
-      expect(typeof answered.probeProjectPermission).toBe("function");
+      expect(typeof answered.abortWorkbenchRun).toBe("function");
       expect(typeof answered.experiments).toBe("function");
       expect(typeof answered.run).toBe("function");
     });
@@ -505,21 +501,6 @@ describe("given the workbench's own doors", () => {
       const { app, runLoop } = harness();
 
       expect(app.run()).toBe(runLoop);
-    });
-  });
-
-  describe("when a browser door asks whether the person may run", () => {
-    it("asks the workbench permission member about that project", async () => {
-      const { app, workbenchPermissions } = harness();
-
-      await expect(
-        app.probeProjectPermission({ user: { id: "user-1" } }, "project-1", "evaluations:manage"),
-      ).resolves.toBe(true);
-      expect(workbenchPermissions.permitted).toHaveBeenCalledWith({
-        session: { user: { id: "user-1" } },
-        projectId: "project-1",
-        permission: "evaluations:manage",
-      });
     });
   });
 

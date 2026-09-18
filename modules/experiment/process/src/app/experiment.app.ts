@@ -4,14 +4,12 @@ import { on, type EventEmitter } from "node:events";
  * The experiment feature's application: what both of its doors call.
  */
 import { AgentApi } from "@langwatch/agent-contract";
-import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   ExperimentApi,
-  ExperimentWorkbenchForbiddenError,
-  ExperimentWorkbenchUnauthorizedError,
   type ExperimentCaller,
   type ExperimentRunLookupInput,
   type ExperimentUpdateFrame,
@@ -69,10 +67,8 @@ import {
 } from "@langwatch/workflow-contract";
 
 import type {
-  ExperimentV3RestSession,
   ExperimentV3RunLoop,
   ExperimentWorkbenchObserver,
-  ExperimentWorkbenchPermissions,
 } from "#app/experiment-workbench.members";
 
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
@@ -174,12 +170,6 @@ export interface ExperimentAppDependencies {
   modelCosts: ExperimentModelCosts;
   /** The slug this deployment derives from a name. */
   slugify(value: string): string;
-  /**
-   * Whether the person behind a browser workbench door holds one permission on
-   * one project. Separate from `permissions` above, which answers about an
-   * actor id the declared check already resolved.
-   */
-  workbenchPermissions: ExperimentWorkbenchPermissions;
   /** The workbench run loop this deployment composed, or the holes where it did not. */
   runLoop: ExperimentV3RunLoop;
   /** Where a run is recorded and an unnamed failure reported. Both best-effort. */
@@ -677,38 +667,12 @@ export class ExperimentApp implements ExperimentApi {
 
   // ── The workbench's own doors ────────────────────────
 
-  /**
-   * Whether the signed-in person behind a browser workbench door holds one
-   * permission on one project.
-   */
-  probeProjectPermission(
-    session: ExperimentV3RestSession,
-    projectId: string,
-    permission: AuthzPermission,
-  ): Promise<boolean> {
-    return this.#dependencies.workbenchPermissions.permitted({ session, projectId, permission });
-  }
-
   async abortWorkbenchRun(
     input: Readonly<{
-      userId: string | null;
       projectId: string;
       runId: string;
     }>,
   ): Promise<{ success: true; runId: string; message: "Abort requested" }> {
-    if (!input.userId) {
-      throw new ExperimentWorkbenchUnauthorizedError();
-    }
-
-    const permitted = await this.probeProjectPermission(
-      { user: { id: input.userId } },
-      input.projectId,
-      "evaluations:manage",
-    );
-    if (!permitted) {
-      throw new ExperimentWorkbenchForbiddenError();
-    }
-
     return ExperimentRunOrchestratorService.requestOwnedAbort({
       ports: this.#dependencies.runLoop.ports,
       progress: this.#dependencies.runLoop.progress,

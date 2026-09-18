@@ -1,15 +1,9 @@
 /**
  * `/api/experiments/execute` and `/api/experiments/abort` - the two workbench
  * doors a BROWSER opens, behind the session door. The project a run names
- * lives in the body, so the scope is deferred to `evaluations:manage`.
+ * resolves `evaluations:manage` from the project in the body before either operation.
  */
-import { deferredScope } from "@langwatch/api/access";
-import {
-  defineRestMiddleware,
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestRawResult,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
 import {
   abortExperimentRunRequestSchema,
   abortExperimentRunResponseSchema,
@@ -18,7 +12,7 @@ import {
   type EvaluationsV3State,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
+import type { z } from "zod";
 
 import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
@@ -33,49 +27,6 @@ import { ExperimentV3RestApi, jsonAnswer, runLoopOf } from "./experiment-v3.rest
 
 const logger = createLogger("langwatch:experiments-v3");
 
-/**
- * Who the session door let in, read off the door's own answer. A project key
- * opens the same door, and it is nobody: these two routes are the browser's.
- */
-export const experimentWorkbenchCaller = defineRestMiddleware(
-  "experimentWorkbenchCaller",
-  z.object({ userId: z.string().nullable() }),
-);
-
-const BODY_NAMES_THE_PROJECT =
-  "the door authenticates the person and the project a run names arrives in the request body, " +
-  "so the handler asks evaluations:manage about that project before anything is read or written";
-
-/** The refusals the two doors have always answered with, word for word. */
-const NOT_SIGNED_IN = "You must be logged in to access this endpoint.";
-const NOT_PERMITTED = "You do not have permission to access this endpoint.";
-
-/**
- * The person behind a workbench door and the permission they hold on the
- * project the body named, or the refusal in their place.
- */
-async function permittedPerson({
-  app,
-  userId,
-  projectId,
-}: {
-  app: ExperimentV3RestApi;
-  userId: string | null;
-  projectId: string;
-}): Promise<{ userId: string } | Response> {
-  if (!userId) return jsonAnswer({ error: NOT_SIGNED_IN }, 401);
-
-  const permitted = await app.probeProjectPermission(
-    { user: { id: userId } },
-    projectId,
-    "evaluations:manage",
-  );
-
-  if (!permitted) return jsonAnswer({ error: NOT_PERMITTED }, 403);
-
-  return { userId };
-}
-
 export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
   .withNamespace("experiments")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -87,17 +38,13 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
   // that answers 401 to everyone reading the reference.
   .post("/execute", "executeExperiment")
   .withInput(executionRequestSchema)
-  .withAccess(deferredScope({ reason: BODY_NAMES_THE_PROJECT }))
+  .withPermission("evaluations:manage", { at: "route", param: "projectId" })
   .withRawResponse({ produces: "text/event-stream" })
   .withDocs({ hide: true })
-  .withMiddleware(experimentWorkbenchCaller)
-  .handle(async ({ app, input }, caller): Promise<RestRawResult> => {
+  .handle(async ({ app, input, actor }): Promise<RestRawResult> => {
     const { projectId } = input;
 
     logger.info({ projectId, scope: input.scope }, "Starting experiment execution");
-
-    const person = await permittedPerson({ app, userId: caller.userId, projectId });
-    if (person instanceof Response) return person;
 
     const { ports: runPorts, progress } = runLoopOf(app.run());
 
@@ -155,7 +102,7 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
     const resultsWriter = ExperimentRunResultsWriterService.findWriterFor({
       persistence: {
         experiments: app.experiments().experimentService,
-        actor: { userId: person.userId, label: "user" },
+        actor: { userId: actor.id, label: "user" },
       },
       projectId,
       experimentId: input.experimentId,
@@ -186,7 +133,7 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
         runPorts,
         mirror,
         resultsWriter,
-        userId: person.userId,
+        userId: actor.id,
       }),
     };
   })
@@ -194,11 +141,10 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
   // ── POST /abort ────────────────────────────────────────────────────────
   .post("/abort", "abortExperimentRun")
   .withInput(abortExperimentRunRequestSchema)
-  .withAccess(deferredScope({ reason: BODY_NAMES_THE_PROJECT }))
+  .withPermission("evaluations:manage", { at: "route", param: "projectId" })
   .withOutput(abortExperimentRunResponseSchema)
   .withDocs({ hide: true })
-  .withMiddleware(experimentWorkbenchCaller)
-  .handle(({ app, input }, caller) => app.abortWorkbenchRun({ ...input, userId: caller.userId }))
+  .handle(({ app, input }) => app.abortWorkbenchRun(input))
 
   .build();
 

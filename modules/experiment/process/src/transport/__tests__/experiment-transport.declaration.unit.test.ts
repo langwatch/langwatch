@@ -168,20 +168,21 @@ describe("given the experiment REST families", () => {
       ]);
     });
 
-    it("keeps the two browser run doors at their paths, behind the session door", () => {
+    it("keeps the two browser run doors at their paths, with project authorization", () => {
       const router = experimentWorkbenchRunRest.router();
 
-      expect(router.credential).toBe("session");
+      expect(router.credential).toBe("browser");
       expect(
-        router.routes.map(({ method, path, operation, access }) => [
+        router.routes.map(({ method, path, operation, permission, access }) => [
           method,
           path,
           operation,
+          permission,
           access?.kind,
         ]),
       ).toEqual([
-        ["post", "/execute", "executeExperiment", "deferred"],
-        ["post", "/abort", "abortExperimentRun", "deferred"],
+        ["post", "/execute", "executeExperiment", "evaluations:manage", undefined],
+        ["post", "/abort", "abortExperimentRun", "evaluations:manage", undefined],
       ]);
     });
 

@@ -1,6 +1,5 @@
 import {
   bindRestMiddleware,
-  browserCallerOfRequest,
   credentialPrincipalOfToken,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
@@ -22,10 +21,7 @@ import {
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
 import { experimentV3Rest, experimentWorkbenchCredential } from "./transport/experiment-v3.rest.ts";
-import {
-  experimentWorkbenchCaller,
-  experimentWorkbenchRunRest,
-} from "./transport/experiment-workbench-run.rest.ts";
+import { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
 import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 
@@ -69,12 +65,6 @@ export const experimentServer = defineServerModule("experiment")
           : { isLangySessionKey: credential.isLangySessionKey }),
       };
     }),
-    // The two browser doors answer their own 401 and 403 in the sentences the
-    // workbench renders, so the session door's answer reaches them as a fact
-    // rather than as a refusal.
-    bindRestMiddleware(experimentWorkbenchCaller, (context) => ({
-      userId: browserCallerOfRequest(context.req.raw)?.userId ?? null,
-    })),
   ]);
 
 /**

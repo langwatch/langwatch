@@ -5,14 +5,16 @@ import { createHmac } from "node:crypto";
  * The installation flow's routes and their `/github-langy/*` aliases.
  * @see specs/integrations/github-connection.feature
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { createRestRuntime, HttpError, UnauthorizedError } from "@langwatch/api/rest";
 import type {
   GithubApi,
   GithubAppConfig,
   GithubInstallStatePayload,
 } from "@langwatch/github-contract";
+import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler } from "hono";
-import { describe, expect, it } from "vitest";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { GithubInstallNonceRedisRepository } from "../../repositories/redis/redis.github-install-nonce.repository.ts";
 import { GithubInstallStateService } from "../../services/github-install-state.service.ts";
@@ -50,8 +52,15 @@ function githubStub(overrides: Partial<GithubApi>): GithubApi {
   return overrides as GithubApi;
 }
 
-/** Every refusal these routes word is an answer, so nothing should reach here. */
-const renderError: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
+/** The runtime writes route-door refusals before a handler can enter. */
+const renderError: ErrorHandler = (error, c) => {
+  if (HandledError.isHandled(error)) {
+    return c.json({ error: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode);
+  }
+  if (error instanceof HttpError) return c.json({ error: error.error }, error.status);
+
+  return c.json({ error: String(error) }, 500);
+};
 
 function mount(
   options: {
@@ -66,6 +75,7 @@ function mount(
   const memberChecks: { userId: string; organizationId: string }[] = [];
   const audits: { action: string }[] = [];
   const sessionReads = { count: 0 };
+  const githubReads = { count: 0 };
 
   const service: Partial<GithubApi> = {
     getAppConfig: () => ({ ...appConfig, configured: options.configured ?? true }),
@@ -114,7 +124,11 @@ function mount(
   };
 
   const installation: GithubInstallApi = {
-    github: () => githubStub(service),
+    github: () => {
+      githubReads.count += 1;
+
+      return githubStub(service);
+    },
     resolveSession: async () => {
       sessionReads.count += 1;
 
@@ -129,9 +143,27 @@ function mount(
 
   const runtime = createRestRuntime({
     identity: {
-      authenticate: () => {
-        throw new Error("The GitHub installation flow answers with no credential resolved.");
+      identify: () => {
+        const session =
+          options.session === undefined ? { user: { id: "user_1" } } : options.session;
+        if (!session) throw new UnauthorizedError("Not authenticated");
+
+        return {
+          actor: { type: "user" as const, id: session.user.id },
+          scope: null,
+        };
       },
+      authenticate: () => {
+        const session =
+          options.session === undefined ? { user: { id: "user_1" } } : options.session;
+        if (!session) throw new UnauthorizedError("Not authenticated");
+
+        return {
+          actor: { type: "user" as const, id: session.user.id },
+          scope: { tier: "organization" as const, id: "org_1" },
+        };
+      },
+      authorize: () => ({ permitted: options.canManage ?? true, organizationRole: null }),
     },
   });
 
@@ -146,6 +178,7 @@ function mount(
     memberChecks,
     audits,
     sessionReads,
+    githubReads,
     install: (query: string) =>
       app.fetch(new Request(`http://api.test/api/github/install?${query}`)),
     setup: (path: string, query: string) =>
@@ -191,11 +224,12 @@ describe("given the declared installation family", () => {
     expect(declaration.addressing).toBe("literal");
   });
 
-  it("resolves no credential, and reads the webhook body unparsed", () => {
+  it("declares the install permission and leaves callback protocols public", () => {
     const declaration = githubInstallRest.router();
 
+    expect(declaration.credential).toBe("browser");
     expect(declaration.routes.map((route) => route.access?.kind)).toEqual([
-      "public",
+      undefined,
       "public",
       "public",
       "public",
@@ -209,12 +243,16 @@ describe("given the declared installation family", () => {
 
 describe("given the GitHub installation routes", () => {
   describe("when an organization manager starts an installation", () => {
+    let api: ReturnType<typeof mount>;
+    let response: Response;
+
+    beforeEach(async () => {
+      api = mount();
+      response = await api.install("organizationId=org_1");
+    });
+
     /** @scenario Starting an installation redirects to GitHub with signed state */
     it("redirects to GitHub carrying state bound to the session and organization", async () => {
-      const api = mount();
-
-      const response = await api.install("organizationId=org_1");
-
       expect(response.status).toBe(302);
       const location = new URL(response.headers.get("location") ?? "");
       expect(`${location.origin}${location.pathname}`).toBe(INSTALL_URL);
@@ -226,14 +264,9 @@ describe("given the GitHub installation routes", () => {
 
     /** @scenario Connecting is not gated by the Langy rollout */
     it("begins the flow with no Langy capability consulted at all", async () => {
-      const api = mount();
-
-      const response = await api.install("organizationId=org_1");
-
       expect(response.status).toBe(302);
-      // The only questions asked are membership and organization management:
-      // an organization with no Langy access reaches GitHub the same way.
-      expect(api.memberChecks).toEqual([{ userId: "user_1", organizationId: "org_1" }]);
+      // Authorization is resolved by the door before the install operation begins.
+      expect(api.memberChecks).toEqual([]);
     });
   });
 
@@ -262,22 +295,19 @@ describe("given the GitHub installation routes", () => {
       const response = await api.install("organizationId=org_1");
 
       expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({ error: "Not authenticated" });
-      expect(api.memberChecks).toEqual([]);
+      expect(api.githubReads.count).toBe(0);
     });
   });
 
-  describe("when the caller is not a member of the organization", () => {
+  describe("when the caller lacks organization management", () => {
     /** @scenario Starting an installation requires organization management */
-    it("refuses before the permission is probed, so the answer says nothing about the org", async () => {
-      const api = mount({ member: false });
+    it("refuses before the installation operation can run", async () => {
+      const api = mount({ canManage: false });
 
       const response = await api.install("organizationId=org_1");
 
       expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toEqual({
-        error: "Not a member of this organization.",
-      });
+      expect(api.githubReads.count).toBe(0);
     });
   });
 

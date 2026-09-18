@@ -11,7 +11,6 @@ import {
   projectRestFacts,
   type RestRawResult,
 } from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   ExperimentNotFoundError,
   ExperimentRunNotFoundError as RunNotFoundError,
@@ -33,10 +32,7 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import type {
-  ExperimentV3RestSession,
-  ExperimentV3RunLoop,
-} from "#app/experiment-workbench.members";
+import type { ExperimentV3RunLoop } from "#app/experiment-workbench.members";
 import type { ExperimentApp } from "#app/experiment.app";
 
 import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
@@ -61,15 +57,8 @@ const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPR
  * Composed by the process's `experiment-v3-rest.mount.ts` (not a module).
  */
 export interface ExperimentV3RestApi {
-  /** Whether the signed-in person holds one permission on one project. */
-  probeProjectPermission(
-    session: ExperimentV3RestSession,
-    projectId: string,
-    permission: AuthzPermission,
-  ): Promise<boolean>;
   abortWorkbenchRun(
     input: Readonly<{
-      userId: string | null;
       projectId: string;
       runId: string;
     }>,

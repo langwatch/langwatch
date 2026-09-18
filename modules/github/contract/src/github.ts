@@ -4,6 +4,15 @@ import { z } from "zod";
 export const githubWebhookEnvelopeSchema = z.record(z.string(), z.unknown());
 export type GithubWebhookEnvelope = z.infer<typeof githubWebhookEnvelopeSchema>;
 
+/** Query values accepted by the browser's installation-start redirect. */
+export const githubInstallStartQuerySchema = z.object({
+  organizationId: z.string().optional(),
+  account: z.string().optional(),
+  installationId: z.string().optional(),
+  mode: z.string().optional(),
+  return: z.string().optional(),
+});
+
 export const githubRepositoryRefSchema = z.object({
   id: z.string(),
   fullName: z.string(),

@@ -1,15 +1,11 @@
-// Types the workbench composes beyond the experiment application: permission
-// probe, run loop, and two best-effort sinks. Live here so app can answer them.
-import type { AuthzPermission } from "@langwatch/authz-contract";
+// Types the workbench composes beyond the experiment application: its run loop
+// and two best-effort sinks. Live here so app can answer them.
 import type { WorkflowService } from "@langwatch/workflow-process";
 
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
 import type { StartPollingRunInput } from "../services/experiment-polling-run.service.ts";
-
-/** The signed-in person the two workbench-run doors read. */
-export type ExperimentV3RestSession = Readonly<{ user: Readonly<{ id: string }> }>;
 
 /**
  * One polling run, as a transport asks for it: the run, and nothing about the
@@ -36,21 +32,6 @@ export type ExperimentV3RunLoop = Readonly<{
   startRun(
     input: ExperimentV3StartRunInput,
   ): Promise<{ runId: string; runUrl: string; total: number }>;
-}>;
-
-/**
- * Whether the signed-in person behind a browser door holds one permission on
- * one project — resolved through the same authorization service every other
- * door asks, so two doors cannot decide differently about a person.
- */
-export type ExperimentWorkbenchPermissions = Readonly<{
-  permitted(
-    input: Readonly<{
-      session: ExperimentV3RestSession;
-      projectId: string;
-      permission: AuthzPermission;
-    }>,
-  ): Promise<boolean>;
 }>;
 
 /**

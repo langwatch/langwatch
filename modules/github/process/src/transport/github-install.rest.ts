@@ -11,6 +11,7 @@ import {
   GithubInstallationAccountMismatchError,
   GithubInstallationConflictError,
   GithubInstallationNotFromFlowError,
+  githubInstallStartQuerySchema,
   githubWebhookEnvelopeSchema,
   type GithubApi,
   type GithubConnectionAuditEntry,
@@ -65,13 +66,6 @@ const payloadTooLarge = (): Error =>
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
-// /install is session-gated in-handler: it requires a logged-in user and an
-// org-membership check before signing state and redirecting to GitHub.
-const INSTALL_HANDLER_AUTH_REASON =
-  "Install-start endpoint: requires a valid application session (checked " +
-  "in-handler through the module's own session operation) plus an org-membership " +
-  "check before any redirect to GitHub. State token is HMAC-signed and bound to the session.";
-
 // /setup is GitHub's Setup URL — a protocol-mandated public redirect target.
 // All sensitive state is signed and bound to the session that started the flow.
 const SETUP_PUBLIC_REASON =
@@ -98,12 +92,10 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   .withAddressing("literal", { v1Twin: true })
 
   .get("/api/github/install", "startGithubInstallation")
-  // No query schema: a public route may declare no scope field, and this one
-  // is addressed with `organizationId`. It is read, and refused, in-handler —
-  // exactly as the flow has always read it.
-  .withAccess(publicRoute({ reason: INSTALL_HANDLER_AUTH_REASON }))
+  .withQuery(githubInstallStartQuerySchema)
+  .withPermission("organization:manage", { at: "route", param: "organizationId" })
   .withRawResponse({ produces: ["application/json"] })
-  .handle(async ({ app, request }) => startInstallation({ app, request }))
+  .handle(async ({ app, request, actor }) => startInstallation({ app, request, userId: actor.id }))
 
   .get("/api/github/setup", "completeGithubInstallation")
   .withAccess(publicRoute({ reason: SETUP_PUBLIC_REASON }))
@@ -184,19 +176,17 @@ function queryOf(request: Request): URLSearchParams {
 async function startInstallation({
   app,
   request,
+  userId,
 }: {
   app: GithubInstallApi;
   request: Request;
+  userId: string;
 }): Promise<Response> {
   const service = app.github();
 
   if (!service.getAppConfig().configured) {
     return jsonAnswer({ error: "The GitHub integration is not available on this instance." }, 503);
   }
-
-  const session = await app.resolveSession({ request });
-
-  if (!session?.user) return jsonAnswer({ error: "Not authenticated" }, 401);
 
   const query = queryOf(request);
   const organizationId = query.get("organizationId") ?? "";
@@ -205,39 +195,7 @@ async function startInstallation({
     return jsonAnswer({ error: "organizationId query param is required" }, 400);
   }
 
-  const refusal = await refuseUnauthorizedStart({
-    app,
-    userId: session.user.id,
-    organizationId,
-  });
-
-  if (refusal) return refusal;
-
-  return redirectTo(await installUrlFor({ app, query, organizationId, userId: session.user.id }));
-}
-
-/**
- * The cross-tenant guard FIRST, so a non-member's response never depends on
- * anything about that organization, then the connect permission.
- */
-async function refuseUnauthorizedStart({
-  app,
-  userId,
-  organizationId,
-}: {
-  app: GithubInstallApi;
-  userId: string;
-  organizationId: string;
-}): Promise<Response | null> {
-  const isMember = await app.github().isOrganizationMember({ userId, organizationId });
-
-  if (!isMember) return jsonAnswer({ error: "Not a member of this organization." }, 403);
-
-  const canManage = await app.canManageOrganization({ userId, organizationId });
-
-  if (!canManage) return jsonAnswer({ error: "Forbidden" }, 403);
-
-  return null;
+  return redirectTo(await installUrlFor({ app, query, organizationId, userId }));
 }
 
 /**

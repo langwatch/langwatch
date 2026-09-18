@@ -35,7 +35,6 @@ import { ExperimentService } from "../services/experiment.service.ts";
 import type {
   ExperimentV3RunLoop,
   ExperimentWorkbenchObserver,
-  ExperimentWorkbenchPermissions,
 } from "./experiment-workbench.members.ts";
 import type {
   ExperimentAppDependencies,
@@ -209,13 +208,11 @@ function inProcessBroadcast(): ExperimentBroadcast {
   };
 }
 
-/** The two allowance checks this process answers through its ONE authorization service. */
-function authzPermissions(authz: AuthzApi): ExperimentPermissions & ExperimentWorkbenchPermissions {
+/** The allowance check this process answers through its ONE authorization service. */
+function authzPermissions(authz: AuthzApi): ExperimentPermissions {
   return {
     mayManageEvaluations: ({ actorId, projectId }) =>
       authz.hasPermission({ userId: actorId, permission: "evaluations:manage", projectId }),
-    permitted: ({ session, projectId, permission }) =>
-      authz.hasPermission({ userId: session.user.id, permission, projectId }),
   };
 }
 
@@ -314,7 +311,6 @@ export function buildExperimentInfrastructure(input: {
     monitors: monitorCascade(dependencies.monitors),
     broadcast: inProcessBroadcast(),
     permissions: authz,
-    workbenchPermissions: authz,
     people: PrismaExperimentPeopleRepository.create(prisma),
     modelCosts: refusing<ExperimentModelCosts>("model cost catalogue"),
     workflowAuthoring: refusing<ExperimentWorkflowAuthoring>("wizard workflow authoring"),

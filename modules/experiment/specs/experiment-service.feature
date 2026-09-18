@@ -86,3 +86,9 @@ Feature: Experiment service boundary
     When it calls the experiment create-or-take door
     Then the experiment is created
     And the body carries its slug and the app path built from the project's slug
+
+  @integration
+  Scenario: A browser caller without evaluations:manage cannot abort a run
+    Given a browser caller that lacks evaluations:manage for the project in the abort body
+    When it calls the workbench abort door
+    Then it is refused at 403 before the abort operation runs
