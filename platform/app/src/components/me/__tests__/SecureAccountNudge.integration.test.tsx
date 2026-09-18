@@ -13,22 +13,43 @@
  * Spec: specs/identity/passkeys.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type SignedInWith = "password" | "passkey" | "federated" | "unknown";
 
-const { nudgeRef, dismissMock } = vi.hoisted(() => ({
-  nudgeRef: {
+const { nudgeRef, dismissMock, cacheCalls, mountFetch } = vi.hoisted(() => {
+  const nudgeRef = {
     current: {
       offer: true,
       passkey: true,
       twoStep: false,
       signedInWith: "password" as SignedInWith,
     },
-  },
-  dismissMock: vi.fn(),
-}));
+  };
+  // The refetch the dialog's own query starts when a page mounts it. It was
+  // already in flight when the answer arrived, so its response carries the
+  // offer the server had not been told about yet.
+  const mountFetch = {
+    isCancelled: false,
+    land: () => {
+      if (mountFetch.isCancelled) return;
+      nudgeRef.current = { ...nudgeRef.current, offer: true };
+    },
+  };
+  return {
+    nudgeRef,
+    dismissMock: vi.fn(),
+    cacheCalls: [] as string[],
+    mountFetch,
+  };
+});
 
 // The query cache is modelled rather than stubbed away: the dialog is mounted
 // on every page, so what it renders after a navigation is decided by what the
@@ -39,12 +60,17 @@ vi.mock("~/utils/api", () => ({
       user: {
         secureAccountNudge: {
           invalidate: vi.fn(),
+          cancel: async () => {
+            cacheCalls.push("cancel");
+            mountFetch.isCancelled = true;
+          },
           setData: (
             _input: unknown,
             updater: (
               previous: typeof nudgeRef.current,
             ) => typeof nudgeRef.current,
           ) => {
+            cacheCalls.push("setData");
             nudgeRef.current = updater(nudgeRef.current);
           },
         },
@@ -93,6 +119,8 @@ describe("the secure-account offer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     arriveWith("password");
+    cacheCalls.length = 0;
+    mountFetch.isCancelled = false;
   });
 
   afterEach(() => {
@@ -102,11 +130,13 @@ describe("the secure-account offer", () => {
   describe("given somebody who answered the offer with Not now", () => {
     describe("when the next page mounts the dialog again", () => {
       /** @scenario "A dismissal is remembered on the next page, not just in the dialog" */
-      it("stays closed, because the answer reached the cached offer too", () => {
+      it("stays closed, because the answer reached the cached offer too", async () => {
         renderNudge();
         fireEvent.click(screen.getByRole("button", { name: "Not now" }));
 
-        expect(dismissMock).toHaveBeenCalled();
+        await waitFor(() => {
+          expect(dismissMock).toHaveBeenCalled();
+        });
         // The dialog closing is local state; this is the part that survives a
         // navigation. `setUpTwoStep` navigates straight after answering, so
         // without it the offer reappears over the page it sent them to.
@@ -114,6 +144,25 @@ describe("the secure-account offer", () => {
         renderNudge();
 
         expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
+      });
+    });
+
+    describe("when a fetch that started before the answer lands after it", () => {
+      /** @scenario "A dismissal is remembered on the next page, not just in the dialog" */
+      it("stays closed, because that fetch was cancelled before the answer was written", async () => {
+        renderNudge();
+        fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+
+        await waitFor(() => {
+          expect(dismissMock).toHaveBeenCalled();
+        });
+        mountFetch.land();
+
+        cleanup();
+        renderNudge();
+
+        expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
+        expect(cacheCalls).toEqual(["cancel", "setData"]);
       });
     });
   });

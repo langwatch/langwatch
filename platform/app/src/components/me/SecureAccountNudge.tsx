@@ -74,7 +74,7 @@ function SecureAccountNudgeOffer({
     <Dialog.Root
       open
       onOpenChange={(details) => {
-        if (!details.open) answer.later();
+        if (!details.open) void answer.later();
       }}
       placement="center"
     >
@@ -217,7 +217,7 @@ function useNudgeAnswer() {
   const [isCreating, setIsCreating] = useState(false);
   const [isAnswered, setIsAnswered] = useState(false);
 
-  const later = () => {
+  const later = async () => {
     setIsAnswered(true);
     // `isAnswered` closes this dialog, and nothing else does: it is mounted on
     // every page, so the next navigation remounts it and renders from the
@@ -225,6 +225,10 @@ function useNudgeAnswer() {
     // cache before the mutation settles, then refresh it from the server.
     // Without the first half the dialog returns over the page somebody was
     // sent to, which is the opposite of what "Not now" promised.
+    //
+    // Cancel first: a mount refetch of this query can already be in flight,
+    // and its response would land after the write and put the offer back.
+    await apiContext.user.secureAccountNudge.cancel({});
     apiContext.user.secureAccountNudge.setData({}, (previous) =>
       previous ? { ...previous, offer: false } : previous,
     );
@@ -238,11 +242,12 @@ function useNudgeAnswer() {
     );
   };
 
-  const setUpTwoStep = () => {
+  const setUpTwoStep = async () => {
     // Dismissed on the way, not on arrival: somebody who came here to set one
     // up has answered the question, and finding the dialog again behind the
-    // settings page would read as the product not listening.
-    later();
+    // settings page would read as the product not listening. Awaited, so the
+    // answer is in the cache before the page that reads it mounts.
+    await later();
     void navigate("/settings/security");
   };
 
