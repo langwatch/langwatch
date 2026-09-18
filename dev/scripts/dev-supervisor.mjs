@@ -46,6 +46,11 @@ const WATCH_IGNORE_PATTERNS = [
   // A test's scratch directory (`.tmp-rest-handler-tQBUui/fixture.ts`): a
   // suite running beside the stack must not restart it once per fixture.
   /(^|\/)\.tmp-[^/]+(\/|$)/,
+  // A module's browser half, which no api/worker code may import (the
+  // enforcer's frontend/server separation). Reloading for it is pure churn,
+  // and on a shared checkout it lets one session's screen work bounce
+  // another's backend. specs/setup/dev-process-topology.feature.
+  /(^|\/)modules\/[^/]+\/browser(-kit)?(\/|$)/,
 ];
 /** The pipe the sentinel reports the stack's pid, then its exit code, on. */
 const HANDSHAKE_FD = 3;
@@ -237,7 +242,11 @@ export function collapseStackRecord(line) {
 
   const frame = firstAppFrame(stack);
   const baseMsg =
-    typeof record.msg === "string" ? record.msg : typeof record.message === "string" ? record.message : "";
+    typeof record.msg === "string"
+      ? record.msg
+      : typeof record.message === "string"
+        ? record.message
+        : "";
   const msg = frame ? `${baseMsg} — at ${frame.file}:${frame.line}` : baseMsg;
 
   const collapsed = { ...record, msg };
@@ -268,7 +277,9 @@ export function classifyMissingExport(text) {
 /** Node's ESM loader refusing to resolve an import at all — a workspace
  * package never built, a typo, a dependency never installed. */
 export function classifyMissingPackage(text) {
-  const match = text.match(/Error \[ERR_MODULE_NOT_FOUND\]: Cannot find package '([^']+)' imported from ([^\n]+)/);
+  const match = text.match(
+    /Error \[ERR_MODULE_NOT_FOUND\]: Cannot find package '([^']+)' imported from ([^\n]+)/,
+  );
   if (!match) return null;
   const [, specifier, importer] = match;
   return { kind: "missing-package", specifier, importer: relativeToRepo(importer.trim()) };
@@ -284,14 +295,21 @@ export function classifyBootException(text) {
   // The prefix before "Error" is optional: Node's own ERR_MODULE_NOT_FOUND and
   // ERR_UNSUPPORTED_DIR_IMPORT throw the bare built-in `Error` class, not a
   // subclass, so "Error [ERR_MODULE_NOT_FOUND]: ..." must match too.
-  const bannerIndex = lines.findIndex((line) => /^\s*(?:[A-Za-z_$][\w$.]*)?Error(?:\s*\[[A-Z_]+\])?:\s/.test(line));
+  const bannerIndex = lines.findIndex((line) =>
+    /^\s*(?:[A-Za-z_$][\w$.]*)?Error(?:\s*\[[A-Z_]+\])?:\s/.test(line),
+  );
   if (bannerIndex === -1) return null;
   const banner = lines[bannerIndex]
     .trim()
     .match(/^((?:[A-Za-z_$][\w$.]*)?Error(?:\s*\[[A-Z_]+\])?):\s*(.*)$/);
   if (!banner) return null;
   const [, errorType, message] = banner;
-  return { kind: "boot-exception", errorType, message, frame: firstAppFrame(lines.slice(bannerIndex).join("\n")) };
+  return {
+    kind: "boot-exception",
+    errorType,
+    message,
+    frame: firstAppFrame(lines.slice(bannerIndex).join("\n")),
+  };
 }
 
 /** Tries every raw-crash shape in order, most specific first. Null when none
@@ -314,7 +332,9 @@ export function crashMessage(classified) {
     case "missing-package":
       return `missing package: cannot find '${classified.specifier}' (imported from ${classified.importer})`;
     case "boot-exception": {
-      const where = classified.frame ? `${classified.frame.file}:${classified.frame.line}` : "an unknown location";
+      const where = classified.frame
+        ? `${classified.frame.file}:${classified.frame.line}`
+        : "an unknown location";
       return `${classified.errorType}: ${classified.message} — at ${where}`;
     }
     default:
@@ -325,7 +345,11 @@ export function crashMessage(classified) {
 /** A classified raw crash, rendered as the same one-JSON-line-at-fatal shape
  * every other structured record uses. */
 export function crashRecordLine(classified) {
-  return JSON.stringify({ time: new Date().toISOString(), level: "fatal", msg: crashMessage(classified) });
+  return JSON.stringify({
+    time: new Date().toISOString(),
+    level: "fatal",
+    msg: crashMessage(classified),
+  });
 }
 
 /**

@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+
 import {
   classifyBootException,
   classifyMissingExport,
@@ -39,13 +40,20 @@ const MISSING_PACKAGE_DUMP =
 /** Runs dev-supervisor.mjs --watch once around a throwaway fixture script,
  * collects its stdout/stderr, and cleans the fixture up. */
 async function runWatchedFixture({ body, env = {} }) {
-  const fixture = path.join(os.tmpdir(), `dev-supervisor-crash-fixture-${process.pid}-${Date.now()}.mjs`);
+  const fixture = path.join(
+    os.tmpdir(),
+    `dev-supervisor-crash-fixture-${process.pid}-${Date.now()}.mjs`,
+  );
   fs.writeFileSync(fixture, body);
   try {
-    const child = spawn(process.execPath, [SUPERVISOR, "--watch", "--", process.execPath, fixture], {
-      cwd: REPO_ROOT,
-      env: { ...process.env, ...env },
-    });
+    const child = spawn(
+      process.execPath,
+      [SUPERVISOR, "--watch", "--", process.execPath, fixture],
+      {
+        cwd: REPO_ROOT,
+        env: { ...process.env, ...env },
+      },
+    );
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => {
@@ -176,7 +184,10 @@ void describe("classifyBootException", () => {
     const classified = classifyBootException(dump);
     assert.equal(classified.errorType, "TypeError");
     assert.equal(classified.message, "Cannot read properties of undefined (reading 'x')");
-    assert.deepEqual(classified.frame, { file: "modules/prompt/process/src/app/prompt.app.ts", line: "193" });
+    assert.deepEqual(classified.frame, {
+      file: "modules/prompt/process/src/app/prompt.app.ts",
+      line: "193",
+    });
   });
 
   void it("is null for text with no Error banner", () => {
@@ -214,7 +225,7 @@ void describe("the watched child's raw crash, end to end", () => {
     });
     assert.match(
       stderr,
-      /"level":"fatal","msg":"missing export: module '@langwatch\/experiment-server' does not export 'createExperimentsRestApp' \(imported at apps\/api\/src\/index\.ts:180\)"/,
+      /"level":"fatal","msg":"missing export: module '@langwatch\/experiment-process' does not export 'createExperimentsRestApp' \(imported at apps\/api\/src\/index\.ts:180\)"/,
     );
     assert.doesNotMatch(stderr, /createExperimentsRestApp,/);
     assert.doesNotMatch(stdout, /createExperimentsRestApp,/);

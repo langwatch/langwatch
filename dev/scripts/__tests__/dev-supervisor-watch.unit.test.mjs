@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { describe, it } from "node:test";
+
 import {
   createDebouncer,
   resolveBundleConfig,
@@ -53,10 +54,7 @@ void describe("shouldIgnoreWatchPath", () => {
   });
 
   void it("ignores a *.test.ts file outside __tests__", () => {
-    assert.equal(
-      shouldIgnoreWatchPath("../../modules/trace/process/src/foo.test.ts"),
-      true,
-    );
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/process/src/foo.test.ts"), true);
   });
 
   void it("ignores a *.spec.tsx file", () => {
@@ -65,16 +63,36 @@ void describe("shouldIgnoreWatchPath", () => {
 
   void it("ignores an editor temp file written beside its target", () => {
     assert.equal(
-      shouldIgnoreWatchPath("../../modules/trace/browser/src/a.tsx.tmp.17938.dfd323429215"),
+      shouldIgnoreWatchPath("../../modules/trace/process/src/a.ts.tmp.17938.dfd323429215"),
       true,
     );
-    assert.equal(shouldIgnoreWatchPath("../../modules/trace/browser/src/a.tsx"), false);
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/process/src/a.ts"), false);
   });
 
   void it("ignores a test suite's scratch directory beside the package", () => {
-    assert.equal(shouldIgnoreWatchPath("../../packages/api/.tmp-rest-handler-tQBUui/fixture.ts"), true);
+    assert.equal(
+      shouldIgnoreWatchPath("../../packages/api/.tmp-rest-handler-tQBUui/fixture.ts"),
+      true,
+    );
     assert.equal(shouldIgnoreWatchPath("../../packages/api/.tmp-rest-handler-tQBUui"), true);
     assert.equal(shouldIgnoreWatchPath("../../packages/api/src/rest/pipeline.ts"), false);
+  });
+
+  // /** @scenario "A browser-half edit leaves the backend lane alone" */
+  void it("ignores a module's browser half, which the backend cannot import", () => {
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/browser/src/ui/a.tsx"), true);
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/browser/package.json"), true);
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/browser-kit/src/a.ts"), true);
+    assert.equal(
+      shouldIgnoreWatchPath("../../enterprise/modules/governance/browser/src/a.tsx"),
+      true,
+    );
+  });
+
+  void it("still restarts on the halves the backend does import", () => {
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/process/src/a.ts"), false);
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/contract/src/a.ts"), false);
+    assert.equal(shouldIgnoreWatchPath("../../packages/kernel/src/a.ts"), false);
   });
 
   void it("ignores dist and generated churn", () => {
@@ -89,17 +107,17 @@ void describe("shouldIgnoreWatchPath", () => {
 
   void it("does not ignore an ordinary source file", () => {
     assert.equal(shouldIgnoreWatchPath("src/api.entrypoint.ts"), false);
-    assert.equal(
-      shouldIgnoreWatchPath("../../modules/trace/process/src/trace.service.ts"),
-      false,
-    );
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/process/src/trace.service.ts"), false);
   });
 });
 
 void describe("resolveWatchConfig", () => {
-  void it("defaults to src and ../../packages with a 750ms window", () => {
+  // The modules and enterprise trees joined the set in d194dc1a37: before that
+  // a week of module edits never restarted the backend and every fix read as
+  // unfixed. This assertion was left behind by that change.
+  void it("defaults to the package, module and enterprise trees with a 750ms window", () => {
     const config = resolveWatchConfig({});
-    assert.deepEqual(config.dirs, ["src", "../../packages"]);
+    assert.deepEqual(config.dirs, ["src", "../../packages", "../../modules", "../../enterprise"]);
     assert.equal(config.debounceMs, 750);
   });
 

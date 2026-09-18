@@ -120,6 +120,19 @@ Feature: The local development process topology
     Then exactly one restart happens
     And it reports how many files triggered it
 
+  # A module's browser half cannot reach the backend: the architecture
+  # enforcer forbids api/worker code from importing a browser package. That
+  # guarantee is the reason a browser-only edit must NOT restart the backend
+  # — it reloads code that provably cannot have changed. With several sessions
+  # sharing one checkout, watching them means one session's screen work
+  # bounces another's API, and each bounce races the worker onto its metrics
+  # port.
+  @unit
+  Scenario: A browser-half edit leaves the backend lane alone
+    Given the backend lane running under a debounced watch
+    When a file changes in a module's browser package
+    Then the change is not worth a restart
+
   # --- The worker drains before a restart takes it down ---
 
   # A restart is a takedown-and-respawn: SIGTERM, then SIGKILL only after a
