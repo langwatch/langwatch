@@ -73,7 +73,10 @@ type StoreSuppliedNames =
   | "logging"
   | "metrics"
   | "eventing"
-  | "mail";
+  | "mail"
+  | "rateLimiter"
+  | "cache"
+  | "idempotency";
 
 declare const supplyState: unique symbol;
 declare const missingSupply: unique symbol;

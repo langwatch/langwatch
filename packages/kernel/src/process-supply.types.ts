@@ -11,16 +11,18 @@ type Intersection<Union> = [Union] extends [never]
     ? Value
     : never;
 
+/**
+ * Derived members (rateLimiter, cache, idempotency) keep their own names:
+ * aliasing them to a base store let `withKeyvalue` satisfy the type while
+ * boot refused at runtime — only the stores supply builds them.
+ */
 export interface MemberNames {
   prisma: "relational";
   clickhouse: "analytical";
   objectStorage: "blobs";
   redis: "keyvalue";
-  cache: "keyvalue";
-  rateLimiter: "keyvalue";
   logger: "logging";
   telemetry: "metrics";
-  idempotency: "relational" | "encryption";
 }
 type MemberName<Name> = Name extends keyof MemberNames ? MemberNames[Name] : Name;
 
