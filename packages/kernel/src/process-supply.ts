@@ -522,10 +522,16 @@ export class ProcessSupply<
       }
     }
     for (const service of state.services) builder.withService(service);
+    const modules = state.modules as readonly InstallableServerFeature<SupplyRecord>[];
+    const selectedModules = modules.map((module) =>
+      state.stores?.tier && module.repositoryRegistry
+        ? { ...module, tier: state.stores.tier }
+        : module,
+    );
     return (
       builder
         // SupplyModule existentially erases each admitted module's contravariant member input.
-        .withModules(state.modules as readonly InstallableServerFeature<SupplyRecord>[])
+        .withModules(selectedModules)
         .boot()
     );
   }
