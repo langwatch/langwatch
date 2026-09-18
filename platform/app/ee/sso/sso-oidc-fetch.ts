@@ -24,7 +24,8 @@ export type OidcTransport = (
   }
 >;
 
-/** Browser origin trust never exempts an OIDC request from the egress policy. */
+// Better Auth owns origin, endpoint, state, PKCE, and redirect validation.
+// This transport only adds LangWatch's deployment-specific egress policy.
 export function createSsoOidcFetch({
   dialableInternalOrigins,
   resolveHost = systemHostResolver,
@@ -58,13 +59,6 @@ export function createSsoOidcFetch({
         redirect: "manual",
         dispatcher,
       });
-      // OIDC endpoints must be final URLs. Never forward credentials across a redirect.
-      if (response.status >= 300 && response.status < 400) {
-        throw new DiscoveryError(
-          "oidc_endpoint_redirect",
-          "oidc endpoint redirects are refused",
-        );
-      }
       const body = await response.arrayBuffer();
       return new Response(body.byteLength === 0 ? null : body, {
         status: response.status,

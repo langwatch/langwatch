@@ -81,29 +81,6 @@ describe("runtime OIDC egress", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses redirects without sending a second request", async () => {
-    const fetchImpl = vi.fn(
-      async () =>
-        new Response(null, {
-          status: 302,
-          headers: { location: "https://127.0.0.1/metadata" },
-        }),
-    );
-    const fetch = createSsoOidcFetch({
-      dialableInternalOrigins: [],
-      resolveHost: async () => ["93.184.216.34"],
-      fetchImpl,
-    });
-    await expect(fetch(`${issuer}/token`)).rejects.toThrow(
-      "oidc endpoint redirects are refused",
-    );
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(fetchImpl).toHaveBeenCalledWith(
-      `${issuer}/token`,
-      expect.objectContaining({ redirect: "manual" }),
-    );
-  });
-
   it("preserves token exchange bytes and closes its pinned dispatcher", async () => {
     const fetchImpl = vi.fn<OidcTransport>(async (_url, init) => {
       expect(new TextDecoder().decode(init.body)).toBe("code=verified-code");
