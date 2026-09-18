@@ -602,7 +602,15 @@ its config — `Secret.define({ privateKey: Secret.load("GITHUB_APP_PRIVATE_KEY"
 — where **`Secret.load(id)` takes ONE identifier every adapter interprets
 for itself**: the env adapter reads the variable of that name, the
 1Password adapter reads that key in the vault's dictionary (config, by
-contrast, always reads the environment). **Global concerns declare the
+contrast, always reads the environment). **1Password addressing is
+convention plus one config key** (ruled 2026-09-18): a single config value
+selects the account (personal or work); the vault is your private vault by
+convention; the handle's own `load` id is the key inside the dictionary
+there — nothing else to configure. **The preflight is part of start()**
+(approved 2026-09-18): the moment the chain exists, every required handle
+declared anywhere in the module array is checked answerable — env set, or
+key present in the vault — and a miss fails the boot immediately, naming
+every missing key at once, values never held. **Global concerns declare the
 same way at their framework owner** — logging and telemetry are
 everyone-sends-to-one-place concerns, so the process-server and
 observability packages declare their config slices and secret handles
