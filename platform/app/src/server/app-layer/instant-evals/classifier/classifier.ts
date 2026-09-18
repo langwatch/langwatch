@@ -118,6 +118,15 @@ export interface InstantEvalJudgement {
   readonly inputTokens: number;
   /** Whether the text had to be cut to fit the request. */
   readonly isTextTruncated: boolean;
+  /**
+   * Time this classification spent waiting for rate-limit capacity, over
+   * every attempt it made.
+   *
+   * Reported because a run whose wall clock is limiter wait and one whose wall
+   * clock is provider latency need opposite fixes, and nothing downstream can
+   * tell them apart from the elapsed time alone.
+   */
+  readonly limiterWaitMs?: number;
 }
 
 /** What one request may carry. Published by the implementation, never assumed. */
@@ -160,6 +169,19 @@ export interface InstantEvalClassifierLimits {
    * text nor the questions: the envelope, and the space the answers need.
    */
   readonly reserveTokens: number;
+  /**
+   * UTF-8 bytes of judged text per input token, measured against the API.
+   *
+   * Published rather than assumed, for the same reason the caps are: how text
+   * tokenises is a property of the model. The generic rule of four bytes per
+   * token is calibrated on English prose, and what a run sends is a
+   * conversation transcript in markdown (speaker labels, headings, JSON
+   * fragments and punctuation), which tokenises far denser. Measured on real
+   * judged transcripts the ratio runs 2.4 to 2.7, so four bytes per token
+   * priced a ten thousand conversation run at 8.1M tokens against a real
+   * 11.4M.
+   */
+  readonly bytesPerInputToken: number;
 }
 
 /** What the classifier charges, and what the customer is charged. */

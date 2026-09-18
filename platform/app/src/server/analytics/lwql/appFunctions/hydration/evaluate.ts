@@ -76,7 +76,10 @@ export async function evaluateCalls({
   );
   const values = emptyValues(evalCalls);
   if (evalCalls.length === 0) {
-    return { values, usage: { requests: 0, inputTokens: 0, skipped: {} } };
+    return {
+      values,
+      usage: { requests: 0, inputTokens: 0, skipped: {}, limiterWaitMs: 0 },
+    };
   }
 
   const units = await buildUnits({ evalCalls, traces });
@@ -93,6 +96,7 @@ export async function evaluateCalls({
     requests: 0,
     inputTokens: 0,
     skipped: {} as Record<string, number>,
+    limiterWaitMs: 0,
   };
   let failures = 0;
 
@@ -332,10 +336,12 @@ function record({
     requests: number;
     inputTokens: number;
     skipped: Record<string, number>;
+    limiterWaitMs: number;
   };
 }): void {
   usage.requests += 1;
   usage.inputTokens += judgement.inputTokens;
+  usage.limiterWaitMs += judgement.limiterWaitMs ?? 0;
   if (judgement.skippedReason) {
     usage.skipped[judgement.skippedReason] =
       (usage.skipped[judgement.skippedReason] ?? 0) + 1;

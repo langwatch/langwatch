@@ -38552,15 +38552,15 @@ langwatch instant-eval estimate "the customer sounds annoyed" \
   --target threads --last 30d --limit 10000
 ```
 
-The estimate counts the rows, measures a sample of their texts, and prices the
-run from that. No row is judged and no charge is made. `run --estimate` does
-the same and exits; a plain `run` over a thousand rows prints the price first,
-then starts.
+The estimate counts the rows, measures fifty of their texts spread across the
+whole selection, and prices the run from that. No row is judged and no charge
+is made. `run --estimate` does the same and exits; a plain `run` over a
+thousand rows prints the price first, then starts.
 
-The row count is exact. The price is not: it comes from the first fifty rows
-the statement returns, so a selection whose rows vary a lot in length costs
-more or less than the estimate said. Read it as the order of magnitude, and
-read the finished run's own token count for what it actually cost.
+Take the row count as exact, and on a selection of ordinary conversations trust
+the price to within a few percent. Because fifty rows are still a sample, expect
+to pay more than it quoted on a selection holding a handful of enormous rows
+among small ones, and check the finished run for the tokens it actually read.
 
 ## Reading what came back
 
@@ -38759,9 +38759,9 @@ row again and costs no money.
 langwatch instant-eval cancel <id>
 ```
 
-Stops the run before its next page. You keep every judgement it had already
-written, and you can read them the same way. Cancel a run that has already
-finished and you get back a 409.
+Stops the run before its next page, keeping every judgement it had already
+written for you to read the same way. Cancel a run that has already finished
+and you get back a 409.
 
 ## Output
 
@@ -38777,7 +38777,7 @@ standard error so the document a script reads holds one object.
 ---
 title: Instant Evals
 sidebarTitle: Overview
-description: Run an eval question over every trace, conversation or LLM call in your history, up to 100,000 rows in one run, and get the matches back in seconds.
+description: Run an eval question over every trace, conversation or LLM call in your history, up to 100,000 rows in one run, and get the matches back in minutes.
 ---
 
 ## What is an Instant Eval
@@ -38824,9 +38824,9 @@ A run is a [LangWatchQL](/api-reference/query/overview) statement, and the `--ta
 
 ## What it costs
 
-The price is 0.0546 USD per million input tokens judged, where the input is each row's text plus your questions. The run in the screenshot above judged 10,000 conversations, read 11.4 million input tokens, and cost 0.62 USD.
+The price is 0.0546 USD per million input tokens judged, where the input is each row's text plus your questions. The run in the screenshot above judged 10,000 conversations in 2 minutes 26 seconds, read 11.4 million input tokens, and cost 0.62 USD. Its estimate beforehand said 11.87 million tokens and 0.65 USD.
 
-Run `langwatch instant-eval estimate` with the same arguments to see the row count and the price before you start. A run over more than 1,000 rows prints its price first. The count is exact; the price is measured from a sample of the rows, so it moves when your rows vary in length.
+Run `langwatch instant-eval estimate` with the same arguments to see the row count and the price before you start. A run over more than 1,000 rows prints its price first. The count is exact, and the price comes from fifty rows sampled across the whole run.
 
 ## Where the answers go
 

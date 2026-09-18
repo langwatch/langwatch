@@ -71,6 +71,9 @@ export function fakes(options?: {
         hasMore: options?.hasMore?.[index] ?? false,
       };
     }),
+    sampleKeys: vi.fn(
+      async () => options?.keys?.[0] ?? [rowKey("t1"), rowKey("t2")],
+    ),
     judge: vi.fn(async () => ({
       columns: [],
       rows: (options?.judgedCells ?? [0.9, 0.1]).map((cell, index) => ({
@@ -81,7 +84,9 @@ export function fakes(options?: {
         requests: 2,
         inputTokens: 1_200,
         skipped: options?.skipped ?? {},
+        limiterWaitMs: 0,
       },
+      timings: { queryMs: 0, readMs: 0, computeMs: 0, judgeMs: 0 },
     })),
     texts: vi.fn(async () => options?.texts ?? []),
   };

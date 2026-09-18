@@ -82,15 +82,24 @@ export async function hydrateLangWatchQLAppFunctions(
   const resolved = collectKeys(input);
   assertKeyCaps(resolved);
 
+  const startedRead = Date.now();
   const traces = await readTraces({ input, resolved });
+  const startedCompute = Date.now();
   const extracted = await computeValues({ input, resolved, traces });
+  const startedJudge = Date.now();
   const judged = await judgeCalls({ input, resolved, traces });
+  const finished = Date.now();
 
   return assembleResult({
     input,
     resolved,
     computed: merge([extracted, judged.values]),
     ...(judged.usage ? { evalUsage: judged.usage } : {}),
+    timings: {
+      readMs: startedCompute - startedRead,
+      computeMs: startedJudge - startedCompute,
+      judgeMs: finished - startedJudge,
+    },
   });
 }
 

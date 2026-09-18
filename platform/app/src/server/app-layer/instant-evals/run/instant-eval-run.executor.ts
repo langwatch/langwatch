@@ -59,6 +59,16 @@ import type { InstantEvalRowKey, InstantEvalRowSource } from "./row-source";
 const logger = createLogger("langwatch:instant-evals:run-executor");
 
 /**
+ * When each run's previous page finished, so a page can report the gap before
+ * it.
+ *
+ * Per pod and best-effort: a run whose pages are spread over several pods sees
+ * a gap only for consecutive pages on the same one, which is enough for the
+ * question it answers. Entries are dropped when the run finishes.
+ */
+const lastPageFinishedAt = new Map<string, number>();
+
+/**
  * Rows one page judges when the texts are ordinary.
  *
  * Five hundred, which is half the thousand-key cap the hydration stage
@@ -225,6 +235,7 @@ async function judgeRunPage(
     return emptyPage();
   }
 
+  const startedKeys = Date.now();
   const keyPage = await deps.rowSource.keys({
     caller,
     sql: row.sql,
@@ -235,6 +246,7 @@ async function judgeRunPage(
       ? {}
       : { after: { traceId: afterTraceId, spanId: afterSpanId } }),
   });
+  const keyMs = Date.now() - startedKeys;
   if (keyPage.keys.length === 0) return emptyPage();
 
   const judged = await judgeUnderCancellation({
@@ -247,33 +259,26 @@ async function judgeRunPage(
     keys: keyPage.keys,
   });
 
-  const at = deps.now?.() ?? Date.now();
-  const mapping = mapInstantEvalPage({
-    tenantId: projectId,
+  const { mapping, insertMs } = await writePageJudgements({
+    deps,
+    projectId,
     runId,
+    page,
     questions,
-    rows: judged.rows,
+    judged,
     keys: keyPage.keys,
-    skipReason: instantEvalSkipReason(judged.usage.skipped),
-    now: at,
   });
 
-  // A page that mostly failed is thrown so the outbox delivers it again,
-  // rather than baking a bad minute of the provider's day into the answer.
-  // Thrown BEFORE the write, so the retry is the only thing that records it.
-  const failureRate = instantEvalPageFailureRate({
-    counters: mapping.counters,
-    questions: questions.length,
+  recordPageProfile({
+    projectId,
+    runId,
+    page,
+    rows: mapping.counters.rows,
+    startedKeys,
+    keyMs,
+    insertMs,
+    judged,
   });
-  if (failureRate > INSTANT_EVAL_PAGE_FAILURE_CEILING) {
-    throw new Error(
-      `instant eval page ${page} of run ${runId} lost ${Math.round(failureRate * 100)}% of its judgements`,
-    );
-  }
-
-  // Written before the page is recorded, so a crash between the two costs
-  // a redelivery rather than a lost page.
-  await deps.judgments.insert(mapping.records);
 
   const last = keyPage.keys.at(-1);
   return {
@@ -286,6 +291,114 @@ async function judgeRunPage(
     cursorSpanId: last?.spanId ? last.spanId : null,
     hasNextPage: keyPage.hasMore && remaining - mapping.counters.rows > 0,
   };
+}
+
+/**
+ * One page's verdicts, mapped to judgement rows and written.
+ *
+ * A page that mostly failed throws instead, so the outbox delivers it again
+ * rather than baking a bad minute of the provider's day into the answer. Thrown
+ * BEFORE the write, so the retry is the only thing that records it.
+ *
+ * The write itself happens before the page is recorded as judged, so a crash
+ * between the two costs a redelivery rather than a lost page, and the
+ * redelivery re-inserts the same keyed rows rather than doubling them.
+ */
+async function writePageJudgements({
+  deps,
+  projectId,
+  runId,
+  page,
+  questions,
+  judged,
+  keys,
+}: {
+  deps: InstantEvalRunExecutorDependencies;
+  projectId: string;
+  runId: string;
+  page: number;
+  questions: ReturnType<typeof readInstantEvalRunQuestions>;
+  judged: Awaited<ReturnType<InstantEvalRowSource["judge"]>>;
+  keys: readonly InstantEvalRowKey[];
+}): Promise<{
+  mapping: ReturnType<typeof mapInstantEvalPage>;
+  insertMs: number;
+}> {
+  const mapping = mapInstantEvalPage({
+    tenantId: projectId,
+    runId,
+    questions,
+    rows: judged.rows,
+    keys,
+    skipReason: instantEvalSkipReason(judged.usage.skipped),
+    now: deps.now?.() ?? Date.now(),
+  });
+
+  const failureRate = instantEvalPageFailureRate({
+    counters: mapping.counters,
+    questions: questions.length,
+  });
+  if (failureRate > INSTANT_EVAL_PAGE_FAILURE_CEILING) {
+    throw new Error(
+      `instant eval page ${page} of run ${runId} lost ${Math.round(failureRate * 100)}% of its judgements`,
+    );
+  }
+
+  const startedInsert = Date.now();
+  await deps.judgments.insert(mapping.records);
+  return { mapping, insertMs: Date.now() - startedInsert };
+}
+
+/**
+ * What one page spent its wall clock on, at debug level.
+ *
+ * A run is a loop of pages, so a run several times slower than its judging
+ * should be is explained by one of these numbers rather than by the total.
+ * `gapMs` is the part no step here owns: the time between the previous page of
+ * this run finishing and this one starting, which is what the pipeline spent
+ * delivering the page event and scheduling the next intent.
+ */
+function recordPageProfile({
+  projectId,
+  runId,
+  page,
+  rows,
+  startedKeys,
+  keyMs,
+  insertMs,
+  judged,
+}: {
+  projectId: string;
+  runId: string;
+  page: number;
+  rows: number;
+  startedKeys: number;
+  keyMs: number;
+  insertMs: number;
+  judged: Awaited<ReturnType<InstantEvalRowSource["judge"]>>;
+}): void {
+  const finishedAt = Date.now();
+  const previous = lastPageFinishedAt.get(runId);
+  logger.debug(
+    {
+      projectId,
+      runId,
+      page,
+      rows,
+      inputTokens: judged.usage.inputTokens,
+      gapMs: previous === undefined ? null : startedKeys - previous,
+      keyMs,
+      queryMs: judged.timings.queryMs,
+      readMs: judged.timings.readMs,
+      computeMs: judged.timings.computeMs,
+      judgeMs: judged.timings.judgeMs,
+      limiterWaitMs: judged.usage.limiterWaitMs,
+      insertMs,
+      pageMs: finishedAt - startedKeys,
+    },
+    "Instant Eval page profile",
+  );
+  lastPageFinishedAt.set(runId, finishedAt);
 }
 
 /**
@@ -380,6 +493,7 @@ async function finishRun(
     );
   }
 
+  lastPageFinishedAt.delete(runId);
   return { costUsd, priceUsd };
 }
 

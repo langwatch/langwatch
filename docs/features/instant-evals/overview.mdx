@@ -1,7 +1,7 @@
 ---
 title: Instant Evals
 sidebarTitle: Overview
-description: Run an eval question over every trace, conversation or LLM call in your history, up to 100,000 rows in one run, and get the matches back in seconds.
+description: Run an eval question over every trace, conversation or LLM call in your history, up to 100,000 rows in one run, and get the matches back in minutes.
 ---
 
 ## What is an Instant Eval
@@ -48,9 +48,9 @@ A run is a [LangWatchQL](/api-reference/query/overview) statement, and the `--ta
 
 ## What it costs
 
-The price is 0.0546 USD per million input tokens judged, where the input is each row's text plus your questions. The run in the screenshot above judged 10,000 conversations, read 11.4 million input tokens, and cost 0.62 USD.
+The price is 0.0546 USD per million input tokens judged, where the input is each row's text plus your questions. The run in the screenshot above judged 10,000 conversations in 2 minutes 26 seconds, read 11.4 million input tokens, and cost 0.62 USD. Its estimate beforehand said 11.87 million tokens and 0.65 USD.
 
-Run `langwatch instant-eval estimate` with the same arguments to see the row count and the price before you start. A run over more than 1,000 rows prints its price first. The count is exact; the price is measured from a sample of the rows, so it moves when your rows vary in length.
+Run `langwatch instant-eval estimate` with the same arguments to see the row count and the price before you start. A run over more than 1,000 rows prints its price first. The count is exact, and the price comes from fifty rows sampled across the whole run.
 
 ## Where the answers go
 

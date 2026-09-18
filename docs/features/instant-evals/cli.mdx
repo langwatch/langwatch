@@ -23,15 +23,15 @@ langwatch instant-eval estimate "the customer sounds annoyed" \
   --target threads --last 30d --limit 10000
 ```
 
-The estimate counts the rows, measures a sample of their texts, and prices the
-run from that. No row is judged and no charge is made. `run --estimate` does
-the same and exits; a plain `run` over a thousand rows prints the price first,
-then starts.
+The estimate counts the rows, measures fifty of their texts spread across the
+whole selection, and prices the run from that. No row is judged and no charge
+is made. `run --estimate` does the same and exits; a plain `run` over a
+thousand rows prints the price first, then starts.
 
-The row count is exact. The price is not: it comes from the first fifty rows
-the statement returns, so a selection whose rows vary a lot in length costs
-more or less than the estimate said. Read it as the order of magnitude, and
-read the finished run's own token count for what it actually cost.
+Take the row count as exact, and on a selection of ordinary conversations trust
+the price to within a few percent. Because fifty rows are still a sample, expect
+to pay more than it quoted on a selection holding a handful of enormous rows
+among small ones, and check the finished run for the tokens it actually read.
 
 ## Reading what came back
 
@@ -230,9 +230,9 @@ row again and costs no money.
 langwatch instant-eval cancel <id>
 ```
 
-Stops the run before its next page. You keep every judgement it had already
-written, and you can read them the same way. Cancel a run that has already
-finished and you get back a 409.
+Stops the run before its next page, keeping every judgement it had already
+written for you to read the same way. Cancel a run that has already finished
+and you get back a 409.
 
 ## Output
 
