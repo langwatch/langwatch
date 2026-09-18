@@ -36,6 +36,7 @@ export function useSpaceInUse({
   const userId = session.data?.user?.id;
   const canReadSources = hasAnyPermission("ingestionSources:view");
   const on = enabled && !!organizationId;
+  const meOn = on && space === "me";
 
   const virtualKeys = api.virtualKeys.list.useQuery(
     { organizationId },
@@ -50,24 +51,45 @@ export function useSpaceInUse({
   );
   const personalKeys = api.personalVirtualKeys.list.useQuery(
     { organizationId, targetUserId: userId ?? "" },
-    { enabled: on && space === "me" && !!userId, refetchOnWindowFocus: false },
+    { enabled: meOn && !!userId, refetchOnWindowFocus: false },
   );
   const personalUsage = api.user.personalUsage.useQuery(
     { organizationId },
-    { enabled: on && space === "me", refetchOnWindowFocus: false },
+    { enabled: meOn, refetchOnWindowFocus: false },
   );
 
   switch (space) {
     case "project":
       return false;
     case "gateway":
-      return virtualKeys.data ? virtualKeys.data.length > 0 : null;
+      return hasAny(virtualKeys.data);
     case "governance":
-      if (!canReadSources) return null;
-      return sources.data ? sources.data.length > 0 : null;
+      return canReadSources ? hasAny(sources.data) : null;
     case "me":
-      if (personalKeys.data && personalKeys.data.length > 0) return true;
-      if (!personalKeys.data || !personalUsage.data) return null;
-      return personalUsage.data.summary.requests > 0;
+      return personalSpaceInUse({
+        personalKeys: personalKeys.data,
+        requests: personalUsage.data?.summary.requests,
+      });
   }
+}
+
+/** Whether a loaded list has any entry; null while it is not loaded. */
+function hasAny(list: readonly unknown[] | undefined): boolean | null {
+  return list ? list.length > 0 : null;
+}
+
+/**
+ * A personal key alone settles it; otherwise both reads must be in before
+ * usage this month can answer.
+ */
+function personalSpaceInUse({
+  personalKeys,
+  requests,
+}: {
+  personalKeys: readonly unknown[] | undefined;
+  requests: number | undefined;
+}): boolean | null {
+  if (hasAny(personalKeys)) return true;
+  if (!personalKeys || requests === undefined) return null;
+  return requests > 0;
 }
