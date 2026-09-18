@@ -512,7 +512,12 @@ installing a module brings its config demand and uninstalling removes it
 without touching the app. No value is declared twice. Every key is a
 **root object** — `process` for the global values, or the module's name
 for its slice — and Zod reads the environment directly at the one boot
-seam.
+seam. **The definition point is the module itself** — the `configSchema`
+static on its app class (the browser half's schema on its declaration) —
+and the generated map is pure re-exports of those declarations, so
+inference flows unbroken: `apiConfig()`'s type is computed from the module
+classes, `create()`'s config parameter from the same schema, and a field
+added on the static appears everywhere with no other edit.
 `.readonly()` on the schema is the immutability story; there is no
 `Object.freeze`, no hand-built projection type mirroring the schema, and no
 re-plumbing from an env read into a second structure. What the parse returns
