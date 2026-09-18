@@ -88,6 +88,11 @@ const SEED_STAMP = "2026-01-01T00:00:00Z";
  * `LlmPromptConfig`, needs the same id the explicit seed used, not the generic
  * `<tenant>-<Model>-1` convention. Kept here rather than imported to avoid a
  * cycle with the harness that consumes this module.
+ *
+ * This is the *fixed* convention — a model whose explicit id the caller can
+ * override (e.g. `promptId`) is not listed here; the caller instead passes its
+ * actual id through `explicitIds` on {@link postgresModelSeedStatements}, which
+ * wins over this table.
  */
 const EXPLICIT_SEED_ID: Record<string, (tenantId: string) => string> = {
   Organization: (t) => `${t}-org`,
@@ -103,9 +108,24 @@ const EXPLICIT_SEED_ID: Record<string, (tenantId: string) => string> = {
   LlmPromptConfigVersion: (t) => `${t}-prompt-v1`,
 };
 
-/** The id a foreign key targeting `model` should point at, for this tenant. */
-function seededId(model: string, tenantId: string): string {
-  return EXPLICIT_SEED_ID[model]?.(tenantId) ?? `${tenantId}-${model}-1`;
+/**
+ * The id a foreign key targeting `model` should point at, for this tenant.
+ *
+ * Consults `explicitIds` (the caller's actual id for a model whose explicit
+ * seed takes a parameter, e.g. `LlmPromptConfig` under a custom `promptId`)
+ * before the fixed {@link EXPLICIT_SEED_ID} convention, then falls back to the
+ * generic `<tenant>-<Model>-1` id.
+ */
+function seededId(
+  model: string,
+  tenantId: string,
+  explicitIds?: Readonly<Record<string, string>>,
+): string {
+  return (
+    explicitIds?.[model] ??
+    EXPLICIT_SEED_ID[model]?.(tenantId) ??
+    `${tenantId}-${model}-1`
+  );
 }
 
 /** A double-quoted SQL identifier. */
@@ -215,7 +235,10 @@ function tenantLink(
   // Parent scope: the base column holds a foreign key to a parent the tenant is
   // reached through; point it at the parent row's seeded id.
   const parentModel = modelByTable.get(first.relation)?.name ?? first.relation;
-  return { column: first.on.from, value: seededId(parentModel, ids.tenantId) };
+  return {
+    column: first.on.from,
+    value: seededId(parentModel, ids.tenantId, ids.explicitIds),
+  };
 }
 
 /**
@@ -255,6 +278,8 @@ interface SeedIds {
   readonly organizationId: string;
   readonly teamId: string;
   readonly userId: string;
+  /** Model name → the id its explicit seed actually used, when caller-chosen. */
+  readonly explicitIds?: Readonly<Record<string, string>>;
 }
 
 /** The value one column of one model's generic row takes. */
@@ -293,7 +318,7 @@ function columnValue({
   // generic id every foreign key to this model points at.
   if (model.primaryKey.length === 1 && model.primaryKey[0] === field.name) {
     if (field.type === "Int" || field.type === "BigInt") return OMIT;
-    return quoteLiteral(seededId(model.name, ids.tenantId));
+    return quoteLiteral(seededId(model.name, ids.tenantId, ids.explicitIds));
   }
 
   // 3. A foreign key. The tenant spine resolves to the ids the harness seeded;
@@ -313,7 +338,7 @@ function columnValue({
   if (target) {
     return field.isOptional
       ? "NULL"
-      : quoteLiteral(seededId(target, ids.tenantId));
+      : quoteLiteral(seededId(target, ids.tenantId, ids.explicitIds));
   }
 
   // 4. A stripped column, given a marker so the isolation test can assert its
@@ -450,6 +475,11 @@ function topologicalOrder(
  *   are what gets seeded
  * @param manifest — the model/field facts every value is built from
  * @param alreadySeeded — model names the explicit seeds cover, skipped here
+ * @param explicitIds — model name → the id its explicit seed actually used,
+ *   for a model whose explicit seed takes a caller-chosen id (e.g.
+ *   `LlmPromptConfig` under a custom `promptId`) rather than the fixed
+ *   `EXPLICIT_SEED_ID` convention. A generic row's foreign key to that model
+ *   then points at the id the explicit seed really wrote, not the convention.
  */
 export function postgresModelSeedStatements({
   tenantId,
@@ -459,6 +489,7 @@ export function postgresModelSeedStatements({
   views,
   manifest,
   alreadySeeded,
+  explicitIds,
   schema = "public",
 }: {
   tenantId: string;
@@ -468,9 +499,16 @@ export function postgresModelSeedStatements({
   views: readonly DerivedPostgresView[];
   manifest: PrismaManifest;
   alreadySeeded: readonly string[];
+  explicitIds?: Readonly<Record<string, string>>;
   schema?: string;
 }): string[] {
-  const ids: SeedIds = { tenantId, organizationId, teamId, userId };
+  const ids: SeedIds = {
+    tenantId,
+    organizationId,
+    teamId,
+    userId,
+    explicitIds,
+  };
   const modelByTable = new Map(
     manifest.models.map((model) => [model.tableName, model]),
   );
