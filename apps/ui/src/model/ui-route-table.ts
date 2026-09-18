@@ -508,10 +508,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         webRouteParent: "project",
         children: [
           {
-            path: "/:project",
-            page: "pages/[project]/index",
-          },
-          {
             path: "/:project/agents",
             page: "runtime/ui/features/agent-ui-host.adapter",
           },
@@ -527,32 +523,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
 
           {
-            path: "/:project/automations",
-            page: "pages/[project]/automations",
-          },
-          {
-            path: "/:project/automations/automations",
-            page: "pages/[project]/automations/automations",
-          },
-          {
-            path: "/:project/automations/alerts",
-            page: "pages/[project]/automations/alerts",
-          },
-          {
-            path: "/:project/automations/schedules",
-            page: "pages/[project]/automations/schedules",
-          },
-          {
+            // The declared "overview", "automations", "alerts" and
+            // "schedules" screens now come from @langwatch/automation-browser
+            // (automation.web.ts); this row has no matching AutomationSection
+            // and no screen renders it — see the batch-a handoff.
             path: "/:project/automations/activity",
             page: "pages/[project]/automations/activity",
-          },
-          {
-            path: "/:project/datasets",
-            page: "pages/[project]/datasets",
-          },
-          {
-            path: "/:project/datasets/:id",
-            page: "pages/[project]/datasets/[id]",
           },
           {
             path: "/:project/evaluators",
@@ -566,10 +542,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
               from: "/:project/evaluations",
               to: "/:project/experiments",
             },
-          },
-          {
-            path: "/:project/online-evaluations",
-            page: "pages/[project]/online-evaluations",
           },
           {
             // Creating an evaluation is a drawer on the online-evaluations page;
@@ -671,10 +643,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
                 "drawer.span": ":span",
               },
             },
-          },
-          {
-            path: "/:project/prompts",
-            page: "pages/[project]/prompts",
           },
           {
             path: "/:project/setup",

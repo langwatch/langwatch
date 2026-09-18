@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/notification.web.ts",
+      "types": "./dist/notification.web.d.ts",
+      "default": "./src/notification.web.ts"
+    },
     "./email-suppressions": {
       "langwatch-declaration-source": "./src/email-suppressions.ts",
       "types": "./dist/email-suppressions.d.ts",
@@ -22,6 +27,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:"
   },
   "devDependencies": {

@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/automation.web.ts",
+      "types": "./dist/automation.web.d.ts",
+      "default": "./src/automation.web.ts"
+    },
     "./automations": {
       "types": "./dist/automations.d.ts",
       "default": "./src/automations.ts"
@@ -29,6 +34,7 @@
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@monaco-editor/react": "catalog:",
     "liqe": "catalog:",
     "lucide-react": "catalog:",

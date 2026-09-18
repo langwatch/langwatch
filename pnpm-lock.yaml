@@ -3079,9 +3079,15 @@ importers:
       '@langwatch/auth-process':
         specifier: workspace:*
         version: link:auth/process
+      '@langwatch/authz-browser':
+        specifier: workspace:*
+        version: link:authz/browser
       '@langwatch/authz-process':
         specifier: workspace:*
         version: link:authz/process
+      '@langwatch/automation-browser':
+        specifier: workspace:*
+        version: link:automation/browser
       '@langwatch/automation-process':
         specifier: workspace:*
         version: link:automation/process
@@ -3091,12 +3097,21 @@ importers:
       '@langwatch/dashboard-process':
         specifier: workspace:*
         version: link:dashboard/process
+      '@langwatch/data-privacy-browser':
+        specifier: workspace:*
+        version: link:data-privacy/browser
       '@langwatch/data-privacy-process':
         specifier: workspace:*
         version: link:data-privacy/process
+      '@langwatch/data-retention-browser':
+        specifier: workspace:*
+        version: link:data-retention/browser
       '@langwatch/data-retention-process':
         specifier: workspace:*
         version: link:data-retention/process
+      '@langwatch/dataset-browser':
+        specifier: workspace:*
+        version: link:dataset/browser
       '@langwatch/dataset-process':
         specifier: workspace:*
         version: link:dataset/process
@@ -3133,6 +3148,9 @@ importers:
       '@langwatch/gateway-process':
         specifier: workspace:*
         version: link:gateway/process
+      '@langwatch/github-browser':
+        specifier: workspace:*
+        version: link:github/browser
       '@langwatch/github-process':
         specifier: workspace:*
         version: link:github/process
@@ -3157,9 +3175,15 @@ importers:
       '@langwatch/model-provider-process':
         specifier: workspace:*
         version: link:model-provider/process
+      '@langwatch/monitor-browser':
+        specifier: workspace:*
+        version: link:monitor/browser
       '@langwatch/monitor-process':
         specifier: workspace:*
         version: link:monitor/process
+      '@langwatch/notification-browser':
+        specifier: workspace:*
+        version: link:notification/browser
       '@langwatch/notification-process':
         specifier: workspace:*
         version: link:notification/process
@@ -3175,9 +3199,15 @@ importers:
       '@langwatch/presence-process':
         specifier: workspace:*
         version: link:presence/process
+      '@langwatch/project-browser':
+        specifier: workspace:*
+        version: link:project/browser
       '@langwatch/project-process':
         specifier: workspace:*
         version: link:project/process
+      '@langwatch/prompt-browser':
+        specifier: workspace:*
+        version: link:prompt/browser
       '@langwatch/prompt-process':
         specifier: workspace:*
         version: link:prompt/process
@@ -3187,6 +3217,9 @@ importers:
       '@langwatch/scenario-process':
         specifier: workspace:*
         version: link:scenario/process
+      '@langwatch/secret-browser':
+        specifier: workspace:*
+        version: link:secret/browser
       '@langwatch/secret-process':
         specifier: workspace:*
         version: link:secret/process
@@ -3199,6 +3232,9 @@ importers:
       '@langwatch/suite-process':
         specifier: workspace:*
         version: link:suite/process
+      '@langwatch/topic-browser':
+        specifier: workspace:*
+        version: link:topic/browser
       '@langwatch/topic-process':
         specifier: workspace:*
         version: link:topic/process
@@ -4399,6 +4435,9 @@ importers:
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../role/contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -4619,6 +4658,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@monaco-editor/react':
         specifier: 'catalog:'
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -5137,6 +5179,9 @@ importers:
       '@langwatch/redaction':
         specifier: workspace:*
         version: link:../../../packages/redaction
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -5290,6 +5335,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -5467,6 +5515,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@langwatch/workflow-browser':
         specifier: workspace:*
         version: link:../../workflow/browser
@@ -5504,6 +5555,9 @@ importers:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.0)
@@ -6935,6 +6989,9 @@ importers:
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -7985,6 +8042,9 @@ importers:
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -8238,6 +8298,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -9174,6 +9237,9 @@ importers:
       '@langwatch/trace-browser':
         specifier: workspace:*
         version: link:../../trace/browser
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@paper-design/shaders-react':
         specifier: 'catalog:'
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
@@ -9414,6 +9480,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@langwatch/workflow-browser':
         specifier: workspace:*
         version: link:../../workflow/browser
@@ -10203,6 +10272,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -10793,6 +10865,9 @@ importers:
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'

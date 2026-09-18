@@ -22,10 +22,10 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
-      "path": "../../analytics/contract/tsconfig.build.json"
+      "path": "../../analytics/browser-kit/tsconfig.build.json"
     },
     {
-      "path": "../../analytics/web-kit/tsconfig.build.json"
+      "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
@@ -40,10 +40,10 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
-      "path": "../../navigation/web/tsconfig.build.json"
+      "path": "../../navigation/browser/tsconfig.build.json"
     },
     {
-      "path": "../../organization/web/tsconfig.build.json"
+      "path": "../../organization/browser/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -53,6 +53,9 @@
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

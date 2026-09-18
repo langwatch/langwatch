@@ -11,7 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/data-privacy.ts"],
+  "files": ["./src/data-privacy.ts", "./src/data-privacy.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -30,7 +30,7 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../authz/web-kit/tsconfig.build.json"
+      "path": "../../authz/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -40,6 +40,9 @@
     },
     {
       "path": "../../../packages/redaction/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

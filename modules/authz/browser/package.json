@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/authz.web.ts",
+      "types": "./dist/authz.web.d.ts",
+      "default": "./src/authz.web.ts"
+    },
     "./authz": {
       "langwatch-declaration-source": "./src/authz.ts",
       "types": "./dist/authz.d.ts",
@@ -24,6 +29,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "react-feather": "catalog:",
     "react-hook-form": "catalog:"

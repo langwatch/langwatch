@@ -10,6 +10,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/dataset.web.ts",
+      "types": "./dist/dataset.web.d.ts",
+      "default": "./src/dataset.web.ts"
+    },
     ".": {
       "langwatch-declaration-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
@@ -92,6 +97,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-table": "catalog:",
@@ -106,6 +112,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

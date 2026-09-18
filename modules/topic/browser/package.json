@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/topic.web.ts",
+      "types": "./dist/topic.web.d.ts",
+      "default": "./src/topic.web.ts"
+    },
     "./topic-clustering": {
       "langwatch-declaration-source": "./src/topic-clustering.ts",
       "types": "./dist/topic-clustering.d.ts",
@@ -23,7 +28,8 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
-    "@langwatch/browser-host": "workspace:*"
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",

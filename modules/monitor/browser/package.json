@@ -10,6 +10,11 @@
   "main": "./src/online-evaluations.ts",
   "types": "./dist/online-evaluations.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/monitor.web.ts",
+      "types": "./dist/monitor.web.d.ts",
+      "default": "./src/monitor.web.ts"
+    },
     "./online-evaluations": {
       "langwatch-declaration-source": "./src/online-evaluations.ts",
       "types": "./dist/online-evaluations.d.ts",
@@ -27,6 +32,7 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "react-icons": "catalog:"
   },

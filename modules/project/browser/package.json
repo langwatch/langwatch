@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/project.web.ts",
+      "types": "./dist/project.web.d.ts",
+      "default": "./src/project.web.ts"
+    },
     "./home": {
       "langwatch-declaration-source": "./src/home.ts",
       "types": "./dist/home.d.ts",
@@ -46,6 +51,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "@tanstack/react-query": "catalog:",
     "lodash-es": "catalog:",

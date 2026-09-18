@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/prompt.web.ts",
+      "types": "./dist/prompt.web.d.ts",
+      "default": "./src/prompt.web.ts"
+    },
     "./llm-config-constants": {
       "langwatch-declaration-source": "./src/llm-config-constants.ts",
       "types": "./dist/llm-config-constants.d.ts",
@@ -109,6 +114,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",

@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/data-retention.web.ts",
+      "types": "./dist/data-retention.web.d.ts",
+      "default": "./src/data-retention.web.ts"
+    },
     "./data-retention": {
       "langwatch-declaration-source": "./src/data-retention.ts",
       "types": "./dist/data-retention.d.ts",
@@ -23,6 +28,7 @@
     "@langwatch/authz-browser-kit": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:"
   },
   "devDependencies": {

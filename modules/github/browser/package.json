@@ -10,6 +10,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/github.web.ts",
+      "types": "./dist/github.web.d.ts",
+      "default": "./src/github.web.ts"
+    },
     "./surfaces/github-connect-popup": {
       "types": "./dist/behavior/github-connect-popup.d.ts",
       "default": "./src/behavior/github-connect-popup.ts"
@@ -32,6 +37,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "react": "catalog:",
     "react-feather": "catalog:",
     "zod": "catalog:"

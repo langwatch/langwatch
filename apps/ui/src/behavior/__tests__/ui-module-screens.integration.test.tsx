@@ -75,8 +75,30 @@ describe("given the installed web modules", () => {
         "/:project/annotations/all",
         "/:project/annotations/me",
         "/:project/annotations/:slug",
+        "/:project/automations",
+        "/:project/automations/automations",
+        "/:project/automations/alerts",
+        "/:project/automations/schedules",
+        "/:project/datasets",
+        "/:project/datasets/:id",
+        "/:project/online-evaluations",
+        "/:project",
+        "/:project/prompts",
       ]);
-      expect(Object.keys(screens.loaders)).toContain("pages/settings/annotation-scores");
+      expect(Object.keys(screens.loaders)).toEqual(
+        expect.arrayContaining([
+          "pages/settings/annotation-scores",
+          "pages/settings/topic-clustering",
+          "pages/settings/email-suppressions",
+          "pages/settings/integrations",
+          "pages/settings/secrets",
+          "pages/settings/roles",
+          "pages/settings/role-bindings",
+          "pages/settings/data-privacy",
+          "pages/settings/data-retention",
+          "pages/settings",
+        ]),
+      );
     });
   });
 
