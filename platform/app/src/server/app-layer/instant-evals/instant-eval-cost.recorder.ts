@@ -50,31 +50,54 @@ export interface InstantEvalCostRecorder {
   recordCost(record: InstantEvalCostRecord): Promise<string>;
 }
 
+/** Whether Prisma refused a write because the row already exists. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
 export class PrismaInstantEvalCostRecorder implements InstantEvalCostRecorder {
   constructor(private readonly prisma: PrismaClient) {}
 
   async recordCost(record: InstantEvalCostRecord): Promise<string> {
-    const costId = generate(KSUID_RESOURCES.COST).toString();
-    await this.prisma.cost.create({
-      data: {
-        id: costId,
-        projectId: record.projectId,
-        costType: CostType.INSTANT_EVAL,
-        costName: record.runId ? "Instant Eval run" : "Instant Eval query",
-        referenceType: CostReferenceType.INSTANT_EVAL,
-        // The run when there is one, and otherwise the project: a synchronous
-        // query has no durable resource to point at, and inventing an id per
-        // request would index a column no query could ever join on.
-        referenceId: record.runId ?? record.projectId,
-        amount: record.costUsd,
-        currency: "USD",
-        extraInfo: {
-          input_tokens: record.inputTokens,
-          requests: record.requests,
-          price_usd: record.priceUsd,
-        },
+    // A run's cost row is addressed by the run, so a retried finish writes the
+    // same row rather than a second one. That is what lets the finish intent
+    // be retried at all: a plain create would double-bill a run whose first
+    // attempt failed after the insert but before the acknowledgement.
+    const costId = record.runId
+      ? `${KSUID_RESOURCES.COST}_instanteval_${record.runId}`
+      : generate(KSUID_RESOURCES.COST).toString();
+    const data = {
+      projectId: record.projectId,
+      costType: CostType.INSTANT_EVAL,
+      costName: record.runId ? "Instant Eval run" : "Instant Eval query",
+      referenceType: CostReferenceType.INSTANT_EVAL,
+      // The run when there is one, and otherwise the project: a synchronous
+      // query has no durable resource to point at, and inventing an id per
+      // request would index a column no query could ever join on.
+      referenceId: record.runId ?? record.projectId,
+      amount: record.costUsd,
+      currency: "USD",
+      extraInfo: {
+        input_tokens: record.inputTokens,
+        requests: record.requests,
+        price_usd: record.priceUsd,
       },
-    });
+    };
+
+    try {
+      await this.prisma.cost.create({ data: { id: costId, ...data } });
+    } catch (error) {
+      // A unique violation on the id means the row this call would have
+      // written is already there, which is the whole point of addressing it by
+      // the run: a retried finish lands on the same row instead of billing a
+      // second time. Every other failure is real and belongs to the caller,
+      // which retries the finish.
+      if (!isUniqueViolation(error)) throw error;
+    }
     return costId;
   }
 }

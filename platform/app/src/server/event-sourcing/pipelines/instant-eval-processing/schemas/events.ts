@@ -88,7 +88,8 @@ export const instantEvalPageJudgedEventDataSchema = z.object({
   page: z.number().int().positive(),
   /** Rows this page judged. */
   rows: z.number().int().nonnegative(),
-  matched: z.number().int().nonnegative(),
+  /** Boolean matches of this page, or null when the run asked no boolean question. */
+  matched: z.number().int().nonnegative().nullable().default(null),
   matchedByQuestion: z.record(z.string(), z.number()),
   failed: z.number().int().nonnegative(),
   skipped: z.number().int().nonnegative(),
@@ -100,6 +101,7 @@ export const instantEvalPageJudgedEventDataSchema = z.object({
    * Null for an empty page, which is also the end of the run.
    */
   cursor: z.string().nullable(),
+  cursorSpanId: z.string().nullable().default(null),
   hasNextPage: z.boolean(),
 });
 export type InstantEvalPageJudgedEventData = z.infer<

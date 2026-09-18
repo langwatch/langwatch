@@ -42,19 +42,54 @@ const calls: LangWatchQLAppFunctionCall[] = [
 
 const questions = instantEvalRunQuestions(calls);
 
-function keys(...traceIds: string[]): ReadonlyMap<string, InstantEvalRowKey> {
-  return new Map(
-    traceIds.map((traceId) => [
-      traceId,
-      {
-        traceId,
-        threadId: `thread-${traceId}`,
-        spanId: "",
-        occurredAt: NOW - 1000,
-      },
-    ]),
-  );
+function keys(...traceIds: string[]): InstantEvalRowKey[] {
+  return traceIds.map((traceId) => ({
+    traceId,
+    threadId: `thread-${traceId}`,
+    spanId: "",
+    occurredAt: NOW - 1000,
+  }));
 }
+
+/** The same keys for a statement whose rows are one per span. */
+function spanKeys(
+  ...pairs: [traceId: string, spanId: string][]
+): InstantEvalRowKey[] {
+  return pairs.map(([traceId, spanId]) => ({
+    traceId,
+    threadId: `thread-${traceId}`,
+    spanId,
+    occurredAt: NOW - 1000,
+  }));
+}
+
+describe("given a statement with several rows per trace", () => {
+  describe("when the page is mapped", () => {
+    /** @scenario "A statement with one row per span writes one judgement per span" */
+    it("writes a judgement per span rather than collapsing the trace", () => {
+      const { records } = mapInstantEvalPage({
+        tenantId: "project-1",
+        runId: "run-1",
+        questions: instantEvalRunQuestions([
+          calls[0] as LangWatchQLAppFunctionCall,
+        ]),
+        rows: [
+          { TraceId: "t1", SpanId: "s1", annoyed: 0.9 },
+          { TraceId: "t1", SpanId: "s2", annoyed: 0.1 },
+        ],
+        keys: spanKeys(["t1", "s1"], ["t1", "s2"]),
+        skipReason: "",
+        now: NOW,
+      });
+
+      // The judgement key is (TenantId, RunId, TraceId, SpanId, QuestionId), so
+      // two spans of one trace are two rows and not one overwriting the other.
+      expect(records).toHaveLength(2);
+      expect(records.map((record) => record.SpanId)).toEqual(["s1", "s2"]);
+      expect(records.map((record) => record.Passed)).toEqual([1, 0]);
+    });
+  });
+});
 
 describe("given a page of judged rows", () => {
   describe("when it is mapped", () => {
@@ -68,7 +103,7 @@ describe("given a page of judged rows", () => {
           { TraceId: "t1", annoyed: 0.9, intent: "refund", helpfulness: 4.2 },
           { TraceId: "t2", annoyed: 0.1, intent: "bug", helpfulness: 2.0 },
         ],
-        keysByTraceId: keys("t1", "t2"),
+        keys: keys("t1", "t2"),
         skipReason: "",
         now: NOW,
       });
@@ -95,7 +130,7 @@ describe("given a page of judged rows", () => {
         rows: [
           { TraceId: "t1", annoyed: 0.9, intent: "refund", helpfulness: 4.2 },
         ],
-        keysByTraceId: keys("t1"),
+        keys: keys("t1"),
         skipReason: "",
         now: NOW,
       });
@@ -130,7 +165,7 @@ describe("given a page of judged rows", () => {
             helpfulness: 3,
           },
         ],
-        keysByTraceId: keys("t1"),
+        keys: keys("t1"),
         skipReason: "",
         now: NOW,
       });
@@ -150,7 +185,7 @@ describe("given a page of judged rows", () => {
           { TraceId: "t1", annoyed: 0.9 },
           { TraceId: "t2", annoyed: 0.2 },
         ],
-        keysByTraceId: keys("t1", "t2"),
+        keys: keys("t1", "t2"),
         skipReason: "",
         now: NOW,
       });
@@ -166,12 +201,15 @@ describe("given a page of judged rows", () => {
         runId: "run-1",
         questions: instantEvalRunQuestions(calls.slice(1)),
         rows: [{ TraceId: "t1", intent: "bug", helpfulness: 3 }],
-        keysByTraceId: keys("t1"),
+        keys: keys("t1"),
         skipReason: "",
         now: NOW,
       });
 
       expect(counters.matchedByQuestion).toEqual({ intent: 1, helpfulness: 1 });
+      // No boolean question, so there is no "yes" to count: the headline is
+      // absent rather than the sum of every judged row.
+      expect(counters.matched).toBeNull();
     });
   });
 
@@ -184,7 +222,7 @@ describe("given a page of judged rows", () => {
           calls[0] as LangWatchQLAppFunctionCall,
         ]),
         rows: [{ TraceId: "t1", annoyed: null }],
-        keysByTraceId: keys("t1"),
+        keys: keys("t1"),
         skipReason: "classifier_not_configured",
         now: NOW,
       });
@@ -206,7 +244,7 @@ describe("given a page of judged rows", () => {
           calls[0] as LangWatchQLAppFunctionCall,
         ]),
         rows: [{ TraceId: "t1", annoyed: null }],
-        keysByTraceId: keys("t1"),
+        keys: keys("t1"),
         skipReason: "classifier_failed",
         now: NOW,
       });

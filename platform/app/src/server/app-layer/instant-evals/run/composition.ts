@@ -1,5 +1,5 @@
 /**
- * The three statements a run builds around the caller's own, and nothing else.
+ * The four statements a run builds around the caller's own, and nothing else.
  *
  * LangWatchQL never rewrites a submitted statement, and a bound scenario holds
  * it to that: the text in `system.query_log` is the text the caller sent
@@ -11,27 +11,43 @@
  * verbatim; only this surface wraps it, which is why the wrapping lives here
  * and not in the query service.
  *
- * Three shapes:
+ * Four shapes:
  *
  *  - the **probe**, `LIMIT 0`, which answers what the statement projects
  *    without reading a row or judging anything;
- *  - the **key pass**, which reads one page of trace ids and nothing else, so a
- *    run knows its size before it spends anything;
- *  - the **page pass**, which reads the whole row for one page's ids, and is
+ *  - the **count**, which answers how many rows the statement matches, bounded
+ *    one past the run's limit so a capped run knows it was capped;
+ *  - the **key pass**, which reads one page of row keys and nothing else;
+ *  - the **page pass**, which reads the whole row for one page's keys, and is
  *    where the extraction and eval functions hydrate.
  *
- * Paging orders by `TraceId`. It is the one column a run's statement is
- * required to project, it is unique per judged row, and it therefore gives a
- * total order with no second column to agree on. A page is `TraceId > <last
- * id>`, which is deterministic across retries: the same page number always
- * covers the same ids, whoever runs it.
+ * ## What a page is ordered by
+ *
+ * `TraceId` is the one column a run's statement is required to project, so it
+ * is always available to order by. It is NOT always unique: a statement over
+ * `analytics.spans` projects one row per span, so several rows share a trace.
+ * When the statement projects `SpanId` as well, paging therefore orders by the
+ * pair and the cursor carries both halves. Ordering by `TraceId` alone there
+ * would cut a trace's span rows across a page boundary and the next page,
+ * starting at `TraceId > cursor`, would skip the rest of them.
+ *
+ * ## What determinism a page depends on
+ *
+ * The caller's statement is executed twice per page, once for the keys and
+ * once for the rows, plus once for the count. Each execution is a keyset
+ * window over the same statement, so the pages tile the selection only if the
+ * statement returns the same rows each time. A statement carrying `LIMIT n`
+ * with no `ORDER BY` does not: ClickHouse may return a different n rows per
+ * execution. Such a statement is accepted, because refusing it would refuse a
+ * legitimate exploratory query, but its pages are not guaranteed to cover one
+ * fixed set. Add an `ORDER BY` to a statement with a `LIMIT`.
  *
  * @see ../../../analytics/lwql/lwql.service.ts: the verbatim path
  * @see ../../../../../specs/instant-evals/instant-eval-pipeline.feature
  */
 
 /**
- * The bound parameter a page pass carries its own ids in.
+ * The bound parameter a page pass carries its own trace ids in.
  *
  * Reserved: a caller whose statement declares it, or whose request supplies a
  * value for it, is refused, because the run would then either overwrite their
@@ -39,13 +55,15 @@
  */
 export const INSTANT_EVAL_PAGE_PARAMETER = "instant_eval_page_ids";
 
-/** The cursor parameter the key pass pages with. Reserved for the same reason. */
+/** The cursor parameters the key pass pages with. Reserved for the same reason. */
 export const INSTANT_EVAL_AFTER_PARAMETER = "instant_eval_after_trace_id";
+export const INSTANT_EVAL_AFTER_SPAN_PARAMETER = "instant_eval_after_span_id";
 
 /** Every parameter name this surface owns. */
 export const INSTANT_EVAL_RESERVED_PARAMETERS = [
   INSTANT_EVAL_PAGE_PARAMETER,
   INSTANT_EVAL_AFTER_PARAMETER,
+  INSTANT_EVAL_AFTER_SPAN_PARAMETER,
 ] as const;
 
 /** Whether a parameter name belongs to the run rather than to the caller. */
@@ -56,12 +74,20 @@ export function isInstantEvalReservedParameter(name: string): boolean {
 /** The column every run's statement has to project, and pages are ordered by. */
 export const INSTANT_EVAL_TRACE_COLUMN = "TraceId";
 
+/** The second half of the order, when the statement projects it. */
+export const INSTANT_EVAL_SPAN_COLUMN = "SpanId";
+
 /** Columns a run carries onto its judgements when the statement projects them. */
 export const INSTANT_EVAL_OPTIONAL_KEY_COLUMNS = [
   "ThreadId",
-  "SpanId",
+  INSTANT_EVAL_SPAN_COLUMN,
   "OccurredAt",
 ] as const;
+
+/** Whether this statement's rows are addressed by the trace and span pair. */
+export function instantEvalPagesBySpan(keyColumns: readonly string[]): boolean {
+  return keyColumns.includes(INSTANT_EVAL_SPAN_COLUMN);
+}
 
 /**
  * The statement, asked what it projects and nothing more.
@@ -75,7 +101,35 @@ export function instantEvalProbeSql(sql: string): string {
 }
 
 /**
- * One page of trace ids, in order, after the id the previous page ended on.
+ * How many rows the statement matches, counted one past the limit.
+ *
+ * A count rather than a key pass read to its end: a hundred thousand keys is
+ * about ten megabytes of JSON, past the executor's own result ceiling, and the
+ * ceiling truncates rather than refuses. Counting inside the database returns
+ * one row whatever the selection's size, and the inner `LIMIT` keeps the count
+ * itself bounded so a ten-million-row selection is not fully scanned to learn
+ * that it is over the cap.
+ *
+ * Pass the run's limit plus one: a total equal to that is a run that was
+ * capped, and a total below it is the whole selection.
+ */
+export function instantEvalCountSql({
+  sql,
+  limit,
+}: {
+  readonly sql: string;
+  /** The run's row limit plus one. */
+  readonly limit: number;
+}): string {
+  return (
+    `SELECT count() AS total FROM (\n` +
+    `SELECT q.${INSTANT_EVAL_TRACE_COLUMN} FROM (\n${sql}\n) AS q LIMIT ${limit}\n` +
+    `) AS c`
+  );
+}
+
+/**
+ * One page of row keys, in order, after the key the previous page ended on.
  *
  * Selects the key columns the statement actually projects: a statement grouped
  * by conversation has no `SpanId`, and naming an absent column in the wrapper
@@ -91,27 +145,39 @@ export function instantEvalKeyPassSql({
   /** The optional key columns the probe found, in catalog order. */
   readonly keyColumns: readonly string[];
   readonly limit: number;
-  /** Whether the page starts after a previous page's last id. */
+  /** Whether the page starts after a previous page's last key. */
   readonly hasCursor: boolean;
 }): string {
+  const bySpan = instantEvalPagesBySpan(keyColumns);
   const projection = [INSTANT_EVAL_TRACE_COLUMN, ...keyColumns]
     .map((column) => `q.${column} AS ${column}`)
     .join(", ");
-  const where = hasCursor
-    ? `\nWHERE q.${INSTANT_EVAL_TRACE_COLUMN} > {${INSTANT_EVAL_AFTER_PARAMETER}:String}`
-    : "";
+  const order = bySpan
+    ? `(q.${INSTANT_EVAL_TRACE_COLUMN}, q.${INSTANT_EVAL_SPAN_COLUMN})`
+    : `q.${INSTANT_EVAL_TRACE_COLUMN}`;
+  const after = bySpan
+    ? `({${INSTANT_EVAL_AFTER_PARAMETER}:String}, {${INSTANT_EVAL_AFTER_SPAN_PARAMETER}:String})`
+    : `{${INSTANT_EVAL_AFTER_PARAMETER}:String}`;
+  const where = hasCursor ? `\nWHERE ${order} > ${after}` : "";
   return (
     `SELECT ${projection}\nFROM (\n${sql}\n) AS q${where}` +
-    `\nORDER BY q.${INSTANT_EVAL_TRACE_COLUMN}\nLIMIT ${limit}`
+    `\nORDER BY ${order}\nLIMIT ${limit}`
   );
 }
 
 /**
- * The whole of one page's rows, bound to the ids the key pass found.
+ * The whole of one page's rows, bound to the trace ids the key pass found.
  *
  * `SELECT *` keeps every output column the caller aliased, which is what lets
  * the hydration plan recorded against the inner statement address this result:
  * the plan is keyed by alias, and the wrapper renames nothing.
+ *
+ * The predicate is on `TraceId` alone even when the page is keyed by the trace
+ * and span pair, because a tuple bound as a query parameter is not a shape the
+ * driver serialises reliably. A trace whose spans straddle the page boundary
+ * therefore returns rows the page does not own, and the caller drops them by
+ * matching the pair. That over-fetch is what the page's own row ceiling
+ * bounds.
  */
 export function instantEvalPagePassSql(sql: string): string {
   return (

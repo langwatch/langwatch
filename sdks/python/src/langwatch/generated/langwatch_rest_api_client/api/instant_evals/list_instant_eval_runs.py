@@ -13,6 +13,7 @@ def _get_kwargs(
     *,
     limit: int | Unset = 20,
     before: datetime.datetime | Unset = UNSET,
+    before_id: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -23,6 +24,8 @@ def _get_kwargs(
     if not isinstance(before, Unset):
         json_before = before.isoformat()
     params["before"] = json_before
+
+    params["beforeId"] = before_id
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -68,6 +71,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     limit: int | Unset = 20,
     before: datetime.datetime | Unset = UNSET,
+    before_id: str | Unset = UNSET,
 ) -> Response[ListInstantEvalRunsResponse200]:
     """List the project's runs, newest first. The project comes from the credential, so a run of another
     project is never listed. Page through them with before, which takes the created time of the oldest
@@ -76,6 +80,7 @@ def sync_detailed(
     Args:
         limit (int | Unset):  Default: 20.
         before (datetime.datetime | Unset):
+        before_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -88,6 +93,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         limit=limit,
         before=before,
+        before_id=before_id,
     )
 
     response = client.get_httpx_client().request(
@@ -102,6 +108,7 @@ def sync(
     client: AuthenticatedClient,
     limit: int | Unset = 20,
     before: datetime.datetime | Unset = UNSET,
+    before_id: str | Unset = UNSET,
 ) -> ListInstantEvalRunsResponse200 | None:
     """List the project's runs, newest first. The project comes from the credential, so a run of another
     project is never listed. Page through them with before, which takes the created time of the oldest
@@ -110,6 +117,7 @@ def sync(
     Args:
         limit (int | Unset):  Default: 20.
         before (datetime.datetime | Unset):
+        before_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -123,6 +131,7 @@ def sync(
         client=client,
         limit=limit,
         before=before,
+        before_id=before_id,
     ).parsed
 
 
@@ -131,6 +140,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     limit: int | Unset = 20,
     before: datetime.datetime | Unset = UNSET,
+    before_id: str | Unset = UNSET,
 ) -> Response[ListInstantEvalRunsResponse200]:
     """List the project's runs, newest first. The project comes from the credential, so a run of another
     project is never listed. Page through them with before, which takes the created time of the oldest
@@ -139,6 +149,7 @@ async def asyncio_detailed(
     Args:
         limit (int | Unset):  Default: 20.
         before (datetime.datetime | Unset):
+        before_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,6 +162,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         limit=limit,
         before=before,
+        before_id=before_id,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -163,6 +175,7 @@ async def asyncio(
     client: AuthenticatedClient,
     limit: int | Unset = 20,
     before: datetime.datetime | Unset = UNSET,
+    before_id: str | Unset = UNSET,
 ) -> ListInstantEvalRunsResponse200 | None:
     """List the project's runs, newest first. The project comes from the credential, so a run of another
     project is never listed. Page through them with before, which takes the created time of the oldest
@@ -171,6 +184,7 @@ async def asyncio(
     Args:
         limit (int | Unset):  Default: 20.
         before (datetime.datetime | Unset):
+        before_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -185,5 +199,6 @@ async def asyncio(
             client=client,
             limit=limit,
             before=before,
+            before_id=before_id,
         )
     ).parsed

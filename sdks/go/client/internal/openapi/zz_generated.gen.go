@@ -25752,8 +25752,11 @@ type ListInstantEvalRunsParams struct {
 	// Limit Runs to list, at most one hundred.
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 
-	// Before List runs accepted strictly before this instant, as an ISO 8601 timestamp. This is the list's cursor.
+	// Before List runs accepted strictly before this instant, as an ISO 8601 timestamp. Half of the list's cursor: pass `beforeId` with it.
 	Before *time.Time `form:"before,omitempty" json:"before,omitempty"`
+
+	// BeforeId The id of the last run of the previous page. Two runs can share an instant, so this is what keeps a page from skipping the others written in the same millisecond.
+	BeforeId *string `form:"beforeId,omitempty" json:"beforeId,omitempty"`
 }
 
 // ListInstantEvalRuns200JSONResponseBodyRunsParameters0 defines parameters for ListInstantEvalRuns.
@@ -86956,6 +86959,18 @@ func NewListInstantEvalRunsRequest(server string, params *ListInstantEvalRunsPar
 
 		}
 
+		if params.BeforeId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "beforeId", *params.BeforeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -106312,10 +106327,10 @@ type ListInstantEvalRunsResponse struct {
 			// Limit Rows this run may judge.
 			Limit int `json:"limit"`
 
-			// Matched Judgements that matched, in total.
-			Matched int `json:"matched"`
+			// Matched Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count.
+			Matched *int `json:"matched"`
 
-			// MatchedByQuestion Judgements that matched, per question.
+			// MatchedByQuestion Per question: matches for a boolean question, judged rows for a score or a category one.
 			MatchedByQuestion map[string]float32 `json:"matchedByQuestion"`
 
 			// Name What the run was called, if anything.
@@ -106421,10 +106436,10 @@ type CreateInstantEvalRunResponse struct {
 		// Limit Rows this run may judge.
 		Limit int `json:"limit"`
 
-		// Matched Judgements that matched, in total.
-		Matched int `json:"matched"`
+		// Matched Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count.
+		Matched *int `json:"matched"`
 
-		// MatchedByQuestion Judgements that matched, per question.
+		// MatchedByQuestion Per question: matches for a boolean question, judged rows for a score or a category one.
 		MatchedByQuestion map[string]float32 `json:"matchedByQuestion"`
 
 		// Name What the run was called, if anything.
@@ -106514,6 +106529,9 @@ type EstimateInstantEvalRunResponse struct {
 		// CostUsd What the run would cost us, in United States dollars.
 		CostUsd float32 `json:"costUsd"`
 
+		// IsRowsCapped Whether the statement matches more rows than the run may judge.
+		IsRowsCapped bool `json:"isRowsCapped"`
+
 		// PriceUsd What the run would cost you, in United States dollars.
 		PriceUsd float32 `json:"priceUsd"`
 
@@ -106522,9 +106540,6 @@ type EstimateInstantEvalRunResponse struct {
 
 		// Rows Rows the statement matches, bounded by the run's limit.
 		Rows int `json:"rows"`
-
-		// RowsCapped Whether the statement matches more rows than the run may judge.
-		RowsCapped bool `json:"rowsCapped"`
 
 		// TotalTokens Input tokens the whole run would send.
 		TotalTokens int `json:"totalTokens"`
@@ -106580,10 +106595,10 @@ type GetInstantEvalRunResponse struct {
 		// Limit Rows this run may judge.
 		Limit int `json:"limit"`
 
-		// Matched Judgements that matched, in total.
-		Matched int `json:"matched"`
+		// Matched Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count.
+		Matched *int `json:"matched"`
 
-		// MatchedByQuestion Judgements that matched, per question.
+		// MatchedByQuestion Per question: matches for a boolean question, judged rows for a score or a category one.
 		MatchedByQuestion map[string]float32 `json:"matchedByQuestion"`
 
 		// Name What the run was called, if anything.
@@ -106688,10 +106703,10 @@ type CancelInstantEvalRunResponse struct {
 		// Limit Rows this run may judge.
 		Limit int `json:"limit"`
 
-		// Matched Judgements that matched, in total.
-		Matched int `json:"matched"`
+		// Matched Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count.
+		Matched *int `json:"matched"`
 
-		// MatchedByQuestion Judgements that matched, per question.
+		// MatchedByQuestion Per question: matches for a boolean question, judged rows for a score or a category one.
 		MatchedByQuestion map[string]float32 `json:"matchedByQuestion"`
 
 		// Name What the run was called, if anything.
@@ -132728,10 +132743,10 @@ func ParseListInstantEvalRunsResponse(rsp *http.Response) (*ListInstantEvalRunsR
 				// Limit Rows this run may judge.
 				Limit int `json:"limit"`
 
-				// Matched Judgements that matched, in total.
-				Matched int `json:"matched"`
+				// Matched Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count.
+				Matched *int `json:"matched"`
 
-				// MatchedByQuestion Judgements that matched, per question.
+				// MatchedByQuestion Per question: matches for a boolean question, judged rows for a score or a category one.
 				MatchedByQuestion map[string]float32 `json:"matchedByQuestion"`
 
 				// Name What the run was called, if anything.
@@ -132833,10 +132848,10 @@ func ParseCreateInstantEvalRunResponse(rsp *http.Response) (*CreateInstantEvalRu
 			// Limit Rows this run may judge.
 			Limit int `json:"limit"`
 
-			// Matched Judgements that matched, in total.
-			Matched int `json:"matched"`
+			// Matched Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count.
+			Matched *int `json:"matched"`
 
-			// MatchedByQuestion Judgements that matched, per question.
+			// MatchedByQuestion Per question: matches for a boolean question, judged rows for a score or a category one.
 			MatchedByQuestion map[string]float32 `json:"matchedByQuestion"`
 
 			// Name What the run was called, if anything.
@@ -132922,6 +132937,9 @@ func ParseEstimateInstantEvalRunResponse(rsp *http.Response) (*EstimateInstantEv
 			// CostUsd What the run would cost us, in United States dollars.
 			CostUsd float32 `json:"costUsd"`
 
+			// IsRowsCapped Whether the statement matches more rows than the run may judge.
+			IsRowsCapped bool `json:"isRowsCapped"`
+
 			// PriceUsd What the run would cost you, in United States dollars.
 			PriceUsd float32 `json:"priceUsd"`
 
@@ -132930,9 +132948,6 @@ func ParseEstimateInstantEvalRunResponse(rsp *http.Response) (*EstimateInstantEv
 
 			// Rows Rows the statement matches, bounded by the run's limit.
 			Rows int `json:"rows"`
-
-			// RowsCapped Whether the statement matches more rows than the run may judge.
-			RowsCapped bool `json:"rowsCapped"`
 
 			// TotalTokens Input tokens the whole run would send.
 			TotalTokens int `json:"totalTokens"`
@@ -132984,10 +132999,10 @@ func ParseGetInstantEvalRunResponse(rsp *http.Response) (*GetInstantEvalRunRespo
 			// Limit Rows this run may judge.
 			Limit int `json:"limit"`
 
-			// Matched Judgements that matched, in total.
-			Matched int `json:"matched"`
+			// Matched Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count.
+			Matched *int `json:"matched"`
 
-			// MatchedByQuestion Judgements that matched, per question.
+			// MatchedByQuestion Per question: matches for a boolean question, judged rows for a score or a category one.
 			MatchedByQuestion map[string]float32 `json:"matchedByQuestion"`
 
 			// Name What the run was called, if anything.
@@ -133088,10 +133103,10 @@ func ParseCancelInstantEvalRunResponse(rsp *http.Response) (*CancelInstantEvalRu
 			// Limit Rows this run may judge.
 			Limit int `json:"limit"`
 
-			// Matched Judgements that matched, in total.
-			Matched int `json:"matched"`
+			// Matched Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count.
+			Matched *int `json:"matched"`
 
-			// MatchedByQuestion Judgements that matched, per question.
+			// MatchedByQuestion Per question: matches for a boolean question, judged rows for a score or a category one.
 			MatchedByQuestion map[string]float32 `json:"matchedByQuestion"`
 
 			// Name What the run was called, if anything.

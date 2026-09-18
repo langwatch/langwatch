@@ -1,7 +1,7 @@
 /**
  * Whether a statement can be a run, decided before anything is spent.
  *
- * Three gates, in an order that is load-bearing:
+ * Three gates, in an order that matters:
  *
  *  1. **The reserved names**, first, because the run's own wrapper binds them
  *     and a statement that declares one would be paged by a value it wrote.

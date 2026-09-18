@@ -48,14 +48,35 @@ export interface InstantEvalRunDefinition {
 export interface InstantEvalRunListQuery {
   readonly projectId: string;
   readonly limit: number;
-  /** Runs created strictly before this instant, which is the list's cursor. */
+  /** Runs created strictly before this instant, the first half of the cursor. */
   readonly before?: Date;
+  /**
+   * The id the previous page ended on, the second half.
+   *
+   * Two runs can share a `createdAt`, so the instant alone is not a total
+   * order: a page ending between them would skip every other run written in
+   * the same millisecond.
+   */
+  readonly beforeId?: string;
 }
 
 export interface InstantEvalRunRepository {
   create(definition: InstantEvalRunDefinition): Promise<Row>;
   findById(input: { projectId: string; runId: string }): Promise<Row | null>;
   list(query: InstantEvalRunListQuery): Promise<Row[]>;
+  /**
+   * Fails a run whose start was never dispatched.
+   *
+   * The only write on this side that is not the projection's: every other
+   * status change is folded from an event, and this one has no event to fold
+   * because the command that would have produced it is what failed. Scoped to
+   * a run still queued so it can never overtake a run that did start.
+   */
+  fail(input: {
+    projectId: string;
+    runId: string;
+    code: string;
+  }): Promise<void>;
 }
 
 export class PrismaInstantEvalRunRepository
@@ -91,11 +112,46 @@ export class PrismaInstantEvalRunRepository
     });
   }
 
-  async list({ projectId, limit, before }: InstantEvalRunListQuery) {
+  async list({ projectId, limit, before, beforeId }: InstantEvalRunListQuery) {
+    // Ordered and paged by the pair, because two runs can share a createdAt:
+    // a page that ended between them would, with `createdAt < before` alone,
+    // skip every other run written in that same millisecond. The id breaks
+    // the tie and is unique, so the order is total.
     return await this.prisma.instantEvalRun.findMany({
-      where: { projectId, ...(before ? { createdAt: { lt: before } } : {}) },
-      orderBy: { createdAt: "desc" },
+      where: {
+        projectId,
+        ...(before
+          ? {
+              OR: [
+                { createdAt: { lt: before } },
+                ...(beforeId
+                  ? [{ createdAt: before, id: { lt: beforeId } }]
+                  : []),
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit,
+    });
+  }
+
+  async fail({
+    projectId,
+    runId,
+    code,
+  }: {
+    projectId: string;
+    runId: string;
+    code: string;
+  }): Promise<void> {
+    await this.prisma.instantEvalRun.updateMany({
+      where: { id: runId, projectId, status: InstantEvalRunStatus.QUEUED },
+      data: {
+        status: InstantEvalRunStatus.FAILED,
+        error: code,
+        finishedAt: new Date(),
+      },
     });
   }
 }
@@ -167,7 +223,7 @@ export class PrismaInstantEvalRunProjectionStore
         status: state.status as InstantEvalRunStatus,
         total: state.total,
         progress: state.progress,
-        matched: state.matched,
+        matched: state.matched ?? null,
         matchedByQuestion: state.matchedByQuestion as Prisma.InputJsonValue,
         failed: state.failed,
         skipped: state.skipped,

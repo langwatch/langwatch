@@ -72,6 +72,14 @@ export const instantEvalJudgePageIntentSchema = z.object({
   page: z.number().int().positive(),
   /** The trace id the previous page ended on, or null for the first page. */
   afterTraceId: z.string().nullable(),
+  /**
+   * The span id the previous page ended on.
+   *
+   * Null for a statement whose rows are one per trace. A statement projecting
+   * `SpanId` has several rows per trace, so the page boundary is the pair and
+   * a cursor on the trace alone would skip a trace's remaining spans.
+   */
+  afterSpanId: z.string().nullable().default(null),
   pageSize: z.number().int().positive(),
   /** Rows the run may still judge, which bounds the last page. */
   remaining: z.number().int().nonnegative(),
@@ -94,6 +102,8 @@ export interface InstantEvalProcessState {
   readonly page: number;
   /** The trace id the last judged page ended on. */
   readonly cursor: string | null;
+  /** The span id the last judged page ended on, for a span-keyed statement. */
+  readonly cursorSpanId: string | null;
   readonly pageSize: number;
   readonly keyColumns: readonly string[];
   /** Rows the run may still judge. */
@@ -110,6 +120,7 @@ export const INITIAL_INSTANT_EVAL_STATE: InstantEvalProcessState = {
   phase: "idle",
   page: 0,
   cursor: null,
+  cursorSpanId: null,
   pageSize: 0,
   keyColumns: [],
   remaining: 0,
@@ -141,6 +152,7 @@ export const instantEvalProcessEventViewSchema = z.object({
   inputTokens: z.number().default(0),
   requests: z.number().default(0),
   cursor: z.string().nullable().default(null),
+  cursorSpanId: z.string().nullable().default(null),
   hasNextPage: z.boolean().default(false),
 });
 

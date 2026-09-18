@@ -108,7 +108,15 @@ export const instantEvalListQuerySchema = z.object({
     .datetime({ offset: true })
     .optional()
     .describe(
-      "List runs accepted strictly before this instant, as an ISO 8601 timestamp. This is the list's cursor.",
+      "List runs accepted strictly before this instant, as an ISO 8601 timestamp. Half of the list's cursor: pass `beforeId` with it.",
+    ),
+  beforeId: z
+    .string()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe(
+      "The id of the last run of the previous page. Two runs can share an instant, so this is what keeps a page from skipping the others written in the same millisecond.",
     ),
 });
 

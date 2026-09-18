@@ -1695,12 +1695,12 @@ const JUDGMENTS: LangWatchQLViewDefinition = {
     "One row per Instant Eval run, trace and question, with the verdict the judge gave.",
   gates: [],
   grain:
-    "one row per (TenantId, RunId, TraceId, QuestionId), latest version only",
+    "one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only",
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "CreatedAt",
   freshness: PROJECTION_FRESHNESS,
   dedup: {
-    keyColumns: ["TenantId", "RunId", "TraceId", "QuestionId"],
+    keyColumns: ["TenantId", "RunId", "TraceId", "SpanId", "QuestionId"],
     versionColumn: "UpdatedAt",
   },
   columns: [

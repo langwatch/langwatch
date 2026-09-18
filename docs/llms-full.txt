@@ -66299,6 +66299,10 @@ Two things are required beyond what the query family already validates:
 
 Anything else the query validator refuses is refused here too, with the code `instant_eval_query_invalid` and the same violations in `meta`. A statement that validates but projects neither of the two required columns answers `instant_eval_query_missing_columns`, naming what is absent.
 
+Project `SpanId` as well when your statement has one row per span rather than one per trace. That is what tells the run to address a judgement by the trace and the span together, so the spans of one trace come back as separate verdicts.
+
+Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your statement once to count it and twice per page, and a `LIMIT` with no order lets the database return a different set of rows each time, so the pages are not guaranteed to cover one fixed set.
+
 ```sql
 SELECT
   TraceId,
@@ -66341,8 +66345,8 @@ When the statement matches more rows than the limit, the run judges the first pa
 | `status` | `QUEUED`, `PLANNING`, `RUNNING`, `FINISHED`, `FAILED` or `CANCELLED` |
 | `total` | Rows the statement matched, once the run has counted them |
 | `progress` | Rows judged so far |
-| `matched` | Judgements that matched, in total |
-| `matchedByQuestion` | The same count per question |
+| `matched` | Judgements that matched, across the boolean questions. Null when the run asked none |
+| `matchedByQuestion` | Matches for a boolean question, judged rows for a score or a category one |
 | `failed` | Rows the judge could not answer |
 | `skipped` | Rows the judge declined, for instance because the text was too large |
 | `tokens` | Input tokens billed so far |
@@ -66358,9 +66362,9 @@ When the statement matches more rows than the limit, the run judges the first pa
 GET /api/v1/instant-evals/run_123/results?questionId=refused&matched=true&limit=200
 ```
 
-A judgement names the trace, the question, the verdict and when it was made. Boolean questions carry `passed` and `probability`, score questions carry `score`, category questions carry `label` and the distribution in `probabilities`. A row the judge declined carries a `skippedReason` instead.
+A judgement names the trace, the span, the question, the verdict and when it was made. Boolean questions carry `passed` and `probability`, score questions carry `score`, category questions carry `label` and the distribution in `probabilities`. A row the judge declined carries a `skippedReason` instead.
 
-The judged text is not stored. `GET /api/v1/instant-evals/{id}/sample?n=5` re-reads a few rows through the original statement and returns them next to their verdicts, which is how you check a run answered the question you meant to ask.
+The judged text is not stored. `GET /api/v1/instant-evals/{id}/sample?n=5` re-reads a few rows through the original statement and returns them next to their verdicts, which is how you check a run answered the question you meant to ask. The rows differ between calls, and a run with a boolean question shows the rows that matched first.
 
 ## Cancelling
 

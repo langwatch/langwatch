@@ -45,7 +45,8 @@ Feature: What an Instant Eval run costs, and what the customer is charged
     And its reference is the run's own id
 
   @unit
-  Scenario: A cost that cannot be written does not fail the run
+  Scenario: A cost that cannot be written is retried, not dropped
     Given a run whose cost row write fails
     When it finishes
-    Then the run is still finished and the failure is logged
+    Then the failure is raised so the finish is delivered again
+    And the retry writes the same cost row rather than a second one

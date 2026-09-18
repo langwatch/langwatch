@@ -28937,8 +28937,10 @@ export interface operations {
             query?: {
                 /** @description Runs to list, at most one hundred. */
                 limit?: number;
-                /** @description List runs accepted strictly before this instant, as an ISO 8601 timestamp. This is the list's cursor. */
+                /** @description List runs accepted strictly before this instant, as an ISO 8601 timestamp. Half of the list's cursor: pass `beforeId` with it. */
                 before?: string;
+                /** @description The id of the last run of the previous page. Two runs can share an instant, so this is what keeps a page from skipping the others written in the same millisecond. */
+                beforeId?: string;
             };
             header?: never;
             path?: never;
@@ -28992,9 +28994,9 @@ export interface operations {
                             total: number | null;
                             /** @description Rows judged so far. */
                             progress: number;
-                            /** @description Judgements that matched, in total. */
-                            matched: number;
-                            /** @description Judgements that matched, per question. */
+                            /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                            matched: number | null;
+                            /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
                             matchedByQuestion: {
                                 [key: string]: number;
                             };
@@ -29092,9 +29094,9 @@ export interface operations {
                         total: number | null;
                         /** @description Rows judged so far. */
                         progress: number;
-                        /** @description Judgements that matched, in total. */
-                        matched: number;
-                        /** @description Judgements that matched, per question. */
+                        /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                        matched: number | null;
+                        /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
                         matchedByQuestion: {
                             [key: string]: number;
                         };
@@ -29157,7 +29159,7 @@ export interface operations {
                         /** @description Rows the statement matches, bounded by the run's limit. */
                         rows: number;
                         /** @description Whether the statement matches more rows than the run may judge. */
-                        rowsCapped: boolean;
+                        isRowsCapped: boolean;
                         /** @description Input tokens one judged row sends, measured from a sample. */
                         avgTokens: number;
                         /** @description Input tokens the whole run would send. */
@@ -29229,9 +29231,9 @@ export interface operations {
                         total: number | null;
                         /** @description Rows judged so far. */
                         progress: number;
-                        /** @description Judgements that matched, in total. */
-                        matched: number;
-                        /** @description Judgements that matched, per question. */
+                        /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                        matched: number | null;
+                        /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
                         matchedByQuestion: {
                             [key: string]: number;
                         };
@@ -29316,9 +29318,9 @@ export interface operations {
                         total: number | null;
                         /** @description Rows judged so far. */
                         progress: number;
-                        /** @description Judgements that matched, in total. */
-                        matched: number;
-                        /** @description Judgements that matched, per question. */
+                        /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                        matched: number | null;
+                        /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
                         matchedByQuestion: {
                             [key: string]: number;
                         };

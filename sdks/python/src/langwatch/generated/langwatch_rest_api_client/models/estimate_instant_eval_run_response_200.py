@@ -14,7 +14,7 @@ class EstimateInstantEvalRunResponse200:
     """
     Attributes:
         rows (int): Rows the statement matches, bounded by the run's limit.
-        rows_capped (bool): Whether the statement matches more rows than the run may judge.
+        is_rows_capped (bool): Whether the statement matches more rows than the run may judge.
         avg_tokens (int): Input tokens one judged row sends, measured from a sample.
         total_tokens (int): Input tokens the whole run would send.
         requests (int): Classifications the run would make, one per judged row.
@@ -23,7 +23,7 @@ class EstimateInstantEvalRunResponse200:
     """
 
     rows: int
-    rows_capped: bool
+    is_rows_capped: bool
     avg_tokens: int
     total_tokens: int
     requests: int
@@ -34,7 +34,7 @@ class EstimateInstantEvalRunResponse200:
     def to_dict(self) -> dict[str, Any]:
         rows = self.rows
 
-        rows_capped = self.rows_capped
+        is_rows_capped = self.is_rows_capped
 
         avg_tokens = self.avg_tokens
 
@@ -51,7 +51,7 @@ class EstimateInstantEvalRunResponse200:
         field_dict.update(
             {
                 "rows": rows,
-                "rowsCapped": rows_capped,
+                "isRowsCapped": is_rows_capped,
                 "avgTokens": avg_tokens,
                 "totalTokens": total_tokens,
                 "requests": requests,
@@ -67,7 +67,7 @@ class EstimateInstantEvalRunResponse200:
         d = dict(src_dict)
         rows = d.pop("rows")
 
-        rows_capped = d.pop("rowsCapped")
+        is_rows_capped = d.pop("isRowsCapped")
 
         avg_tokens = d.pop("avgTokens")
 
@@ -81,7 +81,7 @@ class EstimateInstantEvalRunResponse200:
 
         estimate_instant_eval_run_response_200 = cls(
             rows=rows,
-            rows_capped=rows_capped,
+            is_rows_capped=is_rows_capped,
             avg_tokens=avg_tokens,
             total_tokens=total_tokens,
             requests=requests,

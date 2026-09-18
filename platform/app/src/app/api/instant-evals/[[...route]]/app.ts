@@ -174,6 +174,7 @@ const registerCollectionEndpoints = (v: InstantEvalsVersion): void => {
         ...(query.before === undefined
           ? {}
           : { before: new Date(query.before) }),
+        ...(query.beforeId === undefined ? {} : { beforeId: query.beforeId }),
       });
       return { runs: rows.map(toInstantEvalRunWire) };
     },
@@ -255,7 +256,7 @@ const registerResultsEndpoint = (v: InstantEvalsVersion): void => {
         ...(query.questionId === undefined
           ? {}
           : { questionId: query.questionId }),
-        ...(query.matched === undefined ? {} : { matched: query.matched }),
+        ...(query.matched === undefined ? {} : { isMatched: query.matched }),
         ...(query.status === undefined ? {} : { status: query.status }),
         ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
       });

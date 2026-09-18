@@ -6,6 +6,15 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.list_agents_response_200_data_item_not_selectable_reason_type_1 import (
+    ListAgentsResponse200DataItemNotSelectableReasonType1,
+)
+from ..models.list_agents_response_200_data_item_not_selectable_reason_type_2_type_1 import (
+    ListAgentsResponse200DataItemNotSelectableReasonType2Type1,
+)
+from ..models.list_agents_response_200_data_item_not_selectable_reason_type_3_type_1 import (
+    ListAgentsResponse200DataItemNotSelectableReasonType3Type1,
+)
 from ..models.list_agents_response_200_data_item_status import ListAgentsResponse200DataItemStatus
 from ..models.list_agents_response_200_data_item_type import ListAgentsResponse200DataItemType
 
@@ -43,6 +52,13 @@ class ListAgentsResponse200DataItem:
             connected; offline otherwise, and always for every other kind.
         instances (list[ListAgentsResponse200DataItemInstancesItem]): The processes currently connected for a connected
             agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind.
+        selectable (bool): Whether the credential making this request can run simulations against the agent. False for a
+            personal development agent that belongs to somebody else, which is listed all the same so it can be told apart
+            from the other agents of the same name.
+        not_selectable_reason (ListAgentsResponse200DataItemNotSelectableReasonType1 |
+            ListAgentsResponse200DataItemNotSelectableReasonType2Type1 |
+            ListAgentsResponse200DataItemNotSelectableReasonType3Type1 | None): Why the agent cannot be run by this
+            credential. Null when it can.
         created_at (str):
         updated_at (str):
         platform_url (str):
@@ -60,6 +76,13 @@ class ListAgentsResponse200DataItem:
     owner: ListAgentsResponse200DataItemOwnerType0 | None
     status: ListAgentsResponse200DataItemStatus
     instances: list[ListAgentsResponse200DataItemInstancesItem]
+    selectable: bool
+    not_selectable_reason: (
+        ListAgentsResponse200DataItemNotSelectableReasonType1
+        | ListAgentsResponse200DataItemNotSelectableReasonType2Type1
+        | ListAgentsResponse200DataItemNotSelectableReasonType3Type1
+        | None
+    )
     created_at: str
     updated_at: str
     platform_url: str
@@ -111,6 +134,18 @@ class ListAgentsResponse200DataItem:
             instances_item = instances_item_data.to_dict()
             instances.append(instances_item)
 
+        selectable = self.selectable
+
+        not_selectable_reason: None | str
+        if isinstance(self.not_selectable_reason, ListAgentsResponse200DataItemNotSelectableReasonType1):
+            not_selectable_reason = self.not_selectable_reason.value
+        elif isinstance(self.not_selectable_reason, ListAgentsResponse200DataItemNotSelectableReasonType2Type1):
+            not_selectable_reason = self.not_selectable_reason.value
+        elif isinstance(self.not_selectable_reason, ListAgentsResponse200DataItemNotSelectableReasonType3Type1):
+            not_selectable_reason = self.not_selectable_reason.value
+        else:
+            not_selectable_reason = self.not_selectable_reason
+
         created_at = self.created_at
 
         updated_at = self.updated_at
@@ -133,6 +168,8 @@ class ListAgentsResponse200DataItem:
                 "owner": owner,
                 "status": status,
                 "instances": instances,
+                "selectable": selectable,
+                "notSelectableReason": not_selectable_reason,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
                 "platformUrl": platform_url,
@@ -233,6 +270,52 @@ class ListAgentsResponse200DataItem:
 
             instances.append(instances_item)
 
+        selectable = d.pop("selectable")
+
+        def _parse_not_selectable_reason(
+            data: object,
+        ) -> (
+            ListAgentsResponse200DataItemNotSelectableReasonType1
+            | ListAgentsResponse200DataItemNotSelectableReasonType2Type1
+            | ListAgentsResponse200DataItemNotSelectableReasonType3Type1
+            | None
+        ):
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                not_selectable_reason_type_1 = ListAgentsResponse200DataItemNotSelectableReasonType1(data)
+
+                return not_selectable_reason_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                not_selectable_reason_type_2_type_1 = ListAgentsResponse200DataItemNotSelectableReasonType2Type1(data)
+
+                return not_selectable_reason_type_2_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                not_selectable_reason_type_3_type_1 = ListAgentsResponse200DataItemNotSelectableReasonType3Type1(data)
+
+                return not_selectable_reason_type_3_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(
+                ListAgentsResponse200DataItemNotSelectableReasonType1
+                | ListAgentsResponse200DataItemNotSelectableReasonType2Type1
+                | ListAgentsResponse200DataItemNotSelectableReasonType3Type1
+                | None,
+                data,
+            )
+
+        not_selectable_reason = _parse_not_selectable_reason(d.pop("notSelectableReason"))
+
         created_at = d.pop("createdAt")
 
         updated_at = d.pop("updatedAt")
@@ -252,6 +335,8 @@ class ListAgentsResponse200DataItem:
             owner=owner,
             status=status,
             instances=instances,
+            selectable=selectable,
+            not_selectable_reason=not_selectable_reason,
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,

@@ -15,13 +15,13 @@ T = TypeVar("T", bound="PostApiAnnotationsTraceIdBody")
 class PostApiAnnotationsTraceIdBody:
     """
     Attributes:
-        comment (str | Unset):
-        is_thumbs_up (bool | Unset):
+        comment (str):
+        is_thumbs_up (bool):
         email (str | Unset):
     """
 
-    comment: str | Unset = UNSET
-    is_thumbs_up: bool | Unset = UNSET
+    comment: str
+    is_thumbs_up: bool
     email: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -34,11 +34,12 @@ class PostApiAnnotationsTraceIdBody:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if comment is not UNSET:
-            field_dict["comment"] = comment
-        if is_thumbs_up is not UNSET:
-            field_dict["isThumbsUp"] = is_thumbs_up
+        field_dict.update(
+            {
+                "comment": comment,
+                "isThumbsUp": is_thumbs_up,
+            }
+        )
         if email is not UNSET:
             field_dict["email"] = email
 
@@ -47,9 +48,9 @@ class PostApiAnnotationsTraceIdBody:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        comment = d.pop("comment", UNSET)
+        comment = d.pop("comment")
 
-        is_thumbs_up = d.pop("isThumbsUp", UNSET)
+        is_thumbs_up = d.pop("isThumbsUp")
 
         email = d.pop("email", UNSET)
 

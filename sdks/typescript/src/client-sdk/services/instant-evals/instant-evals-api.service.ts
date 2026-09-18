@@ -114,10 +114,14 @@ export class InstantEvalsApiService {
   async list(options?: {
     limit?: number;
     before?: string;
+    beforeId?: string;
   }): Promise<InstantEvalRun[]> {
     const query = {
       ...(options?.limit === undefined ? {} : { limit: options.limit }),
       ...(options?.before === undefined ? {} : { before: options.before }),
+      ...(options?.beforeId === undefined
+        ? {}
+        : { beforeId: options.beforeId }),
     };
     const { data, error, response } = await this.apiClient.GET(
       "/api/v1/instant-evals",
@@ -160,7 +164,7 @@ export class InstantEvalsApiService {
     id: string,
     options?: {
       questionId?: string;
-      matched?: boolean;
+      isMatched?: boolean;
       status?: InstantEvalJudgment["status"];
       limit?: number;
       cursor?: string;
@@ -170,9 +174,11 @@ export class InstantEvalsApiService {
       ...(options?.questionId === undefined
         ? {}
         : { questionId: options.questionId }),
-      ...(options?.matched === undefined
+      // The query key stays `matched`, which is what the endpoint reads; the
+      // option is named for what it is, which is a boolean.
+      ...(options?.isMatched === undefined
         ? {}
-        : { matched: options.matched ? "true" : "false" }),
+        : { matched: options.isMatched ? "true" : "false" }),
       ...(options?.status === undefined ? {} : { status: options.status }),
       ...(options?.limit === undefined ? {} : { limit: options.limit }),
       ...(options?.cursor === undefined ? {} : { cursor: options.cursor }),

@@ -11,15 +11,17 @@
  * the ids it belongs to, and reading the text back is the sample endpoint's job.
  *
  * @see ./questions.ts: where the questions come from
+ * @see ./verdicts.ts: how one judged cell is read
  * @see ../../../clickhouse/migrations/00097_create_instant_eval_judgments.sql
  */
 
-import { INSTANT_EVAL_TRACE_COLUMN } from "./composition";
 import {
-  INSTANT_EVAL_DEFAULT_THRESHOLD,
-  type InstantEvalRunQuestion,
-} from "./questions";
+  INSTANT_EVAL_SPAN_COLUMN,
+  INSTANT_EVAL_TRACE_COLUMN,
+} from "./composition";
+import type { InstantEvalRunQuestion } from "./questions";
 import type { InstantEvalRowKey } from "./row-source";
+import { countsForQuestion, isBooleanMatch, verdictOf } from "./verdicts";
 
 /** Whether a judgement was made, declined, or attempted and lost. */
 export const INSTANT_EVAL_JUDGMENT_STATUSES = [
@@ -57,112 +59,27 @@ export interface InstantEvalPageCounters {
   /** Rows judged, which is rows of the page that came back. */
   readonly rows: number;
   /** Judgements that matched, across every question. */
-  readonly matched: number;
+  /**
+   * Judgements that matched, across the run's BOOLEAN questions only.
+   *
+   * A boolean question asked something that is either true of the text or
+   * not, so counting the trues is a number that means something. A score and
+   * a category have no "yes", and adding their judged rows in here would make
+   * the headline count read as "matches" while being mostly "rows we looked
+   * at". Null when the run asked no boolean question at all.
+   */
+  readonly matched: number | null;
+  /**
+   * Per question: matches for a boolean one, judged rows for the others.
+   *
+   * The per-question number is what a caller reads beside the question, where
+   * the kind is right there and the meaning is unambiguous.
+   */
   readonly matchedByQuestion: Readonly<Record<string, number>>;
   /** Judgements the judge attempted and lost. */
   readonly failed: number;
   /** Judgements the judge declined to make. */
   readonly skipped: number;
-}
-
-/** The columns a verdict fills, one kind of question each. */
-interface InstantEvalVerdictColumns {
-  readonly passed: number | null;
-  readonly score: number | null;
-  readonly label: string;
-  readonly probability: number | null;
-  readonly probabilities: string;
-}
-
-/**
- * A verdict that fills none of them.
- *
- * Also the answer for a cell whose type does not match what its question
- * reads. That is not defensive padding: hydration writes whatever the
- * classifier returned, and a column read as a score that came back a string
- * has no score in it. Writing the empty verdict records the judgement as
- * present with no value rather than inventing a zero.
- */
-const EMPTY_VERDICT: InstantEvalVerdictColumns = {
-  passed: null,
-  score: null,
-  label: "",
-  probability: null,
-  probabilities: "",
-};
-
-const NUMBER_CELL = (cell: unknown): number | null =>
-  typeof cell === "number" ? cell : null;
-
-const TEXT_CELL = (cell: unknown): string | null =>
-  typeof cell === "string" && cell !== "" ? cell : null;
-
-/** One reader per `reads`, so the whole mapping is a table rather than a switch. */
-const VERDICT_READERS: Record<
-  InstantEvalRunQuestion["reads"],
-  (input: {
-    cell: unknown;
-    question: InstantEvalRunQuestion;
-  }) => InstantEvalVerdictColumns
-> = {
-  probability: ({ cell, question }) => {
-    const probability = NUMBER_CELL(cell);
-    if (probability === null) return EMPTY_VERDICT;
-    const threshold = question.threshold ?? INSTANT_EVAL_DEFAULT_THRESHOLD;
-    return {
-      ...EMPTY_VERDICT,
-      probability,
-      passed: probability >= threshold ? 1 : 0,
-    };
-  },
-  passed: ({ cell }) => ({ ...EMPTY_VERDICT, passed: NUMBER_CELL(cell) }),
-  score: ({ cell }) => ({ ...EMPTY_VERDICT, score: NUMBER_CELL(cell) }),
-  label: ({ cell }) => ({
-    ...EMPTY_VERDICT,
-    label: TEXT_CELL(cell) ?? "",
-  }),
-  probabilities: ({ cell }) => ({
-    ...EMPTY_VERDICT,
-    probabilities: TEXT_CELL(cell) ?? "",
-  }),
-};
-
-/** The verdict a cell carries, read according to what its question publishes. */
-function verdictOf({
-  question,
-  cell,
-}: {
-  question: InstantEvalRunQuestion;
-  cell: unknown;
-}): InstantEvalVerdictColumns {
-  return (VERDICT_READERS[question.reads] ?? VERDICT_READERS.probabilities)({
-    cell,
-    question,
-  });
-}
-
-/**
- * Whether a judgement counts as a match.
- *
- * Only a boolean question has matches: it asked something that is either true
- * of the text or not, and the run's headline number is how many were. A score
- * and a category have no "yes" to count, so for them the number a run reports
- * per question is how many rows were judged at all, which is what a caller
- * then groups by label or averages in SQL.
- */
-function isMatch({
-  question,
-  verdict,
-}: {
-  question: InstantEvalRunQuestion;
-  verdict: ReturnType<typeof verdictOf>;
-}): boolean {
-  if (question.kind === "boolean") return verdict.passed === 1;
-  return (
-    verdict.score !== null ||
-    verdict.label !== "" ||
-    verdict.probabilities !== ""
-  );
 }
 
 /**
@@ -177,6 +94,15 @@ function isAnswered(cell: unknown): boolean {
   return cell !== null && cell !== undefined && cell !== "";
 }
 
+/** One judged cell, as the page mapping produced it. */
+interface InstantEvalMappedJudgment {
+  readonly record: InstantEvalJudgmentRecord;
+  /** Whether a boolean question came back true. Feeds the run's own total. */
+  readonly isBooleanMatch: boolean;
+  /** Whether it counts toward its own question's number. */
+  readonly countsForQuestion: boolean;
+}
+
 export interface InstantEvalPageMapping {
   readonly records: readonly InstantEvalJudgmentRecord[];
   readonly counters: InstantEvalPageCounters;
@@ -188,9 +114,9 @@ export interface InstantEvalPageMapping {
  * One reason for the page rather than one per row, because that is the grain
  * the classifier reports at: it answers per text, and the hydration stage hands
  * back how many texts each reason accounted for, not which. Where a page saw
- * several reasons the commonest one is written, which is the honest summary of
- * a page that mostly hit one wall. `classifier_failed` breaks a tie, so a page
- * that lost rows is never reported as having declined them.
+ * several reasons the commonest one is written, which describes a page that
+ * mostly hit one wall. `classifier_failed` breaks a tie, so a page that lost
+ * rows is never reported as having declined them.
  */
 export function instantEvalSkipReason(
   skipped: Readonly<Record<string, number>>,
@@ -220,7 +146,7 @@ export function mapInstantEvalPage({
   runId,
   questions,
   rows,
-  keysByTraceId,
+  keys,
   skipReason,
   now,
 }: {
@@ -229,54 +155,99 @@ export function mapInstantEvalPage({
   readonly questions: readonly InstantEvalRunQuestion[];
   readonly rows: readonly Record<string, unknown>[];
   /** The key pass's own record of each row, which carries the thread and time. */
-  readonly keysByTraceId: ReadonlyMap<string, InstantEvalRowKey>;
+  readonly keys: readonly InstantEvalRowKey[];
   /** Why unanswered cells of this page went unjudged, when the page knows. */
   readonly skipReason: string;
   readonly now: number;
 }): InstantEvalPageMapping {
-  const records: InstantEvalJudgmentRecord[] = [];
-  const matchedByQuestion: Record<string, number> = {};
-  let matched = 0;
-  let failed = 0;
-  let skipped = 0;
-
-  // Every question of the run gets a key, so a page where one question matched
-  // nothing reports a zero rather than an absence a caller has to interpret.
-  for (const question of questions) matchedByQuestion[question.id] ??= 0;
-
+  const keysByRow = instantEvalKeyIndex(keys);
   const judged = rows.flatMap((row) =>
     judgementsForRow({
       tenantId,
       runId,
       questions,
       row,
-      keysByTraceId,
+      keysByRow,
       skipReason,
       now,
     }),
   );
 
-  for (const one of judged) {
-    records.push(one.record);
-    if (one.record.Status === "failed") failed += 1;
-    if (one.record.Status === "skipped") skipped += 1;
-    if (one.isMatch) {
-      matched += 1;
-      const id = one.record.QuestionId;
-      matchedByQuestion[id] = (matchedByQuestion[id] ?? 0) + 1;
-    }
-  }
-
   return {
-    records,
-    counters: {
-      rows: rows.length,
-      matched,
-      matchedByQuestion,
-      failed,
-      skipped,
-    },
+    records: judged.map((one) => one.record),
+    counters: tally({ judged, questions, rows: rows.length }),
   };
+}
+
+/** What a page's judgements add up to. */
+function tally({
+  judged,
+  questions,
+  rows,
+}: {
+  readonly judged: readonly InstantEvalMappedJudgment[];
+  readonly questions: readonly InstantEvalRunQuestion[];
+  readonly rows: number;
+}): InstantEvalPageCounters {
+  const hasBooleanQuestion = questions.some(
+    (question) => question.kind === "boolean",
+  );
+  return {
+    rows,
+    // Null rather than zero for a run with no boolean question: zero is a real
+    // answer ("no row matched") and such a run has no such answer to give.
+    matched: hasBooleanQuestion
+      ? judged.filter((one) => one.isBooleanMatch).length
+      : null,
+    matchedByQuestion: countPerQuestion({ judged, questions }),
+    failed: judged.filter((one) => one.record.Status === "failed").length,
+    skipped: judged.filter((one) => one.record.Status === "skipped").length,
+  };
+}
+
+/** Matches for a boolean question, judged rows for a score or a category one. */
+function countPerQuestion({
+  judged,
+  questions,
+}: {
+  readonly judged: readonly InstantEvalMappedJudgment[];
+  readonly questions: readonly InstantEvalRunQuestion[];
+}): Record<string, number> {
+  const counts: Record<string, number> = {};
+  // Every question of the run gets a key, so a page where one question matched
+  // no row reports a zero rather than an absence a caller has to interpret.
+  for (const question of questions) counts[question.id] = 0;
+  for (const one of judged) {
+    if (!one.countsForQuestion) continue;
+    const id = one.record.QuestionId;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * The page's keys, indexed by whatever addresses one of its rows.
+ *
+ * The trace and span pair when the statement projects `SpanId`, which is how
+ * a statement over spans has several rows per trace, and the trace alone
+ * otherwise. The same choice keys the judgement row, so a lookup that finds
+ * the key and a write that addresses the judgement agree by construction.
+ */
+export function instantEvalKeyIndex(
+  keys: readonly InstantEvalRowKey[],
+): ReadonlyMap<string, InstantEvalRowKey> {
+  const bySpan = keys.some((key) => key.spanId !== "");
+  return new Map(
+    keys.map((key) => [
+      bySpan ? rowAddress(key.traceId, key.spanId) : key.traceId,
+      key,
+    ]),
+  );
+}
+
+/** One row's address within a page, as a single map key. */
+function rowAddress(traceId: string, spanId: string): string {
+  return `${traceId}\u0000${spanId}`;
 }
 
 /** One row's cells as the judgement rows they are written as. */
@@ -285,7 +256,7 @@ function judgementsForRow({
   runId,
   questions,
   row,
-  keysByTraceId,
+  keysByRow,
   skipReason,
   now,
 }: {
@@ -293,15 +264,17 @@ function judgementsForRow({
   readonly runId: string;
   readonly questions: readonly InstantEvalRunQuestion[];
   readonly row: Record<string, unknown>;
-  readonly keysByTraceId: ReadonlyMap<string, InstantEvalRowKey>;
+  readonly keysByRow: ReadonlyMap<string, InstantEvalRowKey>;
   readonly skipReason: string;
   readonly now: number;
-}): { record: InstantEvalJudgmentRecord; isMatch: boolean }[] {
+}): InstantEvalMappedJudgment[] {
   const traceId = String(row[INSTANT_EVAL_TRACE_COLUMN] ?? "");
   // A row with no trace id has no judgement to address, which the probe makes
   // impossible and the composition does not rely on.
   if (traceId === "") return [];
-  const key = keysByTraceId.get(traceId);
+  const spanId = String(row[INSTANT_EVAL_SPAN_COLUMN] ?? "");
+  const key =
+    keysByRow.get(rowAddress(traceId, spanId)) ?? keysByRow.get(traceId);
 
   return questions.map((question) =>
     judgementFor({
@@ -311,6 +284,7 @@ function judgementsForRow({
       key,
       question,
       cell: row[question.id],
+      spanId,
       skipReason,
       now,
     }),
@@ -325,6 +299,7 @@ function judgementFor({
   key,
   question,
   cell,
+  spanId,
   skipReason,
   now,
 }: {
@@ -334,9 +309,11 @@ function judgementFor({
   readonly key: InstantEvalRowKey | undefined;
   readonly question: InstantEvalRunQuestion;
   readonly cell: unknown;
+  /** The span the row itself named, which is half of the judgement's key. */
+  readonly spanId: string;
   readonly skipReason: string;
   readonly now: number;
-}): { record: InstantEvalJudgmentRecord; isMatch: boolean } {
+}): InstantEvalMappedJudgment {
   const answered = isAnswered(cell);
   const verdict = verdictOf({ question, cell });
   const status: InstantEvalJudgmentStatus = answered
@@ -346,14 +323,15 @@ function judgementFor({
       : "skipped";
 
   return {
-    isMatch: answered && isMatch({ question, verdict }),
+    isBooleanMatch: answered && isBooleanMatch({ question, verdict }),
+    countsForQuestion: answered && countsForQuestion({ question, verdict }),
     record: {
       TenantId: tenantId,
       RunId: runId,
       TraceId: traceId,
       QuestionId: question.id,
       ThreadId: key?.threadId ?? "",
-      SpanId: key?.spanId ?? "",
+      SpanId: spanId || (key?.spanId ?? ""),
       Kind: question.kind,
       Status: status,
       Passed: verdict.passed,

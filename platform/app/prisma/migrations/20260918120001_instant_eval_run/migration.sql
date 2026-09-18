@@ -22,7 +22,7 @@ CREATE TABLE "InstantEvalRun" (
     "status" "InstantEvalRunStatus" NOT NULL DEFAULT 'QUEUED',
     "total" INTEGER,
     "progress" INTEGER NOT NULL DEFAULT 0,
-    "matched" INTEGER NOT NULL DEFAULT 0,
+    "matched" INTEGER,
     "matchedByQuestion" JSONB NOT NULL DEFAULT '{}',
     "failed" INTEGER NOT NULL DEFAULT 0,
     "skipped" INTEGER NOT NULL DEFAULT 0,
@@ -50,3 +50,13 @@ CREATE INDEX "InstantEvalRun_projectId_createdAt_idx" ON "InstantEvalRun"("proje
 
 -- The stall watchdog sweeps the runs of a project that are still in flight.
 CREATE INDEX "InstantEvalRun_projectId_status_idx" ON "InstantEvalRun"("projectId", "status");
+
+-- Down migration (manual) --------------------------------------------------
+-- Prisma migrations are append-only in CI, so this is recorded for an
+-- operator rather than executed. To roll back, run:
+--   DROP INDEX "InstantEvalRun_projectId_status_idx";
+--   DROP INDEX "InstantEvalRun_projectId_createdAt_idx";
+--   DROP TABLE "InstantEvalRun";
+--   DROP TYPE  "InstantEvalRunStatus";
+-- Safe in that order: the table is new here, so dropping it removes every row
+-- this migration could have created and no other table references it.

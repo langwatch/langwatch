@@ -107,7 +107,7 @@ export const RecordInstantEvalPageJudgedCommand = defineCommand({
   spanAttributes: (d) => ({
     "payload.page": d.page,
     "payload.rows": d.rows,
-    "payload.matched": d.matched,
+    "payload.matched": d.matched ?? 0,
   }),
   makeJobId: instantEvalPageDedupeId,
 });

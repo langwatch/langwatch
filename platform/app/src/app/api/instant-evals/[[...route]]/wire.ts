@@ -81,10 +81,18 @@ export const instantEvalRunSchema = z.object({
       "Rows the run found, bounded by its limit. Null until it has looked.",
     ),
   progress: z.number().int().describe("Rows judged so far."),
-  matched: z.number().int().describe("Judgements that matched, in total."),
+  matched: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count.",
+    ),
   matchedByQuestion: z
     .record(z.string(), z.number())
-    .describe("Judgements that matched, per question."),
+    .describe(
+      "Per question: matches for a boolean question, judged rows for a score or a category one.",
+    ),
   failed: z.number().int().describe("Rows the judge could not answer."),
   skipped: z.number().int().describe("Rows the judge declined to answer."),
   tokens: z.number().int().describe("Input tokens the judge billed for."),
@@ -109,7 +117,7 @@ export const instantEvalEstimateSchema = z.object({
     .number()
     .int()
     .describe("Rows the statement matches, bounded by the run's limit."),
-  rowsCapped: z
+  isRowsCapped: z
     .boolean()
     .describe(
       "Whether the statement matches more rows than the run may judge.",

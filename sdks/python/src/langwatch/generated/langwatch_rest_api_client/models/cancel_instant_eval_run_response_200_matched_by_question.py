@@ -11,7 +11,7 @@ T = TypeVar("T", bound="CancelInstantEvalRunResponse200MatchedByQuestion")
 
 @_attrs_define
 class CancelInstantEvalRunResponse200MatchedByQuestion:
-    """Judgements that matched, per question."""
+    """Per question: matches for a boolean question, judged rows for a score or a category one."""
 
     additional_properties: dict[str, float] = _attrs_field(init=False, factory=dict)
 

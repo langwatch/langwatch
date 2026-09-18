@@ -2,21 +2,23 @@
  * Where a run's judgements are kept, and how they are read back.
  *
  * Writes are insert-only into a ReplacingMergeTree keyed by
- * `(TenantId, RunId, TraceId, QuestionId)`, which is what makes a redelivered
- * page safe: the same page judged twice re-inserts the same keys with the same
- * values, and the merge collapses them. The page intent writes here BEFORE it
- * records the page as judged, so a crash between the two costs a redelivery
- * rather than a lost page.
+ * `(TenantId, RunId, TraceId, SpanId, QuestionId)`, which is what makes a
+ * redelivered page safe: the same page judged twice re-inserts the same keys
+ * with the same values, and the merge collapses them. The page intent writes
+ * here BEFORE it records the page as judged, so a crash between the two costs
+ * a redelivery rather than a lost page.
  *
- * Reads are keyset-paged on `(TraceId, QuestionId)`, which is the sort key's
- * own order after the run, so a page is a range scan rather than an offset. The
- * cursor is opaque to a caller and carries both halves, because one trace has a
- * row per question and a cursor on the trace alone would skip or repeat.
+ * Reads are keyset-paged on `(TraceId, SpanId, QuestionId)`, which is the sort
+ * key's own order after the run, so a page is a range scan rather than an
+ * offset. The cursor is opaque to a caller and carries all three parts,
+ * because one trace has a row per span per question and a cursor on fewer of
+ * them would skip or repeat.
  *
  * Every query filters `TenantId` first and bounds `CreatedAt`, which the run's
  * own timestamps supply. Without the time bound a read by run id walks every
  * partition, including the cold ones.
  *
+ * @see ./instant-eval-judgments.query.ts: the cursor, the filters and the row
  * @see ../../../clickhouse/migrations/00097_create_instant_eval_judgments.sql
  * @see ../../../../../specs/instant-evals/instant-eval-api.feature
  */
@@ -24,6 +26,12 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import {
+  buildFilters,
+  encodeInstantEvalCursor,
+  type JudgmentRow,
+  toJudgment,
+} from "./instant-eval-judgments.query";
 import type {
   InstantEvalJudgmentRecord,
   InstantEvalJudgmentStatus,
@@ -76,138 +84,39 @@ export interface InstantEvalJudgmentQuery {
   readonly traceIds?: readonly string[];
 }
 
+/** What a sample asks for, which is a few whole traces rather than a page. */
+export interface InstantEvalJudgmentSampleQuery {
+  readonly projectId: string;
+  readonly runId: string;
+  readonly writtenFrom: Date;
+  readonly writtenUntil: Date;
+  /** Traces to pick. Every judgement of a picked trace comes back. */
+  readonly traces: number;
+  /**
+   * Put traces with a boolean match first.
+   *
+   * What a caller checks with a sample is whether the run answered the
+   * question they meant to ask, and the rows that carry that answer are the
+   * ones that matched. A run with no boolean question has none to prefer.
+   */
+  readonly preferMatched: boolean;
+  /** Varies which traces a repeated call picks. */
+  readonly seed: number;
+}
+
 export interface InstantEvalJudgmentsRepository {
   insert(records: readonly InstantEvalJudgmentRecord[]): Promise<void>;
   page(query: InstantEvalJudgmentQuery): Promise<InstantEvalJudgmentPage>;
-}
-
-/** `TraceId` and `QuestionId`, packed into one opaque token. */
-export function encodeInstantEvalCursor(judgment: {
-  traceId: string;
-  questionId: string;
-}): string {
-  return Buffer.from(
-    JSON.stringify([judgment.traceId, judgment.questionId]),
-    "utf8",
-  ).toString("base64url");
-}
-
-/** The cursor's two halves, or `null` when it is not one of ours. */
-export function decodeInstantEvalCursor(
-  cursor: string,
-): { traceId: string; questionId: string } | null {
-  try {
-    const parsed: unknown = JSON.parse(
-      Buffer.from(cursor, "base64url").toString("utf8"),
-    );
-    if (!Array.isArray(parsed) || parsed.length !== 2) return null;
-    const [traceId, questionId] = parsed;
-    if (typeof traceId !== "string" || typeof questionId !== "string") {
-      return null;
-    }
-    return { traceId, questionId };
-  } catch {
-    return null;
-  }
-}
-
-function parseProbabilities(
-  value: unknown,
-): Readonly<Record<string, number>> | null {
-  if (typeof value !== "string" || value === "") return null;
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return parsed && typeof parsed === "object"
-      ? (parsed as Record<string, number>)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-interface JudgmentRow {
-  TraceId: string;
-  QuestionId: string;
-  ThreadId: string;
-  SpanId: string;
-  Kind: string;
-  Status: string;
-  Passed: number | null;
-  Score: number | null;
-  Label: string;
-  Probability: number | null;
-  Probabilities: string;
-  Error: string;
-  OccurredAt: string;
-}
-
-function toJudgment(row: JudgmentRow): InstantEvalJudgment {
-  return {
-    traceId: row.TraceId,
-    questionId: row.QuestionId,
-    threadId: row.ThreadId,
-    spanId: row.SpanId,
-    kind: row.Kind,
-    status: row.Status as InstantEvalJudgmentStatus,
-    passed: row.Passed === null ? null : row.Passed === 1,
-    score: row.Score,
-    label: row.Label === "" ? null : row.Label,
-    probability: row.Probability,
-    probabilities: parseProbabilities(row.Probabilities),
-    error: row.Error === "" ? null : row.Error,
-    occurredAt: row.OccurredAt,
-  };
-}
-
-/**
- * The predicates and bound parameters one query needs.
- *
- * Split by what each one can read. A filter on a sort-key column goes in
- * `WHERE`, where the index can use it; a filter on a verdict has to wait for
- * `HAVING`, because the verdict is an `argMax` over the versions of the row and
- * does not exist until the group is formed.
- */
-function buildFilters(query: InstantEvalJudgmentQuery): {
-  where: string[];
-  having: string[];
-  parameters: Record<string, unknown>;
-} {
-  const where: string[] = [];
-  const having: string[] = [];
-  const parameters: Record<string, unknown> = {};
-
-  if (query.questionId !== undefined) {
-    where.push("QuestionId = {questionId:String}");
-    parameters.questionId = query.questionId;
-  }
-  if (query.traceIds !== undefined) {
-    where.push("TraceId IN ({traceIds:Array(String)})");
-    parameters.traceIds = [...query.traceIds];
-  }
-
-  const cursor =
-    query.cursor === undefined ? null : decodeInstantEvalCursor(query.cursor);
-  if (cursor) {
-    where.push("(TraceId, QuestionId) > ({after:String}, {afterQ:String})");
-    parameters.after = cursor.traceId;
-    parameters.afterQ = cursor.questionId;
-  }
-
-  if (query.status !== undefined) {
-    having.push("Status = {status:String}");
-    parameters.status = query.status;
-  }
-  if (query.matched !== undefined) {
-    // A match is a boolean question that passed; the other kinds have no yes to
-    // count, so "matched" over them means the judge answered at all.
-    having.push(
-      query.matched
-        ? "(Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))"
-        : "NOT (Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))",
-    );
-  }
-
-  return { where, having, parameters };
+  /**
+   * A few whole traces of a run, chosen pseudo-randomly.
+   *
+   * Not the first page of {@link page}: that is ordered by the sort key, so
+   * every call would return the same lowest trace ids and a sample would only
+   * ever show one corner of the run.
+   */
+  sample(
+    query: InstantEvalJudgmentSampleQuery,
+  ): Promise<readonly InstantEvalJudgment[]>;
 }
 
 export class ClickHouseInstantEvalJudgmentsRepository
@@ -264,9 +173,9 @@ export class ClickHouseInstantEvalJudgmentsRepository
       query: `
         SELECT
           TraceId,
+          SpanId,
           QuestionId,
           argMax(ThreadId, UpdatedAt) AS ThreadId,
-          argMax(SpanId, UpdatedAt) AS SpanId,
           argMax(Kind, UpdatedAt) AS Kind,
           argMax(Status, UpdatedAt) AS Status,
           argMax(Passed, UpdatedAt) AS Passed,
@@ -282,9 +191,9 @@ export class ClickHouseInstantEvalJudgmentsRepository
           AND CreatedAt >= {writtenFrom:DateTime64(3)}
           AND CreatedAt <= {writtenUntil:DateTime64(3)}
           ${where.map((condition) => `AND ${condition}`).join("\n          ")}
-        GROUP BY TraceId, QuestionId
+        GROUP BY TraceId, SpanId, QuestionId
         ${having.length > 0 ? `HAVING ${having.join(" AND ")}` : ""}
-        ORDER BY TraceId, QuestionId
+        ORDER BY TraceId, SpanId, QuestionId
         LIMIT {limit:UInt32}
       `,
       query_params: {
@@ -307,5 +216,66 @@ export class ClickHouseInstantEvalJudgmentsRepository
         ? { nextCursor: encodeInstantEvalCursor(toJudgment(last)) }
         : {}),
     };
+  }
+
+  async sample(
+    query: InstantEvalJudgmentSampleQuery,
+  ): Promise<readonly InstantEvalJudgment[]> {
+    const client = await this.resolveClient(query.projectId);
+    const bounds = `
+      WHERE TenantId = {tenantId:String}
+        AND RunId = {runId:String}
+        AND CreatedAt >= {writtenFrom:DateTime64(3)}
+        AND CreatedAt <= {writtenUntil:DateTime64(3)}
+    `;
+    // The hash of the trace and the seed is the ordering: deterministic for a
+    // given seed, so paging the same sample twice agrees, and different for
+    // the next call, so the caller is not shown the same corner of the run
+    // over and over.
+    const order = query.preferMatched
+      ? "max(Passed) DESC, cityHash64(TraceId, {seed:UInt64})"
+      : "cityHash64(TraceId, {seed:UInt64})";
+
+    const result = await client.query({
+      query: `
+        SELECT
+          TraceId,
+          SpanId,
+          QuestionId,
+          argMax(ThreadId, UpdatedAt) AS ThreadId,
+          argMax(Kind, UpdatedAt) AS Kind,
+          argMax(Status, UpdatedAt) AS Status,
+          argMax(Passed, UpdatedAt) AS Passed,
+          argMax(Score, UpdatedAt) AS Score,
+          argMax(Label, UpdatedAt) AS Label,
+          argMax(Probability, UpdatedAt) AS Probability,
+          argMax(Probabilities, UpdatedAt) AS Probabilities,
+          argMax(Error, UpdatedAt) AS Error,
+          argMax(OccurredAt, UpdatedAt) AS OccurredAt
+        FROM ${TABLE_NAME}
+        ${bounds}
+          AND TraceId IN (
+            SELECT TraceId
+            FROM ${TABLE_NAME}
+            ${bounds}
+            GROUP BY TraceId
+            ORDER BY ${order}
+            LIMIT {traces:UInt32}
+          )
+        GROUP BY TraceId, SpanId, QuestionId
+        ORDER BY TraceId, SpanId, QuestionId
+      `,
+      query_params: {
+        tenantId: query.projectId,
+        runId: query.runId,
+        writtenFrom: query.writtenFrom,
+        writtenUntil: query.writtenUntil,
+        traces: query.traces,
+        seed: query.seed,
+      },
+      format: "JSON",
+    });
+
+    return (await result.json<JudgmentRow>()).data.map(toJudgment);
   }
 }

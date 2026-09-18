@@ -63578,15 +63578,18 @@
                       "description": "Rows judged so far."
                     },
                     "matched": {
-                      "type": "integer",
-                      "description": "Judgements that matched, in total."
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count."
                     },
                     "matchedByQuestion": {
                       "type": "object",
                       "additionalProperties": {
                         "type": "number"
                       },
-                      "description": "Judgements that matched, per question."
+                      "description": "Per question: matches for a boolean question, judged rows for a score or a category one."
                     },
                     "failed": {
                       "type": "integer",
@@ -63851,15 +63854,18 @@
                             "description": "Rows judged so far."
                           },
                           "matched": {
-                            "type": "integer",
-                            "description": "Judgements that matched, in total."
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count."
                           },
                           "matchedByQuestion": {
                             "type": "object",
                             "additionalProperties": {
                               "type": "number"
                             },
-                            "description": "Judgements that matched, per question."
+                            "description": "Per question: matches for a boolean question, judged rows for a score or a category one."
                           },
                           "failed": {
                             "type": "integer",
@@ -63969,7 +63975,17 @@
               "type": "string",
               "format": "date-time"
             },
-            "description": "List runs accepted strictly before this instant, as an ISO 8601 timestamp. This is the list's cursor."
+            "description": "List runs accepted strictly before this instant, as an ISO 8601 timestamp. Half of the list's cursor: pass `beforeId` with it."
+          },
+          {
+            "in": "query",
+            "name": "beforeId",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": "The id of the last run of the previous page. Two runs can share an instant, so this is what keeps a page from skipping the others written in the same millisecond."
           }
         ],
         "security": [
@@ -63994,7 +64010,7 @@
                       "type": "integer",
                       "description": "Rows the statement matches, bounded by the run's limit."
                     },
-                    "rowsCapped": {
+                    "isRowsCapped": {
                       "type": "boolean",
                       "description": "Whether the statement matches more rows than the run may judge."
                     },
@@ -64021,7 +64037,7 @@
                   },
                   "required": [
                     "rows",
-                    "rowsCapped",
+                    "isRowsCapped",
                     "avgTokens",
                     "totalTokens",
                     "requests",
@@ -64216,15 +64232,18 @@
                       "description": "Rows judged so far."
                     },
                     "matched": {
-                      "type": "integer",
-                      "description": "Judgements that matched, in total."
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count."
                     },
                     "matchedByQuestion": {
                       "type": "object",
                       "additionalProperties": {
                         "type": "number"
                       },
-                      "description": "Judgements that matched, per question."
+                      "description": "Per question: matches for a boolean question, judged rows for a score or a category one."
                     },
                     "failed": {
                       "type": "integer",
@@ -64445,15 +64464,18 @@
                       "description": "Rows judged so far."
                     },
                     "matched": {
-                      "type": "integer",
-                      "description": "Judgements that matched, in total."
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count."
                     },
                     "matchedByQuestion": {
                       "type": "object",
                       "additionalProperties": {
                         "type": "number"
                       },
-                      "description": "Judgements that matched, per question."
+                      "description": "Per question: matches for a boolean question, judged rows for a score or a category one."
                     },
                     "failed": {
                       "type": "integer",

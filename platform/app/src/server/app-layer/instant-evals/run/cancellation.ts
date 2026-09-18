@@ -53,7 +53,7 @@ export interface InstantEvalCancellations {
  *
  * Both directions fail soft. A `request` that could not be written still has
  * the event behind it, and an `isRequested` that could not be read answers
- * false, which costs the run one more page rather than stopping a run nobody
+ * false, which costs the run one more page rather than stopping a run no one
  * cancelled.
  */
 export function createInstantEvalCancellations(

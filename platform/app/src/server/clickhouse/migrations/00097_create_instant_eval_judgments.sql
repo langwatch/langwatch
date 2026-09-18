@@ -4,14 +4,21 @@
 -- ============================================================================
 -- instant_eval_judgments, one verdict per Instant Eval run, trace and question.
 --
--- Written by the instantEvalJudgments map projection
--- (instant-eval-processing/projections/instantEvalJudgments.mapProjection.ts):
--- one row per judged row per question of a run, mapped from the
--- `lw.obs.instant_eval.page_judged` event.
+-- Written by the page intent of the instant-eval-processing process manager
+-- (process-manager/instantEvalIntentHandlers.ts) through
+-- instant-eval-judgments.repository.ts: one row per judged row per question of
+-- a run, written before the page is recorded as judged.
 --
--- The grain is (TenantId, RunId, TraceId, QuestionId) because a run asks
--- several questions of one text and each answer is read on its own: a query
--- counting labels of one question must not have to unnest the others.
+-- The grain is (TenantId, RunId, TraceId, SpanId, QuestionId) because a run
+-- asks several questions of one text and each answer is read on its own: a
+-- query counting labels of one question must not have to unnest the others.
+--
+-- SpanId is in the key rather than beside it because a statement is not
+-- required to have one row per trace. One over analytics.spans projects one
+-- row per span, so several judgements share a TraceId, and a key without
+-- SpanId would collapse every span of a trace into one row per question.
+-- A statement whose rows are one per trace writes the empty string there,
+-- which keys it exactly as it would have been keyed without the column.
 --
 -- ReplacingMergeTree gives the exactly-once effect the queue needs. A page that
 -- failed halfway is thrown so the outbox delivers it again, and the second
@@ -64,7 +71,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.instant_eval_judgments
 
     -- Where the judged text came from, when the statement projected it. Empty
     -- when it did not: a trace-level statement has no thread, and only a
-    -- span-level one has a span.
+    -- span-level one has a span. SpanId is part of the sort key, so the
+    -- empty string is what makes a trace-level judgement key on the trace.
     ThreadId String DEFAULT '' CODEC(ZSTD(1)),
     SpanId String DEFAULT '' CODEC(ZSTD(1)),
 
@@ -107,7 +115,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.instant_eval_judgments
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYYYYMM(CreatedAt)
-ORDER BY (TenantId, RunId, TraceId, QuestionId)
+ORDER BY (TenantId, RunId, TraceId, SpanId, QuestionId)
 TTL IF(_retention_days > 0, toDateTime(CreatedAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd

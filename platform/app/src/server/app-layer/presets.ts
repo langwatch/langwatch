@@ -266,6 +266,7 @@ import {
 } from "./identity/repositories/sso-connection-reads.prisma.repository";
 import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
 import { createInstantEvalRunPortFromEnv } from "./instant-evals/run";
+import { ClickHouseInstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
 import { PrismaInstantEvalRunProjectionStore } from "./instant-evals/run/instant-eval-run.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
@@ -458,6 +459,12 @@ export function initializeDefaultApp(options?: {
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
+
+  // ADR-137: one judgements store, handed to the pipeline's run port and to
+  // the App, so the run surface never resolves a client of its own.
+  const instantEvalJudgments = new ClickHouseInstantEvalJudgmentsRepository(
+    resolveClickHouseClient,
+  );
 
   // Clustering reads ClickHouse directly (its query has no repository yet), so
   // it takes the resolver as a parameter. Bound once here, then handed to both
@@ -1433,7 +1440,11 @@ export function initializeDefaultApp(options?: {
           }),
       },
     },
-    instantEvals: { runPort: createInstantEvalRunPortFromEnv() },
+    instantEvals: {
+      runPort: createInstantEvalRunPortFromEnv({
+        judgments: instantEvalJudgments,
+      }),
+    },
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
@@ -1975,6 +1986,7 @@ export function initializeDefaultApp(options?: {
       topics,
       runPage: runClusteringPage,
     },
+    instantEvals: { judgments: instantEvalJudgments },
     gateway: {
       budgets: gatewayBudgetRepository,
       virtualKeySpend: gatewayVirtualKeySpendRepository,
@@ -2357,6 +2369,11 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       webhookEvents: undefined,
     },
     filters: { options: new FilterService(null) },
+    instantEvals: {
+      judgments: new ClickHouseInstantEvalJudgmentsRepository(async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      }),
+    },
     clickhouse: {
       enabled: false,
       resolveClient: async () => {

@@ -1,11 +1,11 @@
 /**
  * Where a run's rows come from, and where its judgements are made.
  *
- * One seam over the LangWatchQL execution path, holding the three reads a run
- * performs and nothing else. It is a seam rather than a direct call for the
- * usual reason plus one that matters more here: a page of this is a page of
- * spend, so a suite has to be able to drive the whole loop against a fake
- * classifier and a fake executor without a datastore and without a bill.
+ * One interface over the LangWatchQL execution path, holding the four reads a
+ * run performs and nothing else. It is an interface rather than a direct call
+ * for the usual reason plus one that matters more here: a page of this is a
+ * page of spend, so a suite has to be able to drive the whole loop against a
+ * fake classifier and a fake executor without a datastore and without a bill.
  *
  * It runs as the same restricted database identity the synchronous API runs as,
  * with the caller's own tenant capability, so the row policy bounds a job
@@ -36,15 +36,15 @@ import {
 } from "~/server/analytics/lwql";
 import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
+import { INSTANT_EVAL_OPTIONAL_KEY_COLUMNS } from "./composition";
 import {
-  INSTANT_EVAL_AFTER_PARAMETER,
-  INSTANT_EVAL_OPTIONAL_KEY_COLUMNS,
-  INSTANT_EVAL_PAGE_PARAMETER,
-  INSTANT_EVAL_TRACE_COLUMN,
-  instantEvalKeyPassSql,
-  instantEvalPagePassSql,
-  instantEvalProbeSql,
-} from "./composition";
+  countPass,
+  type InstantEvalPasses,
+  judgePass,
+  keyPass,
+  probePass,
+  textPass,
+} from "./row-source.passes";
 
 /** The tenant a run reads as. The same two fields the query service needs. */
 export interface InstantEvalRunCaller {
@@ -62,10 +62,38 @@ export interface InstantEvalRowKey {
   readonly occurredAt: number | null;
 }
 
+/**
+ * Where the next page starts.
+ *
+ * `spanId` is null for a statement whose rows are one per trace, and carries
+ * the second half of the order for one whose rows are one per span.
+ */
+export interface InstantEvalCursor {
+  readonly traceId: string;
+  readonly spanId: string | null;
+}
+
 /** What one page of keys found, and whether more follow it. */
 export interface InstantEvalKeyPage {
   readonly keys: readonly InstantEvalRowKey[];
   readonly hasMore: boolean;
+}
+
+/**
+ * Raised when a read came back cut short by the executor's result ceiling.
+ *
+ * The ceiling is a byte budget applied after the rows arrive, and it truncates
+ * rather than refusing, so a caller that ignores it reads a short answer as a
+ * complete one. Every read here is a read whose length is the answer, so a
+ * truncated one is an error and never a shorter page.
+ */
+export class InstantEvalResultTruncatedError extends Error {
+  constructor(pass: string) {
+    super(
+      `the instant eval ${pass} pass came back truncated; narrow the statement or lower the page size`,
+    );
+    this.name = "InstantEvalResultTruncatedError";
+  }
 }
 
 /** One page of judged rows, and what judging them spent. */
@@ -83,7 +111,22 @@ export interface InstantEvalRowSource {
     parameters?: Readonly<Record<string, unknown>>;
   }): Promise<readonly LangWatchQLColumn[]>;
 
-  /** One page of row keys, after the id the previous page ended on. */
+  /**
+   * How many rows the statement matches, counted at most `limit`.
+   *
+   * Separate from {@link keys} because a run's total is needed before its
+   * first page and reading a hundred thousand keys to learn it is both slow
+   * and past the executor's result ceiling.
+   */
+  count(input: {
+    caller: InstantEvalRunCaller;
+    sql: string;
+    parameters?: Readonly<Record<string, unknown>>;
+    /** The run's row limit plus one, so a capped run knows it was capped. */
+    limit: number;
+  }): Promise<number>;
+
+  /** One page of row keys, after the key the previous page ended on. */
   keys(input: {
     caller: InstantEvalRunCaller;
     sql: string;
@@ -91,7 +134,7 @@ export interface InstantEvalRowSource {
     /** Optional key columns the statement projects, from {@link probe}. */
     keyColumns: readonly string[];
     limit: number;
-    afterTraceId?: string;
+    after?: InstantEvalCursor;
   }): Promise<InstantEvalKeyPage>;
 
   /** One page of rows, judged. */
@@ -102,7 +145,8 @@ export interface InstantEvalRowSource {
     parameters?: Readonly<Record<string, unknown>>;
     /** The hydration plan the validator recorded for the inner statement. */
     calls: readonly LangWatchQLAppFunctionCall[];
-    traceIds: readonly string[];
+    /** The page's own keys, which are also what its rows are matched against. */
+    keys: readonly InstantEvalRowKey[];
     classifier: InstantEvalClassifier;
     maxConcurrency: number;
     signal?: AbortSignal;
@@ -154,27 +198,6 @@ export function instantEvalTextPlan(
     });
   }
   return plan;
-}
-
-function textOf(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-/** Epoch milliseconds from whatever shape the column came back as. */
-function occurredAtOf(value: unknown): number | null {
-  if (typeof value === "number") return value;
-  if (typeof value !== "string" || value === "") return null;
-  const parsed = Date.parse(value.includes("T") ? value : `${value}Z`);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-function toRowKey(row: Record<string, unknown>): InstantEvalRowKey {
-  return {
-    traceId: textOf(row[INSTANT_EVAL_TRACE_COLUMN]),
-    threadId: textOf(row.ThreadId),
-    spanId: textOf(row.SpanId),
-    occurredAt: occurredAtOf(row.OccurredAt),
-  };
 }
 
 /** The optional key columns a probe's column list actually offers. */
@@ -286,156 +309,9 @@ export function createInstantEvalRowSource(
 
   return {
     probe: (input) => probePass(passes, input),
+    count: (input) => countPass(passes, input),
     keys: (input) => keyPass(passes, input),
     judge: (input) => judgePass(passes, input),
     texts: (input) => textPass(passes, input),
   };
-}
-
-/** The two reads every pass is built from, closed over one caller's executor. */
-interface InstantEvalPasses {
-  run(input: {
-    caller: InstantEvalRunCaller;
-    sql: string;
-    parameters?: Readonly<Record<string, unknown>>;
-    maxRows: number;
-  }): Promise<Awaited<ReturnType<LangWatchQLExecutor["execute"]>>>;
-  hydrate(input: {
-    caller: InstantEvalRunCaller;
-    protections: Protections;
-    calls: readonly LangWatchQLAppFunctionCall[];
-    execution: Awaited<ReturnType<LangWatchQLExecutor["execute"]>>;
-    instantEvals?: {
-      classifier: InstantEvalClassifier;
-      maxConcurrency: number;
-      queryTokenBudget: number;
-    };
-    signal?: AbortSignal;
-  }): Promise<Awaited<ReturnType<typeof hydrateLangWatchQLAppFunctions>>>;
-}
-
-/** What the statement projects, learned without reading a row. */
-async function probePass(
-  passes: InstantEvalPasses,
-  { caller, sql, parameters }: Parameters<InstantEvalRowSource["probe"]>[0],
-): Promise<readonly LangWatchQLColumn[]> {
-  const execution = await passes.run({
-    caller,
-    sql: instantEvalProbeSql(sql),
-    ...(parameters ? { parameters } : {}),
-    maxRows: 1,
-  });
-  return execution.columns;
-}
-
-/** One page of row keys, and whether another page follows. */
-async function keyPass(
-  passes: InstantEvalPasses,
-  {
-    caller,
-    sql,
-    parameters,
-    keyColumns,
-    limit,
-    afterTraceId,
-  }: Parameters<InstantEvalRowSource["keys"]>[0],
-): ReturnType<InstantEvalRowSource["keys"]> {
-  // One row past the page, which is how "there is more" is learned without a
-  // second count over the same statement.
-  const probeLimit = limit + 1;
-  const execution = await passes.run({
-    caller,
-    sql: instantEvalKeyPassSql({
-      sql,
-      keyColumns,
-      limit: probeLimit,
-      hasCursor: afterTraceId !== undefined,
-    }),
-    parameters: {
-      ...parameters,
-      ...(afterTraceId === undefined
-        ? {}
-        : { [INSTANT_EVAL_AFTER_PARAMETER]: afterTraceId }),
-    },
-    maxRows: probeLimit,
-  });
-  return {
-    keys: execution.rows.slice(0, limit).map(toRowKey),
-    hasMore: execution.rows.length > limit,
-  };
-}
-
-/** One page of rows, judged. */
-async function judgePass(
-  passes: InstantEvalPasses,
-  {
-    caller,
-    protections,
-    sql,
-    parameters,
-    calls,
-    traceIds,
-    classifier,
-    maxConcurrency,
-    signal,
-  }: Parameters<InstantEvalRowSource["judge"]>[0],
-): ReturnType<InstantEvalRowSource["judge"]> {
-  const execution = await passes.run({
-    caller,
-    sql: instantEvalPagePassSql(sql),
-    parameters: { ...parameters, [INSTANT_EVAL_PAGE_PARAMETER]: traceIds },
-    maxRows: traceIds.length,
-  });
-  const hydration = await passes.hydrate({
-    caller,
-    protections,
-    calls,
-    execution,
-    instantEvals: {
-      classifier,
-      maxConcurrency,
-      // A page is already bounded by its own size, so the budget is only a
-      // backstop against a page of texts far larger than the classifier
-      // takes: whatever the whole page could carry at the state cap.
-      queryTokenBudget:
-        Math.max(1, traceIds.length) * classifier.limits.stateTokens,
-    },
-    ...(signal ? { signal } : {}),
-  });
-  return {
-    columns: hydration.columns,
-    rows: hydration.rows,
-    usage: hydration.evalUsage ?? {
-      requests: 0,
-      inputTokens: 0,
-      skipped: {},
-    },
-  };
-}
-
-/** The same page's rows with their text extracted and nothing judged. */
-async function textPass(
-  passes: InstantEvalPasses,
-  {
-    caller,
-    protections,
-    sql,
-    parameters,
-    calls,
-    traceIds,
-  }: Parameters<InstantEvalRowSource["texts"]>[0],
-): ReturnType<InstantEvalRowSource["texts"]> {
-  const execution = await passes.run({
-    caller,
-    sql: instantEvalPagePassSql(sql),
-    parameters: { ...parameters, [INSTANT_EVAL_PAGE_PARAMETER]: traceIds },
-    maxRows: traceIds.length,
-  });
-  const hydration = await passes.hydrate({
-    caller,
-    protections,
-    calls: instantEvalTextPlan(calls),
-    execution,
-  });
-  return hydration.rows;
 }

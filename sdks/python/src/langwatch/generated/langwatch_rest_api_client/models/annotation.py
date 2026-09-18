@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
-from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="Annotation")
 
@@ -15,26 +13,26 @@ T = TypeVar("T", bound="Annotation")
 class Annotation:
     """
     Attributes:
-        id (str | Unset): The ID of the annotation
-        project_id (str | Unset): The ID of the project
-        trace_id (str | Unset): The ID of the trace
-        comment (str | Unset): The comment of the annotation
-        is_thumbs_up (bool | Unset): The thumbs up status of the annotation
-        user_id (str | Unset): The ID of the user
-        created_at (str | Unset): The created at of the annotation
-        updated_at (str | Unset): The updated at of the annotation
-        email (str | Unset): The email of the user
+        id (str): The ID of the annotation
+        project_id (str): The ID of the project
+        trace_id (str): The ID of the trace
+        comment (None | str): The comment of the annotation
+        is_thumbs_up (bool | None): The thumbs up status of the annotation
+        user_id (None | str): The ID of the user
+        created_at (str): The created at of the annotation
+        updated_at (str): The updated at of the annotation
+        email (None | str): The email of the user
     """
 
-    id: str | Unset = UNSET
-    project_id: str | Unset = UNSET
-    trace_id: str | Unset = UNSET
-    comment: str | Unset = UNSET
-    is_thumbs_up: bool | Unset = UNSET
-    user_id: str | Unset = UNSET
-    created_at: str | Unset = UNSET
-    updated_at: str | Unset = UNSET
-    email: str | Unset = UNSET
+    id: str
+    project_id: str
+    trace_id: str
+    comment: None | str
+    is_thumbs_up: bool | None
+    user_id: None | str
+    created_at: str
+    updated_at: str
+    email: None | str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -44,62 +42,80 @@ class Annotation:
 
         trace_id = self.trace_id
 
+        comment: None | str
         comment = self.comment
 
+        is_thumbs_up: bool | None
         is_thumbs_up = self.is_thumbs_up
 
+        user_id: None | str
         user_id = self.user_id
 
         created_at = self.created_at
 
         updated_at = self.updated_at
 
+        email: None | str
         email = self.email
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if id is not UNSET:
-            field_dict["id"] = id
-        if project_id is not UNSET:
-            field_dict["projectId"] = project_id
-        if trace_id is not UNSET:
-            field_dict["traceId"] = trace_id
-        if comment is not UNSET:
-            field_dict["comment"] = comment
-        if is_thumbs_up is not UNSET:
-            field_dict["isThumbsUp"] = is_thumbs_up
-        if user_id is not UNSET:
-            field_dict["userId"] = user_id
-        if created_at is not UNSET:
-            field_dict["createdAt"] = created_at
-        if updated_at is not UNSET:
-            field_dict["updatedAt"] = updated_at
-        if email is not UNSET:
-            field_dict["email"] = email
+        field_dict.update(
+            {
+                "id": id,
+                "projectId": project_id,
+                "traceId": trace_id,
+                "comment": comment,
+                "isThumbsUp": is_thumbs_up,
+                "userId": user_id,
+                "createdAt": created_at,
+                "updatedAt": updated_at,
+                "email": email,
+            }
+        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        id = d.pop("id", UNSET)
+        id = d.pop("id")
 
-        project_id = d.pop("projectId", UNSET)
+        project_id = d.pop("projectId")
 
-        trace_id = d.pop("traceId", UNSET)
+        trace_id = d.pop("traceId")
 
-        comment = d.pop("comment", UNSET)
+        def _parse_comment(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
 
-        is_thumbs_up = d.pop("isThumbsUp", UNSET)
+        comment = _parse_comment(d.pop("comment"))
 
-        user_id = d.pop("userId", UNSET)
+        def _parse_is_thumbs_up(data: object) -> bool | None:
+            if data is None:
+                return data
+            return cast(bool | None, data)
 
-        created_at = d.pop("createdAt", UNSET)
+        is_thumbs_up = _parse_is_thumbs_up(d.pop("isThumbsUp"))
 
-        updated_at = d.pop("updatedAt", UNSET)
+        def _parse_user_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
 
-        email = d.pop("email", UNSET)
+        user_id = _parse_user_id(d.pop("userId"))
+
+        created_at = d.pop("createdAt")
+
+        updated_at = d.pop("updatedAt")
+
+        def _parse_email(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        email = _parse_email(d.pop("email"))
 
         annotation = cls(
             id=id,

@@ -15,12 +15,14 @@
  * of hundred events rather than three hundred thousand.
  *
  * What replaces the projection's guarantee is the key: a judgement is keyed by
- * `(TenantId, RunId, TraceId, QuestionId)` in a replacing table, and the write
- * happens BEFORE the page is recorded as judged. So a crash between the two
- * costs a redelivery, and the redelivery re-inserts the same rows rather than
- * doubling them.
+ * `(TenantId, RunId, TraceId, SpanId, QuestionId)` in a replacing table, and
+ * the write happens BEFORE the page is recorded as judged. So a crash between
+ * the two costs a redelivery, and the redelivery re-inserts the same rows
+ * rather than doubling them.
  *
  * @see ./row-source.ts
+ * @see ./cancellation-watch.ts: how a page already judging is stopped
+ * @see ./instant-eval-run.plan.ts: the planning step
  * @see ../../../event-sourcing/pipelines/instant-eval-processing/process-manager/instantEvalIntentHandlers.ts
  */
 
@@ -29,7 +31,6 @@ import { createLogger } from "@langwatch/observability";
 import type { LangWatchQLAppFunctionCall } from "~/server/analytics/lwql";
 import type {
   InstantEvalPageOutcome,
-  InstantEvalPlan,
   InstantEvalRunPort,
   InstantEvalSpend,
 } from "~/server/event-sourcing/pipelines/instant-eval-processing/process-manager";
@@ -37,8 +38,10 @@ import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
 import { instantEvalCostUsd, instantEvalPriceUsd } from "../classifier/pricing";
 import type { InstantEvalCostRecorder } from "../instant-eval-cost.recorder";
+import { watchForCancellation } from "./cancellation-watch";
 import { InstantEvalRunNotFoundError } from "./errors";
 import type { InstantEvalJudgmentsRepository } from "./instant-eval-judgments.repository";
+import { planRun } from "./instant-eval-run.plan";
 import type { InstantEvalRunRepository } from "./instant-eval-run.repository";
 import {
   INSTANT_EVAL_PAGE_FAILURE_CEILING,
@@ -47,11 +50,7 @@ import {
   mapInstantEvalPage,
 } from "./judgments";
 import { readInstantEvalRunQuestions } from "./questions";
-import {
-  type InstantEvalRowKey,
-  type InstantEvalRowSource,
-  instantEvalKeyColumns,
-} from "./row-source";
+import type { InstantEvalRowKey, InstantEvalRowSource } from "./row-source";
 
 const logger = createLogger("langwatch:instant-evals:run-executor");
 
@@ -78,9 +77,6 @@ export const INSTANT_EVAL_SMALL_PAGE_SIZE = 100;
  */
 export const INSTANT_EVAL_LARGE_TEXT_BYTES = 12 * 1024;
 
-/** Rows a plan measures the text size of. */
-const INSTANT_EVAL_SAMPLE_ROWS = 50;
-
 export interface InstantEvalRunExecutorDependencies {
   readonly runs: InstantEvalRunRepository;
   readonly judgments: InstantEvalJudgmentsRepository;
@@ -102,7 +98,7 @@ export interface InstantEvalRunExecutorDependencies {
 }
 
 /** Everything a step needs about the run it is a step of. */
-async function loadRun({
+export async function loadRun({
   deps,
   projectId,
   runId,
@@ -161,70 +157,20 @@ export function createInstantEvalRunExecutor(
   };
 }
 
-/** What the run is about to do, learned without judging anything. */
-async function planRun(
-  deps: InstantEvalRunExecutorDependencies,
-  { runId, projectId }: Parameters<InstantEvalRunPort["plan"]>[0],
-): Promise<InstantEvalPlan> {
-  const { row, caller, questions, parameters } = await loadRun({
-    deps,
-    projectId,
-    runId,
-  });
-  const columns = await deps.rowSource.probe({
-    caller,
-    sql: row.sql,
-    parameters,
-  });
-  const keyColumns = instantEvalKeyColumns(columns);
-
-  // One key pass over the whole selection, bounded by the run's own limit
-  // plus one: the extra row is how a capped run learns it was capped
-  // without a second count over the same statement.
-  const keyPage = await deps.rowSource.keys({
-    caller,
-    sql: row.sql,
-    parameters,
-    keyColumns,
-    limit: row.rowLimit,
-  });
-
-  // The first rows' texts, read without judging any of them, which is what
-  // the page size is chosen from.
-  const sampleIds = keyPage.keys
-    .slice(0, INSTANT_EVAL_SAMPLE_ROWS)
-    .map((key) => key.traceId);
-  const sample =
-    sampleIds.length === 0
-      ? []
-      : await deps.rowSource.texts({
-          caller,
-          protections: await deps.protections(projectId),
-          sql: row.sql,
-          parameters,
-          calls: instantEvalHydrationPlan(row.plan),
-          traceIds: sampleIds,
-        });
-
-  const averageTextBytes = instantEvalAverageTextBytes({
-    rows: sample,
-    questionIds: questions.map((question) => question.id),
-  });
-
-  return {
-    total: keyPage.keys.length,
-    pageSize: instantEvalPageSizeFor(averageTextBytes),
-    isCapped: keyPage.hasMore,
-    keyColumns,
-  };
-}
-
 /** One page: its keys, its verdicts, and what it added to the run. */
 async function judgeRunPage(
   deps: InstantEvalRunExecutorDependencies,
   input: Parameters<InstantEvalRunPort["judgePage"]>[0],
 ): Promise<InstantEvalPageOutcome> {
-  const { runId, projectId, page, afterTraceId, pageSize, remaining } = input;
+  const {
+    runId,
+    projectId,
+    page,
+    afterTraceId,
+    afterSpanId,
+    pageSize,
+    remaining,
+  } = input;
   const { row, caller, questions, parameters } = await loadRun({
     deps,
     projectId,
@@ -244,19 +190,20 @@ async function judgeRunPage(
     parameters,
     keyColumns: input.keyColumns,
     limit: Math.max(1, Math.min(pageSize, remaining)),
-    ...(afterTraceId === null ? {} : { afterTraceId }),
+    ...(afterTraceId === null
+      ? {}
+      : { after: { traceId: afterTraceId, spanId: afterSpanId } }),
   });
   if (keyPage.keys.length === 0) return emptyPage();
 
-  const judged = await deps.rowSource.judge({
+  const judged = await judgeUnderCancellation({
+    deps,
+    projectId,
+    runId,
     caller,
-    protections: await deps.protections(projectId),
-    sql: row.sql,
+    row,
     parameters,
-    calls: instantEvalHydrationPlan(row.plan),
-    traceIds: keyPage.keys.map((key) => key.traceId),
-    classifier: deps.classifier(),
-    maxConcurrency: deps.maxConcurrency,
+    keys: keyPage.keys,
   });
 
   const at = deps.now?.() ?? Date.now();
@@ -265,7 +212,7 @@ async function judgeRunPage(
     runId,
     questions,
     rows: judged.rows,
-    keysByTraceId: keysByTraceId(keyPage.keys),
+    keys: keyPage.keys,
     skipReason: instantEvalSkipReason(judged.usage.skipped),
     now: at,
   });
@@ -293,8 +240,58 @@ async function judgeRunPage(
     inputTokens: judged.usage.inputTokens,
     requests: judged.usage.requests,
     cursor: last?.traceId ?? null,
+    // Empty when the statement has one row per trace, which is what tells the
+    // next key pass to compare the trace alone.
+    cursorSpanId: last?.spanId ? last.spanId : null,
     hasNextPage: keyPage.hasMore && remaining - mapping.counters.rows > 0,
   };
+}
+
+/**
+ * One page, judged, with a cancel able to stop it part way.
+ *
+ * A cancel asked for mid-page stops the page rather than the run's next one.
+ * The hydration stage takes the signal and abandons the classifications it has
+ * not started, so the rows already judged are still written and paid for, and
+ * the rest are not.
+ */
+async function judgeUnderCancellation({
+  deps,
+  projectId,
+  runId,
+  caller,
+  row,
+  parameters,
+  keys,
+}: {
+  deps: InstantEvalRunExecutorDependencies;
+  projectId: string;
+  runId: string;
+  caller: { id: string; lwqlKey: string };
+  row: { sql: string; plan: unknown };
+  parameters: Record<string, unknown>;
+  keys: readonly InstantEvalRowKey[];
+}): Promise<Awaited<ReturnType<InstantEvalRowSource["judge"]>>> {
+  const cancelWatch = watchForCancellation({
+    ...(deps.isCancelled ? { isCancelled: deps.isCancelled } : {}),
+    projectId,
+    runId,
+  });
+  try {
+    return await deps.rowSource.judge({
+      caller,
+      protections: await deps.protections(projectId),
+      sql: row.sql,
+      parameters,
+      calls: instantEvalHydrationPlan(row.plan),
+      keys,
+      classifier: deps.classifier(),
+      maxConcurrency: deps.maxConcurrency,
+      ...(cancelWatch ? { signal: cancelWatch.signal } : {}),
+    });
+  } finally {
+    cancelWatch?.stop();
+  }
 }
 
 /** What the run cost, recorded once. */
@@ -318,27 +315,27 @@ async function finishRun(
     pricing: classifier.pricing,
   });
 
-  // A run that judged nothing writes no cost row: a row of zero is one a
+  // A run that judged no row writes no cost row: a row of zero is one a
   // customer has to read and dismiss.
+  //
+  // A write that fails is rethrown rather than logged and forgotten. The
+  // finish intent is the outbox's, so a throw here is retried, and the write
+  // is addressed by the run id so a retry lands on the same row instead of
+  // billing twice. Swallowing it would let the run record itself finished
+  // with the ledger permanently short by one row and no way left to notice.
   if (inputTokens > 0) {
-    try {
-      await deps.costRecorder.recordCost({
-        projectId,
-        inputTokens,
-        requests,
-        costUsd,
-        priceUsd,
-        runId,
-      });
-    } catch (error) {
-      // The judgements were made and are already written. Losing the cost
-      // row is an accounting problem to find in the logs, not a reason to
-      // leave the run unfinished.
-      logger.error(
-        { projectId, runId, outcome, error },
-        "Instant Eval run cost row could not be written",
-      );
-    }
+    await deps.costRecorder.recordCost({
+      projectId,
+      inputTokens,
+      requests,
+      costUsd,
+      priceUsd,
+      runId,
+    });
+    logger.debug(
+      { projectId, runId, outcome, costUsd, priceUsd },
+      "Instant Eval run cost recorded",
+    );
   }
 
   return { costUsd, priceUsd };
@@ -354,14 +351,9 @@ function emptyPage(): InstantEvalPageOutcome {
     inputTokens: 0,
     requests: 0,
     cursor: null,
+    cursorSpanId: null,
     hasNextPage: false,
   };
-}
-
-function keysByTraceId(
-  keys: readonly InstantEvalRowKey[],
-): ReadonlyMap<string, InstantEvalRowKey> {
-  return new Map(keys.map((key) => [key.traceId, key]));
 }
 
 /**

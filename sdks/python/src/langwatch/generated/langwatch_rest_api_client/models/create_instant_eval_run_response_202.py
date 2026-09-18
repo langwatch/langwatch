@@ -35,8 +35,10 @@ class CreateInstantEvalRunResponse202:
         status (CreateInstantEvalRunResponse202Status): Where the run is in its life.
         total (int | None): Rows the run found, bounded by its limit. Null until it has looked.
         progress (int): Rows judged so far.
-        matched (int): Judgements that matched, in total.
-        matched_by_question (CreateInstantEvalRunResponse202MatchedByQuestion): Judgements that matched, per question.
+        matched (int | None): Judgements that matched, across this run's boolean questions. Null when the run asked
+            none: a score or a category question has no match to count.
+        matched_by_question (CreateInstantEvalRunResponse202MatchedByQuestion): Per question: matches for a boolean
+            question, judged rows for a score or a category one.
         failed (int): Rows the judge could not answer.
         skipped (int): Rows the judge declined to answer.
         tokens (int): Input tokens the judge billed for.
@@ -58,7 +60,7 @@ class CreateInstantEvalRunResponse202:
     status: CreateInstantEvalRunResponse202Status
     total: int | None
     progress: int
-    matched: int
+    matched: int | None
     matched_by_question: CreateInstantEvalRunResponse202MatchedByQuestion
     failed: int
     skipped: int
@@ -96,6 +98,7 @@ class CreateInstantEvalRunResponse202:
 
         progress = self.progress
 
+        matched: int | None
         matched = self.matched
 
         matched_by_question = self.matched_by_question.to_dict()
@@ -197,7 +200,12 @@ class CreateInstantEvalRunResponse202:
 
         progress = d.pop("progress")
 
-        matched = d.pop("matched")
+        def _parse_matched(data: object) -> int | None:
+            if data is None:
+                return data
+            return cast(int | None, data)
+
+        matched = _parse_matched(d.pop("matched"))
 
         matched_by_question = CreateInstantEvalRunResponse202MatchedByQuestion.from_dict(d.pop("matchedByQuestion"))
 

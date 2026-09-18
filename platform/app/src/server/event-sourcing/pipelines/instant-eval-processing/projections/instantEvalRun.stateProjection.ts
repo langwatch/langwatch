@@ -48,7 +48,13 @@ export interface InstantEvalRunProjectionState {
   /** Rows the key pass found, or null before it ran. */
   readonly total: number | null;
   readonly progress: number;
-  readonly matched: number;
+  /**
+   * Matches across the run's boolean questions, or null when it has none.
+   *
+   * Null rather than zero, because zero is a real answer ("no row matched")
+   * and a run with no boolean question has no such answer to give.
+   */
+  readonly matched: number | null;
   readonly matchedByQuestion: Readonly<Record<string, number>>;
   readonly failed: number;
   readonly skipped: number;
@@ -65,7 +71,7 @@ export const INITIAL_INSTANT_EVAL_RUN_STATE: InstantEvalRunProjectionState = {
   status: "QUEUED",
   total: null,
   progress: 0,
-  matched: 0,
+  matched: null,
   matchedByQuestion: {},
   failed: 0,
   skipped: 0,
@@ -78,6 +84,21 @@ export const INITIAL_INSTANT_EVAL_RUN_STATE: InstantEvalRunProjectionState = {
 };
 
 /** The two counter maps added together, key by key. */
+/**
+ * A page's boolean matches added to the run's running total.
+ *
+ * Null plus a number is that number: the first page that reports a match
+ * count is what establishes that the run has a boolean question at all. Null
+ * plus null stays null, which is the run that asked none.
+ */
+function addMatched(
+  total: number | null,
+  page: number | null | undefined,
+): number | null {
+  if (page === null || page === undefined) return total;
+  return (total ?? 0) + page;
+}
+
 function addCounts(
   left: Readonly<Record<string, number>>,
   right: Readonly<Record<string, number>>,
@@ -117,7 +138,7 @@ function applyEvent(
         ...state,
         status: state.finishedAtMs === null ? "RUNNING" : state.status,
         progress: state.progress + event.data.rows,
-        matched: state.matched + event.data.matched,
+        matched: addMatched(state.matched, event.data.matched),
         matchedByQuestion: addCounts(
           state.matchedByQuestion,
           event.data.matchedByQuestion,

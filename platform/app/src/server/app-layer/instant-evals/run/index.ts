@@ -21,8 +21,6 @@
 import { getLangWatchQLService } from "~/server/analytics/lwql";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { instantEvalsEnabled } from "../access";
 import { getInstantEvalClassifier } from "../classifier";
@@ -31,7 +29,7 @@ import {
   createInstantEvalCancellations,
   type InstantEvalCancellationRedis,
 } from "./cancellation";
-import { ClickHouseInstantEvalJudgmentsRepository } from "./instant-eval-judgments.repository";
+import type { InstantEvalJudgmentsRepository } from "./instant-eval-judgments.repository";
 import { createInstantEvalRunExecutor } from "./instant-eval-run.executor";
 import { PrismaInstantEvalRunRepository } from "./instant-eval-run.repository";
 import {
@@ -48,21 +46,6 @@ import { createInstantEvalRowSource } from "./row-source";
  * than the provider's quota.
  */
 const INSTANT_EVAL_PAGE_CONCURRENCY = 32;
-
-/**
- * The ClickHouse the judgements are written to and read from.
- *
- * A deployment with no ClickHouse cannot hold a judgement, so an absent client
- * is a plain throw rather than a silent no-op: a run that recorded its pages
- * and kept none of their verdicts would report a total it cannot show.
- */
-const resolveClickHouseClient: ClickHouseClientResolver = async (tenantId) => {
-  const client = await getClickHouseClientForTenant(tenantId);
-  if (!client) {
-    throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-  }
-  return client;
-};
 
 /** The project's own query capability, or null when it has none. */
 async function callerFor(projectId: string) {
@@ -96,14 +79,19 @@ function cancellations() {
  *
  * Called by the registry while the application container is being built, so it
  * resolves nothing at call time that is not available yet: every dependency it
- * names is either a module-level client or a function it defers.
+ * names is either a module-level client, a function it defers, or a repository
+ * the composition root already built. The judgements store is the third kind:
+ * ClickHouse is reached through a repository the App hands out, never through a
+ * client this module resolves.
  */
-export function createInstantEvalRunPortFromEnv() {
+export function createInstantEvalRunPortFromEnv({
+  judgments,
+}: {
+  judgments: InstantEvalJudgmentsRepository;
+}) {
   return createInstantEvalRunExecutor({
     runs: new PrismaInstantEvalRunRepository(prisma),
-    judgments: new ClickHouseInstantEvalJudgmentsRepository(
-      resolveClickHouseClient,
-    ),
+    judgments,
     rowSource: createInstantEvalRowSource(),
     classifier: getInstantEvalClassifier,
     costRecorder: new PrismaInstantEvalCostRecorder(prisma),
@@ -121,9 +109,7 @@ let cached: InstantEvalRunService | null = null;
 export function getInstantEvalRunService(): InstantEvalRunService {
   cached ??= new InstantEvalRunService({
     runs: new PrismaInstantEvalRunRepository(prisma),
-    judgments: new ClickHouseInstantEvalJudgmentsRepository(
-      resolveClickHouseClient,
-    ),
+    judgments: getApp().instantEvals.judgments,
     rowSource: createInstantEvalRowSource(),
     query: getLangWatchQLService(),
     classifier: getInstantEvalClassifier,
@@ -140,7 +126,7 @@ export function getInstantEvalRunService(): InstantEvalRunService {
 /**
  * Replaces the process-wide run service, or clears it.
  *
- * **Tests only.** The seam a suite wires a fake classifier and a fake row
+ * **Tests only.** Where a suite wires a fake classifier and a fake row
  * source through.
  */
 export function setInstantEvalRunService(
@@ -155,12 +141,12 @@ export {
   INSTANT_EVAL_RESULTS_CEILING,
   INSTANT_EVAL_SAMPLE_CEILING,
 } from "./caps";
+export type { InstantEvalEstimate } from "./instant-eval-estimate";
 export type {
   InstantEvalJudgment,
   InstantEvalJudgmentPage,
 } from "./instant-eval-judgments.repository";
 export type {
-  InstantEvalEstimate,
   InstantEvalRunCommands,
   InstantEvalRunInput,
 } from "./instant-eval-run.service";

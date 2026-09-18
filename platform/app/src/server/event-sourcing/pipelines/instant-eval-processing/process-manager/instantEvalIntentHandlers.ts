@@ -19,12 +19,12 @@
  * @see ../../../../../app-layer/instant-evals/run/instant-eval-run.executor.ts
  */
 
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { z } from "zod";
 
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { InstantEvalOutcome } from "../schemas/constants";
+import { errorText, handleIntentFailure } from "./instantEvalIntentFailures";
 import type {
   instantEvalFinishIntentSchema,
   instantEvalJudgePageIntentSchema,
@@ -66,7 +66,8 @@ export interface InstantEvalPlan {
 /** What one judged page added to the run. */
 export interface InstantEvalPageOutcome {
   readonly rows: number;
-  readonly matched: number;
+  /** Boolean matches, or null when the run asked no boolean question. */
+  readonly matched: number | null;
   readonly matchedByQuestion: Readonly<Record<string, number>>;
   readonly failed: number;
   readonly skipped: number;
@@ -74,6 +75,8 @@ export interface InstantEvalPageOutcome {
   readonly requests: number;
   /** The last trace id of the page, or null when it judged nothing. */
   readonly cursor: string | null;
+  /** The last span id of the page, for a statement keyed by the pair. */
+  readonly cursorSpanId: string | null;
   readonly hasNextPage: boolean;
 }
 
@@ -91,6 +94,7 @@ export interface InstantEvalRunPort {
     projectId: string;
     page: number;
     afterTraceId: string | null;
+    afterSpanId: string | null;
     pageSize: number;
     remaining: number;
     keyColumns: readonly string[];
@@ -122,13 +126,14 @@ export interface InstantEvalOutcomeCommands {
     runId: string;
     page: number;
     rows: number;
-    matched: number;
+    matched: number | null;
     matchedByQuestion: Record<string, number>;
     failed: number;
     skipped: number;
     inputTokens: number;
     requests: number;
     cursor: string | null;
+    cursorSpanId: string | null;
     hasNextPage: boolean;
   }): Promise<unknown>;
   recordFinished(args: {
@@ -159,95 +164,6 @@ export interface InstantEvalDispatchDeps {
 type PlanPayload = z.infer<typeof instantEvalPlanIntentSchema>;
 type JudgePagePayload = z.infer<typeof instantEvalJudgePageIntentSchema>;
 type FinishPayload = z.infer<typeof instantEvalFinishIntentSchema>;
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-/**
- * The code a failed run carries.
- *
- * A handled error's own code, because it names something the caller can act on
- * and the client registry already has words for it. Anything else is
- * `internal_error`, which is the honest answer: a driver diagnostic is not
- * something a caller can act on and must not be relayed as if it were.
- */
-function failureCode(error: unknown): string {
-  return error instanceof HandledError ? error.code : "internal_error";
-}
-
-/** Records a run as failed, best-effort. */
-async function recordFailure({
-  deps,
-  payload,
-  code,
-  context,
-}: {
-  deps: InstantEvalDispatchDeps;
-  payload: { runId: string; projectId: string };
-  code: string;
-  context: Record<string, unknown>;
-}): Promise<void> {
-  const now = deps.clock?.() ?? Date.now();
-  try {
-    await deps.commands().recordFinished({
-      tenantId: payload.projectId,
-      occurredAt: now,
-      runId: payload.runId,
-      outcome: "failed",
-      errorCode: code,
-      inputTokens: 0,
-      requests: 0,
-      costUsd: 0,
-      priceUsd: 0,
-    });
-  } catch (error) {
-    // Rethrowing here would hand the message back to the outbox, which
-    // redelivers the whole intent. The stall watchdog is what recovers a run
-    // whose failure was never recorded.
-    logger.error(
-      { ...context, error: errorText(error) },
-      "Instant Eval run failure could not be recorded",
-    );
-  }
-}
-
-/**
- * The shared failure branch: retry while attempts remain, otherwise fail the
- * run and retire the message.
- */
-async function handleIntentFailure({
-  deps,
-  payload,
-  error,
-  intentContext,
-  context,
-}: {
-  deps: InstantEvalDispatchDeps;
-  payload: { runId: string; projectId: string };
-  error: unknown;
-  intentContext: IntentContext;
-  context: Record<string, unknown>;
-}): Promise<void> {
-  const maxAttempts = deps.maxAttempts ?? INSTANT_EVAL_MAX_ATTEMPTS;
-  if (intentContext.attempt < maxAttempts) {
-    logger.warn(
-      { ...context, attempt: intentContext.attempt, error: errorText(error) },
-      "Instant Eval step failed; the outbox will retry",
-    );
-    throw error;
-  }
-  logger.error(
-    { ...context, error: errorText(error) },
-    "Instant Eval step failed on its final attempt; failing the run",
-  );
-  await recordFailure({
-    deps,
-    payload,
-    code: failureCode(error),
-    context,
-  });
-}
 
 export function createInstantEvalPlanHandler(deps: InstantEvalDispatchDeps) {
   return async (
@@ -333,6 +249,7 @@ export function createInstantEvalJudgePageHandler(
         inputTokens: outcome.inputTokens,
         requests: outcome.requests,
         cursor: outcome.cursor,
+        cursorSpanId: outcome.cursorSpanId,
         hasNextPage: outcome.hasNextPage,
       });
     } catch (error) {
@@ -367,12 +284,19 @@ export function createInstantEvalFinishHandler(deps: InstantEvalDispatchDeps) {
         requests: payload.requests,
       });
     } catch (error) {
+      // The payload already carries what every judged page spent, so a finish
+      // that cannot write its cost row still reports the run's tokens rather
+      // than filing the spend nowhere.
       await handleIntentFailure({
         deps,
         payload,
         error,
         intentContext,
         context,
+        spend: {
+          inputTokens: payload.inputTokens,
+          requests: payload.requests,
+        },
       });
       return;
     }

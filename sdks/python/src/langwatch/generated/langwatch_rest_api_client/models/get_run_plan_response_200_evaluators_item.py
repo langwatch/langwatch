@@ -18,9 +18,9 @@ class GetRunPlanResponse200EvaluatorsItem:
     """One evaluator that runs after every scenario run, with where each of its inputs reads from.
 
     Attributes:
-        id (str): The attachment id. Stable across edits of the attachment.
-        evaluator_id (str): The id of the saved evaluator this attachment runs.
-        required (bool): Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
+        id (str):
+        evaluator_id (str):
+        required (bool):
         mappings (GetRunPlanResponse200EvaluatorsItemMappings): Where each evaluator input reads its value, keyed by
             input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
     """

@@ -48,6 +48,7 @@ import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent
 import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
+import type { InstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
@@ -204,6 +205,14 @@ export interface AppDependencies {
       searchAfter?: [number, string];
       runContext?: ClusteringRunContext;
     }) => Promise<ClusteringPageOutcome>;
+  };
+  /**
+   * ADR-137: the Instant Eval judgements store, already bound to the
+   * composition root's ClickHouse resolver. The run surface reads and writes
+   * verdicts through it instead of resolving a client of its own.
+   */
+  instantEvals: {
+    judgments: InstantEvalJudgmentsRepository;
   };
   /**
    * The gateway's ClickHouse-backed repositories. Undefined on a deployment

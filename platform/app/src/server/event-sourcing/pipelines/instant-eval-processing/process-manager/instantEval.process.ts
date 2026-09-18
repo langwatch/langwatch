@@ -23,18 +23,27 @@
  *    backed-up subscriber arms a wake already in the past.
  *
  * @see ./instantEvalProcess.types.ts: the state and the payload boundary
+ * @see ./instantEvalProcess.helpers.ts: the outbox keys and the evolutions
  * @see ./instantEvalIntentHandlers.ts: the effects
  */
 
 import type {
   EventHandler,
   IntentSpec,
-  ProcessEvolution,
-  ProcessHandlerContext,
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
 import type { InstantEvalProcessingEvent } from "../schemas/events";
+import {
+  active,
+  currentWake,
+  finishKey,
+  pageKey,
+  pageSizeFor,
+  planKey,
+  schedulingRef,
+  unchanged,
+} from "./instantEvalProcess.helpers";
 import {
   INSTANT_EVAL_CANCEL_GRACE_MS,
   INSTANT_EVAL_STALL_THRESHOLD_MS,
@@ -52,70 +61,6 @@ export type InstantEvalIntents = {
   judgePage: IntentSpec<typeof instantEvalJudgePageIntentSchema>;
   finish: IntentSpec<typeof instantEvalFinishIntentSchema>;
 };
-
-type Ctx = ProcessHandlerContext<InstantEvalIntents>;
-
-/** Deterministic outbox identities, unique per process instance. */
-const planKey = (runId: string) => `plan:${runId}`;
-const pageKey = ({ runId, page }: { runId: string; page: number }) =>
-  `page:${runId}:${page}`;
-const finishKey = ({ runId, reason }: { runId: string; reason: string }) =>
-  `finish:${runId}:${reason}`;
-
-/** Schedule from the later of the input's instant and now. */
-function schedulingRef(ctx: Ctx): number {
-  return Math.max(ctx.at, ctx.now);
-}
-
-/**
- * The wake a no-op has to keep.
- *
- * Stated explicitly because the runtime maps an omitted `nextWakeAt` to null,
- * so "leave the wake alone" is a value, not an omission.
- */
-function currentWake(state: InstantEvalProcessState): number | null {
-  switch (state.phase) {
-    case "terminal":
-    case "idle":
-      return null;
-    case "cancelling":
-      return state.cancelRequestedAtMs === null
-        ? null
-        : state.cancelRequestedAtMs + INSTANT_EVAL_CANCEL_GRACE_MS;
-    default:
-      return state.lastActivityAtMs + INSTANT_EVAL_STALL_THRESHOLD_MS;
-  }
-}
-
-/** A commit that moved the run on, with the stall wake re-armed. */
-function active({
-  state,
-  refMs,
-  intents,
-}: {
-  state: InstantEvalProcessState;
-  refMs: number;
-  intents?: ProcessEvolution<InstantEvalProcessState>["intents"];
-}): ProcessEvolution<InstantEvalProcessState> {
-  const next = { ...state, lastActivityAtMs: refMs };
-  return {
-    state: next,
-    nextWakeAt: currentWake(next),
-    ...(intents ? { intents } : {}),
-  };
-}
-
-/** A commit that changed nothing, keeping whatever wake was armed. */
-function unchanged(
-  state: InstantEvalProcessState,
-): ProcessEvolution<InstantEvalProcessState> {
-  return { state, nextWakeAt: currentWake(state) };
-}
-
-/** Rows one page judges, bounded by what the run may still judge. */
-function pageSizeFor(state: InstantEvalProcessState): number {
-  return Math.max(1, Math.min(state.pageSize, state.remaining));
-}
 
 export const handleRunRequested: EventHandler<
   InstantEvalProcessState,
@@ -176,6 +121,7 @@ export const handleRunPlanned: EventHandler<
     remaining: data.total,
     page: 0,
     cursor: null,
+    cursorSpanId: null,
   };
   // A run cancelled while it was still planning never judges a page.
   if (planned.phase === "cancelling") {
@@ -207,6 +153,7 @@ export const handleRunPlanned: EventHandler<
         projectId: ctx.projectId,
         page: 1,
         afterTraceId: null,
+        afterSpanId: null,
         pageSize: pageSizeFor(planned),
         remaining: planned.remaining,
         keyColumns: [...planned.keyColumns],
@@ -232,6 +179,7 @@ export const handlePageJudged: EventHandler<
     ...state,
     page: data.page,
     cursor: data.cursor,
+    cursorSpanId: data.cursorSpanId,
     remaining: Math.max(0, state.remaining - data.rows),
     inputTokens: state.inputTokens + data.inputTokens,
     requests: state.requests + data.requests,
@@ -272,6 +220,7 @@ export const handlePageJudged: EventHandler<
         projectId: ctx.projectId,
         page: nextPage,
         afterTraceId: advanced.cursor,
+        afterSpanId: advanced.cursorSpanId,
         pageSize: pageSizeFor(advanced),
         remaining: advanced.remaining,
         keyColumns: [...advanced.keyColumns],
@@ -400,6 +349,8 @@ export function buildProcessEventView(
     inputTokens: number("inputTokens"),
     requests: number("requests"),
     cursor: typeof data.cursor === "string" ? data.cursor : null,
+    cursorSpanId:
+      typeof data.cursorSpanId === "string" ? data.cursorSpanId : null,
     hasNextPage: data.hasNextPage === true,
   };
 }

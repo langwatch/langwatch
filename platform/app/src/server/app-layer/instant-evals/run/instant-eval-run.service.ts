@@ -6,47 +6,50 @@
  * a repository a route could have reached for itself.
  *
  * Two of them cost money and neither does it here. `create` accepts a statement
- * and hands the work to the queue; `estimate` reads the keys and measures a
+ * and hands the work to the queue; `estimate` counts the rows and measures a
  * sample of texts without judging any of them. The judging is the pipeline's,
  * which is what lets a hundred thousand rows be a job rather than a request
  * somebody holds open.
  *
+ * The operations with logic of their own live next door: the two writes that
+ * accept a run in `./instant-eval-create.ts`, the price model in
+ * `./instant-eval-estimate.ts`, and the judgement reads in
+ * `./instant-eval-reads.ts`. This module is the surface over them.
+ *
+ * @see ./instant-eval-create.ts
+ * @see ./instant-eval-estimate.ts
+ * @see ./instant-eval-reads.ts
  * @see ./statement.ts: what makes a statement acceptable
  * @see ../../../event-sourcing/pipelines/instant-eval-processing/pipeline.ts
  */
 
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 
 import type { LangWatchQLService } from "~/server/analytics/lwql";
 import type { Protections } from "~/server/traces/protections";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import type { InstantEvalClassifier } from "../classifier/classifier";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "../classifier/pricing";
-import { estimateInstantEvalRequestTokens } from "../classifier/token-budget";
 import type { InstantEvalCancellations } from "./cancellation";
-import {
-  INSTANT_EVAL_SAMPLE_CEILING,
-  instantEvalRowLimitOrRefuse,
-} from "./caps";
+import { instantEvalRowLimitOrRefuse } from "./caps";
 import {
   InstantEvalAlreadyFinishedError,
-  InstantEvalEstimateUnavailableError,
   InstantEvalNotEnabledError,
-  InstantEvalRowCapExceededError,
   InstantEvalRunNotFoundError,
 } from "./errors";
+import { createInstantEvalRun } from "./instant-eval-create";
+import {
+  estimateInstantEvalRun,
+  type InstantEvalEstimate,
+} from "./instant-eval-estimate";
 import type {
   InstantEvalJudgmentPage,
   InstantEvalJudgmentsRepository,
 } from "./instant-eval-judgments.repository";
 import {
-  instantEvalAverageTextBytes,
-  instantEvalHydrationPlan,
-} from "./instant-eval-run.executor";
+  readInstantEvalResults,
+  readInstantEvalSample,
+} from "./instant-eval-reads";
 import type { InstantEvalRunRepository } from "./instant-eval-run.repository";
 import type { InstantEvalJudgmentStatus } from "./judgments";
-import { readInstantEvalRunQuestions } from "./questions";
 import type { InstantEvalRowSource, InstantEvalRunCaller } from "./row-source";
 import {
   type AcceptedInstantEvalStatement,
@@ -55,29 +58,20 @@ import {
 
 const logger = createLogger("langwatch:instant-evals:run-service");
 
-/** Rows an estimate measures the text size of. */
-const INSTANT_EVAL_ESTIMATE_SAMPLE = 50;
-
 /** What a caller sends to start or price a run. */
 export interface InstantEvalRunInput {
   readonly sql: string;
   readonly parameters?: Readonly<Record<string, unknown>>;
   readonly name?: string;
-  /** Rows the run may judge. Defaults to the plan's own cap. */
+  /**
+   * Rows the run may judge.
+   *
+   * Defaults to ten thousand on every plan, not to the plan's own cap: a run
+   * is charged for what it judges, so a paid plan silently taking its whole
+   * hundred thousand rows because the field was absent would bill ten times
+   * what the caller meant to ask for.
+   */
   readonly limit?: number;
-}
-
-/** What a run would cost before it is started. */
-export interface InstantEvalEstimate {
-  readonly rows: number;
-  /** Whether the statement matched more rows than the run may judge. */
-  readonly rowsCapped: boolean;
-  readonly avgTokens: number;
-  readonly totalTokens: number;
-  /** Classifications the run would make, which is one per judged text. */
-  readonly requests: number;
-  readonly costUsd: number;
-  readonly priceUsd: number;
 }
 
 /** The two commands a caller's action sends. */
@@ -117,6 +111,8 @@ export interface InstantEvalRunServiceDependencies {
     isFree: boolean;
   }>;
   readonly now?: () => number;
+  /** The seed a sample's pseudo-random order uses. Injected so a test can pin it. */
+  readonly sampleSeed?: () => number;
 }
 
 export class InstantEvalRunService {
@@ -188,36 +184,15 @@ export class InstantEvalRunService {
       projectId,
       ...(input.limit === undefined ? {} : { requested: input.limit }),
     });
-    const accepted = await this.accept({ caller, protections, input });
-
-    const runId = generate(KSUID_RESOURCES.INSTANT_EVAL_RUN).toString();
-    const row = await this.deps.runs.create({
-      id: runId,
+    return await createInstantEvalRun({
+      runs: this.deps.runs,
+      commands: this.deps.commands(),
       projectId,
       name: input.name ?? null,
-      sql: accepted.sql,
-      parameters: accepted.parameters,
-      questions: [...accepted.questions],
-      plan: [...accepted.plan],
+      accepted: await this.accept({ caller, protections, input }),
       rowLimit,
+      now: this.now(),
     });
-
-    await this.deps.commands().requestRun({
-      tenantId: projectId,
-      occurredAt: this.now(),
-      runId,
-      name: input.name ?? null,
-      sql: accepted.sql,
-      parameters: { ...accepted.parameters },
-      questions: [...accepted.questions],
-      rowLimit,
-    });
-
-    logger.info(
-      { projectId, runId, rowLimit, questions: accepted.questions.length },
-      "Instant Eval run requested",
-    );
-    return row;
   }
 
   /** What the run would read and what judging it would cost. */
@@ -235,84 +210,34 @@ export class InstantEvalRunService {
       projectId,
       ...(input.limit === undefined ? {} : { requested: input.limit }),
     });
-    const accepted = await this.accept({ caller, protections, input });
-
-    try {
-      const keyPage = await this.deps.rowSource.keys({
-        caller,
-        sql: accepted.sql,
-        parameters: accepted.parameters,
-        keyColumns: accepted.keyColumns,
-        limit: rowLimit,
-      });
-
-      const sampleIds = keyPage.keys
-        .slice(0, INSTANT_EVAL_ESTIMATE_SAMPLE)
-        .map((key) => key.traceId);
-      const sample =
-        sampleIds.length === 0
-          ? []
-          : await this.deps.rowSource.texts({
-              caller,
-              protections,
-              sql: accepted.sql,
-              parameters: accepted.parameters,
-              calls: accepted.plan,
-              traceIds: sampleIds,
-            });
-
-      const questions = accepted.questions.map((question) => question.question);
-      const averageBytes = instantEvalAverageTextBytes({
-        rows: sample,
-        questionIds: accepted.questions.map((question) => question.id),
-      });
-      const classifier = this.deps.classifier();
-      // Priced at what one request of the average text would send, because one
-      // request carries every question about one text: that is the whole reason
-      // a three-question statement costs about what a one-question one does.
-      const avgTokens = estimateInstantEvalRequestTokens({
-        text: "x".repeat(averageBytes),
-        questions,
-        limits: classifier.limits,
-      });
-      const rows = keyPage.keys.length;
-      const totalTokens = avgTokens * rows;
-      const costUsd = instantEvalCostUsd({
-        inputTokens: totalTokens,
-        pricing: classifier.pricing,
-      });
-      return {
-        rows,
-        rowsCapped: keyPage.hasMore,
-        avgTokens,
-        totalTokens,
-        requests: rows,
-        costUsd,
-        priceUsd: instantEvalPriceUsd({ costUsd, pricing: classifier.pricing }),
-      };
-    } catch (error) {
-      if (error instanceof InstantEvalRowCapExceededError) throw error;
-      logger.error({ projectId, error }, "Instant Eval estimate failed");
-      throw new InstantEvalEstimateUnavailableError({
-        reasons: [error instanceof Error ? error : new Error(String(error))],
-      });
-    }
+    return await estimateInstantEvalRun({
+      projectId,
+      protections,
+      caller,
+      accepted: await this.accept({ caller, protections, input }),
+      rowLimit,
+      rowSource: this.deps.rowSource,
+      classifier: this.deps.classifier(),
+    });
   }
 
   async list({
     projectId,
     limit,
     before,
+    beforeId,
   }: {
     projectId: string;
     limit: number;
     before?: Date;
+    beforeId?: string;
   }) {
     await this.callerOrRefuse(projectId);
     return await this.deps.runs.list({
       projectId,
       limit,
       ...(before ? { before } : {}),
+      ...(beforeId ? { beforeId } : {}),
     });
   }
 
@@ -326,10 +251,13 @@ export class InstantEvalRunService {
   /**
    * Asks a run to stop.
    *
-   * The Redis hint first, then the event. In that order because the hint is
-   * what a page already in flight reads, and the event is what makes the stop
-   * durable: writing the event first would leave a window where the run is
-   * recorded as cancelling while the page it holds carries on.
+   * The durable event first, then the Redis hint. In that order because the
+   * event is the authority: a hint that landed while the event was refused
+   * would stop the page in flight with no record that anyone asked, and the
+   * stall watchdog would then report the run as failed rather than cancelled.
+   * The reverse window is harmless by comparison: the run is recorded as
+   * cancelling for as long as the page it holds takes to notice, which is the
+   * same window a page that started a millisecond earlier already has.
    */
   async cancel({
     projectId,
@@ -349,13 +277,13 @@ export class InstantEvalRunService {
       throw new InstantEvalAlreadyFinishedError({ runId, status: row.status });
     }
 
-    await this.deps.cancellations.request({ runId });
     await this.deps.commands().requestCancel({
       tenantId: projectId,
       occurredAt: this.now(),
       runId,
       requestedByUserId: requestedByUserId ?? null,
     });
+    await this.deps.cancellations.request({ runId });
     logger.info(
       { projectId, runId },
       "Instant Eval run cancellation requested",
@@ -369,7 +297,7 @@ export class InstantEvalRunService {
     runId,
     limit,
     questionId,
-    matched,
+    isMatched,
     status,
     cursor,
   }: {
@@ -377,33 +305,25 @@ export class InstantEvalRunService {
     runId: string;
     limit: number;
     questionId?: string;
-    matched?: boolean;
+    isMatched?: boolean;
     status?: InstantEvalJudgmentStatus;
     cursor?: string;
   }): Promise<InstantEvalJudgmentPage> {
-    const row = await this.get({ projectId, runId });
-    return await this.deps.judgments.page({
+    return await readInstantEvalResults({
+      judgments: this.deps.judgments,
       projectId,
       runId,
-      // The run's own timestamps bound the read, which is what lets it prune
-      // partitions instead of walking every month the table holds.
-      writtenFrom: row.startedAt ?? row.createdAt,
-      writtenUntil: row.finishedAt ?? new Date(this.now()),
+      row: await this.get({ projectId, runId }),
+      now: this.now(),
       limit,
       ...(questionId === undefined ? {} : { questionId }),
-      ...(matched === undefined ? {} : { matched }),
+      ...(isMatched === undefined ? {} : { isMatched }),
       ...(status === undefined ? {} : { status }),
       ...(cursor === undefined ? {} : { cursor }),
     });
   }
 
-  /**
-   * A few of the run's rows, with the text that was judged beside the verdict.
-   *
-   * The text is re-read through the statement's extraction functions rather
-   * than stored, and nothing is judged again, which is what makes reading a
-   * sample free. The verdicts come from the judgements the run already wrote.
-   */
+  /** A few of the run's rows, with the text that was judged beside the verdict. */
   async sample({
     projectId,
     protections,
@@ -419,33 +339,17 @@ export class InstantEvalRunService {
     const row = await this.deps.runs.findById({ projectId, runId });
     if (!row) throw new InstantEvalRunNotFoundError({ runId });
 
-    const count = Math.max(1, Math.min(n, INSTANT_EVAL_SAMPLE_CEILING));
-    const page = await this.deps.judgments.page({
-      projectId,
-      runId,
-      writtenFrom: row.startedAt ?? row.createdAt,
-      writtenUntil: row.finishedAt ?? new Date(this.now()),
-      limit:
-        count * Math.max(1, readInstantEvalRunQuestions(row.questions).length),
-    });
-    const traceIds = [
-      ...new Set(page.judgments.map((judgment) => judgment.traceId)),
-    ].slice(0, count);
-    if (traceIds.length === 0) return { rows: [], judgments: page.judgments };
-
-    const rows = await this.deps.rowSource.texts({
+    return await readInstantEvalSample({
+      judgments: this.deps.judgments,
+      rowSource: this.deps.rowSource,
       caller,
       protections,
-      sql: row.sql,
-      parameters: (row.parameters ?? {}) as Record<string, unknown>,
-      calls: instantEvalHydrationPlan(row.plan),
-      traceIds,
+      projectId,
+      runId,
+      row,
+      now: this.now(),
+      seed: this.deps.sampleSeed?.() ?? Date.now(),
+      n,
     });
-    return {
-      rows,
-      judgments: page.judgments.filter((judgment) =>
-        traceIds.includes(judgment.traceId),
-      ),
-    };
   }
 }

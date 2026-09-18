@@ -39,10 +39,17 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     And the statement inside it is the caller's own text, unchanged
 
   @unit
-  Scenario: Pass one runs with the row cap raised by one so a capped run can say so
+  Scenario: The run's total comes from a count rather than from every key
     Given a run limited to ten thousand rows
-    When the key pass runs
-    Then its row ceiling is ten thousand and one
+    When the run is planned
+    Then the count runs bounded one row past the limit
+    And the reported total is the limit when the selection is larger
+
+  @unit
+  Scenario: A read that came back truncated fails the step
+    Given a read the executor cut short at its byte ceiling
+    When the count or the key pass reads it
+    Then the step fails rather than reporting a smaller answer
 
   @unit
   Scenario: Pass one makes no judgement
@@ -81,11 +88,40 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Then the run row holds the progress, the matches per question, the failures, the skips and the tokens
 
   @unit
+  Scenario: A statement with one row per span pages by the trace and the span
+    Given a statement that projects a span id
+    When a page is composed
+    Then the key pass orders by the trace and the span together
+    And a later page's cursor carries both halves
+    And a statement projecting no span id pages by the trace alone
+
+  @unit
+  Scenario: A statement with one row per span writes one judgement per span
+    Given a page holding two spans of one trace
+    When it is mapped
+    Then each span is its own judgement rather than one overwriting the other
+
+  @unit
+  Scenario: A page drops the rows of a trace it shares with the next page
+    Given a page read that brought back a neighbour's span rows
+    When the page's rows are taken
+    Then only the pairs the page owns are kept
+    And no row the page does not own is judged
+
+  @integration
+  Scenario: A run over several rows per trace judges every row
+    Given a statement with two rows per trace
+    When the run is driven to its end
+    Then every row is judged and none is skipped by the page boundary
+
+  @unit
   Scenario: A matched judgement is one that passed, scored or landed on a label
     Given a page holding a passing boolean, a score and a category
     When the matches are counted
     Then the boolean counts as matched only when it passed
     And the score and the category count as judged rather than matched
+    And the run's own matched total counts the boolean questions only
+    And it is absent for a run that asked no boolean question
 
   # ---------------------------------------------------------------------------
   # Cancellation, stalls and redelivery

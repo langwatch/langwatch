@@ -72,31 +72,64 @@ not ours.
 LangWatchQL never rewrites a submitted statement and a bound scenario holds it
 to that. A job cannot honour that literally and still page, so the line is drawn
 at **composition**: the caller's text goes inside a subquery, character for
-character, and the wrapper only decides which of its rows come back. Three
+character, and the wrapper only decides which of its rows come back. Four
 wrappers, in `app-layer/instant-evals/run/composition.ts`:
 
 | Pass | Shape | What it is for |
 |---|---|---|
 | probe | `SELECT * FROM (<sql>) AS q LIMIT 0` | what the statement projects, reading no rows and judging nothing |
-| keys | `SELECT q.TraceId … FROM (<sql>) AS q [WHERE q.TraceId > {after}] ORDER BY q.TraceId LIMIT n` | one page of ids, and the run's total |
+| count | `SELECT count() FROM (SELECT q.TraceId FROM (<sql>) AS q LIMIT limit+1) AS c` | the run's total, bounded one past its limit |
+| keys | `SELECT q.TraceId … FROM (<sql>) AS q [WHERE <order> > {after}] ORDER BY <order> LIMIT n` | one page of row keys |
 | page | `SELECT * FROM (<sql>) AS q WHERE q.TraceId IN ({page_ids}) ORDER BY q.TraceId` | the rows of one page, where the extraction and eval functions hydrate |
 
 `/api/v1/query` still runs the text verbatim; only this surface wraps it, which
 is why the wrapping lives on the run and not in the query service.
 
-Paging orders by `TraceId` because it is the one column a run requires, it is
-unique per judged row, and it therefore gives a total order with no second
-column to agree on. A page is `TraceId > <last id>`, so page *n* covers the same
-ids whoever runs it, which is what makes a redelivery safe rather than merely
-harmless. The statement's own key columns, `ThreadId`, `SpanId`, `OccurredAt`,
-are carried onto the judgements when it projects them and left empty when it
-does not, because a statement grouped by conversation has no span and naming an
-absent column in the wrapper would refuse the run for a column nobody promised.
+The total is a **count**, not a key pass read to its end. The executor applies
+an eight-megabyte result ceiling after the rows arrive and truncates rather
+than refusing, so reading a hundred thousand keys to learn a run's size
+returns a shorter list with a `truncated` flag: the run would report a smaller
+total, call itself uncapped, and finish early looking successful. Every read
+this surface performs now treats `truncated` as an error, because in each of
+them the length of the answer is part of the answer.
 
-Two parameter names belong to the run (`instant_eval_page_ids`,
-`instant_eval_after_trace_id`) and a statement or a request naming either is
-refused; so are the dashboard's own period parameters, which a job has no
-surface to fill.
+Paging orders by `TraceId`, and by `(TraceId, SpanId)` when the statement
+projects `SpanId`. `TraceId` is the one column a run requires, so it is always
+available, but it is not always unique: a statement over `analytics.spans`
+projects one row per span, and ordering by the trace alone would cut a trace's
+span rows across a page boundary while the next page, starting at `TraceId >
+cursor`, skipped the rest of them. The cursor therefore carries both halves,
+and the judgement row is keyed by `(TenantId, RunId, TraceId, SpanId,
+QuestionId)` so the spans of one trace are separate judgements rather than one
+collapsed row. A statement with one row per trace writes the empty string
+there, which keys it exactly as it would have been keyed without the column.
+
+The page pass predicate stays on `TraceId` alone, because a tuple bound as a
+query parameter is not a shape the driver serialises reliably. A trace whose
+spans straddle the page boundary therefore returns rows the page does not own,
+and they are dropped by matching the pair before anything is judged, so a row
+the page does not own is never paid for. The over-fetch is bounded by the
+page's own row ceiling, past which the read is refused rather than truncated.
+
+Page *n* covers the same keys whoever runs it, which is what makes a
+redelivery safe rather than merely harmless, **provided the inner statement is
+deterministic**. One carrying `LIMIT n` with no `ORDER BY` is not: ClickHouse
+may return a different n rows per execution, and the statement is executed once
+per count and twice per page. Such a statement is accepted, because refusing it
+would refuse a legitimate exploratory query, but its pages are not guaranteed
+to tile one fixed candidate set. The docs and the shorthand templates say to
+add an `ORDER BY` to a statement with a `LIMIT`.
+
+The statement's own key columns, `ThreadId`, `SpanId`, `OccurredAt`, are
+carried onto the judgements when it projects them and left empty when it does
+not, because a statement grouped by conversation has no span and naming an
+absent column in the wrapper would refuse the run for a column the caller
+never promised.
+
+Three parameter names belong to the run (`instant_eval_page_ids`,
+`instant_eval_after_trace_id`, `instant_eval_after_span_id`) and a statement or
+a request naming any of them is refused; so are the dashboard's own period
+parameters, which a job has no surface to fill.
 
 ### 3. The loop is events driving intents, not a long-lived handler
 
@@ -185,8 +218,8 @@ Ten thousand rows on every plan, up to a hundred thousand on a paid one, asked
 for with a parameter and refused with `instant_eval_row_cap_exceeded` naming
 both numbers. The default is the same everywhere on purpose: ten thousand
 conversations is a real answer to a real question and costs a quarter of a
-dollar at the shipped rate, so nobody has to buy anything to find out whether
-the feature works.
+dollar at the shipped rate, so a customer can find out whether the feature
+works without buying anything first.
 
 One `Cost` row per run at finish, carrying our cost and the customer's price
 beside it. Metering through Stripe and the three-dollar free budget are
@@ -196,9 +229,11 @@ scheduling decision rather than an open design question.
 ## Consequences
 
 - A run is resumable and idempotent per page, and the cost of that is two
-  queries per page rather than one: the keys, then the rows. Both are bounded by
-  the statement's own time predicate, so the second scan is the price of
-  determinism.
+  executions of the caller's statement per page rather than one, plus one for
+  the count: the keys, then the rows. All are bounded by the statement's own
+  time predicate, so the extra scans are the price of determinism. It is also
+  why a statement with `LIMIT` and no `ORDER BY` has no guarantee that its
+  pages tile one fixed set.
 - Ordering by `TraceId` gives no partition pruning on the wrapper. The inner
   statement carries the caller's own time bound, so the scan it drives is
   bounded; `instant_eval_judgments` is in `TIME_PARTITIONED_TABLES` so every
@@ -210,6 +245,15 @@ scheduling decision rather than an open design question.
 - A new source table means a row-filter entry in the SaaS `render-config.sh`,
   which is a third list in another repo that no CI here can see (ADR-101). The
   manifest parity test covers the two lists that are reachable.
+- The run-level `matched` counts the run's boolean questions only, and is
+  null for a run that asked none. A score and a category have no "yes", so
+  adding their judged rows would give a headline number that reads as matches
+  while being mostly rows we looked at. The per-question number keeps the
+  per-kind meaning, because there the kind is listed beside it.
+- A sample is ordered by `cityHash64(TraceId, seed)` with boolean matches
+  first, not by the sort key. The first page of the results read would return
+  the same lowest trace ids on every call, which answers "did the run ask what
+  I meant" for one corner of the run only.
 - The judgements outlive the traces they judged by default
   (`INDEFINITE_DEFAULT_RETENTION_TABLES`), which is what makes "what did that run
   find six months ago" answerable and is a deliberate departure from the

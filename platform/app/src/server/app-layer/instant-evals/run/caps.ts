@@ -6,8 +6,8 @@
  *
  * The default is the same on every plan, which is the point of it: ten
  * thousand conversations is a real answer to a real question and it costs a
- * quarter of a dollar at the shipped rate, so nobody has to buy anything to
- * find out whether the feature works. The raised cap is a paid-plan lever
+ * quarter of a dollar at the shipped rate, so the feature can be tried
+ * without buying anything first. The raised cap is a paid-plan lever
  * rather than a technical one: a hundred thousand rows is seventeen minutes of
  * the platform's classifier budget, and a free tier that could take it would be
  * a free tier that could take all of it.
