@@ -289,19 +289,25 @@ the bundle side: an optional session READ on document requests only (never
 hashed assets — the surface is auth-capable, not auth-enforcing, until a
 policy such as a private-instance gate says otherwise), then serving —
 immutable assets, `index.html` with the injected meta tag, CSP overlaid on
-the stamped base. There is no Router class, no mount API, no scoped router
-object anywhere. **The code's physical shape matches** (ruled 2026-09-18):
-concept-named directories (`policy/`, `hosting/`), at most three classes
-each, and each class takes the previous one in its constructor — the
-request is followed by following `create` calls, never by knowing which of
-eighteen `thing.otherthing.ts` fragments to open next. Helpers live inside
-the class file they serve; a fourth class in a directory means the concept
-is wrongly cut. **Each expose member sets up only the base**: headers and
+the stamped base. **The hosting layer is one muxer with routes and
+middleware** (ruled 2026-09-18), spoken in the industry's own words:
+`HttpMux.create().use(ClientAddress.fromTrustedProxies(...)).use(
+SecurityHeaders.strict()).route("/api", api).route("/", spa)` — middleware
+runs before routing on every request; `/` is a route, not a fallback,
+because longest prefix wins; `.use`/`.route` are internal (boot() writes
+the composition, prefixes stay library constants, no app code ever holds
+the mux). `SinglePageApp` serves the bundle side. There is no public
+Router class, no mount API, no scoped router object anywhere. **The code's
+physical shape matches**: concept-named directories — `hosting/` (HttpMux,
+SinglePageApp), `policy/` (SecurityHeaders, ContentSecurityPolicy,
+ClientAddress) — at most three classes each, composition by constructor,
+helpers inside the class file they serve; a fourth class in a directory
+means the concept is wrongly cut. **Each expose member sets up only the base**: headers and
 general security, as named CLASSES from `@langwatch/api`, never inline
 data — `SecurityHeaders.strict()` (the floor no surface drops below; `.with`/
 `.merge` overlay, `.without` is the loud exception), `ContentSecurityPolicy
 .app()` (the browser bundle's composed overlay — connect-src rides config),
-`ClientAddress.fromClientAddress(...)` (Server-level — client-address truth is
+`ClientAddress.fromTrustedProxies(...)` (Server-level — client-address truth is
 one answer for every surface). The chaining is pre-done in importable
 defaults — `trpcSurfaceDefaults()`, `restSurfaceDefaults()`,
 `browserBundleDefaults()` — and a bare member call IS its default; a
