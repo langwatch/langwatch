@@ -35,21 +35,59 @@ import { CORE_POSTGRES_OVERRIDES } from "./postgresOverrides/core";
 import { PARENTS_POSTGRES_OVERRIDES } from "./postgresOverrides/parents";
 import { SENSITIVE_POSTGRES_OVERRIDES } from "./postgresOverrides/sensitive";
 import { TOPICS_POSTGRES_OVERRIDES } from "./postgresOverrides/topics";
+import { VISIBILITY_POSTGRES_OVERRIDES } from "./postgresOverrides/visibility";
 import { LWQL_POSTGRES_SKIPPED_MODELS } from "./postgresSkippedModels";
 import { LWQL_PRISMA_MANIFEST } from "./prismaManifest";
 import type { LangWatchQLViewDefinition } from "./types";
 
-/** Every override, merged into the single map the derivation reads. */
+/**
+ * Combines two override maps model-by-model, not key-by-key: a plain object
+ * spread would let a later file's entry for a model silently replace an
+ * earlier file's entry for that *same* model, dropping whichever record
+ * fields (aliases, skipColumns, descriptions, ...) only the earlier one set.
+ * `LangyConversationProjection` is exactly this case — `content.ts` gates its
+ * `Title` column and `visibility.ts` restricts its rows, and both must hold.
+ */
+function mergePostgresOverride(
+  base: PostgresDatasetOverride | undefined,
+  addition: PostgresDatasetOverride,
+): PostgresDatasetOverride {
+  return {
+    ...base,
+    ...addition,
+    aliases: { ...base?.aliases, ...addition.aliases },
+    skipColumns: { ...base?.skipColumns, ...addition.skipColumns },
+    columnGates: { ...base?.columnGates, ...addition.columnGates },
+    columnUnits: { ...base?.columnUnits, ...addition.columnUnits },
+    descriptions: { ...base?.descriptions, ...addition.descriptions },
+    reAdmit: { ...base?.reAdmit, ...addition.reAdmit },
+  };
+}
+
+/** Every override file's maps, merged model-by-model into the single map the derivation reads. */
+function mergePostgresOverrides(
+  maps: readonly Readonly<Record<string, PostgresDatasetOverride>>[],
+): Record<string, PostgresDatasetOverride> {
+  const merged: Record<string, PostgresDatasetOverride> = {};
+  for (const map of maps) {
+    for (const [model, override] of Object.entries(map)) {
+      merged[model] = mergePostgresOverride(merged[model], override);
+    }
+  }
+  return merged;
+}
+
 export const LWQL_POSTGRES_ALL_OVERRIDES: Record<
   string,
   PostgresDatasetOverride
-> = {
-  ...CORE_POSTGRES_OVERRIDES,
-  ...TOPICS_POSTGRES_OVERRIDES,
-  ...PARENTS_POSTGRES_OVERRIDES,
-  ...CONTENT_POSTGRES_OVERRIDES,
-  ...SENSITIVE_POSTGRES_OVERRIDES,
-};
+> = mergePostgresOverrides([
+  CORE_POSTGRES_OVERRIDES,
+  TOPICS_POSTGRES_OVERRIDES,
+  PARENTS_POSTGRES_OVERRIDES,
+  CONTENT_POSTGRES_OVERRIDES,
+  SENSITIVE_POSTGRES_OVERRIDES,
+  VISIBILITY_POSTGRES_OVERRIDES,
+]);
 
 /**
  * Every tenant-scoped Prisma model that is not skipped, as a PostgreSQL-resident

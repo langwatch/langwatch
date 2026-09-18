@@ -189,8 +189,16 @@ describe("given postgresApprovedViewStatement", () => {
         joins: projectTenantPath(),
       });
 
-      expect(statement).toBe(
+      expect(statement).toContain(
         `CREATE OR REPLACE VIEW "public"."lwql_topics" AS\n` +
+          `SELECT\n` +
+          `  "m"."projectId" AS "TenantId",\n` +
+          `  "m"."id" AS "TopicId"\n` +
+          `FROM "public"."Topic" AS "m"`,
+      );
+      expect(statement).toContain(`DROP VIEW IF EXISTS "public"."lwql_topics"`);
+      expect(statement).toContain(
+        `CREATE VIEW "public"."lwql_topics" AS\n` +
           `SELECT\n` +
           `  "m"."projectId" AS "TenantId",\n` +
           `  "m"."id" AS "TopicId"\n` +
@@ -212,13 +220,20 @@ describe("given postgresApprovedViewStatement", () => {
         joins: teamTenantPath(),
       });
 
-      expect(statement).toBe(
-        `CREATE OR REPLACE VIEW "public"."lwql_group_things" AS\n` +
-          `SELECT\n` +
-          `  "p"."id" AS "TenantId",\n` +
-          `  "m"."id" AS "GroupThingId"\n` +
-          `FROM "public"."GroupThing" AS "m"\n` +
-          `JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId"`,
+      const expectedBody =
+        `SELECT\n` +
+        `  "p"."id" AS "TenantId",\n` +
+        `  "m"."id" AS "GroupThingId"\n` +
+        `FROM "public"."GroupThing" AS "m"\n` +
+        `JOIN "public"."Project" AS "p" ON "m"."teamId" = "p"."teamId"`;
+      expect(statement).toContain(
+        `CREATE OR REPLACE VIEW "public"."lwql_group_things" AS\n${expectedBody}`,
+      );
+      expect(statement).toContain(
+        `DROP VIEW IF EXISTS "public"."lwql_group_things"`,
+      );
+      expect(statement).toContain(
+        `CREATE VIEW "public"."lwql_group_things" AS\n${expectedBody}`,
       );
     });
   });
@@ -236,14 +251,21 @@ describe("given postgresApprovedViewStatement", () => {
         joins: organizationTenantPath(),
       });
 
-      expect(statement).toBe(
-        `CREATE OR REPLACE VIEW "public"."lwql_virtual_keys" AS\n` +
-          `SELECT\n` +
-          `  "p"."id" AS "TenantId",\n` +
-          `  "m"."id" AS "VirtualKeyId"\n` +
-          `FROM "public"."VirtualKey" AS "m"\n` +
-          `JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"\n` +
-          `JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"`,
+      const expectedBody =
+        `SELECT\n` +
+        `  "p"."id" AS "TenantId",\n` +
+        `  "m"."id" AS "VirtualKeyId"\n` +
+        `FROM "public"."VirtualKey" AS "m"\n` +
+        `JOIN "public"."Team" AS "t" ON "m"."organizationId" = "t"."organizationId"\n` +
+        `JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"`;
+      expect(statement).toContain(
+        `CREATE OR REPLACE VIEW "public"."lwql_virtual_keys" AS\n${expectedBody}`,
+      );
+      expect(statement).toContain(
+        `DROP VIEW IF EXISTS "public"."lwql_virtual_keys"`,
+      );
+      expect(statement).toContain(
+        `CREATE VIEW "public"."lwql_virtual_keys" AS\n${expectedBody}`,
       );
     });
   });
@@ -266,16 +288,141 @@ describe("given postgresApprovedViewStatement", () => {
         }),
       });
 
-      expect(statement).toBe(
-        `CREATE OR REPLACE VIEW "public"."lwql_ledger_entries" AS\n` +
-          `SELECT\n` +
-          `  "p"."id" AS "TenantId",\n` +
-          `  "m"."id" AS "LedgerEntryId"\n` +
-          `FROM "public"."GatewayBudgetLedger" AS "m"\n` +
-          `JOIN "public"."GatewayBudget" AS "gb" ON "m"."budgetId" = "gb"."id"\n` +
-          `JOIN "public"."Team" AS "t" ON "gb"."organizationId" = "t"."organizationId"\n` +
-          `JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"`,
+      const expectedBody =
+        `SELECT\n` +
+        `  "p"."id" AS "TenantId",\n` +
+        `  "m"."id" AS "LedgerEntryId"\n` +
+        `FROM "public"."GatewayBudgetLedger" AS "m"\n` +
+        `JOIN "public"."GatewayBudget" AS "gb" ON "m"."budgetId" = "gb"."id"\n` +
+        `JOIN "public"."Team" AS "t" ON "gb"."organizationId" = "t"."organizationId"\n` +
+        `JOIN "public"."Project" AS "p" ON "t"."id" = "p"."teamId"`;
+      expect(statement).toContain(
+        `CREATE OR REPLACE VIEW "public"."lwql_ledger_entries" AS\n${expectedBody}`,
       );
+      expect(statement).toContain(
+        `DROP VIEW IF EXISTS "public"."lwql_ledger_entries"`,
+      );
+      expect(statement).toContain(
+        `CREATE VIEW "public"."lwql_ledger_entries" AS\n${expectedBody}`,
+      );
+    });
+  });
+
+  describe("when a rowFilter is given", () => {
+    it("ANDs it into a WHERE clause after the join chain", () => {
+      const statement = postgresApprovedViewStatement({
+        schema: SCHEMA,
+        view: "lwql_topics",
+        baseRelation: "Topic",
+        columns: [
+          { exposed: "TenantId", source: "projectId" },
+          { exposed: "TopicId", source: "id" },
+        ],
+        joins: projectTenantPath(),
+        rowFilter: `"m"."isShared" = true`,
+      });
+
+      const expectedBody =
+        `SELECT\n` +
+        `  "m"."projectId" AS "TenantId",\n` +
+        `  "m"."id" AS "TopicId"\n` +
+        `FROM "public"."Topic" AS "m"\n` +
+        `WHERE ("m"."isShared" = true)`;
+      expect(statement).toContain(
+        `CREATE OR REPLACE VIEW "public"."lwql_topics" AS\n${expectedBody}`,
+      );
+      expect(statement).toContain(
+        `CREATE VIEW "public"."lwql_topics" AS\n${expectedBody}`,
+      );
+    });
+
+    it("refuses a blank rowFilter", () => {
+      expect(() =>
+        postgresApprovedViewStatement({
+          schema: SCHEMA,
+          view: "lwql_topics",
+          baseRelation: "Topic",
+          columns: [{ exposed: "TenantId", source: "projectId" }],
+          rowFilter: "   ",
+        }),
+      ).toThrow(/blank rowFilter/);
+    });
+  });
+
+  const SIMPLE_COLUMNS = [{ exposed: "TenantId", source: "projectId" }];
+
+  describe("the DO-block atomic upgrade path", () => {
+    it("emits one statement: CREATE OR REPLACE first, DROP+CREATE only on the reorder SQLSTATEs", () => {
+      const statement = postgresApprovedViewStatement({
+        schema: SCHEMA,
+        view: "lwql_topics",
+        baseRelation: "Topic",
+        columns: SIMPLE_COLUMNS,
+      });
+
+      expect(statement).toContain("DO $lwql$");
+      expect(statement).toContain("CREATE OR REPLACE VIEW");
+      expect(statement).toContain("EXCEPTION");
+      // The two SQLSTATEs confirmed against a real PostgreSQL server: a
+      // reorder, a drop, a rename or a retype all raise
+      // invalid_table_definition (42P16). feature_not_supported is kept as
+      // defense-in-depth even though no case here was observed to raise it.
+      expect(statement).toContain(
+        "WHEN feature_not_supported OR invalid_table_definition THEN",
+      );
+      expect(statement).toContain('DROP VIEW IF EXISTS "public"."lwql_topics"');
+      expect(statement).toContain('CREATE VIEW "public"."lwql_topics" AS');
+      expect(statement).toContain("END\n$lwql$");
+    });
+
+    it("refuses a view body containing the reserved dollar-quote tag", () => {
+      expect(() =>
+        postgresApprovedViewStatement({
+          schema: SCHEMA,
+          view: "lwql_topics",
+          baseRelation: "Topic",
+          columns: SIMPLE_COLUMNS,
+          rowFilter: `"m"."x" = '$lwql$'`,
+        }),
+      ).toThrow(/reserved dollar-quote tag/);
+    });
+
+    describe("when a readerRole is given", () => {
+      it("re-grants it only inside the fallback branch, guarded by a pg_roles probe", () => {
+        const statement = postgresApprovedViewStatement({
+          schema: SCHEMA,
+          view: "lwql_topics",
+          baseRelation: "Topic",
+          columns: SIMPLE_COLUMNS,
+          readerRole: "lwql_ro",
+        });
+
+        expect(statement).toContain(
+          "IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_ro') THEN",
+        );
+        expect(statement).toContain(
+          'GRANT SELECT ON "public"."lwql_topics" TO "lwql_ro"',
+        );
+        // The re-grant belongs to the fallback branch, so it must appear
+        // after EXCEPTION, not inside the CREATE OR REPLACE arm.
+        const exceptionAt = statement.indexOf("EXCEPTION");
+        const grantAt = statement.indexOf("GRANT SELECT");
+        expect(exceptionAt).toBeGreaterThan(-1);
+        expect(grantAt).toBeGreaterThan(exceptionAt);
+      });
+    });
+
+    describe("when no readerRole is given", () => {
+      it("emits no GRANT at all", () => {
+        const statement = postgresApprovedViewStatement({
+          schema: SCHEMA,
+          view: "lwql_topics",
+          baseRelation: "Topic",
+          columns: SIMPLE_COLUMNS,
+        });
+
+        expect(statement).not.toContain("GRANT SELECT");
+      });
     });
   });
 

@@ -270,6 +270,26 @@ const SEED_COLUMN_OVERRIDES: Readonly<
     sqsAccessKeyId: null,
     sqsSecretAccessKeyEncrypted: null,
   },
+
+  // `extraHeaders` is Json, so rule 4's string-only marker never fires for it;
+  // this override nests the marker inside realistic header JSON so the
+  // generic "no excluded- marker leaks" isolation proof also exercises it.
+  ModelProvider: {
+    extraHeaders: `'[{"key":"Authorization","value":"excluded-extraHeaders-marker"}]'::jsonb`,
+  },
+
+  // The approved view for every Langy model carries a rowFilter admitting
+  // only shared conversations (`postgresOverrides/visibility.ts`), which is
+  // enforced all the way down to the engine table this generic seed's row
+  // feeds. Without this override the one generically-seeded conversation
+  // (isShared defaults to `false`) would be invisible even through the
+  // engine table, and every generic per-dataset isolation proof over the
+  // five Langy tables would find zero tenant-a rows and fail vacuously. The
+  // dedicated private-vs-shared visibility proof seeds its own private
+  // conversation by hand instead of relying on this one.
+  LangyConversationProjection: {
+    isShared: "true",
+  },
 };
 
 /** The four ids the harness seeds the tenant spine with. */

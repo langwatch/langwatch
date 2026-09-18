@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { lwqlPostgresApprovedViewStatements } from "../../provisioning/catalogStatements";
 import {
   derivePostgresCatalog,
   type PostgresDatasetOverride,
@@ -230,6 +231,53 @@ describe("given the derived Postgres catalog's overrides", () => {
         baseRelation: "IngestionSource",
         source: "pollerCursor",
       });
+    });
+
+    it("strips ModelProvider.extraHeaders, raw provider auth headers", () => {
+      assertStripped({
+        baseRelation: "ModelProvider",
+        source: "extraHeaders",
+      });
+    });
+  });
+
+  describe("when a model's own repository enforces per-user visibility", () => {
+    const LANGY_MODELS = [
+      "LangyConversationProjection",
+      "LangyConversationTurnProjection",
+      "LangyMessageProjection",
+      "LangyTurnRequest",
+      "LangyActiveTurn",
+    ];
+
+    /** @scenario "Per-user visibility is enforced at the approved view" */
+    it("carries a rowFilter referencing the base alias on every Langy view", () => {
+      for (const baseRelation of LANGY_MODELS) {
+        const view = byModel.get(baseRelation)!;
+        expect(
+          view.postgres?.rowFilter,
+          `${baseRelation} should carry a rowFilter`,
+        ).toBeDefined();
+        expect(view.postgres!.rowFilter).toContain('"m".');
+      }
+    });
+
+    /** @scenario "Per-user visibility is enforced at the approved view" */
+    it("renders the rowFilter into the approved view's WHERE clause", () => {
+      const statements = lwqlPostgresApprovedViewStatements({
+        schema: "public",
+      });
+      for (const baseRelation of LANGY_MODELS) {
+        const view = byModel.get(baseRelation)!;
+        const statement = statements.find((entry) =>
+          entry.includes(`"${view.postgres!.approvedView}"`),
+        );
+        expect(
+          statement,
+          `${baseRelation}'s approved-view DO block`,
+        ).toBeDefined();
+        expect(statement).toContain("\nWHERE (");
+      }
     });
   });
 

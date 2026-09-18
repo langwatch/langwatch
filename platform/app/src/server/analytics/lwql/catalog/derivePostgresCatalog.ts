@@ -102,6 +102,16 @@ export interface PostgresDatasetOverride {
    * it is safe to expose. A re-admit without a non-empty reason is refused.
    */
   readonly reAdmit?: Readonly<Record<string, string>>;
+  /**
+   * A visibility rule the application's own repository enforces in code —
+   * copied verbatim onto {@link LangWatchQLPostgresMapping.rowFilter}. A model
+   * whose repository already restricts which rows a caller may read (e.g. "own
+   * or shared") gets this instead of a skip, since the reader role only ever
+   * sees the approved view and that is the one place left to enforce it. May
+   * use the `{{schema}}` token to name a sibling relation — see
+   * {@link LangWatchQLPostgresMapping.rowFilter}.
+   */
+  readonly rowFilter?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -635,13 +645,26 @@ function tenantColumn(scope: TenantScope): LangWatchQLViewColumn {
   };
 }
 
+/**
+ * Appended to a view's description when a `rowFilter` restricts its rows —
+ * kept here rather than in each override so the note can never be forgotten
+ * by a future `rowFilter` that only sets the predicate.
+ */
+export const ROW_FILTER_NOTE =
+  " Shared Langy conversations only; a member's private conversations are not queryable.";
+
 /** The default view description: the model's doc, else a generated line. */
 function viewDescription(
   model: PrismaModel,
   override: PostgresDatasetOverride,
   grain: string,
 ): string {
-  if (override.description) return override.description;
+  const base = override.description ?? defaultDescription(model, grain);
+  return override.rowFilter ? `${base}${ROW_FILTER_NOTE}` : base;
+}
+
+/** The model's doc comment's first line, else a generated line. */
+function defaultDescription(model: PrismaModel, grain: string): string {
   const firstLine = model.documentation.split("\n")[0]?.trim();
   if (firstLine && firstLine.length > 0) return firstLine;
   return `Rows of the ${model.name} table, ${grain}.`;
@@ -757,6 +780,9 @@ function deriveModel({
       approvedView: `lwql_${name}`,
       tenantSourceColumn: scope.column,
       ...(scope.tenantPath.length > 0 ? { tenantPath: scope.tenantPath } : {}),
+      ...(override.rowFilter !== undefined
+        ? { rowFilter: override.rowFilter }
+        : {}),
     },
     description: viewDescription(model, override, grain),
     gates: [],
@@ -841,6 +867,20 @@ function assertOverride({
   assertReAdmitReasons(name, override);
   assertAnnotationsExposed(name, override, exposedNames);
   assertSkipColumnsExist(name, model, override);
+  assertRowFilterReferencesBaseAlias(name, override);
+}
+
+/** A `rowFilter` that never reads `"m".` filters nothing — refused. */
+function assertRowFilterReferencesBaseAlias(
+  name: string,
+  override: PostgresDatasetOverride,
+): void {
+  if (override.rowFilter === undefined) return;
+  if (!override.rowFilter.includes('"m".')) {
+    throw new Error(
+      `lwql postgres catalog: view "${name}" rowFilter does not reference the base alias "m"`,
+    );
+  }
 }
 
 /** Every `skipColumns` key names a real source column, or the view is refused. */

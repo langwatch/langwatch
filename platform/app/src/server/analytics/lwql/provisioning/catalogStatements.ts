@@ -813,10 +813,17 @@ export function lwqlSourceColumnGrants({
 export function lwqlPostgresApprovedViewStatements({
   schema,
   views = LWQL_VIEW_CATALOG,
+  readerRole,
 }: {
   /** PostgreSQL schema the application's tables live in. */
   schema: string;
   views?: readonly LangWatchQLViewDefinition[];
+  /**
+   * Forwarded to {@link postgresApprovedViewStatement} — the reader role each
+   * view's upgrade-path fallback re-grants `SELECT` to, if the caller knows
+   * it at this point. See that function's doc comment.
+   */
+  readerRole?: string;
 }): string[] {
   return lwqlPostgresViews(views).map((view) => {
     const joins = view.postgres.tenantPath ?? [];
@@ -829,6 +836,8 @@ export function lwqlPostgresApprovedViewStatements({
       view: view.postgres.approvedView,
       baseRelation: view.postgres.baseRelation,
       joins,
+      rowFilter: view.postgres.rowFilter,
+      readerRole,
       columns: view.columns.map((column) => ({
         exposed: column.name,
         // The tenant column is the one rename every mapping performs; the rest
