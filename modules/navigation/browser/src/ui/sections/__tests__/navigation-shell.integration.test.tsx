@@ -151,6 +151,31 @@ function renderShell({
   );
 }
 
+describe("the front door at /", () => {
+  afterEach(() => cleanup());
+
+  /** @scenario The front door draws before any project is chosen */
+  it("draws the address rather than waiting on a project nothing has chosen yet", () => {
+    renderShell({
+      // What a signed-in reader actually arrives with at "/": the address
+      // names no project, so scope resolved none, and the screen that would
+      // choose one renders inside this shell.
+      readings: {
+        pathname: "/",
+        project: undefined,
+        team: undefined,
+        // The seeded reader is an organization admin, which is what carries
+        // them past the page body's own membership gate with no team resolved.
+        organizationRole: "ADMIN",
+        waiting: <div data-testid="waiting" />,
+      },
+    });
+
+    expect(screen.queryByTestId("waiting")).toBeNull();
+    expect(screen.getByTestId("page-body")).toBeTruthy();
+  });
+});
+
 /** The switcher row for a product, which is what carries its state. */
 function productMenuItem(label: string) {
   return screen.getByText(label).closest("[role='menuitem']");

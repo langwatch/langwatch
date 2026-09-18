@@ -14,6 +14,12 @@ export interface ShellRoute {
   isSettingsRoute: boolean;
   isPersonalScopeRoute: boolean;
   isOrgScopeRoute: boolean;
+  /**
+   * The root resolver. It names no project, and the screen that chooses one
+   * renders inside this chrome — so waiting for a project here waits on this
+   * route's own output. specs/navigation/navigation-v2-landing.feature.
+   */
+  isResolverRoute: boolean;
   /** Null on the settings detour, which is not a product. */
   activeProductId: ProductId | null;
 }
@@ -49,6 +55,7 @@ export function resolveShellRoute({
     isSettingsRoute,
     isPersonalScopeRoute,
     isOrgScopeRoute,
+    isResolverRoute: pathname === "/",
     activeProductId,
   };
 }

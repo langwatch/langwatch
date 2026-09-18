@@ -13,6 +13,18 @@ Feature: Landing
   Settings is never a landing destination of its own. Leaving Settings
   goes back to the product the user came from.
 
+  # The chrome refuses to draw until a team and a project resolve, and "/" is
+  # the one address that names neither: the reader has not picked a project
+  # yet, and the screen that picks one for them renders INSIDE that chrome.
+  # Gating the resolver on its own output is a deadlock — a signed-in reader
+  # watches a spinner nothing will ever end, and the home resolver is never
+  # even asked. "/" needs the navigation host mounted, not the furniture.
+  @integration
+  Scenario: The front door draws before any project is chosen
+    Given a signed-in reader whose scope names no project yet
+    When they open "/"
+    Then the chrome draws the address rather than waiting on a project
+
   @unit
   Scenario: An explicit pin outranks everything
     Given I pinned my home to "/governance"

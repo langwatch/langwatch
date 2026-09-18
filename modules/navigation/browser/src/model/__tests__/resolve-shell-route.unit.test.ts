@@ -26,6 +26,7 @@ describe("resolveShellRoute", () => {
         isSettingsRoute: false,
         isPersonalScopeRoute: false,
         isOrgScopeRoute: true,
+        isResolverRoute: false,
         activeProductId: "gateway",
       });
     });
@@ -40,6 +41,7 @@ describe("resolveShellRoute", () => {
         isSettingsRoute: false,
         isPersonalScopeRoute: false,
         isOrgScopeRoute: false,
+        isResolverRoute: false,
         activeProductId: "llm-ops",
       });
     });
@@ -60,6 +62,7 @@ describe("resolveShellRoute", () => {
           isSettingsRoute: true,
           isPersonalScopeRoute: false,
           isOrgScopeRoute: true,
+          isResolverRoute: false,
           activeProductId: null,
         });
       }

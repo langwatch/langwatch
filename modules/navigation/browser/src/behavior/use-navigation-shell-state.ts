@@ -114,6 +114,8 @@ function isShellDataPending({
   if (!route.isPersonalScopeRoute && !(organization && host.organizations().length > 0)) {
     return true;
   }
-  if (route.isPersonalScopeRoute || route.isOrgScopeRoute) return false;
+  // The root resolver draws as soon as the organization is known: it needs the
+  // host mounted, not a project — and it is what CHOOSES the project.
+  if (route.isResolverRoute || route.isPersonalScopeRoute || route.isOrgScopeRoute) return false;
   return !host.team() || !host.project();
 }
