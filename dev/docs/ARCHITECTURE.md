@@ -1045,17 +1045,30 @@ invented:
   | --- | --- | --- |
   | `withScreens` | 33 | `installedModuleScreens` |
   | `withDrawers` | 11 | `installedDrawerLoaders` |
-  | `withConfig` | 3 | yes |
+  | `withConfig` | 1 | yes |
   | `withApi` | 1 of 33 | `installedModuleApis` |
   | `withCapabilities` | 0 | being built |
-  | `withSlots` | **0** | built and waiting (`browser-host/src/slots.tsx`) |
-  | `withFlags` · `withCommands` · `withFailureInterceptors` · `withSeatTypeCopy` | **0** | **none** |
+  | `withSlots` | **0** | built (`browser-host/src/slots.tsx`) |
+  | `withFailureInterceptors` | **0** | built (`ui-feature-shell.tsx:162`) |
+  | `withSeatTypeCopy` | **0** | built (`slots.tsx:143`) |
+  | `withFlags` · `withCommands` | **0** | **none** |
 
-  The last row is public builder surface that does nothing;
-  `withSeatTypeCopy()` takes no argument at all and sets a boolean nobody
-  reads. Those four go, and come back when something needs them. `withSlots`
-  is the opposite case and stays: its consumer is built, and what it lacks is
-  declarers.
+  Only the last row is builder surface that does nothing, and only it is
+  deleted. The three above it are the opposite case and stay: their consumers
+  are built and waiting, and what they lack is declarers. That
+  `withFailureInterceptors` has none is its own finding — the shell runs every
+  installed interceptor over each failed mutation so that "a failure a feature
+  answers application-wide is reported once, rather than by every screen that
+  happens to trip it", and no feature answers one.
+
+  **Count the consuming side, not only the declaring side** (the method note
+  this table cost). A first pass read four slots as dead both ends; two of them
+  had live consumers and were one lane away from deletion. The miss was
+  mechanical: a slot is renamed in transit — `failureInterceptors` is consumed
+  as `features.failures` — so grepping the slot's own name finds nothing and
+  looks like proof. Counting declarers finds what nobody uses; counting
+  consumers finds what nobody fills. The two look identical from one side, and
+  every seam found today has been the second kind.
 
 - **An unmounted host is refused at install, not thrown at render** (ruled
   2026-09-18). A screen declares a `*HostApi`; if nothing mounts it, `createUi`
