@@ -31,6 +31,7 @@ import {
   type GatewaySuccessNotice,
   type GatewayTeam,
 } from "../model/gateway-host.ts";
+import { gatewayApi, type GatewayOrganizationGraph } from "./gateway-api.ts";
 
 /** Writes a registered drawer's address, clearing every stale `drawer.*` key. */
 function openDrawerAddress({
@@ -51,6 +52,28 @@ function openDrawerAddress({
   route.setQuery(next);
 }
 
+/** A stable reference, so a query still loading never re-triggers a memo below it. */
+const NO_ORGANIZATIONS: readonly GatewayOrganizationGraph[] = [];
+
+/**
+ * The graph in the port's shape: every project carries the team it belongs to,
+ * which the graph states by nesting rather than by field.
+ */
+function organizationsOf(
+  graph: readonly GatewayOrganizationGraph[],
+): readonly GatewayOrganization[] {
+  return graph.map((row) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    teams: row.teams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      projects: team.projects.map((project) => ({ ...project, teamId: team.id })),
+    })),
+  }));
+}
+
 class CapabilityGatewayHost extends GatewayHostApi {
   constructor(
     private readonly activeScope: GatewayScope,
@@ -60,6 +83,7 @@ class CapabilityGatewayHost extends GatewayHostApi {
     private readonly navigation: UiNavigation,
     private readonly uiRoute: UiRoute,
     private readonly feedback: UiFeedback,
+    private readonly organizations_: readonly GatewayOrganization[],
   ) {
     super();
   }
@@ -68,14 +92,12 @@ class CapabilityGatewayHost extends GatewayHostApi {
     return this.activeScope;
   }
 
-  /** No org-graph capability exists yet; recorded gap, see the handoff. */
   organizations(): readonly GatewayOrganization[] {
-    return [];
+    return this.organizations_;
   }
 
-  /** Same recorded gap: a compliant `slug`/`teams` shape cannot be built. */
   organization(): GatewayOrganization | undefined {
-    return void 0;
+    return this.organizations_.find((one) => one.id === this.activeScope.organizationId);
   }
 
   project(): GatewayProject | undefined {
@@ -85,9 +107,10 @@ class CapabilityGatewayHost extends GatewayHostApi {
     return { id: project.id, name: project.name, slug: project.slug, teamId: team.id };
   }
 
-  /** Same recorded gap: a compliant `slug`/`projects` shape cannot be built. */
   team(): GatewayTeam | undefined {
-    return void 0;
+    const teamId = this.scopeHost?.team()?.id;
+    if (teamId === void 0) return void 0;
+    return this.organization()?.teams.find((candidate) => candidate.id === teamId);
   }
 
   currentUser(): GatewayActor | null {
@@ -156,6 +179,14 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
   const scopeHost = useUiScope().scopeHost();
   const { isSaaS } = useUiDeployment();
 
+  // Shares the tRPC cache entry with every other reader of this procedure, so
+  // the graph is fetched once per page however many hosts want it.
+  const graph = gatewayApi.organization.getAll.useQuery({ isDemo: false });
+  const organizations = useMemo(
+    () => organizationsOf(graph.data ?? NO_ORGANIZATIONS),
+    [graph.data],
+  );
+
   const host = useMemo(
     () =>
       new CapabilityGatewayHost(
@@ -166,8 +197,19 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
         navigation,
         route,
         feedback,
+        organizations,
       ),
-    [organizationId, projectId, scopeHost, isSaaS, session, navigation, route, feedback],
+    [
+      organizationId,
+      projectId,
+      scopeHost,
+      isSaaS,
+      session,
+      navigation,
+      route,
+      feedback,
+      organizations,
+    ],
   );
 
   return <GatewayHostProvider value={host}>{children}</GatewayHostProvider>;
