@@ -97,13 +97,7 @@ const ready = all
       .withTracing(facilities.tracing)
       .withMetrics(facilities.metrics),
   )
-  .withTransportAuth(
-    (auth) =>
-      auth
-        .withStaticTokens({ cronBearerToken: "test", langyInternalBearerToken: "test", instanceAdminBearerToken: "test" })
-        .withBrowserSession({}),
-    () => ({}),
-  );
+  .expose(() => ({ hosts: {}, serve: () => void 0 }));
 expectTypeOf<MissingNames<typeof ready>>().toEqualTypeOf<never>();
 void (() => ready.boot());
 const wrongFacility = minimal.withObservability((o) => o.withMetrics(facilities.metrics));
@@ -160,13 +154,13 @@ const withTransport = defineServerModule("annotation")
 const transportClock = createApp({ role: "api" }).withModules([withTransport]);
 expectTypeOf<MissingNames<typeof transportClock>>().toEqualTypeOf<"clock">();
 
-const openedTransport = createApp({ role: "api" }).withTransportAuth(
-  (auth) => auth,
-  () => ({
+const openedTransport = createApp({ role: "api" }).expose(() => ({
+  hosts: {
     rest: { mount: () => ({ protocol: "rest" as const }) },
     trpc: { mount: () => ({ protocol: "trpc" as const }) },
-  }),
-);
+  },
+  serve: () => void 0,
+}));
 type OpenedRuntime = Awaited<ReturnType<typeof openedTransport.boot>>;
 expectTypeOf<OpenedRuntime["transports"]["rest"]>().toEqualTypeOf<
   readonly { protocol: "rest" }[]
@@ -174,8 +168,8 @@ expectTypeOf<OpenedRuntime["transports"]["rest"]>().toEqualTypeOf<
 expectTypeOf<OpenedRuntime["transports"]["trpc"]>().toEqualTypeOf<
   Readonly<Record<string, { protocol: "trpc" }>>
 >();
-// @ts-expect-error transport auth cannot open doors without a host factory
-void createApp({ role: "api" }).withTransportAuth((auth) => auth);
+// @ts-expect-error a surface states both what mounts on it and what it serves
+void createApp({ role: "api" }).expose(() => ({ hosts: {} }));
 
 void createApp({ role: "worker" })
   .withService({ name: "producer", start: () => void 0, stop: () => void 0 })

@@ -4,6 +4,7 @@
  * discriminant (ADR-144 §13a) — no inference from a leftover credential.
  */
 import { directSesClientConfiguration, MailerAdapter } from "@langwatch/mail/gateway";
+
 import type { MailConfig, OutboundProxyConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 import type { Mail } from "./members.ts";

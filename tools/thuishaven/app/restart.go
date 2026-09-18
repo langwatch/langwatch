@@ -155,7 +155,7 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 		all = append(all, restartTarget{Name: GoLane, Port: goPort})
 	}
 	if st.APIPort != 0 && !mono {
-		all = append(all, restartTarget{Name: BackendLane, Port: st.APIPort})
+		all = append(all, restartTarget{Name: APILane, Port: st.APIPort})
 	}
 	if name == "" {
 		return all

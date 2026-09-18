@@ -26,6 +26,10 @@
       "types": "./dist/capabilities.d.ts",
       "default": "./src/capabilities.ts"
     },
+    "./analytics": {
+      "types": "./dist/analytics.d.ts",
+      "default": "./src/analytics.ts"
+    },
     "./use-router": {
       "types": "./dist/use-router.d.ts",
       "default": "./src/use-router.ts"

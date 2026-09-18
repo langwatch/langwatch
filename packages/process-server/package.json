@@ -2,7 +2,7 @@
   "name": "@langwatch/process-server",
   "version": "0.1.0",
   "private": true,
-  "description": "The process boundary: the signals that end a LangWatch process, the failures that kill it, and the order the things it hosts are torn down in. It builds no telemetry and reads no config.",
+  "description": "Process composition, transport selection and lifecycle for API and worker applications.",
   "license": "MIT",
   "files": [
     "src"
@@ -21,7 +21,23 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/kernel": "workspace:*"
+    "@langwatch/api": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "zod": "catalog:",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/enterprise-scim-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/handled-error": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:",

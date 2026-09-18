@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const docPath = join(packageRoot, "../../apps/api/src/features/discovery/openapi-document.json");
+const docPath = join(packageRoot, "../../specs/api-reference/openapi-document.json");
 const outPath = join(packageRoot, "src/internal/generated/openapi/api-client.ts");
 const patchScriptPath = join(packageRoot, "scripts/patch-generated-openapi.mjs");
 const stampPath = join(packageRoot, "src/internal/generated/openapi/.fingerprint");

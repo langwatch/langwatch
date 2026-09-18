@@ -14,8 +14,8 @@ export class ConfigCollisionError extends HandledError {
   constructor(env: string, owners: readonly string[]) {
     super(
       "config_collision",
-      `"${env}" is declared by ${owners.map((o) => `"${o}"`).join(" and ")} as different ` +
-        `leaves. One env var carries one meaning: share the exported leaf, or rename one.`,
+      `"${env}" is declared by ${owners.map((o) => `"${o}"`).join(" and ")}. One env var has ` +
+        `one owner: let the owner that declares it pass the parsed value down, or rename one.`,
       { fault: "platform" },
     );
   }

@@ -5,11 +5,14 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { SecretsChain } from "../chain.ts";
+import { refuseDoubleClaims, type SecretsOwner } from "../claims.ts";
+import { secretLogRedactPaths } from "../redact.ts";
 import { SecretsResolver } from "../resolver.ts";
 import { Secret } from "../secret.ts";
 import {
   AbsentSecretError,
   SealedSecretsError,
+  SecretClaimedTwiceError,
   SecretsPreflightError,
   UndeclaredSecretError,
 } from "../secrets.errors.ts";
@@ -90,5 +93,44 @@ describe("the preflight", () => {
     expect((failure as SecretsPreflightError).missing).toEqual(["MISSING_ONE", "MISSING_TWO"]);
 
     await expect(resolver.preflight([Secret.load("IN_ENV")])).resolves.toBeUndefined();
+  });
+});
+
+describe("one credential, declared by two owners", () => {
+  it("refuses one credential declared separately by two owners, naming both", () => {
+    const owners: readonly SecretsOwner[] = [
+      { name: "github", secrets: { signingKey: Secret.load("CREDENTIALS_SECRET") } },
+      { name: "secret", secrets: { encryptionKey: Secret.load("CREDENTIALS_SECRET") } },
+    ];
+
+    const failure = (() => {
+      try {
+        refuseDoubleClaims(owners);
+        return undefined;
+      } catch (error: unknown) {
+        return error;
+      }
+    })();
+
+    expect(failure).toBeInstanceOf(SecretClaimedTwiceError);
+    expect((failure as SecretClaimedTwiceError).id).toBe("CREDENTIALS_SECRET");
+    expect((failure as SecretClaimedTwiceError).owners).toEqual(["github", "secret"]);
+  });
+
+  it("admits one owner declaring many secrets of its own", () => {
+    const owners: readonly SecretsOwner[] = [
+      { name: "secret", secrets: { cipher: Secret.load("CREDENTIALS_SECRET") } },
+      { name: "auth", secrets: { session: Secret.load("NEXTAUTH_SECRET") } },
+      { name: "quiet", secrets: {} },
+      { name: "silent" },
+    ];
+
+    expect(() => refuseDoubleClaims(owners)).not.toThrow();
+  });
+
+  it("derives log redaction from the handles a process declared, not a registry", () => {
+    const paths = secretLogRedactPaths([Secret.load("A_KEY"), Secret.load("A_KEY")]);
+
+    expect(paths).toEqual(["A_KEY", "*.A_KEY"]);
   });
 });

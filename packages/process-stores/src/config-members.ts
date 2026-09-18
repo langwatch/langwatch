@@ -3,7 +3,9 @@
  * value and open nothing, so nothing here has a close.
  */
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+
 import type { Logger } from "@langwatch/observability";
+
 import type { Clock, Encryption, SecretResolver, Telemetry } from "./members.ts";
 
 /** The wall clock. A test swaps this member rather than the code that reads it. */
@@ -37,11 +39,7 @@ export function aesEncryption(key: Uint8Array): Encryption {
       if (parts.length !== 3 || iv === void 0 || tag === void 0 || body === void 0) {
         throw new Error("An encrypted value reads as <iv>.<tag>.<ciphertext>.");
       }
-      const decipher = createDecipheriv(
-        ENCRYPTION_ALGORITHM,
-        key,
-        Buffer.from(iv, "base64url"),
-      );
+      const decipher = createDecipheriv(ENCRYPTION_ALGORITHM, key, Buffer.from(iv, "base64url"));
       decipher.setAuthTag(Buffer.from(tag, "base64url"));
       return Buffer.concat([
         decipher.update(Buffer.from(body, "base64url")),

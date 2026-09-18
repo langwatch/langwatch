@@ -112,13 +112,8 @@ const statements = {
   callback:
     'createApp({ role: "api" }).withModules([clockModule]).withObservability((o) => o.withMetrics(facilities.metrics)).boot();',
   bootArgs: 'createApp({ role: "api" }).boot({});',
-  secretTypo:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withStaticTokens({ langyInternl: "test" }), () => ({}));',
-  removedLimiter:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withRateLimiter({}), () => ({}));',
-  removedLedger:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withIdempotency({}), () => ({}));',
-  missingTransportHosts: 'createApp({ role: "api" }).withTransportAuth((auth) => auth);',
+  surfaceWithoutServe: 'createApp({ role: "api" }).expose(() => ({ hosts: {} }));',
+  surfaceWithoutHosts: 'createApp({ role: "api" }).expose(() => ({ serve: () => void 0 }));',
   badService:
     'createApp({ role: "worker" }).withService({ name: "producer", start: () => void 0 });',
   goodClock: 'createApp({ role: "api" }).withModules([clockModule]).withClock(clock).boot();',
@@ -136,11 +131,10 @@ const statements = {
   goodConfig:
     'createApp({ role: "api" }).withModules([configModule]).withConfig({ "api-key": { pepper: "test" } }).boot();',
   doorsClosed: 'createApp({ role: "worker" }).withModules([projectModule]).boot();',
-  doorsEmpty: 'createApp({ role: "api" }).withTransportAuth((auth) => auth, () => ({})).boot();',
-  doorsSession:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withBrowserSession({}), () => ({})).boot();',
-  doorsTokens:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withStaticTokens({ cronBearerToken: "test", langyInternalBearerToken: "test", instanceAdminBearerToken: "test" }), () => ({})).boot();',
+  surfaceEmpty:
+    'createApp({ role: "api" }).expose(() => ({ hosts: {}, serve: () => void 0 })).boot();',
+  surfaceOpened:
+    'createApp({ role: "api" }).expose(() => ({ hosts: { rest: { mount: () => ({}) } }, serve: () => void 0 })).boot();',
   goodService:
     'createApp({ role: "worker" }).withService({ name: "producer", start: () => void 0, stop: () => void 0 }).boot();',
   ...truncationStatements,
@@ -249,9 +243,8 @@ describe("compiler checked process supply", () => {
     "overwritten",
     "callback",
     "bootArgs",
-    "removedLimiter",
-    "removedLedger",
-    "missingTransportHosts",
+    "surfaceWithoutServe",
+    "surfaceWithoutHosts",
     "badService",
   ])("refuses %s", (name) => {
     expect(diagnostics.get(name)?.length).toBeGreaterThan(0);
@@ -295,11 +288,6 @@ describe("compiler checked process supply", () => {
     expect(diagnostics.get("configTypo")?.join("\n")).toContain("pepper");
   });
 
-  /** @scenario "A misspelled shared secret is refused where it is written" */
-  it("refuses an unknown static token name", () => {
-    expect(diagnostics.get("secretTypo")?.join("\n")).toContain("langyInternl");
-  });
-
   it("keeps config slices, members and peer gaps at 49 modules", () => {
     expect(diagnostics.get("scale")?.join("\n")).toContain('MissingSupply<"clock">');
     expect(diagnostics.get("scaleConfig")?.join("\n")).toContain("m48");
@@ -335,9 +323,8 @@ describe("compiler checked process supply", () => {
     "noAnalytics",
     "goodConfig",
     "doorsClosed",
-    "doorsEmpty",
-    "doorsSession",
-    "doorsTokens",
+    "surfaceEmpty",
+    "surfaceOpened",
     "goodService",
   ])("accepts %s", (name) => {
     expect(diagnostics.get(name)).toBeUndefined();

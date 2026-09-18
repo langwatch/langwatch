@@ -243,6 +243,9 @@ func TestSessionDashboardIsTabOne(t *testing.T) {
 	m := dashModel(t, []app.SessionServiceStatus{
 		{Name: "app", URL: "https://app.feat-x.langwatch.localhost", Up: true, Restartable: true},
 		{Name: "nlp", Restartable: true},
+		// Machine-wide machinery is a row of this one list, not a line of its
+		// own: it is read and selected the same way everything else is.
+		{Name: "postgres", Port: 5432, Detail: ":5432 lw_feat_x", Up: true, Shared: true},
 	}, nil)
 
 	if viewer.TabNames[0] != viewer.SessionTab {
@@ -252,7 +255,7 @@ func TestSessionDashboardIsTabOne(t *testing.T) {
 		t.Fatal("haven up must open on the dashboard, not straight into a log tab")
 	}
 	view := m.View()
-	for _, want := range []string{"haven up", "Services", "app", "nlp", "Shared infrastructure", "q Detach", "X Stop stack"} {
+	for _, want := range []string{"haven up", "Services", "app", "nlp", "postgres", ":5432 lw_feat_x", "q Detach", "X Stop stack"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("dashboard is missing %q\n%s", want, view)
 		}

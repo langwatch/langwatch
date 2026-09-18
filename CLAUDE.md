@@ -3,6 +3,10 @@
 LLM Ops platform for evaluation, observability, and optimization of AI agents
 and pipelines.
 
+## Comments
+
+Don't write pointless comments. Good code explains itself. If it's vital, add it to an ADR or spec file, and link back.
+
 ## The three authorities
 
 Everything in this file is a digest. The full truth lives in three places, in
@@ -311,10 +315,12 @@ haven up +langy        # add a service to this stack, sticky (likewise -gateway,
 haven logs nlp -t      # tail one service's logs from any terminal
 ```
 
-haven supervises two Node lanes — `ui` and `backend` — beside one `go` lane
+haven supervises two Node lanes — `ui` and `api` — beside one `go` lane
 holding the data-plane services. None is individually selectable (`haven up
-±api`/`±backend`/`±workers` are refused by name); `haven logs go` is where the
-gateway and NLP engine read, and restarting either means restarting the lane.
+±api`/`±backend`/`±workers` are refused by name); the api lane hosts the worker
+beside the API, so `haven logs api` and `haven logs worker` each show one of
+them and `haven logs go` is where the gateway and NLP engine read. Restarting
+any of them means restarting the lane.
 `https://langwatch.localhost` is the cross-worktree dashboard;
 `observability.langwatch.localhost` proxies local Grafana;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. Driving
@@ -350,7 +356,7 @@ sandboxed langy tiers, both opt-in.
 not reinvent process hunting — `dev/scripts/kill-dev-tree.sh` already does it
 correctly.
 
-Locally there are **two Node processes**: `backend` runs the api and the
+Locally there are **two Node processes**: the `api` lane runs the api and the
 worker in one process (a launcher, not a process role — each still resolves
 its own secrets, config and graph; boot is worker then api, shutdown drains
 the worker first). Production is unchanged: three Node deployments.

@@ -19,7 +19,7 @@ type health struct {
 // per-service health, RAM footprint) plus the shared machinery (proxy, daemon,
 // observability, the managed database servers) in a single one-shot report.
 // asJSON is the agent-friendly form.
-func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
+func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) error {
 	ctx := context.Background()
 	stacks := o.store.Stacks()
 	scheme, port := o.proxy.Endpoint()
@@ -66,7 +66,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 			"servers":       servers,
 			"footprint":     map[string]any{"live": live, "rssBytes": rss},
 			"selection":     selection,
-			"overlay":       o.worktreeOverlay(worktreeDir),
+			"overlay":       o.worktreeOverlay(worktreeDir, reveal),
 		})
 	}
 
@@ -109,7 +109,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 		}
 		fmt.Printf("%s %s — %s\n", ok(h.OK), name, h.Detail)
 	}
-	o.printWorktreeOverlay(worktreeDir)
+	o.printWorktreeOverlay(worktreeDir, reveal)
 	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",
 		len(stacks), live, domain.HumanBytes(int64(rss)), shared(domain.HubService), o.cfg.Naming.TLD)
 	return nil
@@ -118,8 +118,10 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 // worktreeOverlay is what this worktree's stack resolved to. Nothing writes it
 // to a file any more, so the report is where a person reads it back: without it
 // the only way to see the URLs and database this stack is actually using would
-// be to attach to a lane and print its environment.
-func (o *Orchestrator) worktreeOverlay(worktreeDir string) map[string]string {
+// be to attach to a lane and print its environment. Masked exactly like `haven
+// env` unless reveal is set — this is the JSON form an agent pipes around, so
+// it must never be the unmasked one by default (see domain.SecretClasses).
+func (o *Orchestrator) worktreeOverlay(worktreeDir string, reveal bool) map[string]string {
 	if worktreeDir == "" {
 		return nil
 	}
@@ -127,12 +129,21 @@ func (o *Orchestrator) worktreeOverlay(worktreeDir string) map[string]string {
 	if !ok {
 		return nil
 	}
-	return domain.EnvMap(st.OverlayEnv())
+	env := domain.EnvMap(st.OverlayEnv())
+	if reveal {
+		return env
+	}
+	classes := domain.SecretClasses(worktreeDir)
+	masked := make(map[string]string, len(env))
+	for key, value := range env {
+		masked[key] = domain.MaskEnvValue(classes, key, value)
+	}
+	return masked
 }
 
 // printWorktreeOverlay renders the same set for a human, keys sorted, and says
 // where to get it into a shell. Silent when this worktree has no stack.
-func (o *Orchestrator) printWorktreeOverlay(worktreeDir string) {
+func (o *Orchestrator) printWorktreeOverlay(worktreeDir string, reveal bool) {
 	if worktreeDir == "" {
 		return
 	}
@@ -142,9 +153,17 @@ func (o *Orchestrator) printWorktreeOverlay(worktreeDir string) {
 	}
 	env := st.OverlayEnv()
 	values := domain.EnvMap(env)
-	fmt.Printf("\nthis worktree resolved to (eval \"$(haven env)\" to load it in a shell):\n")
+	var classes map[string]domain.SecretClass
+	if !reveal {
+		classes = domain.SecretClasses(worktreeDir)
+	}
+	fmt.Printf("\nthis worktree resolved to (eval \"$(haven env --reveal)\" to load it in a shell):\n")
 	for _, key := range overlayKeys(env) {
-		fmt.Printf("  %-38s %s\n", key, values[key])
+		value := values[key]
+		if !reveal {
+			value = domain.MaskEnvValue(classes, key, value)
+		}
+		fmt.Printf("  %-38s %s\n", key, value)
 	}
 }
 

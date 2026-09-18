@@ -18,10 +18,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./docs-url": {
+      "types": "./dist/docs-url.d.ts",
+      "default": "./src/docs-url.ts"
+    },
+    "./public-app-config": {
+      "types": "./dist/public-app-config.d.ts",
+      "default": "./src/public-app-config.ts"
+    },
+    "./public-app-config/projection": {
+      "types": "./dist/public-app-config.projection.d.ts",
+      "default": "./src/public-app-config.projection.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b tsconfig.test.json",
     "test": "vitest run"
   },
   "dependencies": {

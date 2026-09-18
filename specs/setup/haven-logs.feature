@@ -28,6 +28,10 @@ Feature: haven logs
     Then every line shows the time, the service and the level in the same fixed columns
     And a line that is not structured keeps the service column and reads unchanged
     And an error's stack trace is indented under the line it belongs to
+    And a message carrying its own newlines is inset under the column it started at
+    And an embedded payload keeps the indentation its own structure is written in
+    And a serialised error the message already reads out is shortened to what it alone adds
+    And a stack whose opening repeats a message of several lines is read out once, keeping its frames
 
   Scenario: The raw bytes are one flag away
     When the developer runs "haven logs --raw"
@@ -42,6 +46,32 @@ Feature: haven logs
     When the developer runs "haven logs nlp"
     Then only nlp's lines appear
     And "haven logs nlp gateway" combines the two
+
+  # The api lane hosts the API and the worker in one Node process (ADR-004,
+  # amendment 2026-09-07), so one capture file holds both. A worker that refuses
+  # to boot otherwise reads as "the api failed", which is the half of the
+  # diagnosis that does not say which application to go and look at.
+  Scenario: The two applications the api lane hosts are addressable by name
+    When the developer runs "haven logs worker"
+    Then only the lines the worker application wrote appear
+    And "haven logs api" shows only the API application's lines
+    And "haven logs api worker" combines the two, each labelled with its own name
+    And naming a service that does not exist lists api and worker among the choices
+    And a capture written when the lane was called "backend" is still found
+
+  Scenario: The api lane is still readable whole
+    When the developer runs "haven logs"
+    Then the api lane's lines appear under the lane's own name
+    And the launcher's own lines, which belong to neither half, are among them
+
+  # A stack serving pages with a dead worker looks healthy from every row but
+  # the worker's, and the logs page is where a person already is when they are
+  # asking why nothing happened.
+  Scenario: A log sub-tab carries the health of the application behind it
+    When the developer opens the logs page
+    Then each application's sub-tab is marked green when it answers and red when it does not
+    And a sub-tab haven supervises nothing behind carries no mark at all
+    And the mark on the api sub-tab reads the lane, not the routed api hostname
 
   @integration @unimplemented
   Scenario: Tailing is -t and only -t

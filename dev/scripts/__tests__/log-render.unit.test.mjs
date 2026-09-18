@@ -52,7 +52,28 @@ void describe("given a structured line", () => {
         at,
       },
     );
-    assert.deepEqual(got.split("\n").slice(1), ["    Error: boom", "        at run (a.ts:1:1)"]);
+    // The header repeats the message, so it is read out once and the frames
+    // — what the stack alone adds — are what stays.
+    assert.deepEqual(got.split("\n").slice(1), ["        at run (a.ts:1:1)"]);
+  });
+
+  void it("insets a message that carries its own newlines", () => {
+    const got = render('{"level":"fatal","msg":"rejected: [\\n  {\\n    \\"code\\": \\"bad\\"\\n  }\\n]"}', {
+      lane: "worker",
+      at,
+    });
+    for (const row of got.split("\n").slice(1)) {
+      assert.ok(row.startsWith("    "), `continuation ${row} must be inset, not at the margin`);
+    }
+  });
+
+  void it("reads a repeated error out once, keeping the type it named", () => {
+    const got = render(
+      '{"level":"fatal","msg":"boot failed: the mcp member cannot be supplied","stack":"MissingMemberError: the mcp member cannot be supplied\\n    at build (m.ts:1:1)"}',
+      { lane: "worker", at },
+    );
+    assert.equal(got.split("the mcp member cannot be supplied").length - 1, 1);
+    assert.ok(got.includes("error=MissingMemberError"), got);
   });
 
   void it("drops the fields that are constant for the process", () => {

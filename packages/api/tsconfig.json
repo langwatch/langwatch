@@ -10,7 +10,6 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "rootDir": ".",
     "types": ["node"],
-
     "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*"],
@@ -35,6 +34,9 @@
     },
     {
       "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../test-harness/tsconfig.build.json"
     }
   ]
 }

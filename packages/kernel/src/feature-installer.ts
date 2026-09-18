@@ -1,4 +1,7 @@
-import { FeatureConfigError } from "./boot-errors.ts";
+import type { ConfigOf, ConfigSlice } from "@langwatch/config";
+import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
+
+import { FeatureConfigError, FeatureSecretsUnavailableError } from "./boot-errors.ts";
 /** One feature installer. A feature declares its config, the contract services */
 import type {
   DependencyIdentity,
@@ -26,6 +29,15 @@ import type { TransportFactBinding } from "./transport-mounting.ts";
 /** Which process is booting. A role hosts only the work that role owns. */
 export type ServerRole = "api" | "worker" | "tasks";
 
+/**
+ * How the application root narrows the process's one resolver to a single
+ * module: its own declared handles, and nothing else in the process.
+ */
+export type ModuleSecretsScope = (
+  owner: string,
+  declared: readonly SecretHandle<unknown>[],
+) => ScopedSecrets;
+
 /** As much of Zod as a feature's config needs, so this package depends on none. */
 export interface FeatureConfigSchema<Config> {
   parse(value: unknown): Config;
@@ -41,6 +53,8 @@ export type FeatureSetup<
   readonly dependencies: ResolvedTokens<Dependencies>;
   readonly config: Config;
   readonly resources: ResourceOwnership;
+  /** This module's declared handles, resolved only through `into` (§6). */
+  readonly secrets: ScopedSecrets;
 }> &
   ([Members] extends [never] ? object : Readonly<{ readonly members: Members }>) &
   ([Repositories] extends [never] ? object : Readonly<{ readonly repositories: Repositories }>);
@@ -58,13 +72,35 @@ export type AppDefinition<Dependencies extends TokenMap, Members, Config, App> =
   App
 > &
   Readonly<{
-    readonly configSchema: FeatureConfigSchema<Config>;
+    readonly configSchema?: FeatureConfigSchema<Config>;
+    /** Present when the App declared its own slice instead (§6). */
+    readonly config?: ConfigSlice;
     readonly repositories?: FeatureRepositories;
     /** What this App reads off the process's members, declared with `reads(...)`. */
     readonly reads?: readonly string[];
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, Members, NoInfer<Config>>,
-    ) => NoInfer<App>;
+    ) => NoInfer<App> | Promise<NoInfer<App>>;
+  }>;
+
+/**
+ * An App that declares its own config slice (§6). The process parses every
+ * owner once, so `create` receives that slice already parsed — there is no
+ * second schema and no second parse.
+ */
+export type DeclaredConfigAppDefinition<
+  Dependencies extends TokenMap,
+  Members,
+  Slice extends ConfigSlice,
+  App,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    readonly config: Slice;
+    readonly repositories?: FeatureRepositories;
+    readonly reads?: readonly string[];
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, Members, ConfigOf<Slice>>,
+    ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
 /** Static construction metadata for an app with no semantic configuration. */
@@ -78,7 +114,7 @@ export type AppDefinitionWithoutConfig<Dependencies extends TokenMap, Members, A
     readonly reads?: readonly string[];
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, Members, undefined>,
-    ) => NoInfer<App>;
+    ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
 /** Module supplies facts (org, link, media type) its routes declare. */
@@ -110,6 +146,12 @@ export interface FeatureSetupArguments<Config, Members, Dependencies> {
   readonly config: Config;
   readonly members: Members;
   readonly dependencies: Dependencies;
+  /**
+   * Exactly the handles this module declared, and the only way to resolve one
+   * (§6): `into(handle, build)` hands the value to the closure and lets only
+   * the constructed collaborator escape. Resolving seals when boot finishes.
+   */
+  readonly secrets: ScopedSecrets;
   readonly repositorySelection?: FeatureInstallArguments<Members>["repositorySelection"];
   /**
    * What the module's registry answered on the selected backend, instantiated
@@ -195,6 +237,12 @@ export interface FeatureInstallArguments<Members> {
   readonly role: ServerRole;
   /** Instantiated once by the repository-aware declaration that wraps this. */
   readonly repositories?: unknown;
+  /**
+   * Scoped to this module's own declared handles by the application root. A
+   * process that composed no resolver supplies none, and a module that then
+   * resolves one refuses by name rather than reading an undeclared secret.
+   */
+  readonly secrets?: ScopedSecrets;
   /** The instance the graph resolved for one token. */
   resolve: (token: TokenIdentity) => unknown;
 }
@@ -205,6 +253,9 @@ export interface FeatureInstallArguments<Members> {
  */
 export interface InstallableServerFeature<Members, Name extends string = string, Config = unknown> {
   readonly name: Name;
+  readonly config?: ConfigSlice;
+  readonly secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+  readonly publicConfig?: (config: unknown) => unknown;
   /** Config schema for compile-time validation (ADR-144). */
   readonly configSchema?: FeatureConfigSchema<Config>;
   /** Every door this feature declared, for the process root to mount at boot. */
@@ -230,7 +281,7 @@ export interface InstallableServerFeature<Members, Name extends string = string,
   readonly members?: readonly string[];
   /** Repository tier: live (default) or memory via withMemoryRepositories. */
   readonly tier?: Tier;
-  readonly install: (args: FeatureInstallArguments<Members>) => InstalledFeatureState;
+  readonly install: (args: FeatureInstallArguments<Members>) => Promise<InstalledFeatureState>;
 }
 
 /** One slice per module name, as a process states the config it hands them. */
@@ -369,8 +420,9 @@ export class ServerFeatureBuilder<
   ) {}
 
   /** The typed config slice `boot({ config })` must carry for this feature. */
+  /** Absent where the App declared its own slice: the one process parse ran already (§6). */
   withConfig<NextConfig>(
-    schema: FeatureConfigSchema<NextConfig>,
+    schema: FeatureConfigSchema<NextConfig> | undefined,
   ): ServerFeatureBuilder<NextConfig, Members, Dependencies, TransportDependencies, Name> {
     return new ServerFeatureBuilder({ ...this.shape, configSchema: schema });
   }
@@ -398,7 +450,9 @@ export class ServerFeatureBuilder<
 
   /** Ordinary code, run once per process, that constructs what this feature owns. */
   withSetup<Provided>(
-    setup: (args: FeatureSetupArguments<Config, Members, ResolvedTokens<Dependencies>>) => Provided,
+    setup: (
+      args: FeatureSetupArguments<Config, Members, ResolvedTokens<Dependencies>>,
+    ) => Provided | Promise<Provided>,
   ): ServerFeatureAssembly<
     Config,
     Members,
@@ -440,7 +494,7 @@ interface FeatureAssemblyState<
 > extends FeatureShape<Config, Dependencies, TransportDependencies, Name> {
   readonly setup: (
     args: FeatureSetupArguments<Config, Members, ResolvedTokens<Dependencies>>,
-  ) => Provided;
+  ) => Provided | Promise<Provided>;
   readonly providers: readonly FeatureProvider<Provided>[];
   readonly transport:
     | ((
@@ -747,7 +801,7 @@ export class ServerFeatureAssembly<
       members: Object.freeze([...state.members]),
       types: undefined as never,
 
-      install: (args: FeatureInstallArguments<Members>): InstalledFeatureState => {
+      install: async (args: FeatureInstallArguments<Members>): Promise<InstalledFeatureState> => {
         const config = parseFeatureConfig(state.name, state.configSchema, args.config);
         const dependencies = resolveTokens(
           state.dependencies,
@@ -755,13 +809,16 @@ export class ServerFeatureAssembly<
         ) as ResolvedTokens<Dependencies>;
         const setupArguments = {
           config,
+          secrets: args.secrets ?? undeclaredSecrets(state.name),
           members: args.members,
           dependencies,
           resources: args.resources,
           repositorySelection: args.repositorySelection,
           repositories: args.repositories,
         };
-        const provided = state.setup(setupArguments);
+        // A module resolving a secret does so in `create()`, so the whole
+        // install awaits: only the constructed collaborator comes back.
+        const provided = await state.setup(setupArguments);
         const { worker, close } = state;
         if (close) {
           args.resources.own(state.name, () => close(provided));
@@ -888,12 +945,24 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
   >(
     app: AppDefinition<Dependencies, Members, Config, App> & { readonly reads: Reads },
   ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>;
+  withApp<
+    Dependencies extends TokenMap,
+    Members,
+    Slice extends ConfigSlice,
+    App,
+    const Reads extends readonly string[],
+  >(
+    app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App> & { readonly reads: Reads },
+  ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, Reads>;
   withApp<Dependencies extends TokenMap, Members, App, const Reads extends readonly string[]>(
     app: AppDefinitionWithoutConfig<Dependencies, Members, App> & { readonly reads: Reads },
   ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>;
   withApp<Dependencies extends TokenMap, Members, Config, App>(
     app: AppDefinition<Dependencies, Members, Config, App>,
   ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, readonly []>;
+  withApp<Dependencies extends TokenMap, Members, Slice extends ConfigSlice, App>(
+    app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App>,
+  ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, readonly []>;
   withApp<Dependencies extends TokenMap, Members, App>(
     app: AppDefinitionWithoutConfig<Dependencies, Members, App>,
   ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, readonly []>;
@@ -902,7 +971,7 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
       | AppDefinition<TokenMap, unknown, unknown, unknown>
       | AppDefinitionWithoutConfig<TokenMap, unknown, unknown>,
   ): object {
-    if ("configSchema" in app) {
+    if ("configSchema" in app || "config" in app) {
       return new ConfiguredAppBuilder(this.name, app);
     }
     return new UnconfiguredAppBuilder(this.name, app);
@@ -917,12 +986,34 @@ type RepositoryAppDefinition<
   App,
 > = AppContract<Dependencies, App> &
   Readonly<{
-    readonly configSchema: FeatureConfigSchema<Config>;
+    readonly configSchema?: FeatureConfigSchema<Config>;
+    /** Present when the App declared its own slice instead (§6). */
+    readonly config?: ConfigSlice;
     readonly reads?: readonly string[];
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, never, NoInfer<Config>, Repositories> &
         Readonly<{ members: Members }>,
-    ) => NoInfer<App>;
+    ) => NoInfer<App> | Promise<NoInfer<App>>;
+  }>;
+
+/**
+ * The repository path's twin of {@link DeclaredConfigAppDefinition}: an App
+ * over its own repositories declaring a config slice, not a second schema.
+ */
+type RepositoryDeclaredConfigAppDefinition<
+  Dependencies extends TokenMap,
+  Members,
+  Slice extends ConfigSlice,
+  Repositories,
+  App,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    readonly config: Slice;
+    readonly reads?: readonly string[];
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, never, ConfigOf<Slice>, Repositories> &
+        Readonly<{ members: Members }>,
+    ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
 type RepositoryAppDefinitionWithoutConfig<
@@ -936,7 +1027,7 @@ type RepositoryAppDefinitionWithoutConfig<
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, never, undefined, Repositories> &
         Readonly<{ members: Members }>,
-    ) => NoInfer<App>;
+    ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
 class RepositoryDefinedFeatureBuilder<
@@ -994,23 +1085,58 @@ class RepositoryDefinedFeatureBuilder<
       App
     >,
   ): RepositoryUnconfiguredAppBuilder<Name, Live, Memory, Dependencies, Members, App, readonly []>;
-  withApp<Dependencies extends TokenMap, Members extends object, Config, App>(
+  withApp<
+    Dependencies extends TokenMap,
+    Members extends object,
+    Slice extends ConfigSlice,
+    App,
+    const Reads extends readonly string[],
+  >(
+    app: RepositoryDeclaredConfigAppDefinition<
+      Dependencies,
+      Members,
+      Slice,
+      ModuleRepositories<Live, Memory>,
+      App
+    > & { readonly reads: Reads },
+  ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, ConfigOf<Slice>, App, Reads>;
+  withApp<Dependencies extends TokenMap, Members extends object, Slice extends ConfigSlice, App>(
+    app: RepositoryDeclaredConfigAppDefinition<
+      Dependencies,
+      Members,
+      Slice,
+      ModuleRepositories<Live, Memory>,
+      App
+    >,
+  ): RepositoryAppBuilder<
+    Name,
+    Live,
+    Memory,
+    Dependencies,
+    Members,
+    ConfigOf<Slice>,
+    App,
+    readonly []
+  >;
+  withApp(
     app:
       | RepositoryAppDefinition<
-          Dependencies,
-          Members,
-          Config,
+          TokenMap,
+          unknown,
+          unknown,
           ModuleRepositories<Live, Memory>,
-          App
+          unknown
         >
       | RepositoryAppDefinitionWithoutConfig<
-          Dependencies,
-          Members,
+          TokenMap,
+          unknown,
           ModuleRepositories<Live, Memory>,
-          App
+          unknown
         >,
-  ) {
-    if ("configSchema" in app) {
+  ): object {
+    // Mirrors the non-repository path: a declared slice is config too, and the
+    // one process parse has already produced it (§6).
+    if ("configSchema" in app || "config" in app) {
       return new RepositoryAppBuilder(this.name, this.repositories, app);
     }
     return new RepositoryUnconfiguredAppBuilder(this.name, this.repositories, app);
@@ -1104,11 +1230,12 @@ class RepositoryAppBuilder<
     const setup = serverFeature<Members>(name)
       .withConfig(app.configSchema)
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, resources, repositories }) => {
+      .withSetup(({ dependencies, members, config, secrets, resources, repositories }) => {
         return app.create({
           dependencies,
           members,
           config,
+          secrets,
           resources,
           repositories: repositories as ModuleRepositories<Live, Memory>,
         });
@@ -1124,13 +1251,14 @@ class RepositoryAppBuilder<
       // handed to the app and to this module's eventing declaration alike. A
       // second read would give the two halves separate objects over the same
       // rows, and a memory tier two separate databases.
-      install: (args) => {
+      install: async (args) => {
         if (!args.repositorySelection) {
           throw new Error(`Module "${name}" was installed without a repository tier.`);
         }
         const repositories = instantiateRepositories(registry, args.repositorySelection);
-        return { ...setup.install({ ...args, repositories }), repositories };
+        return { ...(await setup.install({ ...args, repositories })), repositories };
       },
+      ...declaredOwner(app),
       members: declaredReads(app),
       repositoryRegistry: registry,
       ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
@@ -1273,11 +1401,12 @@ class ConfiguredAppBuilder<
     const declaration = serverFeature<Members>(this.name)
       .withConfig(app.configSchema)
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, resources }) =>
+      .withSetup(({ dependencies, members, config, secrets, resources }) =>
         app.create({
           dependencies,
           members,
           config,
+          secrets,
           resources,
         }),
       )
@@ -1287,6 +1416,7 @@ class ConfiguredAppBuilder<
       ...declaration,
       name: this.name,
       repositories: snapshotRepositories(app.repositories),
+      ...declaredOwner(app),
       members: declaredReads(app),
       ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
     };
@@ -1367,11 +1497,12 @@ class UnconfiguredAppBuilder<
     const declaration = serverFeature<Members>(this.name)
       .withConfig({ parse: () => void 0 })
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, resources }) =>
+      .withSetup(({ dependencies, members, config, secrets, resources }) =>
         app.create({
           dependencies,
           members,
           config,
+          secrets,
           resources,
         }),
       )
@@ -1381,6 +1512,7 @@ class UnconfiguredAppBuilder<
       ...declaration,
       name: this.name,
       repositories: snapshotRepositories(app.repositories),
+      ...declaredOwner(app),
       members: declaredReads(app),
       ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
     };
@@ -1420,7 +1552,7 @@ export type ModuleContributions<
 /** A built declaration, as the facts wrapper reads the two fields it needs. */
 interface InstallableDeclaration {
   readonly dependencies: TokenMap;
-  readonly install: (args: FeatureInstallArguments<never>) => InstalledFeatureState;
+  readonly install: (args: FeatureInstallArguments<never>) => Promise<InstalledFeatureState>;
 }
 
 /** Bind transport facts at install (API role only). */
@@ -1432,8 +1564,8 @@ function bindingTransportFacts<Declaration extends object>(
 
   return {
     ...declaration,
-    install: (args: FeatureInstallArguments<never>): InstalledFeatureState => {
-      const state = installable.install(args);
+    install: async (args: FeatureInstallArguments<never>): Promise<InstalledFeatureState> => {
+      const state = await installable.install(args);
       if (args.role !== "api") return state;
 
       return {
@@ -1481,12 +1613,24 @@ function withContributions<
   return contributions;
 }
 
+/**
+ * What a module is handed where the process composed no chain. Declaring costs
+ * nothing, so this only ever fires on an actual resolve, naming both.
+ */
+function undeclaredSecrets(feature: string): ScopedSecrets {
+  return new ScopedSecrets((handle) => {
+    throw new FeatureSecretsUnavailableError(feature, handle.id);
+  });
+}
+
 function parseFeatureConfig<Config>(
   feature: string,
   schema: FeatureConfigSchema<Config> | undefined,
   value: unknown,
 ): Config {
-  if (schema === undefined) return void 0 as Config;
+  // A module that declares `config` (§6) is already parsed by the one process
+  // parse; only a legacy `configSchema` re-parses here.
+  if (schema === undefined) return value as Config;
   try {
     return schema.parse(value);
   } catch (error) {
@@ -1503,4 +1647,17 @@ function resolveTokens(
     resolved[key] = resolve(token);
   }
   return resolved;
+}
+
+function declaredOwner(app: object): {
+  config?: ConfigSlice;
+  secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+  publicConfig?: (config: unknown) => unknown;
+} {
+  const owner = app as {
+    config?: ConfigSlice;
+    secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+    publicConfig?: (config: unknown) => unknown;
+  };
+  return { config: owner.config, secrets: owner.secrets, publicConfig: owner.publicConfig };
 }

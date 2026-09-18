@@ -24,6 +24,7 @@ export {
   DuplicateProviderError,
   FeatureConfigError,
   FeatureApiUnavailableError,
+  FeatureSecretsUnavailableError,
   MissingProviderError,
   RoleContributionError,
 } from "./boot-errors.ts";
@@ -39,9 +40,11 @@ export {
   membersFor,
   membersFrom,
   noMembers,
+  storesBackedMembers,
   MissingMemberError,
   type MemberClaim,
   type MemberSource,
+  type StoresMemberSource,
 } from "./module-members.ts";
 export type { Tier } from "./tiers.ts";
 export {
@@ -78,6 +81,7 @@ export {
   ServerFeatureAssembly,
   ServerFeatureBuilder,
   type ServerFeatureDeclaration,
+  type ModuleSecretsScope,
   type ServerRole,
   withMemoryRepositories,
 } from "./feature-installer.ts";
@@ -112,10 +116,7 @@ export {
   type FeatureRepositories,
 } from "./repository-ownership.ts";
 
-export { createApp, ProcessSupply } from "./process-supply.ts";
-export {
-  ObservabilitySupply,
-  TransportAuthSupply,
-  type StaticTransportTokens,
-} from "./process-supply.options.ts";
+export { createApp, ProcessSupply, type ExposedSurface } from "./process-supply.ts";
+export { ObservabilitySupply } from "./process-supply.options.ts";
 export type { RequiredConfig, RequiredMembers, RequiredPeers } from "./process-supply.types.ts";
+export { bootInstalledProcess } from "./boot-installed-process.ts";

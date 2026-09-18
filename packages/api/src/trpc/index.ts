@@ -111,3 +111,15 @@ export {
 } from "./policy.ts";
 
 export type { ApiHandlerArguments } from "../handler-arguments.ts";
+
+// Where every declared namespace mounts, and the subscription lane over the
+// same composed router.
+export {
+  MembershipDisabledError,
+  TrpcHost,
+  type TrpcAuditSink,
+  type TrpcNamespace,
+  type TrpcRequestContext,
+  type TrpcSession,
+  type TrpcSessionUser,
+} from "./host.ts";

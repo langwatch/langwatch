@@ -10,7 +10,6 @@ const REPOSITORY_ROOT = resolve(import.meta.dirname, "../..");
 const SERVER_LIST = "modules/server-modules.generated.ts";
 const WEB_LIST = "modules/web-modules.generated.ts";
 const SERVER_MEMBERS = "modules/server-module-members.generated.ts";
-const MODULE_CONFIGS = "modules/installed-module-configs.generated.ts";
 const MODULES_PACKAGE = "modules/package.json";
 
 /** `api-key` reads as `apiKey`, which is how a module names its declaration. */
@@ -135,36 +134,6 @@ function moduleConfigsFor({ root, catalogue }) {
     });
   }
   return configs.toSorted((one, other) => one.id.localeCompare(other.id));
-}
-
-/** The map `defineProcessConfig` composes a process's whole parse from. */
-function moduleConfigSourceFor({ configs }) {
-  const imports = configs
-    .map((config) => `import { ${config.symbol} } from "${config.specifier}";`)
-    .toSorted((one, other) => one.localeCompare(other));
-  const entries = configs.map((config) => {
-    const key = /^[a-z][a-zA-Z0-9]*$/.test(config.id) ? config.id : JSON.stringify(config.id);
-    return `  ${key}: ${config.symbol},`;
-  });
-
-  return [
-    "/** Generated from modules/catalogue.json. Do not edit by hand. */",
-    "/** Run `pnpm generate:modules` to rewrite it. */",
-    "",
-    ...imports,
-    imports.length === 0 ? "" : "",
-    "/**",
-    " * Every installed module that declares a config schema, in name order,",
-    " * re-exported from the module's own declaration. A module that declares",
-    " * none contributes no key here and no root key on the parsed config.",
-    " */",
-    "export const installedModuleConfigs = {",
-    ...entries,
-    "} as const;",
-    "",
-  ]
-    .filter((line, index, all) => !(line === "" && all[index - 1] === ""))
-    .join("\n");
 }
 
 /** The generated source for one list, imports first and the array last. */
@@ -400,7 +369,6 @@ export function generateModuleLists({ root = REPOSITORY_ROOT } = {}) {
         half: "web",
       }) + pairingSource({ root, catalogue }),
     [SERVER_MEMBERS]: memberSourceFor({ root, catalogue }),
-    [MODULE_CONFIGS]: moduleConfigSourceFor({ configs }),
     [MODULES_PACKAGE]: packageSourceFor({ root, catalogue, configs }),
     ...generateBrowserRenderers({ root }),
   };

@@ -20,10 +20,25 @@ export class ConfigLeaf<Schema extends z.ZodType = z.ZodType> {
   ) {}
 }
 
-/** Config always reads the environment — one spelling, one schema. */
+/**
+ * What a definition is handed to build its leaves. Config always reads the
+ * environment — one spelling, one schema.
+ */
+export interface ConfigDefiner {
+  env<Schema extends z.ZodType>(env: string, schema: Schema): ConfigLeaf<Schema>;
+}
+
+const definer: ConfigDefiner = {
+  env: (env, schema) => new ConfigLeaf(env, schema),
+};
+
+/**
+ * An owner defines its own object, which is then passed into the process that
+ * installs it — never reached for from module scope, so nothing is ambient.
+ */
 export const Config = {
-  env<Schema extends z.ZodType>(env: string, schema: Schema): ConfigLeaf<Schema> {
-    return new ConfigLeaf(env, schema);
+  define<const Slice extends ConfigSlice>(build: (c: ConfigDefiner) => Slice): Slice {
+    return build(definer);
   },
 } as const;
 
@@ -34,6 +49,9 @@ type Parsed<Node> =
   Node extends ConfigLeaf<infer Schema>
     ? z.infer<Schema>
     : { readonly [Key in keyof Node]: Parsed<Node[Key]> };
+
+/** The parsed shape of one owner's slice — what its create() receives. */
+export type ConfigOf<Slice extends ConfigSlice> = Parsed<Slice>;
 
 /** An owner: a module or framework package. Secrets shape is structural (one id per handle). */
 export type ConfigOwner = Readonly<{
@@ -126,7 +144,9 @@ function refuseCrossClaims(
     if (secretOwner !== undefined) throw new ConfigClaimsSecretError(leaf.env, owner, secretOwner);
 
     const held = claimed.get(leaf.env);
-    if (held && held.leaf !== leaf) throw new ConfigCollisionError(leaf.env, [held.owner, owner]);
+    if (held && held.owner !== owner) {
+      throw new ConfigCollisionError(leaf.env, [held.owner, owner]);
+    }
     claimed.set(leaf.env, { leaf, owner });
   }
 }

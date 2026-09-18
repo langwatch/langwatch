@@ -4,10 +4,12 @@
  * screen asks ports instead. Missing ports refuse loudly, never silently.
  */
 
-import type { UiScopeHost } from "./use-organization-team-project.ts";
+import { createContext, useContext } from "react";
+
+import type { UiAnalytics } from "./analytics.ts";
 import type { UiSessionSnapshot } from "./session.ts";
 import type { UiSlots } from "./slots.tsx";
-import { createContext, useContext } from "react";
+import type { UiScopeHost } from "./use-organization-team-project.ts";
 
 /** The composition never filled this port, and something asked it to work. */
 export class UiCapabilityUnavailableError extends Error {
@@ -246,6 +248,12 @@ const PRODUCTION_UI_DEPLOYMENT: UiDeployment = { isDevelopment: false };
 /** Every capability a screen can ask for, all of them answered. */
 export type UiCapabilities = {
   /**
+   * Where every module's named events go. Absent and "installed no
+   * destination" are the same reading — `useUiAnalytics` degrades to the
+   * inert destination either way, exactly as `useUiSlots` does.
+   */
+  analytics?: UiAnalytics;
+  /**
    * Optional so a hand-built capability set stays valid without one;
    * {@link resolveUiCapabilities} always fills it, production when absent.
    */
@@ -292,6 +300,7 @@ export function resolveUiCapabilities({
   session,
 }: UiCapabilityResolution): UiCapabilities {
   return {
+    analytics: install.analytics,
     deployment: install.deployment ?? PRODUCTION_UI_DEPLOYMENT,
     documentTitle: install.documentTitle ?? documentTitle,
     feedback: install.feedback ?? UNAVAILABLE_UI_FEEDBACK,

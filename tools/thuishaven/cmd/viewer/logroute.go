@@ -5,12 +5,13 @@ import (
 	"strings"
 )
 
-// A lane is not an application. Locally the backend lane runs the api and the
+// A lane is not an application. Locally the api lane runs the api and the
 // worker in one process and the go lane runs the gateway and the NLP engine in
 // one, so a tab per lane answers "which process wrote this" when the question a
 // person actually has is "which application wrote this". The structured line
-// already says: Node writes `name`, Go writes `service`. This is that rule, and
-// nothing else in the viewer needs to know it.
+// already says which one. This is that rule, in one place: `haven logs` reads
+// it through RouteLine too, so a tab and a filtered command never disagree
+// about which application a line came from.
 
 // LogApps are the log tab's sub-tabs, in order. "all" is always present; the
 // rest appear once their application has written a line.
@@ -27,12 +28,12 @@ const AllApps = "all"
 // the two that host a pair it is the one a person means by the lane's name  -
 // the front door, whose absence is what they would notice.
 var laneDefaults = map[string]string{
-	"app":     "ui",
-	"backend": "api", "go": "gateway", "ui": "ui", "langy": "langy",
+	"app": "ui",
+	"api": "api", "go": "gateway", "ui": "ui", "langy": "langy",
 	"langyagent": "langy", "idp": "idp", "design-system": "design-system",
 	"mail-room": "mail-room", "tasks": "tasks", "obs": "obs",
-	// Pre-2026-09-07 lane names, still on disk in older captures.
-	"api": "api", "workers": "worker", "gateway": "gateway", "nlp": "nlp",
+	// Earlier lane names, still on disk in older captures.
+	"backend": "api", "workers": "worker", "gateway": "gateway", "nlp": "nlp",
 }
 
 // LaneDefaultApp is the application a lane's unstructured output belongs to.
@@ -43,8 +44,11 @@ func LaneDefaultApp(lane string) string {
 	return lane
 }
 
-// ownerFields is the pair of keys the two runtimes name themselves with. Node
-// writes a logger `name`, Go writes a `service`; nothing writes both.
+// ownerFields is the pair of keys a line names its writer with. A Node
+// application's own records carry a logger `name`; the Go services carry a
+// `service`. A Node *process* failure carries `service` too — the shared
+// failure record (processFailureLine) has no logger to name — which is how a
+// half that died before its first log line still says which half it was.
 type ownerFields struct {
 	Name    string `json:"name"`
 	Service string `json:"service"`
@@ -101,11 +105,18 @@ func appFromLoggerName(name string) (string, bool) {
 	return "", false
 }
 
-// appFromServiceName reads the Go services' OpenTelemetry service name.
+// appFromServiceName reads a service identity: the Go services' OpenTelemetry
+// name, or the process name a Node half's failure record carries. The two Node
+// halves are matched exactly — a substring test would read "langwatch-backend",
+// the launcher hosting both, as one of them.
 func appFromServiceName(service string) (string, bool) {
 	switch {
 	case service == "":
 		return "", false
+	case service == "langwatch-worker":
+		return "worker", true
+	case service == "langwatch-api":
+		return "api", true
 	case strings.Contains(service, "nlpgo"), strings.Contains(service, "-nlp"):
 		return "nlp", true
 	case strings.Contains(service, "aigateway"), strings.Contains(service, "gateway"):

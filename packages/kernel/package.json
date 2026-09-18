@@ -15,6 +15,10 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./module-api": {
+      "types": "./dist/module-api-token.d.ts",
+      "default": "./src/module-api-token.ts"
+    },
     "./supply": {
       "types": "./dist/process-supply.d.ts",
       "default": "./src/process-supply.ts"
@@ -25,7 +29,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/secrets": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

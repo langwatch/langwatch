@@ -21,7 +21,7 @@ import (
 // list; a TUI is useless to them.
 func runHub(ctx context.Context, d deps) error {
 	if d.isAgent {
-		return d.orch.Status(false, d.worktree)
+		return d.orch.Status(false, d.worktree, false)
 	}
 	// The TUI owns the terminal: a stray zap line would scribble over the
 	// interface, so the orchestrator's logs go to a file for this command.

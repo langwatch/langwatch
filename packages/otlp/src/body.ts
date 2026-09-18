@@ -6,12 +6,14 @@
 
 import { promisify } from "node:util";
 import { brotliDecompress, gunzip, inflate } from "node:zlib";
+
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
 import * as rootModule from "@opentelemetry/otlp-transformer/build/src/generated/root.js";
+
 import {
   OtlpBodyTooLargeError,
   OtlpBodyUnreadableError,
@@ -163,9 +165,23 @@ async function readWireBody(req: Request): Promise<Buffer> {
  */
 export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
   const encoding = req.headers.get("content-encoding");
+  if (encoding && encoding !== "identity" && !isSupportedEncoding(encoding)) {
+    throw new OtlpUnsupportedEncodingError({ encoding });
+  }
+  return decodeOtlpBody(await readWireBody(req), encoding);
+}
+
+export async function decodeOtlpBody(
+  bytes: Uint8Array,
+  encoding: string | null,
+): Promise<ArrayBuffer> {
+  if (bytes.byteLength > OTLP_MAX_BODY_BYTES) {
+    throw new OtlpBodyTooLargeError({ maxBytes: OTLP_MAX_BODY_BYTES, encoding });
+  }
+  const raw = Buffer.from(bytes);
 
   if (!encoding || encoding === "identity") {
-    return toArrayBuffer(await readWireBody(req));
+    return toArrayBuffer(raw);
   }
 
   // Settled before the body is read, so a request we are going to refuse
@@ -178,7 +194,6 @@ export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
   // their options type (ZlibOptions vs BrotliOptions), so calling the indexed
   // union directly is not something TypeScript will resolve.
   const decompress: Decompressor = DECOMPRESSORS[encoding];
-  const raw = await readWireBody(req);
 
   try {
     return toArrayBuffer(await decompress(raw, { maxOutputLength: OTLP_MAX_BODY_BYTES }));

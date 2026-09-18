@@ -13,12 +13,16 @@ vi.mock("langwatch", () => ({
 }));
 
 import { createProcessObservability } from "../process-observability.ts";
+import { processTelemetry } from "../process-telemetry.ts";
+import type { TelemetrySecret, TelemetrySettings } from "../telemetry-settings.ts";
 import { UnexportedSpanProcessor } from "../unexported-spans.ts";
 
 /** What the SDK was actually handed, for the one call this test made. */
 function sdkOptions(): {
   spanProcessors?: readonly unknown[];
   advanced?: Record<string, unknown>;
+  sampler?: unknown;
+  langwatch?: unknown;
 } {
   expect(setupObservability).toHaveBeenCalledTimes(1);
   return setupObservability.mock.calls[0]?.[0] as never;
@@ -101,6 +105,91 @@ describe("given a caller sharing an already-built observability graph", () => {
 
       expect(reused).toBe(shared);
       expect(setupObservability).not.toHaveBeenCalled();
+    });
+  });
+});
+
+const settings = (over: Partial<TelemetrySettings>): TelemetrySettings => ({
+  otlpEndpoint: void 0,
+  environment: "test",
+  serviceVersion: void 0,
+  resourceAttributes: void 0,
+  tracesSampleRatio: void 0,
+  logs: {
+    format: void 0,
+    level: void 0,
+    consoleLevel: void 0,
+    otelLevel: void 0,
+    otelExport: false,
+  },
+  metrics: { mode: "otlp", enabled: true },
+  ...over,
+});
+
+/** A resolver answering one handle, recording which handles were asked for. */
+function contextWith(over: Partial<TelemetrySettings>, headers?: string) {
+  const asked: TelemetrySecret[] = [];
+  return {
+    asked,
+    context: {
+      config: { observability: settings(over) },
+      secrets: {
+        into: async <Out>(
+          handle: TelemetrySecret,
+          build: (value: string | undefined) => Out | Promise<Out>,
+        ) => {
+          asked.push(handle);
+          return build(headers);
+        },
+      },
+    },
+  };
+}
+
+describe("given a process composing telemetry from its declared slice", () => {
+  describe("when a collector is configured", () => {
+    it("exports platform spans to the collector, never to the product's ingest", async () => {
+      await processTelemetry("langwatch-api")(
+        contextWith({ otlpEndpoint: "http://collector.test:4318" }).context,
+      );
+
+      const options = sdkOptions();
+      expect(options.langwatch).toBe("disabled");
+      expect(options.spanProcessors).toHaveLength(1);
+      expect(options.spanProcessors?.[0]).not.toBeInstanceOf(UnexportedSpanProcessor);
+    });
+
+    /** @scenario "The headers reach the exporter through the resolver" */
+    it("reads the collector credential through its declared handle", async () => {
+      const { asked, context } = contextWith(
+        { otlpEndpoint: "http://collector.test:4318" },
+        "Authorization=Bearer collector-token",
+      );
+
+      await processTelemetry("langwatch-api")(context);
+
+      expect(asked.map((handle) => handle.id)).toEqual(["OTEL_EXPORTER_OTLP_HEADERS"]);
+    });
+  });
+
+  describe("when a sampling ratio is configured", () => {
+    it("builds a sampler, and leaves the SDK default alone without one", async () => {
+      await processTelemetry("langwatch-api")(contextWith({ tracesSampleRatio: 0.1 }).context);
+      expect(sdkOptions().sampler).toBeDefined();
+
+      setupObservability.mockClear();
+      await processTelemetry("langwatch-api")(contextWith({}).context);
+      expect(sdkOptions().sampler).toBeUndefined();
+    });
+  });
+
+  describe("when the process shuts down", () => {
+    it("answers with the logger and a component that flushes", async () => {
+      const telemetry = await processTelemetry("langwatch-api")(contextWith({}).context);
+
+      expect(typeof telemetry.logger.info).toBe("function");
+      expect(telemetry.component.name).toBe("process telemetry");
+      await expect(telemetry.component.stop()).resolves.not.toThrow();
     });
   });
 });

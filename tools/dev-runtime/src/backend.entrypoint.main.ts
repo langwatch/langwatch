@@ -1,8 +1,16 @@
 import process from "node:process";
+
 import { processFailureLine } from "@langwatch/observability";
-import { startStandaloneApi } from "@langwatch/platform-api";
-import { startStandaloneWorker } from "@langwatch/worker";
-import { drainBackend, startBackend, type BackendHalves } from "./backend.process.ts";
+import { startApi } from "@langwatch/platform-api";
+import { startWorker } from "@langwatch/worker";
+
+import {
+  backendHalfOf,
+  drainBackend,
+  startBackend,
+  BACKEND_HALF_SERVICE,
+  type BackendHalves,
+} from "./backend.process.ts";
 
 /**
  * Local-only launcher for API and worker in one Node process.
@@ -22,7 +30,12 @@ let stopping: Promise<void> | undefined;
 const stop = (code: number): Promise<void> => {
   stopping ??= (async () => {
     const deadline = setTimeout(() => {
-      write(processFailureLine({ service: BACKEND_SERVICE, event: "shutdown outlived its deadline; exiting" }));
+      write(
+        processFailureLine({
+          service: BACKEND_SERVICE,
+          event: "shutdown outlived its deadline; exiting",
+        }),
+      );
       process.exit(1);
     }, SHUTDOWN_DEADLINE_MS);
     deadline.unref();
@@ -50,36 +63,31 @@ process.on("uncaughtException", (error) => {
   void stop(1);
 });
 process.on("unhandledRejection", (reason) => {
-  write(processFailureLine({ service: BACKEND_SERVICE, event: "unhandled rejection", error: reason }));
+  write(
+    processFailureLine({ service: BACKEND_SERVICE, event: "unhandled rejection", error: reason }),
+  );
   void stop(1);
 });
 
 /** Boots both applications and reports whether they came up. Never re-throws. */
 export function bootBackendEntry(): Promise<void> {
-  return startBackend({
-    env: process.env,
-    write,
-    // A hosted application asking to exit is a fatal it could not recover from.
-    // It reaches the one shutdown this process owns instead of ending the
-    // process underneath the other half.
-    fail: (code) => void stop(code === 0 ? 1 : code),
-    startWorker: async (host) => {
-      const worker = await startStandaloneWorker({ host });
-      return { close: () => worker.close(), observability: worker.worker.observability };
-    },
-    // Reuses the worker's already-built observability graph: setting the SDK
-    // up a second time in this one process is what prints the "OpenTelemetry
-    // is already set up" error.
-    startApi: (host, observability) =>
-      startStandaloneApi({ host, observability: { sharedHandle: observability } }),
-  })
+  // Neither half owns this process: the launcher takes the signals and drains
+  // both, and startBackend decides which half sets telemetry up.
+  return startBackend({ startWorker, startApi })
     .then((started) => {
       halves = started;
     })
     .catch((error) => {
-      // Name the failure, then exit outright: a failed boot's own pollers
-      // would hold the loop open, and a silent exit costs the diagnosis.
-      write(processFailureLine({ service: BACKEND_SERVICE, event: "fatal boot failure", error }));
+      // Name the half that refused, then exit outright: a failed boot's own
+      // pollers would hold the loop open, and a silent exit costs the diagnosis.
+      const half = backendHalfOf(error);
+      write(
+        processFailureLine({
+          service: half ? BACKEND_HALF_SERVICE[half] : BACKEND_SERVICE,
+          event: "fatal boot failure",
+          error,
+        }),
+      );
       process.exit(1);
     });
 }

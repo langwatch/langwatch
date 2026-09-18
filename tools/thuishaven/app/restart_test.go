@@ -68,7 +68,7 @@ func TestRestart(t *testing.T) {
 
 		t.Run("when restarting the backend, it resolves the API port", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, BackendLane, false); err != nil {
+			if err := o.Restart(ctx, params, APILane, false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 102 {
@@ -96,7 +96,7 @@ func TestRestart(t *testing.T) {
 		})
 
 		t.Run("when naming an unknown or shared service, it refuses with the restartable list", func(t *testing.T) {
-			for _, name := range []string{"clickhouse", "nlp", "api", "workers", "bogus"} {
+			for _, name := range []string{"clickhouse", "nlp", "backend", "workers", "bogus"} {
 				_, sys, o := newFixture()
 				if err := o.Restart(ctx, params, name, false); err == nil {
 					t.Errorf("Restart(%q) should refuse", name)
@@ -124,7 +124,7 @@ func TestRestart(t *testing.T) {
 		// group or the go lane's.
 		t.Run("when `backend` is named, only the backend's own group is bounced", func(t *testing.T) {
 			store, sys, o := newFixture()
-			if err := o.Restart(ctx, params, BackendLane, false); err != nil {
+			if err := o.Restart(ctx, params, APILane, false); err != nil {
 				t.Fatalf("Restart(backend): %v", err)
 			}
 			_ = store

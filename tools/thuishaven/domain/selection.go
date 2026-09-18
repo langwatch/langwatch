@@ -6,7 +6,7 @@ import (
 )
 
 // Selection is a worktree's sticky service choice (ADR-064): which optional
-// services `haven up` runs here. The two Node lanes — ui and backend — always
+// services `haven up` runs here. The two Node lanes — ui and api — always
 // run and are not selectable. Gateway and NLP still select individually; both
 // are hosted by the one `go` lane. Expressed as deltas on up (`haven up
 // +langy`, `haven up -nlp`), persisted per worktree, shown by status. The zero
@@ -66,18 +66,20 @@ var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "des
 // one; see MailService. Refused by name rather than falling into the generic
 // "unknown service" error, which would read as a typo.
 var RetiredSelectionServices = map[string]string{
-	"workers":   "no longer selects anything — the worker runs in the backend lane locally and as its own deployment in production — every stack runs the ui and backend lanes, so there is nothing to select",
-	"api":       "no longer selects anything — the api runs in the backend lane, which every stack runs",
-	"backend":   "is not selectable — every stack runs the backend lane, or it would serve pages and process no jobs",
+	"workers":   "no longer selects anything — the worker runs in the api lane locally and as its own deployment in production — every stack runs the ui and api lanes, so there is nothing to select",
+	"worker":    "no longer selects anything — the worker runs in the api lane, which every stack runs",
+	"api":       "is not selectable — every stack runs the api lane, or it would serve pages and process no jobs",
+	"backend":   "was renamed — the lane is called api now, and it is not selectable: every stack runs it",
 	"storybook": "was renamed — use +design-system / -design-system",
 }
 
 // MonolithRetiredSelectionServices are the ±names refused on a monolith
 // checkout, on top of the ones refused everywhere: it has neither application
-// package, so `ui` and `backend` name nothing there. Refused by name, like
-// `api`, rather than as a typo, because it is the layout that decides.
+// package, so `ui` and `api` name nothing there. Refused by name rather than as
+// a typo, because it is the layout that decides.
 var MonolithRetiredSelectionServices = map[string]string{
 	"ui":      "is not a lane of this checkout - it runs one app lane, which serves the browser application and its API together",
+	"api":     "is not a lane of this checkout - it runs one app lane, which serves the browser application and its API together",
 	"backend": "is not a lane of this checkout - it runs one app lane, which serves the browser application and its API together",
 }
 
@@ -205,7 +207,7 @@ func (s Selection) Describe() string { return s.DescribeForLayout(LayoutModular)
 // DescribeForLayout is Describe for a known layout: a monolith checkout runs
 // one Node lane, so naming two would describe a stack that is not there.
 func (s Selection) DescribeForLayout(layout Layout) string {
-	on := []string{"ui", "backend"}
+	on := []string{"ui", "api"}
 	if layout.IsMonolith() {
 		on = []string{MonolithAppLane}
 	}

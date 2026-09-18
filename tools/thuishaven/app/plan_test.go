@@ -73,7 +73,7 @@ func TestNoLaneIsRed(t *testing.T) {
 		if c.Color == red {
 			t.Errorf("lane %q uses red (ANSI %s); red is reserved for real errors", c.Name, red)
 		}
-		if c.Name == BackendLane {
+		if c.Name == APILane {
 			sawBackend = true
 		}
 	}
@@ -119,7 +119,7 @@ func TestTheTwoNodeLanesAlwaysRun(t *testing.T) {
 		return Child{}, false
 	}
 
-	for lane, pkg := range map[string]string{"ui": UIPackage, BackendLane: BackendPackage} {
+	for lane, pkg := range map[string]string{"ui": UIPackage, APILane: BackendPackage} {
 		child, ok := find(lane)
 		if !ok {
 			t.Fatalf("no %q lane was planned; every stack runs both", lane)
@@ -136,12 +136,36 @@ func TestTheTwoNodeLanesAlwaysRun(t *testing.T) {
 			}
 		}
 	}
-	// The worker is not a lane of its own any more, and neither is the api.
-	for _, gone := range []string{"api", "workers"} {
+	// The worker is not a lane of its own any more — it runs inside the api
+	// lane, which is the lane "backend" was renamed to.
+	for _, gone := range []string{"workers", "worker", "backend"} {
 		if _, found := find(gone); found {
-			t.Errorf("a %q lane was planned; both run inside the backend lane now", gone)
+			t.Errorf("a %q lane was planned; the worker runs inside the api lane now", gone)
 		}
 	}
+}
+
+// The ui lane is served first, deliberately. Vite is up in under a second and
+// the API takes several more; the browser application spends that gap on its
+// own waiting screen (specs/ui/api-boot-wait.feature) rather than on a hostname
+// that answers nothing. Gating the lane on the API's health made that screen
+// unreachable and the whole stack look dead while it booted.
+//
+// @scenario "The ui lane is not held back by the API"
+func TestTheUILaneStartsWithoutWaitingForTheAPI(t *testing.T) {
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	children := o.planChildren(domain.Stack{Slug: "test"}, PlanOptions{Selection: domain.Selection{}}, t.TempDir(), "")
+
+	for _, c := range children {
+		if c.Name != "ui" {
+			continue
+		}
+		if c.ReadyProbeURL != "" {
+			t.Errorf("ui lane waits for %q; the browser application waits for the API itself", c.ReadyProbeURL)
+		}
+		return
+	}
+	t.Fatal("no ui lane was planned")
 }
 
 // One Go process, hosting whichever data-plane services the stack selected,

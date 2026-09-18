@@ -208,8 +208,9 @@ ever dropped silently.
 **Project viewer.** The fixed tabs are session, logs, jobs, errors, traces,
 metrics, profiles, stores, mail and idp. Use `1`–`9` and `0`, arrows, Tab or
 click a tab; the tab bar wraps in a narrow terminal. Click a service in the
-session list or select it with ↑/↓ and Enter to inspect it. `backend` opens
-API logs, `mail` opens the inbox and `idp` opens identity providers. Quiet
+session list or select it with ↑/↓ and Enter to inspect it. `api` opens API
+logs, `worker` the worker's, `mail` opens the inbox and `idp` opens identity
+providers. Quiet
 services remain selected while waiting for output. `o` opens the selected
 service's URL, `r` restarts it and `a` restarts all supervised services.
 
@@ -415,7 +416,7 @@ downstream reads that one answer:
 
 | Layout     | Detected by             | Node lanes                     |
 | ---------- | ----------------------- | ------------------------------ |
-| `modular`  | `apps/ui` + `apps/api`  | `ui` + `backend`               |
+| `modular`  | `apps/ui` + `apps/api`  | `ui` + `api` (hosts the worker) |
 | `monolith` | `platform/app`          | `app`, one process for both    |
 
 A checkout with neither shape is planned as modular and fails on its own lane's

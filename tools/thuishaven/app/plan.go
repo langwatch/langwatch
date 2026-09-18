@@ -125,12 +125,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath("ui"),
 			Shell: "pnpm -s --filter " + UIPackage + " dev",
 			Env:   nodeEnv("ui"),
-			// Hold the browser application (vite) until the API answers /api/health.
-			// It proxies /api to the API lane, which is a much bigger process and
-			// boots slower; a browser that loads the SPA before the API is up gets
-			// stuck in an auth redirect loop. Gating the lane means the hostname
-			// simply isn't served until the stack can actually handle a request.
-			ReadyProbeURL: st.HealthProbeURL(),
+			// No readiness probe: the browser application holds the reader on its
+			// own waiting screen until the API answers, so serving it first is the
+			// boot the reader should see. specs/ui/api-boot-wait.feature.
 		})
 	}
 	// One Go lane, hosting whichever data-plane services this stack selected.
@@ -256,9 +253,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		// its own configuration and composes its own graph, and nothing reads
 		// WORKERS_IN_PROCESS or START_WORKERS. Production still deploys them
 		// separately.
-		Name: BackendLane, Dir: repoDir, Color: palette[0], LogPath: logPath(BackendLane),
+		Name: APILane, Dir: repoDir, Color: palette[0], LogPath: logPath(APILane),
 		Shell: "pnpm -s --filter " + BackendPackage + " dev",
-		Env:   nodeEnv(BackendLane),
+		Env:   nodeEnv(APILane),
 	})
 	return out
 }
@@ -285,8 +282,19 @@ const (
 
 // The lane names haven supervises, logs and restarts by.
 const (
-	// BackendLane is the API + worker Node process.
-	BackendLane = "backend"
+	// APILane is the Node process serving the API. It hosts the worker beside
+	// it locally (ADR-004, amendment 2026-09-07), but it is named for what a
+	// person reaches: the API, at the app's /api.
+	APILane = "api"
+	// LegacyAPILane is what this lane was called before it was named for the
+	// application it serves. Captures written then are still on disk, so the
+	// name still resolves — it is never written any more.
+	LegacyAPILane = "backend"
+	// WorkerLane is the worker half of that process. It is not a lane haven
+	// supervises or restarts on its own — it is reported as its own row because
+	// it has its own liveness, and a stack whose worker is down looks healthy
+	// from every other row.
+	WorkerLane = "worker"
 	// GoLane is the process hosting the Go data-plane services.
 	GoLane = "go"
 )

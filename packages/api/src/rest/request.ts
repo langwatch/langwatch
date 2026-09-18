@@ -18,15 +18,16 @@ import {
   trace,
 } from "@opentelemetry/api";
 import type { Context, MiddlewareHandler, Next, ValidationTargets } from "hono";
-import { HTTPException } from "hono/http-exception";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import { validator as openApiValidator } from "hono-openapi";
+import { HTTPException } from "hono/http-exception";
+import { type SSEStreamingApi, streamSSE } from "hono/streaming";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z, ZodIssue, ZodSchema } from "zod";
 
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
+import type { RestDoorCredential } from "./declaration.ts";
 import {
   DECLARED_ANSWER,
   ENDPOINT_ROUTE,
@@ -35,6 +36,7 @@ import {
   type Declined,
   type ServiceContext,
 } from "./response.ts";
+import type { RestIdentity } from "./runtime.ts";
 
 // Validation: install the hook so failures reach the route's onError (ADR-045).
 
@@ -415,7 +417,7 @@ export async function storeRestAnswer({
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** How a route that reads its own body wants the bytes it was sent. */
-export type RestRawBodyForm = "text" | "bytes";
+export type RestRawBodyForm = "text" | "bytes" | "stream";
 
 /**
  * A route whose body is the evidence - a signature is computed over the exact
@@ -425,7 +427,11 @@ export type RestRawBodyForm = "text" | "bytes";
 export type RestRawBody = Readonly<{ form: RestRawBodyForm; mediaType: string }>;
 
 /** What the handler is handed for the form it asked for. */
-export type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text" ? string : Uint8Array;
+export type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text"
+  ? string
+  : Form extends "stream"
+    ? ReadableStream<Uint8Array> | null
+    : Uint8Array;
 
 /** The `Body` slot of a route that reads its own bytes. */
 export type RestRawBodyDeclared<Form extends RestRawBodyForm = RestRawBodyForm> = Readonly<{
@@ -877,6 +883,7 @@ function runAfterSSECompletion({
 export interface RestTransportMiddleware<Schema extends z.ZodType = z.ZodType> {
   readonly name: string;
   readonly schema: Schema;
+  readonly source?: "headers";
 }
 
 export interface RestTransportMiddlewareBinding {
@@ -1076,4 +1083,21 @@ export function fingerprintJson(value: unknown): string {
 
 export function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+export interface RestCredentialBinding {
+  readonly credential: RestDoorCredential;
+  resolveIdentity(): RestIdentity;
+}
+
+/** Binds a module-owned credential to its own declared REST families. */
+export function bindRestCredential(
+  credential: RestDoorCredential,
+  resolveIdentity: () => RestIdentity,
+): RestCredentialBinding {
+  return Object.freeze({ credential, resolveIdentity });
+}
+
+export function isRestCredentialBinding(binding: object): binding is RestCredentialBinding {
+  return "credential" in binding && "resolveIdentity" in binding;
 }

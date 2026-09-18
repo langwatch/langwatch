@@ -153,7 +153,136 @@ func Parse(line string) (Record, bool) {
 		return Record{}, false
 	}
 	rec.Fields = collectFields(raw, used)
+	rec = readErrorOnce(rec)
 	return rec, true
+}
+
+// readErrorOnce makes a failure record say its error once. Such a record
+// commonly carries the same text three times — as the message, as a serialized
+// error, and as the stack's opening — so each copy is reduced to what it alone
+// adds: the error's type, and the frames.
+func readErrorOnce(rec Record) Record {
+	rec.Fields = compactRepeatedError(rec.Fields, rec.Message)
+	errType, frames, trimmed := trimRepeatedStackHeader(rec.Stack, rec.Message)
+	if !trimmed {
+		return rec
+	}
+	rec.Stack = frames
+	// "Error" names nothing a reader did not already know, so only a type that
+	// says something is worth the field it would take.
+	if errType != "" && errType != "Error" && !hasField(rec.Fields, "error") {
+		rec.Fields = insertField(rec.Fields, Field{Key: "error", Value: errType})
+	}
+	return rec
+}
+
+func hasField(fields []Field, key string) bool {
+	for _, field := range fields {
+		if field.Key == key {
+			return true
+		}
+	}
+	return false
+}
+
+// insertField keeps the fields in the sorted order collectFields built them in.
+func insertField(fields []Field, add Field) []Field {
+	at := sort.Search(len(fields), func(i int) bool { return fields[i].Key >= add.Key })
+	fields = append(fields, Field{})
+	copy(fields[at+1:], fields[at:])
+	fields[at] = add
+	return fields
+}
+
+// trimRepeatedStackHeader separates a stack's opening from its frames when the
+// record's message has already read that opening out. A Node stack begins
+// "<Type>: <message>" before its frames, so a record carrying both says the
+// same thing twice — and where the message embeds a report, twice is a
+// screenful each. It answers the type the header named, the frames alone, and
+// whether there was anything to trim.
+func trimRepeatedStackHeader(stack, message string) (errType, frames string, trimmed bool) {
+	if stack == "" || message == "" {
+		return "", stack, false
+	}
+	lines := strings.Split(strings.TrimRight(stack, "\n"), "\n")
+	first := firstFrameIndex(lines)
+	if first <= 0 {
+		return "", stack, false
+	}
+	header := strings.Join(lines[:first], "\n")
+	body := header
+	if name, rest, found := strings.Cut(header, ": "); found {
+		errType, body = strings.TrimSpace(name), rest
+	}
+	if !strings.Contains(normalizeSpace(message), normalizeSpace(body)) {
+		return "", stack, false
+	}
+	return errType, strings.Join(lines[first:], "\n"), true
+}
+
+// firstFrameIndex is where a stack's frames begin. -1 when it has none, which
+// is a stack that is all header and must not be trimmed away to nothing.
+func firstFrameIndex(lines []string) int {
+	for i, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "at ") {
+			return i
+		}
+	}
+	return -1
+}
+
+// normalizeSpace collapses every run of whitespace to one space, so a header
+// and a message that differ only in how their embedded payload was indented
+// still compare as the same text.
+func normalizeSpace(text string) string {
+	return strings.Join(strings.Fields(text), " ")
+}
+
+// compactRepeatedError shortens a serialized error whose message the record
+// already carries. A failure record commonly says the same thing three times —
+// the message, the serialized error, and the stack's first line — and the
+// serialized copy is the one that says least. What it alone adds is the error's
+// type and code, so that is what is kept.
+func compactRepeatedError(fields []Field, message string) []Field {
+	for i, field := range fields {
+		if field.Key != "error" {
+			continue
+		}
+		if short, ok := shortenSerialisedError(field.Value, message); ok {
+			fields[i].Value = short
+		}
+	}
+	return fields
+}
+
+// shortenSerialisedError answers what a serialized error adds beyond a message
+// that already reads it out — its type and code — or reports that it adds more
+// than that and must be kept whole.
+func shortenSerialisedError(value, message string) (string, bool) {
+	var err struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+		Code    string `json:"code"`
+	}
+	if json.Unmarshal([]byte(value), &err) != nil {
+		return "", false
+	}
+	// A suffix, not just an equal: a process failure record composes its
+	// message as "<what was happening>: <the error's own message>", so the
+	// serialized copy is the tail of what has already been read.
+	if err.Message == "" || !strings.HasSuffix(strings.TrimSpace(message), strings.TrimSpace(err.Message)) {
+		return "", false
+	}
+	kept := make([]string, 0, 2)
+	for _, part := range []string{err.Type, err.Code} {
+		if part != "" {
+			kept = append(kept, part)
+		}
+	}
+	if len(kept) == 0 {
+		return "", false
+	}
+	return strings.Join(kept, " "), true
 }
 
 func parseTime(raw map[string]json.RawMessage) (time.Time, string, bool) {
@@ -318,6 +447,13 @@ func collapseViteMessage(rec Record) Record {
 		}
 		return rec
 	}
+	// Only a message that really is the banner is collapsed. Trimming and
+	// dropping lines is right for Vite's box and wrong for every other
+	// multi-line message — a validation report or a pretty-printed payload
+	// carries its meaning in the indentation this would flatten.
+	if !hasViteBannerLine(rec.Message) {
+		return rec
+	}
 	var kept []string
 	for _, part := range strings.Split(rec.Message, "\n") {
 		clean := strings.TrimSpace(stripSGR(part))
@@ -331,6 +467,24 @@ func collapseViteMessage(rec Record) Record {
 	}
 	rec.Message = strings.Join(kept, "\n")
 	return rec
+}
+
+// hasViteBannerLine reports whether any line of a multi-line message is part of
+// Vite's own banner — the only shape collapseViteMessage is meant to rewrite.
+func hasViteBannerLine(message string) bool {
+	for _, part := range strings.Split(message, "\n") {
+		clean := strings.TrimSpace(stripSGR(part))
+		if clean == "" {
+			continue
+		}
+		if isViteBannerNoise(clean) {
+			return true
+		}
+		if _, ready := viteReadyMessage(clean); ready {
+			return true
+		}
+	}
+	return false
 }
 
 // renderRecord composes the fixed-column line (and any stack continuation)
@@ -349,7 +503,7 @@ func renderRecord(rec Record, opts Options) string {
 	b.WriteString("  ")
 	b.WriteString(paint(pad(string(rec.Level), LevelWidth), levelColor(rec.Level), opts.Color))
 	b.WriteString("  ")
-	b.WriteString(rec.Message)
+	b.WriteString(insetMessage(rec.Message))
 	for _, field := range rec.Fields {
 		b.WriteString("  ")
 		b.WriteString(paint(field.Key+"=", sgrDim, opts.Color))
@@ -362,6 +516,18 @@ func renderRecord(rec Record, opts Options) string {
 		}
 	}
 	return b.String()
+}
+
+// insetMessage puts a message's own newlines under the column its first line
+// starts at. A record carrying an embedded block — a validation report, a
+// pretty-printed payload — otherwise breaks the fixed columns at its first
+// newline, and everything after it reads as unlabeled output at the margin.
+// Inset by the same amount as a stack trace, so one record reads as one block.
+func insetMessage(message string) string {
+	if !strings.Contains(message, "\n") {
+		return message
+	}
+	return strings.ReplaceAll(strings.TrimRight(message, "\n"), "\n", "\n"+stackIndent)
 }
 
 // renderPassthrough keeps a non-JSON line exactly as the child wrote it,

@@ -68,18 +68,11 @@ func (m *viewerModel) sessionRows(budget int) []string {
 		rows = append(rows, "  \x1b[1mServices\x1b[0m  "+dimText(m.snap.Branch), "  "+dimText("Select a deployable to inspect logs or simulator."))
 	}
 	count := min(len(m.snap.Services), max(1, budget-len(rows)))
-	if budget >= 10 {
-		count = min(count, budget-len(rows)-3)
-	}
 	start := max(0, m.cursor-count+1)
 	for i := start; i < min(start+count, len(m.snap.Services)); i++ {
 		m.serviceRows[m.bodyStart+len(rows)] = i
 		rows = append(rows, cutRow(m.serviceRow(i, m.snap.Services[i]), m.width))
 	}
-	if budget-len(rows) >= 2 {
-		rows = append(rows, "", "  "+dimText("Shared infrastructure")+"  "+m.serversLine())
-	}
-
 	return rows
 }
 

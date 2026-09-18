@@ -65,6 +65,19 @@ export class FeatureConfigError extends Error {
   }
 }
 
+/** A module resolved a secret in a process that composed no secrets chain. */
+export class FeatureSecretsUnavailableError extends Error {
+  constructor(
+    readonly feature: string,
+    readonly id: string,
+  ) {
+    super(
+      `Feature "${feature}" resolved secret "${id}", and this process composed no secrets chain. State one on the Server preamble with withSecrets(...).`,
+    );
+    this.name = "FeatureSecretsUnavailableError";
+  }
+}
+
 /** Peer references exist during construction, but operations become available together. */
 export class FeatureApiUnavailableError extends Error {
   constructor(

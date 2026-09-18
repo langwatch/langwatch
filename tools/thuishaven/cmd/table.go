@@ -348,9 +348,10 @@ var baseTable = []commandSpec{
 		summary: "one-shot report: every stack, service health, shared servers, RAM",
 		flags: []flagSpec{
 			{long: "--json", summary: "machine-readable"},
+			{long: "--reveal", summary: "print this worktree's overlay secrets instead of masking them"},
 		},
 		run: func(_ context.Context, d deps, inv invocation) error {
-			return d.orch.Status(d.isAgent || inv.has("--json"), d.worktree)
+			return d.orch.Status(d.isAgent || inv.has("--json"), d.worktree, inv.has("--reveal"))
 		},
 	},
 	{

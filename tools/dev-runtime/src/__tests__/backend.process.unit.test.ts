@@ -1,19 +1,10 @@
-import {
-  createProcessObservability,
-  type ProcessObservability,
-} from "@langwatch/observability/node";
 import { describe, expect, it, vi } from "vitest";
-import { embeddedBackendHost } from "../backend.host.ts";
 import {
   drainBackend,
   startBackend,
   type BackendApiHalf,
   type BackendWorkerHalf,
 } from "../backend.process.ts";
-
-// A real graph that records spans and exports nothing, the shape of every local lane.
-const fakeObservability = (): ProcessObservability =>
-  createProcessObservability({ serviceName: "dev-runtime-test", setup: { langwatch: "disabled" } });
 
 function halfSpies(order: string[]) {
   const api: BackendApiHalf = {
@@ -25,7 +16,6 @@ function halfSpies(order: string[]) {
     close: vi.fn(async () => {
       order.push("worker.close");
     }),
-    observability: fakeObservability(),
   };
   return { api, worker };
 }
@@ -38,9 +28,6 @@ describe("given the backend process hosts both applications", () => {
       const { api, worker } = halfSpies(order);
 
       const halves = await startBackend({
-        env: {},
-        write: () => void 0,
-        fail: () => void 0,
         startWorker: async () => {
           order.push("worker.start");
           return worker;
@@ -56,22 +43,22 @@ describe("given the backend process hosts both applications", () => {
     });
 
     /** @scenario "One observability graph is set up and shared by both applications" */
-    it("hands the API the exact observability graph the worker built", async () => {
+    it("lets exactly one half set the telemetry SDK up", async () => {
       const { api, worker } = halfSpies([]);
-      let receivedByApi: unknown;
+      const asked: Record<string, boolean> = {};
 
       await startBackend({
-        env: {},
-        write: () => void 0,
-        fail: () => void 0,
-        startWorker: async () => worker,
-        startApi: async (_host, observability) => {
-          receivedByApi = observability;
+        startWorker: async (options) => {
+          asked["worker"] = options.ownsTelemetry;
+          return worker;
+        },
+        startApi: async (options) => {
+          asked["api"] = options.ownsTelemetry;
           return api;
         },
       });
 
-      expect(receivedByApi).toBe(worker.observability);
+      expect(asked).toEqual({ worker: true, api: false });
     });
 
     /** @scenario "A half-started backend drains what it did start" */
@@ -81,9 +68,6 @@ describe("given the backend process hosts both applications", () => {
 
       await expect(
         startBackend({
-          env: {},
-          write: () => void 0,
-          fail: () => void 0,
           startWorker: async () => worker,
           startApi: async () => {
             throw new Error("no database");
@@ -123,25 +107,22 @@ describe("given the backend process hosts both applications", () => {
 
   describe("when a hosted application reaches for the process", () => {
     /** @scenario "Neither hosted application owns the process's signals" */
-    it("accepts and drops signal subscription, and routes exit to one owner", () => {
-      const fail = vi.fn();
-      const written: string[] = [];
-      const host = embeddedBackendHost({
-        env: { PORT: "5560" },
-        write: (line) => void written.push(line),
-        fail,
+    it("boots both halves as non-owners, so the launcher keeps the signals", async () => {
+      const { api, worker } = halfSpies([]);
+      const owners: boolean[] = [];
+
+      await startBackend({
+        startWorker: async (options) => {
+          owners.push(options.ownsProcess);
+          return worker;
+        },
+        startApi: async (options) => {
+          owners.push(options.ownsProcess);
+          return api;
+        },
       });
 
-      const listener = () => void 0;
-      host.on("SIGTERM", listener);
-      host.onUncaughtException(listener);
-      host.off("SIGTERM", listener);
-      host.write("boom\n");
-      host.exit(3);
-
-      expect(written).toEqual(["boom\n"]);
-      expect(fail).toHaveBeenCalledWith(3);
-      expect(host.env).toEqual({ PORT: "5560" });
+      expect(owners).toEqual([false, false]);
     });
   });
 });

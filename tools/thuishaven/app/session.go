@@ -11,13 +11,19 @@ import (
 // dashboard shows it: CLI-spelled name, where it is reached, whether its port
 // answers, and whether `r` can bounce it (fallbacks and shared servers can't).
 type SessionServiceStatus struct {
-	Name        string `json:"name"`
-	Role        string `json:"role"`
-	URL         string `json:"url"`
-	Port        int    `json:"port"`
-	Up          bool   `json:"up"`
+	Name string `json:"name"`
+	Role string `json:"role"`
+	URL  string `json:"url"`
+	Port int    `json:"port"`
+	Up   bool   `json:"up"`
+	// Detail is what a row with no URL of its own says instead — a shared
+	// server's port and database, or the daemon's pid.
+	Detail      string `json:"detail,omitempty"`
 	Fallback    bool   `json:"fallback,omitempty"`
 	Restartable bool   `json:"restartable"`
+	// Shared marks machine-wide machinery rather than this stack's own child:
+	// listed so it can be selected and read, never bounced from here.
+	Shared bool `json:"shared,omitempty"`
 }
 
 // SessionServer is one piece of shared machinery the stack leans on — the
@@ -80,6 +86,18 @@ func (o *Orchestrator) SessionSnapshot(slug string) SessionReport {
 	}
 	for _, svc := range st.Services {
 		cli := domain.CLIServiceNameForLayout(svc.Name, st.Layout)
+		// The routed api hostname is a convenience route for tooling, not a
+		// deployable, and it answers on the same process as the api lane below.
+		// Listing both puts two rows called "api" in a picker of deployables.
+		if cli == APILane && !st.Layout.IsMonolith() {
+			continue
+		}
+		// The database servers are machine-wide and are appended once below,
+		// from the one place that knows their port and database. A stack that
+		// merely routes to them must not list them a second time here.
+		if sharedServerNames[cli] {
+			continue
+		}
 		r.Services = append(r.Services, SessionServiceStatus{
 			Name:        cli,
 			Role:        svc.Role,
@@ -96,12 +114,25 @@ func (o *Orchestrator) SessionSnapshot(slug string) SessionReport {
 		// application, so its app row already IS this one.
 		if svc.Name == "app" && st.APIPort != 0 && !st.Layout.IsMonolith() {
 			r.Services = append(r.Services, SessionServiceStatus{
-				Name:        BackendLane,
+				Name:        APILane,
 				Role:        svc.Role,
 				URL:         strings.TrimSuffix(svc.URL, "/") + "/api",
 				Port:        st.APIPort,
 				Up:          o.sys.PortInUse(st.APIPort),
-				Restartable: restartable[BackendLane],
+				Restartable: restartable[APILane],
+			})
+		}
+		// The worker is the other half of that one process and serves no
+		// browser traffic, so it has no URL — but it is the half whose absence
+		// makes a stack process no jobs while still serving pages, and a list
+		// that omits it cannot show that. Its metrics listener is what answers.
+		if svc.Name == "app" && st.WorkerMetricsPort != 0 && !st.Layout.IsMonolith() {
+			r.Services = append(r.Services, SessionServiceStatus{
+				Name:        WorkerLane,
+				Role:        svc.Role,
+				Port:        st.WorkerMetricsPort,
+				Up:          o.sys.PortInUse(st.WorkerMetricsPort),
+				Restartable: restartable[APILane],
 			})
 		}
 	}
@@ -135,5 +166,21 @@ func (o *Orchestrator) SessionSnapshot(slug string) SessionReport {
 			Port: st.ObservabilityGrafanaPort, Detail: "grafana",
 		})
 	}
+	// The shared machinery joins the one list the dashboard can select from,
+	// after this stack's own children. Reporting it on a line of its own as
+	// well would say everything twice and leave half of it unreachable.
+	for _, server := range r.Servers {
+		r.Services = append(r.Services, SessionServiceStatus{
+			Name: server.Name, Port: server.Port, Up: server.Up,
+			Detail: server.Detail, Shared: true,
+		})
+	}
 	return r
+}
+
+// sharedServerNames are the routed names a shared server already answers for.
+var sharedServerNames = map[string]bool{
+	domain.ClickHouseService: true,
+	domain.PostgresService:   true,
+	domain.RedisService:      true,
 }

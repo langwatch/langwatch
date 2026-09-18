@@ -83,7 +83,7 @@ func TestRender(t *testing.T) {
 			name: "a stack trace is indented under its line",
 			line: `{"time":"2026-09-07T11:10:46.108Z","level":"error","msg":"boom","stack":"Error: boom\n    at run (job.ts:1:1)"}`,
 			opts: base,
-			want: "11:10:46.108  api        error  boom\n    Error: boom\n        at run (job.ts:1:1)",
+			want: "11:10:46.108  api        error  boom\n        at run (job.ts:1:1)",
 		},
 		{
 			name: "a lane name that exactly fills the column and the longest level still align",
@@ -261,4 +261,117 @@ func TestNormalizeLevel(t *testing.T) {
 			t.Errorf("NormalizeLevel(%q) = %q, want %q", in, got, want)
 		}
 	}
+}
+
+// @scenario "One rendering, whatever the service logs with"
+func TestRenderInsetsAMultiLineMessage(t *testing.T) {
+	line := `{"level":"fatal","time":"2026-09-18T10:00:00.000Z","msg":"boot failed: [\n  {\n    \"code\": \"invalid_type\"\n  }\n]"}`
+
+	out := Render(line, Options{Lane: "worker"})
+
+	rows := strings.Split(out, "\n")
+	if len(rows) < 2 {
+		t.Fatalf("render = %q, want the message's own newlines kept", out)
+	}
+	if strings.Contains(rows[0], "\n") || !strings.Contains(rows[0], "boot failed:") {
+		t.Errorf("first row = %q, want the message to start on the column line", rows[0])
+	}
+	for _, row := range rows[1:] {
+		if !strings.HasPrefix(row, "    ") {
+			t.Errorf("continuation %q is at the margin; it must be inset so the columns still read", row)
+		}
+	}
+}
+
+// @scenario "One rendering, whatever the service logs with"
+func TestRenderShortensAnErrorTheMessageAlreadyReadsOut(t *testing.T) {
+	t.Run("when the serialized error repeats the message, only what it adds is kept", func(t *testing.T) {
+		line := `{"level":"fatal","time":"2026-09-18T10:00:00.000Z","msg":"fatal boot failure: table claimed twice","error":{"type":"OwnershipError","message":"table claimed twice"}}`
+
+		out := Render(line, Options{Lane: "worker"})
+
+		if !strings.Contains(out, "error=OwnershipError") {
+			t.Errorf("render = %q, want the error shortened to its type", out)
+		}
+		if strings.Count(out, "table claimed twice") != 1 {
+			t.Errorf("render = %q, want the repeated message read out once", out)
+		}
+	})
+
+	t.Run("when the serialized error says something else, it is kept whole", func(t *testing.T) {
+		line := `{"level":"fatal","time":"2026-09-18T10:00:00.000Z","msg":"boot failed","error":{"type":"OwnershipError","message":"table claimed twice"}}`
+
+		out := Render(line, Options{Lane: "worker"})
+
+		if !strings.Contains(out, "table claimed twice") {
+			t.Errorf("render = %q, want an error the message does not carry kept whole", out)
+		}
+	})
+}
+
+// @scenario "One rendering, whatever the service logs with"
+func TestRenderKeepsAnEmbeddedPayloadsOwnIndentation(t *testing.T) {
+	// The Vite banner collapse trims every line it touches. Applied to any
+	// multi-line message it flattens a payload whose nesting is its meaning.
+	line := `{"level":"fatal","time":"2026-09-18T10:00:00.000Z","msg":"rejected: [\n  {\n    \"code\": \"invalid_type\"\n  }\n]"}`
+
+	out := Render(line, Options{Lane: "worker"})
+
+	if !strings.Contains(out, `        "code": "invalid_type"`) {
+		t.Errorf("render = %q, want the payload's own nesting kept under the inset", out)
+	}
+}
+
+// @scenario "One rendering, whatever the service logs with"
+func TestRenderReadsARepeatedStackHeaderOnce(t *testing.T) {
+	t.Run("when the header repeats a message that embeds a report, only the frames are kept", func(t *testing.T) {
+		line := `{"level":"fatal","time":"2026-09-18T10:00:00.000Z","msg":"boot failed: rejected: [\n  {\n    \"code\": \"invalid_type\"\n  }\n]","stack":"ConfigError: rejected: [\n  {\n    \"code\": \"invalid_type\"\n  }\n]\n    at parse (kernel.ts:1:1)"}`
+
+		out := Render(line, Options{Lane: "worker"})
+
+		if strings.Count(out, "invalid_type") != 1 {
+			t.Errorf("render = %q, want the report read out once, not once per copy", out)
+		}
+		if !strings.Contains(out, "at parse (kernel.ts:1:1)") {
+			t.Errorf("render = %q, want the frames the stack alone adds", out)
+		}
+	})
+
+	t.Run("when the header is one line, it is still only read once", func(t *testing.T) {
+		line := `{"level":"fatal","time":"2026-09-18T10:00:00.000Z","msg":"boot failed: the mcp member cannot be supplied","stack":"MissingMemberError: the mcp member cannot be supplied\n    at build (members.ts:1:1)"}`
+
+		out := Render(line, Options{Lane: "worker"})
+
+		if strings.Count(out, "the mcp member cannot be supplied") != 1 {
+			t.Errorf("render = %q, want the message read out once however short the header is", out)
+		}
+		if !strings.Contains(out, "error=MissingMemberError") {
+			t.Errorf("render = %q, want the type the trimmed header named kept as a field", out)
+		}
+	})
+
+	// "Error" is what an error is. Surfacing it as a field would spend a column
+	// on the one type name that tells a reader nothing.
+	t.Run("when the trimmed header named no useful type, no field is invented", func(t *testing.T) {
+		line := `{"level":"error","time":"2026-09-18T10:00:00.000Z","msg":"boom","stack":"Error: boom\n    at run (job.ts:1:1)"}`
+
+		out := Render(line, Options{Lane: "worker"})
+
+		if strings.Contains(out, "error=") {
+			t.Errorf("render = %q, want no error field for a bare Error", out)
+		}
+		if !strings.Contains(out, "at run (job.ts:1:1)") {
+			t.Errorf("render = %q, want the frames kept", out)
+		}
+	})
+
+	t.Run("when the header says something the message does not, it is kept", func(t *testing.T) {
+		line := `{"level":"fatal","time":"2026-09-18T10:00:00.000Z","msg":"boot failed","stack":"ConfigError: a different cause\n  with its own detail\n    at parse (kernel.ts:1:1)"}`
+
+		out := Render(line, Options{Lane: "worker"})
+
+		if !strings.Contains(out, "a different cause") {
+			t.Errorf("render = %q, want a header the message does not carry kept", out)
+		}
+	})
 }

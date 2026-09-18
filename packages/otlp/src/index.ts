@@ -18,6 +18,7 @@ export {
   parseOtlpMetrics,
   parseOtlpTraces,
   readOtlpBody,
+  decodeOtlpBody,
   type OtlpParseResult,
 } from "./body.ts";
 export {

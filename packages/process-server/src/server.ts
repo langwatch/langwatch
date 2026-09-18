@@ -4,7 +4,6 @@ import process from "node:process";
 
 import { ResourceScope } from "@langwatch/kernel";
 
-import { browserBundleDoor, type BrowserBundle } from "./browser-bundle.ts";
 import { GracefulShutdown } from "./graceful-shutdown.ts";
 import { hostedRuntime } from "./hosted-runtime.ts";
 
@@ -43,30 +42,11 @@ export type HealthRoute = Readonly<{
   handle: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>;
 }>;
 
-/**
- * A request handler contributed to the same door, tried in `order` once no
- * exact route matched. Returning false declines the request, so the next
- * contribution — and ultimately the 404 — sees it.
- */
-export type DoorHandler = Readonly<{
-  name: string;
-  /** Lower answers first. A mounted transport is 100, the browser bundle 1000. */
-  order?: number;
-  handle: (request: IncomingMessage, response: ServerResponse) => boolean | Promise<boolean>;
-}>;
-
-/** Whatever `.with()` accepts: a lifecycle component, or something on the door. */
-export type ServerContribution = ServerComponent | HealthRoute | DoorHandler;
-
-/** Where a contribution with no order of its own is tried. */
-const DEFAULT_DOOR_ORDER = 100;
+/** Whatever `.with()` accepts: a lifecycle component, or a route on the door. */
+export type ServerContribution = ServerComponent | HealthRoute;
 
 function isHealthRoute(contribution: ServerContribution): contribution is HealthRoute {
   return "path" in contribution && "handle" in contribution;
-}
-
-function isDoorHandler(contribution: ServerContribution): contribution is DoorHandler {
-  return "handle" in contribution && !("path" in contribution);
 }
 
 /**
@@ -86,13 +66,7 @@ export type ServerComponent = Readonly<{
   timeoutMs?: number;
 }>;
 
-/**
- * The process boundary: the signals that end it, the failures that kill it,
- * and the order the things it hosts are torn down in.
- *
- * It builds no telemetry and reads no config. A process resolves those itself
- * and hands this one a logger, so those concerns keep their own owners.
- */
+/** Owns process signals, listeners and teardown order. */
 export class Server {
   static create(options: ServerOptions): Server {
     const exit = options.exit ?? (process.exit.bind(process) as (code: number) => never);
@@ -118,7 +92,8 @@ export class Server {
 
   private readonly components: ServerComponent[] = [];
   private readonly healthRoutes = new Map<string, HealthRoute>();
-  private readonly doorHandlers: DoorHandler[] = [];
+  /** The ONE handler the application composed. Absent until `serve`. */
+  private served: ApplicationHandler | undefined;
   private healthListener: http.Server | undefined;
   private draining = false;
   private disposeFatal: (() => void) | undefined;
@@ -127,7 +102,7 @@ export class Server {
   private closing: Promise<void> | undefined;
   private sealed = false;
 
-  private constructor(
+  protected constructor(
     readonly name: string,
     private readonly logger: ServerLogger,
     shutdownDeadlineMs: number | undefined,
@@ -149,13 +124,6 @@ export class Server {
   with(contribution: ServerContribution): this {
     if (isHealthRoute(contribution)) {
       this.healthRoutes.set(contribution.path, contribution);
-      return this;
-    }
-    if (isDoorHandler(contribution)) {
-      this.doorHandlers.push(contribution);
-      this.doorHandlers.sort(
-        (left, right) => (left.order ?? DEFAULT_DOOR_ORDER) - (right.order ?? DEFAULT_DOOR_ORDER),
-      );
       return this;
     }
     if (this.sealed) {
@@ -210,20 +178,13 @@ export class Server {
       return;
     }
 
-    void this.dispatch(request, response);
-  }
-
-  /** The door's contributions, in order, until one answers. Then the 404. */
-  private async dispatch(request: IncomingMessage, response: ServerResponse): Promise<void> {
-    for (const handler of this.doorHandlers) {
-      const answered = await this.answer(
-        handler.name,
-        () => handler.handle(request, response),
-        response,
-      );
-      if (answered) return;
+    const application = this.served;
+    if (application === undefined) {
+      if (!response.headersSent) response.writeHead(404).end();
+      return;
     }
-    if (!response.headersSent) response.writeHead(404).end();
+
+    void this.answer("application", () => application(request, response), response);
   }
 
   /**
@@ -244,15 +205,16 @@ export class Server {
     }
   }
 
-  /**
-   * The booted application, on this server's one door: every mounted
-   * transport answers behind the built-in routes, the browser bundle answers
-   * last so it shadows none of them, and then the process listens.
-   */
-  serve(application: ServedApplication, options: ServeOptions = {}): Promise<void> {
+  /** Hosts the composed application behind health routes on the same listener. */
+  serve(application: ServedApplication): Promise<void> {
     this.with(hostedRuntime({ name: `${application.name} runtime`, runtime: application }));
-    for (const handler of doorHandlersOf(application)) this.with(handler);
-    if (options.ui !== undefined) this.with(browserBundleDoor(options.ui));
+    if (!isApplicationHandler(application.handler)) {
+      throw new Error(
+        `"${application.name}" was served without composing a handler. An application whose ` +
+          `chain exposes nothing has nothing for this server to answer requests with.`,
+      );
+    }
+    this.served = application.handler;
 
     return this.listen();
   }
@@ -263,7 +225,9 @@ export class Server {
    * it took before anything it calls into is closed under it.
    */
   run(application: ServedApplication): Promise<void> {
-    this.with(hostedRuntime({ name: `${application.name} runtime`, runtime: application, drain: true }));
+    this.with(
+      hostedRuntime({ name: `${application.name} runtime`, runtime: application, drain: true }),
+    );
 
     return this.listen();
   }
@@ -336,59 +300,27 @@ export class Server {
   }
 }
 
+/** The one thing a served application answers requests with. */
+export type ApplicationHandler = (
+  request: IncomingMessage,
+  response: ServerResponse,
+) => void | Promise<void>;
+
 /**
  * A booted application, as the server that hosts it reads one. Transports are
- * erased here on purpose: this package knows no protocol, and a process's own
- * doors are what turned a declaration into something that answers a request.
+ * erased here on purpose: this package knows no protocol, and what turned a
+ * declaration into something that answers a request was decided elsewhere.
  */
 export type ServedApplication = Readonly<{
   name: string;
   start: () => void | Promise<void>;
   stop: () => void | Promise<void>;
-  transports: Readonly<{
-    rest: readonly unknown[];
-    trpc: Readonly<Record<string, unknown>>;
-  }>;
+  /** Composed by the chain's own `expose`, once every declaration mounted. */
+  handler?: unknown;
 }>;
 
-/** What a process states about its surface beyond the application itself. */
-export type ServeOptions = Readonly<{
-  /** The built browser application, answered after every mounted transport. */
-  ui?: BrowserBundle;
-}>;
-
-/**
- * Every door handler a booted application carries, each one once: a process
- * whose REST families and tRPC namespaces mounted on ONE door is handed that
- * door once per mount, and hosting it repeatedly would try it repeatedly.
- */
-function doorHandlersOf(application: ServedApplication): readonly DoorHandler[] {
-  const handlers = new Set<DoorHandler>();
-  const mounted = [
-    ...application.transports.rest,
-    ...Object.values(application.transports.trpc),
-  ];
-
-  for (const transport of mounted) {
-    if (!isServable(transport)) {
-      throw new Error(
-        `"${application.name}" mounted a transport this server cannot serve. A process's own ` +
-          `door must return something answering { name, handle } from each mount.`,
-      );
-    }
-    handlers.add(transport);
-  }
-
-  return [...handlers];
-}
-
-function isServable(transport: unknown): transport is DoorHandler {
-  return (
-    typeof transport === "object" &&
-    transport !== null &&
-    "handle" in transport &&
-    typeof (transport as DoorHandler).handle === "function"
-  );
+function isApplicationHandler(handler: unknown): handler is ApplicationHandler {
+  return typeof handler === "function";
 }
 
 /**

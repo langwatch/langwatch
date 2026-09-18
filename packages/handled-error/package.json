@@ -42,6 +42,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
     "@types/react": "catalog:",

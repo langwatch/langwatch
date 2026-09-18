@@ -224,11 +224,11 @@ type Lane struct {
 }
 
 // Lanes are the Node application lanes every stack supervises, in launch order:
-// the browser application (on the routed `app` port) and the backend — the API
-// application and the worker application in ONE local process (ADR-004,
-// amendment 2026-09-07). The backend lane is reported on the API port; its
-// worker half's metrics listener is WorkerMetricsPort, which the same report
-// already carries.
+// the browser application (on the routed `app` port) and the api — which hosts
+// the worker application beside it in ONE local process (ADR-004, amendment
+// 2026-09-07) and is named for what a person reaches. The api lane is reported
+// on the API port; its worker half's metrics listener is WorkerMetricsPort,
+// which the same report already carries.
 //
 // The Go services are omitted because they are one-to-one with their routed
 // services, which the same report already lists.
@@ -241,7 +241,7 @@ func (s Stack) Lanes() []Lane {
 	}
 	return []Lane{
 		{Name: "ui", Port: s.svc("app").Port},
-		{Name: "backend", Port: s.APIPort},
+		{Name: "api", Port: s.APIPort},
 	}
 }
 

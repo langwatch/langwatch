@@ -27,24 +27,3 @@ export class ObservabilitySupply<
     });
   }
 }
-
-export interface StaticTransportTokens {
-  readonly cronBearerToken?: string;
-  readonly langyInternalBearerToken?: string;
-  readonly instanceAdminBearerToken?: string;
-}
-
-export class TransportAuthSupply {
-  constructor(
-    readonly staticTokens: StaticTransportTokens = {},
-    readonly browserSession: unknown = void 0,
-  ) {}
-
-  withStaticTokens(tokens: StaticTransportTokens): TransportAuthSupply {
-    return new TransportAuthSupply({ ...this.staticTokens, ...tokens }, this.browserSession);
-  }
-
-  withBrowserSession(session: object): TransportAuthSupply {
-    return new TransportAuthSupply(this.staticTokens, session);
-  }
-}

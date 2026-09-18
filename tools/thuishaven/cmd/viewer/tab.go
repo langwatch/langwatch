@@ -121,6 +121,10 @@ type Sources struct {
 	Now func() time.Time
 	// Simulator resolves a service's current loopback port and browser URL.
 	Simulator func(name string) (port int, browserURL string)
+	// AppUp is whether the application behind a log sub-tab is answering.
+	// known is false for a sub-tab haven supervises nothing for (obs, tasks),
+	// which is reported as no dot rather than as a service that is down.
+	AppUp func(app string) (up bool, known bool)
 }
 
 // New builds every tab but the session dashboard, in the top row's order.

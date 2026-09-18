@@ -72,7 +72,7 @@ func TestMailSMTPEnvReachesBothNodeLanes(t *testing.T) {
 		{Name: domain.MailService, Port: 45580, SMTPPort: 45581, URL: "https://mail.test.langwatch.localhost"},
 	}}
 	children := o.planChildren(st, PlanOptions{Selection: domain.DefaultSelection(), RepoRoot: repo}, repo, "")
-	for _, name := range []string{"ui", "backend"} {
+	for _, name := range []string{"ui", APILane} {
 		child, ok := findChild(children, name)
 		if !ok {
 			t.Fatalf("no %q lane was planned", name)

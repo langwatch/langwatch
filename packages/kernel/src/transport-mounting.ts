@@ -145,8 +145,8 @@ function mountRest<Rest>(
 
   // A module binds ONE facts list for both doors; each door takes only its
   // own shape (REST bindings carry `middleware`, tRPC bindings carry `fact`).
-  const facts = entry.facts.filter((binding) => "middleware" in binding);
-  return host.mount(descriptor.router(), entry.provided, (facts.length > 0 ? { facts } : {}));
+  const facts = entry.facts.filter((binding) => "middleware" in binding || "credential" in binding);
+  return host.mount(descriptor.router(), entry.provided, facts.length > 0 ? { facts } : {});
 }
 
 /** One tRPC namespace on the process's own root, bound to the feature's app. */

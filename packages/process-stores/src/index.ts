@@ -47,11 +47,8 @@ export type {
   RedisConfig,
 } from "./config.ts";
 export { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "./config-members.ts";
-export {
-  consumingEventing,
-  producerEventing,
-  type EventingEventLogMembers,
-} from "./eventing-members.ts";
+export { consumingEventing, producerEventing } from "./eventing-role.ts";
+export type { EventingEventLogMembers } from "./eventing-members.ts";
 export { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
 export {
   cachedTenantDirectory,
@@ -61,3 +58,11 @@ export {
 export { UnknownStorageProjectError } from "./object-storage-member.ts";
 
 export { hostedMembers } from "./hosted-members.ts";
+
+export { storesOwner, type StoresConfig } from "./config-owner.ts";
+export {
+  PipelineParticipation,
+  ProducerPipelines,
+  ConsumerPipelines,
+} from "./pipeline-selection.ts";
+export { openProcessStores } from "./open-stores.ts";

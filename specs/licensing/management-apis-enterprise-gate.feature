@@ -149,14 +149,7 @@ Feature: Management APIs require an Enterprise plan
       And no Enterprise capability is granted
 
     @unit
-    Scenario: A process with no database resolves the baseline plan
-      Given a process that opened no database
-      When its active plan is resolved
-      Then the resolved plan is the deployment's baseline
-      And no Enterprise capability is granted
-
-    @unit
-    Scenario: A process that forgets to supply a license source refuses to boot
-      Given a process installing the entitlement module
-      When it boots without providing an activated license source
-      Then it refuses to boot rather than silently resolving every organization as unlicensed
+    Scenario: Entitlement resolves licenses through its installed peer
+      Given a process installing the entitlement and licensing modules
+      When entitlement declares its license dependency
+      Then it names the LicensingApi token provided by the licensing module

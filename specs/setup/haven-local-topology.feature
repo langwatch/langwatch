@@ -109,6 +109,13 @@ Feature: The local development topology
     And no lane carries WORKERS_IN_PROCESS or START_WORKERS
 
   @unit
+  Scenario: The ui lane is not held back by the API
+    Given a worktree with no service selection of its own
+    When haven plans the stack's children
+    Then the "ui" lane carries no readiness probe
+    And it is started without waiting for the API to answer
+
+  @unit
   Scenario: The Go data-plane services share one lane
     Given a stack that selected the gateway and the NLP engine
     When haven plans the stack's children

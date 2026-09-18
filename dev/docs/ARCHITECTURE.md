@@ -11,15 +11,15 @@ it. On conflict between sections, the more specific wins.
 
 Four Node processes and three Go services:
 
-| Process | Package | What it is |
-|---|---|---|
-| `apps/ui` | `@langwatch/ui` | The browser application (Vite SPA) |
-| `apps/api` | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle |
-| `apps/worker` | `@langwatch/worker` | Queues, schedulers, projections, subscribers |
-| `apps/tasks` | `@langwatch/tasks` | One-shot migrations and backfills |
-| `services/aigateway` | Go | Virtual-key data plane (Bifrost fan-out) |
-| `services/nlpgo` | Go | Optimization-studio executions and evaluators |
-| `services/langyagent` | Go | Langy conversation manager (pi harness workers) |
+| Process               | Package                   | What it is                                      |
+| --------------------- | ------------------------- | ----------------------------------------------- |
+| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA)              |
+| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle    |
+| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers    |
+| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills               |
+| `services/aigateway`  | Go                        | Virtual-key data plane (Bifrost fan-out)        |
+| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators   |
+| `services/langyagent` | Go                        | Langy conversation manager (pi harness workers) |
 
 **Applications hold no product code.** The product lives in modules. An
 application is a `main.ts` and a `config.ts`; everything it used to carry —
@@ -38,10 +38,10 @@ one.
 
 Named by one rule: **where the code runs, or what it declares.**
 
-| | core | runs + declares | reads | wire | shares |
-|---|---|---|---|---|---|
-| **Node** | `@langwatch/module` | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api` | contracts |
-| **Web** | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host` | `@langwatch/browser-trpc` | `<name>-browser-kit` |
+|          | core                | runs + declares      | reads                       | wire                      | shares               |
+| -------- | ------------------- | -------------------- | --------------------------- | ------------------------- | -------------------- |
+| **Node** | `@langwatch/module` | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api`          | contracts            |
+| **Web**  | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host`   | `@langwatch/browser-trpc` | `<name>-browser-kit` |
 
 The core is a contract's only framework import and is incredibly light;
 each runtime owns the declaration vocabulary for its own half, so weight is
@@ -128,10 +128,10 @@ export const TraceApi = moduleApi<TraceApi>("trace");
 ```ts
 // modules/trace/process/src/trace.module.ts — the installer
 export const traceProcessModule = defineProcessModule("trace")
-  .withRepositories(traceRepositories)   // registry: { live, memory }
-  .withApi(TraceModule)                  // the one class implementing TraceApi
-  .withTransports(traceRest, traceTrpc)  // inert declarations
-  .withEventing(tracePipeline);          // §9
+  .withRepositories(traceRepositories) // registry: { live, memory }
+  .withApi(TraceModule) // the one class implementing TraceApi
+  .withTransports(traceRest, traceTrpc) // inert declarations
+  .withEventing(tracePipeline); // §9
 ```
 
 No `.build()`: every `with*` result is installable. `index.ts` exports the
@@ -247,29 +247,25 @@ installed server modules' own declared schemas, composed by the generated
 parse (§6). A hand-maintained per-app config module is a defect.
 
 ```ts
-// apps/api/src/main.ts — the whole process (ruled 2026-09-18; the landed
-// interim uses createServerApp + withStores, see git log)
+// apps/api/src/main.ts
 import "@langwatch/time/polyfill";
+import { serverModules as processModules } from "@langwatch/installed-modules/server";
+import { processTelemetry } from "@langwatch/observability/node";
+import { processConfig, Server } from "@langwatch/process-server";
 
 const server = await Server.create("langwatch-api")
-  .withConfig(apiConfig)                // §6 parse from the installed modules' own schemas — FIRST
-  .withSecrets((config, secrets) =>     // config feeds secrets; the builder is handed in, never
-    secrets                             //   imported; it chains directly — no chain() word
-      .withEnv()
-      .withFile()
-      .withOnePassword(config.process.secretsVault))
-  .withTelemetry(grafanaTelemetry())    // logger + trace links + OTLP export, from config
-  .withMetrics(prometheusMetrics())     // scrape endpoint, token from config
-  .start();                             // fatal handlers → parse → secrets → /healthz live
+  .withConfig(processConfig(processModules))
+  .withSecrets((config, secrets) =>
+    secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
+  )
+  .withTelemetry(processTelemetry("langwatch-api"))
+  .start();
 
-const app = await server.composeProcess("api")
-  .withModules(processModules)          // dependencies resolve from config — no store lines (§5)
-  .exposeTransports((transports) => transports    // REQUIRED on the api; not on the worker's builder at all
-    .trpc()                             //   required iff any module declares namespaces
-    .rest()                             //   required iff any module declares families; family
-                                        //   credentials bind at their declaring modules, not here
-    .browserBundle())                   //   ALWAYS required on the api; .browserBundle(none) opts out loudly
-  .withPipelines((pipelines) => pipelines.produce()) // emits commands; never claims the queue
+const app = await server
+  .composeProcess("api")
+  .withModules(processModules)
+  .exposeTransports((transports) => transports.trpc().rest().browserBundle())
+  .withPipelines((pipelines) => pipelines.produce())
   .boot();
 
 await server.serve(app);
@@ -277,8 +273,9 @@ await server.serve(app);
 
 ```ts
 // apps/worker/src/main.ts — the whole difference
-const app = await server.composeProcess("worker")
-  .withModules(processModules)          // SAME module graph: apps install fully, jobs call them in-process
+const app = await server
+  .composeProcess("worker")
+  .withModules(processModules) // SAME module graph: apps install fully, jobs call them in-process
   .withPipelines((pipelines) => pipelines.consume()) // consumers, jobs, process managers
   .boot();
 
@@ -397,11 +394,11 @@ dependency; `main.ts` never touches lifecycle:
   worker drains before the api's graph closes under it" a structural fact.
 - Module services start in dependency order; teardown registers in reverse.
 
-| | knows about |
-|---|---|
-| `main.ts` | the config schema and the chain — no lifecycle, no hosting |
+|                    | knows about                                                 |
+| ------------------ | ----------------------------------------------------------- |
+| `main.ts`          | the config schema and the chain — no lifecycle, no hosting  |
 | `createApp`/`boot` | what modules declared, and how to register it on the server |
-| `Server` | signals, phases, deadline, `/healthz`, `/metrics`, serve |
+| `Server`           | signals, phases, deadline, `/healthz`, `/metrics`, serve    |
 
 **The Server chain is fluent and speaks in named factories** (settled
 2026-09-18, superseding the same day's generic-`.with(component)` phrasing).
@@ -542,17 +539,44 @@ config file** (settled 2026-09-18 — this section replaces every earlier
 iteration).
 
 ```ts
-// modules/github/process/src/github.server.ts — the module declares, on itself
-static configSchema = z.object({
-  appId: z.string().optional(),               // GITHUB_APP_ID
-}).readonly();
+// modules/github/contract/src/github.config.ts — the declaration, in the contract
+export const githubConfig = Config.define((c) => ({
+  appId: c.env("GITHUB_APP_ID", z.string().optional()),
+}));
+export const githubSecrets = {
+  privateKey: Secret.load("GITHUB_APP_PRIVATE_KEY", { optional: true }),
+} as const;
+export type GithubConfig = ConfigOf<typeof githubConfig>;
+
+// modules/github/process/src/app/github.app.ts — the process half attaches them
+static readonly config = githubConfig;
+static readonly secrets = githubSecrets;
 
 // apps/api/src/main.ts — the app's entire involvement
 const server = await Server.create("langwatch-api")
-  .withSecrets(secretsChain())
-  .withConfig(apiConfig())                    // generated from the installed list
+  .withConfig(processConfig(processModules))  // the installed list IS the schema
+  .withSecrets((config, secrets) => secrets.withEnv().withFile())
   ...
 ```
+
+**The declaration lives in the contract; the process half attaches it and the
+browser half projects from it** (ruled 2026-09-18). All three halves read one
+declaration rather than each writing their own:
+
+- **contract** — `<name>.config.ts` holds the config slice (one
+  `Config.define`, whose `c.env` leaves), the secret handles (`Secret.load`), the inferred `ConfigOf<…>`
+  type, and the browser projection schema plus its `project` function. This
+  is the only file that names an environment variable.
+- **process** — the App class attaches them as `static readonly config` and
+  `static readonly secrets`; `create()` receives the parsed slice and a
+  scoped `secrets`, and resolves through `secrets.into(handle, build)`.
+  Nothing in the process half names an env var or re-declares a schema.
+- **browser** — `defineBrowserModule` validates the contract's projection
+  slice before first render; the browser never sees a handle or a leaf.
+
+A module with no deployment facts declares neither and contributes no root
+key. Framework owners (process-server, stores, observability) declare the
+same way at their own package, which is why they are not module-shaped.
 
 **You write the schema yourself and attach it where you define the module**
 (ruled 2026-09-18). Both halves work the same way: defining the process
@@ -571,6 +595,48 @@ migrated** (ruled 2026-09-18): RuntimeConfig definitions, the contract
 `*ConfigDefinition` files, the generated config map and both app config
 files all go; the compiler enumerates the fallout and this section is what
 replaces them.
+
+**One environment variable has exactly one owner** (ruled 2026-09-18). The
+parse refuses a second claim by name — `"BASE_HOST" is declared by "process"
+and "platform-health"` — and the process does not boot. The owner that
+declares a value passes it down; nobody re-declares it to get a copy.
+
+This is what makes **a process fact not a module fact** enforceable rather
+than advisory. Two worked cases, both declared once on the process owner
+(`packages/process-server/src/owner.ts`) and handed to every module as a
+member:
+
+- `BASE_HOST` → the `publicBaseUrl` member (optional; blank and absent both
+  mean the deployment named none). The eight modules that link back to the
+  product read it; none names the variable.
+- `NODE_ENV` → the `nodeEnvironment` member, carried as the raw string. The
+  `http` owner no longer declares it either — it **derives** `production` from
+  the process slice, because a derived value is not a second claim. A module
+  wanting a boolean derives it the same way.
+
+The same holds for `processName` and anything else the process, not the
+deployment's module, knows.
+
+Note the two member vocabularies, which are not interchangeable: `reads(...)`
+from `@langwatch/process-stores/members` is a **closed** list of the fourteen
+store members, so `reads("publicBaseUrl")` is a compile error on purpose. A
+module reading anything else declares the raw literal
+`static readonly reads = ["prisma", "publicBaseUrl"] as const` and restates
+the member shapes in its own `Readonly<{…}>` type — a module depends on
+contracts, never on the stores package's types. `modules/platform-health` and
+`modules/project` are the exemplars.
+
+**`configSchema` is deleted, not migrated** (ruled 2026-09-18). The legacy
+static — an App-level Zod schema re-parsed per feature and fed by the deleted
+`apps/api/src/config.ts` — held four different kinds of thing at once, and
+only the first is config: a module deployment fact (→ the contract slice), a
+process fact (→ the owning process, drilled as a member), an availability
+decision (→ a declared supply the process answers, never an env var), and a
+role decision (→ the composition's word). Sorting those four is the port; the
+static, its `*AppConfigSchema` const, its inferred type and the kernel's
+`withConfig(app.configSchema)` parse branch all go. A module with no
+deployment facts of its own declares no `config` static at all and its
+`FeatureSetup` config parameter is `undefined`.
 
 **Secrets are the sibling package, and a secret is a value you may only
 pass through** (approved 2026-09-18). A module declares its handles beside
@@ -663,7 +729,7 @@ its question, as an argument. Deep nesting paying for itself in signatures
 is the intended pressure.
 
 **A module maps its own config to its dependency state.** Whether a seam is
-configured is derived *inside* the module from its declared slice plus its
+configured is derived _inside_ the module from its declared slice plus its
 closed members — never defaulted invisibly, never hand-supplied by the
 process. An unconfigured seam refuses by name with a stable error code. This
 is the completion of §3.3's fourth case: what remains for the process to
@@ -696,21 +762,33 @@ LANGWATCH_STORES=memory
 ```
 
 ```ts
-export const storesConfig = (modules) => Config.group({
-  tier:       Config.value(z.enum(["live", "memory"]).default("live"), { env: "LANGWATCH_STORES" }),
-  postgres:   Config.value(z.string().url(), { env: "DATABASE_URL",   developmentDefault: "postgresql://…localhost…" }),
-  clickhouse: Config.value(z.string().url(), { env: "CLICKHOUSE_URL", developmentDefault: "http://…localhost…" }),
-  redis:      Config.value(z.string(),       { env: "REDIS_URL",      developmentDefault: "redis://localhost:6379" }),
-}).refine(/* rule 1: live + a required store unset → refuse naming modules and key
-             rule 2: memory + NODE_ENV=production → refuse by name */);
+export const storesConfig = (modules) =>
+  Config.group({
+    tier: Config.value(z.enum(["live", "memory"]).default("live"), { env: "LANGWATCH_STORES" }),
+    postgres: Config.value(z.string().url(), {
+      env: "DATABASE_URL",
+      developmentDefault: "postgresql://…localhost…",
+    }),
+    clickhouse: Config.value(z.string().url(), {
+      env: "CLICKHOUSE_URL",
+      developmentDefault: "http://…localhost…",
+    }),
+    redis: Config.value(z.string(), {
+      env: "REDIS_URL",
+      developmentDefault: "redis://localhost:6379",
+    }),
+  }).refine(
+    /* rule 1: live + a required store unset → refuse naming modules and key
+             rule 2: memory + NODE_ENV=production → refuse by name */
+  );
 ```
 
-| You did | What happens |
-|---|---|
-| forgot `DATABASE_URL` in production | refusal: *"live stores: trace, annotation require postgres; DATABASE_URL is unset"* — **never memory** |
-| `LANGWATCH_STORES=memory` locally | whole process on memory twins, stated, one line |
-| `LANGWATCH_STORES=memory` in production | refusal: *"asked to run production on memory storage"* |
-| typo'd the knob | enum refusal — not a fallback to either side |
+| You did                                 | What happens                                                                                           |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| forgot `DATABASE_URL` in production     | refusal: _"live stores: trace, annotation require postgres; DATABASE_URL is unset"_ — **never memory** |
+| `LANGWATCH_STORES=memory` locally       | whole process on memory twins, stated, one line                                                        |
+| `LANGWATCH_STORES=memory` in production | refusal: _"asked to run production on memory storage"_                                                 |
+| typo'd the knob                         | enum refusal — not a fallback to either side                                                           |
 
 Memory is reachable only by writing the word, and only outside production.
 Absence always refuses. There is deliberately no per-store tier: one knob,
@@ -772,10 +850,10 @@ The module declares its whole pipeline once:
 ```ts
 // modules/trace/process/src/eventing/trace.pipeline.ts
 export const tracePipeline = definePipeline("trace")
-  .withEvents(traceEvents)                          // zod-typed, versioned
-  .withCommands({ ingestSpan })                     // validate → append
-  .withProjections({ traceSummary })                // fold → read model      (worker-only)
-  .withSubscribers({ onSpanIngested })              // reactions, idempotent  (worker-only)
+  .withEvents(traceEvents) // zod-typed, versioned
+  .withCommands({ ingestSpan }) // validate → append
+  .withProjections({ traceSummary }) // fold → read model      (worker-only)
+  .withSubscribers({ onSpanIngested }) // reactions, idempotent  (worker-only)
   .withJobs({ retentionSweep: cron("0 3 * * *") }); // schedules              (worker-only)
 ```
 
@@ -785,12 +863,12 @@ Neither declaration exposes a transport. `boot()` translates the same module
 pipeline declaration per role — **api is commands-only,
 structurally**:
 
-| | role `"api"` | role `"worker"` |
-|---|---|---|
-| commands | send (append + return) | send |
-| projections / subscribers / process managers | **never constructed** — nothing to call | hosted, per-aggregate ordered |
-| scheduled jobs | never constructed | hosted |
-| eventing supply the role's chain demands | `EventingProducer` (the type) | `EventingHost` (consume + produce) |
+|                                              | role `"api"`                            | role `"worker"`                    |
+| -------------------------------------------- | --------------------------------------- | ---------------------------------- |
+| commands                                     | send (append + return)                  | send                               |
+| projections / subscribers / process managers | **never constructed** — nothing to call | hosted, per-aggregate ordered      |
+| scheduled jobs                               | never constructed                       | hosted                             |
+| eventing supply the role's chain demands     | `EventingProducer` (the type)           | `EventingHost` (consume + produce) |
 
 Two enforcement layers: the reaction half is simply not built in an api
 process, and the role types the eventing requirement — an api-role chain
@@ -808,10 +886,10 @@ same ordered stream; every consumer registers drain-first on the server.
 
 ```ts
 // apps/ui/src/main.tsx
-const ui = await createUi({ mount: "root" })   // document + meta-tag config read are defaults
+const ui = await createUi({ mount: "root" }) // document + meta-tag config read are defaults
   .withModules(browserModules)
   .render();
-mountShell(ui);                                 // shell/: providers + router over declarations
+mountShell(ui); // shell/: providers + router over declarations
 ```
 
 `createUi` reads the injected public config from the DOM meta tag by default
@@ -881,8 +959,9 @@ modules like any other** — the generated lists carry core and enterprise
 tiers, and the same catalogue installs both into the same processes. There is
 no enterprise composition package, no separate wiring, no conditional
 mounting: **enterprise routes are always mounted and refuse per-organization
-on entitlement**. The licence leg is the `licenseSource` supply token,
-provided by the process.
+on entitlement**. Entitlement depends on the installed `LicensingApi` peer.
+Licensing resolves each organization’s signed license; an absent or invalid
+license is a normal domain result, not deployment-level capability absence.
 
 ---
 
@@ -915,10 +994,10 @@ next to `src/`.**
 The installation test is the same chain as production:
 
 ```ts
-const runtime = await createApp({ role: "api" })          // no server: nothing to tear down
+const runtime = await createApp({ role: "api" }) // no server: nothing to tear down
   .withModules([annotationProcessModule, traceProcessModule, presenceProcessModule])
   .withConfig({ annotation: {}, trace: {}, presence: {} })
-  .withStores(memoryStores())                              // branded → memory tier everywhere
+  .withStores(memoryStores()) // branded → memory tier everywhere
   .boot();
 
 const traces = runtime.service(TraceApi);
@@ -972,7 +1051,9 @@ member bags · `*App` classes inside modules · `defineServerModule` /
 `defineWebModule` (renamed) · `RestErrorHandler` · error envelopes in
 transports · re-exports for backwards compatibility · `refusing*` twins ·
 `try*`/`require*` method names · `T | null` returns in new code (`find*` =
-array; `get*` = one or throws).
+array; `get*` = one or throws) · `static readonly configSchema` and its
+`*AppConfigSchema`/`*ServerConfigSchema` consts · a module declaring an env
+var another owner already declares (`BASE_HOST` outside the process owner).
 
 ---
 
@@ -985,21 +1066,20 @@ This document names the target. **Landed 2026-09-18:** the tree rename
 dissolved into `entitlement-contract`, and `.withStores(stores)` on the
 chain. New code uses the left column only.
 
-| Target | Today |
-|---|---|
-| `@langwatch/module` (light core) | `@langwatch/kernel`'s token half |
-| `@langwatch/process` | `@langwatch/process-server` + kernel's boot AND declaration halves |
-| `@langwatch/browser` | `@langwatch/ui-kernel` (boot half) |
-| `createProcessApp(role)` | `createServerApp(role)` (generated) |
-| `openStores(config)` | `createProcessMembers({ config })` |
-| `defineProcessModule` / `defineBrowserModule` | `defineServerModule` / `defineWebModule` |
-| `traceProcessModule` / `processModules` | `traceServer` / `serverModules` |
-| `TraceModule` + `.withApi(...)` | `TraceApp` + `.withApp(...)` |
-| `<f>.module.ts` / `<f>.web.ts` file stems | `<f>.server.ts` / `<f>.web.ts` |
+| Target                                        | Today                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `@langwatch/module` (light core)              | `@langwatch/kernel`'s token half                                   |
+| `@langwatch/process`                          | `@langwatch/process-server` + kernel's boot AND declaration halves |
+| `@langwatch/browser`                          | `@langwatch/ui-kernel` (boot half)                                 |
+| `createProcessApp(role)`                      | `createServerApp(role)` (generated)                                |
+| `openStores(config)`                          | `createProcessMembers({ config })`                                 |
+| `defineProcessModule` / `defineBrowserModule` | `defineServerModule` / `defineWebModule`                           |
+| `traceProcessModule` / `processModules`       | `traceServer` / `serverModules`                                    |
+| `TraceModule` + `.withApi(...)`               | `TraceApp` + `.withApp(...)`                                       |
+| `<f>.module.ts` / `<f>.web.ts` file stems     | `<f>.server.ts` / `<f>.web.ts`                                     |
 
 Also open, each a worklist: the config-defined dependency state migration
-(§6 — deletes the remaining bespoke member tail and the `licenseSource`
-token); eventing member composition for both roles; `browserModules` is
+(§6 — deletes the remaining bespoke member tail); eventing member composition for both roles; `browserModules` is
 empty (no module exports `./declaration` yet — the browser serves chrome
 only); the ClickHouse resolver ruling (§7); worker job declarations designed,
 not landed.

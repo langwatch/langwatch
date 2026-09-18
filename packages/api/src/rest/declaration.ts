@@ -19,6 +19,7 @@ import {
   type Credential,
   type RouteAccess,
 } from "../access/access.ts";
+import { PayloadTooLargeError } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
 import {
   assertAddressingOptions,
@@ -120,6 +121,7 @@ type RouteInput<Params extends RouteSource, Query extends RouteSource, Body exte
  */
 type OutputSchema =
   | z.ZodObject
+  | z.ZodUnion
   | z.ZodArray
   | z.ZodVoid
   | z.ZodUndefined
@@ -165,7 +167,7 @@ export const DOOR_SCOPE_TIER = {
   project: "project",
   organization: "organization",
   scimToken: "organization",
-  browser: "project",
+  browser: null,
   internalSecret: null,
   "instance-admin": null,
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
@@ -176,8 +178,9 @@ type DoorScope<Door extends RestDoorCredential> = (typeof DOOR_SCOPE_TIER)[Door]
   : Extract<AuthzDeclaredScopeId, { tier: (typeof DOOR_SCOPE_TIER)[Door] }>;
 type ScopedHandlerArguments<Input, App, Door extends RestDoorCredential> = Omit<
   ApiHandlerArguments<Input, App>,
-  "scope"
+  "scope" | "actor"
 > & {
+  readonly actor: Door extends "browser" ? Extract<Actor, { type: "user" }> : Actor | null;
   readonly scope: DoorScope<Door>;
   /**
    * The scope this route's own path named, when its permission was checked
@@ -227,7 +230,7 @@ type HandlerArgumentsFor<
     : Access extends "deferred"
       ? DeferredHandlerArguments<Input, App>
       : ScopedHandlerArguments<Input, App, Door>;
-type RouteAccessKind = "scoped" | "public" | "authenticated" | "optional" | "deferred";
+export type RouteAccessKind = "scoped" | "public" | "authenticated" | "optional" | "deferred";
 /**
  * What a stored handler is invoked with, once the declaration's own types are
  * gone: every door's arguments widened to one shape. Real types are enforced
@@ -241,7 +244,7 @@ export type StoredHandlerArguments<Api> = Readonly<{
   target: AuthzDeclaredScopeId | null;
   signal: AbortSignal | undefined;
   /** Read once, only for a route that declared it; undefined everywhere else. */
-  raw: string | Uint8Array | undefined;
+  raw: string | Uint8Array | ReadableStream<Uint8Array> | null | undefined;
   /** The file parts a multipart route named; undefined everywhere else. */
   files: Readonly<Record<string, File>> | undefined;
   /** The producer for the kind a route declared; undefined everywhere else. */
@@ -266,9 +269,10 @@ export type RestMethodName = Uppercase<HttpMethod>;
 
 /** The statuses a route declares answers for, each with the body it carries. */
 export type RestRouteAnswers = Readonly<Record<number, OutputSchema>>;
-type AnswerResult<Answers extends RestRouteAnswers> = {
+export type RestDeclaredResult<Answers extends RestRouteAnswers> = {
   [Status in keyof Answers]: Readonly<{
-    status: Status & ContentfulStatusCode;
+    status: Status & import("hono/utils/http-status").StatusCode;
+    headers?: Readonly<Record<string, string>>;
     body: z.input<Answers[Status] & OutputSchema>;
   }>;
 }[keyof Answers];
@@ -307,7 +311,7 @@ type SerialisedRouteResult<Output extends RouteAnswer> = Output extends RestRawA
   : Output extends OutputSchema
     ? z.infer<Output> | Promise<z.infer<Output>>
     : Output extends RestRouteAnswers
-      ? AnswerResult<Output> | Promise<AnswerResult<Output>>
+      ? RestDeclaredResult<Output> | Promise<RestDeclaredResult<Output>>
       : void | Promise<void>;
 type RouteAnswer =
   | OutputSchema
@@ -387,7 +391,9 @@ type RawResponseArguments<Output extends RouteAnswer> = Output extends RestRawAn
  * own path names (the project or team it addresses), not the one the
  * credential resolved. `param` is the field that tier is spelled with.
  */
-export type RestPermissionTarget = Readonly<{ at: "route"; param: ScopeTierField }>;
+export type RestPermissionTarget =
+  | Readonly<{ at: "route"; param: ScopeTierField }>
+  | Readonly<{ at: "header"; param: ScopeTierField; header: string }>;
 
 export type RestTransportRoute<Api> = Readonly<{
   readonly method: HttpMethod;
@@ -1036,14 +1042,27 @@ class RouteBuilder<Api, S extends RouteShape> {
     });
   }
 
-  withBodyLimit(limit: Readonly<{ maxBytes: number; onExceeded(): Error }>): RouteBuilder<Api, S> {
+  withBodyLimit(limit: Readonly<{ maxBytes: number; onExceeded?(): Error }>): RouteBuilder<Api, S> {
     if (!Number.isSafeInteger(limit.maxBytes) || limit.maxBytes < 0)
       throw new Error("REST body limit must be a non-negative safe integer");
 
     return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
       ...this.state,
-      bodyLimit: limit,
+      bodyLimit: {
+        maxBytes: limit.maxBytes,
+        onExceeded: limit.onExceeded ?? (() => new PayloadTooLargeError()),
+      },
     });
+  }
+
+  withHeaders<Schema extends z.ZodObject>(schema: Schema) {
+    const headers: RestTransportMiddleware<Schema> = Object.freeze({
+      name: `headers:${this.operation}`,
+      schema,
+      source: "headers",
+    });
+
+    return this.withMiddleware(headers);
   }
 
   withMiddleware<const Added extends readonly RestTransportMiddleware[]>(
@@ -1450,6 +1469,33 @@ function assertBodyMethod(method: HttpMethod, path: string): void {
   }
 }
 
+function assertPublicRouteConstraints({
+  operation,
+  state,
+}: {
+  operation: string;
+  state: RouteState;
+}): void {
+  if (state.access?.kind !== "public") return;
+
+  assertNoScopeInput({ operation, state });
+
+  // Both ask a question about a tenant, and a public route resolves none.
+  if (state.entitlement) {
+    throw new Error(
+      `REST ${operation} answers without a credential, so there is no tenant to ask whether it ` +
+        `holds "${state.entitlement}"`,
+    );
+  }
+
+  if (state.idempotency) {
+    throw new Error(
+      `REST ${operation} answers without a credential, so there is no tenancy a caller's ` +
+        "idempotency key is unique within",
+    );
+  }
+}
+
 function assertRouteReady({
   method,
   path,
@@ -1469,22 +1515,7 @@ function assertRouteReady({
     throw new Error(`REST ${operation} declares both a permission and ${state.access.kind} access`);
   }
 
-  if (state.access?.kind === "public") assertNoScopeInput({ operation, state });
-
-  // Both ask a question about a tenant, and a public route resolves none.
-  if (state.access?.kind === "public" && state.entitlement) {
-    throw new Error(
-      `REST ${operation} answers without a credential, so there is no tenant to ask whether it ` +
-        `holds "${state.entitlement}"`,
-    );
-  }
-
-  if (state.access?.kind === "public" && state.idempotency) {
-    throw new Error(
-      `REST ${operation} answers without a credential, so there is no tenancy a caller's ` +
-        "idempotency key is unique within",
-    );
-  }
+  assertPublicRouteConstraints({ operation, state });
 
   if (state.answers && state.status !== void 0) {
     throw new Error(`REST ${operation} declares responds(), so its status is the answer's own`);
@@ -1720,6 +1751,7 @@ function isBodylessMethod(method: HttpMethod): boolean {
 const DEFAULT_RAW_MEDIA_TYPE = {
   text: "text/plain",
   bytes: "application/octet-stream",
+  stream: "application/octet-stream",
 } as const satisfies Record<RestRawBodyForm, string>;
 
 /**
@@ -1737,9 +1769,27 @@ function assertPermissionTarget({
     query?: z.ZodObject;
     input?: SourceSchema;
     permissionTarget?: RestPermissionTarget;
+    middleware?: readonly RestTransportMiddleware[];
   }>;
 }): void {
-  const param = state.permissionTarget!.param;
+  const target = state.permissionTarget!;
+  const param = target.param;
+
+  if (target.at === "header") {
+    const declared = state.middleware?.some(
+      (fact) =>
+        fact.source === "headers" &&
+        fact.schema instanceof z.ZodObject &&
+        sourceKeys(fact.schema).includes(target.header),
+    );
+
+    if (!declared)
+      throw new Error(
+        `REST ${operation} checks header "${target.header}" without declaring it withHeaders()`,
+      );
+
+    return;
+  }
 
   const declared = [state.params, state.query, state.input]
     .filter((schema): schema is SourceSchema => schema !== void 0)
@@ -1783,7 +1833,11 @@ function assertDeclaredAnswers({
     throw new Error(`REST ${operation} must declare one or two 2xx answers in responds()`);
   }
 
-  if (successes.length === 2 && answers[successes[0]!] !== answers[successes[1]!]) {
+  if (
+    successes.length === 2 &&
+    !successes.includes(204) &&
+    answers[successes[0]!] !== answers[successes[1]!]
+  ) {
     throw new Error(
       `REST ${operation} declares two successes carrying different bodies; two are for one ` +
         "answer whose status says only whether it created what it returned",

@@ -11,6 +11,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
+
 import type { ObjectStorageAccount, ObjectStorageConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 import type { ObjectStorage, StoredObject, StoredObjectAddress } from "./members.ts";
@@ -63,9 +64,7 @@ export function buildObjectStorage(options: {
   };
 
   /** Where this project's objects live, and which client reaches them. */
-  const place = async (
-    projectId: string,
-  ): Promise<{ client: S3Client; bucket: string }> => {
+  const place = async (projectId: string): Promise<{ client: S3Client; bucket: string }> => {
     if (projectId === "") throw new UnknownStorageProjectError(projectId);
     if (accounts.size === 0) return { client: clientFor(config), bucket: shared };
 

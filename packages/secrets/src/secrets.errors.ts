@@ -45,6 +45,21 @@ export class SecretsPreflightError extends HandledError {
   }
 }
 
+/** A credential has one owner; a second declaration is a guess about intent. */
+export class SecretClaimedTwiceError extends HandledError {
+  constructor(
+    readonly id: string,
+    readonly owners: readonly string[],
+  ) {
+    super(
+      "secret_claimed_twice",
+      `The secret "${id}" is declared by both ${owners.join(" and ")}. ` +
+        `One owner declares it and builds the collaborator; inject that into the other.`,
+      { fault: "platform" },
+    );
+  }
+}
+
 /** 1Password answered something other than "no such key". */
 export class OnePasswordUnavailableError extends HandledError {
   constructor(detail: string) {

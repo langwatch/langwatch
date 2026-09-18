@@ -240,6 +240,14 @@ func (m *viewerModel) sources(combined, capDir string) viewer.Sources {
 			}
 			return 0, ""
 		},
+		AppUp: func(tab string) (bool, bool) {
+			for _, svc := range m.snap.Services {
+				if svc.Name == tab {
+					return svc.Up, true
+				}
+			}
+			return false, false
+		},
 	}
 }
 

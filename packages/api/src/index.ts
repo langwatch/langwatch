@@ -5,6 +5,18 @@
 
 export {
   AuthenticatedActorRequiredError,
+  SurfaceBlankSecretError,
+  SurfaceCapabilityUnavailableError,
+  SurfaceUnconfiguredError,
+  SurfaceUnverifiedError,
+  OrganizationAuthenticationUnavailableError,
+  OrganizationCredentialClassMismatchError,
+  OrganizationInvalidCredentialsError,
+  OrganizationMissingCredentialsError,
+  OrganizationNotFoundForCredentialError,
+  OrganizationPermissionError,
+  ProjectInvalidCredentialsError,
+  ProjectMissingCredentialsError,
   ApiVersionConflictError,
   createErrorHandler,
   EnterprisePlanRequiredError,

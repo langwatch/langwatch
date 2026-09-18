@@ -66,13 +66,13 @@
     "@opentelemetry/otlp-transformer-telemetry": "npm:@opentelemetry/otlp-transformer@0.221.0",
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-metrics": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
     "langwatch": "workspace:*",
     "pino": "catalog:",
     "pino-opentelemetry-transport": "catalog:",
     "pino-pretty": "catalog:"
   },
   "devDependencies": {
-    "@opentelemetry/sdk-trace-base": "catalog:",
     "@opentelemetry/sdk-trace-node": "catalog:",
     "@pyroscope/nodejs": "0.6.2",
     "@types/node": "catalog:",

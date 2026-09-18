@@ -45,6 +45,8 @@ export {
 
 // The runtime half: the ports a process fills, and the mount that puts a
 // family's declaration behind the one execution path.
+export { RestHost, type RestIdentities, type RestFamilyBearers } from "./host.ts";
+
 export {
   createRestRuntime,
   type RestAuditRow,
@@ -145,6 +147,9 @@ export {
   recordBrowserCaller,
   recordOrganizationCredential,
   recordProjectCredential,
+  SessionReader,
+  type SessionCaller,
+  type SessionVerification,
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
   PersonalUsageServiceKeyUnsupportedError,
@@ -178,6 +183,9 @@ export {
   baseResponses,
   buildStandardSuccessResponse,
   canonicalBaseResponses,
+  canonicalErrorAnswer,
+  canonicalErrorFor,
+  canonicalErrorResponse,
   canonicalConflictResponses,
   canonicalUnprocessableResponses,
   coerceToEpoch,
@@ -210,6 +218,7 @@ export {
   UnauthorizedError,
   UnprocessableEntityError,
   type ApiErrorBody,
+  type ApiErrorReason,
   type Declined,
   type EndpointDocs,
   type EndpointVariables,
@@ -256,7 +265,7 @@ export {
   type RestTransportDocs,
   type SecurityRequirement,
 } from "./openapi.ts";
-export { generateSpecs as generateApiSpecs, resolver } from "hono-openapi";
+export { resolver } from "hono-openapi";
 
 // The security half: the ports one process fills for its own doors, the
 // cross-check that every mounted route declared a policy, the refusal
@@ -264,6 +273,8 @@ export { generateSpecs as generateApiSpecs, resolver } from "hono-openapi";
 export {
   allRegisteredRoutes,
   assertEveryRouteDeclared,
+  BrowserOriginGuard,
+  type OriginBearingRequest,
   collectAuthDiagnostics,
   emitManagementAudit,
   familyFromBasePath,
@@ -293,3 +304,13 @@ export function routeHandlers(app: Hono) {
 
   return { GET: h, POST: h, PUT: h, DELETE: h, PATCH: h } as const;
 }
+
+export { BrowserSessionIdentity, BrowserOriginRefusedError } from "./browser-session.ts";
+
+export { bindRestCredential, type RestCredentialBinding } from "./request.ts";
+
+export { BearerIdentity } from "./bearer-identity.ts";
+
+export type { RestDeclaredResult } from "./declaration.ts";
+
+export type { RouteAccess } from "../access/access.ts";

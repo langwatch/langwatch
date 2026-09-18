@@ -3,7 +3,7 @@ import type { ResolvedTokens } from "./dependency-token.ts";
 import type { InstallableServerFeature, ServerRole } from "./feature-installer.ts";
 import { ModuleApiToken } from "./module-api-token.ts";
 import { membersFrom, storesBackedMembers, type StoresMemberSource } from "./module-members.ts";
-import { ObservabilitySupply, TransportAuthSupply } from "./process-supply.options.ts";
+import { ObservabilitySupply } from "./process-supply.options.ts";
 import type {
   InstalledPeersInAnyBranch,
   InstalledSupplyPeers,
@@ -43,12 +43,16 @@ type MissingFrom<
   Peers
 > &
   string;
-interface TransportOpening<Rest, Trpc> {
-  readonly auth: TransportAuthSupply;
-  readonly openHosts: (
-    peers: TransportPeers,
-    auth: TransportAuthSupply,
-  ) => FeatureTransportHosts<Rest, Trpc>;
+/**
+ * What a process exposes: the hosts every declared transport mounts on, and the
+ * one handler it serves once they have. Both come from ONE call, at the one
+ * moment either can be built — every module's application exists and nothing is
+ * listening yet.
+ */
+export interface ExposedSurface<Rest, Trpc> {
+  readonly hosts: FeatureTransportHosts<Rest, Trpc>;
+  /** Called after every declaration mounted. Its answer is what `serve` hosts. */
+  readonly serve: () => unknown;
 }
 interface SupplyState<Rest, Trpc> {
   readonly role: ServerRole;
@@ -57,7 +61,7 @@ interface SupplyState<Rest, Trpc> {
   readonly config: SupplyRecord;
   readonly peers: SupplyRecord;
   readonly services: readonly RuntimeService[];
-  readonly transport?: TransportOpening<Rest, Trpc>;
+  readonly transport?: (peers: TransportPeers) => ExposedSurface<Rest, Trpc>;
   readonly stores?: StoresMemberSource;
 }
 
@@ -408,12 +412,16 @@ export class ProcessSupply<
     return this.#withMembers(configure(new ObservabilitySupply<Modules>({})).supplied);
   }
 
-  withTransportAuth<NextRest, NextTrpc>(
-    configure: (auth: TransportAuthSupply) => TransportAuthSupply,
-    openHosts: (
-      peers: TransportPeers,
-      auth: TransportAuthSupply,
-    ) => FeatureTransportHosts<NextRest, NextTrpc>,
+  /**
+   * What this process serves. `expose` exists for the roles that answer
+   * requests; a worker has nothing to expose and says so by never calling it.
+   *
+   * The whole composition — which surfaces, on which prefixes, behind which
+   * middleware — is written INSIDE this call, once, by whoever implements it.
+   * A main never sees a namespace, a mount, or any transport internals.
+   */
+  expose<NextRest, NextTrpc>(
+    surface: (peers: TransportPeers) => ExposedSurface<NextRest, NextTrpc>,
   ) {
     return new ProcessSupply<
       Modules,
@@ -428,10 +436,7 @@ export class ProcessSupply<
       RequiredPeerSet,
       InstalledPeerSet,
       InstalledPeerSetInAnyBranch
-    >({
-      ...this.#state,
-      transport: { auth: configure(new TransportAuthSupply()), openHosts },
-    });
+    >({ ...this.#state, transport: surface });
   }
 
   withService(service: RuntimeService) {
@@ -493,9 +498,14 @@ export class ProcessSupply<
         : membersFrom(legacyMemberNames(state.members)),
     };
     const transport = state.transport;
+    let exposed: ExposedSurface<Rest, Trpc> | undefined;
     const builder = transport
-      ? new ApplicationBuilder<SupplyRecord>(options).withTransports((peers) =>
-          transport.openHosts(peers, transport.auth),
+      ? new ApplicationBuilder<SupplyRecord>(options).withTransports(
+          (peers) => {
+            exposed = transport(peers);
+            return exposed.hosts;
+          },
+          () => exposed?.serve(),
         )
       : new ApplicationBuilder<SupplyRecord, Rest, Trpc>(options);
     const supplied = new Set<ModuleApiToken<unknown> | SupplyToken<unknown>>();

@@ -4,6 +4,7 @@ import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { Actor } from "@langwatch/actor";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
+import { trace } from "@opentelemetry/api";
 import type { Context, ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { resolver, type DescribeRouteOptions } from "hono-openapi";
@@ -621,25 +622,197 @@ export function createFamilyErrorHandler(options: {
 }
 
 /**
- * A canonical-envelope family's own `onError`, layered over the shared mapping. Installing
- * an `onError` REPLACES the spine's, so `mapError` is not optional — without it a family
- * that logs would stop answering canonically.
+ * The code for a refusal that only knows its status. `HttpError` carries a status and a
+ * sentence but no machine name, so without this a caller branching on `error.code` would
+ * get nothing to branch on.
+ */
+const CODE_BY_STATUS: Readonly<Record<number, string>> = {
+  400: "bad_request",
+  401: "unauthorized",
+  403: "forbidden",
+  404: "not_found",
+  409: "conflict",
+  412: "precondition_failed",
+  422: "unprocessable_entity",
+  429: "rate_limited",
+};
+
+const FALLBACK_ERROR_CODE = "internal_error";
+
+/**
+ * What a 5xx says out loud. An unexpected failure's message names Prisma models, SQL,
+ * hosts and stack fragments. None of that is API copy, and the structured trace ids
+ * carried alongside are the correlation channel that replaces it.
+ */
+const INTERNAL_ERROR_MESSAGE = "An unknown error occurred";
+
+/**
+ * One status for one code, across every family a process serves. `validation_error` is
+ * pinned to 422 since it is raised at two statuses elsewhere; `malformed_request` needs
+ * none — both raise sites agree on 400.
+ */
+const VALIDATION_ERROR_CODE = "validation_error";
+const VALIDATION_ERROR_STATUS = 422;
+
+/** One link in `meta.reasons`, in the wire's own casing. */
+export interface ApiErrorReason {
+  code: string;
+  message: string;
+  retryable: boolean;
+  meta?: Record<string, unknown>;
+}
+
+function reasonsOf(error: unknown): ApiErrorReason[] {
+  if (!HandledError.isHandled(error)) return [];
+
+  return error.serialize().reasons.map((reason) => ({
+    code: reason.code,
+    message: typeof reason.meta?.message === "string" ? reason.meta.message : reason.code,
+    retryable: reason.retryable,
+    ...(reason.meta && Object.keys(reason.meta).length > 0 ? { meta: reason.meta } : {}),
+  }));
+}
+
+/**
+ * A status-carrying REST error, recognised by its shape rather than by its class: there
+ * are two `HttpError` trees in this tree, and both answer here.
+ */
+function isStatusCarryingError(
+  error: unknown,
+): error is Error & { status: ContentfulStatusCode; error: string } {
+  return (
+    error instanceof Error &&
+    typeof (error as { status?: unknown }).status === "number" &&
+    typeof (error as { error?: unknown }).error === "string"
+  );
+}
+
+/**
+ * The canonical body and status for any thrown value. THE mapping — every canonical
+ * family answers through it, so one code can never mean two statuses across families.
+ */
+export function canonicalErrorFor(
+  error: unknown,
+  trace?: { traceId?: string; spanId?: string },
+): { status: ContentfulStatusCode; body: ApiErrorBody } {
+  const traceIds = { traceId: trace?.traceId, spanId: trace?.spanId };
+
+  if (HandledError.isHandled(error)) return handledErrorEnvelope(error, traceIds);
+
+  if (isStatusCarryingError(error)) {
+    const { status } = error;
+
+    return {
+      status,
+      body: apiErrorBody({
+        status,
+        code: CODE_BY_STATUS[status] ?? FALLBACK_ERROR_CODE,
+        message: status >= 500 ? INTERNAL_ERROR_MESSAGE : error.message,
+        ...traceIds,
+      }),
+    };
+  }
+
+  return {
+    status: 500,
+    body: apiErrorBody({
+      status: 500,
+      code: FALLBACK_ERROR_CODE,
+      message: INTERNAL_ERROR_MESSAGE,
+      ...traceIds,
+    }),
+  };
+}
+
+/**
+ * The envelope for a handled error: its own code, status, meta and reason chain below
+ * 5xx; the opaque body at 5xx. A handled message is customer-safe by construction
+ * (ADR-045), and customer-safe is not the same question as caller-actionable.
+ */
+function handledErrorEnvelope(
+  error: HandledError,
+  traceIds: { traceId?: string; spanId?: string },
+): { status: ContentfulStatusCode; body: ApiErrorBody } {
+  const isValidation = error.code === VALIDATION_ERROR_CODE;
+  const status = (
+    isValidation ? VALIDATION_ERROR_STATUS : (error.httpStatus ?? 500)
+  ) as ContentfulStatusCode;
+
+  if (status >= 500) {
+    return {
+      status,
+      body: apiErrorBody({
+        status,
+        code: FALLBACK_ERROR_CODE,
+        message: INTERNAL_ERROR_MESSAGE,
+        retryable: error.retryable,
+        ...traceIds,
+      }),
+    };
+  }
+
+  const reasons = reasonsOf(error);
+
+  return {
+    status,
+    body: apiErrorBody({
+      status,
+      code: error.code,
+      message: error.message ?? "",
+      retryable: error.retryable,
+      meta: { ...error.meta, ...(reasons.length > 0 ? { reasons } : {}) },
+      ...traceIds,
+    }),
+  };
+}
+
+/**
+ * The canonical envelope for a failure with no request context to read trace
+ * ids from — one that never reached, or escaped, a family's own `onError`. The
+ * SAME serializer, so a client cannot tell which layer failed.
+ */
+export function canonicalErrorAnswer(failure: unknown): Response {
+  const span = trace.getActiveSpan()?.spanContext();
+  const { status, body } = canonicalErrorFor(failure, {
+    ...(span && span.traceId !== INVALID_TRACE_ID ? { traceId: span.traceId } : {}),
+    ...(span && span.spanId !== INVALID_SPAN_ID ? { spanId: span.spanId } : {}),
+  });
+
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+  });
+}
+
+/** Answers `error` as the canonical envelope, with the request's own trace ids. */
+export function canonicalErrorResponse(error: unknown, c: Context): Response {
+  const { status, body } = canonicalErrorFor(error, requestTraceIds(c));
+
+  return c.json(body, status);
+}
+
+/**
+ * A canonical-envelope family's own `onError`, layered over the shared mapping. `mapError`
+ * defaults to {@link canonicalErrorFor} — the one mapping every canonical family answers
+ * through — so a family that only wants its own log line states only that.
  */
 export function createCanonicalFamilyErrorHandler(options: {
   /** e.g. `langwatch:api:webhooks:errors`. */
   loggerName: string;
   /** e.g. `Webhooks API Error`, the prefix on the logged sentence. */
   label: string;
-  /** The process's canonical mapping, with the request's trace ids folded in. */
-  mapError: (
+  /** Overrides the canonical mapping. A family almost never needs its own. */
+  mapError?: (
     error: unknown,
     c: Context<any>,
   ) => { status: ContentfulStatusCode; body: ApiErrorBody };
 }): ErrorHandler {
   const logger = createLogger(options.loggerName);
+  const mapError =
+    options.mapError ?? ((error: unknown, c: Context<any>) => canonicalErrorFor(error, requestTraceIds(c)));
 
   return async (error, c) => {
-    const { status, body } = options.mapError(error, c);
+    const { status, body } = mapError(error, c);
 
     logger.error(
       {

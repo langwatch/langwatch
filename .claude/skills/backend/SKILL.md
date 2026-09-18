@@ -29,7 +29,6 @@ await createApp({ role: "api", server })
   .withConfig(server.config.modules)
   .withStores(stores)                   // the one supply call — never per-store with*
   .withTransportAuth((a) => a.withStaticTokens({...}).withBrowserSession(session))
-  .provide({ licenseSource })            // every declared supply token, one line each
   .boot();
 await server.serve({ port: server.config.process.port, static: uiBundle() });
 ```

@@ -132,41 +132,33 @@ describe("process supply", () => {
     await Promise.all([a.stop(), b.stop()]);
   });
 
-  it("opens REST and tRPC hosts from the declared transport auth", async () => {
+  it("opens REST and tRPC hosts from the exposed surface", async () => {
     const runtime = await createApp({ role: "api" })
       .withModules([transportedClockModule])
       .withClock(clock)
-      .withTransportAuth(
-        (auth) => auth.withStaticTokens({ cronBearerToken: "cron-secret" }),
-        (peers, auth) => {
-          const clockApi = peers.app(ClockApp.contract);
+      .expose((peers) => {
+        const clockApi = peers.app(ClockApp.contract);
 
-          return {
+        return {
+          hosts: {
             rest: {
-              mount: () => ({
-                protocol: "rest" as const,
-                cron: auth.staticTokens.cronBearerToken,
-                now: clockApi.now(),
-              }),
+              mount: () => ({ protocol: "rest" as const, now: clockApi.now() }),
             },
             trpc: {
-              mount: () => ({
-                protocol: "trpc" as const,
-                cron: auth.staticTokens.cronBearerToken,
-                now: clockApi.now(),
-              }),
+              mount: () => ({ protocol: "trpc" as const, now: clockApi.now() }),
             },
-          };
-        },
-      )
+          },
+          serve: () => "served",
+        };
+      })
       .boot();
 
-    expect(runtime.transports.rest).toEqual([
-      { protocol: "rest", cron: "cron-secret", now: "frozen" },
-    ]);
+    expect(runtime.transports.rest).toEqual([{ protocol: "rest", now: "frozen" }]);
     expect(runtime.transports.trpc).toEqual({
-      clock: { protocol: "trpc", cron: "cron-secret", now: "frozen" },
+      clock: { protocol: "trpc", now: "frozen" },
     });
+    // Composed at the one moment it can be: after every declaration mounted.
+    expect(runtime.handler).toBe("served");
     await runtime.stop();
   });
 

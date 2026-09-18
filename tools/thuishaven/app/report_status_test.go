@@ -77,7 +77,7 @@ func TestStatusJSONSeparatesNoStackFromADeadStack(t *testing.T) {
 			o := statusOrch(&fakeStore{}, &fakeSystem{})
 
 			out := captureStdout(t, func() {
-				if err := o.Status(true, ""); err != nil {
+				if err := o.Status(true, "", false); err != nil {
 					t.Fatalf("status: %v", err)
 				}
 			})
@@ -94,7 +94,7 @@ func TestStatusJSONSeparatesNoStackFromADeadStack(t *testing.T) {
 			o := statusOrch(store, &fakeSystem{alive: map[int]bool{42: false}})
 
 			out := captureStdout(t, func() {
-				if err := o.Status(true, ""); err != nil {
+				if err := o.Status(true, "", false); err != nil {
 					t.Fatalf("status: %v", err)
 				}
 			})
@@ -120,7 +120,7 @@ func TestStatusJSONSeparatesNoStackFromADeadStack(t *testing.T) {
 			o := statusOrch(store, sys)
 
 			out := captureStdout(t, func() {
-				if err := o.Status(true, ""); err != nil {
+				if err := o.Status(true, "", false); err != nil {
 					t.Fatalf("status: %v", err)
 				}
 			})
@@ -128,6 +128,69 @@ func TestStatusJSONSeparatesNoStackFromADeadStack(t *testing.T) {
 			st := (*decodeStatus(t, out).Stacks)[0]
 			if !st.Live || len(st.Services) != 1 || !st.Services[0].Listening {
 				t.Errorf("stack = %+v, want it live with app listening", st)
+			}
+		})
+	})
+}
+
+// overlayStatusJSON is the shape a script reads for this worktree's overlay.
+type overlayStatusJSON struct {
+	Overlay map[string]string `json:"overlay"`
+}
+
+func decodeOverlayStatus(t *testing.T, out string) overlayStatusJSON {
+	t.Helper()
+	var got overlayStatusJSON
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("status --json is not valid JSON: %v\n%s", err, out)
+	}
+	return got
+}
+
+// The regression: `haven status --json` never called the masking helper at
+// all, so the seeded admin password, the local access tokens and any
+// connection string with a password in it printed in clear — worse than the
+// degraded-but-still-masking fallback `haven env` had.
+// @scenario "Status masks this worktree's overlay credentials by default"
+func TestStatusJSONMasksTheOverlayByDefault(t *testing.T) {
+	t.Run("given the caller's own worktree has a stack", func(t *testing.T) {
+		t.Run("when status runs as JSON with no --reveal, credentials are masked", func(t *testing.T) {
+			st := droppedStack(42)
+			store := &fakeStore{stacks: []domain.Stack{st}}
+			o := statusOrch(store, &fakeSystem{alive: map[int]bool{42: true}})
+
+			out := captureStdout(t, func() {
+				if err := o.Status(true, st.WorktreeDir, false); err != nil {
+					t.Fatalf("status: %v", err)
+				}
+			})
+
+			got := decodeOverlayStatus(t, out)
+			if got.Overlay["LANGWATCH_ADMIN_PASSWORD"] != domain.MaskedSecret {
+				t.Errorf("overlay.LANGWATCH_ADMIN_PASSWORD = %q, want it masked",
+					got.Overlay["LANGWATCH_ADMIN_PASSWORD"])
+			}
+			if got.Overlay["LANGWATCH_SLUG"] != "feat-x" {
+				t.Errorf("overlay.LANGWATCH_SLUG = %q, want the plain deployment fact untouched",
+					got.Overlay["LANGWATCH_SLUG"])
+			}
+		})
+
+		t.Run("when status runs as JSON with --reveal, credentials print in clear", func(t *testing.T) {
+			st := droppedStack(42)
+			store := &fakeStore{stacks: []domain.Stack{st}}
+			o := statusOrch(store, &fakeSystem{alive: map[int]bool{42: true}})
+
+			out := captureStdout(t, func() {
+				if err := o.Status(true, st.WorktreeDir, true); err != nil {
+					t.Fatalf("status: %v", err)
+				}
+			})
+
+			got := decodeOverlayStatus(t, out)
+			if got.Overlay["LANGWATCH_ADMIN_PASSWORD"] != domain.DefaultAdminPassword {
+				t.Errorf("overlay.LANGWATCH_ADMIN_PASSWORD = %q, want the real seeded value under --reveal",
+					got.Overlay["LANGWATCH_ADMIN_PASSWORD"])
 			}
 		})
 	})

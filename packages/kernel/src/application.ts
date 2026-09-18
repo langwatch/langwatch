@@ -1,3 +1,5 @@
+import type { ScopedSecrets, SecretHandle } from "@langwatch/secrets";
+
 import {
   DependencyCycleError,
   DuplicateFeatureError,
@@ -20,6 +22,7 @@ import type {
   FeatureProvider,
   ModuleConfigGuard,
   ModuleConfigRecord,
+  ModuleSecretsScope,
   ServerFeatureDeclaration,
   ServerRole,
 } from "./feature-installer.ts";
@@ -87,6 +90,12 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     services: readonly RuntimeService[],
     /** Which feature declared each contribution, so a bad one can be named. */
     private readonly declaredBy: ReadonlyMap<unknown, string> = new Map(),
+    /**
+     * What this process serves: ONE composed handler, built by the surface the
+     * chain exposed once everything mounted. Absent in every role that serves
+     * no requests, and absent in a test, which passes no server.
+     */
+    readonly handler: unknown = void 0,
   ) {
     this.lifecycle = new RuntimeLifecycle(services, scope);
   }
@@ -204,7 +213,9 @@ interface DeclaredFeature {
   readonly requiredMembers: readonly string[];
   /** Repository tier: live or memory (withMemoryRepositories). */
   readonly tier: Tier;
-  readonly install: (args: FeatureInstallArguments<unknown>) => InstalledFeatureState;
+  /** The handles this module declared, for the root to scope its resolver to. */
+  readonly secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+  readonly install: (args: FeatureInstallArguments<unknown>) => Promise<InstalledFeatureState>;
 }
 
 /** One instance the process itself answers for, by the token that names it. */
@@ -220,6 +231,12 @@ interface BuilderState<Rest, Trpc> {
   /** Peers the process hands in itself, rather than by installing their module. */
   readonly provisions: ProcessProvision[];
   hosts: TransportHostSource<Rest, Trpc>;
+  /**
+   * What this process serves, once every declared transport has mounted. Called
+   * at the one moment it can be: the whole surface exists and nothing is
+   * listening yet.
+   */
+  serve?: (() => unknown) | undefined;
 }
 
 /** Factory to build doors after all modules install (needed when doors read modules). */
@@ -242,6 +259,12 @@ export interface ApplicationOptions<
   readonly config?: Config;
   /** Member sources; omitted means no client, module refusing by name. */
   readonly members?: MemberSource<Members>;
+  /**
+   * Scopes the process's resolver to one module's own declared handles (§6).
+   * A process that states no secrets chain omits it, and a module resolving
+   * one anyway is refused by name rather than reading an undeclared secret.
+   */
+  readonly secrets?: ModuleSecretsScope;
 }
 
 /** An application with its members named, collecting declarations. */
@@ -255,12 +278,14 @@ export class ApplicationBuilder<
   private readonly role: ServerRole;
   private readonly config: Readonly<Record<string, unknown>>;
   private readonly source: MemberSource<Members>;
+  private readonly secrets: ModuleSecretsScope | undefined;
   readonly name: string;
 
   constructor(options: ApplicationOptions<Members, Config>, state?: BuilderState<Rest, Trpc>) {
     this.role = options.role;
     this.config = options.config ?? {};
     this.source = options.members ?? noMembers<Members>();
+    this.secrets = options.secrets;
     this.name = options.role;
     this.state = state ?? { features: [], services: [], provisions: [], hosts: {} };
   }
@@ -271,10 +296,16 @@ export class ApplicationBuilder<
    */
   withTransports<NextRest, NextTrpc>(
     hosts: TransportHostSource<NextRest, NextTrpc>,
+    serve?: () => unknown,
   ): ApplicationBuilder<Members, NextRest, NextTrpc, Config> {
     return new ApplicationBuilder<Members, NextRest, NextTrpc, Config>(
-      { role: this.role, config: this.config as Config, members: this.source },
-      { ...this.state, hosts },
+      {
+        role: this.role,
+        config: this.config as Config,
+        members: this.source,
+        ...(this.secrets ? { secrets: this.secrets } : {}),
+      },
+      { ...this.state, hosts, serve },
     );
   }
 
@@ -316,6 +347,13 @@ export class ApplicationBuilder<
     }
     this.state.provisions.push({ token, instance });
     return this;
+  }
+
+  /** Exactly this module's own handles: a peer's are not reachable by name. */
+  private secretsFor(declaration: DeclaredFeature): { secrets?: ScopedSecrets } {
+    if (!this.secrets) return {};
+
+    return { secrets: this.secrets(declaration.name, Object.values(declaration.secrets ?? {})) };
   }
 
   /** Something the runtime starts and stops around the feature graph. */
@@ -386,13 +424,15 @@ export class ApplicationBuilder<
     const declared: DeclaredTransports[] = [];
     this.allocateApiClients(apis, providerOf, provided);
     let transports: MountedTransports<Rest, Trpc> = { rest: [], trpc: {} };
+    let handler: unknown;
     try {
       for (const declaration of order) {
         const resources = new ResourceScope();
         scope.own(declaration.name, () => resources.close());
-        const state = declaration.install({
+        const state = await declaration.install({
           resources,
           config: config[declaration.name],
+          ...this.secretsFor(declaration),
           // Each module is handed the members it declared and nothing else, so
           // one that never named a client cannot reach for one.
           members: membersFor(members, declaration.requiredMembers) as Members,
@@ -424,6 +464,8 @@ export class ApplicationBuilder<
         if (hosts.rest !== void 0 || hosts.trpc !== void 0) {
           transports = mountDeclaredTransports({ declared, hosts });
         }
+        // A bundle-only API still serves even when neither protocol has declarations.
+        handler = this.state.serve?.();
       }
     } catch (error) {
       apis.close();
@@ -443,6 +485,7 @@ export class ApplicationBuilder<
       scope,
       [...featureServices, ...this.state.services],
       contributions.declaredBy,
+      handler,
     );
   }
 

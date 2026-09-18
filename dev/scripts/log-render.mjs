@@ -172,7 +172,83 @@ export function parse(line) {
     .toSorted()
     .map((key) => ({ key, value: renderValue(raw[key]) }));
 
-  return { at, level, message: message ?? "", stack: stack ?? "", fields };
+  return readErrorOnce({ at, level, message: message ?? "", stack: stack ?? "", fields });
+}
+
+/**
+ * Makes a failure record say its error once. Such a record commonly carries the
+ * same text three times - as the message, as a serialised error, and as the
+ * stack's opening - so each copy is reduced to what it alone adds: the error's
+ * type, and the frames.
+ */
+function readErrorOnce(record) {
+  record.fields = compactRepeatedError(record.fields, record.message);
+  const { type, frames, trimmed } = trimRepeatedStackHeader(record.stack, record.message);
+  if (!trimmed) return record;
+  record.stack = frames;
+  // "Error" names nothing a reader did not already know.
+  if (type && type !== "Error" && !record.fields.some((field) => field.key === "error")) {
+    record.fields = [...record.fields, { key: "error", value: type }].toSorted((a, b) =>
+      a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
+    );
+  }
+  return record;
+}
+
+/** Collapses every run of whitespace, so two copies indented differently match. */
+const normalizeSpace = (text) => text.split(/\s+/).filter(Boolean).join(" ");
+
+/**
+ * Shortens a serialised error whose message the record already reads out. What
+ * the copy alone adds is the error's type and code, so that is what is kept.
+ */
+function compactRepeatedError(fields, message) {
+  return fields.map((field) => {
+    if (field.key !== "error") return field;
+    let error;
+    try {
+      error = JSON.parse(field.value);
+    } catch {
+      return field;
+    }
+    // A suffix, not an equal: a process failure composes its message as
+    // "<what was happening>: <the error's own message>".
+    if (!error?.message || !normalizeSpace(message).endsWith(normalizeSpace(error.message))) {
+      return field;
+    }
+    const kept = [error.type, error.code].filter(Boolean);
+    return kept.length === 0 ? field : { key: field.key, value: kept.join(" ") };
+  });
+}
+
+/**
+ * Separates a stack's opening from its frames when the message has already read
+ * that opening out. A Node stack begins "<Type>: <message>" before its frames,
+ * so a record carrying both says the same thing twice.
+ */
+function trimRepeatedStackHeader(stack, message) {
+  const kept = { type: "", frames: stack, trimmed: false };
+  if (!stack || !message) return kept;
+  const lines = stack.replace(/\n+$/, "").split("\n");
+  const first = lines.findIndex((line) => line.trimStart().startsWith("at "));
+  if (first <= 0) return kept;
+  const header = lines.slice(0, first).join("\n");
+  const at = header.indexOf(": ");
+  const type = at === -1 ? "" : header.slice(0, at).trim();
+  const body = at === -1 ? header : header.slice(at + 2);
+  if (!normalizeSpace(message).includes(normalizeSpace(body))) return kept;
+  return { type, frames: lines.slice(first).join("\n"), trimmed: true };
+}
+
+/**
+ * Puts a message's own newlines under the column its first line starts at. A
+ * record carrying an embedded block otherwise breaks the fixed columns at its
+ * first newline and everything after it reads at the margin.
+ */
+function insetMessage(message) {
+  return message.includes("\n")
+    ? message.replace(/\n+$/, "").replaceAll("\n", `\n${STACK_INDENT}`)
+    : message;
 }
 
 /**
@@ -213,7 +289,7 @@ export function render(line, { lane = "", laneColor = "", at, color = false } = 
 
   let out =
     columns(paint(pad(record.level, LEVEL_WIDTH), levelColor(record.level), color)) +
-    `  ${record.message}`;
+    `  ${insetMessage(record.message)}`;
   for (const field of record.fields) {
     out += `  ${paint(`${field.key}=`, SGR_DIM, color)}${field.value}`;
   }

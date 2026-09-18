@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
@@ -22,12 +21,18 @@ func (m *viewerModel) serviceRow(i int, svc app.SessionServiceStatus) string {
 	}
 	name := svc.Name
 	tag := ""
-	if svc.Fallback {
+	switch {
+	case svc.Fallback:
 		tag = " \x1b[2m(shared)\x1b[0m"
-	} else if !svc.Restartable {
+	case svc.Shared:
+		tag = " \x1b[2m(machine-wide)\x1b[0m"
+	case !svc.Restartable:
 		tag = " \x1b[2m(managed)\x1b[0m"
 	}
 	dest := svc.URL
+	if dest == "" {
+		dest = svc.Detail
+	}
 	if dest == "" && svc.Port != 0 {
 		dest = fmt.Sprintf(":%d", svc.Port)
 	}
@@ -36,21 +41,4 @@ func (m *viewerModel) serviceRow(i int, svc app.SessionServiceStatus) string {
 		return selectedLine("›"+row, m.width)
 	}
 	return " " + row
-}
-
-// serversLine renders the shared machinery as compact dot+name pills on one
-// line - the proxy, the daemon, and whichever database servers this stack uses.
-func (m *viewerModel) serversLine() string {
-	parts := make([]string, 0, len(m.snap.Servers))
-	for _, s := range m.snap.Servers {
-		dot := "\x1b[31m○\x1b[0m"
-		if s.Up {
-			dot = "\x1b[32m●\x1b[0m"
-		}
-		parts = append(parts, fmt.Sprintf("%s %s", dot, s.Name))
-	}
-	if len(parts) == 0 {
-		return "\x1b[2mnone\x1b[0m"
-	}
-	return strings.Join(parts, "   ")
 }

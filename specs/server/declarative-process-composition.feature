@@ -128,3 +128,16 @@ Feature: Composing a process declaratively
     Given a module whose withTasks call received a value that is not a task
     When a process with the "tasks" role boots and is asked for its tasks
     Then it refuses, naming the module that declared it
+
+  @unit
+  Scenario: A bundle-only API builds a handler without running worker contributions
+    Given installed modules with worker contributions and a selected browser bundle
+    When the API boots with producing pipelines
+    Then it builds its HTTP handler without constructing worker contributions
+
+  @unit
+  Scenario: Worker services start after boot and drain before their module closes
+    Given a worker with consuming pipelines and a module-owned service
+    When the worker boots and its runtime starts
+    Then the service starts after boot
+    And shutdown drains the service before releasing its module

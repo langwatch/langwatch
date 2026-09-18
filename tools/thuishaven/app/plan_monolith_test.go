@@ -52,7 +52,7 @@ func TestMonolithPlansOneNodeLane(t *testing.T) {
 			if app.Dir != repo {
 				t.Errorf("app lane runs in %q, want the workspace root %q", app.Dir, repo)
 			}
-			for _, gone := range []string{"ui", BackendLane} {
+			for _, gone := range []string{"ui", APILane} {
 				if _, found := findChild(children, gone); found {
 					t.Errorf("a %q lane was planned; that package does not exist in this checkout", gone)
 				}
@@ -245,7 +245,7 @@ func TestStatusJSONReportsTheMonolithLayoutAndItsLane(t *testing.T) {
 			o := statusOrch(store, sys)
 
 			out := captureStdout(t, func() {
-				if err := o.Status(true, ""); err != nil {
+				if err := o.Status(true, "", false); err != nil {
 					t.Fatalf("status: %v", err)
 				}
 			})

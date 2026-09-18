@@ -29,8 +29,8 @@ func TestWorkersIsNoLongerSelectable(t *testing.T) {
 		if err == nil {
 			t.Fatalf("%s was accepted; the workers lane always runs", delta)
 		}
-		if !strings.Contains(err.Error(), "backend lane") {
-			t.Errorf("%s error = %q, want it to say the worker runs in the backend lane", delta, err)
+		if !strings.Contains(err.Error(), "api lane") {
+			t.Errorf("%s error = %q, want it to say the worker runs in the api lane", delta, err)
 		}
 	}
 }
@@ -95,7 +95,7 @@ func TestSelectionFromStack(t *testing.T) {
 // @scenario "Status shows the selection"
 func TestDescribeNamesTheDeltas(t *testing.T) {
 	got := DefaultSelection().Describe()
-	for _, on := range []string{"ui", "backend", "gateway", "nlp"} {
+	for _, on := range []string{"ui", "api", "gateway", "nlp"} {
 		if !strings.Contains(got, on) {
 			t.Errorf("Describe() = %q, want the selected service %q named", got, on)
 		}

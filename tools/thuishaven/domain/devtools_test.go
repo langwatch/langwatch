@@ -217,7 +217,7 @@ func TestDeveloperToolsAreNotNodeLanes(t *testing.T) {
 			t.Errorf("%q is a developer tool, not a Node lane", l.Name)
 		}
 	}
-	if strings.Join(names, ",") != "ui,backend" {
-		t.Errorf("Lanes() = %v, want ui, backend", names)
+	if strings.Join(names, ",") != "ui,api" {
+		t.Errorf("Lanes() = %v, want ui, api", names)
 	}
 }

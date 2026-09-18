@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "types": ["node"],
     "rootDir": "src",
     "noEmit": true,
     // `./views` is the one entry here that renders: the presentation

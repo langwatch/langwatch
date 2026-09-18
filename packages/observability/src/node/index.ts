@@ -23,13 +23,30 @@ export {
   type OtlpMetricsTelemetryInputs,
 } from "./otlp-metrics.ts";
 export {
+  PROMETHEUS_CONTENT_TYPE,
   prometheusMetrics,
   type PrometheusExposition,
   type PrometheusMetricsOptions,
 } from "./prometheus-metrics-door.ts";
+export { PrometheusPullReader, renderExposition } from "./prometheus-exposition.ts";
+export { otlpSpanProcessors, tracesSampler, type OtlpTraceExportOptions } from "./otlp-traces.ts";
+export {
+  metricsScrapeTokenSecret,
+  otlpHeadersFrom,
+  otlpHeadersSecret,
+  resourceAttributesFrom,
+  type MetricsMode,
+  type TelemetryContext,
+  type TelemetrySecret,
+  type TelemetrySecrets,
+  type TelemetrySettings,
+} from "./telemetry-settings.ts";
+export { processMetrics } from "./process-metrics.ts";
 
 // Every method of a service, wrapped in a span named `ClassName.methodName`,
 // applied once at factory time so the service's own methods stay clean.
 // Lives on the NODE entry, not the package root: it evaluates OpenTelemetry
 // at import, and the root is asserted to load in a browser bundle without it.
 export { traced } from "../trace/traced.ts";
+
+export { processTelemetry } from "./process-telemetry.ts";

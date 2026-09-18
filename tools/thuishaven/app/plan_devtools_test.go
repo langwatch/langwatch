@@ -107,7 +107,7 @@ func TestDeveloperToolsDoNotDisturbTheThreeNodeLanes(t *testing.T) {
 	sel.DesignSystem, sel.MailRoom = true, true
 	children := devToolsPlan(t, sel)
 
-	for lane, pkg := range map[string]string{"ui": UIPackage, BackendLane: BackendPackage} {
+	for lane, pkg := range map[string]string{"ui": UIPackage, APILane: BackendPackage} {
 		child, ok := findChild(children, lane)
 		if !ok {
 			t.Fatalf("no %q lane was planned; every stack runs both", lane)

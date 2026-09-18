@@ -6,10 +6,10 @@ import { Config, parseProcessConfig } from "../config.ts";
 
 const github = {
   name: "github",
-  config: {
-    appId: Config.env("GITHUB_APP_ID", z.string().optional()),
-    apiUrl: Config.env("GITHUB_API_URL", z.string().url().default("https://api.github.com")),
-  },
+  config: Config.define((c) => ({
+    appId: c.env("GITHUB_APP_ID", z.string().optional()),
+    apiUrl: c.env("GITHUB_API_URL", z.string().url().default("https://api.github.com")),
+  })),
 } as const;
 
 describe("parseProcessConfig", () => {
@@ -26,10 +26,10 @@ describe("parseProcessConfig", () => {
   it("refuses naming owner.path and the env var, every miss at once", () => {
     const strict = {
       name: "strict",
-      config: {
-        one: Config.env("STRICT_ONE", z.string()),
-        nested: { two: Config.env("STRICT_TWO", z.string()) },
-      },
+      config: Config.define((c) => ({
+        one: c.env("STRICT_ONE", z.string()),
+        nested: { two: c.env("STRICT_TWO", z.string()) },
+      })),
     } as const;
 
     const refusalsOf = (run: () => unknown): readonly string[] => {
@@ -46,17 +46,19 @@ describe("parseProcessConfig", () => {
     expect(refusals.some((line) => line.startsWith("strict.nested.two ← STRICT_TWO"))).toBe(true);
   });
 
-  it("accepts one shared leaf under many owners, refuses two meanings for one var", () => {
-    const baseHost = Config.env("BASE_HOST", z.string().optional());
-    const a = { name: "a", config: { host: baseHost } } as const;
-    const b = { name: "b", config: { host: baseHost } } as const;
+  it("refuses two owners claiming one variable, however they spell it", () => {
+    const a = {
+      name: "a",
+      config: Config.define((c) => ({ host: c.env("BASE_HOST", z.string().optional()) })),
+    } as const;
+    const b = {
+      name: "b",
+      config: Config.define((c) => ({ host: c.env("BASE_HOST", z.string().optional()) })),
+    } as const;
 
-    const config = parseProcessConfig({ owners: [a, b], environment: { BASE_HOST: "x.test" } });
-    expect(config.a.host).toBe("x.test");
-    expect(config.b.host).toBe("x.test");
-
-    const rival = { name: "c", config: { host: Config.env("BASE_HOST", z.string()) } } as const;
-    expect(() => parseProcessConfig({ owners: [a, rival], environment: {} })).toThrowError(
+    // One variable carries one meaning. The owner that declares it passes the
+    // parsed value down; a second declaration is a second meaning, not sharing.
+    expect(() => parseProcessConfig({ owners: [a, b], environment: {} })).toThrowError(
       ConfigCollisionError,
     );
   });
@@ -73,7 +75,7 @@ describe("parseProcessConfig", () => {
   });
 });
 
-describe("the wall between config and secrets", () => {
+describe("config and secrets stay separate", () => {
   it("refuses a config leaf claiming an env name any owner declared as a secret", () => {
     const security = {
       name: "security",
@@ -81,7 +83,7 @@ describe("the wall between config and secrets", () => {
     } as const;
     const sneaky = {
       name: "sneaky",
-      config: { key: Config.env("SIGNING_KEY", z.string().optional()) },
+      config: Config.define((c) => ({ key: c.env("SIGNING_KEY", z.string().optional()) })),
     } as const;
 
     expect(() => parseProcessConfig({ owners: [security, sneaky], environment: {} })).toThrowError(

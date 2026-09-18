@@ -34,6 +34,14 @@
       "types": "./dist/rest/index.d.ts",
       "default": "./src/rest/index.ts"
     },
+    "./hosting": {
+      "types": "./dist/hosting/index.d.ts",
+      "default": "./src/hosting/index.ts"
+    },
+    "./policy": {
+      "types": "./dist/policy/index.d.ts",
+      "default": "./src/policy/index.ts"
+    },
     "./trpc": {
       "types": "./dist/trpc/index.d.ts",
       "default": "./src/trpc/index.ts"
@@ -45,6 +53,14 @@
     "./web": {
       "types": "./dist/web/index.d.ts",
       "default": "./src/web/index.ts"
+    },
+    "./hosting/selection": {
+      "types": "./dist/hosting/transport-selection.d.ts",
+      "default": "./src/hosting/transport-selection.ts"
+    },
+    "./hosting/mux": {
+      "types": "./dist/hosting/http-mux.d.ts",
+      "default": "./src/hosting/http-mux.ts"
     }
   },
   "scripts": {
@@ -52,11 +68,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hono/node-server": "catalog:",
     "@langwatch/actor": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/observability": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@standard-schema/spec": "^1.1.0",
@@ -71,7 +88,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@hono/node-server": "catalog:",
+    "@langwatch/test-harness": "workspace:*",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@opentelemetry/sdk-trace-web": "catalog:",

@@ -6,6 +6,7 @@ import {
   ValidationError,
   type ZodLikeError,
 } from "@langwatch/handled-error";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -361,3 +362,228 @@ export function createErrorHandler(): (err: Error, c: Context) => Response | Pro
 }
 
 export { formatError, isTrustedHandledError, SchemaFailure, validationErrorFromZod };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// What a surface answers a credential it will not accept. One class per code,
+// because the code is what a caller branches on. The sentences are part of the
+// wire, not decoration: an SDK's own error copy quotes them.
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * The sentence an unauthenticated caller of a project family receives. It names
+ * all three accepted credential shapes because that is what it has always named.
+ */
+export const MISSING_PROJECT_CREDENTIAL_MESSAGE =
+  "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
+
+export const INVALID_PROJECT_CREDENTIAL_MESSAGE = "Invalid auth token.";
+
+/** No credential at all reached a project surface. */
+export class ProjectMissingCredentialsError extends HandledError {
+  declare readonly code: "missing_credentials";
+
+  constructor() {
+    super("missing_credentials", MISSING_PROJECT_CREDENTIAL_MESSAGE, {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "ProjectMissingCredentialsError";
+  }
+}
+
+/** The token reached a project surface and stands for nothing this deployment knows. */
+export class ProjectInvalidCredentialsError extends HandledError {
+  declare readonly code: "invalid_credentials";
+
+  constructor() {
+    super("invalid_credentials", INVALID_PROJECT_CREDENTIAL_MESSAGE, {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "ProjectInvalidCredentialsError";
+  }
+}
+
+/** No credential at all reached an organization surface. */
+export class OrganizationMissingCredentialsError extends HandledError {
+  declare readonly code: "missing_credentials";
+
+  constructor() {
+    super("missing_credentials", "Authentication required. Use Authorization: Bearer <api-key>.", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "OrganizationMissingCredentialsError";
+  }
+}
+
+/** A PROJECT key was presented at an organization surface: a different mistake. */
+export class OrganizationCredentialClassMismatchError extends HandledError {
+  declare readonly code: "credential_class_mismatch";
+
+  constructor() {
+    super(
+      "credential_class_mismatch",
+      "This endpoint requires an organization API key, and a project key was presented.",
+      { httpStatus: 401, fault: "customer" },
+    );
+    this.name = "OrganizationCredentialClassMismatchError";
+  }
+}
+
+/** The token reached the surface and stands for nothing this deployment knows. */
+export class OrganizationInvalidCredentialsError extends HandledError {
+  declare readonly code: "invalid_credentials";
+
+  constructor() {
+    super("invalid_credentials", "Invalid credentials.", { httpStatus: 401, fault: "customer" });
+    this.name = "OrganizationInvalidCredentialsError";
+  }
+}
+
+/**
+ * The credential resolved, and the tenant behind it is gone. Answered as a 401
+ * rather than a 404: which organizations exist is not something an unaccepted
+ * credential gets to learn.
+ */
+export class OrganizationNotFoundForCredentialError extends HandledError {
+  declare readonly code: "organization_not_found";
+
+  constructor() {
+    super("organization_not_found", "Organization not found", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "OrganizationNotFoundForCredentialError";
+  }
+}
+
+/** The lookup behind the surface broke. The caller learns nothing of the cause. */
+export class OrganizationAuthenticationUnavailableError extends HandledError {
+  declare readonly code: "internal_error";
+
+  constructor() {
+    super("internal_error", "Authentication service error", {
+      httpStatus: 500,
+      fault: "platform",
+    });
+    this.name = "OrganizationAuthenticationUnavailableError";
+  }
+}
+
+/** The credential is accepted and does not hold what the route asked for. */
+export class OrganizationPermissionError extends HandledError {
+  constructor(permission: AuthzPermission) {
+    super("insufficient_permissions", `Insufficient permissions. Required: ${permission}`, {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "OrganizationPermissionError";
+  }
+}
+
+/**
+ * A surface this deployment opened with no verifier behind it, or a credential
+ * it refused. It fails CLOSED: the request is refused, and the refusal names
+ * the surface rather than letting an unverified caller through.
+ */
+export class SurfaceUnverifiedError extends HandledError {
+  constructor(surface: string) {
+    super("unauthorized", "Authentication required", {
+      httpStatus: 401,
+      fault: "customer",
+      meta: { surface },
+    });
+    this.name = "SurfaceUnverifiedError";
+  }
+}
+
+/** The route is served and this deployment composed nothing behind it. */
+export class SurfaceCapabilityUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `This deployment has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "SurfaceCapabilityUnavailableError";
+  }
+}
+
+/**
+ * A bearer whose secret this deployment did not configure. 404 rather than 401:
+ * whether this deployment holds a given secret is not something a caller
+ * presenting the wrong one gets to learn.
+ */
+export class SurfaceUnconfiguredError extends HandledError {
+  constructor(surface: string) {
+    super("not_found", "Not found", { httpStatus: 404, fault: "customer", meta: { surface } });
+    this.name = "SurfaceUnconfiguredError";
+  }
+}
+
+/**
+ * A bearer whose secret this deployment named and left blank: not an absent
+ * one, which the 404 above is for, but a mis-set key, said out loud.
+ */
+export class SurfaceBlankSecretError extends HandledError {
+  declare readonly code: "internal_error";
+
+  constructor(surface: string) {
+    super("internal_error", "This deployment is misconfigured.", {
+      httpStatus: 500,
+      fault: "platform",
+      meta: { surface },
+    });
+    this.name = "SurfaceBlankSecretError";
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The subscription lane's own refusals. All three are the same claim from three
+// angles: the lane streams SUBSCRIPTIONS opened by this application's own
+// pages, and nothing else.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The composed router carries no procedure at the requested path. */
+export class LiveStreamNotFoundError extends HandledError {
+  declare readonly code: "live_stream_not_found";
+
+  constructor() {
+    super("live_stream_not_found", "No live update channel is served at that path.", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "LiveStreamNotFoundError";
+  }
+}
+
+/**
+ * The path names a real procedure, but a query or a mutation.
+ */
+export class LiveStreamUnsupportedProcedureError extends HandledError {
+  declare readonly code: "live_stream_unsupported_procedure";
+
+  constructor() {
+    super(
+      "live_stream_unsupported_procedure",
+      "Only subscriptions are served on the live update channel; call this procedure over the tRPC endpoint instead.",
+      { httpStatus: 405, fault: "customer" },
+    );
+    this.name = "LiveStreamUnsupportedProcedureError";
+  }
+}
+
+/** The request did not originate from this application's own origin. */
+export class LiveStreamCrossSiteBlockedError extends HandledError {
+  declare readonly code: "live_stream_cross_site_blocked";
+
+  constructor() {
+    super(
+      "live_stream_cross_site_blocked",
+      "A live update channel can only be opened from this application's own pages.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "LiveStreamCrossSiteBlockedError";
+  }
+}

@@ -78,6 +78,7 @@ import {
   type RestRawAnswer,
   type RestRawBody,
   type RestTransportMiddlewareBinding,
+  type RestTransportMiddleware,
 } from "./request.ts";
 import { isProducedAnswer, producedKind, producerFor, type RestEvent } from "./response-kind.ts";
 import { DECLARED_ANSWER, ENDPOINT_ROUTE, isDeclined, REQUEST_FAMILY } from "./response.ts";
@@ -92,6 +93,7 @@ const outputLogger = createLogger("langwatch:api:output-validation");
 const ROUTE_PARAMS = "routeParams" as const;
 const VERSION_REQUEST = "apiVersionRequest" as const;
 const ROUTE_INPUT = "endpointInput" as const;
+const ROUTE_HEADER_FACTS = "endpointHeaderFacts" as const;
 const ROUTE_RAW_BODY = "endpointRawBody" as const;
 const ROUTE_FORM_FIELDS = "endpointFormFields" as const;
 const ROUTE_FILES = "endpointFiles" as const;
@@ -122,7 +124,10 @@ export type RestIdentity = Readonly<{
    * carrying an `anyAuthenticated` route needs it, and a mount that supplies
    * none is refused by name.
    */
-  identify?(input: { request: Request }): Promise<RestCaller> | RestCaller;
+  identify?(input: {
+    request: Request;
+    rawBody?: string | Uint8Array;
+  }): Promise<RestCaller> | RestCaller;
   /**
    * The same door, opened for a caller who may have presented nothing: it
    * answers `null` for a request carrying no credential at all, and refuses
@@ -235,6 +240,56 @@ export interface RestRuntime {
 const HOST_ENFORCED = "project credential and permission enforced by the transport host";
 
 /** Builds one process's REST path. */
+function mountFamilyRoutes<Api>({
+  app,
+  basePath,
+  declaration,
+  ports,
+  options,
+  facts,
+  credential,
+}: {
+  app: HonoApp;
+  basePath: string;
+  declaration: RestTransportDeclaration<Api>;
+  ports: RestRuntimeMembers;
+  options: RestMountOptions<Api>;
+  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  credential: Credential;
+}): Map<string, Set<HttpMethod>> {
+  const served = new Map<string, Set<HttpMethod>>();
+
+  for (const route of declaration.routes) {
+    for (const mount of addressesOf({ route, declaration })) {
+      mountRoute({
+        app,
+        basePath,
+        route,
+        path: mount.path,
+        v1Twin: declaration.v1Twin,
+        stack: routeStack({
+          route,
+          declaration,
+          ports,
+          options,
+          facts,
+          ...mount.context,
+        }),
+        policy: registryPolicy({ route, options, credential }),
+        credentialClass:
+          route.access?.kind === "public"
+            ? "none"
+            : CREDENTIAL_CLASS[routeCredential(route, credential)],
+        credential: route.access?.kind === "public" ? "public" : routeCredential(route, credential),
+        family: declaration.namespace,
+        served,
+      });
+    }
+  }
+
+  return served;
+}
+
 export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
   return {
     mount: (declaration, options) => {
@@ -255,36 +310,15 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
         for (const scope of scopes) app.use(scope, middleware);
       }
 
-      const served = new Map<string, Set<HttpMethod>>();
-
-      for (const route of declaration.routes) {
-        for (const mount of addressesOf({ route, declaration })) {
-          mountRoute({
-            app,
-            basePath,
-            route,
-            path: mount.path,
-            v1Twin: declaration.v1Twin,
-            stack: routeStack({
-              route,
-              declaration,
-              ports,
-              options,
-              facts,
-              ...mount.context,
-            }),
-            policy: registryPolicy({ route, options, credential }),
-            credentialClass:
-              route.access?.kind === "public"
-                ? "none"
-                : CREDENTIAL_CLASS[routeCredential(route, credential)],
-            credential:
-              route.access?.kind === "public" ? "public" : routeCredential(route, credential),
-            family: declaration.namespace,
-            served,
-          });
-        }
-      }
+      const served = mountFamilyRoutes({
+        app,
+        basePath,
+        declaration,
+        ports,
+        options,
+        facts,
+        credential,
+      });
 
       mountMethodGuards({ app, served });
 
@@ -325,16 +359,22 @@ function assertPortsBound<Api>({
       );
     }
 
-    if (route.permissionTarget && !ports.identity.authorize) {
+    const door = doorOf({ credential: route.credential ?? declaration.credential, ports });
+
+    if (route.permissionTarget && !door.authorize) {
       throw new Error(
         `REST ${address} checks "${route.permission}" at the scope its path names, and this ` +
           "runtime supplied no identity.authorize",
       );
     }
 
-    const identified = route.access?.kind === "authenticated" || route.access?.kind === "deferred";
+    const identified =
+      route.access?.kind === "authenticated" ||
+      route.access?.kind === "deferred" ||
+      ((route.credential ?? declaration.credential) === "browser" &&
+        Boolean(route.permissionTarget));
 
-    if (identified && !ports.identity.identify) {
+    if (identified && !door.identify) {
       throw new Error(
         `REST ${address} answers behind the family's door with no permission, and this runtime ` +
           "supplied no identity.identify",
@@ -343,7 +383,7 @@ function assertPortsBound<Api>({
 
     assertCapabilityPorts({ address, route, ports });
 
-    if (route.access?.kind === "optional" && !ports.identity.identifyOptional) {
+    if (route.access?.kind === "optional" && !door.identifyOptional) {
       throw new Error(
         `REST ${address} answers with or without the family's credential, and this runtime ` +
           "supplied no identity.identifyOptional",
@@ -416,6 +456,15 @@ function factBindings<Api>({
 
   for (const route of declaration.routes) {
     for (const fact of route.middleware ?? []) {
+      if (fact.source === "headers") {
+        bound.set(fact.name, {
+          middleware: fact,
+          resolve: (context) => Object.fromEntries(context.req.raw.headers),
+        });
+
+        continue;
+      }
+
       if (bound.has(fact.name)) continue;
 
       throw new Error(
@@ -523,6 +572,13 @@ function routeStack<Api>({
 /** The exact characters or bytes a route that parses nothing was sent. */
 function rawBodyMiddleware(rawBody: RestRawBody): MiddlewareHandler {
   return async (context, next) => {
+    if (rawBody.form === "stream") {
+      context.set(ROUTE_RAW_BODY, context.req.raw.body);
+      await next();
+
+      return;
+    }
+
     const bytes = new Uint8Array(await context.req.raw.arrayBuffer());
 
     context.set(ROUTE_RAW_BODY, rawBody.form === "text" ? TEXT.decode(bytes) : bytes);
@@ -719,6 +775,36 @@ function mergeInput({
 }
 
 /** Authenticate, decide, handle, check the answer, respond. */
+function decideRouteCaller<Api>({
+  route,
+  ports,
+  options,
+  context,
+  caller,
+  input,
+}: {
+  route: RestTransportRoute<Api>;
+  ports: RestRuntimeMembers;
+  options: RestMountOptions<Api>;
+  context: Context;
+  caller: RestCaller;
+  input: unknown;
+}) {
+  const permission = route.access ? void 0 : permissionOf(route.permission);
+
+  return decide({
+    declaration: {
+      kind: "service-authorized",
+      reason: route.access?.reason ?? options.reason ?? HOST_ENFORCED,
+      permissions: permission === void 0 ? [] : [permission],
+    },
+    caller: { actor: normalizedActor(caller.actor), scope: caller.scope },
+    input,
+    ...(ports.authorization ? { authorize: ports.authorization.forRequest(context.req.raw) } : {}),
+    ...(ports.denials ? { denials: ports.denials } : {}),
+  });
+}
+
 function handlerMiddleware<Api>({
   route,
   credential,
@@ -758,9 +844,15 @@ function handlerMiddleware<Api>({
       return answerWith({ context, next, route, result });
     }
 
-    const permission = route.access ? void 0 : permissionOf(route.permission);
     const door = doorOf({ credential, ports });
-    const caller = await callerOf({ route, door, request: context.req.raw });
+
+    const caller = await callerOf({
+      route,
+      door,
+      credential,
+      request: context.req.raw,
+      rawBody: context.get(ROUTE_RAW_BODY),
+    });
 
     // An optional door the caller presented nothing at: the handler is told
     // there is no one behind the request rather than handed a guess.
@@ -781,21 +873,9 @@ function handlerMiddleware<Api>({
       return answerWith({ context, next, route, result: anonymous });
     }
 
-    const decision = await decide({
-      declaration: {
-        kind: "service-authorized",
-        reason: route.access?.reason ?? options.reason ?? HOST_ENFORCED,
-        permissions: permission === void 0 ? [] : [permission],
-      },
-      caller: { actor: normalizedActor(caller.actor), scope: caller.scope },
-      input,
-      ...(ports.authorization
-        ? { authorize: ports.authorization.forRequest(context.req.raw) }
-        : {}),
-      ...(ports.denials ? { denials: ports.denials } : {}),
-    });
+    const decision = await decideRouteCaller({ route, ports, options, context, caller, input });
 
-    const target = await checkRouteScope({ route, caller, door, ports, input });
+    const target = await checkRouteScope({ route, caller, door, ports, input, context });
     const capabilities = { route, ports, context, family, version, caller, input } as const;
 
     // The scope access resolved: the one a route's own path named when it named
@@ -1174,7 +1254,9 @@ function handlerArguments<Api>({
     target,
     signal: context.req.raw.signal,
     request: context.req.raw,
-    raw: route.rawBody ? (context.get(ROUTE_RAW_BODY) as string | Uint8Array) : undefined,
+    raw: route.rawBody
+      ? (context.get(ROUTE_RAW_BODY) as string | Uint8Array | ReadableStream<Uint8Array> | null)
+      : undefined,
     files: route.multipart
       ? (context.get(ROUTE_FILES) as Readonly<Record<string, File>>)
       : undefined,
@@ -1222,23 +1304,64 @@ async function answerWith<Api>({
  * The permission a route asks at the scope its own path named, and the target
  * it was asked about. Null for every route checked at the credential's scope.
  */
+function headerScopeInput(
+  route: RestTransportRoute<unknown>,
+  context: Context,
+  target: Readonly<{ param: string; header: string }>,
+): Record<string, unknown> {
+  const fact = route.middleware?.find((candidate) => candidate.source === "headers");
+
+  if (!fact) throw new Error(`REST ${route.operation} has no declared header schema`);
+
+  const headers = resolveHeaderFact(fact, context);
+
+  if (typeof headers !== "object" || headers === null)
+    throw new Error(`REST ${route.operation} header schema returned no object`);
+
+  return { [target.param]: Reflect.get(headers, target.header) };
+}
+
+function resolveHeaderFact(fact: RestTransportMiddleware, context: Context): unknown {
+  const cached: Map<string, unknown> =
+    context.get(ROUTE_HEADER_FACTS) ?? new Map<string, unknown>();
+
+  if (cached.has(fact.name)) return cached.get(fact.name);
+
+  const parsed = fact.schema.safeParse(Object.fromEntries(context.req.raw.headers.entries()));
+
+  if (!parsed.success) throw requestValidationErrorFrom({ target: "header", error: parsed.error });
+
+  cached.set(fact.name, parsed.data);
+  context.set(ROUTE_HEADER_FACTS, cached);
+
+  return parsed.data;
+}
+
 async function checkRouteScope({
   route,
   caller,
   door,
   ports,
   input,
+  context,
 }: {
   route: RestTransportRoute<unknown>;
   caller: RestCaller;
   door: RestIdentity;
   ports: RestRuntimeMembers;
   input: unknown;
+  context: Context;
 }): Promise<AuthzDeclaredScopeId | null> {
   if (!route.permissionTarget) return null;
 
   const permission = permissionOf(route.permission);
-  const target = routeScopeOf({ param: route.permissionTarget.param, input });
+
+  const scopeInput =
+    route.permissionTarget.at === "header"
+      ? headerScopeInput(route, context, route.permissionTarget)
+      : input;
+
+  const target = routeScopeOf({ param: route.permissionTarget.param, input: scopeInput });
 
   const decision = await requireAuthorize(door)({ caller, permission, target });
 
@@ -1260,17 +1383,24 @@ async function checkRouteScope({
 async function callerOf({
   route,
   door,
+  credential,
   request,
+  rawBody,
 }: {
+  rawBody?: string | Uint8Array;
+  credential: RestDoorCredential;
   route: RestTransportRoute<unknown>;
   door: RestIdentity;
   request: Request;
 }): Promise<RestCaller | null> {
   const kind = route.access?.kind;
 
+  if (credential === "browser" && route.permissionTarget) return requireIdentify(door)({ request });
+
   if (kind === "optional") return requireIdentifyOptional(door)({ request });
 
-  if (kind === "authenticated" || kind === "deferred") return requireIdentify(door)({ request });
+  if (kind === "authenticated" || kind === "deferred")
+    return requireIdentify(door)({ request, ...(rawBody === void 0 ? {} : { rawBody }) });
 
   return door.authenticate({ request, permission: permissionOf(route.permission) });
 }
@@ -1353,13 +1483,22 @@ async function resolveFacts({
   const resolved: unknown[] = [];
 
   for (const fact of route.middleware ?? []) {
+    if (fact.source === "headers") {
+      resolved.push(resolveHeaderFact(fact, context));
+      continue;
+    }
+
     const binding = facts.get(fact.name);
 
     if (!binding) {
       throw new Error(`REST ${route.operation} declares the fact "${fact.name}" and none is bound`);
     }
 
-    resolved.push(fact.schema.parse(await binding.resolve(context)));
+    const parsed = fact.schema.safeParse(await binding.resolve(context));
+
+    if (!parsed.success) throw parsed.error;
+
+    resolved.push(parsed.data);
   }
 
   return resolved;
@@ -1419,7 +1558,7 @@ function doorActorOf({
   credential: RestDoorCredential;
   actor: Actor | null;
 }): Actor | null {
-  return DOOR_SCOPE_TIER[credential] === null ? null : actor;
+  return credential !== "browser" && DOOR_SCOPE_TIER[credential] === null ? null : actor;
 }
 
 /**
@@ -1619,7 +1758,12 @@ function respondDeclared({
   answers: RestRouteAnswers;
   result: unknown;
 }): Response {
-  const answer = result as { status?: unknown; body?: unknown };
+  const answer = result as {
+    status?: unknown;
+    body?: unknown;
+    headers?: Readonly<Record<string, string>>;
+  };
+
   const status = typeof answer?.status === "number" ? answer.status : undefined;
   const schema = status === undefined ? undefined : answers[status];
 
@@ -1631,6 +1775,9 @@ function respondDeclared({
   }
 
   const validation = schema.safeParse(answer.body);
+  for (const [name, value] of Object.entries(answer.headers ?? {})) context.header(name, value);
+
+  if (status === 204 || status === 304) return context.body(null, status);
 
   // The declared status IS the answer, whatever its class, so the request
   // record reads as one rather than as a server fault.

@@ -226,13 +226,32 @@ func renderedLevel(line string) int {
 func (t *LogsTab) subTabsLine() string {
 	parts := []string{}
 	for _, app := range t.SubTabs() {
+		label := t.appDot(app) + app
 		if app == t.selected {
-			parts = append(parts, sgrReverse+" "+app+" "+sgrReset)
+			parts = append(parts, sgrReverse+" "+label+" "+sgrReset)
 			continue
 		}
-		parts = append(parts, dim(" "+app+" "))
+		parts = append(parts, dim(" ")+t.appDot(app)+dim(app+" "))
 	}
 	return strings.Join(parts, " ")
+}
+
+// appDot is the health mark a sub-tab carries: green when the application
+// answers, red when it does not. A sub-tab haven supervises nothing for gets no
+// dot — an absent probe is not a service that is down. "all" is every
+// application at once and so is nobody's health.
+func (t *LogsTab) appDot(app string) string {
+	if app == AllApps || t.src.AppUp == nil {
+		return ""
+	}
+	up, known := t.src.AppUp(app)
+	if !known {
+		return ""
+	}
+	if up {
+		return "\x1b[32m●\x1b[0m"
+	}
+	return "\x1b[31m●\x1b[0m"
 }
 
 // Footer names the severity floor, the source, and where the muted lines went.
@@ -342,13 +361,6 @@ func (t *LogsTab) SelectSubTab(app string) {
 		t.apps[app] = true
 		t.selected = app
 	}
-}
-
-func lastN(lines []string, n int) []string {
-	if len(lines) <= n {
-		return lines
-	}
-	return lines[len(lines)-n:]
 }
 
 func lastNRows(rows []Row, n int) []Row {

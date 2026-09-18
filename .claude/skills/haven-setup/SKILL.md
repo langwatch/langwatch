@@ -131,14 +131,36 @@ With the observability stack up, query Grafana instead — `gcx logs query
 and read `page.on('console', …)`: the tRPC/SSE logging gives a live timeline the server's
 stdout does not.
 
+## Gotcha 6: secrets resolve through `.env`, not through haven's overlay
+
+haven's own injected variables (hostnames, ports, database URLs — see
+`tools/thuishaven/app/overlayenv.go`) go straight into each child's OS
+environment; nothing writes them to a file. A `Secret.load(id)` handle
+(`packages/secrets`, dev/docs/ARCHITECTURE.md §6) resolves through
+`secrets.withEnv().withFile().withOnePassword(...)`, and `withEnv()` already
+sees whatever haven injected, so nothing extra is needed for those. What is
+NOT haven's: `LANGWATCH_OP_ACCOUNT` (which 1Password account the chain asks)
+is a personal choice — set it in the workspace `.env`, never by haven — and it
+reaches the process because `pnpm dev`'s own `node --env-file=../../.env`
+loads that file before `main.ts` runs (haven does not need to know about it).
+
+`haven env --reveal` masks by `packages/secrets/keys.json`'s classification —
+that file was deleted in the config/secrets rebuild (commit `eea150100e`), so
+`tools/thuishaven/domain/secretkeys.go`'s `SecretClasses` now always falls
+back to name-shape masking (`NameLooksSecret`). This fails closed (still
+masks), so `haven env` stays safe to paste, just less precise than the old
+registry was; restoring precision needs a new classification source, which is
+an open design question, not a bug to patch around.
+
 ## Signing in for a browser check
 
 The local-dev seed identity is documented in
 `packages/prisma-client/prisma/seed.ts`'s own header — not a secret. Sign-in only works
 against the origin the app is configured with (haven sets `NEXTAUTH_URL` to the
-real `https://app.<slug>.langwatch.localhost:<port>`; auth is better-auth, but that
-variable is still what names the trusted origin, bound in
-`apps/api/src/platform/config/api.config.ts`). Hitting the app on raw `127.0.0.1:<port>`
+real `https://app.<slug>.langwatch.localhost:<port>`; auth is better-auth, and that
+variable is still what names the trusted origin, read in
+`modules/auth/process/src/channels/http/http.better-auth.channel.ts`, declared at
+`modules/auth/contract/src/auth.config.ts`). Hitting the app on raw `127.0.0.1:<port>`
 is fine for an anonymous health check and will always 403 the sign-in — that is the
 trusted-origin check working, not a bug.
 

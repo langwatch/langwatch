@@ -2180,6 +2180,14 @@ const presentations = {
     title: "That test suite name isn't available",
     describe: () => "Choose a different name and try again.",
   },
+  scenario_generation_failed: {
+    title: "Scenario generation failed",
+    describe: () => "Try generating the scenario again.",
+  },
+  scenario_generation_timed_out: {
+    title: "Scenario generation timed out",
+    describe: () => "Try again in a moment, or shorten the request.",
+  },
   scenario_generate_rate_limited: {
     // The author-assist spends a model call per click; the counter is the
     // project's because the invoice is.
@@ -2429,6 +2437,11 @@ const presentations = {
     title: "The service isn't configured correctly",
     describe: () =>
       "A required secret is not set on this deployment. An operator needs to provide it before the service can start.",
+  },
+  secret_claimed_twice: {
+    title: "The service isn't configured correctly",
+    describe: () =>
+      "Two parts of the service each claim the same credential. An operator needs to resolve which one owns it before the service can start.",
   },
   secret_sealed: {
     title: "Something went wrong on our side",
@@ -3014,6 +3027,10 @@ const presentations = {
     title: "This shared link has already been viewed",
     describe: () =>
       "It was set to open a limited number of times. Ask whoever shared it for a new link.",
+  },
+  share_trace_pinned: {
+    title: "This trace is currently shared",
+    describe: () => "Disable the share before unpinning.",
   },
   share_read_rate_limited: {
     title: "This shared trace is busy right now",
