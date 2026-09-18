@@ -692,6 +692,72 @@ describe("given a default pi install, where pi writes below the sessions root", 
     expect(atRoot.capture.pendingCount()).toBe(0);
   });
 
+  /**
+   * The same end-to-end half for the project's own settings file, and missing
+   * for the same reason: every test bound to that scenario asserts the STRING
+   * the resolver returns. A resolver that returns the right string to a capture
+   * that never opens it satisfies all of them, while the scenario promises that
+   * the directory is READ.
+   *
+   * The control is the directory the global file names. It is written, it is
+   * real, and it holds a session — so a resolver that quietly prefers the
+   * global file would harvest from there and pass a test that only asked for
+   * turns. Asking for nothing at the global directory is what pins the
+   * precedence to the thing that actually reads.
+   *
+   * @scenario "A session directory the project moved is the one capture reads"
+   */
+  it("captures from the directory the project's own settings name", async () => {
+    const home = join(dir, "home");
+    const cwd = join(dir, "project");
+    const movedTo = join(dir, "moved-sessions");
+    const globalDir = join(dir, "global-sessions");
+
+    await mkdir(join(cwd, ".pi"), { recursive: true });
+    await writeFile(
+      join(cwd, ".pi", "settings.json"),
+      JSON.stringify({ sessionDir: movedTo }),
+      "utf8",
+    );
+    await mkdir(join(home, ".pi", "agent"), { recursive: true });
+    await writeFile(
+      join(home, ".pi", "agent", "settings.json"),
+      JSON.stringify({ sessionDir: globalDir }),
+      "utf8",
+    );
+
+    await mkdir(movedTo, { recursive: true });
+    await writeFile(
+      join(movedTo, "20260914T100000_moved.jsonl"),
+      sessionLines("aaaaaaaa", "bbbbbbbb"),
+      "utf8",
+    );
+    await mkdir(globalDir, { recursive: true });
+    await writeFile(
+      join(globalDir, "20260914T100000_global.jsonl"),
+      sessionLines("cccccccc"),
+      "utf8",
+    );
+
+    const resolved = await resolvePiSessionDir({
+      toolArgs: [],
+      env: {},
+      home,
+      cwd,
+    });
+    expect(resolved).toBe(movedTo);
+
+    const captured = recordingCaptureFor(resolved);
+    expect(await captured.capture.harvest()).toBe(2);
+    expect(captured.bodies.join("")).toContain(SESSION_ID);
+
+    // The control: the global directory holds a session of its own, and this
+    // run must not be reading it.
+    const fromGlobal = recordingCaptureFor(globalDir);
+    expect(await fromGlobal.capture.harvest()).toBe(1);
+    expect(resolved).not.toBe(globalDir);
+  });
+
   function recordingCaptureFor(sessionsDir: string): {
     capture: ReturnType<typeof createPiCapture>;
     bodies: string[];
