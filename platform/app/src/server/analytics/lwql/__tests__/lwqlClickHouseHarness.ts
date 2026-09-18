@@ -2134,7 +2134,8 @@ const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
 ];
 
 /**
- * One tenant's rows in every mapped base relation.
+ * One tenant's rows in every mapped base relation, followed by one row per
+ * every *other* derived view's base model (the generic seed).
  *
  * Parameterized rather than fixed to the two harness fixtures because the
  * endpoint suites authenticate as *real project ids* and need PostgreSQL rows
@@ -2149,6 +2150,14 @@ const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
  * `traceIds` ties annotations to whatever traces the caller seeded on the
  * ClickHouse side, so an annotation-to-trace join has matching rows; the
  * default is the shape the isolation suite seeds.
+ *
+ * The generic seed runs last (its rows may reference the explicit ones as
+ * foreign keys) and skips {@link LWQL_EXPLICITLY_SEEDED_MODELS} so a model
+ * this function already inserted never gets a second, colliding row. Every
+ * caller of this function — not only {@link startLangWatchQLPostgres} — needs
+ * this, since `postgresEngineIsolation.integration.test.ts` and friends read
+ * every derived view's engine table and would otherwise find nothing seeded
+ * for the ~85 views the explicit seed above does not cover.
  */
 /**
  * The models {@link postgresTenantSeedStatements} hand-seeds, so the generic
@@ -2170,6 +2179,20 @@ export const LWQL_EXPLICITLY_SEEDED_MODELS = [
   "Topic",
   "VirtualKey",
 ] as const;
+
+/**
+ * The whole derived Postgres catalog, computed once from the same manifest,
+ * skip map and overrides the shipped catalog is built from.
+ *
+ * Shared between {@link postgresTenantSeedStatements} (every generic caller's
+ * seed) and {@link startLangWatchQLPostgres} (the view/reader-role setup), so
+ * the two never derive it separately and drift.
+ */
+const LWQL_HARNESS_DERIVED_POSTGRES_VIEWS = derivePostgresCatalog({
+  manifest: LWQL_PRISMA_MANIFEST,
+  skip: LWQL_POSTGRES_SKIPPED_MODELS,
+  overrides: LWQL_POSTGRES_ALL_OVERRIDES,
+});
 
 export function postgresTenantSeedStatements({
   tenantId,
@@ -2221,7 +2244,7 @@ export function postgresTenantSeedStatements({
     const value = thumbsUp[index % thumbsUp.length];
     return value === null || value === undefined ? "NULL" : String(value);
   };
-  return [
+  const explicit: string[] = [
     // The tenancy spine: Organization → Team → Project. None of Organization,
     // Team or User is derived into a LangWatchQL view (identity / access-control
     // plumbing), so their column values never reach a view and carry no
@@ -2323,6 +2346,22 @@ export function postgresTenantSeedStatements({
           `${version}, 'commit of ${tenantId}', '{"prompt":"text"}'::jsonb, '1', ${at})`,
       ),
     ),
+  ];
+  // Every other derived view's base model, generated from the manifest, after
+  // the explicit seeds so a foreign key to one of those (e.g. a VirtualKey or
+  // a prompt) points at a row that already exists.
+  return [
+    ...explicit,
+    ...postgresModelSeedStatements({
+      tenantId,
+      organizationId,
+      teamId,
+      userId,
+      views: LWQL_HARNESS_DERIVED_POSTGRES_VIEWS,
+      manifest: LWQL_PRISMA_MANIFEST,
+      alreadySeeded: LWQL_EXPLICITLY_SEEDED_MODELS,
+      schema: PG_SCHEMA,
+    }),
   ];
 }
 
@@ -2443,38 +2482,15 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
     );
   }
 
-  // The whole derived Postgres catalog, so every one of its views has a base
-  // row per tenant to be proven scoped — not only the handful the explicit
-  // seeds above cover. Derived once here from the same manifest, skip map and
-  // overrides the shipped catalog is built from.
-  const derivedPostgresViews = derivePostgresCatalog({
-    manifest: LWQL_PRISMA_MANIFEST,
-    skip: LWQL_POSTGRES_SKIPPED_MODELS,
-    overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-  });
-
   await applyAsAdmin([
     `ALTER DATABASE ${PG_DATABASE} SET log_statement='all'`,
     ...lwqlApprovedPostgresViewNames().map(
       (view) => `DROP VIEW IF EXISTS ${PG_SCHEMA}."${view}"`,
     ),
+    // Each call already appends the generic seed (every other derived view's
+    // base model) after its explicit rows — see `postgresTenantSeedStatements`.
     ...[TENANT_A, TENANT_B].flatMap((tenant) =>
       postgresTenantSeedStatements({ tenantId: tenant.tenantId }),
-    ),
-    // Every other derived view's base model, generated from the manifest, after
-    // the explicit seeds so a foreign key to one of those (e.g. a VirtualKey or
-    // a prompt) points at a row that already exists.
-    ...[TENANT_A, TENANT_B].flatMap((tenant) =>
-      postgresModelSeedStatements({
-        tenantId: tenant.tenantId,
-        organizationId: `${tenant.tenantId}-org`,
-        teamId: `${tenant.tenantId}-team`,
-        userId: `${tenant.tenantId}-user`,
-        views: derivedPostgresViews,
-        manifest: LWQL_PRISMA_MANIFEST,
-        alreadySeeded: LWQL_EXPLICITLY_SEEDED_MODELS,
-        schema: PG_SCHEMA,
-      }),
     ),
     ...POSTGRES_LOAD_FIXTURE_STATEMENTS,
     // The shipped generator, not a hand-copy: a catalog column the approved
