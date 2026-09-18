@@ -1,6 +1,5 @@
 import { SCIM_SPEC_OPTIONS } from "@ee/scim/openapi";
 import { app as scimApp } from "@ee/scim/routes";
-import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
 import path from "path";
@@ -26,16 +25,28 @@ import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
-import rawCurrentSpec from "../app/api/openapiLangWatch.json";
+import currentSpec from "../app/api/openapiLangWatch.json";
 import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
 import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { ORGANIZATIONS_SPEC_OPTIONS } from "../app/api/organizations/[[...route]]/openapi";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
+import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
+import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
+import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
+import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
+import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
+import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
+import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
+import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
+import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
+import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
+import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
+import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 import { normalizeExclusiveBounds } from "../server/api/openapi-exclusive-bounds";
 import { requireDefaultedResponseFields } from "../server/api/openapi-response-required";
 import {
@@ -53,6 +64,7 @@ import {
 import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy";
 import { app as experimentsV3App } from "../server/routes/experiments-v3";
 import { app as miscApp } from "../server/routes/misc";
+import { mergeOpenAPISpecs } from "./mergeOpenAPISpecs";
 
 /**
  * `generateSpecs`, with response schemas read as output rather than input.
@@ -72,10 +84,11 @@ import { app as miscApp } from "../server/routes/misc";
 const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
   requireDefaultedResponseFields(await generateSpecsUnpinned(hono, options, c));
 
-// Surfaces whose routes come straight from their Hono apps. Their paths
-// REPLACE on merge, and any path the apps no longer serve is pruned from
-// the previous spec below: without the prune, a deleted route would ride
-// the merge union forever.
+// Namespaces owned by a Hono app. The MERGE no longer consults this list —
+// `mergeOpenAPISpecs` derives ownership dynamically from `appSpecs` each run, so
+// the prune can no longer drift (issue #2987). The list survives only as the
+// input to `assertMayInheritTheDefault`: the security-stamping guard that
+// refuses to leave an app-derived operation on the document-wide default.
 const APP_DERIVED_PREFIXES = [
   "/api/agent-cache",
   "/api/agents",
@@ -148,39 +161,12 @@ const APP_DERIVED_PREFIXES = [
  * The boundary is a whole path segment, which rules out both directions of
  * accident: a bare `startsWith` would let `/api/experiment` claim a future
  * `/api/experimental-runs`, and a substring test would match the prefix
- * anywhere in the key, including keys that are not paths at all. `customMerge`
- * runs at every level of the merge, so it is asked about `paths`, `components`
- * and every operation field too.
+ * anywhere in the key.
  */
 const isAppDerivedPath = (key: string): boolean =>
   APP_DERIVED_PREFIXES.some(
     (prefix) => key === prefix || key.startsWith(`${prefix}/`),
   );
-
-const currentSpec = {
-  ...rawCurrentSpec,
-  paths: Object.fromEntries(
-    Object.entries(
-      (rawCurrentSpec as { paths?: Record<string, unknown> }).paths ?? {},
-    ).filter(([route]) => !isAppDerivedPath(route)),
-  ),
-};
-
-import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
-import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
-import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
-import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
-import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
-import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
-import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
-import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
-import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
-import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
-import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
-import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
-
-const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
-  sourceArray;
 
 const langwatchSpec = {
   openapi: "3.1.0",
@@ -192,11 +178,14 @@ const langwatchSpec = {
 };
 
 /**
- * This task generates the OpenAPI spec for the dataset API.
+ * This task generates the OpenAPI spec for the LangWatch API.
  *
- * It will always update the current spec with new endpoints,
- * so deleting endpoints needs to be done manually from the the
- * original file.
+ * Each Hono app owns its `/api/<namespace>` entirely, so paths in those
+ * namespaces are refreshed from the apps every run: routes an app no longer
+ * generates (removed routes, renamed path params) are pruned automatically
+ * instead of lingering. Paths in namespaces that no app generates are
+ * hand-maintained in the committed spec and preserved untouched. See
+ * `mergeOpenAPISpecs` for the merge contract.
  */
 export default async function execute() {
   console.log("Generating OpenAPI spec...");
@@ -298,72 +287,63 @@ export default async function execute() {
   const webhooksSpec = await generateSpecs(webhooksApp);
   const gatewaySpendSpec = await generateSpecs(gatewaySpendApp);
   console.log("Merging specs...");
-  const mergedSpec = deepmerge.all(
-    // Merges this way ==>
-    [
-      currentSpec,
-      agentCacheSpec,
-      agentsSpec,
-      apiKeysSpec,
-      analyticsSpec,
-      analyticsSqlSpec,
-      querySpec,
-      codingAgentSpec,
-      codingAgentV1Spec,
-      dashboardsSpec,
-      datasetSpec,
-      evaluatorsSpec,
-      eventsSpec,
-      experimentsSpec,
-      evaluationsLegacySpec,
-      experimentsV3Spec,
-      miscSpec,
-      gatewayPlatformSpec,
-      governanceSpec,
-      graphsSpec,
-      langyControlSpec,
-      meSpec,
-      llmConfigsSpec,
-      modelDefaultsSpec,
-      modelProvidersSpec,
-      monitorsSpec,
-      organizationSpec,
-      organizationsSpec,
-      roleBindingsSpec,
-      rolesSpec,
-      scimTokensSpec,
-      scimSpec,
-      scenarioEventsSpec,
-      scenariosSpec,
-      projectsSpec,
-      secretsSpec,
-      simulationRunsSpec,
-      suitesSpec,
-      runPlansSpec,
-      testSuitesSpec,
-      teamsSpec,
-      groupsSpec,
-      tracesSpec,
-      triggersSpec,
-      webhooksSpec,
-      gatewaySpendSpec,
-      workflowsSpec,
-      langwatchSpec,
-    ],
-    {
-      arrayMerge: overwriteMerge,
-      customMerge(key) {
-        // Since we get these routes from the app directly,
-        // we don't want to merge, we just want to replace.
-        if (isAppDerivedPath(key)) {
-          // Replace with new
-          return (_target, source) => {
-            return source;
-          };
-        }
-      },
-    },
-  );
+  // Order carried over from the legacy deepmerge.all call: specs are deep-merged
+  // in array order (a later spec deep-merges onto earlier ones; arrays are
+  // replaced). Apps own disjoint /api/<namespace>s, so their paths never collide
+  // here — order only affects shared top-level keys such as components.schemas.
+  const appSpecs = [
+    agentCacheSpec,
+    agentsSpec,
+    apiKeysSpec,
+    analyticsSpec,
+    analyticsSqlSpec,
+    querySpec,
+    codingAgentSpec,
+    codingAgentV1Spec,
+    dashboardsSpec,
+    datasetSpec,
+    evaluatorsSpec,
+    eventsSpec,
+    experimentsSpec,
+    evaluationsLegacySpec,
+    experimentsV3Spec,
+    miscSpec,
+    gatewayPlatformSpec,
+    governanceSpec,
+    graphsSpec,
+    langyControlSpec,
+    meSpec,
+    llmConfigsSpec,
+    modelDefaultsSpec,
+    modelProvidersSpec,
+    monitorsSpec,
+    organizationSpec,
+    organizationsSpec,
+    roleBindingsSpec,
+    rolesSpec,
+    scimTokensSpec,
+    scimSpec,
+    scenarioEventsSpec,
+    scenariosSpec,
+    projectsSpec,
+    secretsSpec,
+    simulationRunsSpec,
+    suitesSpec,
+    runPlansSpec,
+    testSuitesSpec,
+    teamsSpec,
+    groupsSpec,
+    tracesSpec,
+    triggersSpec,
+    webhooksSpec,
+    gatewaySpendSpec,
+    workflowsSpec,
+  ];
+  const mergedSpec = mergeOpenAPISpecs({
+    currentSpec,
+    appSpecs,
+    baseSpec: langwatchSpec,
+  });
 
   console.log("Stamping per-operation security...");
   stampSecurityFromRegistry(mergedSpec as SpecShape);

@@ -22,8 +22,9 @@
  *      the framework emits one from the endpoint config, and only when the
  *      config declares an `output` or a `description`
  *   2. the route's Hono app is imported by `src/tasks/generateOpenAPISpec.ts`
- *   3. its prefix is in that file's `APP_DERIVED_PREFIXES`, or the merge keeps
- *      whatever the JSON already said
+ *   3. the app emits the route, so the merge treats its `/api/<namespace>` as
+ *      app-owned and refreshes it; otherwise the merge keeps whatever the JSON
+ *      already said
  *
  * So the answer to "can we just generate the spec for everything?" is yes,
  * mechanically (describe the operation, import its app), and the reason it had
@@ -328,9 +329,8 @@ function formatUnexplained(routes: RegisteredRoute[]): string[] {
     "",
     "Publish it: describe the operation (describeRoute({...}) on the handler,",
     "or output/description in the endpoint config of an @langwatch/api",
-    "service), import its app in src/tasks/generateOpenAPISpec.ts, add its",
-    "prefix to APP_DERIVED_PREFIXES, then run `pnpm run task",
-    "generateOpenAPISpec`.",
+    "service), import its app in src/tasks/generateOpenAPISpec.ts and its",
+    "spec into the appSpecs list, then run `pnpm run task generateOpenAPISpec`.",
     "",
     "Or record why it stays unpublished, in UNPUBLISHED in",
     "scripts/openapi-route-exclusions.ts.",
