@@ -1,9 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "paths": {
-      "@langwatch/user-browser": ["./src/index.ts"]
-    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,

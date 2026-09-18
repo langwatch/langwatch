@@ -15,9 +15,9 @@
     "paths": {
       "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
       "@langwatch/coding-agent-contract": ["../../coding-agent/contract/src/index.ts"],
-      "@langwatch/coding-agent-browser": ["../../coding-agent/web/src/index.ts"],
+      "@langwatch/coding-agent-browser": ["../../coding-agent/browser/src/index.ts"],
       "@langwatch/coding-agent-browser/surfaces/activity": [
-        "../../coding-agent/web/src/activity.ts"
+        "../../coding-agent/browser/src/activity.ts"
       ],
       "@langwatch/enterprise-governance-contract": [
         "../../../enterprise/modules/governance/contract/src/index.ts"
