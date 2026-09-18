@@ -226,7 +226,7 @@ export class PrismaScimReconciliationRepository
         kind: (row.revokedAt ? "removed" : "attached") as "attached" | "removed",
         occurredAtMs: Math.max(row.occurredAt.getTime(), row.revokedAt?.getTime() ?? 0),
       }))
-      .sort((a, b) => b.occurredAtMs - a.occurredAtMs || a.grantId.localeCompare(b.grantId))
+      .toSorted((a, b) => b.occurredAtMs - a.occurredAtMs || a.grantId.localeCompare(b.grantId))
       .slice(0, limit);
   }
 

@@ -23,10 +23,8 @@
  * company in. The origins of the connections we hold are therefore the
  * trusted set, and it grows and shrinks with them rather than with a deploy.
  *
- * Server-side OIDC requests use `sso-oidc-fetch.ts`, independently of this
- * browser allowlist. It validates and pins DNS answers on every request and
- * refuses redirects. Only operator-configured internal IdP origins may reach
- * private addresses; registering a tenant issuer never grants that exemption.
+ * Better Auth validates OIDC endpoints, redirects, state, and PKCE. This list
+ * only supplies the issuer origins registered for the current SSO request.
  *
  * TWO STATIC WAYS ON REMAIN, for the cases no registered connection covers:
  *

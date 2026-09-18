@@ -902,6 +902,68 @@ export class ScimService {
     return undefined;
   }
 
+  private userNameInPatchOp(operation: ScimPatchOperation): string | undefined {
+    if (operation.path === "userName" && typeof operation.value === "string") {
+      return operation.value;
+    }
+    if (operation.value === null || typeof operation.value !== "object") {
+      return undefined;
+    }
+
+    const userName = (operation.value as Record<string, unknown>).userName;
+    return typeof userName === "string" ? userName : undefined;
+  }
+
+  private patchValues({
+    operations,
+    active,
+    name,
+    userName,
+  }: {
+    operations: ScimPatchOperation[];
+    active: boolean;
+    name: string | null;
+    userName: string;
+  }): {
+    active: boolean;
+    deactivating: boolean;
+    name: string | null;
+    userName: string;
+    costCenters: (string | null)[];
+  } {
+    let deactivating = false;
+    const costCenters: (string | null)[] = [];
+
+    for (const operation of operations) {
+      const costCenter = this.costCenterFromPatchOp(operation);
+      if (costCenter.present) {
+        costCenters.push(costCenter.value);
+      }
+      if (operation.op !== "replace") continue;
+
+      const nextActive = this.activeInPatchOp(operation);
+      if (nextActive !== undefined) {
+        deactivating ||= !nextActive;
+        active = nextActive;
+      }
+
+      const nameParts = namePartsIn({
+        path: operation.path,
+        value: operation.value,
+      });
+      if (nameParts) {
+        name = mergeNameParts({ current: name, ...nameParts }) ?? name;
+      }
+
+      const nextUserName = this.userNameInPatchOp(operation);
+      if (nextUserName !== undefined) {
+        userName = nextUserName;
+      }
+    }
+
+    return { active, deactivating, name, userName, costCenters };
+  }
+
   async updateUser({
     id,
     organizationId,
@@ -922,32 +984,12 @@ export class ScimService {
       userId: id,
     });
 
-    let active = found.resource?.active ?? found.user.deactivatedAt === null;
-    let name = found.resource ? found.resource.name : found.user.name;
-    let userName = found.resource?.userName ?? found.user.email ?? "";
-    let deactivating = false;
-    const costCenters: (string | null)[] = [];
-    for (const operation of patchRequest.Operations) {
-      const costCenterOp = this.costCenterFromPatchOp(operation);
-      if (costCenterOp.present) costCenters.push(costCenterOp.value);
-      if (operation.op !== "replace") continue;
-      const nextActive = this.activeInPatchOp(operation);
-      if (nextActive !== undefined) {
-        if (!nextActive) deactivating = true;
-        active = nextActive;
-      }
-      const nameParts = namePartsIn({
-        path: operation.path,
-        value: operation.value,
-      });
-      if (nameParts) name = mergeNameParts({ current: name, ...nameParts }) ?? name;
-      if (operation.path === "userName" && typeof operation.value === "string")
-        userName = operation.value;
-      if (operation.value !== null && typeof operation.value === "object") {
-        const value = operation.value as Record<string, unknown>;
-        if (typeof value.userName === "string") userName = value.userName;
-      }
-    }
+    const { active, deactivating, name, userName, costCenters } = this.patchValues({
+      operations: patchRequest.Operations,
+      active: found.resource?.active ?? found.user.deactivatedAt === null,
+      name: found.resource ? found.resource.name : found.user.name,
+      userName: found.resource?.userName ?? found.user.email ?? "",
+    });
     const conflict = await this.userNameConflict(organizationId, id, userName);
     if (conflict) return conflict;
     if (deactivating && found.hasMembership) {

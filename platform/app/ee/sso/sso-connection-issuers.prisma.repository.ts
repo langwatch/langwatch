@@ -39,7 +39,7 @@ export class PrismaSsoConnectionIssuers implements IdentityConnectionIssuersPort
 
   private cached: {
     at: number;
-    rows: Array<{ providerId: string; issuer: string }>;
+    rows: { providerId: string; issuer: string }[];
   } | null = null;
 
   constructor(
@@ -150,7 +150,7 @@ export class PrismaSsoConnectionIssuers implements IdentityConnectionIssuersPort
     return this.findIssuerForConnection({ connectionId: connection.id });
   }
 
-  private async rows(): Promise<Array<{ providerId: string; issuer: string }>> {
+  private async rows(): Promise<{ providerId: string; issuer: string }[]> {
     const now = this.now();
     if (this.cached && now - this.cached.at < PrismaSsoConnectionIssuers.CACHE_TTL_MS) {
       return this.cached.rows;

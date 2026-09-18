@@ -42,8 +42,6 @@ import { plugins } from "~/server/better-auth/config/plugins";
 import type { PasskeySignUpRegistration } from "~/server/better-auth/passkey-signup";
 import { prisma } from "~/server/db";
 
-import { createSsoOidcFetch } from "../sso-oidc-fetch";
-
 const BASE_URL = "http://localhost:3000";
 const SUITE = nanoid(8).toLowerCase();
 const PROVIDER_ID = `sso-signin-test-${SUITE}`;
@@ -59,12 +57,12 @@ const MIGRATING_EMAIL = `migrating-${SUITE}@${SUITE}.sso-signin-test.example`;
 
 /** Every decision the app's `resolveUser` asked for, so the test can say the
  *  production wrapper really ran rather than assuming it. */
-const decisionsAsked: Array<{ providerId: string; email?: string | null }> = [];
+const decisionsAsked: { providerId: string; email?: string | null }[] = [];
 
 let auth: ReturnType<typeof buildAuth>;
 let idToken: string;
 let jwks: { keys: unknown[] };
-let oidcFetch: typeof globalThis.fetch;
+let realFetch: typeof globalThis.fetch;
 
 const base64url = (input: string | Uint8Array): string =>
   Buffer.from(input as Uint8Array).toString("base64url");
@@ -124,7 +122,6 @@ const buildAuth = () =>
     database: identityStorageAdapter(),
     trustedOrigins: [IDP, BASE_URL],
     plugins: plugins({
-      ssoOidcFetch: oidcFetch,
       backupCodeCount: 10,
       // Never reached: nothing here registers a passkey.
       passkeySignUp: () => ({}) as PasskeySignUpRegistration,
@@ -149,6 +146,12 @@ const respond = (body: unknown): Response =>
     headers: { "content-type": "application/json" },
   });
 
+const requestUrl = (input: RequestInfo | URL): string => {
+  if (typeof input === "string") return input;
+
+  return input instanceof URL ? input.toString() : input.url;
+};
+
 beforeAll(async () => {
   const issuedAt = Math.floor(Date.now() / 1000);
   const minted = await mintIdToken({
@@ -164,33 +167,30 @@ beforeAll(async () => {
   idToken = minted.token;
   jwks = { keys: [minted.jwk] };
 
-  oidcFetch = createSsoOidcFetch({
-    dialableInternalOrigins: [],
-    resolveHost: async () => ["93.184.216.34"],
-    fetchImpl: async (input) => {
-      const url = input;
-      if (url.startsWith(`${IDP}/.well-known/openid-configuration`)) {
-        return respond({
-          issuer: IDP,
-          authorization_endpoint: `${IDP}/authorize`,
-          token_endpoint: `${IDP}/token`,
-          jwks_uri: `${IDP}/jwks`,
-        });
-      }
-      if (url.startsWith(`${IDP}/token`)) {
-        return respond({
-          access_token: `access-${SUITE}`,
-          id_token: idToken,
-          token_type: "Bearer",
-          expires_in: 3600,
-        });
-      }
-      if (url.startsWith(`${IDP}/jwks`)) {
-        return respond(jwks);
-      }
-      throw new Error(`unexpected oidc endpoint: ${input}`);
-    },
-  });
+  realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = requestUrl(input);
+    if (url.startsWith(`${IDP}/.well-known/openid-configuration`)) {
+      return respond({
+        issuer: IDP,
+        authorization_endpoint: `${IDP}/authorize`,
+        token_endpoint: `${IDP}/token`,
+        jwks_uri: `${IDP}/jwks`,
+      });
+    }
+    if (url.startsWith(`${IDP}/token`)) {
+      return respond({
+        access_token: `access-${SUITE}`,
+        id_token: idToken,
+        token_type: "Bearer",
+        expires_in: 3600,
+      });
+    }
+    if (url.startsWith(`${IDP}/jwks`)) {
+      return respond(jwks);
+    }
+    return realFetch(input, init);
+  }) as typeof globalThis.fetch;
 
   await prisma.ssoProvider.create({
     data: {
@@ -246,6 +246,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  globalThis.fetch = realFetch;
   await prisma.ssoProvider.deleteMany({ where: { providerId: PROVIDER_ID } });
   const users = await prisma.user.findMany({
     where: {

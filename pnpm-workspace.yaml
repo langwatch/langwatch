@@ -304,6 +304,3 @@ onlyBuiltDependencies:
   - protobufjs
   - sharp
   - ssh2
-
-patchedDependencies:
-  "@better-auth/sso@1.7.1": patches/@better-auth__sso@1.7.1.patch

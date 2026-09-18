@@ -242,13 +242,13 @@ export class ScimTokenService {
    * only in the {@link generate} response, once.
    */
   async list({ organizationId }: { organizationId: string }): Promise<
-    Array<{
+    {
       id: string;
       description: string | null;
       connectionId: string | null;
       createdAt: Date;
       lastUsedAt: Date | null;
-    }>
+    }[]
   > {
     return this.prisma.scimToken.findMany({
       where: { organizationId },

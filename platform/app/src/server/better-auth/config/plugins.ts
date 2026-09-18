@@ -41,7 +41,6 @@ export interface SsoProvisionedUsersPort {
 }
 
 export interface PluginsDeps {
-  ssoOidcFetch: typeof globalThis.fetch;
   /**
    * How many backup codes a set holds (D06).
    *
@@ -88,7 +87,6 @@ export interface PluginsDeps {
  * screen. Feature flags are read per project, and neither caller has one yet.
  */
 export function plugins({
-  ssoOidcFetch,
   backupCodeCount,
   passkeySignUp,
   confirmSignUpAddress,
@@ -150,10 +148,10 @@ export function plugins({
             // passkey is refused as unrecognized. See `passkeyRelyingParty.ts`.
             // Null when the deployment names neither address, and the plugin keeps
             // its own default there rather than the boot failing.
-            ...(passkeyRelyingParty({
+            ...passkeyRelyingParty({
               baseHost: env.BASE_HOST,
               nextAuthUrl: env.NEXTAUTH_URL,
-            }) ?? {}),
+            }),
 
             // Signing UP with a passkey, not only adding one to an account that
             // already exists. This is what drops the session requirement from
@@ -192,7 +190,7 @@ export function plugins({
      * rebuildable by replay.
      */
     sso({
-      oidcFetch: ssoOidcFetch,
+      // Better Auth validates OIDC endpoints, redirects, state, and PKCE.
       // Provider rows are projections of the managed connection log. The
       // plugin's session-authenticated registration route must never become a
       // second writer for the same configuration.

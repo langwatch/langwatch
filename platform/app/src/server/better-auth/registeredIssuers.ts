@@ -51,12 +51,13 @@ const ssoRequestBody = z.object({
   domain: z.string().min(1).optional(),
   email: z.string().optional(),
 });
+type SsoRequestBody = z.infer<typeof ssoRequestBody>;
 
-/** The same, from a sign-in body, without consuming the caller's stream. */
-async function connectionIdInBody(request: Request): Promise<string | null> {
+/** Parse a sign-in body without consuming the caller's stream. */
+async function requestBody(request: Request): Promise<SsoRequestBody | null> {
   try {
     const body = ssoRequestBody.safeParse(await request.clone().json());
-    return body.success ? (body.data.providerId ?? null) : null;
+    return body.success ? body.data : null;
   } catch {
     return null;
   }
@@ -68,26 +69,19 @@ export class RegisteredIssuers {
 
   /** Missing or ambiguous targets never inherit another tenant's origin. */
   async issuersForRequest(request: Request | undefined): Promise<string[]> {
-    if (!isSingleSignOnRequest(request) || !request?.url) return [];
+    if (!request || !isSingleSignOnRequest(request)) return [];
 
-    let named: string | null = null;
-    try {
-      named = connectionIdInPath(new URL(request.url).pathname);
-    } catch {
-      named = null;
-    }
-    named ??= await connectionIdInBody(request);
-    if (named === null) return this.issuerForDomainRequest(request);
+    const body = await requestBody(request);
+    const connectionId = connectionIdInPath(new URL(request.url).pathname) ?? body?.providerId;
+    if (!connectionId) return this.issuerForDomainRequest(body);
 
-    const only = await this.issuerForConnection(named);
+    const only = await this.issuerForConnection(connectionId);
     return only === null ? [] : [only];
   }
 
-  private async issuerForDomainRequest(request: Request): Promise<string[]> {
+  private async issuerForDomainRequest(body: SsoRequestBody | null): Promise<string[]> {
     try {
-      const parsed = ssoRequestBody.safeParse(await request.clone().json());
-      if (!parsed.success) return [];
-      const domain = parsed.data.domain ?? extractEmailDomain(parsed.data.email ?? "");
+      const domain = body?.domain ?? extractEmailDomain(body?.email ?? "");
       if (!domain) return [];
       const issuer = await this.deps.issuers.findIssuerForDomain({
         domain: normalizeDomain(domain),
