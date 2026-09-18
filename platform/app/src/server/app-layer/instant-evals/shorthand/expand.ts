@@ -50,6 +50,7 @@ import type { InstantEvalQuestion } from "../classifier/classifier";
 import { instantEvalTextBudget } from "../classifier/token-budget";
 import { compileInstantEvalShorthandFilter } from "./filter";
 import {
+  INSTANT_EVAL_MAX_SHORTHAND_QUESTIONS,
   type InstantEvalShorthandColumn,
   InstantEvalShorthandError,
   type InstantEvalShorthandQuestion,
@@ -108,6 +109,11 @@ export const instantEvalShorthandSchema = z.object({
     .describe("The newest instant to judge. Defaults to now."),
   questions: z
     .array(instantEvalShorthandQuestionSchema)
+    // Bounded here as well as in the column builder, so a list far over the
+    // ceiling is refused by its own count rather than by the token budget that
+    // many questions happen to leave.
+    .min(1)
+    .max(INSTANT_EVAL_MAX_SHORTHAND_QUESTIONS)
     .describe("What to ask of each row. One classification asks them all."),
 });
 

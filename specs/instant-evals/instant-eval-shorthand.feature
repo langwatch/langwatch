@@ -225,6 +225,24 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
     And the subquery bounds its own time column
 
   @unit
+  Scenario: A question list over the ceiling is refused by its count
+    Given a shorthand carrying more questions than one classification may ask
+    When it is read
+    Then it is refused for the number of questions, not for the room they leave
+
+  @unit
+  Scenario: A question written as whitespace is refused
+    Given a shorthand whose question carries nothing but spaces
+    When it is read
+    Then it is refused rather than sent to the classifier as an empty prompt
+
+  @unit
+  Scenario: A label is decoded before it is compared
+    Given a shorthand filter naming a label
+    When it is compiled
+    Then each element of the encoded label list is decoded before the comparison
+
+  @unit
   Scenario: A filtered threads statement names the view's own trace column
     Given a shorthand naming the threads target and a filter naming the service
     When it is expanded
@@ -251,7 +269,7 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
     Given a shorthand for every one of the three targets
     When each is expanded
     Then each statement is accepted by the same gate a submitted statement goes through
-    And each declares only parameters the request itself carries
+    And each declares only parameters its own expansion binds, the window among them
 
   @integration
   Scenario: The estimate answers for a shorthand too

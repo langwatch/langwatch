@@ -18,6 +18,10 @@ import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCliInstantEvalsService } from "./cli-instant-evals-service";
 import { printJudgments } from "./render";
+import {
+  INSTANT_EVAL_RESULTS_CEILING,
+  readCountFlag,
+} from "./countFlag";
 
 /** The states a judgement can be read back in. */
 const JUDGMENT_STATUSES = ["judged", "skipped", "failed"] as const;
@@ -58,6 +62,11 @@ export const resultsInstantEvalCommand = async (
   }
 
   const isMatched = options.matched ? true : options.unmatched ? false : undefined;
+  const limit = readCountFlag({
+    raw: options.limit,
+    flag: "--limit",
+    max: INSTANT_EVAL_RESULTS_CEILING,
+  });
   const service = createCliInstantEvalsService();
   const spinner = createSpinner(`Reading judgements for ${id}...`).start();
 
@@ -70,7 +79,7 @@ export const resultsInstantEvalCommand = async (
       ...(options.status === undefined
         ? {}
         : { status: options.status as "judged" | "skipped" | "failed" }),
-      ...(options.limit === undefined ? {} : { limit: Number(options.limit) }),
+      ...(limit === undefined ? {} : { limit }),
       ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
     });
 

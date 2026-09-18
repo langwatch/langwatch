@@ -48,10 +48,10 @@ Starts a run. Takes a question, or a statement of your own.
 |---|---|
 | `[question]` | The question, as the first argument |
 | `--ask <question>` | The same, as a flag. Repeat it to ask several questions of the same text |
-| `--criteria <text>` | For a yes or no question: what counts as yes, then what counts as no. Write it twice |
+| `--criteria <text>` | For a yes or no question: what counts as yes, then what counts as no. Write it twice. Not combinable with `--threshold` on the same question |
 | `--score <min..max>` | Ask for a rating on that whole-numbered scale instead of a yes or no |
 | `--category <name=meaning>` | Ask which option fits. Repeat it for each option |
-| `--threshold <probability>` | Where a yes or no question's probability becomes a pass |
+| `--threshold <probability>` | Where a yes or no question's probability becomes a pass. Not combinable with `--criteria` on the same question |
 | `--id <name>` | What to call the question before it, which becomes its column |
 | `--questions-file <path>` | Read the questions from a JSON or YAML file |
 | `--target <target>` | What one row is: `traces`, `threads` or `llm-spans` (default `traces`) |
@@ -110,7 +110,7 @@ fields the LangWatchQL trace view can answer: `traceId`, `traceName`, `service`,
 
 Anything that reaches outside the trace row is refused by name: span fields
 (`spanId`, `spanName`, `spanType`, `spanStatus`, `rootSpanType`,
-`span.attribute.<key>`), evaluation fields (`eval`, `evaluator*`, `guardrail`),
+`span.attribute.<key>`, `containsAi`), evaluation fields (`eval`, `evaluator*`, `guardrail`),
 events and annotations (`event`, `event.attribute.<key>`, `annotation`,
 `feedback`), scenario-run fields (`scenario`, `scenarioSet`, `scenarioBatch`,
 `scenarioStatus`, `scenarioVerdict`), and `status:ok` or `status:warning`. The

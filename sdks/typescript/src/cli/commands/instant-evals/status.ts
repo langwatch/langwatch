@@ -54,6 +54,7 @@ export const statusInstantEvalCommand = async (
             runId: run.id,
             machine,
             timeoutMs: minutes * 60_000,
+            known: run,
           })
         ).run;
 

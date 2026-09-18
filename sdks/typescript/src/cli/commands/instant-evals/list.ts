@@ -12,6 +12,10 @@ import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCliInstantEvalsService } from "./cli-instant-evals-service";
 import { printRunList } from "./render";
+import {
+  INSTANT_EVAL_LIST_CEILING,
+  readCountFlag,
+} from "./countFlag";
 
 export const listInstantEvalsCommand = async (options: {
   limit?: string;
@@ -20,12 +24,17 @@ export const listInstantEvalsCommand = async (options: {
 }): Promise<CommandResult | void> => {
   await resolveCredentials();
 
+  const limit = readCountFlag({
+    raw: options.limit,
+    flag: "--limit",
+    max: INSTANT_EVAL_LIST_CEILING,
+  });
   const service = createCliInstantEvalsService();
   const spinner = createSpinner("Fetching Instant Eval runs...").start();
 
   try {
     const runs = await service.list({
-      ...(options.limit === undefined ? {} : { limit: Number(options.limit) }),
+      ...(limit === undefined ? {} : { limit }),
       ...(options.before === undefined ? {} : { before: options.before }),
       ...(options.beforeId === undefined
         ? {}

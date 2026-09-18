@@ -221,14 +221,21 @@ const modelHandler: FilterTagTranslator = (tag, negated, ctx) => {
   return wrap(`has(Models, {${param}:String})`, negated);
 };
 
-/** `label:<value>`, over the JSON-encoded label list on the attribute map. */
+/**
+ * `label:<value>`, over the JSON-encoded label list on the attribute map.
+ *
+ * Each element comes back as a JSON scalar, quotes and escapes intact, so it
+ * is decoded rather than unquoted: stripping the quotes would leave a label
+ * holding a quote or a unicode escape spelled the JSON way, and it would then
+ * never equal the plain value a caller typed.
+ */
 const labelHandler: FilterTagTranslator = (tag, negated, ctx) => {
   const value = extractStringValue(tag);
   validateValueLength(value);
   const param = nextParam(ctx, "label");
   ctx.params[param] = value;
   return wrap(
-    `arrayExists(x -> trim(BOTH '\"' FROM x) = {${param}:String}, JSONExtractArrayRaw(Attributes['langwatch.labels']))`,
+    `arrayExists(x -> JSONExtractString(x) = {${param}:String}, JSONExtractArrayRaw(Attributes['langwatch.labels']))`,
     negated,
   );
 };

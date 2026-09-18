@@ -69,6 +69,28 @@ const refusalOf = async (promise: Promise<unknown>): Promise<string> => {
     .join("\n");
 };
 
+describe("readLast, given a window far past any date", () => {
+  describe("when the digits overflow", () => {
+    /** @scenario "A --last window past any date is refused" */
+    it("refuses a run of digits that overflows to infinity", async () => {
+      const refusal = await refusalOf(
+        build({ instructions: "annoyed", flags: { last: `${"9".repeat(400)}w` } }),
+      );
+
+      expect(refusal).toContain("--last");
+    });
+
+    /** @scenario "A --last window past any date is refused" */
+    it("refuses a finite window no instant can sit in", async () => {
+      const refusal = await refusalOf(
+        build({ instructions: "annoyed", flags: { last: "99999999999999999999w" } }),
+      );
+
+      expect(refusal).toContain("--last");
+    });
+  });
+});
+
 describe("buildInstantEvalRunBody, given the shorthand", () => {
   describe("when the question is the positional argument", () => {
     /** @scenario "A question given as the positional argument starts a run" */

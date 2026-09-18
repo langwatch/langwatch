@@ -43,18 +43,28 @@ const QUESTION_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /** Questions one shorthand may ask. */
 export const INSTANT_EVAL_MAX_SHORTHAND_QUESTIONS = 10;
 
+/**
+ * A string carrying something other than whitespace.
+ *
+ * `min(1)` alone accepts a run of spaces, and a question whose instructions
+ * are three spaces reaches the classifier as an empty prompt and is billed
+ * like any other.
+ */
+const written = (
+  schema: z.ZodString,
+): z.ZodEffects<z.ZodString, string, string> =>
+  schema.refine((value) => value.trim().length > 0, {
+    message: "Write something other than whitespace.",
+  });
+
 /** One named option of a category question. */
 export const instantEvalShorthandOptionSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(100)
-    .describe("What the column holds when this option is the answer."),
-  description: z
-    .string()
-    .min(1)
-    .max(500)
-    .describe("What this option means, in your own words."),
+  name: written(z.string().min(1).max(100)).describe(
+    "What the column holds when this option is the answer.",
+  ),
+  description: written(z.string().min(1).max(500)).describe(
+    "What this option means, in your own words.",
+  ),
 });
 
 export const instantEvalShorthandQuestionSchema = z.object({
@@ -73,15 +83,11 @@ export const instantEvalShorthandQuestionSchema = z.object({
     .describe(
       "What kind of answer you want: a yes or no, a rating on a scale, or one of a list of options.",
     ),
-  instructions: z
-    .string()
-    .min(1)
-    .max(2_000)
-    .describe(
-      "The question, in your own words, as you would write it for a human reader.",
-    ),
+  instructions: written(z.string().min(1).max(2_000)).describe(
+    "The question, in your own words, as you would write it for a human reader.",
+  ),
   criteria: z
-    .array(z.string().min(1).max(500))
+    .array(written(z.string().min(1).max(500)))
     .length(2)
     .optional()
     .describe(

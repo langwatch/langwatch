@@ -136,6 +136,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 60_000,
+        known: run(),
         sleep: noSleep,
       });
 
@@ -157,6 +158,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 60_000,
+        known: run(),
         sleep: noSleep,
       });
 
@@ -174,6 +176,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 60_000,
+        known: run(),
         sleep: noSleep,
       });
 
@@ -194,6 +197,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 10_000,
+        known: run(),
         sleep: async () => {
           clock += 3_000;
         },
@@ -221,10 +225,51 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
         runId: "instant_eval_abc",
         machine: true,
         timeoutMs: 600_000,
+        known: run(),
         sleep: noSleep,
       });
 
       expect(waited.outcome).toBe("poll_failure");
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "A wait that gives up while the API is down still answers" */
+    it("answers with the run the caller already had when every read fails", async () => {
+      // Both give-up paths are reached BECAUSE reading the run is failing, so
+      // one more read is the least likely call to succeed. It used to be
+      // awaited unguarded, and `--wait` died on the network error instead of
+      // reporting that it had stopped waiting.
+      const get = vi.fn().mockRejectedValue(new Error("down"));
+
+      const waited = await waitForInstantEvalRun({
+        service: { get } as never,
+        runId: "instant_eval_abc",
+        machine: true,
+        timeoutMs: 600_000,
+        known: run({ status: "queued" }),
+        sleep: noSleep,
+      });
+
+      expect(waited.outcome).toBe("poll_failure");
+      expect(waited.run.status).toBe("queued");
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "A wait that times out while the API is down still answers" */
+    it("answers with the run the caller already had when it times out unread", async () => {
+      const get = vi.fn().mockRejectedValue(new Error("down"));
+
+      const waited = await waitForInstantEvalRun({
+        service: { get } as never,
+        runId: "instant_eval_abc",
+        machine: true,
+        timeoutMs: -1,
+        known: run({ status: "queued" }),
+        sleep: noSleep,
+      });
+
+      expect(waited.outcome).toBe("timeout");
+      expect(waited.run.status).toBe("queued");
       expect(process.exitCode).toBe(1);
     });
   });

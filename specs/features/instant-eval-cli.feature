@@ -181,6 +181,24 @@ Feature: langwatch instant-eval, asking one question of a whole production histo
     And the failure code is reported
 
   @unit
+  Scenario: A --last window past any date is refused
+    Given a line asking for a window written with more digits than a date can hold
+    When the window is read
+    Then it is refused by name rather than reaching the API as an unreadable instant
+
+  @unit
+  Scenario: A wait that gives up while the API is down still answers
+    Given a run being waited on and an API that answers nothing
+    When the wait gives up after repeated read failures
+    Then it answers with the run the caller already had, rather than failing on one more read
+
+  @unit
+  Scenario: A wait that times out while the API is down still answers
+    Given a run being waited on and an API that answers nothing
+    When the wait runs out of time before any read succeeds
+    Then it answers with the run the caller already had, rather than failing on one more read
+
+  @unit
   Scenario: --wait gives up after the minutes it was given
     Given a run that never finishes
     When the user waits two minutes on it

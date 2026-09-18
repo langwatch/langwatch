@@ -67,6 +67,17 @@ describe("compileInstantEvalShorthandFilter, given a filter", () => {
       expect(compiled.sql).toContain("JSONExtractArrayRaw");
       expect(compiled.parameters).toEqual({ label_0: "beta" });
     });
+
+    /** @scenario "A label is decoded before it is compared" */
+    it("decodes each element rather than unquoting it", () => {
+      const compiled = compileInstantEvalShorthandFilter("label:beta")!;
+
+      // The list holds JSON scalars. Stripping the quotes leaves a label
+      // carrying a quote or a unicode escape spelled the JSON way, so it never
+      // equals the plain value the caller typed.
+      expect(compiled.sql).toContain("JSONExtractString(x)");
+      expect(compiled.sql).not.toContain("trim(BOTH");
+    });
   });
 
   describe("when the status asked for is one the trace view cannot answer", () => {

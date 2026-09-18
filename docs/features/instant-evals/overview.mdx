@@ -17,9 +17,11 @@ answered across six months of production.
 ## What it costs
 
 Judging is done by a small classifier that answers typed questions over text,
-so a run is cheap and fast rather than a model call per row. Ten thousand
-conversations costs about a quarter of a dollar and finishes in under two
-minutes. A hundred thousand takes about seventeen.
+so a run is cheap and fast rather than a model call per row.
+
+What a run costs depends on how many rows it selects, how much text each one
+renders to, and how many questions you ask. Run `langwatch instant-eval
+estimate` to see the figure for your own data before you start.
 
 Every run is priced before it starts. `--estimate` gives you the price without
 starting anything, and a run over a thousand rows prints its price first.

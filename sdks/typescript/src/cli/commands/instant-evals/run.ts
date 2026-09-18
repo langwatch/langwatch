@@ -122,6 +122,7 @@ export const runInstantEvalCommand = async (
     runId: run.id,
     machine,
     timeoutMs: minutes * 60_000,
+    known: run,
   });
   const document: RunDocument = {
     outcome: waited.outcome,

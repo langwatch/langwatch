@@ -81,6 +81,7 @@ export async function waitForInstantEvalRun({
   runId,
   machine,
   timeoutMs,
+  known,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }: {
   service: Pick<InstantEvalsApiService, "get">;
@@ -88,6 +89,12 @@ export async function waitForInstantEvalRun({
   /** The caller asked for a machine format, so stdout is the final document's. */
   machine: boolean;
   timeoutMs: number;
+  /**
+   * The run as the caller already read it, returned when giving up before any
+   * poll succeeded. Both exits here are reached because reading the run is
+   * failing, so a last read cannot be relied on to answer.
+   */
+  known: InstantEvalRun;
   /** Injected so a test does not sit through the poll interval. */
   sleep?: (ms: number) => Promise<void>;
 }): Promise<InstantEvalWaitResult> {
@@ -113,7 +120,10 @@ export async function waitForInstantEvalRun({
           chalk.yellow(`Follow it with: langwatch instant-eval status ${runId}`),
         );
       }
-      return { outcome: "timeout", run: last ?? (await lastResort(service, runId)) };
+      return {
+        outcome: "timeout",
+        run: last ?? (await lastResort(service, runId, known)),
+      };
     }
 
     await sleep(POLL_INTERVAL_MS);
@@ -130,7 +140,7 @@ export async function waitForInstantEvalRun({
         );
         return {
           outcome: "poll_failure",
-          run: last ?? (await lastResort(service, runId)),
+          run: last ?? (await lastResort(service, runId, known)),
         };
       }
       continue;
@@ -177,6 +187,11 @@ export async function waitForInstantEvalRun({
 async function lastResort(
   service: Pick<InstantEvalsApiService, "get">,
   runId: string,
+  known: InstantEvalRun,
 ): Promise<InstantEvalRun> {
-  return await service.get(runId);
+  try {
+    return await service.get(runId);
+  } catch {
+    return known;
+  }
 }

@@ -360,10 +360,12 @@ five read commands, `rendersOwnResult` for `run` and `status` because a poll
 and an estimate line follow the answer, and `-o table|json|agents|yaml` with
 `--jq` throughout. Two decisions are its own:
 
-- **Money is never spent by surprise.** `--estimate` prices the run and exits.
-  A plain `run` whose limit is over a thousand rows asks for the estimate
-  first, prints one line, and then creates. A failed estimate does not stop the
-  run: the caller asked for a run, not for a price.
+- **A run says what it will cost before it starts.** `--estimate` prices the
+  run and exits. A plain `run` whose limit is over a thousand rows asks for the
+  estimate first, prints one line, and then creates. If the estimate itself
+  fails the run still goes ahead, unpriced: the caller asked for a run, not for
+  a price, and the limit they wrote is the ceiling on what it can spend. That
+  ceiling, not the estimate, is what bounds the bill.
 - **`run` prints the statement.** Under a Statement heading in table mode, with
   its bound parameters. A caller who asked a question with `--target` gets back
   the LangWatchQL that answered it, which is what they edit when the shorthand

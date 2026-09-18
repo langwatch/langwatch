@@ -16,6 +16,10 @@ import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCliInstantEvalsService } from "./cli-instant-evals-service";
 import { printSample } from "./render";
+import {
+  INSTANT_EVAL_SAMPLE_CEILING,
+  readCountFlag,
+} from "./countFlag";
 
 export const sampleInstantEvalCommand = async (
   id: string,
@@ -23,12 +27,17 @@ export const sampleInstantEvalCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
+  const n = readCountFlag({
+    raw: options.number,
+    flag: "-n",
+    max: INSTANT_EVAL_SAMPLE_CEILING,
+  });
   const service = createCliInstantEvalsService();
   const spinner = createSpinner(`Sampling run ${id}...`).start();
 
   try {
     const sample = await service.sample(id, {
-      ...(options.number === undefined ? {} : { n: Number(options.number) }),
+      ...(n === undefined ? {} : { n }),
     });
 
     spinner.succeed(

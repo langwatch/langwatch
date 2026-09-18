@@ -19,6 +19,7 @@ import {
   InstantEvalShorthandError,
   type InstantEvalShorthandInput,
   type InstantEvalShorthandQuestion,
+  instantEvalShorthandSchema,
 } from "..";
 
 const NOW = new Date("2026-09-18T12:00:00.000Z");
@@ -349,6 +350,34 @@ describe("expandInstantEvalShorthand, given how questions are named", () => {
       });
 
       expect(sql).toContain("'it\\'s a path C:\\\\tmp'");
+    });
+  });
+});
+
+describe("instantEvalShorthandSchema, given a question list", () => {
+  describe("when the list is longer than the ceiling", () => {
+    /** @scenario "A question list over the ceiling is refused by its count" */
+    it("refuses by count rather than by the budget the questions leave", () => {
+      const parsed = instantEvalShorthandSchema.safeParse({
+        target: "traces",
+        questions: Array.from({ length: 11 }, () => ({
+          instructions: "the customer sounds annoyed",
+        })),
+      });
+
+      expect(parsed.success).toBe(false);
+    });
+  });
+
+  describe("when a question is written as whitespace", () => {
+    /** @scenario "A question written as whitespace is refused" */
+    it("refuses instructions that carry nothing but spaces", () => {
+      const parsed = instantEvalShorthandSchema.safeParse({
+        target: "traces",
+        questions: [{ instructions: "   " }],
+      });
+
+      expect(parsed.success).toBe(false);
     });
   });
 });

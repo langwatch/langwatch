@@ -74,6 +74,9 @@ const DURATION_UNITS: Readonly<Record<string, number>> = {
   w: 7 * 24 * 60 * 60 * 1_000,
 };
 
+/** The widest window whose start is still a date JavaScript can hold. */
+const MAX_WINDOW_MS = 8.64e15;
+
 /** `--last 7d`, `--last 24h`, `--last 2w`. */
 export function readLast(raw: string): number {
   const match = /^(\d+)\s*([mhdw])$/i.exec(raw.trim());
@@ -83,8 +86,18 @@ export function readLast(raw: string): number {
     );
   }
   const amount = Number(match[1]);
-  if (amount <= 0) refuse(`Invalid --last value: ${raw} (it has to be positive)`);
-  return amount * DURATION_UNITS[match[2]!.toLowerCase()]!;
+  if (!Number.isFinite(amount) || amount <= 0) {
+    refuse(`Invalid --last value: ${raw} (it has to be a positive number)`);
+  }
+  const ms = amount * DURATION_UNITS[match[2]!.toLowerCase()]!;
+  // The digits are unbounded, so a long enough run of them overflows to
+  // Infinity, and even a finite one can name a window no instant can sit in.
+  // Either way the start of the window is not a date, so it is refused here
+  // rather than thrown at the caller as a RangeError.
+  if (ms > MAX_WINDOW_MS) {
+    refuse(`Invalid --last value: ${raw} (that window reaches past any date)`);
+  }
+  return ms;
 }
 
 /** The window the line asked for, as two instants, or nothing. */
