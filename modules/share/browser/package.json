@@ -15,10 +15,6 @@
       "types": "./dist/share.web.d.ts",
       "default": "./src/share.web.ts"
     },
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
     "./share-link-views": {
       "langwatch-declaration-source": "./src/share-link-views.ts",
       "types": "./dist/share-link-views.d.ts",

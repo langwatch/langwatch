@@ -1,9 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "paths": {
-      "@langwatch/share-browser": ["./src/index.ts"]
-    },
+    "paths": {},
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -15,7 +13,6 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
-    "./src/index.ts",
     "./src/share-link-views.ts",
     "./src/share-links.ts",
     "./src/share.web.ts"

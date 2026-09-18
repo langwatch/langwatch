@@ -24,10 +24,6 @@
     "./navigation": {
       "types": "./dist/navigation.d.ts",
       "default": "./src/navigation.ts"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.tsx"
     }
   },
   "scripts": {

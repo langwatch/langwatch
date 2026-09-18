@@ -13,11 +13,6 @@
       "types": "./dist/organization.web.d.ts",
       "default": "./src/organization.web.ts"
     },
-    "./organization-client": {
-      "langwatch-declaration-source": "./src/organization-client.ts",
-      "types": "./dist/organization-client.d.ts",
-      "default": "./src/organization-client.ts"
-    },
     "./surfaces/personal-workspace-features": {
       "types": "./dist/behavior/personal-workspace-features-api.d.ts",
       "default": "./src/behavior/personal-workspace-features-api.ts"
@@ -25,18 +20,6 @@
     "./surfaces/department-picker": {
       "types": "./dist/department-picker.d.ts",
       "default": "./src/department-picker.ts"
-    },
-    "./drawers": {
-      "types": "./dist/drawers.d.ts",
-      "default": "./src/drawers.ts"
-    },
-    "./drawers/project": {
-      "types": "./dist/ui/sections/project-drawers.d.ts",
-      "default": "./src/ui/sections/project-drawers.ts"
-    },
-    "./organization": {
-      "types": "./dist/organization.d.ts",
-      "default": "./src/organization.ts"
     },
     "./surfaces/organization-facts": {
       "types": "./dist/behavior/ui-organization-facts.d.ts",

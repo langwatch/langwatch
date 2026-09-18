@@ -12,16 +12,6 @@
       "langwatch-declaration-source": "./src/api-key.web.ts",
       "types": "./dist/api-key.web.d.ts",
       "default": "./src/api-key.web.ts"
-    },
-    "./api-keys": {
-      "langwatch-declaration-source": "./src/api-keys.ts",
-      "types": "./dist/api-keys.d.ts",
-      "default": "./src/api-keys.ts"
-    },
-    "./authorize": {
-      "langwatch-declaration-source": "./src/authorize.ts",
-      "types": "./dist/authorize.d.ts",
-      "default": "./src/authorize.ts"
     }
   },
   "scripts": {
@@ -38,7 +28,8 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
-    "motion": "catalog:"
+    "motion": "catalog:",
+    "react-router": "catalog:"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",

@@ -7,62 +7,11 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/trace.web.ts",
       "types": "./dist/trace.web.d.ts",
       "default": "./src/trace.web.ts"
-    },
-    "./surfaces/trace-host": {
-      "langwatch-declaration-source": "./src/behavior/trace-host.ts",
-      "types": "./dist/behavior/trace-host.d.ts",
-      "default": "./src/behavior/trace-host.ts"
-    },
-    "./surfaces/trace-drawer-store": {
-      "langwatch-declaration-source": "./src/behavior/drawer.store.ts",
-      "types": "./dist/behavior/drawer.store.d.ts",
-      "default": "./src/behavior/drawer.store.ts"
-    },
-    "./surfaces/trace-view-state": {
-      "langwatch-declaration-source": "./src/trace-view-state.ts",
-      "types": "./dist/trace-view-state.d.ts",
-      "default": "./src/trace-view-state.ts"
-    },
-    "./surfaces/annotation-queue-session": {
-      "langwatch-declaration-source": "./src/surfaces/annotation-queue-session/index.ts",
-      "types": "./dist/surfaces/annotation-queue-session/index.d.ts",
-      "default": "./src/surfaces/annotation-queue-session/index.ts"
-    },
-    "./surfaces/trace-filters": {
-      "langwatch-declaration-source": "./src/surfaces/trace-filters/index.ts",
-      "types": "./dist/surfaces/trace-filters/index.d.ts",
-      "default": "./src/surfaces/trace-filters/index.ts"
-    },
-    "./surfaces/trace-origins": {
-      "langwatch-declaration-source": "./src/surfaces/trace-origins/index.ts",
-      "types": "./dist/surfaces/trace-origins/index.d.ts",
-      "default": "./src/surfaces/trace-origins/index.ts"
-    },
-    "./surfaces/trace-selection": {
-      "langwatch-declaration-source": "./src/surfaces/trace-selection/index.ts",
-      "types": "./dist/surfaces/trace-selection/index.d.ts",
-      "default": "./src/surfaces/trace-selection/index.ts"
-    },
-    "./traces": {
-      "types": "./dist/traces.d.ts",
-      "default": "./src/traces.ts"
-    },
-    "./screens/traces": {
-      "langwatch-declaration-source": "./src/screens/traces/index.ts",
-      "types": "./dist/screens/traces/index.d.ts",
-      "default": "./src/screens/traces/index.ts"
-    },
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
     },
     "./surfaces/setup-with-agent-button": {
       "langwatch-declaration-source": "./src/ui/sections/setup-with-agent-button.tsx",
@@ -84,21 +33,6 @@
       "types": "./dist/ui/sections/traces/traces-mapping.d.ts",
       "default": "./src/ui/sections/traces/traces-mapping.tsx"
     },
-    "./surfaces/isolated-error-boundary": {
-      "langwatch-declaration-source": "./src/ui/sections/isolated-error-boundary.tsx",
-      "types": "./dist/ui/sections/isolated-error-boundary.d.ts",
-      "default": "./src/ui/sections/isolated-error-boundary.tsx"
-    },
-    "./drawer.store": {
-      "langwatch-declaration-source": "./src/behavior/drawer.store.ts",
-      "types": "./dist/behavior/drawer.store.d.ts",
-      "default": "./src/behavior/drawer.store.ts"
-    },
-    "./drawers": {
-      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
-      "types": "./dist/ui/sections/drawers.d.ts",
-      "default": "./src/ui/sections/drawers.ts"
-    },
     "./surfaces/presence-menu-item": {
       "langwatch-declaration-source": "./src/ui/sections/presence/presence-menu-item.tsx",
       "types": "./dist/ui/sections/presence/presence-menu-item.d.ts",
@@ -108,31 +42,6 @@
       "langwatch-declaration-source": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx",
       "types": "./dist/ui/sections/explorer/search-bar/suggestion-dropdown.d.ts",
       "default": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx"
-    },
-    "./surfaces/suggestion-state": {
-      "langwatch-declaration-source": "./src/model/get-suggestion-state.ts",
-      "types": "./dist/model/get-suggestion-state.d.ts",
-      "default": "./src/model/get-suggestion-state.ts"
-    },
-    "./surfaces/suggestion-items": {
-      "langwatch-declaration-source": "./src/model/explorer/search-bar/suggestion-items.ts",
-      "types": "./dist/model/explorer/search-bar/suggestion-items.d.ts",
-      "default": "./src/model/explorer/search-bar/suggestion-items.ts"
-    },
-    "./surfaces/suggestion-ui": {
-      "langwatch-declaration-source": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts",
-      "types": "./dist/ui/sections/explorer/search-bar/suggestion-ui.d.ts",
-      "default": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts"
-    },
-    "./surfaces/conversation-view": {
-      "langwatch-declaration-source": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts",
-      "types": "./dist/ui/sections/explorer/trace-drawer/conversation-view/index.d.ts",
-      "default": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts"
-    },
-    "./surfaces/conversation-expand-context": {
-      "langwatch-declaration-source": "./src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts",
-      "types": "./dist/behavior/explorer/trace-drawer/conversation-view/expand-context.d.ts",
-      "default": "./src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts"
     },
     "./surfaces/trace-id-peek": {
       "langwatch-declaration-source": "./src/ui/sections/explorer/trace-id-peek.tsx",
@@ -144,40 +53,10 @@
       "types": "./dist/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.d.ts",
       "default": "./src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx"
     },
-    "./surfaces/conversation-turns": {
-      "langwatch-declaration-source": "./src/ui/sections/explorer/hooks/use-conversation-turns.ts",
-      "types": "./dist/ui/sections/explorer/hooks/use-conversation-turns.d.ts",
-      "default": "./src/ui/sections/explorer/hooks/use-conversation-turns.ts"
-    },
-    "./surfaces/explorer-trace-types": {
-      "langwatch-declaration-source": "./src/ui/sections/explorer/types/trace.ts",
-      "types": "./dist/ui/sections/explorer/types/trace.d.ts",
-      "default": "./src/ui/sections/explorer/types/trace.ts"
-    },
-    "./surfaces/legacy-trace-to-turn": {
-      "langwatch-declaration-source": "./src/ui/sections/explorer/utils/legacy-trace-to-turn.ts",
-      "types": "./dist/ui/sections/explorer/utils/legacy-trace-to-turn.d.ts",
-      "default": "./src/ui/sections/explorer/utils/legacy-trace-to-turn.ts"
-    },
-    "./surfaces/trace-edit-mode": {
-      "langwatch-declaration-source": "./src/ui/sections/explorer/utils/trace-edit-mode.ts",
-      "types": "./dist/ui/sections/explorer/utils/trace-edit-mode.d.ts",
-      "default": "./src/ui/sections/explorer/utils/trace-edit-mode.ts"
-    },
     "./surfaces/project-span-names": {
       "langwatch-declaration-source": "./src/ui/sections/use-project-span-names.ts",
       "types": "./dist/ui/sections/use-project-span-names.d.ts",
       "default": "./src/ui/sections/use-project-span-names.ts"
-    },
-    "./surfaces/export-types": {
-      "langwatch-declaration-source": "./src/model/export-types.ts",
-      "types": "./dist/model/export-types.d.ts",
-      "default": "./src/model/export-types.ts"
-    },
-    "./surfaces/scenario-role": {
-      "langwatch-declaration-source": "./src/ui/elements/scenario-role.tsx",
-      "types": "./dist/ui/elements/scenario-role.d.ts",
-      "default": "./src/ui/elements/scenario-role.tsx"
     },
     "./surfaces/conversation": {
       "langwatch-declaration-source": "./src/ui/sections/conversation/index.ts",
@@ -205,14 +84,16 @@
     "@langwatch/dataset-browser": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-browser": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
-    "@langwatch/langy-browser": "workspace:*",
+    "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-browser": "workspace:*",

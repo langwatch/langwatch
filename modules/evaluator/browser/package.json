@@ -7,18 +7,11 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/evaluator.web.ts",
       "types": "./dist/evaluator.web.d.ts",
       "default": "./src/evaluator.web.ts"
-    },
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
     },
     "./dynamic-zod-form": {
       "langwatch-declaration-source": "./src/dynamic-zod-form.ts",
@@ -35,45 +28,10 @@
       "types": "./dist/ui/sections/evaluators/evaluator-editor-shared.d.ts",
       "default": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx"
     },
-    "./evaluator-result-chip": {
-      "langwatch-declaration-source": "./src/evaluator-result-chip.ts",
-      "types": "./dist/evaluator-result-chip.d.ts",
-      "default": "./src/evaluator-result-chip.ts"
-    },
-    "./drawers": {
-      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
-      "types": "./dist/ui/sections/drawers.d.ts",
-      "default": "./src/ui/sections/drawers.ts"
-    },
-    "./editor-drawers": {
-      "langwatch-declaration-source": "./src/ui/sections/editor-drawers.ts",
-      "types": "./dist/ui/sections/editor-drawers.d.ts",
-      "default": "./src/ui/sections/editor-drawers.ts"
-    },
     "./available-evaluators": {
       "langwatch-declaration-source": "./src/available-evaluators.ts",
       "types": "./dist/available-evaluators.d.ts",
       "default": "./src/available-evaluators.ts"
-    },
-    "./evaluation-edit": {
-      "langwatch-declaration-source": "./src/evaluation-edit.ts",
-      "types": "./dist/evaluation-edit.d.ts",
-      "default": "./src/evaluation-edit.ts"
-    },
-    "./evaluators": {
-      "langwatch-declaration-source": "./src/evaluators.ts",
-      "types": "./dist/evaluators.d.ts",
-      "default": "./src/evaluators.ts"
-    },
-    "./evaluation-types": {
-      "langwatch-declaration-source": "./src/evaluation-types.ts",
-      "types": "./dist/evaluation-types.d.ts",
-      "default": "./src/evaluation-types.ts"
-    },
-    "./evaluation-results": {
-      "langwatch-declaration-source": "./src/evaluation-results.ts",
-      "types": "./dist/evaluation-results.d.ts",
-      "default": "./src/evaluation-results.ts"
     },
     "./surfaces/evaluation-status": {
       "langwatch-declaration-source": "./src/model/evaluation-status.ts",
@@ -100,6 +58,7 @@
     "@langwatch/experiment-browser": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prompt-browser": "workspace:*",

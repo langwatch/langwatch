@@ -14,10 +14,13 @@
   "files": [
     "./src/ui/index.ts",
     "./src/command-bar.ts",
-    "./src/navigation.ts",
-    "./src/testing.tsx"
+    "./src/navigation.ts"
   ],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json"
+  ],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",
@@ -57,6 +60,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

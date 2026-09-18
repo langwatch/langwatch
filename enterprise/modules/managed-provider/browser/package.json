@@ -8,12 +8,7 @@
     "src"
   ],
   "type": "module",
-  "exports": {
-    "./surfaces/managed-provider-alert": {
-      "types": "./dist/ui/sections/managed-provider-alert/index.d.ts",
-      "default": "./src/ui/sections/managed-provider-alert/index.ts"
-    }
-  },
+  "exports": {},
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run"

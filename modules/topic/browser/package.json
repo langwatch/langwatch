@@ -12,11 +12,6 @@
       "langwatch-declaration-source": "./src/topic.web.ts",
       "types": "./dist/topic.web.d.ts",
       "default": "./src/topic.web.ts"
-    },
-    "./topic-clustering": {
-      "langwatch-declaration-source": "./src/topic-clustering.ts",
-      "types": "./dist/topic-clustering.d.ts",
-      "default": "./src/topic-clustering.ts"
     }
   },
   "scripts": {

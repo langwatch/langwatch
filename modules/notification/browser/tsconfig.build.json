@@ -11,8 +11,14 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/email-suppressions.ts", "./src/notification.web.ts"],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "files": [
+    "./src/notification.web.ts"
+  ],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json"
+  ],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",

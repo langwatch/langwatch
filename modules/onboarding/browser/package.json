@@ -18,16 +18,6 @@
       "types": "./dist/onboarding.web.d.ts",
       "default": "./src/onboarding.web.ts"
     },
-    "./hooks/useAttributionCapture": {
-      "langwatch-declaration-source": "./src/behavior/use-attribution-capture.ts",
-      "types": "./dist/behavior/use-attribution-capture.d.ts",
-      "default": "./src/behavior/use-attribution-capture.ts"
-    },
-    "./onboarding": {
-      "langwatch-declaration-source": "./src/onboarding.ts",
-      "types": "./dist/onboarding.d.ts",
-      "default": "./src/onboarding.ts"
-    },
     "./surfaces/onboarding-mesh-background": {
       "langwatch-declaration-source": "./src/ui/elements/onboarding-mesh-background.tsx",
       "types": "./dist/ui/elements/onboarding-mesh-background.d.ts",
@@ -127,6 +117,7 @@
     "react-feather": "catalog:",
     "react-hook-form": "catalog:",
     "react-icons": "catalog:",
+    "react-router": "catalog:",
     "shiki": "catalog:",
     "zod": "catalog:"
   },

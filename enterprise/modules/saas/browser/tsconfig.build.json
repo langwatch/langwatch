@@ -1,9 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "paths": {
-      "@langwatch/enterprise-saas-browser": ["./src/index.ts"]
-    },
+    "paths": {},
     "composite": true,
     "declaration": true,
     "declarationMap": true,

@@ -10,25 +10,10 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
     "./declaration": {
       "langwatch-declaration-source": "./src/langy.web.ts",
       "types": "./dist/langy.web.d.ts",
       "default": "./src/langy.web.ts"
-    },
-    "./langy": {
-      "langwatch-declaration-source": "./src/langy.ts",
-      "types": "./dist/langy.d.ts",
-      "default": "./src/langy.ts"
-    },
-    "./langy-code-access-preference": {
-      "langwatch-declaration-source": "./src/langy-code-access-preference.ts",
-      "types": "./dist/langy-code-access-preference.d.ts",
-      "default": "./src/langy-code-access-preference.ts"
     },
     "./langy-page-registration": {
       "langwatch-declaration-source": "./src/langy-page-registration.ts",
@@ -62,6 +47,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/github-browser": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

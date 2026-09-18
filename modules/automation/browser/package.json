@@ -12,14 +12,6 @@
       "langwatch-declaration-source": "./src/automation.web.ts",
       "types": "./dist/automation.web.d.ts",
       "default": "./src/automation.web.ts"
-    },
-    "./automations": {
-      "types": "./dist/automations.d.ts",
-      "default": "./src/automations.ts"
-    },
-    "./drawers": {
-      "types": "./dist/drawers.d.ts",
-      "default": "./src/drawers.ts"
     }
   },
   "scripts": {

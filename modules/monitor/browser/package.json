@@ -14,11 +14,6 @@
       "langwatch-declaration-source": "./src/monitor.web.ts",
       "types": "./dist/monitor.web.d.ts",
       "default": "./src/monitor.web.ts"
-    },
-    "./online-evaluations": {
-      "langwatch-declaration-source": "./src/online-evaluations.ts",
-      "types": "./dist/online-evaluations.d.ts",
-      "default": "./src/online-evaluations.ts"
     }
   },
   "scripts": {

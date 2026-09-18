@@ -15,16 +15,6 @@
       "types": "./dist/annotation.web.d.ts",
       "default": "./src/annotation.web.ts"
     },
-    "./annotations": {
-      "langwatch-declaration-source": "./src/annotations.ts",
-      "types": "./dist/annotations.d.ts",
-      "default": "./src/annotations.ts"
-    },
-    "./annotation-scores": {
-      "langwatch-declaration-source": "./src/annotation-scores.ts",
-      "types": "./dist/annotation-scores.d.ts",
-      "default": "./src/annotation-scores.ts"
-    },
     "./annotation-form": {
       "langwatch-declaration-source": "./src/annotation-form.ts",
       "types": "./dist/annotation-form.d.ts",
@@ -39,11 +29,6 @@
       "langwatch-declaration-source": "./src/annotation-card.ts",
       "types": "./dist/annotation-card.d.ts",
       "default": "./src/annotation-card.ts"
-    },
-    "./testing": {
-      "langwatch-declaration-source": "./src/testing.tsx",
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.tsx"
     }
   },
   "scripts": {
@@ -57,6 +42,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-browser": "workspace:*",
     "@langwatch/time": "workspace:*",

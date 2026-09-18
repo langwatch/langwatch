@@ -14,17 +14,9 @@
       "types": "./dist/billing.web.d.ts",
       "default": "./src/billing.web.ts"
     },
-    "./billing": {
-      "types": "./dist/billing.d.ts",
-      "default": "./src/billing.ts"
-    },
     "./surfaces/contact-sales": {
       "types": "./dist/ui/sections/contact-sales/index.d.ts",
       "default": "./src/ui/sections/contact-sales/index.ts"
-    },
-    "./surfaces/seat-proration-preview": {
-      "types": "./dist/ui/sections/seat-proration-preview/index.d.ts",
-      "default": "./src/ui/sections/seat-proration-preview/index.ts"
     }
   },
   "scripts": {

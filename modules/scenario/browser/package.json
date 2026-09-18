@@ -15,35 +15,15 @@
       "types": "./dist/scenario.web.d.ts",
       "default": "./src/scenario.web.ts"
     },
-    "./scenario-mappings": {
-      "langwatch-declaration-source": "./src/scenario-mappings.ts",
-      "types": "./dist/scenario-mappings.d.ts",
-      "default": "./src/scenario-mappings.ts"
-    },
     "./surfaces/media-part": {
       "langwatch-declaration-source": "./src/ui/sections/media-part.tsx",
       "types": "./dist/ui/sections/media-part.d.ts",
       "default": "./src/ui/sections/media-part.tsx"
     },
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
     "./surfaces/simulations-preference": {
       "langwatch-declaration-source": "./src/simulations-preference.ts",
       "types": "./dist/simulations-preference.d.ts",
       "default": "./src/simulations-preference.ts"
-    },
-    "./simulations": {
-      "langwatch-declaration-source": "./src/simulations.ts",
-      "types": "./dist/simulations.d.ts",
-      "default": "./src/simulations.ts"
-    },
-    "./drawers": {
-      "langwatch-declaration-source": "./src/drawers.ts",
-      "types": "./dist/drawers.d.ts",
-      "default": "./src/drawers.ts"
     },
     "./surfaces/parameter-line-field": {
       "types": "./dist/ui/sections/agent-testing/run/parameter-line-field.d.ts",
@@ -67,7 +47,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/workflow-browser-kit": "workspace:*",
     "@chakra-ui/react": "catalog:",
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/sortable": "catalog:",
@@ -81,6 +60,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/evaluator-browser": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-browser": "workspace:*",
@@ -89,19 +69,22 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
+    "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prompt-browser": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
-    "@langwatch/suite-browser": "workspace:*",
+    "@langwatch/suite-browser-kit": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",
+    "@langwatch/workflow-browser-kit": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@tanstack/react-table": "catalog:",
     "@tanstack/react-virtual": "catalog:",

@@ -12,11 +12,6 @@
       "langwatch-declaration-source": "./src/authz.web.ts",
       "types": "./dist/authz.web.d.ts",
       "default": "./src/authz.web.ts"
-    },
-    "./authz": {
-      "langwatch-declaration-source": "./src/authz.ts",
-      "types": "./dist/authz.d.ts",
-      "default": "./src/authz.ts"
     }
   },
   "scripts": {

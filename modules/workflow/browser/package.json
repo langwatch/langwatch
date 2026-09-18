@@ -7,8 +7,6 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/workflow.web.ts",
@@ -19,11 +17,6 @@
       "langwatch-declaration-source": "./src/workflow-code-editor.ts",
       "types": "./dist/workflow-code-editor.d.ts",
       "default": "./src/workflow-code-editor.ts"
-    },
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
     },
     "./surfaces/copy-button": {
       "langwatch-declaration-source": "./src/ui/sections/copy-button.tsx",
@@ -39,11 +32,6 @@
       "langwatch-declaration-source": "./src/hoverable-big-text.ts",
       "types": "./dist/hoverable-big-text.d.ts",
       "default": "./src/hoverable-big-text.ts"
-    },
-    "./code-block-editor": {
-      "langwatch-declaration-source": "./src/code-block-editor.ts",
-      "types": "./dist/code-block-editor.d.ts",
-      "default": "./src/code-block-editor.ts"
     },
     "./render-code": {
       "langwatch-declaration-source": "./src/render-code.ts",
@@ -80,11 +68,6 @@
       "types": "./dist/feature-flag.d.ts",
       "default": "./src/feature-flag.ts"
     },
-    "./surfaces/workflow-host": {
-      "langwatch-declaration-source": "./src/model/workflow-host.ts",
-      "types": "./dist/model/workflow-host.d.ts",
-      "default": "./src/model/workflow-host.ts"
-    },
     "./add-model-provider-key": {
       "langwatch-declaration-source": "./src/add-model-provider-key.ts",
       "types": "./dist/add-model-provider-key.d.ts",
@@ -109,15 +92,6 @@
       "langwatch-declaration-source": "./src/emoji-picker-modal.ts",
       "types": "./dist/emoji-picker-modal.d.ts",
       "default": "./src/emoji-picker-modal.ts"
-    },
-    "./execution-state-error": {
-      "langwatch-declaration-source": "./src/execution-state-error.ts",
-      "types": "./dist/execution-state-error.d.ts",
-      "default": "./src/execution-state-error.ts"
-    },
-    "./workflows": {
-      "types": "./dist/workflows.d.ts",
-      "default": "./src/workflows.ts"
     },
     "./handled-error-views": {
       "langwatch-declaration-source": "./src/handled-error-views.ts",
@@ -148,11 +122,6 @@
       "langwatch-declaration-source": "./src/crisp-bubble-policy.ts",
       "types": "./dist/crisp-bubble-policy.d.ts",
       "default": "./src/crisp-bubble-policy.ts"
-    },
-    "./surfaces/workflow-routes": {
-      "langwatch-declaration-source": "./src/model/routes.ts",
-      "types": "./dist/model/routes.d.ts",
-      "default": "./src/model/routes.ts"
     },
     "./fetch-sse": {
       "langwatch-declaration-source": "./src/fetch-sse.ts",
@@ -204,9 +173,12 @@
     "@langwatch/dataset-browser": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/evaluator-browser": "workspace:*",
+    "@langwatch/evaluator-browser-kit": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-browser": "workspace:*",
+    "@langwatch/experiment-browser-kit": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

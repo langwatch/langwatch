@@ -23,31 +23,6 @@
       "types": "./dist/ui/elements/model-selector.d.ts",
       "default": "./src/ui/elements/model-selector.tsx"
     },
-    "./no-models-configured-callout": {
-      "langwatch-declaration-source": "./src/no-models-configured-callout.ts",
-      "types": "./dist/no-models-configured-callout.d.ts",
-      "default": "./src/no-models-configured-callout.ts"
-    },
-    "./surfaces/provider-model-selector": {
-      "langwatch-declaration-source": "./src/ui/elements/provider-model-selector.tsx",
-      "types": "./dist/ui/elements/provider-model-selector.d.ts",
-      "default": "./src/ui/elements/provider-model-selector.tsx"
-    },
-    "./ai-sparkles-loader": {
-      "langwatch-declaration-source": "./src/ai-sparkles-loader.ts",
-      "types": "./dist/ai-sparkles-loader.d.ts",
-      "default": "./src/ai-sparkles-loader.ts"
-    },
-    "./history-icon": {
-      "langwatch-declaration-source": "./src/history-icon.ts",
-      "types": "./dist/history-icon.d.ts",
-      "default": "./src/history-icon.ts"
-    },
-    "./drawers": {
-      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
-      "types": "./dist/ui/sections/drawers.d.ts",
-      "default": "./src/ui/sections/drawers.ts"
-    },
     "./model-limits": {
       "langwatch-declaration-source": "./src/model-limits.ts",
       "types": "./dist/model-limits.d.ts",
@@ -57,31 +32,6 @@
       "langwatch-declaration-source": "./src/behavior/use-model-providers-settings.ts",
       "types": "./dist/behavior/use-model-providers-settings.d.ts",
       "default": "./src/behavior/use-model-providers-settings.ts"
-    },
-    "./model-providers": {
-      "langwatch-declaration-source": "./src/model-providers.ts",
-      "types": "./dist/model-providers.d.ts",
-      "default": "./src/model-providers.ts"
-    },
-    "./clamp-max-tokens": {
-      "langwatch-declaration-source": "./src/clamp-max-tokens.ts",
-      "types": "./dist/clamp-max-tokens.d.ts",
-      "default": "./src/clamp-max-tokens.ts"
-    },
-    "./missing-model-toast": {
-      "langwatch-declaration-source": "./src/missing-model-toast.ts",
-      "types": "./dist/missing-model-toast.d.ts",
-      "default": "./src/missing-model-toast.ts"
-    },
-    "./surfaces/model-error": {
-      "langwatch-declaration-source": "./src/model/model-error.ts",
-      "types": "./dist/model/model-error.d.ts",
-      "default": "./src/model/model-error.ts"
-    },
-    "./model-error-interceptor": {
-      "langwatch-declaration-source": "./src/model-error-interceptor.ts",
-      "types": "./dist/model-error-interceptor.d.ts",
-      "default": "./src/model-error-interceptor.ts"
     }
   },
   "scripts": {
@@ -94,6 +44,8 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/error-views": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-browser-kit": "workspace:*",

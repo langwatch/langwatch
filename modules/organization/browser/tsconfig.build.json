@@ -13,13 +13,16 @@
   },
   "files": [
     "./src/behavior/personal-workspace-features-api.ts",
+    "./src/behavior/scope-capability.ts",
+    "./src/behavior/ui-organization-facts.ts",
     "./src/department-picker.ts",
-    "./src/drawers.ts",
-    "./src/ui/sections/project-drawers.ts",
-    "./src/organization.ts",
     "./src/organization.web.ts"
   ],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json"
+  ],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",

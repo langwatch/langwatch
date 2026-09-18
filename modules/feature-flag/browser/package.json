@@ -7,32 +7,16 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/feature-flag.web.ts",
       "types": "./dist/feature-flag.web.d.ts",
       "default": "./src/feature-flag.web.ts"
     },
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
-    "./anonymous-id": {
-      "langwatch-declaration-source": "./src/anonymous-id.ts",
-      "types": "./dist/anonymous-id.d.ts",
-      "default": "./src/anonymous-id.ts"
-    },
     "./surfaces/experiment-catalogue": {
       "langwatch-declaration-source": "./src/experiment-catalogue.ts",
       "types": "./dist/experiment-catalogue.d.ts",
       "default": "./src/experiment-catalogue.ts"
-    },
-    "./rule-editing": {
-      "langwatch-declaration-source": "./src/rule-editing.ts",
-      "types": "./dist/rule-editing.d.ts",
-      "default": "./src/rule-editing.ts"
     }
   },
   "scripts": {

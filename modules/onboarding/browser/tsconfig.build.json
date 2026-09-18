@@ -12,10 +12,8 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
-    "./src/behavior/use-attribution-capture.ts",
     "./src/model/observability/types.ts",
     "./src/model/shared/build-mcp-config.ts",
-    "./src/onboarding.ts",
     "./src/onboarding.web.ts",
     "./src/ui/blocks/observability/docs-links.tsx",
     "./src/ui/blocks/tech-stack.tsx",
@@ -32,7 +30,11 @@
     "./src/ui/sections/via-claude-code-screen.tsx",
     "./src/ui/sections/via-claude-desktop-screen.tsx"
   ],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json"
+  ],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",
@@ -57,6 +59,9 @@
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
       "path": "../../model-provider/browser-kit/tsconfig.build.json"

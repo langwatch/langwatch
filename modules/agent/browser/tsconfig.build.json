@@ -12,13 +12,8 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
-    "./src/agent-client.ts",
-    "./src/agent-editors.ts",
     "./src/agent-http-editor.ts",
-    "./src/agent-management.ts",
-    "./src/agent.web.ts",
-    "./src/connected-agents.ts",
-    "./src/ui/sections/http-config-editor.tsx"
+    "./src/agent.web.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -47,7 +42,13 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
       "path": "../../scenario/contract/tsconfig.build.json"

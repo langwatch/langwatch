@@ -12,11 +12,6 @@
       "langwatch-declaration-source": "./src/notification.web.ts",
       "types": "./dist/notification.web.d.ts",
       "default": "./src/notification.web.ts"
-    },
-    "./email-suppressions": {
-      "langwatch-declaration-source": "./src/email-suppressions.ts",
-      "types": "./dist/email-suppressions.d.ts",
-      "default": "./src/email-suppressions.ts"
     }
   },
   "scripts": {

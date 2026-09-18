@@ -13,35 +13,10 @@
       "types": "./dist/agent.web.d.ts",
       "default": "./src/agent.web.ts"
     },
-    "./agent-editors": {
-      "langwatch-declaration-source": "./src/agent-editors.ts",
-      "types": "./dist/agent-editors.d.ts",
-      "default": "./src/agent-editors.ts"
-    },
-    "./agent-management": {
-      "langwatch-declaration-source": "./src/agent-management.ts",
-      "types": "./dist/agent-management.d.ts",
-      "default": "./src/agent-management.ts"
-    },
-    "./connected-agents": {
-      "langwatch-declaration-source": "./src/connected-agents.ts",
-      "types": "./dist/connected-agents.d.ts",
-      "default": "./src/connected-agents.ts"
-    },
     "./agent-http-editor": {
       "langwatch-declaration-source": "./src/agent-http-editor.ts",
       "types": "./dist/agent-http-editor.d.ts",
       "default": "./src/agent-http-editor.ts"
-    },
-    "./agent-client": {
-      "langwatch-declaration-source": "./src/agent-client.ts",
-      "types": "./dist/agent-client.d.ts",
-      "default": "./src/agent-client.ts"
-    },
-    "./surfaces/http-config-editor": {
-      "langwatch-declaration-source": "./src/ui/sections/http-config-editor.tsx",
-      "types": "./dist/ui/sections/http-config-editor.d.ts",
-      "default": "./src/ui/sections/http-config-editor.tsx"
     }
   },
   "scripts": {
@@ -53,6 +28,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/scenario-browser": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",

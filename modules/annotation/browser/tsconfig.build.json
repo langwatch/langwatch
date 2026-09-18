@@ -15,10 +15,7 @@
     "./src/annotation-card.ts",
     "./src/annotation-chips.ts",
     "./src/annotation-form.ts",
-    "./src/annotation-scores.ts",
-    "./src/annotation.web.ts",
-    "./src/annotations.ts",
-    "./src/testing.tsx"
+    "./src/annotation.web.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -48,6 +45,9 @@
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"

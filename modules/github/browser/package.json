@@ -18,15 +18,6 @@
     "./surfaces/github-connect-popup": {
       "types": "./dist/behavior/github-connect-popup.d.ts",
       "default": "./src/behavior/github-connect-popup.ts"
-    },
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
-    "./integrations": {
-      "langwatch-declaration-source": "./src/integrations.ts",
-      "types": "./dist/integrations.d.ts",
-      "default": "./src/integrations.ts"
     }
   },
   "scripts": {

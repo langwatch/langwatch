@@ -1,9 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "paths": {
-      "@langwatch/feature-flag-browser": ["./src/index.ts"]
-    },
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -15,10 +12,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
-    "./src/index.ts",
-    "./src/anonymous-id.ts",
     "./src/experiment-catalogue.ts",
-    "./src/rule-editing.ts",
     "./src/feature-flag.web.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

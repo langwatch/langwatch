@@ -19,8 +19,7 @@
     "./src/coding-agent.web.ts",
     "./src/index.ts",
     "./src/pull-requests.ts",
-    "./src/session-table.ts",
-    "./src/testing.tsx"
+    "./src/session-table.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -56,9 +55,6 @@
     },
     {
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
     }
   ]
 }

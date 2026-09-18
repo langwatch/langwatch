@@ -10,12 +10,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    }
-  },
+  "exports": {},
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run"

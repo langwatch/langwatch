@@ -12,11 +12,6 @@
       "langwatch-declaration-source": "./src/data-privacy.web.ts",
       "types": "./dist/data-privacy.web.d.ts",
       "default": "./src/data-privacy.web.ts"
-    },
-    "./data-privacy": {
-      "langwatch-declaration-source": "./src/data-privacy.ts",
-      "types": "./dist/data-privacy.d.ts",
-      "default": "./src/data-privacy.ts"
     }
   },
   "scripts": {

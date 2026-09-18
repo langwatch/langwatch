@@ -8,33 +8,16 @@
     "tests"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/experiment.web.ts",
       "types": "./dist/experiment.web.d.ts",
       "default": "./src/experiment.web.ts"
     },
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
     "./batch-evaluation-state": {
       "langwatch-declaration-source": "./src/batch-evaluation-state.ts",
       "types": "./dist/batch-evaluation-state.d.ts",
       "default": "./src/batch-evaluation-state.ts"
-    },
-    "./evaluation-progress-bar": {
-      "langwatch-declaration-source": "./src/evaluation-progress-bar.ts",
-      "types": "./dist/evaluation-progress-bar.d.ts",
-      "default": "./src/evaluation-progress-bar.ts"
-    },
-    "./drawers": {
-      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
-      "types": "./dist/ui/sections/drawers.d.ts",
-      "default": "./src/ui/sections/drawers.ts"
     },
     "./comparison-config-form": {
       "langwatch-declaration-source": "./src/comparison-config-form.ts",
@@ -46,45 +29,15 @@
       "types": "./dist/evaluation-mappings.d.ts",
       "default": "./src/evaluation-mappings.ts"
     },
-    "./cell-failure": {
-      "langwatch-declaration-source": "./src/cell-failure.ts",
-      "types": "./dist/cell-failure.d.ts",
-      "default": "./src/cell-failure.ts"
-    },
     "./evaluator-editor-callbacks": {
       "langwatch-declaration-source": "./src/evaluator-editor-callbacks.ts",
       "types": "./dist/evaluator-editor-callbacks.d.ts",
       "default": "./src/evaluator-editor-callbacks.ts"
     },
-    "./mapping-validation": {
-      "langwatch-declaration-source": "./src/mapping-validation.ts",
-      "types": "./dist/mapping-validation.d.ts",
-      "default": "./src/mapping-validation.ts"
-    },
-    "./experiments": {
-      "langwatch-declaration-source": "./src/experiments.ts",
-      "types": "./dist/experiments.d.ts",
-      "default": "./src/experiments.ts"
-    },
     "./batch-results": {
       "langwatch-declaration-source": "./src/batch-results.ts",
       "types": "./dist/batch-results.d.ts",
       "default": "./src/batch-results.ts"
-    },
-    "./workbench-store": {
-      "langwatch-declaration-source": "./src/workbench-store.ts",
-      "types": "./dist/workbench-store.d.ts",
-      "default": "./src/workbench-store.ts"
-    },
-    "./workbench-results-fold": {
-      "langwatch-declaration-source": "./src/workbench-results-fold.ts",
-      "types": "./dist/workbench-results-fold.d.ts",
-      "default": "./src/workbench-results-fold.ts"
-    },
-    "./workbench-run-identification": {
-      "langwatch-declaration-source": "./src/workbench-run-identification.ts",
-      "types": "./dist/workbench-run-identification.d.ts",
-      "default": "./src/workbench-run-identification.ts"
     }
   },
   "scripts": {
@@ -100,15 +53,19 @@
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/dataset-browser": "workspace:*",
+    "@langwatch/dataset-browser-kit": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/evaluator-browser": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/evaluator-browser-kit": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/experiment-browser-kit": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
+    "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
     "@langwatch/prompt-browser": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",

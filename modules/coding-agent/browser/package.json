@@ -25,11 +25,6 @@
       "types": "./dist/activity.d.ts",
       "default": "./src/activity.ts"
     },
-    "./testing": {
-      "langwatch-declaration-source": "./src/testing.tsx",
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.tsx"
-    },
     "./surfaces/session-table": {
       "langwatch-declaration-source": "./src/session-table.ts",
       "types": "./dist/session-table.d.ts",

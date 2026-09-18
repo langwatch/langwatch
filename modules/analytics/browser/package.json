@@ -8,18 +8,11 @@
     "tests"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/analytics.web.ts",
       "types": "./dist/analytics.web.d.ts",
       "default": "./src/analytics.web.ts"
-    },
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
     },
     "./surfaces/analytics-registry": {
       "langwatch-declaration-source": "./src/model/analytics-registry.ts",
@@ -46,16 +39,6 @@
       "types": "./dist/ui/sections/use-filter-params.d.ts",
       "default": "./src/ui/sections/use-filter-params.ts"
     },
-    "./analytics": {
-      "langwatch-declaration-source": "./src/analytics.ts",
-      "types": "./dist/analytics.d.ts",
-      "default": "./src/analytics.ts"
-    },
-    "./surfaces/analytics-host": {
-      "langwatch-declaration-source": "./src/model/analytics-host.ts",
-      "types": "./dist/model/analytics-host.d.ts",
-      "default": "./src/model/analytics-host.ts"
-    },
     "./surfaces/precondition-matchers": {
       "langwatch-declaration-source": "./src/model/filters/precondition-matchers.ts",
       "types": "./dist/model/filters/precondition-matchers.d.ts",
@@ -70,11 +53,6 @@
       "langwatch-declaration-source": "./src/model/filters/types.ts",
       "types": "./dist/model/filters/types.d.ts",
       "default": "./src/model/filters/types.ts"
-    },
-    "./testing": {
-      "langwatch-declaration-source": "./src/__tests__/lwql-fixtures.ts",
-      "types": "./dist/__tests__/lwql-fixtures.d.ts",
-      "default": "./src/__tests__/lwql-fixtures.ts"
     }
   },
   "scripts": {
@@ -94,9 +72,9 @@
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/prompt-browser": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

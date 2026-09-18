@@ -15,10 +15,6 @@
       "langwatch-declaration-source": "./src/governance.web.ts",
       "types": "./dist/governance.web.d.ts",
       "default": "./src/governance.web.ts"
-    },
-    "./governance": {
-      "types": "./dist/governance.d.ts",
-      "default": "./src/governance.ts"
     }
   },
   "scripts": {
@@ -37,8 +33,12 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
+    "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/navigation-browser": "workspace:*",
     "@langwatch/project-browser": "workspace:*",
