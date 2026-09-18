@@ -171,6 +171,23 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     When a statement calling eval is validated
     Then it is refused with APP_FUNCTION_GATED
 
+  # A judgement is charged to a project. A key that reads several has no single
+  # owner for the bill, so judging is refused for it rather than attributed to
+  # whichever project the key happened to list first.
+  @unit
+  Scenario: An eval function is refused for a key that reads more than one project
+    Given a key that can read two projects
+    And the Instant Evals flag is on for both of them
+    When the caller asks whether Instant Evals are open to it
+    Then the answer is no
+
+  @unit
+  Scenario: A key that reads one project is judged on that project's own flag
+    Given a key that can read one project
+    And the Instant Evals flag is on for it
+    When the caller asks whether Instant Evals are open to it
+    Then the answer is yes
+
   @unit
   Scenario: The schema publishes eval functions as unavailable while they are gated
     Given the Instant Evals flag is off for the project

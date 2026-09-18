@@ -69,14 +69,25 @@ export interface LangWatchQLInstantEvalSupport {
  */
 export function createLangWatchQLInstantEvalSupport({
   recorder = new PrismaInstantEvalCostRecorder(prisma),
+  isProjectEnabled = (projectId: string) =>
+    instantEvalsEnabled({ prisma, projectId }),
 }: {
   recorder?: InstantEvalCostRecorder;
+  /**
+   * Whether one project may judge, injectable so the scope rule below can be
+   * stated in a test without a datastore behind it — the same reason
+   * `instantEvalsEnabled` takes `isClassifierConfigured`.
+   */
+  isProjectEnabled?: (projectId: string) => Promise<boolean>;
 } = {}): LangWatchQLInstantEvalSupport {
   return {
     isEnabled: async ({ projectIds }) => {
+      // A judgement is charged to a project, so a scope that names anything
+      // other than exactly one has no owner for the bill and is refused before
+      // the flag is read at all.
       const only = projectIds.length === 1 ? projectIds[0] : undefined;
       if (only === undefined) return false;
-      return await instantEvalsEnabled({ prisma, projectId: only });
+      return await isProjectEnabled(only);
     },
     classifier: getInstantEvalClassifier,
     maxConcurrency: DEFAULT_MAX_CONCURRENCY,
