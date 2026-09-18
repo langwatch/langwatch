@@ -1,6 +1,7 @@
 import type { LookupOperatorActivityRow } from "@langwatch/identity-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { IDENTITY_LOOKUP_AUDIT_PREFIX } from "@langwatch/identity-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import {
   IdentityLookupRepository,
   type LookupConnectionRow,

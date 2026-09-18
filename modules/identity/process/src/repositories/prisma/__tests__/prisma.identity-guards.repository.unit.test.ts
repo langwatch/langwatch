@@ -3,6 +3,7 @@ import {
   MFA_ENROLLED_EVENT_TYPE,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   type IdentityGuardsDatabase,
   PostgresIdentityGuardsAdapter,

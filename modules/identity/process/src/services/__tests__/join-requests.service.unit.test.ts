@@ -4,8 +4,8 @@ import type {
   JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
 import { emptyJoinRequest } from "@langwatch/identity-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Temporal, type Instant } from "@langwatch/time";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * The shared counter, as the service now takes it: a dependency rather than a
@@ -19,13 +19,13 @@ const rateLimitMock = vi.fn(
   }),
 );
 
-import { JoinRequestsService } from "../join-requests.service.ts";
 import {
   JOIN_REJECTION_COOLDOWN_MS,
   type JoinMembership,
   type JoinRequestNotifier,
   type JoinSetting,
 } from "../../rules/join-requests-contract.rules.ts";
+import { JoinRequestsService } from "../join-requests.service.ts";
 
 /**
  * Everything AROUND the lifecycle: the reveal discipline at the boundary, the anti-abuse limits,

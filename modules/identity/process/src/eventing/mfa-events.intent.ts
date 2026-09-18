@@ -1,9 +1,10 @@
+import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import type { MfaCommand, MfaFactInput } from "@langwatch/identity-contract";
 import {
   MFA_EVENT_VERSION_LATEST,
   USER_IDENTITY_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
-import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
+
 import type { MfaEvent } from "./mfa-enrollment-state.projection.ts";
 
 /** The one place an MFA enrollment fact becomes a framework event. */

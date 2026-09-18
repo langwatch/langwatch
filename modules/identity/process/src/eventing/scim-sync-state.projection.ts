@@ -1,4 +1,10 @@
 import {
+  AbstractFoldProjection,
+  EventSchema,
+  type FoldEventHandlers,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import {
   emptyScimSync,
   reduceScimSync,
   SCIM_APPLY_FAILED_EVENT_TYPE,
@@ -17,12 +23,6 @@ import {
   scimTokenRevokedPayloadSchema,
   scimUserPushedPayloadSchema,
 } from "@langwatch/identity-contract";
-import {
-  AbstractFoldProjection,
-  EventSchema,
-  type FoldEventHandlers,
-  type StateProjectionStore,
-} from "@langwatch/eventing";
 import { z } from "zod";
 
 /**

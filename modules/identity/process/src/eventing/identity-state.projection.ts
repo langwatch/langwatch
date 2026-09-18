@@ -1,4 +1,10 @@
 import {
+  AbstractFoldProjection,
+  EventSchema,
+  type FoldEventHandlers,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import {
   emptyIdentityHeads,
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
@@ -17,12 +23,6 @@ import {
   USER_ERASED_EVENT_TYPE,
   userErasedPayloadSchema,
 } from "@langwatch/identity-contract";
-import {
-  AbstractFoldProjection,
-  EventSchema,
-  type FoldEventHandlers,
-  type StateProjectionStore,
-} from "@langwatch/eventing";
 import { z } from "zod";
 
 /**

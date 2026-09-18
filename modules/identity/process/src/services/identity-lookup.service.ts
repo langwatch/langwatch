@@ -1,3 +1,4 @@
+import type { AuditLogApi, AuditLogJsonValue } from "@langwatch/audit-log-contract";
 import {
   IDENTITY_LOOKUP_AUDIT_PREFIX,
   type IdentityLookupAnswer,
@@ -9,13 +10,13 @@ import {
   OPERATOR_ACTIVITY_LIMIT,
   routingIdentifierOf,
 } from "@langwatch/identity-contract";
-import type { AuditLogApi, AuditLogJsonValue } from "@langwatch/audit-log-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
-import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
+
 import type {
   IdentityLookupRepository,
   LookupIdentifierRow,
 } from "../repositories/identity-lookup.repository.ts";
+import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import type { SignInRouterService } from "./signin-router.service.ts";
 
 /** The operator issuing a lookup, as this surface knows them. */

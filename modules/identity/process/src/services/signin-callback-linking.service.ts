@@ -2,8 +2,11 @@ import {
   identifierDomain,
   type IdentifierProvider,
   type LinkProposalReason,
-  normalizeIdentifierValue,IdentityJitDisabledError,IdentityLinkProposedError
+  normalizeIdentifierValue,
+  IdentityJitDisabledError,
+  IdentityLinkProposedError,
 } from "@langwatch/identity-contract";
+
 import type { IdentityCeremonyClock } from "../rules/ceremony-types.rules.ts";
 import type { IdentityLinkProposalWrites } from "../rules/identity-writes.rules.ts";
 

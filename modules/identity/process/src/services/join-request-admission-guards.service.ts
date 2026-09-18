@@ -1,10 +1,3 @@
-/**
- * Whether a person may ask at all: are they asking too often, looking too often, still inside
- * a rejection's cool-down, is the domain they claim actually held by the organization, and is
- * the request they name one this organization owns. Every refusal is thrown, never returned.
- */
-import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 import {
   JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD,
   JoinAutoConnectionAdmitsError,
@@ -16,6 +9,14 @@ import {
   isPublicEmailDomain,
   type JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
+/**
+ * Whether a person may ask at all: are they asking too often, looking too often, still inside
+ * a rejection's cool-down, is the domain they claim actually held by the organization, and is
+ * the request they name one this organization owns. Every refusal is thrown, never returned.
+ */
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
 import {
   JOIN_LOOKUPS_PER_WINDOW,
   JOIN_REJECTION_COOLDOWN_MS,

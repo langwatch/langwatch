@@ -1,10 +1,11 @@
 import type { BackfillIdentifierRow } from "@langwatch/identity-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type {
   BackfillAccountRow,
   BackfillUserRow,
   IdentityBackfillRepository,
 } from "../identity-backfill.repository.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
  * The backfill's reads over the legacy truth (`User`/`Account`) and the

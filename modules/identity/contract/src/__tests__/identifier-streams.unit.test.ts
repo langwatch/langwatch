@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { identityStreamsFor } from "../identifier-aggregate.ts";
 import {
   T0,

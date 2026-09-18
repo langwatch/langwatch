@@ -4,34 +4,37 @@
  * reads — `prisma` and `eventing` — plus its own config.
  */
 import type { EventSourcing } from "@langwatch/eventing";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
   SCIM_SYNC_PIPELINE_NAME,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import { AdminEmailPlatformOperatorsRepository } from "../repositories/prisma/prisma.sso-platform-operators.repository.ts";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
+
+import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
 import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository.ts";
 import { PrismaIdentityReservationRepository } from "../repositories/prisma/prisma.identity-reservations.repository.ts";
 import { PrismaIdentitySecretCarryRepository } from "../repositories/prisma/prisma.identity-secret-carry.repository.ts";
 import { PrismaJoinRequestAudienceRepository } from "../repositories/prisma/prisma.join-request-audience.repository.ts";
 import { PrismaScimSyncProjectionRepository } from "../repositories/prisma/prisma.scim-sync-projection.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "../repositories/prisma/prisma.sso-connection-projection.repository.ts";
+import { AdminEmailPlatformOperatorsRepository } from "../repositories/prisma/prisma.sso-platform-operators.repository.ts";
+import {
+  SsoConnectionLedgerWriterAdapter,
+  type SsoConnectionStagedSender,
+} from "../services/eventing-sso-connection-ledger.service.ts";
 import {
   IdentityLedgerWriterAdapter,
   type IdentityStagedSender,
 } from "../services/identity-ledger.service.ts";
 import {
-  SsoConnectionLedgerWriterAdapter,
-  type SsoConnectionStagedSender,
-} from "../services/eventing-sso-connection-ledger.service.ts";
-import { IDENTITY_LATCH_CACHE_MAX_USERS, IDENTITY_LATCH_CACHE_TTL_MS } from "../services/per-subject-cached-latch.service.ts";
+  IDENTITY_LATCH_CACHE_MAX_USERS,
+  IDENTITY_LATCH_CACHE_TTL_MS,
+} from "../services/per-subject-cached-latch.service.ts";
 import { IdentityProducerPipelinesAdapter } from "../services/producer-identity-pipelines.service.ts";
-import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
-import type { IdentityEventing, PlatformOperator } from "./identity.members.ts";
-import type { IdentityAppConfig } from "./identity.app.ts";
 import type { IdentityInfrastructure } from "./identity-members.ts";
+import type { IdentityEventing, PlatformOperator } from "./identity.members.ts";
 
 /** The one shape a command dispatcher has, checked rather than asserted. */
 type IdentityCommandSender = { send(data: unknown): Promise<unknown> };
@@ -177,7 +180,10 @@ class RegisteredIdentityEventing implements IdentityEventing {
 }
 
 /** The four pipelines and the verbs each one is expected to publish. */
-const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<string, readonly string[]>([
+const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<
+  string,
+  readonly string[]
+>([
   [IDENTITY_PIPELINE_NAME, IDENTITY_COMMAND_NAMES],
   [JOIN_REQUEST_PIPELINE_NAME, JOIN_REQUEST_COMMAND_NAMES],
   [SSO_CONNECTION_PIPELINE_NAME, SSO_CONNECTION_COMMAND_NAMES],
@@ -258,17 +264,19 @@ function ssoConnectionLedger(options: {
 export function buildIdentityInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   eventing: EventSourcing;
-  config: IdentityAppConfig;
+  adminEmails: readonly string[];
+  /** The composition's own word (unresolved, see the handoff), never a deployment's. */
+  registersPipelines: boolean;
 }): IdentityInfrastructure {
-  const { prisma, eventing, config } = input;
-  const identityEventing = config.registersPipelines
+  const { prisma, eventing, adminEmails, registersPipelines } = input;
+  const identityEventing = registersPipelines
     ? RegisteredIdentityEventing.create(eventing)
     : ProcessRegisteredIdentityEventing.create(eventing);
   const operators: PlatformOperator = {
     isPlatformOperatorEmail: ({ email }) => {
       if (email == null) return false;
       const normalized = email.trim().toLowerCase();
-      return config.adminEmails.some((admin) => admin.trim().toLowerCase() === normalized);
+      return adminEmails.some((admin) => admin.trim().toLowerCase() === normalized);
     },
   };
 

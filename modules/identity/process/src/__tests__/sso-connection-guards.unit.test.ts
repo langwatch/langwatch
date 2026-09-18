@@ -11,6 +11,7 @@ import {
   VERIFICATION_REQUESTED_EVENT_TYPE,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import {
   InMemoryConnections,

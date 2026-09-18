@@ -10,11 +10,12 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
+
 import type {
   BackfillAccountRow,
   BackfillUserRow,
 } from "../repositories/identity-backfill.repository.ts";
+import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
 import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
@@ -315,8 +316,7 @@ describe("the identifier backfill pass", () => {
       const outcome = await service.migrateUser({ userId: USER });
 
       expect(outcome.status).toBe("migrated");
-      const diffs = (outcome.report as { diffs: { kind: string; identifierId: string }[] })
-        .diffs;
+      const diffs = (outcome.report as { diffs: { kind: string; identifierId: string }[] }).diffs;
       expect(diffs).toContainEqual(
         expect.objectContaining({
           kind: "surplus_row",

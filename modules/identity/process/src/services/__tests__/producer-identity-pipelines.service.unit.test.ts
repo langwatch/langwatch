@@ -1,18 +1,19 @@
-/**
- * The four identity definitions, as a process that only SENDS on them builds them. What this pins
- * is the pair of properties a producer variant exists for.
- * @vitest-environment node
- */
-import { describe, expect, it } from "vitest";
-import { IdentityProducerPipelinesAdapter } from "../producer-identity-pipelines.service.ts";
-import { PostgresIdentityPipelineAdapter } from "../../repositories/prisma/prisma.identity-pipeline.repository.ts";
-import { PostgresScimSyncPipelineAdapter } from "../../repositories/prisma/prisma.scim-sync-pipeline.repository.ts";
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
   SCIM_SYNC_PIPELINE_NAME,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
+/**
+ * The four identity definitions, as a process that only SENDS on them builds them. What this pins
+ * is the pair of properties a producer variant exists for.
+ * @vitest-environment node
+ */
+import { describe, expect, it } from "vitest";
+
+import { PostgresIdentityPipelineAdapter } from "../../repositories/prisma/prisma.identity-pipeline.repository.ts";
+import { PostgresScimSyncPipelineAdapter } from "../../repositories/prisma/prisma.scim-sync-pipeline.repository.ts";
+import { IdentityProducerPipelinesAdapter } from "../producer-identity-pipelines.service.ts";
 
 const PROCESS_NAME = "langwatch-api";
 

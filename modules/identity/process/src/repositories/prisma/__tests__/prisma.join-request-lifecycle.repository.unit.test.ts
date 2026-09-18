@@ -1,7 +1,8 @@
 import type { JoinRequestFact } from "@langwatch/identity-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import type { JoinRequestNotificationService } from "../../../services/join-request-notification.service.ts";
 import type { JoinRequestService } from "../../../services/join-request.service.ts";
-import { describe, expect, it, vi } from "vitest";
 import { PrismaJoinRequestLifecycleRepository as EventingJoinRequestLifecycleAdapter } from "../prisma.join-request-lifecycle.repository.ts";
 
 /**

@@ -1,5 +1,6 @@
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { MemoryIdentityStore } from "./memory-identity.store.ts";
+import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import {
   MemoryIdentityBackfillRepository,
   MemoryIdentityHeadsRepository,
@@ -8,7 +9,6 @@ import {
   MemoryIdentityUsersRepository,
   MemoryIdentityVerificationRepository,
 } from "./memory.identity-user.repositories.ts";
-import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import {
   MemoryJoinCandidateRepository,
   MemoryJoinRequestReadRepository,

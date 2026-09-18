@@ -5,6 +5,7 @@ import type {
   SignInMethodPolicy,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   type SignInRoutingRecord,
   SignInRouterService,

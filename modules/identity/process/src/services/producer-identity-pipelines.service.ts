@@ -1,11 +1,12 @@
-/**
- * The four identity pipelines as a PRODUCER registers them. One definition, two registrations.
- */
-import { IdentityGuardsService } from "./identity-guards.service.ts";
-import { JoinRequestGuardsService } from "./join-request-guards.service.ts";
-import { MfaGuardsService } from "./mfa-guards.service.ts";
-import { ScimSyncGuardsService } from "./scim-sync-guards.service.ts";
-import { SsoConnectionGuardsService } from "./sso-connection-guards.service.ts";
+import type { StateProjectionStore, StoredProjection } from "@langwatch/eventing";
+
+import type { ConnectionTeardown } from "../eventing/connection-teardown.process.ts";
+import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
+import type { JoinRequestLifecycle } from "../eventing/join-request-lifecycle.process.ts";
+import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
+import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.ts";
+import type { ScimSyncFoldState } from "../eventing/scim-sync-state.projection.ts";
+import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
@@ -18,28 +19,28 @@ import type {
   SsoConnectionStrandingRepository,
   SsoPlatformOperatorRepository,
 } from "../repositories/sso-connection.repository.ts";
-import type { StateProjectionStore, StoredProjection } from "@langwatch/eventing";
+import { CryptoIdentifierIdentityAdapter } from "./crypto-identifier-identity.service.ts";
+/**
+ * The four identity pipelines as a PRODUCER registers them. One definition, two registrations.
+ */
+import { IdentityGuardsService } from "./identity-guards.service.ts";
 import {
   IdentityPipelineDefinitionAdapter,
   type IdentityPipeline,
 } from "./identity-pipeline-definition.service.ts";
-import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
-import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.ts";
+import { JoinRequestGuardsService } from "./join-request-guards.service.ts";
 import {
   JoinRequestPipelineDefinitionAdapter,
   type JoinRequestPipeline,
 } from "./join-request-pipeline-definition.service.ts";
-import type { JoinRequestLifecycle } from "../eventing/join-request-lifecycle.process.ts";
-import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
+import { MfaGuardsService } from "./mfa-guards.service.ts";
+import { ScimSyncGuardsService } from "./scim-sync-guards.service.ts";
 import {
   ScimSyncPipelineDefinitionAdapter,
   type ScimSyncPipeline,
 } from "./scim-sync-pipeline-definition.service.ts";
-import type { ScimSyncFoldState } from "../eventing/scim-sync-state.projection.ts";
+import { SsoConnectionGuardsService } from "./sso-connection-guards.service.ts";
 import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.service.ts";
-import type { ConnectionTeardown } from "../eventing/connection-teardown.process.ts";
-import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
-import { CryptoIdentifierIdentityAdapter } from "./crypto-identifier-identity.service.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(input: { processName: string; pipeline: string; capability: string }): Error {

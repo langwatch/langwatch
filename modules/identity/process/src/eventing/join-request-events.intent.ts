@@ -1,9 +1,10 @@
+import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import type { JoinRequestCommand, JoinRequestFactInput } from "@langwatch/identity-contract";
 import {
   JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_EVENT_VERSION_LATEST,
 } from "@langwatch/identity-contract";
-import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
+
 import type { JoinRequestEvent } from "./join-request-state.projection.ts";
 
 /** The one place a join-request fact becomes a framework event. */

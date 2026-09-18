@@ -4,8 +4,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
-import { PostgresIdentityEmailAdapter } from "../prisma.identity-email.repository.ts";
+
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../../rules/identity-migration-names.rules.ts";
+import { PostgresIdentityEmailAdapter } from "../prisma.identity-email.repository.ts";
 
 type Row = Record<string, unknown>;
 

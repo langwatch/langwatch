@@ -3,6 +3,7 @@ import type {
   IdentityFact,
   IdentityFactInput,
 } from "@langwatch/identity-contract";
+
 import type { IdentityLedger } from "../../rules/identity-ledger.rules.ts";
 import { type InMemoryHeads, T0 } from "./in-memory-heads.ts";
 

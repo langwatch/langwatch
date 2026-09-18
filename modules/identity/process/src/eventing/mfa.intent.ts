@@ -1,4 +1,10 @@
 import {
+  type Command,
+  type CommandHandler,
+  type CommandSchema,
+  defineCommandSchema,
+} from "@langwatch/eventing";
+import {
   CONFIRM_MFA_COMMAND_TYPE,
   CONSUME_BACKUP_CODE_COMMAND_TYPE,
   confirmMfaCommandDataSchema,
@@ -15,9 +21,9 @@ import {
   recordMfaVerificationFailureCommandDataSchema,
   regenerateBackupCodesCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
-import { type Command, type CommandHandler, type CommandSchema, defineCommandSchema } from "@langwatch/eventing";
+
+import type { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import type { MfaEvent } from "./mfa-enrollment-state.projection.ts";
 import { mfaEventsFor } from "./mfa-events.intent.ts";
 

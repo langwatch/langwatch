@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
+
+import type { JoinRequestNotificationMail } from "../app/identity.members.ts";
 import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
 import type { PrismaJoinRequestNotificationContextRepository } from "../repositories/prisma/prisma.join-request-notification-context.repository.ts";
-import type { JoinRequestNotificationMail } from "../app/identity.members.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 
 const logger = createLogger("langwatch:identity:join-request-adapters");

@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { identityActorSchema } from "./vocabulary.ts";
 
 /** Join-request vocabulary: states, events, and reducer for the request lifecycle. Isomorphic and

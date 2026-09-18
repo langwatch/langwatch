@@ -11,18 +11,18 @@ import {
   organizationAdmitsDomain,
   resolveJoinLookup,
 } from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
+import { JOIN_REQUEST_EXPIRY_MS } from "../eventing/join-request-lifecycle.process.ts";
 import {
   approveJoinCommandId,
   newJoinRequestCommandId,
   newJoinRequestId,
 } from "../rules/join-request-id.rules.ts";
-import { createLogger } from "@langwatch/observability";
-import { JOIN_REQUEST_EXPIRY_MS } from "../eventing/join-request-lifecycle.process.ts";
 import { type JoinRequestsServiceDeps } from "../rules/join-requests-contract.rules.ts";
-import { JoinRequestAdmissionGuardsService } from "./join-request-admission-guards.service.ts";
 import { JoinDomainSettingService } from "./join-domain-setting.service.ts";
-import { nowInstant } from "@langwatch/time";
+import { JoinRequestAdmissionGuardsService } from "./join-request-admission-guards.service.ts";
 
 const logger = createLogger("langwatch:identity:join-requests");
 

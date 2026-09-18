@@ -1,22 +1,23 @@
-import { JoinRequestGuardsService } from "../../services/join-request-guards.service.ts";
-import type { JoinRequestMail } from "../../app/identity.members.ts";
-import { JoinRequestService } from "../../services/join-request.service.ts";
-import { PostgresJoinRequestNotificationAdapter } from "../../repositories/prisma/prisma.join-request-notification.repository.ts";
 import type { EventSourcing } from "@langwatch/eventing";
-import {
-  JoinRequestPipelineDefinitionAdapter,
-  type JoinRequestPipeline,
-} from "../../services/join-request-pipeline-definition.service.ts";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import type { JoinRequestMail } from "../../app/identity.members.ts";
 import type { JoinRequestEvent } from "../../eventing/join-request-state.projection.ts";
+import { PostgresJoinRequestNotificationAdapter } from "../../repositories/prisma/prisma.join-request-notification.repository.ts";
 import {
   EventingJoinRequestLedgerAdapter,
   type JoinRequestStagedSender,
 } from "../../services/eventing-join-request-ledger.service.ts";
+import { JoinRequestGuardsService } from "../../services/join-request-guards.service.ts";
+import {
+  JoinRequestPipelineDefinitionAdapter,
+  type JoinRequestPipeline,
+} from "../../services/join-request-pipeline-definition.service.ts";
+import { JoinRequestService } from "../../services/join-request.service.ts";
 import { PrismaJoinRequestLifecycleRepository } from "./prisma.join-request-lifecycle.repository.ts";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository.ts";
 import { PrismaJoinRequestReadRepository } from "./prisma.join-request.repository.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** Every model the join-request ledger reads or writes, and no other. */
 export type JoinRequestPipelineDatabase = PrismaClient;

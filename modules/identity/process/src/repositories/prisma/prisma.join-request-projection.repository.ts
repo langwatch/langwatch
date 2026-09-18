@@ -1,4 +1,9 @@
 import type {
+  ProjectionStoreContext,
+  StateProjectionStore,
+  StoredProjection,
+} from "@langwatch/eventing";
+import type {
   JoinMatchKind,
   JoinRequestAggregateState,
   JoinRequestState,
@@ -6,12 +11,8 @@ import type {
   JoinWithdrawalCause,
 } from "@langwatch/identity-contract";
 import type { JoinRequest, PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
-import type {
-  ProjectionStoreContext,
-  StateProjectionStore,
-  StoredProjection,
-} from "@langwatch/eventing";
 
 /**
  * `JoinRequest` head and its cursor, written under the queue's per-request lock.

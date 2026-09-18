@@ -1,4 +1,10 @@
 import {
+  type Command,
+  type CommandHandler,
+  type CommandSchema,
+  defineCommandSchema,
+} from "@langwatch/eventing";
+import {
   APPROVE_JOIN_COMMAND_TYPE,
   type ApproveJoinCommandData,
   approveJoinCommandDataSchema,
@@ -16,11 +22,11 @@ import {
   type WithdrawJoinCommandData,
   withdrawJoinCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
-import { type Command, type CommandHandler, type CommandSchema, defineCommandSchema } from "@langwatch/eventing";
-import type { JoinRequestEvent } from "./join-request-state.projection.ts";
+
+import type { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import { joinRequestEventsFor } from "./join-request-events.intent.ts";
+import type { JoinRequestEvent } from "./join-request-state.projection.ts";
 
 /**
  * The join-request pipeline's five verbs, as the queue's STAGED RE-RUN of each: the same guard the

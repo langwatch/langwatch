@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { IdentityFact } from "../facts.ts";
 import { reduceIdentifier, userErasureFacts } from "../identifier-aggregate.ts";
 import {

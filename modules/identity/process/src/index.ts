@@ -70,18 +70,12 @@ export type {
   AccountSecretPair,
   IdentitySecretCarryOutcome,
 } from "./services/identity-secret-carry.service.ts";
-export type {
-  IdentityHeadsReader,
-} from "./repositories/identity-heads.repository.ts";
-export type {
-  IdentifierReservationHolder,
-} from "./repositories/identity-reservations.repository.ts";
+export type { IdentityHeadsReader } from "./repositories/identity-heads.repository.ts";
+export type { IdentifierReservationHolder } from "./repositories/identity-reservations.repository.ts";
 export type { IdentityLedger } from "./rules/identity-ledger.rules.ts";
 export type { IdentityUserGate } from "./rules/identity-user-gate.rules.ts";
 export type { IdentityUsersRepository } from "./repositories/identity-users.repository.ts";
-export type {
-  IdentityVerificationRecord,
-} from "./repositories/identity-verification.repository.ts";
+export type { IdentityVerificationRecord } from "./repositories/identity-verification.repository.ts";
 export type { MfaEnrollmentRepository } from "./repositories/mfa-enrollment.repository.ts";
 export type {
   SignInAccountLookup,
@@ -160,9 +154,7 @@ export {
 export { type JoinRequestNotificationMail } from "./app/identity.members.ts";
 export { InProcessBreakGlassLimiterAdapter } from "./services/in-process-break-glass-limiter.service.ts";
 export { LocalDoorBreakGlassBindingAdapter } from "./services/local-door-break-glass-binding.service.ts";
-export type {
-  SsoConnectionBackofficePage,
-} from "./repositories/sso-connection-backoffice.repository.ts";
+export type { SsoConnectionBackofficePage } from "./repositories/sso-connection-backoffice.repository.ts";
 export type { PrismaSsoConnectionBackofficeDatabase } from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
 export { PrismaLegacySsoOrganizationRepository } from "./repositories/prisma/prisma.legacy-sso-organization.repository.ts";
 export type {

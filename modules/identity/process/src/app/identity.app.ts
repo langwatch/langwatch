@@ -3,16 +3,18 @@
  * newborn sweep, join-request/SSO-connection/directory-sync guards — every
  * capability crossing a package boundary today (ADR-101, 115, 116, 117).
  */
-import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
+import {
+  identityConfig,
+  IdentityApi,
+  IdentityCapabilityUnavailableError,
+  type IdentityConfig,
+} from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { Temporal, nowInstant } from "@langwatch/time";
-import { z } from "zod";
-import { buildIdentityInfrastructure } from "./identity-composition.build.ts";
-import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
-import { LocalDoorBreakGlassBindingAdapter } from "../services/local-door-break-glass-binding.service.ts";
+
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
-import { CachedIdentityLatch } from "../services/per-subject-cached-latch.service.ts";
+import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
 import { IdentityEmailService } from "../services/identity-email.service.ts";
@@ -25,13 +27,17 @@ import { IdentitySecretCarryService } from "../services/identity-secret-carry.se
 import { IdentityService } from "../services/identity.service.ts";
 import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
+import { LocalDoorBreakGlassBindingAdapter } from "../services/local-door-break-glass-binding.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
+import { CachedIdentityLatch } from "../services/per-subject-cached-latch.service.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
+import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
+import { buildIdentityInfrastructure } from "./identity-composition.build.ts";
 /**
  * The boundary `reservations().reapOrphans()` call takes no args, so it bounds
  * itself per pass the same way `IdentityNewbornReconciliationService`'s own
@@ -39,39 +45,48 @@ import { IdentitySecretHealMigrationAdapter } from "../services/system-migration
  */
 const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
 /**
- * Config schema: `ADMIN_EMAILS`, the platform-operator list for the SSO
- * connection guards' D05 tier-1 check. Defaults to none rather than refusing
- * at boot — every other identity capability still composes.
+ * `registersPipelines` is the composition's own word — which process
+ * produces the four identity pipelines — never a deployment's; unresolved,
+ * see the handoff. Default preserves the deleted schema's producer-role default.
  */
-const identityAppConfigSchema = z.object({
-  adminEmails: z.array(z.string()).default([]),
-  /**
-   * Whether this process registers the four identity pipelines (the
-   * producer role, default `true`). A draining process sets `false`, since
-   * one runtime holds one registration and senders resolve off it at first send.
-   */
-  registersPipelines: z.boolean().default(true),
-});
-export type IdentityAppConfig = z.infer<typeof identityAppConfigSchema>;
+type IdentityMembers = MembersRead<readonly ["prisma", "eventing"]> &
+  Readonly<{ registersPipelines: boolean }>;
 
-type IdentitySetup = FeatureSetup<
-  Record<string, never>,
-  MembersRead<typeof IdentityApp.reads>,
-  IdentityAppConfig
-> &
+type IdentitySetup = FeatureSetup<Record<string, never>, IdentityMembers, IdentityConfig> &
   Readonly<{ repositories: IdentityRepositories }>;
+
+type IdentityAppParts = {
+  emails: IdentityEmailService;
+  identityGuards: IdentityGuardsService;
+  mfaGuards: MfaGuardsService;
+  reservations: IdentityRepositories["reservations"];
+  identity: IdentityService;
+  verification: VerificationCeremonyService;
+  newbornSweep: IdentityNewbornReconciliationService;
+  backfill: IdentityBackfillService;
+  secrets: IdentitySecretCarryService;
+  joinRequestGuards: JoinRequestGuardsService;
+  joinRequestNotifications: JoinRequestNotificationService | null;
+  ssoConnections: SsoConnectionService | null;
+  ssoConnectionGuards: SsoConnectionGuardsService;
+  ssoBackoffice: SsoConnectionBackofficeService | null;
+  scimSyncGuards: ScimSyncGuardsService;
+};
 
 export class IdentityApp implements IdentityApi {
   static readonly contract = IdentityApi;
   static readonly dependencies = {};
-  static readonly configSchema = identityAppConfigSchema;
-  static readonly reads = reads("prisma", "eventing");
+  static readonly config = identityConfig;
+  /** `registersPipelines` is named raw so the process can answer it through
+   * `withMember`/`withMembers` (see {@link IdentityMembers}). */
+  static readonly reads = [...reads("prisma", "eventing"), "registersPipelines"] as const;
 
   static create(setup: IdentitySetup): IdentityApp {
     const infrastructure = buildIdentityInfrastructure({
       prisma: setup.members.prisma,
       eventing: setup.members.eventing,
-      config: setup.config,
+      adminEmails: setup.config.adminEmails,
+      registersPipelines: setup.members.registersPipelines,
     });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create(
@@ -81,16 +96,21 @@ export class IdentityApp implements IdentityApi {
       CryptoIdentifierIdentityAdapter.create(),
     );
     const mfaGuards = MfaGuardsService.create(setup.repositories.mfaEnrollment);
-    const emails = IdentityEmailService.create(
-      setup.repositories.heads,
-      CachedIdentityLatch.create({
-        repository: setup.repositories.latch,
-        ttlMs: infrastructure.latch.ttlMs,
-        maxUsers: infrastructure.latch.maxUsers,
-        now: infrastructure.latch.now,
-      }).gate(),
-    );
+    const latch = CachedIdentityLatch.create({
+      repository: setup.repositories.latch,
+      ttlMs: infrastructure.latch.ttlMs,
+      maxUsers: infrastructure.latch.maxUsers,
+      now: infrastructure.latch.now,
+    });
+    const isLatched = latch.gate();
+    const emails = IdentityEmailService.create(setup.repositories.heads, isLatched);
     const identity = IdentityService.create(identityGuards, infrastructure.ledger);
+    const verification = VerificationCeremonyService.create(
+      setup.repositories.verification,
+      setup.repositories.heads,
+      identity,
+      { isLatched },
+    );
     const newbornSweep = IdentityNewbornReconciliationService.create({
       newborns: setup.repositories.newborn,
       identity,
@@ -138,6 +158,7 @@ export class IdentityApp implements IdentityApi {
       mfaGuards,
       reservations,
       identity,
+      verification,
       newbornSweep,
       backfill,
       secrets,
@@ -150,43 +171,40 @@ export class IdentityApp implements IdentityApi {
     });
   }
 
-  private constructor(
-    private readonly parts: {
-      emails: IdentityEmailService;
-      identityGuards: IdentityGuardsService;
-      mfaGuards: MfaGuardsService;
-      reservations: IdentityRepositories["reservations"];
-      identity: IdentityService;
-      newbornSweep: IdentityNewbornReconciliationService;
-      backfill: IdentityBackfillService;
-      secrets: IdentitySecretCarryService;
-      joinRequestGuards: JoinRequestGuardsService;
-      joinRequestNotifications: JoinRequestNotificationService | null;
-      ssoConnections: SsoConnectionService | null;
-      ssoConnectionGuards: SsoConnectionGuardsService;
-      ssoBackoffice: SsoConnectionBackofficeService | null;
-      scimSyncGuards: ScimSyncGuardsService;
-    },
-  ) {}
+  readonly #parts: IdentityAppParts;
+
+  private constructor(parts: IdentityAppParts) {
+    this.#parts = parts;
+  }
 
   findEmail(input: { userId: string }): Promise<string | null> {
-    return this.parts.emails.tryResolveEmail(input);
+    return this.#parts.emails.tryResolveEmail(input);
   }
 
   verifiedEmailsOf(input: { userId: string }) {
-    return this.parts.emails.verifiedEmailsOf(input);
+    return this.#parts.emails.verifiedEmailsOf(input);
+  }
+
+  completeEmailVerification(input: {
+    userId: string;
+    identifierId: string;
+    verificationId: string;
+    token: string;
+    codeVerifier: string;
+  }): Promise<void> {
+    return this.#parts.verification.completeEmailVerification(input);
   }
 
   guards(): IdentityGuardsService {
-    return this.parts.identityGuards;
+    return this.#parts.identityGuards;
   }
 
   mfaGuards(): MfaGuardsService {
-    return this.parts.mfaGuards;
+    return this.#parts.mfaGuards;
   }
 
   reservations() {
-    const reservations = this.parts.reservations;
+    const reservations = this.#parts.reservations;
     return {
       claim: (args: {
         normalizedValue: string;
@@ -210,47 +228,47 @@ export class IdentityApp implements IdentityApi {
   }
 
   identity(): IdentityService {
-    return this.parts.identity;
+    return this.#parts.identity;
   }
 
   newbornSweep(): IdentityNewbornReconciliationService {
-    return this.parts.newbornSweep;
+    return this.#parts.newbornSweep;
   }
 
   userMigrations() {
     return [
-      IdentityIdentifierBackfillMigrationAdapter.create(this.parts.backfill),
-      IdentitySecretHealMigrationAdapter.create(this.parts.secrets),
+      IdentityIdentifierBackfillMigrationAdapter.create(this.#parts.backfill),
+      IdentitySecretHealMigrationAdapter.create(this.#parts.secrets),
     ] as const;
   }
 
   joinRequestGuards(): JoinRequestGuardsService {
-    return this.parts.joinRequestGuards;
+    return this.#parts.joinRequestGuards;
   }
 
   joinRequestNotifications(): JoinRequestNotificationService | null {
-    return this.parts.joinRequestNotifications;
+    return this.#parts.joinRequestNotifications;
   }
 
   ssoConnections(): SsoConnectionService {
-    if (!this.parts.ssoConnections) {
+    if (!this.#parts.ssoConnections) {
       throw new IdentityCapabilityUnavailableError("SSO connection store");
     }
-    return this.parts.ssoConnections;
+    return this.#parts.ssoConnections;
   }
 
   ssoConnectionGuards(): SsoConnectionGuardsService {
-    return this.parts.ssoConnectionGuards;
+    return this.#parts.ssoConnectionGuards;
   }
 
   ssoBackoffice(): SsoConnectionBackofficeService {
-    if (!this.parts.ssoBackoffice) {
+    if (!this.#parts.ssoBackoffice) {
       throw new IdentityCapabilityUnavailableError("SSO connection backoffice");
     }
-    return this.parts.ssoBackoffice;
+    return this.#parts.ssoBackoffice;
   }
 
   scimSyncGuards(): ScimSyncGuardsService {
-    return this.parts.scimSyncGuards;
+    return this.#parts.scimSyncGuards;
   }
 }

@@ -12,6 +12,7 @@ import {
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
+
 import { buildIdentityInfrastructure } from "../identity-composition.build.ts";
 
 /**
@@ -36,10 +37,7 @@ function recordingRuntime() {
       registered.push(pipeline);
       return {
         commands: Object.fromEntries(
-          definition.commands.map((command) => [
-            command.name,
-            senderFor(pipeline, command.name),
-          ]),
+          definition.commands.map((command) => [command.name, senderFor(pipeline, command.name)]),
         ),
       };
     },
@@ -78,7 +76,8 @@ function infrastructureFor(input: { eventing: EventSourcing; registersPipelines:
   return buildIdentityInfrastructure({
     prisma: {} as IdentityBuildInput["prisma"],
     eventing: input.eventing,
-    config: { adminEmails: [], registersPipelines: input.registersPipelines },
+    adminEmails: [],
+    registersPipelines: input.registersPipelines,
   });
 }
 
@@ -153,8 +152,16 @@ describe("given a process that drains the identity pipelines", () => {
       await approve?.send({ joinRequestId: "join-1" });
 
       expect(runtime.sent).toEqual([
-        { pipeline: IDENTITY_PIPELINE_NAME, command: "attachIdentifier", data: { userId: "user-1" } },
-        { pipeline: JOIN_REQUEST_PIPELINE_NAME, command: "approveJoin", data: { joinRequestId: "join-1" } },
+        {
+          pipeline: IDENTITY_PIPELINE_NAME,
+          command: "attachIdentifier",
+          data: { userId: "user-1" },
+        },
+        {
+          pipeline: JOIN_REQUEST_PIPELINE_NAME,
+          command: "approveJoin",
+          data: { joinRequestId: "join-1" },
+        },
       ]);
       expect(runtime.registered).toEqual([IDENTITY_PIPELINE_NAME, JOIN_REQUEST_PIPELINE_NAME]);
     });

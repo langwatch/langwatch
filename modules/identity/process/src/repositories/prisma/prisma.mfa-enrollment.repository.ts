@@ -1,5 +1,6 @@
 import { emptyMfaEnrollment, type MfaEnrollmentState } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository.ts";
 import { mfaEnrollmentRowToState } from "./prisma.mfa-enrollment.mapper.ts";
 

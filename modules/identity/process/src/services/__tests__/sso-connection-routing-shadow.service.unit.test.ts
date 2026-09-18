@@ -1,5 +1,6 @@
 import type { RoutableConnection } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
+
 import type { SignInDomainRouting } from "../signin-router.service.ts";
 import {
   ShadowComparingDomainRoutingAdapter,

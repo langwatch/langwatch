@@ -1,12 +1,13 @@
-import { SCIM_TOKEN_REVOKED_EVENT_TYPE } from "@langwatch/identity-contract";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
+import { SCIM_TOKEN_REVOKED_EVENT_TYPE } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
+
+import type { ScimSyncFoldState } from "../../../eventing/scim-sync-state.projection.ts";
+import type { ScimSyncPipeline } from "../../../services/scim-sync-pipeline-definition.service.ts";
 import {
   PostgresScimSyncPipelineAdapter,
   type ScimSyncPipelineDatabase,
 } from "../prisma.scim-sync-pipeline.repository.ts";
-import type { ScimSyncFoldState } from "../../../eventing/scim-sync-state.projection.ts";
-import type { ScimSyncPipeline } from "../../../services/scim-sync-pipeline-definition.service.ts";
 
 const ORGANIZATION = "organization_acme";
 const SYNC = "scimsync_1";

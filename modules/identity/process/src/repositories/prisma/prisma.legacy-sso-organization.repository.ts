@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { LegacySsoOrganizationRepository } from "../../services/sso-connection-grandfather.service.ts";
 
 /**

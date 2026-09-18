@@ -5,11 +5,12 @@ import {
   type SsoConnectionType,
   type SsoIdpMetadata,
 } from "@langwatch/identity-contract";
-import type { SignInDomainRouting } from "./signin-router.service.ts";
+
 import {
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
 } from "../rules/sso-connection-id.rules.ts";
+import type { SignInDomainRouting } from "./signin-router.service.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 
 /**

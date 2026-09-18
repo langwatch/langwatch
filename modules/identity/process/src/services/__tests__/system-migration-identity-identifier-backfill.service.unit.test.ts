@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { IdentityIdentifierBackfillMigrationAdapter } from "../system-migration-identity-identifier-backfill.service.ts";
+
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
+import { IdentityIdentifierBackfillMigrationAdapter } from "../system-migration-identity-identifier-backfill.service.ts";
 
 describe("the identifier backfill migration", () => {
   describe("when the runner drives a tenant", () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { JoinRequestAudience } from "../../repositories/join-request-audience.repository.ts";
+
 import type { JoinRequestMail } from "../../app/identity.members.ts";
+import { JoinRequestAudience } from "../../repositories/join-request-audience.repository.ts";
 import { JoinRequestNotificationService } from "../join-request-notification.service.ts";
 
 /**
@@ -48,8 +49,7 @@ class RecordingMail implements JoinRequestMail {
   readonly stillWaiting: { adminEmail: string; organizationName: string }[] = [];
   readonly expired: { requesterEmail: string; organizationName: string }[] = [];
 
-  constructor(private readonly bouncing: ReadonlySet<string> = new Set()) {
-  }
+  constructor(private readonly bouncing: ReadonlySet<string> = new Set()) {}
 
   async sendStillWaiting(input: {
     adminEmail: string;

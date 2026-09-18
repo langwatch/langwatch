@@ -1,4 +1,10 @@
 import {
+  AbstractFoldProjection,
+  EventSchema,
+  type FoldEventHandlers,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
@@ -29,12 +35,6 @@ import {
   VERIFICATION_REQUESTED_EVENT_TYPE,
   verificationRequestedPayloadSchema,
 } from "@langwatch/identity-contract";
-import {
-  AbstractFoldProjection,
-  EventSchema,
-  type FoldEventHandlers,
-  type StateProjectionStore,
-} from "@langwatch/eventing";
 import { z } from "zod";
 
 /**

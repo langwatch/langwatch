@@ -1,4 +1,5 @@
 import type { SsoConnectionState } from "@langwatch/identity-contract";
+
 import type {
   SsoConnectionBackofficePage,
   SsoConnectionBackofficeRepository,
@@ -32,7 +33,9 @@ export class MemorySsoConnectionReadRepository implements SsoConnectionReadRepos
         connection.state === ACTIVE && this.verifiedDomains(connection).includes(args.domain),
     );
 
-    return owner ? { connectionId: owner.connectionId, organizationId: owner.organizationId } : null;
+    return owner
+      ? { connectionId: owner.connectionId, organizationId: owner.organizationId }
+      : null;
   }
 
   private verifiedDomains(connection: SsoConnectionState): readonly string[] {

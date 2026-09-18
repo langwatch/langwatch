@@ -1,5 +1,6 @@
 import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { IdentityHeadsRepository } from "../identity-heads.repository.ts";
 import { identifierRowToFact } from "./prisma.identifier.mapper.ts";
 

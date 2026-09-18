@@ -1,10 +1,12 @@
 import { HandledError } from "@langwatch/handled-error";
-import { normalizeIdentifierValue,
+import {
+  normalizeIdentifierValue,
   IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE,
-  IdentityUnsupportedStorageQueryError } from "@langwatch/identity-contract";
+  IdentityUnsupportedStorageQueryError,
+} from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
-import { APIError } from "better-auth/api";
 import type {
   AdapterFactory,
   AdapterFactoryConfig,
@@ -14,22 +16,23 @@ import type {
   DBAdapter,
 } from "better-auth/adapters";
 import { createAdapterFactory } from "better-auth/adapters";
-import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
-import {
-  type AccountQuery,
-  type AccountWhere,
-  BetterAuthAccountQueriesAdapter,
-} from "./better-auth-account-queries.service.ts";
-import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules.ts";
-import { BetterAuthIdentityBirthAdapter } from "./better-auth-identity-birth.service.ts";
+import { APIError } from "better-auth/api";
+
 import type { IdentityBirth } from "../app/identity.members.ts";
-import { nowInstant } from "@langwatch/time";
+import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules.ts";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccounts,
   IdentityResolver,
 } from "../rules/identity-storage.rules.ts";
+import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
+import {
+  type AccountQuery,
+  type AccountWhere,
+  BetterAuthAccountQueriesAdapter,
+} from "./better-auth-account-queries.service.ts";
+import { BetterAuthIdentityBirthAdapter } from "./better-auth-identity-birth.service.ts";
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
@@ -679,11 +682,14 @@ function identityCustomAdapter({
         }
         const found = await legacy.findOne<Row>({
           model,
-          where: modelOf(model) === "user" ? await resolveUserWhere(model, legacyWhere) : legacyWhere,
+          where:
+            modelOf(model) === "user" ? await resolveUserWhere(model, legacyWhere) : legacyWhere,
           select,
           join,
         });
-        return found === null ? null : (toStorageKeys(model, await withLegacyIssuer(model, found)) as never);
+        return found === null
+          ? null
+          : (toStorageKeys(model, await withLegacyIssuer(model, found)) as never);
       },
 
       findMany: async ({ model, where, limit, select, sortBy, offset, join }) => {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import {
   JOIN_REQUEST_EXPIRY_MS,
   JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { IdentifierFact, IdentityHeads } from "../facts.ts";
 import { primaryEmailOf } from "../primary-email.ts";
 

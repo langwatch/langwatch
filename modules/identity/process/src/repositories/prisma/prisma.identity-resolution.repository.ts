@@ -1,12 +1,13 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
 import type {
   IdentityIssuerResolution,
   IdentityResolution,
   IdentityResolver,
 } from "../../rules/identity-storage.rules.ts";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
-import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:identity:resolution");
 

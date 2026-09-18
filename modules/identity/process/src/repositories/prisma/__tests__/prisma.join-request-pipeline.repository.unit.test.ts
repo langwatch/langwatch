@@ -1,12 +1,13 @@
-import type { JoinRequestMail } from "../../../app/identity.members.ts";
 import { createTenantId, type EventSourcing, type StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
+
+import type { JoinRequestMail } from "../../../app/identity.members.ts";
+import type { JoinRequestFoldState } from "../../../eventing/join-request-state.projection.ts";
+import type { JoinRequestPipeline } from "../../../services/join-request-pipeline-definition.service.ts";
 import {
   PostgresJoinRequestPipelineAdapter,
   type JoinRequestPipelineDatabase,
 } from "../prisma.join-request-pipeline.repository.ts";
-import type { JoinRequestFoldState } from "../../../eventing/join-request-state.projection.ts";
-import type { JoinRequestPipeline } from "../../../services/join-request-pipeline-definition.service.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature

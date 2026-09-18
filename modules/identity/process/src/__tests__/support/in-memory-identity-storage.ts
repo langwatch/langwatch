@@ -1,4 +1,5 @@
 import { type IdentifierFact, isLiveIdentifierState } from "@langwatch/identity-contract";
+
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,

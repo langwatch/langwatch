@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";

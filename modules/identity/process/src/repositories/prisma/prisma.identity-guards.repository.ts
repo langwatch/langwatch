@@ -1,7 +1,7 @@
 import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
-import type { IdentityReservationRepository } from "../identity-reservations.repository.ts";
 import { MfaGuardsService } from "../../services/mfa-guards.service.ts";
+import type { IdentityReservationRepository } from "../identity-reservations.repository.ts";
 import {
   PrismaIdentityHeadsRepository,
   type PrismaIdentityHeadsDatabase,

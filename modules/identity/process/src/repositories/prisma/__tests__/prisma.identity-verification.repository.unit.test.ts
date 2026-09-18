@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { describe, expect, it } from "vitest";
+
 import { PrismaIdentityVerificationRepository } from "../prisma.identity-verification.repository.ts";
 
 /**

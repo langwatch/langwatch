@@ -6,10 +6,16 @@ import {
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
-import { deriveNewbornUserId } from "../../rules/identifier-hash.rules.ts";
-import { BetterAuthIdentityBirthAdapter } from "../../services/better-auth-identity-birth.service.ts";
+
 import { type IdentityBirth } from "../../app/identity.members.ts";
+import type { IdentityUsersRepository } from "../../repositories/identity-users.repository.ts";
+import { deriveNewbornUserId } from "../../rules/identifier-hash.rules.ts";
+import {
+  adoptUserEmailCommandId,
+  newIdentityCommandId,
+} from "../../rules/identity-command-id.rules.ts";
+import type { IdentityAccounts, IdentityResolver } from "../../rules/identity-storage.rules.ts";
+import { BetterAuthIdentityBirthAdapter } from "../../services/better-auth-identity-birth.service.ts";
 import {
   BetterAuthCeremonyBridgeAdapter,
   IdentityCeremoniesAdapter,
@@ -18,18 +24,13 @@ import {
   BetterAuthIdentityStorageAdapter,
   type PasskeyRemovalPort,
 } from "../../services/better-auth-identity-storage.service.ts";
-import type { IdentityAccounts, IdentityResolver } from "../../rules/identity-storage.rules.ts";
+import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
-import {
-  adoptUserEmailCommandId,
-  newIdentityCommandId,
-} from "../../rules/identity-command-id.rules.ts";
-import type { IdentityUsersRepository } from "../../repositories/identity-users.repository.ts";
 import { IdentityService } from "../../services/identity.service.ts";
 import { InMemoryIdentityEventStore, inMemoryIdentityLedger } from "./in-memory-event-store.ts";
 import { InMemoryHeads, T0 } from "./in-memory-heads.ts";
-import { InMemoryReservations } from "./in-memory-reservations.ts";
 import { inertIdentityPorts, InMemoryIdentityStorage } from "./in-memory-identity-storage.ts";
+import { InMemoryReservations } from "./in-memory-reservations.ts";
 
 export const PASSWORD = "correct-horse-battery";
 export const NEW_PASSWORD = "staple-battery-horse";

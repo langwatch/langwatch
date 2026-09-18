@@ -1,9 +1,10 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
+
 import type {
   IdentityVerificationRecord,
   IdentityVerificationRepository,
 } from "../identity-verification.repository.ts";
-import { z } from "zod";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
  * The verification ceremony's row-truth storage (D01): ceremony records live on the better-auth

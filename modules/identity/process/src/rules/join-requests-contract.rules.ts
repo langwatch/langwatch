@@ -4,12 +4,12 @@
  * collaborator shapes the service is given rather than reaching for.
  */
 import { type DomainJoinSetting } from "@langwatch/identity-contract";
+
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
 } from "../repositories/join-request.repository.ts";
 import type { JoinRequestService } from "../services/join-request.service.ts";
-
 
 /**
  * How often somebody may ask, and how often they may look. The sign-in endpoints' own shape

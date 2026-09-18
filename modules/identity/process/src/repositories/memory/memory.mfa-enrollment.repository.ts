@@ -1,4 +1,5 @@
 import { emptyMfaEnrollment, type MfaEnrollmentState } from "@langwatch/identity-contract";
+
 import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository.ts";
 import { MemoryIdentityStore } from "./memory-identity.store.ts";
 
@@ -15,7 +16,9 @@ export class MemoryMfaEnrollmentRepository implements MfaEnrollmentRepository {
   private constructor(private readonly store: MemoryIdentityStore) {}
 
   async findEnrollment(args: { userId: string }): Promise<MfaEnrollmentState> {
-    return this.store.mfaEnrollments.get(args.userId) ?? emptyMfaEnrollment({ userId: args.userId });
+    return (
+      this.store.mfaEnrollments.get(args.userId) ?? emptyMfaEnrollment({ userId: args.userId })
+    );
   }
 
   async findRequiringOrganizationSlugs(args: { userId: string }): Promise<readonly string[]> {

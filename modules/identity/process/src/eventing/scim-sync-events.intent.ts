@@ -1,9 +1,10 @@
+import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import type { ScimSyncCommand, ScimSyncFactInput } from "@langwatch/identity-contract";
 import {
   SCIM_SYNC_AGGREGATE_TYPE,
   SCIM_SYNC_EVENT_VERSION_LATEST,
 } from "@langwatch/identity-contract";
-import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
+
 import type { ScimSyncEvent } from "./scim-sync-state.projection.ts";
 
 /** The one place a SCIM sync fact becomes a framework event. */

@@ -1,15 +1,19 @@
+import type { EventStore, StateProjectionStore } from "@langwatch/eventing";
 import {
   APPROVE_JOIN_COMMAND_TYPE,
   EXPIRE_JOIN_COMMAND_TYPE,
   type JoinRequestCommand,
 } from "@langwatch/identity-contract";
-import type { EventStore, StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
+
+import type {
+  JoinRequestEvent,
+  JoinRequestFoldState,
+} from "../../eventing/join-request-state.projection.ts";
 import {
   EventingJoinRequestLedgerAdapter,
   type JoinRequestStagedSender,
 } from "../eventing-join-request-ledger.service.ts";
-import type { JoinRequestEvent,JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature

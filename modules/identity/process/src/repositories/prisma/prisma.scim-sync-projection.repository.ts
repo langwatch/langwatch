@@ -1,21 +1,22 @@
 import type {
+  ProjectionStoreContext,
+  StateProjectionStore,
+  StoredProjection,
+} from "@langwatch/eventing";
+import type {
   ScimRevokeCause,
   ScimSyncFailure,
   ScimSyncLifecycleState,
   ScimSyncState,
 } from "@langwatch/identity-contract";
-import type { ScimSyncReadRepository } from "../scim-sync.repository.ts";
 import type {
   Prisma,
   PrismaClient,
   ScimSyncState as ScimSyncRow,
 } from "@langwatch/prisma-client/generated";
+
 import type { ScimSyncFoldState } from "../../eventing/scim-sync-state.projection.ts";
-import type {
-  ProjectionStoreContext,
-  StateProjectionStore,
-  StoredProjection,
-} from "@langwatch/eventing";
+import type { ScimSyncReadRepository } from "../scim-sync.repository.ts";
 
 /**
  * The directory-sync pipeline's projection store (D08): the Postgres `ScimSyncState` head and its

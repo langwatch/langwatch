@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { IdentityEmailService } from "../services/identity-email.service.ts";
 import { fact, InMemoryHeads, USER } from "./support/in-memory-heads.ts";
 

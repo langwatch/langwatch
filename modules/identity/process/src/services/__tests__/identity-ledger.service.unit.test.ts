@@ -1,23 +1,24 @@
-import {
-  ATTACH_IDENTIFIER_COMMAND_TYPE,
-  emptyIdentityHeads,
-  reduceIdentity,
-} from "@langwatch/identity-contract";
-import { IdentityGuardsService } from "../identity-guards.service.ts";
-import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
-import { IdentityService } from "../identity.service.ts";
-import { describe, expect, it, vi } from "vitest";
-import type { IdentityEvent,IdentityFoldState } from "../../eventing/identity-state.projection.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
-import { IdentityLedgerWriterAdapter } from "../identity-ledger.service.ts";
-import { identityProjectionConvergenceTimeoutsTotal } from "../metrics-identity-ledger.service.ts";
+import {
+  ATTACH_IDENTIFIER_COMMAND_TYPE,
+  emptyIdentityHeads,
+  reduceIdentity,
+} from "@langwatch/identity-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { identityEventsFor } from "../../eventing/identity-events.intent.ts";
+import type { IdentityEvent, IdentityFoldState } from "../../eventing/identity-state.projection.ts";
+import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { CryptoIdentifierIdentityAdapter } from "../crypto-identifier-identity.service.ts";
-import { identityEventsFor } from "../../eventing/identity-events.intent.ts";
+import { IdentityGuardsService } from "../identity-guards.service.ts";
+import { IdentityLedgerWriterAdapter } from "../identity-ledger.service.ts";
+import { IdentityService } from "../identity.service.ts";
+import { identityProjectionConvergenceTimeoutsTotal } from "../metrics-identity-ledger.service.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

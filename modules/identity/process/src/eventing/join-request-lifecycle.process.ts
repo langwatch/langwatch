@@ -1,5 +1,5 @@
-import { z } from "zod";
 import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing";
+import { z } from "zod";
 
 export const JOIN_REQUEST_LIFECYCLE_PROCESS_NAME = "joinRequestLifecycle" as const;
 

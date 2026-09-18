@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { PlatformOperator } from "../../app/identity.members.ts";
 import type { SsoPlatformOperatorRepository } from "../sso-connection.repository.ts";
 

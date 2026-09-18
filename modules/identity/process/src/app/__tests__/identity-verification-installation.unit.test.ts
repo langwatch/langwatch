@@ -1,0 +1,36 @@
+import { IdentityApi } from "@langwatch/identity-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it } from "vitest";
+
+import { identityServer } from "../../identity.server.ts";
+
+describe("identity verification installation", () => {
+  it("composes the ceremony behind IdentityApi and keeps an unlatched user from spending a proof", async () => {
+    const runtime = await createApp({ role: "api" })
+      .withModules([withMemoryRepositories(identityServer)])
+      .withConfig({ identity: { adminEmails: [] } })
+      .withMembers({ registersPipelines: false })
+      .withRelational(createApiFixture<PrismaClient>())
+      .withEventing(new EventSourcing({ enabled: false }))
+      .boot();
+
+    try {
+      const identity = runtime.service(IdentityApi);
+
+      await expect(
+        identity.completeEmailVerification({
+          userId: "user_1",
+          identifierId: "identifier_1",
+          verificationId: "verification_1",
+          token: "mailbox-token",
+          codeVerifier: "a".repeat(43),
+        }),
+      ).rejects.toMatchObject({ code: "identity_verification_invalid" });
+    } finally {
+      await runtime.stop();
+    }
+  });
+});
+import { EventSourcing } from "@langwatch/eventing";

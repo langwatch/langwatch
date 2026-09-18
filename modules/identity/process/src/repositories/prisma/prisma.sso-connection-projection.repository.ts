@@ -1,4 +1,9 @@
 import type {
+  ProjectionStoreContext,
+  StateProjectionStore,
+  StoredProjection,
+} from "@langwatch/eventing";
+import type {
   SsoConnectionLifecycleState,
   SsoConnectionSource,
   SsoConnectionState,
@@ -8,12 +13,8 @@ import type {
   SsoVerificationMethod,
 } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient, SsoConnection } from "@langwatch/prisma-client/generated";
+
 import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state.projection.ts";
-import type {
-  ProjectionStoreContext,
-  StateProjectionStore,
-  StoredProjection,
-} from "@langwatch/eventing";
 
 /** The one model the connection head reads and writes, and no other. */
 export type PrismaSsoConnectionProjectionDatabase = Pick<PrismaClient, "ssoConnection">;

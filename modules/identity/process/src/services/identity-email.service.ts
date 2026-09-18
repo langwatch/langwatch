@@ -5,6 +5,7 @@ import {
   primaryEmailOf,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
+
 import type { IdentityHeadsReader } from "../repositories/identity-heads.repository.ts";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 

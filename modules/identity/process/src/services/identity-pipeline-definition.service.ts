@@ -1,5 +1,3 @@
-import type { IdentityGuardsService } from "./identity-guards.service.ts";
-import type { MfaGuardsService } from "./mfa-guards.service.ts";
 import {
   defineAggregate,
   defineEvents,
@@ -9,11 +7,27 @@ import {
   type StateProjectionStore,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { IDENTITY_EVENT_TYPES, MFA_EVENT_TYPES,IDENTITY_PIPELINE_NAME,USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
+import {
+  IDENTITY_EVENT_TYPES,
+  MFA_EVENT_TYPES,
+  IDENTITY_PIPELINE_NAME,
+  USER_IDENTITY_AGGREGATE_TYPE,
+} from "@langwatch/identity-contract";
+
 import { AttachIdentifierCommand } from "../eventing/attach-identifier.intent.ts";
 import { DetachIdentifierCommand } from "../eventing/detach-identifier.intent.ts";
 import { EraseUserCommand } from "../eventing/erase-user.intent.ts";
+import {
+  type IdentityEvent,
+  type IdentityFoldState,
+  IdentityStateFoldProjection,
+} from "../eventing/identity-state.projection.ts";
 import { MarkPrimaryCommand } from "../eventing/mark-primary.intent.ts";
+import {
+  MfaEnrollmentStateFoldProjection,
+  type MfaEvent,
+  type MfaFoldState,
+} from "../eventing/mfa-enrollment-state.projection.ts";
 import {
   ConfirmMfaCommand,
   ConsumeBackupCodeCommand,
@@ -25,16 +39,8 @@ import {
 } from "../eventing/mfa.intent.ts";
 import { ProposeLinkCommand } from "../eventing/propose-link.intent.ts";
 import { VerifyIdentifierCommand } from "../eventing/verify-identifier.intent.ts";
-import {
-  type IdentityEvent,
-  type IdentityFoldState,
-  IdentityStateFoldProjection,
-} from "../eventing/identity-state.projection.ts";
-import {
-  MfaEnrollmentStateFoldProjection,
-  type MfaEvent,
-  type MfaFoldState,
-} from "../eventing/mfa-enrollment-state.projection.ts";
+import type { IdentityGuardsService } from "./identity-guards.service.ts";
+import type { MfaGuardsService } from "./mfa-guards.service.ts";
 
 export interface IdentityPipelineDeps {
   identityProjectionStore: StateProjectionStore<IdentityFoldState>;
@@ -58,7 +64,11 @@ export type IdentityPipeline = ReturnType<typeof IdentityPipelineDefinitionAdapt
 export class IdentityPipelineDefinitionAdapter {
   static create(
     deps: IdentityPipelineDeps,
-  ): StaticPipelineDefinition<IdentityEvent | MfaEvent, Record<string, Projection>, RegisteredCommand> {
+  ): StaticPipelineDefinition<
+    IdentityEvent | MfaEvent,
+    Record<string, Projection>,
+    RegisteredCommand
+  > {
     return definePipeline<IdentityEvent | MfaEvent>({
       name: IDENTITY_PIPELINE_NAME,
       aggregate: defineAggregate({

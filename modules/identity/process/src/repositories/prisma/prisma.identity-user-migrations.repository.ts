@@ -1,19 +1,20 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
-import { IdentityLedgerWriterAdapter } from "../../services/identity-ledger.service.ts";
+
+import type { IdentityEventing } from "../../app/identity.members.ts";
 import { PostgresIdentityGuardsAdapter } from "../../repositories/prisma/prisma.identity-guards.repository.ts";
+import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
+import { IdentityBackfillPlanService } from "../../services/identity-backfill-plan.service.ts";
+import { IdentityBackfillService } from "../../services/identity-backfill.service.ts";
+import { IdentityLedgerWriterAdapter } from "../../services/identity-ledger.service.ts";
+import { IdentitySecretCarryService } from "../../services/identity-secret-carry.service.ts";
+import { IdentityService } from "../../services/identity.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../../services/system-migration-identity-secret-heal.service.ts";
-import type { IdentityEventing } from "../../app/identity.members.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
 import { PrismaIdentityProjectionRepository } from "./prisma.identity-projection.repository.ts";
 import { PrismaIdentitySecretCarryRepository } from "./prisma.identity-secret-carry.repository.ts";
 import { PrismaIdentityUsersRepository } from "./prisma.identity-users.repository.ts";
-import { IdentityBackfillPlanService } from "../../services/identity-backfill-plan.service.ts";
-import { IdentityBackfillService } from "../../services/identity-backfill.service.ts";
-import { IdentitySecretCarryService } from "../../services/identity-secret-carry.service.ts";
-import { IdentityService } from "../../services/identity.service.ts";
 
 export type PostgresIdentityUserMigrationsOptions = {
   /** The composition root's own typed client, handed down with no cast. */

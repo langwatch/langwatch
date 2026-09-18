@@ -6,11 +6,12 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { mintVerificationToken, s256Challenge, safeEqual, sha256Hex } from "../rules/pkce.rules.ts";
-import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
+
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityVerificationRepository } from "../repositories/identity-verification.repository.ts";
+import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type { IdentityVerificationWrites } from "../rules/identity-writes.rules.ts";
+import { mintVerificationToken, s256Challenge, safeEqual, sha256Hex } from "../rules/pkce.rules.ts";
 
 const logger = createLogger("langwatch:identity:verification-ceremony");
 

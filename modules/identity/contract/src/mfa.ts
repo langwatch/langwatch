@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { userTenantedCommandSchema } from "./facts.ts";
 import { identityActorSchema } from "./vocabulary.ts";
 

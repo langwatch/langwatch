@@ -1,9 +1,10 @@
 import type { RoutableConnection } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
+
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import type { SignInDomainRouting } from "../services/signin-router.service.ts";
 import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import {
   InMemoryConnections,

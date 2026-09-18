@@ -1,4 +1,3 @@
-import type { ScimSyncGuardsService } from "./scim-sync-guards.service.ts";
 import {
   defineAggregate,
   defineEvents,
@@ -8,7 +7,17 @@ import {
   type StateProjectionStore,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { SCIM_SYNC_EVENT_TYPES,SCIM_SYNC_AGGREGATE_TYPE,SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
+import {
+  SCIM_SYNC_EVENT_TYPES,
+  SCIM_SYNC_AGGREGATE_TYPE,
+  SCIM_SYNC_PIPELINE_NAME,
+} from "@langwatch/identity-contract";
+
+import {
+  type ScimSyncEvent,
+  type ScimSyncFoldState,
+  ScimSyncStateFoldProjection,
+} from "../eventing/scim-sync-state.projection.ts";
 import {
   IssueScimTokenCommand,
   RecordScimApplyFailureCommand,
@@ -16,11 +25,7 @@ import {
   RecordScimUserPushCommand,
   RevokeScimSyncCommand,
 } from "../eventing/scim-sync.intent.ts";
-import {
-  type ScimSyncEvent,
-  type ScimSyncFoldState,
-  ScimSyncStateFoldProjection,
-} from "../eventing/scim-sync-state.projection.ts";
+import type { ScimSyncGuardsService } from "./scim-sync-guards.service.ts";
 
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by

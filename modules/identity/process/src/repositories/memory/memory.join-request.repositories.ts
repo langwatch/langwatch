@@ -3,6 +3,7 @@ import type {
   JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
+
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
@@ -19,9 +20,7 @@ export class MemoryJoinRequestReadRepository implements JoinRequestListReadRepos
 
   private constructor(private readonly store: MemoryIdentityStore) {}
 
-  async tryFindRequest(args: {
-    joinRequestId: string;
-  }): Promise<JoinRequestAggregateState | null> {
+  async tryFindRequest(args: { joinRequestId: string }): Promise<JoinRequestAggregateState | null> {
     return this.store.joinRequests.get(args.joinRequestId) ?? null;
   }
 
@@ -73,9 +72,7 @@ export class MemoryJoinCandidateRepository implements JoinCandidateRepository {
 
   private constructor(private readonly store: MemoryIdentityStore) {}
 
-  async findCandidateOrganizations(args: {
-    domain: string;
-  }): Promise<JoinCandidateOrganization[]> {
+  async findCandidateOrganizations(args: { domain: string }): Promise<JoinCandidateOrganization[]> {
     return this.store.joinCandidates.get(args.domain) ?? [];
   }
 

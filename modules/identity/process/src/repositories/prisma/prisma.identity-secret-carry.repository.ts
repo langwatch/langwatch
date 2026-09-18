@@ -1,9 +1,10 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import type { IdentityAccountSecrets } from "../../rules/identity-storage.rules.ts";
 import type {
   AccountSecretPair,
   IdentitySecretCarryRepository,
 } from "../../services/identity-secret-carry.service.ts";
-import type { IdentityAccountSecrets } from "../../rules/identity-storage.rules.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
  * The `Account` row's secret columns, by the canonical name `AccountCredential` stores them under.

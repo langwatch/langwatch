@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { normalizeIdentifierValue } from "../identifier.ts";
 import {
   type AccountSignInMethods,

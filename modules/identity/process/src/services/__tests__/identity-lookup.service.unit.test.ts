@@ -2,8 +2,9 @@ import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-co
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MemoryIdentityLookupRepository } from "../../repositories/memory/memory.identity-lookup.repository.ts";
+
 import { MemoryIdentityStore } from "../../repositories/memory/memory-identity.store.ts";
+import { MemoryIdentityLookupRepository } from "../../repositories/memory/memory.identity-lookup.repository.ts";
 import type { SsoPlatformOperatorRepository } from "../../repositories/sso-connection.repository.ts";
 import { IdentityLookupRefusedError, IdentityLookupService } from "../identity-lookup.service.ts";
 
@@ -28,9 +29,10 @@ class FakeAuditLog implements AuditLogApi {
       operatorUserId: command.userId,
       operatorName: null,
       act: command.action.replace("identityLookup.", ""),
-      address: typeof command.args === "object" && command.args && "address" in command.args
-        ? String((command.args as Record<string, unknown>).address)
-        : null,
+      address:
+        typeof command.args === "object" && command.args && "address" in command.args
+          ? String((command.args as Record<string, unknown>).address)
+          : null,
       atMs: Date.now(),
     });
   }
@@ -116,12 +118,12 @@ describe("IdentityLookupService", () => {
     it("refuses with nothing about the address, every time", async () => {
       const service = serviceFor({ operatorIds: new Set() });
 
-      await expect(
-        service.resolve({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toThrow(IdentityLookupRefusedError);
-      await expect(
-        service.resolve({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toThrow(IdentityLookupRefusedError);
+      await expect(service.resolve({ address: "sam@acme.com", operator: MALLORY })).rejects.toThrow(
+        IdentityLookupRefusedError,
+      );
+      await expect(service.resolve({ address: "sam@acme.com", operator: MALLORY })).rejects.toThrow(
+        IdentityLookupRefusedError,
+      );
     });
   });
 

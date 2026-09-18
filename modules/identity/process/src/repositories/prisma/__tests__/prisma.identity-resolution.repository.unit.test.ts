@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
+
 import { PrismaIdentityResolutionRepository } from "../prisma.identity-resolution.repository.ts";
 
 /**

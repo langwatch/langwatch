@@ -1,10 +1,4 @@
-/**
- * `AccountCredential.userId` cascades under `relationMode = "prisma"` (packages/prisma-
- * client/prisma/schema.prisma),
- * Spec: specs/identity/identity-storage-adapter.feature.
- */
-import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -12,7 +6,13 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { createLogger } from "@langwatch/observability";
+/**
+ * `AccountCredential.userId` cascades under `relationMode = "prisma"` (packages/prisma-
+ * client/prisma/schema.prisma),
+ * Spec: specs/identity/identity-storage-adapter.feature.
+ */
+import { nanoid } from "nanoid";
+import { afterAll, describe, expect, it } from "vitest";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

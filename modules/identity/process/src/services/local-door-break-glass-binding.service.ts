@@ -1,4 +1,5 @@
 import { LOCAL_METHOD_SET } from "@langwatch/identity-contract";
+
 import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connection.repository.ts";
 
 /**

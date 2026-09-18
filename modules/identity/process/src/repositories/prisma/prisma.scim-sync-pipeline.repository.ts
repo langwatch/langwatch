@@ -1,10 +1,11 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { ScimSyncGuardsService } from "../../services/scim-sync-guards.service.ts";
 import {
   ScimSyncPipelineDefinitionAdapter,
   type ScimSyncPipeline,
 } from "../../services/scim-sync-pipeline-definition.service.ts";
 import { PrismaScimSyncProjectionRepository } from "./prisma.scim-sync-projection.repository.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** The one model the directory-sync ledger reads and writes. */
 export type ScimSyncPipelineDatabase = PrismaClient;

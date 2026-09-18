@@ -14,6 +14,7 @@ import {
   type ScimSyncFactInput,
   type ScimSyncState,
 } from "@langwatch/identity-contract";
+
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
 
 /**

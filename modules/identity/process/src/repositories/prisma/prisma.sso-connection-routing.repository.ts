@@ -3,8 +3,9 @@ import {
   routingStateOf,
   type SignInMethod,
 } from "@langwatch/identity-contract";
-import type { SignInDomainRouting } from "../../services/signin-router.service.ts";
 import type { PrismaClient, SsoConnection } from "@langwatch/prisma-client/generated";
+
+import type { SignInDomainRouting } from "../../services/signin-router.service.ts";
 
 /**
  * The router's domain-lookup port over the `SsoConnection` PROJECTION — what

@@ -1,13 +1,14 @@
+import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import type { IdentifierFact } from "@langwatch/identity-contract";
 import { IdentityIdentifierNotFoundError } from "@langwatch/identity-contract";
-import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
+
+import type { IdentityFoldState } from "../../../eventing/identity-state.projection.ts";
+import type { IdentityPipeline } from "../../../services/identity-pipeline-definition.service.ts";
 import {
   type IdentityPipelineDatabase,
   PostgresIdentityPipelineAdapter,
 } from "../prisma.identity-pipeline.repository.ts";
-import type { IdentityFoldState } from "../../../eventing/identity-state.projection.ts";
-import type { IdentityPipeline } from "../../../services/identity-pipeline-definition.service.ts";
 
 const USER = "user_sam";
 const IDENTIFIER = "idf_1";

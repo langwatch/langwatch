@@ -2,6 +2,7 @@
  * caller-minted commandId for deduplication. No PII; persons are userId + externalId. See D08.
  */
 import { z } from "zod";
+
 import { scimApplyOpSchema, scimRevokeCauseSchema, scimUserOpSchema } from "./scim-sync.ts";
 import { identityActorSchema } from "./vocabulary.ts";
 

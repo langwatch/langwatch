@@ -1,17 +1,18 @@
+import { IdentityEngineUnavailableError } from "@langwatch/identity-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import type { IdentityBirthLedger } from "../../app/identity.members.ts";
+import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
+import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository.ts";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
+import { CryptoIdentifierIdentityAdapter } from "../crypto-identifier-identity.service.ts";
+import { IdentityBirthService } from "../identity-birth.service.ts";
 /**
  * The package's own suite proves what better-auth sees; this proves the leg ORDER,
  * @vitest-environment node
  * The born-finalized entrance's SEQUENCE (ADR-116 §3).
  */
 import { IdentityGuardsService } from "../identity-guards.service.ts";
-import { IdentityEngineUnavailableError } from "@langwatch/identity-contract";
-import { describe, expect, it, vi } from "vitest";
-import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
-import { IdentityBirthService } from "../identity-birth.service.ts";
-import type { IdentityBirthLedger } from "../../app/identity.members.ts";
-import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository.ts";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
-import { CryptoIdentifierIdentityAdapter } from "../crypto-identifier-identity.service.ts";
 
 const EMAIL = "newborn@acme.com";
 const T0 = 1_690_000_000_000;

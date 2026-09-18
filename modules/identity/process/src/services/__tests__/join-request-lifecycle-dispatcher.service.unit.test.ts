@@ -7,9 +7,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { JoinRequestLifecycleDispatcherAdapter } from "../join-request-lifecycle-dispatcher.service.ts";
 import type { PrismaJoinRequestReadRepository } from "../../repositories/prisma/prisma.join-request.repository.ts";
 import type { JoinRequestNotifier } from "../../rules/join-requests-contract.rules.ts";
+import { JoinRequestLifecycleDispatcherAdapter } from "../join-request-lifecycle-dispatcher.service.ts";
 import type { JoinRequestService } from "../join-request.service.ts";
 
 const ORGANIZATION_ID = "org_1";

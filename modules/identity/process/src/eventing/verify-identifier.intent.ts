@@ -1,12 +1,13 @@
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import {
   VERIFY_IDENTIFIER_COMMAND_TYPE,
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
 } from "@langwatch/identity-contract";
+
 import type { IdentityGuardsService } from "../services/identity-guards.service.ts";
-import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import type { IdentityEvent } from "./identity-state.projection.ts";
 import { identityEventsFor } from "./identity-events.intent.ts";
+import type { IdentityEvent } from "./identity-state.projection.ts";
 
 /** The staged re-run: the calling path's guard, the calling path's envelope. */
 export class VerifyIdentifierCommand implements CommandHandler<

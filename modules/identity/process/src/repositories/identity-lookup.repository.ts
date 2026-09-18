@@ -6,7 +6,9 @@ import type { LookupOperatorActivityRow } from "@langwatch/identity-contract";
  * would be overwritten by the next fold (`sso-connection-backoffice`).
  */
 export abstract class IdentityLookupRepository {
-  abstract findIdentifiersByValue(input: { value: string }): Promise<readonly LookupIdentifierRow[]>;
+  abstract findIdentifiersByValue(input: {
+    value: string;
+  }): Promise<readonly LookupIdentifierRow[]>;
 
   abstract findIdentifiersForUser(input: {
     userId: string;

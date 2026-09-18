@@ -20,6 +20,7 @@ import {
   type RegenerateBackupCodesCommandData,
   remainingBackupCodes,
 } from "@langwatch/identity-contract";
+
 import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
 
 /**

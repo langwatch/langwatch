@@ -1,6 +1,7 @@
-import type { SsoConnectionGrandfatherService } from "./sso-connection-grandfather.service.ts";
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+
 import { IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME } from "../rules/identity-migration-names.rules.ts";
+import type { SsoConnectionGrandfatherService } from "./sso-connection-grandfather.service.ts";
 
 /**
  * D04 — the connection grandfather as the runner sees it (ADR-117 §5): the

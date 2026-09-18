@@ -1,3 +1,8 @@
+import type {
+  ProjectionStoreContext,
+  StateProjectionStore,
+  StoredProjection,
+} from "@langwatch/eventing";
 /**
  * The join-request ledger writer, which had no test of its own at all. appender, so this writer
  * touches no event log — and a process that never registered the pipeline is told,
@@ -11,14 +16,10 @@ import {
   type JoinRequestCommand,
   type JoinRequestFactInput,
 } from "@langwatch/identity-contract";
-import type {
-  ProjectionStoreContext,
-  StateProjectionStore,
-  StoredProjection,
-} from "@langwatch/eventing";
-import type { JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
 import { describe, expect, it, vi } from "vitest";
+
 import type { IdentityEventing } from "../../app/identity.members.ts";
+import type { JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
 import { JoinRequestLedgerWriterAdapter } from "../join-request-ledger.service.ts";
 
 const ORGANIZATION = "org_acme";
@@ -68,8 +69,7 @@ class RecordingEventing implements IdentityEventing {
   readonly asked: { pipeline: string; command: string }[] = [];
   readonly staged: unknown[] = [];
 
-  constructor(private readonly registered: boolean) {
-  }
+  constructor(private readonly registered: boolean) {}
 
   async tryPipelineCommand(input: { pipeline: string; command: string }) {
     this.asked.push(input);

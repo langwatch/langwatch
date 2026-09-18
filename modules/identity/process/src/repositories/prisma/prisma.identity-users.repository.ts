@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { IdentityUsersRepository } from "../identity-users.repository.ts";
 
 /** The one model the identity guards touch on the legacy side of the fork. */

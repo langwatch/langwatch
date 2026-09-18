@@ -24,6 +24,7 @@ import {
   WITHDRAW_JOIN_COMMAND_TYPE,
   type WithdrawJoinCommandData,
 } from "@langwatch/identity-contract";
+
 import type { JoinRequestReadRepository } from "../repositories/join-request.repository.ts";
 
 /**

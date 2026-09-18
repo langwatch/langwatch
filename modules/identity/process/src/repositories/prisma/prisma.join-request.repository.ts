@@ -6,12 +6,13 @@ import {
   type JoinCandidateOrganization,
   type JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, type Instant } from "@langwatch/time";
+
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
 } from "../join-request.repository.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate, type Instant } from "@langwatch/time";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository.ts";
 
 /**

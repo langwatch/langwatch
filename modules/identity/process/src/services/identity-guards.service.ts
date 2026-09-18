@@ -25,11 +25,12 @@ import {
   userErasureFacts,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
+
 import type { IdentifierIdentity } from "../app/identity.members.ts";
-import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
+import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
 
 /**
  * Why removing this identifier would strand the person, or null. Pure and

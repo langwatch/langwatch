@@ -1,4 +1,5 @@
 import type { LookupOperatorActivityRow } from "@langwatch/identity-contract";
+
 import {
   IdentityLookupRepository,
   type LookupConnectionRow,

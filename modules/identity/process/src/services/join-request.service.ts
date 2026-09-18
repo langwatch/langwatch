@@ -18,8 +18,9 @@ import {
   type WithdrawJoinCommandData,
   withdrawJoinCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { JoinRequestGuardsService } from "./join-request-guards.service.ts";
+
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
+import type { JoinRequestGuardsService } from "./join-request-guards.service.ts";
 
 /**
  * The join-request write surface (D12): five verbs, each the same move — parse the input, run

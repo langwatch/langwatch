@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { joinMatchKindSchema, joinResolverSchema, joinWithdrawalCauseSchema } from "./join-request.ts";
+
+import {
+  joinMatchKindSchema,
+  joinResolverSchema,
+  joinWithdrawalCauseSchema,
+} from "./join-request.ts";
 import { identityActorSchema } from "./vocabulary.ts";
 
 /** Join-request commands for the full lifecycle: request, approve, reject, withdraw, expire. Each

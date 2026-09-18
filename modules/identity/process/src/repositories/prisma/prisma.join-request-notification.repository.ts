@@ -1,9 +1,9 @@
+import type { JoinRequestMail } from "../../app/identity.members.ts";
+import { JoinRequestNotificationService } from "../../services/join-request-notification.service.ts";
 import {
   PrismaJoinRequestAudienceRepository,
   type PrismaJoinRequestAudienceDatabase,
 } from "./prisma.join-request-audience.repository.ts";
-import type { JoinRequestMail } from "../../app/identity.members.ts";
-import { JoinRequestNotificationService } from "../../services/join-request-notification.service.ts";
 
 /** Every model a join-request notification reads, and no other. */
 export type JoinRequestNotificationDatabase = PrismaJoinRequestAudienceDatabase;

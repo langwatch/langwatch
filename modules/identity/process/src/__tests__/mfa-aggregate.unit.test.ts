@@ -1,15 +1,15 @@
+import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {
   emptyMfaEnrollment,
   IDENTITY_EVENT_VERSION_LATEST,
   MFA_EVENT_VERSION_LATEST,
   type MfaEnrollmentState,
   type MfaFact,
-  reduceMfaEnrollment,USER_IDENTITY_AGGREGATE_TYPE
+  reduceMfaEnrollment,
+  USER_IDENTITY_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
-import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
-import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { describe, expect, it } from "vitest";
-import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
+
 import {
   ConfirmMfaCommand,
   ConsumeBackupCodeCommand,
@@ -19,7 +19,9 @@ import {
   RecordMfaVerificationFailureCommand,
   RegenerateBackupCodesCommand,
 } from "../eventing/mfa.intent.ts";
+import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
 import { IdentityPipelineDefinitionAdapter } from "../services/identity-pipeline-definition.service.ts";
+import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

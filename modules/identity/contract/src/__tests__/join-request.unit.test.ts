@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   emptyJoinRequest,
   JOIN_APPROVED_EVENT_TYPE,

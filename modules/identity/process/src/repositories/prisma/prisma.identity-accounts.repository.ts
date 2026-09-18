@@ -1,10 +1,11 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccounts,
 } from "../../rules/identity-storage.rules.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** The `Identifier` columns an assembled account row is built from. */
 interface LinkedIdentifierRow {

@@ -1,5 +1,6 @@
 import type { SsoConnectionState } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type {
   SsoConnectionBackofficePage,
   SsoConnectionBackofficeRepository,
@@ -67,7 +68,11 @@ export class PrismaSsoConnectionBackofficeRepository implements SsoConnectionBac
     };
   }
 
-  async tryFindById({ connectionId }: { connectionId: string }): Promise<SsoConnectionState | null> {
+  async tryFindById({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<SsoConnectionState | null> {
     const row = await this.prisma.ssoConnection.findUnique({
       where: { id: connectionId },
     });

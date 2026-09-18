@@ -1,3 +1,12 @@
+import { createTenantId } from "@langwatch/eventing";
+import type { IdentifierFact } from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaTenancyGuardService,
+} from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * rows are upserted whole, replay's writes win over stated linkage,
  * The identity fold's store against real Postgres (ADR-101 §3, ADR-116):
@@ -5,18 +14,10 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaTenancyGuardService,
-} from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import type { IdentityFoldState } from "../../../eventing/identity-state.projection.ts";
 import { PrismaIdentityProjectionRepository } from "../prisma.identity-projection.repository.ts";
 import { PrismaIdentityReservationRepository } from "../prisma.identity-reservations.repository.ts";
-import type { IdentityFoldState } from "../../../eventing/identity-state.projection.ts";
-import type { IdentifierFact } from "@langwatch/identity-contract";
-import { createTenantId } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const namespace = `idproj-${nanoid(8)}`;

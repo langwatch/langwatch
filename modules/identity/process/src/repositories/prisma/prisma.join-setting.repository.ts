@@ -1,5 +1,6 @@
 import { DEFAULT_DOMAIN_JOIN_SETTING, type DomainJoinSetting } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { JoinSetting } from "../../rules/join-requests-contract.rules.ts";
 import { PrismaJoinCandidateRepository } from "./prisma.join-request.repository.ts";
 

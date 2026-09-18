@@ -1,4 +1,10 @@
 import {
+  type Command,
+  type CommandHandler,
+  type CommandSchema,
+  defineCommandSchema,
+} from "@langwatch/eventing";
+import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   type ActivateConnectionCommandData,
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
@@ -43,11 +49,11 @@ import {
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
-import { type Command, type CommandHandler, type CommandSchema, defineCommandSchema } from "@langwatch/eventing";
-import type { SsoConnectionEvent } from "./sso-connection-state.projection.ts";
+
+import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { ssoConnectionEventsFor } from "./sso-connection-events.intent.ts";
+import type { SsoConnectionEvent } from "./sso-connection-state.projection.ts";
 
 /**
  * The connection pipeline's thirteen verbs plus grandfathering, as the queue's STAGED RE-RUN of

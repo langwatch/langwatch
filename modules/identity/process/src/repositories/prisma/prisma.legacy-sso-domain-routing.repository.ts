@@ -1,6 +1,7 @@
 import type { RoutableConnection, SignInMethod } from "@langwatch/identity-contract";
-import type { SignInDomainRouting } from "../../services/signin-router.service.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import type { SignInDomainRouting } from "../../services/signin-router.service.ts";
 
 /**
  * The router's domain-lookup port, over the data that exists TODAY: `Organization.ssoDomain` /

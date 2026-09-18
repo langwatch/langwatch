@@ -9,14 +9,19 @@ import {
   type IdentityFactInput,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import { deriveNewbornUserId } from "../rules/identifier-hash.rules.ts";
-import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules.ts";
-import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
-import { IdentityBirth, type IdentityNewborn,type IdentityBirthLedger } from "../app/identity.members.ts";
 import { createLogger } from "@langwatch/observability";
+
+import {
+  IdentityBirth,
+  type IdentityNewborn,
+  type IdentityBirthLedger,
+} from "../app/identity.members.ts";
+import { identityEventsFor } from "../eventing/identity-events.intent.ts";
 import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository.ts";
-import { identityEventsFor } from "../eventing/identity-events.intent.ts";
+import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
+import { deriveNewbornUserId } from "../rules/identifier-hash.rules.ts";
+import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules.ts";
 
 const logger = createLogger("langwatch:identity:birth");
 

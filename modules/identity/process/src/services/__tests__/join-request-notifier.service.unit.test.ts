@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+
+import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
 import type { JoinRequestAudience } from "../../repositories/join-request-audience.repository.ts";
 import type { PrismaJoinRequestNotificationContextRepository } from "../../repositories/prisma/prisma.join-request-notification-context.repository.ts";
 import { EmailJoinRequestNotifierAdapter } from "../join-request-notifier.service.ts";
-import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature
@@ -16,8 +17,7 @@ function recordingMail() {
     async (_: Parameters<JoinRequestNotificationMail["sendRequestExpired"]>[0]) => undefined,
   );
   const sendJoinedAutomatically = vi.fn(
-    async (_: Parameters<JoinRequestNotificationMail["sendJoinedAutomatically"]>[0]) =>
-      undefined,
+    async (_: Parameters<JoinRequestNotificationMail["sendJoinedAutomatically"]>[0]) => undefined,
   );
   class RecordingMail implements JoinRequestNotificationMail {
     sendRequestArrived = sendRequestArrived;

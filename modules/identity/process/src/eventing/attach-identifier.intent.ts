@@ -1,12 +1,13 @@
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
   type AttachIdentifierCommandData,
   attachIdentifierCommandDataSchema,
 } from "@langwatch/identity-contract";
+
 import type { IdentityGuardsService } from "../services/identity-guards.service.ts";
-import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import type { IdentityEvent } from "./identity-state.projection.ts";
 import { identityEventsFor } from "./identity-events.intent.ts";
+import type { IdentityEvent } from "./identity-state.projection.ts";
 
 /**
  * The staged re-run of an attach: the same guard the calling path ran

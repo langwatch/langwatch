@@ -9,6 +9,7 @@ import {
   normalizeDomain,
   type DomainJoinSetting,
 } from "@langwatch/identity-contract";
+
 import type { JoinRequestsServiceDeps } from "../rules/join-requests-contract.rules.ts";
 import type { JoinRequestAdmissionGuardsService } from "./join-request-admission-guards.service.ts";
 

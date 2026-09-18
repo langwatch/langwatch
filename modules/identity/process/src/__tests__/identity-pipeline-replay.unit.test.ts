@@ -1,8 +1,3 @@
-import { emptyIdentityHeads,USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
-import { IdentityGuardsService } from "../services/identity-guards.service.ts";
-import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
-import { describe, expect, it } from "vitest";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../testing.ts";
 import {
   createTenantId,
   EventSourcing,
@@ -11,9 +6,15 @@ import {
   type StoredProjection,
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { IdentityPipelineDefinitionAdapter } from "../services/identity-pipeline-definition.service.ts";
+import { emptyIdentityHeads, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
+import { describe, expect, it } from "vitest";
+
 import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
+import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
+import { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import { IdentityPipelineDefinitionAdapter } from "../services/identity-pipeline-definition.service.ts";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../testing.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -109,7 +110,8 @@ describe("identity pipeline", () => {
       try {
         await pipeline.service.waitUntilReady();
         const attachIdentifier = pipeline.commands.attachIdentifier;
-        if (!attachIdentifier) throw new Error("identity pipeline did not install attachIdentifier");
+        if (!attachIdentifier)
+          throw new Error("identity pipeline did not install attachIdentifier");
         await attachIdentifier.send({
           tenantId: USER,
           userId: USER,

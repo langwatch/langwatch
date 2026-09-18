@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { nowInstant } from "@langwatch/time";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
 import {
   IDENTITY_BORN_REPORT_KIND,
   PrismaIdentityNewbornRepository,

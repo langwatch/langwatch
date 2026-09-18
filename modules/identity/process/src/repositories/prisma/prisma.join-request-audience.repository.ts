@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { JoinRequestAudience } from "../join-request-audience.repository.ts";
 
 /** Every model a join-request notification reads, and no other. */

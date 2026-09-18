@@ -3,6 +3,7 @@
  * Both pass-time directions of the bridge mirror's row half (ADR-116 §4).
  */
 import { describe, expect, it, vi } from "vitest";
+
 import type {
   AccountSecretPair,
   IdentitySecretCarryRepository,

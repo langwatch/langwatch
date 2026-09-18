@@ -1,7 +1,8 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { IdentityEmailService } from "../../services/identity-email.service.ts";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { IdentityUserGate } from "../../rules/identity-user-gate.rules.ts";
+import { IdentityEmailService } from "../../services/identity-email.service.ts";
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";
 import { PrismaIdentityLatchRepository } from "./prisma.identity-latch.repository.ts";
 

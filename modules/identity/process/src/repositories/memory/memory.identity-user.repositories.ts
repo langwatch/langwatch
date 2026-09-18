@@ -1,10 +1,12 @@
 import {
   emptyIdentityHeads,
   type IdentifierFact,
-  type IdentityHeads,type BackfillIdentifierRow
+  type IdentityHeads,
+  type BackfillIdentifierRow,
 } from "@langwatch/identity-contract";
 import { Temporal } from "@langwatch/time";
 import type { Instant } from "@langwatch/time";
+
 import type {
   BackfillAccountRow,
   BackfillUserRow,

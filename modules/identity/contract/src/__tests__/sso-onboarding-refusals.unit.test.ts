@@ -1,14 +1,15 @@
-/**
- * Every refusal the single sign-on onboarding surfaces can produce, and what a customer
- * actually reads when one arrives. Corresponds to specs/identity/sso-onboarding-tiers.feature.
- */
-import { describe, expect, it } from "vitest";
 import {
   explainAnyError,
   explainHandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/handled-error/presentation";
 import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
+/**
+ * Every refusal the single sign-on onboarding surfaces can produce, and what a customer
+ * actually reads when one arrives. Corresponds to specs/identity/sso-onboarding-tiers.feature.
+ */
+import { describe, expect, it } from "vitest";
+
 import {
   SsoConnectionActivationBlockedError,
   SsoConnectionDomainTakenError,

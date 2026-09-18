@@ -2,10 +2,14 @@ import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-co
 import type { IdentifierFact, SsoConnectionState } from "@langwatch/identity-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MemoryIdentityLookupRepository } from "../repositories/memory/memory.identity-lookup.repository.ts";
+
 import { MemoryIdentityStore } from "../repositories/memory/memory-identity.store.ts";
+import { MemoryIdentityLookupRepository } from "../repositories/memory/memory.identity-lookup.repository.ts";
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
-import { IdentityLookupRefusedError, IdentityLookupService } from "../services/identity-lookup.service.ts";
+import {
+  IdentityLookupRefusedError,
+  IdentityLookupService,
+} from "../services/identity-lookup.service.ts";
 
 /**
  * D05 tier 1 end to end at the read surface: the real service, the real
@@ -131,8 +135,14 @@ describe("identity lookup, end to end at the read surface", () => {
   describe("when every person holding any part of the address is asked for", () => {
     /** @scenario "Every person holding any part of the address is listed" */
     it("lists both holders, neither as the only answer", async () => {
-      store.identifiers.set("id_1", identifierRow({ identifierId: "id_1", userId: "user_1", state: "VERIFIED" }));
-      store.identifiers.set("id_2", identifierRow({ identifierId: "id_2", userId: "user_2", state: "DETACHED" }));
+      store.identifiers.set(
+        "id_1",
+        identifierRow({ identifierId: "id_1", userId: "user_1", state: "VERIFIED" }),
+      );
+      store.identifiers.set(
+        "id_2",
+        identifierRow({ identifierId: "id_2", userId: "user_2", state: "DETACHED" }),
+      );
       reads.users.set("user_1", { userId: "user_1", name: "Sam", email: "sam@acme.com" });
       reads.users.set("user_2", { userId: "user_2", name: "Sam Former", email: null });
 
@@ -145,9 +155,9 @@ describe("identity lookup, end to end at the read surface", () => {
   describe("when mallory holds no platform operator access", () => {
     /** @scenario "A refused lookup is recorded as an attempt, and reveals nothing" */
     it("refuses the request and records only that she made an attempt", async () => {
-      await expect(
-        service.resolve({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toThrow(IdentityLookupRefusedError);
+      await expect(service.resolve({ address: "sam@acme.com", operator: MALLORY })).rejects.toThrow(
+        IdentityLookupRefusedError,
+      );
 
       expect(auditLog.rows).toHaveLength(1);
       expect(auditLog.rows[0]?.userId).toBe(MALLORY.userId);

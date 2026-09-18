@@ -5,11 +5,12 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { s256Challenge } from "../rules/pkce.rules.ts";
+
 import type {
   IdentityVerificationRecord,
   IdentityVerificationRepository,
 } from "../repositories/identity-verification.repository.ts";
+import { s256Challenge } from "../rules/pkce.rules.ts";
 import {
   IDENTITY_VERIFICATION_TTL_MS,
   VerificationCeremonyService,

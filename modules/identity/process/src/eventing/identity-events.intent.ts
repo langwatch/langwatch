@@ -1,10 +1,11 @@
+import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
 import type { IdentityCommand, IdentityFactInput } from "@langwatch/identity-contract";
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
   IDENTITY_EVENT_VERSION_LATEST,
   USER_IDENTITY_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
-import { createTenantId, eventIdempotencyKey, EventUtils } from "@langwatch/eventing";
+
 import type { IdentityEvent } from "./identity-state.projection.ts";
 
 /**

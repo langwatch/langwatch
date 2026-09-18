@@ -1,4 +1,5 @@
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
+
 import type { IdentityUsersRepository } from "../../repositories/identity-users.repository.ts";
 
 /**

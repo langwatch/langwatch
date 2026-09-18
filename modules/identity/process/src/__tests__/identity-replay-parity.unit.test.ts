@@ -11,6 +11,7 @@ import {
   reduceIdentity,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   identifierFactToRow,
   identifierRowToFact,

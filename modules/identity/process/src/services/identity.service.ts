@@ -18,8 +18,10 @@ import {
   proposeLinkCommandDataSchema,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
   type VerifyIdentifierCommandData,
-  verifyIdentifierCommandDataSchema,type IdentityGuardsApi
+  verifyIdentifierCommandDataSchema,
+  type IdentityGuardsApi,
 } from "@langwatch/identity-contract";
+
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import type {
   IdentityAdoptionWrites,

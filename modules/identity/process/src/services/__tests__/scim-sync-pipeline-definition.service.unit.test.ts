@@ -1,7 +1,7 @@
-import { emptyScimSync, type ScimSyncState, scimSyncIdFor } from "@langwatch/identity-contract";
-import { ScimSyncGuardsService } from "../scim-sync-guards.service.ts";
-import { describe, expect, it } from "vitest";
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
+import { emptyScimSync, type ScimSyncState, scimSyncIdFor } from "@langwatch/identity-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   IssueScimTokenCommand,
   RecordScimApplyFailureCommand,
@@ -9,6 +9,7 @@ import {
   RecordScimUserPushCommand,
   RevokeScimSyncCommand,
 } from "../../eventing/scim-sync.intent.ts";
+import { ScimSyncGuardsService } from "../scim-sync-guards.service.ts";
 import { ScimSyncPipelineDefinitionAdapter } from "../scim-sync-pipeline-definition.service.ts";
 
 const ORGANIZATION = "org_acme";

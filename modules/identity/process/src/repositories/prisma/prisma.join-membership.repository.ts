@@ -7,6 +7,7 @@ import {
 } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { JoinMembership } from "../../rules/join-requests-contract.rules.ts";
 
 /**
@@ -22,10 +23,7 @@ const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
  * acceptance and SSO auto-join already use (ADR-092).
  */
 export class PrismaJoinMembershipRepository implements JoinMembership {
-  static create(
-    prisma: PrismaClient,
-    writer: AuthzGrantsService,
-  ): PrismaJoinMembershipRepository {
+  static create(prisma: PrismaClient, writer: AuthzGrantsService): PrismaJoinMembershipRepository {
     return new PrismaJoinMembershipRepository(prisma, writer);
   }
 

@@ -1,4 +1,10 @@
 import {
+  AbstractFoldProjection,
+  EventSchema,
+  type FoldEventHandlers,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import {
   emptyJoinRequest,
   JOIN_APPROVED_EVENT_TYPE,
   joinApprovedPayloadSchema,
@@ -13,12 +19,6 @@ import {
   joinWithdrawnPayloadSchema,
   reduceJoinRequest,
 } from "@langwatch/identity-contract";
-import {
-  AbstractFoldProjection,
-  EventSchema,
-  type FoldEventHandlers,
-  type StateProjectionStore,
-} from "@langwatch/eventing";
 import { z } from "zod";
 
 /**

@@ -9,6 +9,7 @@ import {
   type IdentityFactInput,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
+
 import { InMemoryIdentityEventStore } from "./support/in-memory-event-store.ts";
 import { ACTOR, USER } from "./support/in-memory-heads.ts";
 

@@ -1,20 +1,21 @@
+import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {
   emptyIdentityHeads,
   type IdentifierFact,
   type IdentityHeads,
 } from "@langwatch/identity-contract";
-import { IdentityGuardsService } from "../identity-guards.service.ts";
-import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
 import { describe, expect, it } from "vitest";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
-import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
+
 import { AttachIdentifierCommand } from "../../eventing/attach-identifier.intent.ts";
 import { DetachIdentifierCommand } from "../../eventing/detach-identifier.intent.ts";
 import { EraseUserCommand } from "../../eventing/erase-user.intent.ts";
 import { MarkPrimaryCommand } from "../../eventing/mark-primary.intent.ts";
 import { VerifyIdentifierCommand } from "../../eventing/verify-identifier.intent.ts";
-import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.service.ts";
+import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { CryptoIdentifierIdentityAdapter } from "../crypto-identifier-identity.service.ts";
+import { IdentityGuardsService } from "../identity-guards.service.ts";
+import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.service.ts";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

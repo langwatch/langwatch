@@ -21,6 +21,7 @@ import {
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
+
 import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,

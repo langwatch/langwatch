@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
+
 import { Instance, Ksuid } from "@langwatch/ksuid";
-import {
-  type DeriveIdentifierIdInput,
-  type IdentifierIdentity,
-} from "../app/identity.members.ts";
+
+import { type DeriveIdentifierIdInput, type IdentifierIdentity } from "../app/identity.members.ts";
 
 /**
  * Pinned, never read from the ambient environment - the grants ledger's
@@ -19,8 +18,7 @@ export class CryptoIdentifierIdentityAdapter implements IdentifierIdentity {
     return new CryptoIdentifierIdentityAdapter();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   deriveIdentifierId(fact: DeriveIdentifierIdInput): string {
     const { userId, provider, providerAccountId, normalizedValue, occurredAtMs } = fact;

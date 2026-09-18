@@ -1,4 +1,3 @@
-import type { JoinRequestGuardsService } from "./join-request-guards.service.ts";
 import {
   defineAggregate,
   defineEvents,
@@ -19,15 +18,10 @@ import {
   JOIN_REQUESTED_EVENT_TYPE,
   JOIN_WITHDRAWN_EVENT_TYPE,
   JOIN_REQUEST_AGGREGATE_TYPE,
-  JOIN_REQUEST_PIPELINE_NAME
+  JOIN_REQUEST_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import {
-  ApproveJoinCommand,
-  ExpireJoinCommand,
-  RejectJoinCommand,
-  RequestJoinCommand,
-  WithdrawJoinCommand,
-} from "../eventing/join-request.intent.ts";
+
+import { runExpireRequest, runRemindAdmins } from "../eventing/join-request-lifecycle.intent.ts";
 import {
   expireRequestIntentSchema,
   JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,
@@ -44,7 +38,14 @@ import {
   type JoinRequestFoldState,
   JoinRequestStateFoldProjection,
 } from "../eventing/join-request-state.projection.ts";
-import { runExpireRequest, runRemindAdmins } from "../eventing/join-request-lifecycle.intent.ts";
+import {
+  ApproveJoinCommand,
+  ExpireJoinCommand,
+  RejectJoinCommand,
+  RequestJoinCommand,
+  WithdrawJoinCommand,
+} from "../eventing/join-request.intent.ts";
+import type { JoinRequestGuardsService } from "./join-request-guards.service.ts";
 
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by (the ledger writer
@@ -120,7 +121,11 @@ export class JoinRequestPipelineDefinitionAdapter {
 function mountRequestLifecycle(
   pm: ProcessManagerInitialStage<JoinRequestEvent>,
   lifecycle: JoinRequestLifecycle,
-): ProcessManagerHandledStage<JoinRequestEvent, JoinRequestLifecycleState, Record<string, IntentSpec<any>>> {
+): ProcessManagerHandledStage<
+  JoinRequestEvent,
+  JoinRequestLifecycleState,
+  Record<string, IntentSpec<any>>
+> {
   return pm
     .state<JoinRequestLifecycleState>(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)
     .intent("remindAdmins", remindAdminsIntentSchema, runRemindAdmins({ port: lifecycle }))

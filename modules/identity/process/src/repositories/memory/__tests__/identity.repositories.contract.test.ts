@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { IdentityRepositories } from "../../identity.repositories.ts";
 import { MemoryIdentityStore } from "../memory-identity.store.ts";
 import { MemoryIdentityRepositories } from "../memory.identity.repositories.ts";

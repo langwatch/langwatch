@@ -45,8 +45,9 @@ import {
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionGuardsService } from "./sso-connection-guards.service.ts";
+
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
+import type { SsoConnectionGuardsService } from "./sso-connection-guards.service.ts";
 
 /**
  * The SSO connection write surface (D04, ADR-117 §5): fourteen verbs, each

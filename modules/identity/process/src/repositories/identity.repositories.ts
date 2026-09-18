@@ -1,7 +1,7 @@
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
-import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
+import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
 import type { IdentityNewbornRepository } from "./identity-newborn.repository.ts";
 import type { IdentityReservationRepository } from "./identity-reservations.repository.ts";
 import type { IdentityUsersRepository } from "./identity-users.repository.ts";

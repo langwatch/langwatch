@@ -1,8 +1,9 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
-import { newJoinRequestCommandId } from "../rules/join-request-id.rules.ts";
-import type { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository.ts";
+
 import type { JoinRequestLifecycle } from "../eventing/join-request-lifecycle.process.ts";
+import type { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository.ts";
+import { newJoinRequestCommandId } from "../rules/join-request-id.rules.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 import type { JoinRequestService } from "./join-request.service.ts";
 

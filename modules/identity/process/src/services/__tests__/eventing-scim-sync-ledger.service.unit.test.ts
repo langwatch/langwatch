@@ -12,6 +12,7 @@ import {
 } from "@langwatch/identity-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
+
 import type { IdentityEventing } from "../../app/identity.members.ts";
 import { ScimSyncLedgerWriterAdapter } from "../eventing-scim-sync-ledger.service.ts";
 
@@ -24,8 +25,7 @@ class RecordingEventing implements IdentityEventing {
   readonly asked: { pipeline: string; command: string }[] = [];
   readonly staged: unknown[] = [];
 
-  constructor(private readonly registered: boolean) {
-  }
+  constructor(private readonly registered: boolean) {}
 
   async tryPipelineCommand(input: { pipeline: string; command: string }) {
     this.asked.push(input);
@@ -108,7 +108,10 @@ describe("given a process that composed the writer with no queue behind it", () 
       // a warn would read as an event-stack blip that clears, and this one
       // never does.
       const { logger, lines } = createTestLogger();
-      const writer = new ScimSyncLedgerWriterAdapter({ eventing: new RecordingEventing(false), logger });
+      const writer = new ScimSyncLedgerWriterAdapter({
+        eventing: new RecordingEventing(false),
+        logger,
+      });
       const { command, facts } = issueToken();
 
       await writer.commit({ command, facts });

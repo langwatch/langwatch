@@ -1,7 +1,8 @@
+import { createLogger } from "@langwatch/observability";
+
+import type { ConnectionTeardown } from "../eventing/connection-teardown.process.ts";
 import { newSsoConnectionCommandId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
-import { createLogger } from "@langwatch/observability";
-import type { ConnectionTeardown } from "../eventing/connection-teardown.process.ts";
 
 const logger = createLogger("langwatch:identity:sso-connection-teardown");
 

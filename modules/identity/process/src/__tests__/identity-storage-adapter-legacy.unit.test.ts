@@ -4,6 +4,7 @@
  * FACTORY SPINE's bypass paths. The accounts port is INERT. Hermetic.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+
 import type { AuthUnderTest, IdentityStack, MemoryDB } from "./support/storage-adapter-stack.ts";
 import {
   identityStack,
@@ -251,7 +252,10 @@ describe("better-auth over the identity storage adapter", () => {
       const listed = await identity.auth.api.listUserAccounts({
         headers: new Headers({ cookie }),
       });
-      expect(listed.map((row) => row.providerId).toSorted()).toEqual(["connection-acme", "credential"]);
+      expect(listed.map((row) => row.providerId).toSorted()).toEqual([
+        "connection-acme",
+        "credential",
+      ]);
     });
 
     /** @scenario "An issuer-keyed account read on the legacy branch drops the synthetic issuer" */

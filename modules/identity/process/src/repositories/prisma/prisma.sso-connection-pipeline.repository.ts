@@ -1,14 +1,7 @@
-import {
-  AdminEmailPlatformOperatorsRepository,
-  type PrismaSsoPlatformOperatorDatabase,
-} from "./prisma.sso-platform-operators.repository.ts";
-import type { PlatformOperator } from "../../app/identity.members.ts";
-import { LocalDoorBreakGlassBindingAdapter } from "../../services/local-door-break-glass-binding.service.ts";
-import { SsoConnectionGuardsService } from "../../services/sso-connection-guards.service.ts";
-import { SsoConnectionService } from "../../services/sso-connection.service.ts";
 import type { EventSourcing } from "@langwatch/eventing";
-import { SsoConnectionPipelineDefinitionAdapter } from "../../services/sso-connection-pipeline-definition.service.ts";
 import { SSO_CONNECTION_PIPELINE_NAME } from "@langwatch/identity-contract";
+
+import type { PlatformOperator } from "../../app/identity.members.ts";
 import type { SsoConnectionEvent } from "../../eventing/sso-connection-state.projection.ts";
 import {
   SsoConnectionLedgerWriterAdapter,
@@ -19,6 +12,10 @@ import {
   SsoConnectionDirectoryRevocation,
   UnrevokedSsoConnectionDirectory,
 } from "../../services/eventing-sso-connection-teardown.service.ts";
+import { LocalDoorBreakGlassBindingAdapter } from "../../services/local-door-break-glass-binding.service.ts";
+import { SsoConnectionGuardsService } from "../../services/sso-connection-guards.service.ts";
+import { SsoConnectionPipelineDefinitionAdapter } from "../../services/sso-connection-pipeline-definition.service.ts";
+import { SsoConnectionService } from "../../services/sso-connection.service.ts";
 import {
   PrismaSsoConnectionProjectionRepository,
   type PrismaSsoConnectionProjectionDatabase,
@@ -29,6 +26,10 @@ import {
   type PrismaSsoConnectionReadDatabase,
   type PrismaSsoConnectionStrandingDatabase,
 } from "./prisma.sso-connection-reads.repository.ts";
+import {
+  AdminEmailPlatformOperatorsRepository,
+  type PrismaSsoPlatformOperatorDatabase,
+} from "./prisma.sso-platform-operators.repository.ts";
 
 /** Every model the connection ledger reads or writes, and no other. */
 export type SsoConnectionPipelineDatabase = PrismaSsoConnectionProjectionDatabase &

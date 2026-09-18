@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
+
 import { PrismaLegacySsoOrganizationRepository } from "../prisma.legacy-sso-organization.repository.ts";
 
 function repositoryOver(findUniqueImpl: () => Promise<unknown>) {
@@ -27,13 +28,16 @@ describe("PrismaLegacySsoOrganizationRepository", () => {
       ["a provider with no domain", { ssoDomain: null, ssoProvider: "okta" }],
       ["neither", { ssoDomain: null, ssoProvider: null }],
       ["no organization at all", null],
-    ])("answers null for %s — half a configuration is not something to grandfather", async (_case, row) => {
-      const { repository } = repositoryOver(async () => row);
+    ])(
+      "answers null for %s — half a configuration is not something to grandfather",
+      async (_case, row) => {
+        const { repository } = repositoryOver(async () => row);
 
-      const result = await repository.tryFindLegacySso({ organizationId: "org-1" });
+        const result = await repository.tryFindLegacySso({ organizationId: "org-1" });
 
-      expect(result).toBeNull();
-    });
+        expect(result).toBeNull();
+      },
+    );
   });
 
   describe("findByDomain()", () => {

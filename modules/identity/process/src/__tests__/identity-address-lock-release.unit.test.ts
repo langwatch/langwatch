@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { InMemoryReservations } from "./support/in-memory-reservations.ts";
 
 /**

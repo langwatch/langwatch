@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { emptyIdentityHeads, type IdentityFact, type IdentityHeads } from "../facts.ts";
 import { reduceIdentity } from "../reduce.ts";
 

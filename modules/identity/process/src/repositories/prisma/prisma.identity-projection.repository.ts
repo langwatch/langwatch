@@ -1,15 +1,16 @@
-import type { IdentifierFact } from "@langwatch/identity-contract";
-import { isLiveIdentifierState, LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
-import type { IdentityReservationRepository } from "../identity-reservations.repository.ts";
-import { BetterAuthAccountQueriesAdapter } from "../../services/better-auth-account-queries.service.ts";
-import { createLogger } from "@langwatch/observability";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import type { IdentityFoldState } from "../../eventing/identity-state.projection.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
+import type { IdentifierFact } from "@langwatch/identity-contract";
+import { isLiveIdentifierState, LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+
+import type { IdentityFoldState } from "../../eventing/identity-state.projection.ts";
+import { BetterAuthAccountQueriesAdapter } from "../../services/better-auth-account-queries.service.ts";
+import type { IdentityReservationRepository } from "../identity-reservations.repository.ts";
 import {
   identifierFactToRow as factToRow,
   identifierRowToFact as rowToFact,

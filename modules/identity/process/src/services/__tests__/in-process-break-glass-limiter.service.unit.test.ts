@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { InProcessBreakGlassLimiterAdapter } from "../in-process-break-glass-limiter.service.ts";
 
 describe("the break-glass budget", () => {

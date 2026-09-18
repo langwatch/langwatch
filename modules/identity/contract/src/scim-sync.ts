@@ -2,6 +2,7 @@
  * only; membership consequences dispatch to the grants ledger. See D08.
  */
 import { z } from "zod";
+
 import { identityActorSchema } from "./vocabulary.ts";
 
 export const SCIM_SYNC_EVENT_VERSION_LATEST = "2026-08-24" as const;

@@ -1,5 +1,10 @@
 /** @vitest-environment node */
 
+import type {
+  ProjectionStoreContext,
+  StateProjectionStore,
+  StoredProjection,
+} from "@langwatch/eventing";
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
@@ -11,14 +16,11 @@ import {
   TEARDOWN_REQUESTED_EVENT_TYPE,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import type {
-  ProjectionStoreContext,
-  StateProjectionStore,
-  StoredProjection,
-} from "@langwatch/eventing";
+
 import {
   type SsoConnectionFoldState,
-  SsoConnectionStateFoldProjection,type SsoConnectionEvent
+  SsoConnectionStateFoldProjection,
+  type SsoConnectionEvent,
 } from "../eventing/sso-connection-state.projection.ts";
 
 const ORG = "org_acme";

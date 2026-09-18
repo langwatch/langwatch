@@ -4,10 +4,11 @@ import {
   type SsoDomainVerification,
   SsoSamlNotSelfServeError,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionService } from "./sso-connection.service.ts";
-import { newSsoConnectionCommandId, newSsoConnectionId } from "../rules/sso-connection-id.rules.ts";
-import type { SsoConnectionBackofficeRepository } from "../repositories/sso-connection-backoffice.repository.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { SsoConnectionBackofficeRepository } from "../repositories/sso-connection-backoffice.repository.ts";
+import { newSsoConnectionCommandId, newSsoConnectionId } from "../rules/sso-connection-id.rules.ts";
+import type { SsoConnectionService } from "./sso-connection.service.ts";
 
 /**
  * What the back office reads and commands (D05 tier 1). The write half is a THIN pass-through on

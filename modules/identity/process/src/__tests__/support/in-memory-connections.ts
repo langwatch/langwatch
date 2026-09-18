@@ -4,6 +4,7 @@ import {
   type SsoConnectionFactInput,
   type SsoConnectionState,
 } from "@langwatch/identity-contract";
+
 import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,

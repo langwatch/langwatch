@@ -1,5 +1,6 @@
-import type { IdentitySecretCarryService } from "./identity-secret-carry.service.ts";
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+
+import type { IdentitySecretCarryService } from "./identity-secret-carry.service.ts";
 
 /** Its own state-table key, separate from the backfill's on purpose — see
  *  the class docblock. Never rename. */

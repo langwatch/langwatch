@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { IdentityHeads } from "../facts.ts";
 import { primaryChangeFacts, userErasureFacts } from "../identifier-aggregate.ts";
 import {

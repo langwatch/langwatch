@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
 import { PostgresIdentityGuardsAdapter } from "../../repositories/prisma/prisma.identity-guards.repository.ts";
 import {
   IdentityPipelineDefinitionAdapter,
@@ -5,7 +7,6 @@ import {
 } from "../../services/identity-pipeline-definition.service.ts";
 import { PrismaIdentityProjectionRepository } from "./prisma.identity-projection.repository.ts";
 import { PrismaMfaEnrollmentProjectionRepository } from "./prisma.mfa-enrollment-projection.repository.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** Every model the identity ledger reads or writes, and no other. */
 export type IdentityPipelineDatabase = PrismaClient;

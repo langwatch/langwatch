@@ -12,8 +12,10 @@ import {
   remainingBackupCodes,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { IdentityGuardsService } from "../services/identity-guards.service.ts";
+
 import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
+import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
+import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import {
   ACTOR,
@@ -26,7 +28,6 @@ import {
 } from "./support/in-memory-heads.ts";
 import { InMemoryReservations } from "./support/in-memory-reservations.ts";
 import { InMemoryUsers } from "./support/in-memory-users.ts";
-import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 
 /** No legacy user holds anything, which is what every test below assumes
  *  unless it says otherwise — the cross-population collision guard has its

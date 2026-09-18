@@ -4,7 +4,7 @@
  * The suite moved with the policy. What it proved before — that ADR-027's
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { routeSignIn } from "../signin-routing.ts";
+
 import {
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,
@@ -12,6 +12,7 @@ import {
   SignInMethodPolicyService,
   type SignInMethodPolicyInputs,
 } from "../signin-method-policy.ts";
+import { routeSignIn } from "../signin-routing.ts";
 
 const federationLicensed = vi.fn<() => Promise<boolean>>();
 const resolveAuthProvider = vi.fn<() => Promise<string>>();

@@ -9,6 +9,7 @@ import {
   type ScimSyncState,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   SCIM_APPLY_MAX_ATTEMPTS,
   ScimSyncGuardsService,

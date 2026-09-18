@@ -1,7 +1,9 @@
 /** @vitest-environment node */
 
-import { describe, expect, it, vi } from "vitest";
 import type { ProcessHandlerContext } from "@langwatch/eventing";
+import { describe, expect, it, vi } from "vitest";
+
+import { runCompleteTeardown } from "../connection-teardown.intent.ts";
 import {
   CONNECTION_TEARDOWN_INITIAL_STATE,
   type ConnectionTeardownIntents,
@@ -10,7 +12,6 @@ import {
   onTeardownRequested,
   onTornDown,
 } from "../connection-teardown.process.ts";
-import { runCompleteTeardown } from "../connection-teardown.intent.ts";
 
 const ORG = "org_acme";
 const CONNECTION = "ssoc_1";

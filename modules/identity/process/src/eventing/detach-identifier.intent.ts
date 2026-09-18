@@ -1,12 +1,13 @@
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import {
   DETACH_IDENTIFIER_COMMAND_TYPE,
   type DetachIdentifierCommandData,
   detachIdentifierCommandDataSchema,
 } from "@langwatch/identity-contract";
+
 import type { IdentityGuardsService } from "../services/identity-guards.service.ts";
-import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import type { IdentityEvent } from "./identity-state.projection.ts";
 import { identityEventsFor } from "./identity-events.intent.ts";
+import type { IdentityEvent } from "./identity-state.projection.ts";
 
 /** The staged re-run: the calling path's guard, the calling path's envelope. */
 export class DetachIdentifierCommand implements CommandHandler<

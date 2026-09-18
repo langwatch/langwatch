@@ -1,6 +1,27 @@
 import { moduleApi } from "@langwatch/kernel";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import type { MatchableEmail } from "./matchable-emails.ts";
+
+import type {
+  ActivateConnectionCommandData,
+  ApproveDomainClaimCommandData,
+  AttestDomainCommandData,
+  ClaimDomainCommandData,
+  CompleteTeardownCommandData,
+  DiscardConnectionCommandData,
+  GrandfatherConnectionCommandData,
+  RegisterConnectionCommandData,
+  RejectDomainClaimCommandData,
+  RequestTeardownCommandData,
+  RequestVerificationCommandData,
+  ResumeConnectionCommandData,
+  SuspendConnectionCommandData,
+  VerifyDomainCommandData,
+} from "./connection-commands.ts";
+import type {
+  SsoConnectionFactInput,
+  SsoDomainVerification,
+  SsoConnectionLifecycleState,
+} from "./connection.ts";
 import type {
   AttachIdentifierCommandData,
   DetachIdentifierCommandData,
@@ -19,6 +40,7 @@ import type {
   WithdrawJoinCommandData,
 } from "./join-request-commands.ts";
 import type { JoinRequestFactInput } from "./join-request.ts";
+import type { MatchableEmail } from "./matchable-emails.ts";
 import type {
   ConfirmMfaCommandData,
   ConsumeBackupCodeCommandData,
@@ -26,25 +48,9 @@ import type {
   EnrollMfaCommandData,
   ExpireMfaEnrollmentCommandData,
   RecordMfaVerificationFailureCommandData,
-  RegenerateBackupCodesCommandData,MfaFactInput
+  RegenerateBackupCodesCommandData,
+  MfaFactInput,
 } from "./mfa.ts";
-import type {
-  ActivateConnectionCommandData,
-  ApproveDomainClaimCommandData,
-  AttestDomainCommandData,
-  ClaimDomainCommandData,
-  CompleteTeardownCommandData,
-  DiscardConnectionCommandData,
-  GrandfatherConnectionCommandData,
-  RegisterConnectionCommandData,
-  RejectDomainClaimCommandData,
-  RequestTeardownCommandData,
-  RequestVerificationCommandData,
-  ResumeConnectionCommandData,
-  SuspendConnectionCommandData,
-  VerifyDomainCommandData,
-} from "./connection-commands.ts";
-import type { SsoConnectionFactInput, SsoDomainVerification, SsoConnectionLifecycleState } from "./connection.ts";
 import type {
   IssueScimTokenCommandData,
   RecordScimApplyFailureCommandData,
@@ -187,7 +193,11 @@ export interface SsoConnectionApi {
 
 /** The backoffice read/write surface over SSO connections. */
 export interface SsoConnectionBackofficeApi {
-  list(args: { page: number; pageSize: number; search?: string }): Promise<IdentityBackofficeSsoConnectionList>;
+  list(args: {
+    page: number;
+    pageSize: number;
+    search?: string;
+  }): Promise<IdentityBackofficeSsoConnectionList>;
   findById(args: { connectionId: string }): Promise<IdentityBackofficeSsoConnection | null>;
   registerConnection(args: {
     organizationId: string;
@@ -267,6 +277,14 @@ export interface IdentityApi {
   findEmail(input: { userId: string }): Promise<string | null>;
   /** Gets every verified address this user has proven, or null for legacy `User.email` holders. */
   verifiedEmailsOf(input: { userId: string }): Promise<MatchableEmail[] | null>;
+  /** Completes the session user's PKCE-bound, single-use email verification ceremony. */
+  completeEmailVerification(input: {
+    userId: string;
+    identifierId: string;
+    verificationId: string;
+    token: string;
+    codeVerifier: string;
+  }): Promise<void>;
   /** Operations, not properties: a module boundary carries callable members only. */
   guards(): IdentityGuardsApi;
   mfaGuards(): MfaGuardsApi;
@@ -276,7 +294,12 @@ export interface IdentityApi {
       userId: string;
       identifierId: string;
       commandId: string;
-    }): Promise<{ normalizedValue: string; userId: string; identifierId: string; commandId: string }>;
+    }): Promise<{
+      normalizedValue: string;
+      userId: string;
+      identifierId: string;
+      commandId: string;
+    }>;
     release(args: { userId: string; holdingIdentifierIds: readonly string[] }): Promise<number>;
     reapOrphans(): Promise<number>;
   };

@@ -1,4 +1,10 @@
 import {
+  AbstractFoldProjection,
+  EventSchema,
+  type FoldEventHandlers,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import {
   BACKUP_CODE_CONSUMED_EVENT_TYPE,
   BACKUP_CODES_REGENERATED_EVENT_TYPE,
   backupCodeConsumedPayloadSchema,
@@ -17,12 +23,6 @@ import {
   mfaVerificationFailedPayloadSchema,
   reduceMfaEnrollment,
 } from "@langwatch/identity-contract";
-import {
-  AbstractFoldProjection,
-  EventSchema,
-  type FoldEventHandlers,
-  type StateProjectionStore,
-} from "@langwatch/eventing";
 import { z } from "zod";
 
 /**

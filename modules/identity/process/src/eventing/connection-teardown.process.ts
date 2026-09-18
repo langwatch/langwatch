@@ -1,5 +1,5 @@
-import { z } from "zod";
 import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing";
+import { z } from "zod";
 
 export const CONNECTION_TEARDOWN_PROCESS_NAME = "connectionTeardown" as const;
 

@@ -1,5 +1,6 @@
 import type { IdentifierProvider, IdentityCommand } from "@langwatch/identity-contract";
 import type { TenantMigrationRecord } from "@langwatch/system-migrations";
+
 import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 
 /**
@@ -55,11 +56,7 @@ export interface IdentityBirthLedger {
   stage(input: { command: IdentityCommand }): Promise<void>;
 
   /** Wait, bounded, for the fold to carry these events. An observation. */
-  awaitFold(input: {
-    userId: string;
-    tenantId: string;
-    events: IdentityEvent[];
-  }): Promise<void>;
+  awaitFold(input: { userId: string; tenantId: string; events: IdentityEvent[] }): Promise<void>;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+
 import type { IdentityLatchRepository } from "../repositories/identity-latch.repository.ts";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 
