@@ -1331,8 +1331,8 @@ export function identityAddressLockReaper(): IdentityAddressLockReaperService {
  *
  * The legacy branch is better-auth's own published Prisma engine rather than
  * a re-implementation, so an unlatched user's storage traffic is
- * byte-for-byte what it has always been — and the gate ships closed, which
- * makes that every user until an operator enrolls one.
+ * byte-for-byte what it has always been. The gate stays closed for each user
+ * until their automatic backfill finalizes.
  *
  * Built once, at module load, because `betterAuth()` is: the ceremonies it
  * carries resolve the pipeline handle lazily, so an adapter composed before

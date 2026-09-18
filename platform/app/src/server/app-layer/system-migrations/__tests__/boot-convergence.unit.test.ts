@@ -21,10 +21,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import {
-  runSystemMigrationsToQuiescence,
-  SystemMigrationPreflightError,
-} from "../boot";
+import { runSystemMigrationsToQuiescence, SystemMigrationPreflightError } from "../boot";
 
 function summaryOf({ advanced }: { advanced: number }): MigrationPassSummary {
   return {
@@ -92,9 +89,7 @@ describe("runSystemMigrationsToQuiescence", () => {
       held: 1,
       finiteHeld: 1,
     });
-    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow(
-      "finite migrations held",
-    );
+    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow("finite migrations held");
     expect(stubs.runPass).toHaveBeenCalledTimes(2);
   });
 
@@ -167,6 +162,18 @@ describe("runSystemMigrationsToQuiescence", () => {
     });
   });
 
+  it("refuses parked migrations when startup requires complete settlement", async () => {
+    stubs.runPass.mockResolvedValue({
+      ...summaryOf({ advanced: 0 }),
+      parked: 1,
+    });
+
+    await expect(runSystemMigrationsToQuiescence({ requireNoParked: true })).rejects.toThrow(
+      "1 migrations parked",
+    );
+    expect(stubs.runPass).toHaveBeenCalledTimes(2);
+  });
+
   /** @scenario One tenant's parked migration does not stop the fleet starting */
   it("still refuses when a finite migration stalls beside the park", async () => {
     // The park is tolerated; the stalled finite hold beside it is not, so
@@ -178,9 +185,7 @@ describe("runSystemMigrationsToQuiescence", () => {
       finiteHeld: 1,
     });
 
-    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow(
-      "finite migrations held",
-    );
+    await expect(runSystemMigrationsToQuiescence()).rejects.toThrow("finite migrations held");
   });
 
   it("waits for queue effects and propagates barrier failures", async () => {
@@ -200,9 +205,7 @@ describe("runSystemMigrationsToQuiescence", () => {
     stubs.runPass.mockResolvedValue(summaryOf({ advanced: 1 }));
 
     const run = runSystemMigrationsToQuiescence();
-    const rejected = expect(run).rejects.toBeInstanceOf(
-      SystemMigrationPreflightError,
-    );
+    const rejected = expect(run).rejects.toBeInstanceOf(SystemMigrationPreflightError);
     await vi.runAllTimersAsync();
 
     await rejected;

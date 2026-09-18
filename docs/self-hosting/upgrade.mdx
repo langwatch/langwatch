@@ -9,80 +9,22 @@ description: "How to upgrade LangWatch to the latest version"
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
 
-## Complete identity and access migrations first
+## Automatic identity and access migration
 
-The identity and access update removes the old RBAC permission checks. Existing
-installations must complete their data migrations **before** installing this
-update. Do this in two deployments; do not jump straight from an older version.
+Identity and access migrations run automatically during startup. The new app
+does not begin serving until the authorization, identifier, and existing SSO
+data have migrated and passed their consistency checks. No preparatory release
+or manual migration pass is required.
 
-<Steps>
-  <Step title="Run the preparatory release">
-    Install the preparatory release named in the release notes, using a pinned
-    image or chart version. Keep the app and workers running against your
-    existing PostgreSQL, ClickHouse and Redis databases so the migration events
-    can be processed and verified.
+Keep the current identity-provider configuration, callback URLs, and
+`CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
+SSO route; switching providers remains a separate operation.
 
-    Keep your current identity-provider configuration, callback URLs and
-    `CREDENTIALS_SECRET`. Moving data does not require replacing your provider.
-  </Step>
-  <Step title="Check the migration results">
-    Sign in with an operator account from `ADMIN_EMAILS` and open
-    **Ops > Migrations** (`/ops/migrations`). Check each of these steps:
+Take a fresh database backup, deploy normally, and watch the startup logs. If
+the migration finds inconsistent historical data, startup stops before the new
+runtime serves traffic. The diagnostics below help resolve those exceptional
+cases; they are not a routine preflight.
 
-    | Migration | What must be complete |
-    | --- | --- |
-    | **Authorization engine** (`authz-engine`) | Every organization's existing roles and access grants are **Finalized**. |
-    | **Identifier history backfill** (`identity-d01-identifier-backfill`) | Existing users' sign-in methods are **Finalized**. This step tracks users, so its count is not the organization count. |
-    | **Enterprise SSO connection history** (`identity-d04-connection-grandfather`) | Existing organizations have a **Finalized** result, including those with an existing SSO configuration. |
-
-    Read the results for all existing organizations and users. A zero error
-    count alone does not prove that every account was included. Where available,
-    use **Run for organization…** to run a step for a specific organization and
-    inspect its result. For the identifier backfill, this checks that
-    organization's members.
-
-    **Held**, **Parked**, **Rolled back**, waiting, or missing results mean the
-    upgrade is not ready. Resolve the report and rerun the migration on the
-    preparatory release. **Run a pass now** starts work; it does not certify that
-    the work finished.
-
-    The recurring **Sign-in credential repair** task is different: it keeps
-    credentials synchronized during the transition and has no terminal
-    **Finalized** state. Investigate its errors, but do not wait for a completion
-    state it cannot reach.
-  </Step>
-  <Step title="Verify access, then upgrade">
-    Before changing versions, test an existing administrator's sign-in, a
-    member's team and project access, and an existing SSO sign-in where used.
-    If you use SCIM, check that provisioning still reaches the expected
-    organization and review any failed requests.
-
-    Once the required migrations are **Finalized**, take a fresh backup and
-    install the identity and access update using the deployment steps below.
-    Repeat those sign-in and access checks after the upgrade.
-  </Step>
-</Steps>
-
-<Warning>
-If a required migration says **Not yet available for self-hosted installations**,
-stop here. That build cannot complete the preparation; restarting it or waiting
-longer will not enable the migration. Use a preparatory release that makes all
-required steps available, or [contact support](https://langwatch.ai/support)
-before upgrading. Do not mark migrations complete by editing database rows.
-</Warning>
-
-A healthy app, a completed Prisma schema migration, and an empty work queue do
-not replace these checks. The migration must also verify the imported data and
-persist its **Finalized** result.
-
-This data migration preserves the existing SSO route. Switching to a replacement
-provider is a separate operation with domain verification and a test sign-in;
-see [SSO setup](/platform/sso).
-
-## Check SSO connection ownership before upgrading
-
-Before applying the identity schema migrations, run these read-only queries
-against the installation's PostgreSQL database. Each must return no rows.
 The live connection indexes deliberately refuse duplicate slots rather than
 silently choosing a connection. `REJECTED`, `DRAFT`, and `CLAIMED` still occupy
 slots; only `DISCARDED` and `TORN_DOWN` release them.
