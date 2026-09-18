@@ -124,16 +124,40 @@ export async function findFilesModifiedSince({
     followSymlinks,
     onFile: async (full, name) => {
       if (!matchesName(name)) return false;
-      try {
-        const s = await stat(full);
-        if (s.mtimeMs >= sinceMs) out.push(full);
-      } catch {
-        /* skip unreadable */
-      }
+      if (await fileModifiedSince({ path: full, sinceMs })) out.push(full);
       return false;
     },
   });
   return out;
+}
+
+/**
+ * Whether one file — named rather than found by a walk — is a file at all and
+ * was last modified at or after `sinceMs`.
+ *
+ * The same question {@link findFilesModifiedSince} asks of everything it walks,
+ * for a caller that already knows the path: pi can be handed an exact session
+ * file with `--session`, and that file can be anywhere, so no walk reaches it.
+ * Splitting the rule across two modules is how the two answers drift — one
+ * gains a clock allowance or a link rule and the other does not — and the
+ * allowance in particular is subtle enough that only one of them would get it.
+ *
+ * False rather than throwing for a path that does not exist, cannot be read, or
+ * is a directory. An absent file is the ordinary state early in a run.
+ */
+export async function fileModifiedSince({
+  path,
+  sinceMs,
+}: {
+  path: string;
+  sinceMs: number;
+}): Promise<boolean> {
+  try {
+    const s = await stat(path);
+    return s.isFile() && s.mtimeMs >= sinceMs;
+  } catch {
+    return false;
+  }
 }
 
 /**

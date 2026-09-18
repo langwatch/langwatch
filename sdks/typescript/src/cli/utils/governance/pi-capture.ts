@@ -69,10 +69,9 @@
  *
  * Spec: specs/coding-agent/pi-session-capture.feature
  */
-import { stat } from "node:fs/promises";
-
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import {
+  fileModifiedSince,
   findFilesModifiedSince,
   postOtlpBody,
 } from "./agent-rollout-transport";
@@ -253,16 +252,18 @@ async function sessionFilesTouchedSince({
 
   for (const file of files) {
     if (offered.has(file)) continue;
-    try {
-      const s = await stat(file);
-      if (s.isFile() && s.mtimeMs >= sinceMs - FS_CLOCK_SKEW_GRACE_MS) {
-        offered.add(file);
-      }
-    } catch {
-      // Not written yet, or gone. Both are ordinary: the file appears some way
-      // into the run rather than at the instant pi starts, and a command line
-      // pi refuses never produces one at all, so an absent file is the normal
-      // state early on.
+    // Asked through the same helper the walk uses, so the window is one rule
+    // rather than two that can drift apart. A path that is absent, unreadable
+    // or not a file answers false: all three are ordinary, because the file
+    // appears some way into the run rather than at the instant pi starts, and a
+    // command line pi refuses never produces one at all.
+    if (
+      await fileModifiedSince({
+        path: file,
+        sinceMs: sinceMs - FS_CLOCK_SKEW_GRACE_MS,
+      })
+    ) {
+      offered.add(file);
     }
   }
   // The shared walker yields newest-name-first, which is what a caller
