@@ -33,7 +33,7 @@
  * for `llm_messages_span`, whose key is `(trace_id, span_id)` and would
  * otherwise lose half of itself in the database.
  *
- * @see ../../../../../specs/analytics/lwql-app-functions.feature
+ * @see ../../../../../specs/lwql/app-functions.feature
  * @see dev/docs/adr/136-lwql-app-functions-identity-udfs.md
  */
 

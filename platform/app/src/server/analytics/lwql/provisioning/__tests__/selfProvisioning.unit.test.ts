@@ -19,7 +19,7 @@
  *    tables are dropped first so a changed catalog converges on upgrade.
  *
  * @see ../selfProvisioning.ts — the module under test
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";

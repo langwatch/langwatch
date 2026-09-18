@@ -10640,7 +10640,7 @@ langwatch vk enable <vk_id>
 langwatch vk revoke <vk_id>
 ```
 
-`vk create` also takes `--scope org:<id>`, `--scope team:<id>`, `--trace-project <id>`, `--routing-policy <id>`, `--routing-mode none|fallback_all|policy`, `--principal-user <user_id>` and `--providers-allowed <ids>`. `vk update <id>` changes the name, description, scopes, trace project, routing and budget, with `--clear-description`, `--clear-trace-project`, `--clear-routing-policy` and `--clear-budget` to unset them, and `--config-json <json>` or `--config-file <path>` to set the key's configuration.
+`vk create` also takes `--scope org:<id>`, `--scope team:<id>`, `--trace-project <id>`, `--routing-policy <id>`, `--routing-mode none|fallback_all|policy`, `--principal-user <user_id>`, `--providers-allowed <ids>` and `--reveal-once`, which keeps the secret out of the output and returns a `reveal_id` the app reads exactly once, within 24 hours. `vk update <id>` changes the name, description, scopes, trace project, routing and budget, with `--clear-description`, `--clear-trace-project`, `--clear-routing-policy` and `--clear-budget` to unset them, and `--config-json <json>` or `--config-file <path>` to set the key's configuration.
 
 ## Manage keys over REST
 
@@ -19404,7 +19404,7 @@ uv add langwatch langchain langgraph langchain-openai
 The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
-Use LangWatch's callback handler to instrument your LangGraph agents. Pass the callback to model invocations within your graph nodes to capture LLM calls and tool usage as spans.
+Use LangWatch's callback handler to instrument your LangGraph agents. Pass the callback to the graph invocation, not to a model call inside a node: LangGraph then propagates it to everything the run touches, so every node becomes a span, including tool nodes and plain Python nodes.
 
 ```python
 import langwatch
@@ -19453,9 +19453,6 @@ def llm_call(state: dict):
             )
         ]
         + state["messages"],
-        config=RunnableConfig(
-            callbacks=[langwatch.get_current_trace().get_langchain_callback()]  # +
-        ),
     )
     return {"messages": [msg]}
 
@@ -19492,7 +19489,12 @@ agent = agent_builder.compile()
 
 @langwatch.trace(name="LangGraph - Calculator Agent")
 def main(user_question: str) -> str:
-    result = agent.invoke({"messages": [HumanMessage(content=user_question)]})
+    result = agent.invoke(
+        {"messages": [HumanMessage(content=user_question)]},
+        config=RunnableConfig(
+            callbacks=[langwatch.get_current_trace().get_langchain_callback()]  # +
+        ),
+    )
     final_msg = result["messages"][-1]  # assistant reply
     return getattr(final_msg, "content", str(final_msg))
 
@@ -19501,7 +19503,9 @@ if __name__ == "__main__":
     print(main("Add 13 and 37."))
 ```
 
-The `@langwatch.trace()` decorator creates a parent trace for your graph execution. Within each node that makes LLM calls, use `get_langchain_callback()` and pass it to the model's `RunnableConfig` to capture those calls as spans within the trace.
+The `@langwatch.trace()` decorator creates a parent trace for your graph execution. `get_langchain_callback()` goes in the config of `agent.invoke()`, and the same config argument works for `ainvoke()` and `stream()`. From there LangGraph passes it down: each node becomes a chain span named after the node, model calls become LLM spans, and tool calls become tool spans.
+
+A callback attached only to the model call inside one node produces LLM spans alone. The tool nodes and the plain function nodes never appear, so the trace does not show which step the graph ran.
 
 ## Related
 
@@ -32078,6 +32082,7 @@ Rules for the connect function:
 - Change nothing about how the service starts. The connect function runs on the startup path, and the start command stays the same.
 - **Turn fields** are what the platform sends on every call: `messages` (the whole conversation, OpenAI-style), `new_messages` (`newMessages`, the delta since the last turn), `thread_id` (`threadId`), `session`, `trace_id` (`traceId`). In Python, declare only the ones you use and the SDK passes exactly those. In TypeScript, they arrive as one object, so destructure what you need.
 - Return a string, one message, a list of messages, or `langwatch.AgentReply(output, session=...)` (`{ output, session }` in TypeScript).
+- The connect function is the adapter, and only it carries the decorator. Never place the decorator on a function the app already has when that function returns its own result, for example a dict with the output, a thread id and an order number: the SDK cannot turn that into a reply, and every turn of the run times out. Call that function from the connect function and return its reply text.
 - Do not change the agent's own code to fit the connect function. Map the turn onto the agent's existing call in the connect function instead.
 - Do NOT add a `traceparent` middleware. The SDK adopts the turn's trace context before it calls the function, so the agent's spans land in the turn's trace and the judge reads them.
 
@@ -32184,7 +32189,7 @@ langwatch scenario create 'Order status question' \
 langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id. A name with a space goes in double quotes, `--target "connected:ACME checkout"`, and so does `--wait-online "ACME checkout"`: passed bare, the shell splits it and the command refuses the stray word.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -32219,7 +32224,7 @@ Report failures as they happened. If a CLI command failed or the platform was un
 A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
 
 1. Restart the service that holds the connect call, on the same port.
-2. Run `langwatch agent get <name>` and read the parameter list back.
+2. Run `langwatch agent get "<name>"` and read the parameter list back.
 3. Put that list in the pull request body, as the command printed it.
 
 When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
@@ -32350,6 +32355,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 ## Common Mistakes
 
 - Do NOT reimplement the agent inside the connect function, and do NOT point it at a simplified copy. It calls the agent the product already runs, so the simulation exercises the real code path.
+- Do NOT decorate a function the app already has when it returns its own result object instead of reply text. Write the connect function beside it, call it, and return the text.
 - Do NOT add a runner script or a second start command when the service already has one. The connect function goes on the existing startup path.
 - Do NOT add a `traceparent` middleware for a connected agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
 - Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
@@ -47824,8 +47830,10 @@ CRITICAL: Do NOT guess how to instrument. Different frameworks have different in
 
 ## Step 2: Install the LangWatch SDK
 
-For Python: `pip install langwatch` (or `uv add langwatch`).
-For TypeScript: `npm install langwatch` (or `pnpm add langwatch`).
+For Python, a ladder, stopping at the first that works, and the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line (a venv uv made has no pip in it); otherwise `.venv/bin/python -m pip install langwatch` when `.venv` exists, and only then `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`. A command not found (exit 127) moves to the next rung, never a retry: it is a missing spelling, never a missing capability. When no rung exists, ask before giving up: "Install uv for me" or "I'll set up Python myself".
+For TypeScript: `npm install langwatch` when no lockfile names another manager, `pnpm add langwatch`, `yarn add langwatch` or `bun add langwatch` by the lockfile; a 127 on the named manager falls back to `npm`.
+`uv add` and the JavaScript managers write the manifest themselves. A pip install writes nothing, so add the package to the project's own requirements file (`requirements.txt`, or the file the folder uses, such as `requirements/base.txt`) yourself: `python -m pip show langwatch` gives the version, and the line is `langwatch==<installed version>`, pinned the way the file pins its other packages and unpinned when it pins none of them.
+Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python, `node -e "require('langwatch')"` for TypeScript. A Python release below 1.3.0 has neither, and pip installs one without a word when the interpreter is newer than the SDK supports: every release with the API declares an upper Python bound, and pip walks back to the last release with none. `pip install langwatch --upgrade` cannot help there. A failed check is a question about the interpreter, asked before giving up: "Install Python 3.13 with uv for me" or "I'll pick the interpreter myself".
 
 If install fails due to peer dependency conflicts, widen the conflicting range and retry. Do NOT silently skip.
 
@@ -47853,6 +47861,33 @@ const langwatch = new LangWatch();
 
 The exact pattern depends on the framework, so follow the docs, not these examples.
 
+**A graph takes the callback at the graph, not at a model call inside it.** LangChain propagates a callback down from wherever it is attached, so in LangGraph the callback goes in the config of the graph invocation:
+
+```python
+graph.invoke(state, config={"callbacks": [langwatch.get_current_trace().get_langchain_callback()]})
+```
+
+The same config argument works on `ainvoke` and `stream`. Every node the run touches then becomes a span under the trace: a chain span named after the node, LLM spans for the model calls and tool spans for the tool calls. Attached only to the model call inside one node, the trace holds LLM spans and nothing else, so the tool nodes and the plain function nodes are missing and a check for whether the graph reached its payment step has no span to read.
+
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it. This is the first and only check: copy the command for the language as written, run it once from the project root, and read the answer. No variant before it (a probe such as `import langwatch` with no loader reads the bare process and always answers missing on a dotenv project) and none after it.
+
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+```
+
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. Always `-c`, never `python -` with a heredoc: python-dotenv's loader looks for its caller's file and fails on standard input. TypeScript:
+
+```bash
+node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"
+```
+
+The command prints only whether `LANGWATCH_API_KEY` is set, never its value. Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
+
 ## Step 4: Verify
 
 Do NOT consider the work complete without verifying. In order:
@@ -47867,6 +47902,8 @@ Do NOT consider the work complete without verifying. In order:
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
+- Do NOT attach the LangChain callback only to a model call inside a graph node: it belongs on the graph invocation, or the nodes never become spans
 - Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
 ````
 
@@ -49417,7 +49454,7 @@ langwatch scenario run <scenarioId> --target connected:support-agent@development
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
 - For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row. A name with a space is quoted whole: `--target "connected:ACME checkout"`.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
@@ -49430,7 +49467,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 #### 6. Run a test suite
 
 ```bash
-langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
+langwatch test-suite run "<testSuiteId|name>" --target http:<agentId> --format json
 
 langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \
@@ -49795,6 +49832,7 @@ Rules for the connect function:
 - Change nothing about how the service starts. The connect function runs on the startup path, and the start command stays the same.
 - **Turn fields** are what the platform sends on every call: `messages` (the whole conversation, OpenAI-style), `new_messages` (`newMessages`, the delta since the last turn), `thread_id` (`threadId`), `session`, `trace_id` (`traceId`). In Python, declare only the ones you use and the SDK passes exactly those. In TypeScript, they arrive as one object, so destructure what you need.
 - Return a string, one message, a list of messages, or `langwatch.AgentReply(output, session=...)` (`{ output, session }` in TypeScript).
+- The connect function is the adapter, and only it carries the decorator. Never place the decorator on a function the app already has when that function returns its own result, for example a dict with the output, a thread id and an order number: the SDK cannot turn that into a reply, and every turn of the run times out. Call that function from the connect function and return its reply text.
 - Do not change the agent's own code to fit the connect function. Map the turn onto the agent's existing call in the connect function instead.
 - Do NOT add a `traceparent` middleware. The SDK adopts the turn's trace context before it calls the function, so the agent's spans land in the turn's trace and the judge reads them.
 
@@ -49901,7 +49939,7 @@ langwatch scenario create 'Order status question' \
 langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id. A name with a space goes in double quotes, `--target "connected:ACME checkout"`, and so does `--wait-online "ACME checkout"`: passed bare, the shell splits it and the command refuses the stray word.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -49936,7 +49974,7 @@ Report failures as they happened. If a CLI command failed or the platform was un
 A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
 
 1. Restart the service that holds the connect call, on the same port.
-2. Run `langwatch agent get <name>` and read the parameter list back.
+2. Run `langwatch agent get "<name>"` and read the parameter list back.
 3. Put that list in the pull request body, as the command printed it.
 
 When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
@@ -50067,6 +50105,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 ## Common Mistakes
 
 - Do NOT reimplement the agent inside the connect function, and do NOT point it at a simplified copy. It calls the agent the product already runs, so the simulation exercises the real code path.
+- Do NOT decorate a function the app already has when it returns its own result object instead of reply text. Write the connect function beside it, call it, and return the text.
 - Do NOT add a runner script or a second start command when the service already has one. The connect function goes on the existing startup path.
 - Do NOT add a `traceparent` middleware for a connected agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
 - Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
@@ -51237,8 +51276,10 @@ CRITICAL: Do NOT guess how to instrument. Different frameworks have different in
 
 ## Step 2: Install the LangWatch SDK
 
-For Python: `pip install langwatch` (or `uv add langwatch`).
-For TypeScript: `npm install langwatch` (or `pnpm add langwatch`).
+For Python, a ladder, stopping at the first that works, and the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line (a venv uv made has no pip in it); otherwise `.venv/bin/python -m pip install langwatch` when `.venv` exists, and only then `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`. A command not found (exit 127) moves to the next rung, never a retry: it is a missing spelling, never a missing capability. When no rung exists, ask before giving up: "Install uv for me" or "I'll set up Python myself".
+For TypeScript: `npm install langwatch` when no lockfile names another manager, `pnpm add langwatch`, `yarn add langwatch` or `bun add langwatch` by the lockfile; a 127 on the named manager falls back to `npm`.
+`uv add` and the JavaScript managers write the manifest themselves. A pip install writes nothing, so add the package to the project's own requirements file (`requirements.txt`, or the file the folder uses, such as `requirements/base.txt`) yourself: `python -m pip show langwatch` gives the version, and the line is `langwatch==<installed version>`, pinned the way the file pins its other packages and unpinned when it pins none of them.
+Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python, `node -e "require('langwatch')"` for TypeScript. A Python release below 1.3.0 has neither, and pip installs one without a word when the interpreter is newer than the SDK supports: every release with the API declares an upper Python bound, and pip walks back to the last release with none. `pip install langwatch --upgrade` cannot help there. A failed check is a question about the interpreter, asked before giving up: "Install Python 3.13 with uv for me" or "I'll pick the interpreter myself".
 
 If install fails due to peer dependency conflicts, widen the conflicting range and retry. Do NOT silently skip.
 
@@ -51266,6 +51307,33 @@ const langwatch = new LangWatch();
 
 The exact pattern depends on the framework, so follow the docs, not these examples.
 
+**A graph takes the callback at the graph, not at a model call inside it.** LangChain propagates a callback down from wherever it is attached, so in LangGraph the callback goes in the config of the graph invocation:
+
+```python
+graph.invoke(state, config={"callbacks": [langwatch.get_current_trace().get_langchain_callback()]})
+```
+
+The same config argument works on `ainvoke` and `stream`. Every node the run touches then becomes a span under the trace: a chain span named after the node, LLM spans for the model calls and tool spans for the tool calls. Attached only to the model call inside one node, the trace holds LLM spans and nothing else, so the tool nodes and the plain function nodes are missing and a check for whether the graph reached its payment step has no span to read.
+
+**The environment loads before LangWatch initialises.** `langwatch.setup()` and `new LangWatch()` read `LANGWATCH_API_KEY` from the process environment the moment they run, and a `.env` file is not the environment until something loads it. A filmed run put `langwatch.setup()` at the top of the entry file, above the import that called `load_dotenv()`, and the process died at import with "LangWatch API key is required but not provided".
+
+- Python: find what loads the environment (`load_dotenv()` from python-dotenv, a settings module, a config loader) and put `langwatch.setup()` below every import that runs it, never at the top of the entry file. When the project depends on python-dotenv but the entry file does not load it, add `from dotenv import load_dotenv` and `load_dotenv()` at the top of the instrumented entry file, above `import langwatch`.
+- TypeScript: when the project uses dotenv, `import "dotenv/config"` is the first import of the entry file, above the `langwatch` import; the SDK reads the key when it is constructed.
+
+Before you start the process, check that the key is visible to it the way the project reads it. This is the first and only check: copy the command for the language as written, run it once from the project root, and read the answer. No variant before it (a probe such as `import langwatch` with no loader reads the bare process and always answers missing on a dotenv project) and none after it.
+
+```bash
+uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
+```
+
+`uv run` is the runner the project uses; `poetry run python -c` or `.venv/bin/python -c` when it uses those. Always `-c`, never `python -` with a heredoc: python-dotenv's loader looks for its caller's file and fails on standard input. TypeScript:
+
+```bash
+node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"
+```
+
+The command prints only whether `LANGWATCH_API_KEY` is set, never its value. Swap the loader for the project's own when it is not dotenv. `False` means the file is not where the loader looks or the order above is wrong: fix that, never retry the check with another path.
+
 ## Step 4: Verify
 
 Do NOT consider the work complete without verifying. In order:
@@ -51280,6 +51348,8 @@ Do NOT consider the work complete without verifying. In order:
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
 - Do NOT skip `langwatch.setup()` in Python
+- Do NOT call `langwatch.setup()` above the import that loads the environment: the key is read when `setup()` runs
+- Do NOT attach the LangChain callback only to a model call inside a graph node: it belongs on the graph invocation, or the nodes never become spans
 - Do NOT skip Step 1; instrumentation patterns vary across OpenAI/LangGraph/Vercel/Mastra/Agno and guessing breaks subtly
 
 ---
@@ -52606,7 +52676,7 @@ langwatch scenario run <scenarioId> --target connected:support-agent@development
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
 - For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row. A name with a space is quoted whole: `--target "connected:ACME checkout"`.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
@@ -52619,7 +52689,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 #### 6. Run a test suite
 
 ```bash
-langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
+langwatch test-suite run "<testSuiteId|name>" --target http:<agentId> --format json
 
 langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \
@@ -53340,7 +53410,7 @@ Ask light questions with options. Don't overwhelm: pick the top 2-3 most impactf
 After each improvement:
 
 1. Show what was accomplished
-2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch test-suite run <id|name> --target <type:id> --wait`, etc.)
+2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch test-suite run "<id|name>" --target <type:id> --wait`, etc.)
 3. Ask what to tackle next
 4. Stop when the user says "that's enough"
 
@@ -54803,6 +54873,263 @@ langwatch chart delete <chart-id>
   </div>
 </div>
 
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Build me a custom chart widget</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/dashboard-widgets"} data-track="docs_copy_skill_install" data-track-title={"Build me a custom chart widget"} data-track-skill={"langwatch/skills/recipes/dashboard-widgets"}>
+          <code>npx skills add langwatch/skills/recipes/dashboard-widgets</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/dashboard-widgets"} data-track="docs_copy_slash_command" data-track-title={"Build me a custom chart widget"} data-track-command={"/dashboard-widgets"}>
+          <code><span className="lw-slash-command">/dashboard-widgets</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Build me a custom chart widget"} data-track-skill={"langwatch/skills/recipes/dashboard-widgets"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Build me a custom chart widget
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+# Author a Dashboard Widget
+
+Turn a question ("show cost per model as a bar chart") into a saved dashboard widget: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → save it → prove it runs**.
+
+Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
+
+Every `dashboard-widget` command runs against whatever project `LANGWATCH_PROJECT_ID` names in the environment. That variable is normally already set for you — do not invent a `langwatch project ...` command to look it up (there isn't one; `langwatch projects list` is the read command, plural). Only pass `--project <slug-or-id>` on a command yourself when you need to target a *different* project than the one already in scope. If a command fails with "No project is in scope", set `LANGWATCH_PROJECT_ID` or pass `--project` — do not retry the same call unchanged.
+
+## Step 1: Discover the schema before writing any SQL
+
+Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
+
+```bash
+langwatch dashboard-widget schema -f json
+```
+
+Read the datasets, their grain, their time column, and which columns are `available` to you.
+
+**Seed data is stale** (newest trace 2026-08-04 as of this writing). Write SQL with a wide time window — `WHERE timestamp >= subtractDays(now(), 400)` — not a narrow recent one. A query that legitimately returns 0 rows because of a narrow window is not a bug; widen the window before assuming something is broken.
+
+## Step 2: Write the queries file
+
+`--queries-file` is a JSON array of named queries: `{ name, sql, parameters? }`. A widget's code calls a query by `name` — the two files are one unit.
+
+- `parameters` declares what a `LW.query` call may pass for this query: each entry is `{ name, type, default? }`, where `type` is one of `"string" | "number" | "boolean"` (the JS type of the value, not the SQL type). Any key the widget code passes that is **not** declared here is rejected before any request fires — declare it or don't pass it.
+- The reserved bound names `{dashboard_context_period_start:DateTime}`, `{dashboard_context_period_end:DateTime}`, `{dashboard_context_granularity_seconds:UInt32}` are opt-in: use them in a query's SQL and the executor fills them from the page's own time window automatically. The `dashboard_context_` prefix is reserved — supplied by the dashboard, read-only; author-declared params are separate. **Do not** add them to that query's `parameters` array, and never pass them yourself in a `LW.query` call — either mistake is refused with `dashboard_widget_query_reserved_param` / a schema validation error. On the dashboard-widgets authoring page, that window comes from a session-only range chip (1h / 24h / 7d / 30d, default 24h, resets on reload) — a query using the reserved bounds automatically re-runs when the chip changes. On a dashboard, a pinned widget instead follows that dashboard's own period selector.
+- Your own bind parameters use the same ClickHouse-style SQL placeholder syntax as `lwql-charts` (`{since:DateTime}`, `{model:String}`, …), declared with their JS type in `parameters`.
+
+```json
+[
+  {
+    "name": "cost_by_model",
+    "sql": "SELECT model, sum(costCents) / 100.0 AS cost FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY model ORDER BY cost DESC LIMIT 10",
+    "parameters": []
+  }
+]
+```
+
+## Step 3: Write the widget file
+
+One React/TSX file, default-exporting a component. **React and Recharts are available as globals** in the render iframe (`window.React`, `window.Recharts`) — no import needed, no build step (in-browser Babel compiles the file on load). You may also `import` from `"react"`, `"react-dom"`, `"react-dom/client"`, `"recharts"`, or `"@langwatch/charts"` if you prefer that style; these resolve to the same globals, and importing anything else is refused at compile time.
+
+Fetch data with the `LW.useChartQuery(name, params)` hook, where `name` matches an entry in the queries file. It returns the same shape as TanStack Query's `useQuery` — same field names, on purpose:
+
+```jsx
+const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
+```
+
+- `data` is the query's result rows, or `null` until the first result lands. An empty array (`data.length === 0`) means the query genuinely returned zero rows — not an error; against stale seed data that is expected unless the SQL uses a wide window (see Step 1).
+- `isLoading` is `true` only for the first fetch, before any data has ever landed. `isFetching` is `true` for any fetch in flight, including a background refetch — use it if you want to show a subtle "updating" state without clearing the chart.
+- `isError` is `true` on failure; `error` is then an `Error` (`error.message`) — it never throws into the component. An undeclared param, a reserved-param misuse, or a SQL error all surface here instead of crashing the widget. `status` is `"pending" | "error" | "success"` if you prefer a single field to branch on.
+- The hook auto-refetches when the page's time window changes, and when `params` changes by value — pass a plain object, not one you rebuild with a different identity every render for no reason. Call the returned `refetch()` to re-run it manually (e.g. from a button).
+
+Always render all three branches (loading / error / data) — a widget that only handles the happy path shows nothing useful while data is stale-empty or a query is misconfigured.
+
+Params are validated against the query's declared `parameters` before anything is forwarded to LangWatchQL — an undeclared key, or a required parameter with no default that is omitted, comes back through `error` rather than firing the request.
+
+For code outside a component (or when you need a raw promise instead of hook semantics), `LW.query(name, params)` is the low-level escape hatch the hook is built on: it returns a promise that resolves to `{ rows, statistics }` or rejects with `{ code, title, message }`.
+
+### Prebuilt charts: `@langwatch/charts`
+
+Ten chart primitives, prebuilt and themed, so most widgets don't need to hand-roll a Recharts layout: `MetricStat`, `Sparkline`, `AreaTimeseries`, `StackedBars`, `GroupedBars`, `ProjectionBars`, `Donut`, `Leaderboard`, `Heatmap`. Plus `LwqlChart`, an auto-picker that infers a chart type (area / bars / donut / leaderboard / table) from a query's row shape — pass it `data`, and optionally `kind` to force one.
+
+Every component consumes `LW.useChartQuery` rows directly and themes itself — no color or style props needed.
+
+```jsx
+export default function Widget() {
+  const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
+
+  if (isError) return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
+  if (isLoading || data === null) return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+
+  return <LwqlChart data={data} />;
+}
+```
+
+More worked examples: `platform/app/scripts/north-star-widgets/`.
+
+### Drill-down: `LW.navigate`
+
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget — `target` is `"traces"` or `"trace"`, and `params` is keyed by filter field ids (e.g. `"metadata.user_id"`) that the host resolves into the Trace Explorer URL.
+
+`Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
+
+## Step 4: Save the widget, then prove it renders
+
+```bash
+langwatch dashboard-widget create \
+  --name "Cost by model" \
+  --code-file widget.tsx \
+  --queries-file queries.json \
+  -f json
+```
+
+Creating (and updating) validates the queries file's shape and the widget's JS/TSX syntax, but it does not execute the queries or mount the component — a wrong column name or a runtime error in the widget only surfaces when it actually runs. Open the widget's `platformUrl` (printed on success) and confirm it renders with real data before calling the work done.
+
+## Managing saved widgets
+
+```bash
+langwatch dashboard-widget list -f json
+langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
+langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
+langwatch dashboard-widget delete <id>
+langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
+```
+
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — the widget still lives and is edited on the custom-chart-playground page. See `langwatch dashboard list` for ids.
+
+`update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
+
+## Worked example: bar chart of daily trace counts
+
+`widget.tsx`:
+
+```jsx
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+export default function Widget() {
+  const { data, isLoading, isError, error } = LW.useChartQuery("daily_traces", {});
+
+  if (isError) {
+    return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
+  }
+  if (isLoading || data === null) {
+    return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+  }
+
+  const rows = data.map((row) => ({
+    day: String(row.day).slice(0, 10),
+    traces: Number(row.traces),
+  }));
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>{rows.length} rows</div>
+      <ResponsiveContainer width="100%" height={230}>
+        <BarChart data={rows}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+          <YAxis allowDecimals={false} />
+          <Tooltip />
+          <Bar dataKey="traces" fill="#f97316" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+```
+
+`queries.json`:
+
+```json
+[
+  {
+    "name": "daily_traces",
+    "sql": "SELECT toStartOfDay(timestamp) AS day, count() AS traces FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY day ORDER BY day",
+    "parameters": []
+  }
+]
+```
+
+Create it:
+
+```bash
+langwatch dashboard-widget create \
+  --name "Daily traces" \
+  --code-file widget.tsx \
+  --queries-file queries.json \
+  -f json
+```
+
+## Failure modes worth knowing
+
+- `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
+- `custom_chart_playground_not_enabled` — the custom-chart-playground feature flag is off for this project; do not retry any `dashboard-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
+- A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
+- `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
+- `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
+- "Cannot import '\<specifier>'" — the widget imported something other than `react`, `react-dom`, `react-dom/client`, `recharts`, or `@langwatch/charts`; use only those, or the corresponding global.
+- A query returning 0 rows against seed data — the seed's newest trace is 2026-08-04; widen the time window before assuming the query is wrong.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/dashboard-widgets/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Build me a custom chart widget"} data-track-skill={"langwatch/skills/recipes/dashboard-widgets"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
 {/* lw-generated:recipes:end */}
 
 <div className="lw-info-box">
@@ -55882,7 +56209,7 @@ langwatch scenario run <scenarioId> --target connected:support-agent@development
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
 - For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row. A name with a space is quoted whole: `--target "connected:ACME checkout"`.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
@@ -55895,7 +56222,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 #### 6. Run a test suite
 
 ```bash
-langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
+langwatch test-suite run "<testSuiteId|name>" --target http:<agentId> --format json
 
 langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \
@@ -56571,7 +56898,7 @@ Langy asks which way to use the first time a request needs a code change. Reques
     ![The code access card in the Langy chat, with the options Share my local folder and Use GitHub](/images/langy/local-development/code-access-card.png)
   </Step>
   <Step title="Run the command in the folder">
-    Pick **Share my local folder**. The card shows one command. Run it in the folder you want Langy to work in:
+    Pick **Share local folder**. The card shows one command. Run it in the folder you want Langy to work in:
 
     ```bash
     npx langwatch@latest langy --share-control
@@ -56604,11 +56931,13 @@ Every action runs on your machine, inside the shared folder, through the CLI. La
 | Read a file, list a directory, search for text or files | No |
 | Edit a file, write a new file | No |
 | Run a read-only command (`ls`, `cat`, `git status`, `git diff`, `git log`, `node -v`, and similar) | No |
-| Run any other command (`pnpm test`, `git push`, `rm`) | Yes |
+| Run git in the folder (`git add`, `git commit`, `git checkout`, `git branch`, `git fetch`, `git pull`, `git push`, `git merge`, `git rebase`, `git stash`, and similar) | No |
+| Run a git command that throws work away or rewrites history the remote already has (`git push --force`, `git push --delete`, `git reset --hard`, `git clean -fd`, `git checkout -- <path>`, `git restore <path>`, `git branch -D`, `git stash drop`, `git filter-branch`, `git rm -f`, `git config --global`) | Yes |
+| Run any other command (`pnpm test`, `pnpm install`, `rm`) | Yes |
 | Read a secret file (`.env`, `.envrc`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `.netrc`, `.npmrc`, `.git-credentials`, and similar) | Yes, even to read |
 | Reach a path outside the folder, or use `sudo` | Refused in every mode |
 
-Edits inside the folder run without a question because Langy works on its own branch: your working state and your default branch stay untouched, and the pull request is where you review the change.
+Edits and git run without a question because Langy works on its own branch: it commits in your git identity on a `langy/*` branch, your working state and your default branch stay untouched, and the pull request is where you review the change. Which git form asks is decided by reading the command itself, not by what Langy says about it.
 
 When the CLI refuses an action, it tells Langy why, so Langy finds another way inside the folder or says what it could not do.
 
@@ -67124,34 +67453,222 @@ Each row carries a conversation identifier and its transcript, cut to roughly ei
 
 ---
 title: "Overview"
-description: "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query."
+description: "Run a read-only LangWatchQL SELECT over your project's analytics views, or discover which views and columns your key can query."
 ---
 
-## Intro
+The Query API runs read-only LangWatchQL `SELECT` statements over your project's analytics views. `POST /api/v1/query` runs one statement. `GET /api/v1/query/schema` lists the views, columns, and function names your key can query.
 
-The Query API runs read-only LangWatchQL `SELECT` statements over your project's analytics datasets. `POST /api/v1/query` runs one statement. `GET /api/v1/query/schema` lists the datasets and columns your key can query.
+The request body is the query itself, and a `200` is the result itself: no envelope, no wrapper object around it. A failure answers with the standard LangWatch error envelope and a real HTTP status, so one parser reads every response.
 
 ## Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/v1/query` | Run one LangWatchQL statement. |
-| `GET` | `/api/v1/query/schema` | List queryable datasets, columns, and permission gates. |
+| `GET` | `/api/v1/query/schema` | List queryable views, columns, permission gates, and function names. |
 
 ## Authentication
 
-Pass your LangWatch API key in the `X-Auth-Token` header.
+Send your LangWatch API key in any one of these forms:
+
+| Form | Header |
+|------|--------|
+| Token header | `X-Auth-Token: <token>` |
+| Bearer | `Authorization: Bearer <token>` |
+| Basic | `Authorization: Basic base64(projectId:token)` |
+
+Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required. To narrow the result to one project, filter inside the statement itself with `WHERE TenantId = '<project id>'`.
+
+A result that mixes rows from more than one project carries the `MULTI_PROJECT_RESULT` diagnostic, so a caller who expected a single project can tell.
 
 ## Errors
 
-Both endpoints answer with the standard LangWatch error envelope and a real HTTP status. No wrapper sits around it. See [Error Envelope](/ai-gateway/api/errors).
+Both endpoints answer with the standard LangWatch error envelope and a real HTTP status. No wrapper sits around it. See [Error Envelope](/ai-gateway/api/errors). Where a failure has a fix, the envelope's `meta` carries the corrective fields for it. For example, `FUNCTION_NOT_ALLOWED` lists `allowedFunctions`.
 
-| Status | `type` | When |
+| Status | `code` | When |
 |--------|--------|------|
-| `400` | `bad_request` | The request body failed validation. |
-| `401` | `unauthenticated` | The API key is missing, invalid, or revoked. |
-| `403` | `permission_denied` | The key lacks the `analytics:view` permission. |
-| `422` | `unprocessable_entity` | The statement is valid but would scan more data than the key allows. |
+| `400` | `validation_error` | The request body failed validation. |
+| `400` | `lwql_unparseable` | The statement is not valid LangWatchQL. |
+| `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds, for example a function outside the allowlist, or a `LIMIT` above 10,000 rows (`meta.violations` names it `LIMIT_TOO_HIGH` or `LIMIT_REQUIRED_PER_BRANCH`). |
+| `401` | `missing_credentials` | No supported authentication credential was sent. |
+| `401` | `invalid_credentials` | The API key is unknown, revoked, or has the wrong secret. |
+| `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission on any project. |
+| `413` | `lwql_result_too_large` | The result body exceeds about 8,000,000 bytes. |
+| `422` | `query_scan_limit_exceeded` | The statement is valid but would scan more data than the key allows. |
+
+## Queryable views
+
+Every view is a read-only projection over one ClickHouse or PostgreSQL table. `GET /api/v1/query/schema` is the live source of truth: the table below is a human-readable index of the same 47 views, grouped by what they're for.
+
+### How the catalog is built
+
+Every ClickHouse table is a view by default: the catalog is derived from a generated columns manifest, so a new table shows up here automatically once it's catalogued, rather than needing a hand-written entry.
+
+Two column families are gated rather than freely selectable: free-text carriers (captured input, captured output, tool output, log bodies) sit behind the `output` gate (`input` for a few views that separate the two), and billed/derived cost columns sit behind the `costs` gate. A gate's state comes from the project's privacy settings, never from the query. Selecting a gated column your key's project has not opened is refused outright with `GATED_COLUMN`, never silently dropped from the result.
+
+{/* lwql-views-start */}
+
+#### Observability: traces, spans, logs
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `traces` | One row per trace, with its timing, token, cost and error rollups. | `input`, `output`, `costs` | one row per (TenantId, TraceId), latest version only | `OccurredAt` |
+| `spans` | One row per span, with its timing, status and attributes. | `input`, `output`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+| `logs` | Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span. | `input`, `output` | one row per (TenantId, TraceId, TimeUnixMs, RecordId) | `TimeUnixMs` |
+| `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | None | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
+| `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries. | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
+| `metric_series_definitions` | Metric series definitions from OpenTelemetry: name, unit, attributes, kind. | `output` | one row per SeriesId | `LastSeenAt` |
+| `metric_ingestion_usage` | Per-tenant metric ingestion usage estimates. | None | one row per (OrganizationId, PointId), latest version only | `AcceptedAt` |
+| `objects` | Stored file objects: what was captured, its size and hash. | None | one row per id | `created_at` |
+| `annotations` | One row per human annotation of a trace, with the reviewer's thumbs verdict. | None | one row per AnnotationId | `CreatedAt` |
+| `langy_conversation_messages` | Langy conversation turns, one row per message. | `output` | one row per (TenantId, ConversationId, MessageId) | `CreatedAt` |
+| `langy_usage_events` | Langy usage telemetry: tool calls, outcomes and durations. | None | one row per (TenantId, OccurredAt, EventId) | `OccurredAt` |
+
+#### Coding agents
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `coding_sessions` | One row per coding-agent session, with its shape, economics, git context and outcome. Deduplicated by session. | `input`, `costs` | one row per (TenantId, SessionId), latest version only | `StartedAt` |
+| `coding_session_events` | One row per coding-agent session event: model calls, compactions, rate limits, tool runs and more, in event order. | `costs` | one row per (TenantId, SessionId, TimeUnixMs, RecordId) | `TimeUnixMs` |
+| `coding_trace_sessions` | Correlates a trace to the coding-agent session it belongs to. | None | one row per (TenantId, TraceId) | `OccurredAt` |
+| `coding_tool_results` | One row per coding-agent tool call, with the text it printed back to the agent. | `output` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+
+`coding_tool_results.OutputText` is what the tool printed back to the agent. Read it to answer "what did this failed tool call print":
+
+```sql
+SELECT ToolName, OutputText
+FROM coding_tool_results
+WHERE TenantId = '<project id>' AND Success = 0
+ORDER BY StartTime DESC
+LIMIT 20
+```
+
+#### Experiments & evaluations
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `evaluations` | One row per evaluation run, with its score and outcome. | `input`, `output` | one row per (TenantId, EvaluationId), latest version only | `ScheduledAt` |
+| `simulations` | One row per simulation run, with its verdict and criteria. | `input`, `output` | one row per (TenantId, ScenarioRunId), latest version only | `StartedAt` |
+| `simulation_trace_metrics` | Cost and latency metrics per simulated trace. | `costs` | one row per (ScenarioRunId, TraceId) | `OccurredAt` |
+| `experiments` | One row per experiment, with its display name and kind. | None | one row per ExperimentId | `CreatedAt` |
+| `experiment_items` | Individual item results within an experiment run with evaluations. | `input`, `output`, `costs` | one row per (RunId, ProjectionId) | `OccurredAt` |
+| `experiment_run_results` | Experiment run results: completion counts, cost, and aggregate scores. | `output`, `costs` | one row per (RunId, ExperimentId) | `StartedAt` |
+| `dspy_optimizer_steps` | DSPy optimizer steps with prompts, examples, and LLM call details. | `output`, `costs` | one row per (ExperimentId, RunId, StepIndex) | `CreatedAt` |
+| `batch_evaluations` | One row per offline batch evaluation of a dataset row, with its score, outcome and cost. | `costs` | one row per BatchEvaluationId | `CreatedAt` |
+| `test_suite_runs` | Test suite execution results with completion and pass counts. | None | one row per (ScenarioSetId, BatchRunId) | `StartedAt` |
+
+Note: "dataset" above refers to an evaluation dataset (rows a batch evaluation runs over). Everything else queryable through LangWatchQL is a view.
+
+#### Metrics & rollups
+
+Rollup views (`_by_minute`, `_rollups`) return **finalised values only**: figures for a bucket that was still open when the row was written are absent, not partial. A metric a caller wants without touching per-row data belongs here.
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `trace_metrics` | One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with `uniqExact(TraceId)`. | `costs` | one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still | `OccurredAt` |
+| `trace_metrics_by_minute` | Trace and span metrics summed per minute. Every measure is a sum: divide by TraceCount for a per-trace average. | `costs` | one row per (TenantId, BucketStart), every measure summed | `BucketStart` |
+| `model_usage_by_minute` | Span metrics summed per minute, per model and span type: span counts, costs and tokens. | `costs` | one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed | `BucketStart` |
+| `evaluation_metrics` | One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited. | `costs` | one row per (TenantId, EvaluationId), latest version only | `OccurredAt` |
+| `evaluation_metrics_by_minute` | Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount. | `costs` | one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed | `BucketStart` |
+| `metric_rollups` | Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets. | None | one row per (SeriesId, BucketStart) | `BucketStart` |
+| `session_metrics` | Per-session time-series metrics with aggregate statistics. | None | one row per (SessionId, SeriesId) | `AsOf` |
+| `simulation_metric_rollups` | Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps. | `costs` | one row per (TenantId, ScenarioRunId, TraceId), latest version only | `OccurredAt` |
+
+#### Gateway & billing
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `gateway_budget_ledger` | Budget ledger entries per request with token counts and spend. | `costs` | one row per (BudgetId, GatewayRequestId) | `OccurredAt` |
+| `gateway_budget_totals` | Per-scope budget totals, merged from the aggregating rollup: spend, token counts and request count per budget window. | `costs` | one row per (TenantId, Scope, ScopeId, Window, PeriodStart, BudgetId), latest version only | `PeriodStart` |
+| `gateway_request_spend` | Individual API request spend and reconciliation details. | `costs`, `output` | one row per GatewayRequestId | `OccurredAt` |
+| `billing_events` | Billing events for customer invoice generation. | None | one row per DeduplicationKeyHash | `EventTimestamp` |
+
+#### Governance & audit
+
+Governance views are keyed by the organization's hidden `internal_governance` project. A key scoped to an ordinary project sees **zero rows** here, not an error and not a gate refusal, until the caller's project set includes the org-level governance project.
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `governance_cost_restatements` | Index of cost-rollup restatements, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs` | one row per (TenantId, RestatementKey) | `TenantId` |
+| `governance_daily_cost_rollup` | Daily cost rollups per tenant, provider and model, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs`, `output` | one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId) | `Day` |
+| `governance_hourly_kpis` | Hourly spend and token KPIs per source, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs` | one row per (TenantId, SourceId, HourBucket, TraceId) | `HourBucket` |
+| `governance_security_events` | Raw OCSF-shaped security events, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `output` | one row per (TenantId, EventId) | `EventTime` |
+| `automation_events` | Audit log of automation trigger executions and actions. | None | one row per EventId | `OccurredAt` |
+
+#### Legacy
+
+Superseded by the canonical views above; kept for rolling-deployment reads and draining under their own TTL.
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `legacy_event_log` | Legacy append-only event log, superseded by the canonical fact tables. | `output` | one row per (AggregateType, AggregateId, IdempotencyKey) | `EventOccurredAt` |
+| `legacy_log_records` | Pre-canonical OpenTelemetry log record storage, superseded by `logs`; retained for rolling-deployment reads and draining under its own TTL. | `output` | one row per (TraceId, SpanId, ProjectionId), latest version only | `TimeUnixMs` |
+| `legacy_metric_records` | Pre-canonical OpenTelemetry metric record storage, superseded by the `metric_points` family; retained for rolling-deployment reads and draining under its own TTL. | None | one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only | `TimeUnixMs` |
+
+#### Entities & reference data
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `projects` | The caller's project, with its display name and slug. | None | one row per TenantId | `CreatedAt` |
+| `prompts` | One row per prompt configuration, with the name its versions are known by. | None | one row per PromptId | `CreatedAt` |
+| `prompt_versions` | One row per version of a prompt, carrying the version number a trace records. | None | one row per PromptVersionId | `CreatedAt` |
+
+{/* lwql-views-end */}
+
+### Tables intentionally left out
+
+A table off the catalog above is always a recorded decision, never an oversight: a coverage guard fails the build until every ClickHouse table is either catalogued or given a reason here:
+
+| Table | Reason |
+|-------|--------|
+| `lwql_api_key_tenant_map` | Access-control plumbing, not customer telemetry: holds key hashes the row policy reads to self-filter; the policy already scopes it, so exposing it would leak the isolation mechanism for no customer benefit. |
+| `goose_db_version` | The goose migration-version table, engine-internal tooling state, no tenant column at all. |
+| Any table ending in `_mv`, or naming a `.inner` target | Materialised-view internals: engine plumbing, not a table a caller would query; its data is already exposed through the table it feeds. |
+
+## Supported functions
+
+A query may call only the functions on the allowlist below. `GET /api/v1/query/schema` serves the same list under its `functions` field, so an agent can read it back at run time, and a `FUNCTION_NOT_ALLOWED` refusal carries it under `allowedFunctions` so a rejected query can be fixed without another round trip. Combinator forms of the listed aggregates, such as `countIf`, are also accepted.
+
+- `abs`, `addDays`, `addHours`, `addMinutes`, `addMonths`, `addQuarters`, `addSeconds`, `addWeeks`, `addYears`, `and`
+- `any`, `anyLast`, `argMax`, `argMin`, `arrayAll`, `arrayAvg`, `arrayConcat`, `arrayCount`, `arrayDistinct`, `arrayElement`
+- `arrayEnumerate`, `arrayExists`, `arrayFilter`, `arrayFirst`, `arrayFirstIndex`, `arrayJoin`, `arrayLast`, `arrayMap`, `arrayMax`, `arrayMin`
+- `arrayReverseSort`, `arraySlice`, `arraySort`, `arrayStringConcat`, `arraySum`, `arrayUniq`, `assumeNotNull`, `avg`, `caseWithExpression`, `caseWithoutExpression`
+- `CAST`, `ceil`, `ceiling`, `coalesce`, `concat`, `concatWithSeparator`, `count`, `date_trunc`, `dateDiff`, `dateTrunc`
+- `dense_rank`, `divide`, `empty`, `endsWith`, `equals`, `exists`, `exp`, `extract`, `extractAll`, `first_value`
+- `floor`, `formatDateTime`, `fromUnixTimestamp`, `globalIn`, `globalNotIn`, `greater`, `greaterOrEquals`, `greatest`, `groupArray`, `groupUniqArray`
+- `has`, `hasAll`, `hasAny`, `if`, `ifNull`, `ilike`, `in`, `indexOf`, `intDiv`, `intDivOrZero`
+- `isDistinctFrom`, `isNotDistinctFrom`, `isNotNull`, `isNull`, `isValidJSON`, `JSONExtract`, `JSONExtractArrayRaw`, `JSONExtractBool`, `JSONExtractFloat`, `JSONExtractInt`
+- `JSONExtractKeys`, `JSONExtractKeysAndValues`, `JSONExtractRaw`, `JSONExtractString`, `JSONExtractUInt`, `JSONHas`, `JSONLength`, `JSONType`, `lagInFrame`, `lambda`
+- `last_value`, `leadInFrame`, `least`, `left`, `length`, `lengthUTF8`, `less`, `lessOrEquals`, `like`, `ln`
+- `log`, `log10`, `log2`, `lower`, `lowerUTF8`, `map`, `mapContains`, `mapFilter`, `mapKeys`, `mapValues`
+- `match`, `max`, `median`, `medianExact`, `min`, `minus`, `modulo`, `moduloOrZero`, `multiIf`, `multiply`
+- `negate`, `not`, `notEmpty`, `notEquals`, `notILike`, `notIn`, `notLike`, `now`, `now64`, `nth_value`
+- `ntile`, `nullIf`, `or`, `plus`, `position`, `positionCaseInsensitive`, `pow`, `power`, `quantile`, `quantileExact`
+- `quantiles`, `quantilesExact`, `quantilesTDigest`, `quantilesTiming`, `quantileTDigest`, `quantileTiming`, `rank`, `replaceAll`, `replaceOne`, `replaceRegexpAll`
+- `replaceRegexpOne`, `right`, `round`, `row_number`, `sign`, `simpleJSONExtractBool`, `simpleJSONExtractFloat`, `simpleJSONExtractInt`, `simpleJSONExtractString`, `simpleJSONExtractUInt`
+- `simpleJSONHas`, `splitByChar`, `splitByString`, `sqrt`, `startsWith`, `stddevPop`, `stddevSamp`, `substring`, `substringUTF8`, `subtractDays`
+- `subtractHours`, `subtractMinutes`, `subtractMonths`, `subtractQuarters`, `subtractSeconds`, `subtractWeeks`, `subtractYears`, `sum`, `toBool`, `toDate`
+- `toDate32`, `toDate32OrDefault`, `toDate32OrNull`, `toDate32OrZero`, `toDateOrDefault`, `toDateOrNull`, `toDateOrZero`, `toDateTime`, `toDateTime64`, `toDateTime64OrDefault`
+- `toDateTime64OrNull`, `toDateTime64OrZero`, `toDateTimeOrDefault`, `toDateTimeOrNull`, `toDateTimeOrZero`, `today`, `toDayOfMonth`, `toDayOfWeek`, `toDayOfYear`, `toDecimal128`
+- `toDecimal128OrDefault`, `toDecimal128OrNull`, `toDecimal128OrZero`, `toDecimal256`, `toDecimal256OrDefault`, `toDecimal256OrNull`, `toDecimal256OrZero`, `toDecimal32`, `toDecimal32OrDefault`, `toDecimal32OrNull`
+- `toDecimal32OrZero`, `toDecimal64`, `toDecimal64OrDefault`, `toDecimal64OrNull`, `toDecimal64OrZero`, `toFloat32`, `toFloat32OrDefault`, `toFloat32OrNull`, `toFloat32OrZero`, `toFloat64`
+- `toFloat64OrDefault`, `toFloat64OrNull`, `toFloat64OrZero`, `toHour`, `toInt128`, `toInt128OrDefault`, `toInt128OrNull`, `toInt128OrZero`, `toInt16`, `toInt16OrDefault`
+- `toInt16OrNull`, `toInt16OrZero`, `toInt256`, `toInt256OrDefault`, `toInt256OrNull`, `toInt256OrZero`, `toInt32`, `toInt32OrDefault`, `toInt32OrNull`, `toInt32OrZero`
+- `toInt64`, `toInt64OrDefault`, `toInt64OrNull`, `toInt64OrZero`, `toInt8`, `toInt8OrDefault`, `toInt8OrNull`, `toInt8OrZero`, `toIntervalDay`, `toIntervalHour`
+- `toIntervalMinute`, `toIntervalMonth`, `toIntervalQuarter`, `toIntervalSecond`, `toIntervalWeek`, `toIntervalYear`, `toISOWeek`, `toLastDayOfMonth`, `toMinute`, `toMonday`
+- `toMonth`, `topK`, `toQuarter`, `toSecond`, `toStartOfDay`, `toStartOfFifteenMinutes`, `toStartOfFiveMinutes`, `toStartOfHour`, `toStartOfInterval`, `toStartOfISOWeek`
+- `toStartOfMinute`, `toStartOfMonth`, `toStartOfQuarter`, `toStartOfSecond`, `toStartOfTenMinutes`, `toStartOfWeek`, `toStartOfYear`, `toString`, `toTimeZone`, `toUInt128`
+- `toUInt128OrDefault`, `toUInt128OrNull`, `toUInt128OrZero`, `toUInt16`, `toUInt16OrDefault`, `toUInt16OrNull`, `toUInt16OrZero`, `toUInt256`, `toUInt256OrDefault`, `toUInt256OrNull`
+- `toUInt256OrZero`, `toUInt32`, `toUInt32OrDefault`, `toUInt32OrNull`, `toUInt32OrZero`, `toUInt64`, `toUInt64OrDefault`, `toUInt64OrNull`, `toUInt64OrZero`, `toUInt8`
+- `toUInt8OrDefault`, `toUInt8OrNull`, `toUInt8OrZero`, `toUnixTimestamp`, `toUUID`, `toUUIDOrDefault`, `toUUIDOrNull`, `toUUIDOrZero`, `toWeek`, `toYear`
+- `trim`, `trimBoth`, `trimLeft`, `trimRight`, `trunc`, `truncate`, `tuple`, `tupleElement`, `uniq`, `uniqCombined`
+- `uniqExact`, `upper`, `upperUTF8`, `varPop`, `varSamp`, `yesterday`
+
+## Response ceilings
+
+A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs, so a large answer comes back as one page rather than a stream. To read the rest, page with `LIMIT`/`OFFSET` and an `ORDER BY`.
+
+A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LIMIT_TOO_HIGH` before it runs. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`. Select fewer columns or a smaller `LIMIT` to bring it under the cap.
 
 ---
 

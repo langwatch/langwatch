@@ -9,12 +9,12 @@
  * is put through the real validator rather than eyeballed.
  *
  * @see ../catalog.ts
- * @see specs/analytics/lwql-app-functions.feature
+ * @see specs/lwql/app-functions.feature
  */
 import { describe, expect, it } from "vitest";
 
 import type { Protections } from "~/server/traces/protections";
-import { describeLangWatchQLFunctions } from "../../schema";
+import { describeLangWatchQLAppFunctions } from "../../schema";
 import { validateLangWatchQL } from "../../validation/validate";
 import {
   isLangWatchQLAppFunction,
@@ -205,10 +205,10 @@ describe("given the app-function catalog", () => {
   });
 });
 
-describe("given the schema endpoint's functions section", () => {
+describe("given the schema endpoint's app functions section", () => {
   describe("when the caller holds every content permission", () => {
     it("publishes one entry per catalogued function, in catalog order", () => {
-      const functions = describeLangWatchQLFunctions({
+      const functions = describeLangWatchQLAppFunctions({
         database: DATABASE,
         protections: FULL,
       });
@@ -220,7 +220,7 @@ describe("given the schema endpoint's functions section", () => {
 
     /** @scenario "Every catalogued function is published with a runnable example" */
     it("carries the signature, return type, encoding, key kind, cap and gates", () => {
-      const [entry] = describeLangWatchQLFunctions({
+      const [entry] = describeLangWatchQLAppFunctions({
         database: DATABASE,
         protections: FULL,
       }).filter((candidate) => candidate.name === "conversation_bounded");
@@ -240,7 +240,7 @@ describe("given the schema endpoint's functions section", () => {
     });
 
     it("marks a JSON-returning function as JSON, so a consumer parses it back", () => {
-      const functions = describeLangWatchQLFunctions({
+      const functions = describeLangWatchQLAppFunctions({
         database: DATABASE,
         protections: FULL,
       });
@@ -257,7 +257,7 @@ describe("given the schema endpoint's functions section", () => {
   describe("when the caller holds no content permission", () => {
     /** @scenario "The schema lists a gated function rather than hiding it" */
     it("lists every gated function with available false rather than hiding it", () => {
-      const functions = describeLangWatchQLFunctions({
+      const functions = describeLangWatchQLAppFunctions({
         database: DATABASE,
         protections: NONE,
       });
@@ -273,7 +273,7 @@ describe("given the schema endpoint's functions section", () => {
     });
 
     it("still offers the ungated function", () => {
-      const functions = describeLangWatchQLFunctions({
+      const functions = describeLangWatchQLAppFunctions({
         database: DATABASE,
         protections: NONE,
       });
@@ -286,7 +286,7 @@ describe("given the schema endpoint's functions section", () => {
 
   describe("when the caller holds one of two required permissions", () => {
     it("withholds a function needing both", () => {
-      const functions = describeLangWatchQLFunctions({
+      const functions = describeLangWatchQLAppFunctions({
         database: DATABASE,
         protections: { canSeeCapturedInput: true } as Protections,
       });

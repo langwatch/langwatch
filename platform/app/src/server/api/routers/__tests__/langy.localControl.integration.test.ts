@@ -57,6 +57,7 @@ vi.mock("~/server/app-layer/langy/langySkipPermissions", () => ({
 }));
 
 import { prisma } from "~/server/db";
+import { pollWaitResponseSchema } from "~/server/langy-local-control/http";
 import {
   conversationKeyBindingsKey,
   sessionKeyBindingKey,
@@ -322,6 +323,52 @@ describe("given a question Langy asked mid-task", () => {
       expect(answered).toMatchObject({
         state: "answered",
         answers: [{ selected: ["acme-free"] }],
+      });
+    });
+
+    /** @scenario "The tool result carries the go" */
+    it("hands the worker's poll the question and the selection, in the shape its tool renders", async () => {
+      const proposal =
+        "Now that your agent is integrated, I think we should write some tests for it. The first one I'd write is Guest completes checkout, because it is the golden path.";
+      const createLabel =
+        'Create "Guest completes checkout" as your first scenario test';
+      const wait = await getLocalControlRuntime().waits.startQuestion({
+        projectId,
+        conversationId,
+        turnId,
+        questions: [
+          {
+            question: proposal,
+            bare: true,
+            options: [
+              { label: createLabel },
+              { label: "Chat about this", quiet: true },
+            ],
+          },
+        ],
+      });
+
+      // The panel's own path: the choices card's selection becomes this
+      // mutation, with the question text and the picked label.
+      await caller().answerQuestion({
+        projectId,
+        conversationId,
+        waitId: wait.waitId,
+        answers: [{ question: proposal, selected: [createLabel] }],
+      });
+
+      // What GET /api/langy/waits/:id serialises for the worker's long poll
+      // is this poll result, as is; the worker parses it as PollWaitResponse
+      // and renders "Q: ...\nA: ..." plus the go line from these fields.
+      const polled = await getLocalControlRuntime().waits.poll({
+        waitId: wait.waitId,
+        holdMs: 0,
+      });
+      const forTheWorker = pollWaitResponseSchema.parse(polled);
+      expect(forTheWorker).toEqual({
+        waitId: wait.waitId,
+        state: "answered",
+        answers: [{ question: proposal, selected: [createLabel] }],
       });
     });
   });

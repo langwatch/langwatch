@@ -20,7 +20,7 @@ object that cannot follow that pattern, and §4 says why.
 content rather than the preview).
 
 **Behavioural contract:**
-[specs/analytics/lwql-app-functions.feature](../../../specs/analytics/lwql-app-functions.feature).
+[specs/lwql/app-functions.feature](../../../specs/lwql/app-functions.feature).
 
 ## Context
 

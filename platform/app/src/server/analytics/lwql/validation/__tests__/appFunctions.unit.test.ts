@@ -13,7 +13,7 @@
  * asserted accepted.
  *
  * @see ../../appFunctions/catalog.ts — the functions
- * @see specs/analytics/lwql-app-functions.feature
+ * @see specs/lwql/app-functions.feature
  */
 import { describe, expect, it } from "vitest";
 

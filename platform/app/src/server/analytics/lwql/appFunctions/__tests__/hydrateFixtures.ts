@@ -96,7 +96,7 @@ export const hydrate = (input: {
   limits?: LangWatchQLHydrationLimits;
 }) =>
   hydrateLangWatchQLAppFunctions({
-    projectId: "project-a",
+    projectIds: ["project-a"],
     protections: PROTECTIONS,
     limits: input.limits ?? LIMITS,
     ...input,

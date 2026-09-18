@@ -478,8 +478,10 @@ function ComposerImpl({
                 // The model is locked in the moment a turn starts — it rode
                 // with the send and can't change mid-flight — so the picker
                 // greys out until the turn settles rather than offering a
-                // choice that wouldn't take.
+                // choice that wouldn't take. It still says which model the
+                // running turn is on, which is what the reason is for.
                 disabled={disabled || turnActive}
+                disabledReason={turnActive ? "turn-active" : undefined}
               />
               <SigilButton
                 sigil="#"
@@ -593,6 +595,9 @@ function composerKeyHandler({
  * refused. And while a card is open the turn is waiting for the READER, so the
  * line points at the card rather than blaming Langy for the wait, and names
  * the terminal as well when the folder is shared from one (ADR-129).
+ *
+ * A card holds a turn, so a pending entry with no turn in flight is a leftover
+ * of a turn that ended, not something to answer: the field reads idle then.
  */
 export function composerPlaceholder({
   awaitingAnswer,
@@ -606,7 +611,7 @@ export function composerPlaceholder({
   /** What it says when nothing is running and nothing is waiting. */
   idle: string;
 }): string {
-  if (awaitingAnswer) {
+  if (awaitingAnswer && turnActive) {
     return terminalConnected
       ? AWAITING_ANSWER_TERMINAL_PLACEHOLDER
       : AWAITING_ANSWER_PLACEHOLDER;

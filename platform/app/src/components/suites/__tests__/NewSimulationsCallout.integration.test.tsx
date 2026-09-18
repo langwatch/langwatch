@@ -5,6 +5,7 @@
  * to the previous simulations screens.
  *
  * @see specs/suites/new-simulations-callout.feature
+ * @see specs/features/onboarding/guided-tour.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -13,6 +14,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
+}));
+
+// Whether a guided onboarding path is being set up; the hook reads the
+// organization and the tour store, neither of which the bare rig has.
+let guidedPathActive = false;
+vi.mock("~/features/guided-onboarding/guidedPathActive", () => ({
+  useGuidedPathActive: () => guidedPathActive,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -63,6 +71,7 @@ describe("<NewSimulationsCallout />", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    guidedPathActive = false;
     for (const key of Object.keys(routerQuery)) delete routerQuery[key];
     // The card retires on 2026-09-22; the tests read it while it still shows,
     // whatever the machine's clock says.
@@ -156,6 +165,44 @@ describe("<NewSimulationsCallout />", () => {
           screen.queryByText("Welcome to the new simulations screen"),
         ).toBeNull();
       });
+    });
+  });
+
+  describe("given a guided onboarding path is being set up", () => {
+    /** @scenario "the simulations welcome card stays quiet while a guided path is active" */
+    it("pins no card, and snoozes nothing", () => {
+      guidedPathActive = true;
+
+      const { unmount } = renderWithProviders(
+        <NewSimulationsCallout target="runs" />,
+      );
+
+      expect(
+        screen.queryByText("Welcome to the new simulations screen"),
+      ).toBeNull();
+      expect(localStorage.getItem(SNOOZE_KEY)).toBeNull();
+      expect(localStorage.getItem(PREFERENCE_KEY)).toBeNull();
+
+      // Once the path is done the card shows as if it had never been held.
+      unmount();
+      guidedPathActive = false;
+      renderWithProviders(<NewSimulationsCallout target="runs" />);
+      expect(
+        screen.getByText("Welcome to the new simulations screen"),
+      ).toBeDefined();
+    });
+
+    /** @scenario "the simulations welcome card stays quiet while a guided path is active" */
+    it("stays off even with the address parameter that brings the card back", () => {
+      guidedPathActive = true;
+      routerQuery.simulationsWelcome = "1";
+      routerQuery["simulations-welcome"] = "1";
+
+      renderWithProviders(<NewSimulationsCallout target="scenarios" />);
+
+      expect(
+        screen.queryByText("Welcome to the new simulations screen"),
+      ).toBeNull();
     });
   });
 

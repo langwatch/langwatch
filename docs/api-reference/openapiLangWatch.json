@@ -6743,6 +6743,12 @@
                   "negateFilters": {
                     "type": "boolean"
                   },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "series": {
                     "type": "array",
                     "items": {
@@ -12212,13 +12218,13 @@
       "post": {
         "operationId": "postApiV1Query",
         "summary": "Run a LangWatchQL query",
-        "description": "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.\n\nDiagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.\n\nA projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused. A run that would need more distinct conversations, traces or spans than the published cap answers 422 rather than a partial result.\n\nThe project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.\n\nFailures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.",
+        "description": "Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\nDiagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.\n\nA projection may call the app functions the schema endpoint lists (`conversation`, `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE, GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies both of its branches even where each reads as a top-level projection. A run that would need more distinct conversations, traces or spans than the published cap answers 422 rather than a partial result.\n\nAny LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.\n\nA statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.\n\nFailures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.",
         "tags": [
           "Query"
         ],
         "responses": {
           "200": {
-            "description": "The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project.",
+            "description": "The query ran. Columns, rows, execution statistics and diagnostics, scoped to the projects the key can read.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12272,9 +12278,6 @@
                         "rowsReturned"
                       ]
                     },
-                    "truncated": {
-                      "type": "boolean"
-                    },
                     "followsTimeWindow": {
                       "type": "boolean"
                     },
@@ -12295,13 +12298,14 @@
                           "code": {
                             "type": "string",
                             "enum": [
-                              "RESULT_TRUNCATED",
+                              "MULTI_PROJECT_RESULT",
                               "POSSIBLE_FANOUT",
                               "UNBOUNDED_TIME_RANGE",
                               "MISSING_TIME_BUCKETS",
                               "INCOMPLETE_COMPARISON_PERIOD",
                               "APP_FUNCTION_VALUE_TRUNCATED",
-                              "APP_FUNCTION_UNRESOLVED_KEYS"
+                              "APP_FUNCTION_UNRESOLVED_KEYS",
+                              "APP_FUNCTION_RESULT_TRUNCATED"
                             ]
                           },
                           "message": {
@@ -12323,7 +12327,6 @@
                     "columns",
                     "rows",
                     "statistics",
-                    "truncated",
                     "followsTimeWindow",
                     "followsGranularity",
                     "diagnostics"
@@ -12656,13 +12659,13 @@
       "get": {
         "operationId": "getApiV1QuerySchema",
         "summary": "Discover the queryable LangWatchQL schema",
-        "description": "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.\n\nAlso lists the app functions a projection may call (`functions`), each with its signature, the type and encoding of the value it returns, how many distinct keys one run may read, and the permissions it needs.\n\nScoped to the credential's own project and its permissions: a column or function this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.",
+        "description": "Lists the LangWatchQL analytics views this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each view's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.\n\nUnder `appFunctions` it lists the app functions a projection may call, each with its signature, the type and encoding of the value it returns, how many distinct keys one run may read, and the permissions it needs.\n\nScoped to the projects the credential can read and their permissions: a column or app function this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.\n\nAny LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.",
         "tags": [
           "Query"
         ],
         "responses": {
           "200": {
-            "description": "The datasets and columns this key may query, with the permissions that unlock each one.",
+            "description": "The views and columns this key may query, with the permissions that unlock each one.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12671,7 +12674,7 @@
                     "database": {
                       "type": "string"
                     },
-                    "datasets": {
+                    "views": {
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -12768,6 +12771,12 @@
                     "functions": {
                       "type": "array",
                       "items": {
+                        "type": "string"
+                      }
+                    },
+                    "appFunctions": {
+                      "type": "array",
+                      "items": {
                         "type": "object",
                         "properties": {
                           "name": {
@@ -12798,7 +12807,8 @@
                             ]
                           },
                           "cap": {
-                            "type": "number"
+                            "type": "integer",
+                            "exclusiveMinimum": 0
                           },
                           "gates": {
                             "type": "array",
@@ -12835,8 +12845,9 @@
                   },
                   "required": [
                     "database",
-                    "datasets",
-                    "functions"
+                    "views",
+                    "functions",
+                    "appFunctions"
                   ]
                 }
               }
@@ -21705,6 +21716,12 @@
                   "negateFilters": {
                     "type": "boolean"
                   },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "series": {
                     "type": "array",
                     "items": {
@@ -25653,7 +25670,7 @@
       "post": {
         "operationId": "postApiGatewayV1VirtualKeys",
         "summary": "Create virtual key",
-        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app, so a caller that only relays the key (an agent printing a snippet) never holds it. `scopes` defaults to the caller's project, where `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
         "tags": [
           "Virtual Keys"
         ],
@@ -25851,12 +25868,20 @@
                       ]
                     },
                     "secret": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "The secret, absent when `reveal_once` was set."
+                    },
+                    "reveal_id": {
+                      "type": "string",
+                      "description": "With `reveal_once`: the id that serves the secret once, through the app."
+                    },
+                    "preview": {
+                      "type": "string",
+                      "description": "With `reveal_once`: the key's display prefix, safe to show in place of the secret."
                     }
                   },
                   "required": [
-                    "virtual_key",
-                    "secret"
+                    "virtual_key"
                   ]
                 }
               }
@@ -25951,7 +25976,7 @@
             }
           },
           "403": {
-            "description": "Caller lacks virtualKeys:manage at a requested scope",
+            "description": "Caller lacks virtualKeys:create on its own project, or virtualKeys:manage at a scope beyond it",
             "content": {
               "application/json": {
                 "schema": {
@@ -26103,6 +26128,9 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "reveal_once": {
+                    "type": "boolean"
                   },
                   "scopes": {
                     "type": "array",
@@ -37526,6 +37554,9 @@
                         "minLength": 1,
                         "maxLength": 255
                       },
+                      "gitRepository": {
+                        "type": "boolean"
+                      },
                       "gitBranch": {
                         "type": "string",
                         "maxLength": 255
@@ -37810,19 +37841,35 @@
                                               "edits": {
                                                 "type": "array",
                                                 "items": {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "oldText": {
-                                                      "type": "string",
-                                                      "minLength": 1
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "oldText": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        },
+                                                        "newText": {
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "oldText",
+                                                        "newText"
+                                                      ]
                                                     },
-                                                    "newText": {
-                                                      "type": "string"
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "append": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "append"
+                                                      ]
                                                     }
-                                                  },
-                                                  "required": [
-                                                    "oldText",
-                                                    "newText"
                                                   ]
                                                 },
                                                 "minItems": 1,
@@ -37976,6 +38023,29 @@
                                                 "type": "integer",
                                                 "exclusiveMinimum": 0,
                                                 "maximum": 20000
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_langwatch_env"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "path": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 4096
                                               }
                                             }
                                           }
@@ -38253,6 +38323,9 @@
                                   "minLength": 1,
                                   "maxLength": 255
                                 },
+                                "gitRepository": {
+                                  "type": "boolean"
+                                },
                                 "gitBranch": {
                                   "type": "string",
                                   "maxLength": 255
@@ -38401,7 +38474,8 @@
                                     "cancelled",
                                     "timeout",
                                     "exec_failed",
-                                    "not_found"
+                                    "not_found",
+                                    "key_refused"
                                   ]
                                 },
                                 "message": {
@@ -38649,7 +38723,7 @@
             }
           }
         },
-        "description": "List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
+        "description": "List the open requests Langy made for a folder of mine, on every project I can read. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
         "tags": [
           "Langy"
         ],
@@ -38742,6 +38816,9 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 255
+                      },
+                      "gitRepository": {
+                        "type": "boolean"
                       },
                       "gitBranch": {
                         "type": "string",
@@ -68049,6 +68126,12 @@
                   },
                   "negateFilters": {
                     "type": "boolean"
+                  },
+                  "excludeOrigins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "pageOffset": {
                     "type": "number",

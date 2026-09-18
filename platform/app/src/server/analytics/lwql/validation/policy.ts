@@ -9,7 +9,7 @@
  * resolved server-side from the authenticated context — never from the request
  * body, and never from the SQL text. This module only says what the shape is.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 /**
@@ -77,7 +77,8 @@ export interface LangWatchQLPolicy {
   readonly allowedTables: readonly string[];
   /**
    * Fields the caller's permissions withhold, matched case-insensitively
-   * against the last segment of a column reference (`t.body` matches `body`).
+   * against every dotted segment of a column reference — not only the last —
+   * so `gated.sub` and `t.gated.sub` are refused along with `t.gated`.
    *
    * When this is non-empty the walk also refuses wildcard column sets, because
    * it cannot prove `*` excludes a withheld field without the table's columns.
@@ -106,6 +107,17 @@ export interface LangWatchQLPolicy {
   readonly defaultDatabase?: string;
   /** Defaults to {@link DEFAULT_LWQL_LIMITS}. */
   readonly limits?: LangWatchQLLimits;
+  /**
+   * The columns of each view in {@link allowedTables}, keyed the same way
+   * (`table` or `database.table`, qualified against {@link defaultDatabase}
+   * the same way a reference is).
+   *
+   * Optional, and absent entries are expected: this is what turns a
+   * `GATED_COLUMN` refusal into one naming the view's actual columns rather
+   * than a bare "not available", and a caller that has not wired the catalog
+   * through yet loses nothing but that enrichment.
+   */
+  readonly viewColumns?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** The policy in the form the walk compares against: lowercased and set-shaped. */
@@ -116,6 +128,10 @@ export interface ResolvedLangWatchQLPolicy {
   readonly reservedDatabases: ReadonlySet<string>;
   readonly defaultDatabase: string;
   readonly limits: LangWatchQLLimits;
+  /** {@link LangWatchQLPolicy.allowedTables}, sorted and deduplicated, for display in a refusal's `meta`. */
+  readonly availableViews: readonly string[];
+  /** {@link LangWatchQLPolicy.viewColumns}, qualified the same way {@link allowedTables} is. */
+  readonly viewColumns: ReadonlyMap<string, readonly string[]>;
 }
 
 /**
@@ -160,5 +176,16 @@ export function resolveLangWatchQLPolicy(
     reservedDatabases: new Set(RESERVED_DATABASES),
     defaultDatabase,
     limits: policy.limits ?? DEFAULT_LWQL_LIMITS,
+    availableViews: [
+      ...new Set(policy.allowedTables.map((entry) => entry.trim())),
+    ].sort((left, right) => left.localeCompare(right)),
+    viewColumns: new Map(
+      Object.entries(policy.viewColumns ?? {}).map(([table, columns]) => [
+        qualifyTableName({ table, defaultDatabase }),
+        [...new Set(columns.map((column) => column.trim()))].sort(
+          (left, right) => left.localeCompare(right),
+        ),
+      ]),
+    ),
   };
 }

@@ -33,7 +33,7 @@ export const SKIP_NOT_ALLOWED_HINT =
   "This model is not allowed to skip permission checks. Check the allowed models list in the provider settings.";
 
 /**
- * The patterns as one phrase: "git fetch" and "git checkout".
+ * The patterns as one phrase: "uv sync" and "uv run".
  *
  * Every pattern, never the first one alone. One click on the session grant
  * covers each part of the chain that is not read-only, and the session's

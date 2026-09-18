@@ -10,7 +10,7 @@
  * silently.
  *
  * @see ../accessModel.ts — the statements under test
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -19,6 +19,7 @@ import { DEFAULT_LWQL_RESOURCE_LIMITS } from "../../limits";
 import {
   clickHouseAccessManagementConfigXml,
   type LangWatchQLNames,
+  lwqlKeyMapRowPolicyStatement,
   lwqlKeyMapTableStatement,
   lwqlRowPolicyStatement,
   lwqlSettingsProfileStatement,
@@ -43,6 +44,8 @@ const LIMITS = {
   maxConcurrentQueriesForUser: 5,
   maxRowsToRead: 222_000,
   maxBytesToRead: 333_000,
+  maxResultRows: 444_000,
+  maxResultBytes: 555_000,
 };
 
 describe("given the LangWatchQL settings profile statement", () => {
@@ -56,6 +59,9 @@ describe("given the LangWatchQL settings profile statement", () => {
       ["rows scanned", "max_rows_to_read = 222000 CONST"],
       ["bytes scanned", "max_bytes_to_read = 333000 CONST"],
       ["scan overflow", "read_overflow_mode = 'throw' CONST"],
+      ["rows returned", "max_result_rows = 444000 CONST"],
+      ["bytes returned", "max_result_bytes = 555000 CONST"],
+      ["result overflow", "result_overflow_mode = 'throw' CONST"],
     ])("pins the %s ceiling", (_label, expected) => {
       expect(
         lwqlSettingsProfileStatement({ names: NAMES, limits: LIMITS }),
@@ -144,6 +150,39 @@ describe("given the LangWatchQL row policy", () => {
       expect(
         statement.indexOf("HAVING uniqExact(TenantId) = 1"),
       ).toBeGreaterThan(statement.indexOf("any(TenantId)"));
+    });
+  });
+
+  describe("when the caller's key-hash context is a set", () => {
+    it("resolves the tenant through set membership, not a single-hash equality", () => {
+      const statement = lwqlRowPolicyStatement({
+        names: NAMES,
+        lwqlTable: LWQL_TABLE,
+      });
+
+      // The pre-#8085 form was `KeyHash = getSetting(...)`, which under a
+      // comma-joined set matches no row. Set membership is what lets one key
+      // reach every project it can read; the empty default still reads zero
+      // rows because no 64-hex hash equals the empty string.
+      expect(statement).toContain(
+        "has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash)",
+      );
+      expect(statement).toContain("GROUP BY KeyHash");
+      expect(statement).not.toContain("KeyHash = getSetting");
+    });
+  });
+
+  describe("when the key map's own self-policy is created", () => {
+    it("admits the caller's whole key-hash set, not one hash", () => {
+      // The self-policy governs the very subquery the tenant predicate runs
+      // against the key map, so it must be the same set test — a single-hash
+      // equality here would starve the tenant predicate of every tenant.
+      const statement = lwqlKeyMapRowPolicyStatement({ names: NAMES });
+
+      expect(statement).toContain(
+        "has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash)",
+      );
+      expect(statement).not.toContain("KeyHash = getSetting");
     });
   });
 
