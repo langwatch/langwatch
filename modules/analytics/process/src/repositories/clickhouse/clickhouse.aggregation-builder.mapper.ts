@@ -332,7 +332,8 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
           )
           GROUP BY TenantId, TraceId, SpanModelKey
         )
-        WHERE SpanModelKey != 'unknown'
+        WHERE (
+          SpanModelKey != 'unknown'
           OR SpanModelCost > 0
           OR SpanModelNonBilledCost > 0
           OR SpanModelPromptTokens > 0
@@ -340,6 +341,7 @@ function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
           OR SpanModelCacheReadTokens > 0
           OR SpanModelCacheWriteTokens > 0
           OR SpanModelReasoningTokens > 0
+        )
       ) ${smd} ON ${ts}.TenantId = ${smd}.TenantId AND ${ts}.TraceId = ${smd}.TraceId`;
 }
 
@@ -696,7 +698,10 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     })
     .join("\n");
 
-  // Build WHERE clause
+  // Build WHERE clause. Every call site wraps `(${baseWhere} ${filterWhere})`:
+  // dedupedTraceSummaries' own tenant predicate sits one bracket deep already,
+  // so this OR (and any filter's) must nest one level deeper still, not just
+  // sit in its own bracket, to stay outside the tenant guard's reach.
   const baseWhere = `
     ${ts}.TenantId = {tenantId:String}
     AND (
@@ -722,7 +727,11 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     filterConditions.push(`${ts}.TraceId IN ({traceIds:Array(String)})`);
     allTranslationParams.traceIds = input.traceIds;
   }
-  const filterWhere = filterConditions.length > 0 ? `AND ${filterConditions.join(" AND ")}` : "";
+  // Wrapped in its own paren: several call sites splice this straight after a
+  // single-range WHERE with no bracket of their own, and a condition here can
+  // itself contain an OR (e.g. the error/annotation filters) — nesting one
+  // level deeper keeps it out of the tenant guard's reach regardless.
+  const filterWhere = filterConditions.length > 0 ? `AND (${filterConditions.join(" AND ")})` : "";
 
   // When using arrayJoin for grouping (like labels), span-level groupBy (like
   // span_type), or the span-partitioned model grouping, we need a CTE approach
@@ -868,8 +877,8 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       ${selectExprs.join(",\n      ")}
     FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
     ${joinClauses}
-    WHERE ${baseWhere}
-      ${filterWhere}
+    WHERE (${baseWhere}
+      ${filterWhere})
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
@@ -1087,8 +1096,8 @@ function buildMixedEvalTimeseriesQuery({
         ${innerSelectExprs.join(",\n        ")}
       FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
       ${joinClauses}
-      WHERE ${baseWhere}
-        ${filterWhere}
+      WHERE (${baseWhere}
+        ${filterWhere})
       GROUP BY ${innerGroupBy.join(", ")}
     )
     SELECT
@@ -1473,8 +1482,8 @@ function buildArrayJoinTimeseriesQuery({
         ${cteSelectExprs.join(",\n        ")}
       FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
       ${cteJoinClauses}
-      WHERE ${baseWhere}
-        ${filterWhere}
+      WHERE (${baseWhere}
+        ${filterWhere})
       GROUP BY ${cteGroupByCols.join(", ")}
     `;
   } else {
@@ -1483,8 +1492,8 @@ function buildArrayJoinTimeseriesQuery({
         ${cteSelectExprs.join(",\n        ")}
       FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
       ${cteJoinClauses}
-      WHERE ${baseWhere}
-        ${filterWhere}
+      WHERE (${baseWhere}
+        ${filterWhere})
     `;
   }
 
@@ -2047,8 +2056,8 @@ function buildDateBucketedPipelineQuery({
           ${simpleSelectExprs.join(",\n          ")}
         FROM ${dedupedTraceSummaries(ts)}
         ${simpleJoinClauses}
-        WHERE ${baseWhere}
-          ${fullFilterWhere}
+        WHERE (${baseWhere}
+          ${fullFilterWhere})
         GROUP BY ${simpleGroupByCols.join(", ")}
         ${groupKeyHaving}
       )`);
@@ -2164,8 +2173,8 @@ function buildPipelineMetricCTE(metric: MetricTranslation, ctx: PipelineCTEConte
   const baseFrom = `
           FROM ${dedupedTraceSummaries(ctx.ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
           ${ctx.joinClauses}
-          WHERE ${ctx.baseWhere}
-            ${ctx.fullFilterWhere}`;
+          WHERE (${ctx.baseWhere}
+            ${ctx.fullFilterWhere})`;
 
   if (subquery.nestedSubquery) {
     // 3-level aggregation (e.g., threads per user)
