@@ -1,5 +1,5 @@
 /**
- * `langwatch instant-eval estimate` — what a run would read and what it would
+ * `langwatch instant-eval estimate`: what a run would read and what it would
  * cost, with nothing judged and nothing charged.
  *
  * Takes the same inputs `run` does, so a line that prices a run is the same

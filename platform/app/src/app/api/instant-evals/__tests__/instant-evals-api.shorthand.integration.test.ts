@@ -3,7 +3,7 @@
  * service is handed.
  *
  * The run service is stood up on fakes, so what these hold is the boundary's
- * own decision — which of `sql` and `target` the request meant, and what the
+ * own decision: which of `sql` and `target` the request meant, and what the
  * service receives for each. What the expansion WRITES is held by
  * `server/app-layer/instant-evals/shorthand/__tests__`, against the real query
  * validator.

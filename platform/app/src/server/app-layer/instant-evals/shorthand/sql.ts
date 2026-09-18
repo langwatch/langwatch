@@ -49,7 +49,7 @@ export function sqlInteger(value: number): string {
  * The point is not decoration. The validator reads a numeric option as "any
  * literal whose parsed type is not String", and a threshold of `1` written as
  * `1` is an integer literal where the catalog declares a non-integer
- * parameter — accepted, but `0` and `1` are the two thresholds a caller is
+ * parameter, accepted, but `0` and `1` are the two thresholds a caller is
  * most likely to write, so they are spelled `0.0` and `1.0` for the same
  * reason every other one is.
  */

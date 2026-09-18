@@ -1,5 +1,5 @@
 /**
- * `langwatch instant-eval list` — the project's runs, newest first.
+ * `langwatch instant-eval list`: the project's runs, newest first.
  *
  * @see specs/features/instant-eval-cli.feature
  */

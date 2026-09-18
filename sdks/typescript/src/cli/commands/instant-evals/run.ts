@@ -1,5 +1,5 @@
 /**
- * `langwatch instant-eval run` — ask one question of a whole history.
+ * `langwatch instant-eval run`: ask one question of a whole history.
  *
  * Renders its own resolved format rather than returning a `CommandResult`,
  * because two things follow the answer: the estimate that is printed BEFORE a
@@ -175,7 +175,7 @@ async function reportEstimate({
  * Only asked for above the row threshold: a small run is not worth a second
  * round trip, and the whole point of the threshold is that the caller sees a
  * price before a spend that is worth seeing. A failed estimate does not stop
- * the run — the caller asked for a run, not for a price — so it is reported on
+ * the run, because the caller asked for a run and not for a price, so it is reported on
  * stderr and the run goes ahead.
  */
 async function priceIfLarge({

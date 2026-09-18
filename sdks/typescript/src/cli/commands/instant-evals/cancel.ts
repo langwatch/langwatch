@@ -1,5 +1,5 @@
 /**
- * `langwatch instant-eval cancel <id>` — ask a run to stop.
+ * `langwatch instant-eval cancel <id>`: ask a run to stop.
  *
  * It stops before its next page, so the pages it already judged keep their
  * judgements and are still readable.

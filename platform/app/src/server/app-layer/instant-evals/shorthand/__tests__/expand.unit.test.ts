@@ -374,6 +374,28 @@ describe("expandInstantEvalShorthand, given a filter", () => {
       expect(sql).toContain("FROM analytics.traces");
       expect(sql).toContain("OccurredAt >= {start_at:DateTime}");
     });
+
+    /** @scenario "A filtered threads statement names the view's own trace column" */
+    it("names the view's own trace column, not the aggregate the statement projects", () => {
+      const { sql } = expand({ target: "threads", filter: "service:checkout" });
+
+      // ClickHouse resolves a WHERE identifier against the SELECT aliases
+      // first, and `threads` projects TraceId as argMax(...), which it refuses
+      // in a WHERE. The subquery must therefore read the view's own column.
+      expect(sql).toContain("m.TraceId IN (");
+      expect(sql).not.toContain("\n  AND TraceId IN (");
+    });
+
+    /** @scenario "A filtered llm-spans statement reads its own plain trace column" */
+    it("reads the plain trace column when the projection is not an aggregate", () => {
+      const { sql } = expand({
+        target: "llm_spans",
+        filter: "service:checkout",
+      });
+
+      expect(sql).toContain("TraceId IN (");
+      expect(sql).not.toContain("m.TraceId IN (");
+    });
   });
 
   describe("when there is no filter", () => {

@@ -4,9 +4,9 @@
  * A run is always a statement. A request may carry one, or it may carry a
  * shorthand that this expands into one. What it may not carry is both, or
  * neither: a request with both would have a statement whose relationship to
- * the shorthand nobody could state, and a request with neither has nothing to
+ * the shorthand could not state, and a request with neither has nothing to
  * judge. Both are refused here, before the gate, under the same code the gate
- * itself uses — one code for "this cannot be a run's statement".
+ * itself uses: one code for "this cannot be a run's statement".
  *
  * @see ../shorthand/expand.ts
  * @see ./statement.ts: what the resulting statement then has to clear

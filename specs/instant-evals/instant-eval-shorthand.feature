@@ -225,6 +225,18 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
     And the subquery bounds its own time column
 
   @unit
+  Scenario: A filtered threads statement names the view's own trace column
+    Given a shorthand naming the threads target and a filter naming the service
+    When it is expanded
+    Then the subquery reads the trace column the view carries, not the aggregate the statement projects
+
+  @unit
+  Scenario: A filtered llm-spans statement reads its own plain trace column
+    Given a shorthand naming the llm-spans target and a filter naming the service
+    When it is expanded
+    Then the subquery reads the span view's unqualified trace column
+
+  @unit
   Scenario: A shorthand with no filter writes no filter condition
     Given a shorthand with no filter
     When it is expanded

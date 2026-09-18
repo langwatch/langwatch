@@ -1,5 +1,5 @@
 /**
- * `langwatch instant-eval results <id>` — one page of a run's judgements.
+ * `langwatch instant-eval results <id>`: one page of a run's judgements.
  *
  * The page is a keyset page, so the cursor a page answers with is the only way
  * to read the one after it: no judgement is ever carried by two pages, and no

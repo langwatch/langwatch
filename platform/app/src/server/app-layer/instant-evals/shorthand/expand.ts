@@ -139,6 +139,13 @@ interface TargetTemplate {
   readonly text: (budgetTokens: number) => string;
   /** Whether the trace filter is a condition here or a subquery on the traces view. */
   readonly filterPlacement: "inline" | "trace-subquery";
+  /**
+   * The view's own trace column, as the subquery's left-hand side must spell
+   * it. Not the projected name: ClickHouse resolves a WHERE identifier against
+   * the SELECT aliases first, and `threads` projects `TraceId` as an aggregate,
+   * which an unqualified `TraceId IN (...)` would pick up and be refused for.
+   */
+  readonly filterTraceColumn?: string;
 }
 
 const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
@@ -178,6 +185,7 @@ const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
     text: (budget) =>
       `conversation_bounded(m.ConversationId, ${sqlInteger(budget)}, '')`,
     filterPlacement: "trace-subquery",
+    filterTraceColumn: "m.TraceId",
   },
   llm_spans: {
     view: "spans",
@@ -235,7 +243,7 @@ function classifierQuestions(
  * The token budget the extraction call is written with.
  *
  * The shipped default, unless the questions themselves are large enough that
- * the classifier's state would not hold both — in which case it is whatever
+ * the classifier's state would not hold both, in which case it is whatever
  * the questions leave, and a question list that leaves nothing is refused
  * here rather than by a failed request per row.
  */
@@ -292,15 +300,17 @@ function windowConditions(timeColumn: string): readonly string[] {
 function traceSubquery({
   database,
   filterSql,
+  traceColumn,
 }: {
   readonly database: string;
   readonly filterSql: string;
+  readonly traceColumn: string;
 }): string {
   const where = [...windowConditions("OccurredAt"), `(${filterSql})`].join(
     "\n    AND ",
   );
   return (
-    `TraceId IN (\n` +
+    `${traceColumn} IN (\n` +
     `    SELECT TraceId\n` +
     `    FROM ${database}.traces\n` +
     `    WHERE ${where}\n` +
@@ -337,7 +347,11 @@ export function expandInstantEvalShorthand({
     conditions.push(
       template.filterPlacement === "inline"
         ? `(${filter.sql})`
-        : traceSubquery({ database, filterSql: filter.sql }),
+        : traceSubquery({
+            database,
+            filterSql: filter.sql,
+            traceColumn: template.filterTraceColumn ?? "TraceId",
+          }),
     );
   }
 

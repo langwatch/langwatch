@@ -30,8 +30,8 @@ const MAX_PARAM_COUNT = 50;
 /**
  * How one dialect compiles a single `field:value` tag.
  *
- * The boolean structure of the language — AND, OR, NOT, parentheses, the node
- * ceiling — is the same whatever table the result runs against, so the walk
+ * The boolean structure of the language (AND, OR, NOT, parentheses, the node
+ * ceiling) is the same whatever table the result runs against, so the walk
  * below takes the per-tag compilation as an argument. `trace_summaries` is one
  * dialect (the rest of this file); the LangWatchQL trace view is another, and
  * it lives with the feature that needs it.

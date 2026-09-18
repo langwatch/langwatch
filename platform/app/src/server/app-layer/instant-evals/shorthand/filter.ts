@@ -4,9 +4,9 @@
  * ## Why this is a second dialect and not a reuse of the trace compiler
  *
  * `translateFilterToClickHouse` compiles the same language, and its output
- * cannot be used here. It targets the base tables — `trace_summaries` for the
+ * cannot be used here. It targets the base tables (`trace_summaries` for the
  * trace's own columns and partition-pruned subqueries over `stored_spans`,
- * `evaluation_runs` and `simulation_runs` for everything else — and it binds
+ * `evaluation_runs` and `simulation_runs` for everything else) and it binds
  * `{tenantId:String}` itself. A statement a caller runs speaks to the
  * LangWatchQL views under a restricted identity that cannot see any of those
  * tables, and does not need to bind a tenant because the row policy is what
@@ -30,7 +30,7 @@
  * field is a caller who writes one more line; a shorthand that quietly dropped
  * a condition is a caller who is charged for judging rows they excluded.
  *
- * The boolean structure — AND, OR, NOT, parentheses, the node ceiling — is the
+ * The boolean structure (AND, OR, NOT, parentheses, the node ceiling) is the
  * language's, not the dialect's, so it is shared with the trace compiler
  * through `translateFilterAst`.
  *

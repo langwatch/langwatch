@@ -98,6 +98,40 @@ A file is also how a question gets a name of its own. Without one, questions
 are called `q1`, `q2` and so on, and that name is the column the answer lands
 in and the name every judgement is filed under.
 
+### What `--filter` accepts
+
+`--filter` speaks the trace explorer's language, and a target supports the
+fields the LangWatchQL trace view can answer: `traceId`, `traceName`, `service`,
+`origin`, `user`, `customer`, `conversation`, `scenarioRun`, `topic`,
+`subtopic`, `label`, `model`, `status:error`, `cost`, `duration`, `tokens`,
+`promptTokens`, `completionTokens`, `tokensPerSecond`, `ttft`, `ttlt`, `spans`,
+`tokensEstimated`, `selectedPrompt`, `lastUsedPrompt`, `promptVersion`,
+`trace.attribute.<key>`, and a bare word as free text.
+
+Anything that reaches outside the trace row is refused by name: span fields
+(`spanId`, `spanName`, `spanType`, `spanStatus`, `rootSpanType`,
+`span.attribute.<key>`), evaluation fields (`eval`, `evaluator*`, `guardrail`),
+events and annotations (`event`, `event.attribute.<key>`, `annotation`,
+`feedback`), scenario-run fields (`scenario`, `scenarioSet`, `scenarioBatch`,
+`scenarioStatus`, `scenarioVerdict`), and `status:ok` or `status:warning`. The
+refusal lists what it does accept. Ask the rest with `--sql`, which reaches
+every table. See [the target shorthand](/features/instant-evals/shorthand) for
+where the filter lands in each target's statement.
+
+### Rerunning the statement a target wrote
+
+`run` prints the statement it wrote. It binds its window as two parameters, so
+running it again through `langwatch query` needs both:
+
+```bash
+langwatch query "$(cat written.sql)" \
+  --param start_at=2026-09-11T00:00:00 \
+  --param end_at=2026-09-18T00:00:00
+```
+
+Change the values to move the window without touching the query. Resubmitting
+it as a run works the same way, with `--sql` and two `--param` flags.
+
 ### Waiting
 
 `--wait` polls every three seconds and reports one line:

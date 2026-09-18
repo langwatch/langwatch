@@ -1,5 +1,5 @@
 /**
- * `langwatch instant-eval status <id>` — where one run is, and optionally
+ * `langwatch instant-eval status <id>`: where one run is, and optionally
  * waiting there until it is done.
  *
  * Renders its own resolved format because `--wait` follows the answer, the

@@ -4,8 +4,8 @@
  * A run's questions are read off its statement (`../run/questions.ts`), and
  * that does not change here: the shorthand's job is to WRITE the statement, so
  * a question in this vocabulary is translated into the eval function that asks
- * it and then forgotten. Everything downstream — the stored questions, the
- * counters, the judgement rows — is derived from the statement, so a run
+ * it and then forgotten. Everything downstream (the stored questions, the
+ * counters, the judgement rows) is derived from the statement, so a run
  * started from a shorthand and a run started from the equivalent statement are
  * the same run.
  *

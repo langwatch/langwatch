@@ -38627,6 +38627,40 @@ A file is also how a question gets a name of its own. Without one, questions
 are called `q1`, `q2` and so on, and that name is the column the answer lands
 in and the name every judgement is filed under.
 
+### What `--filter` accepts
+
+`--filter` speaks the trace explorer's language, and a target supports the
+fields the LangWatchQL trace view can answer: `traceId`, `traceName`, `service`,
+`origin`, `user`, `customer`, `conversation`, `scenarioRun`, `topic`,
+`subtopic`, `label`, `model`, `status:error`, `cost`, `duration`, `tokens`,
+`promptTokens`, `completionTokens`, `tokensPerSecond`, `ttft`, `ttlt`, `spans`,
+`tokensEstimated`, `selectedPrompt`, `lastUsedPrompt`, `promptVersion`,
+`trace.attribute.<key>`, and a bare word as free text.
+
+Anything that reaches outside the trace row is refused by name: span fields
+(`spanId`, `spanName`, `spanType`, `spanStatus`, `rootSpanType`,
+`span.attribute.<key>`), evaluation fields (`eval`, `evaluator*`, `guardrail`),
+events and annotations (`event`, `event.attribute.<key>`, `annotation`,
+`feedback`), scenario-run fields (`scenario`, `scenarioSet`, `scenarioBatch`,
+`scenarioStatus`, `scenarioVerdict`), and `status:ok` or `status:warning`. The
+refusal lists what it does accept. Ask the rest with `--sql`, which reaches
+every table. See [the target shorthand](/features/instant-evals/shorthand) for
+where the filter lands in each target's statement.
+
+### Rerunning the statement a target wrote
+
+`run` prints the statement it wrote. It binds its window as two parameters, so
+running it again through `langwatch query` needs both:
+
+```bash
+langwatch query "$(cat written.sql)" \
+  --param start_at=2026-09-11T00:00:00 \
+  --param end_at=2026-09-18T00:00:00
+```
+
+Change the values to move the window without touching the query. Resubmitting
+it as a run works the same way, with `--sql` and two `--param` flags.
+
 ### Waiting
 
 `--wait` polls every three seconds and reports one line:
@@ -38812,6 +38846,19 @@ Copy it, edit it, and resubmit it with `--sql`, or run it through
 [the query endpoint](/api-reference/query/overview) to see the rows before you
 judge them.
 
+The statement carries two parameters, `start_at` and `end_at`, so a rerun has
+to supply both:
+
+```bash
+langwatch query "$(cat written.sql)" \
+  --param start_at=2026-09-11T00:00:00 \
+  --param end_at=2026-09-18T00:00:00
+```
+
+The values are the window the shorthand resolved, which `run` prints beside the
+statement. Any other window works too, which is the point of taking the
+statement: the same query over a different week is a `--param` change.
+
 ## What each target expands into
 
 Every statement projects `TraceId`, whatever other key columns the target has,
@@ -38898,11 +38945,24 @@ shorthand supports the half of it the LangWatchQL trace view can answer:
 `*` wildcards on `model` and the range spellings `cost:>0.01` and
 `duration:[100 TO 500]`.
 
-Every other field the explorer filters on reaches outside the trace row, into
-spans, evaluations, events or scenario runs, and a shorthand refuses it by
-name rather than dropping the condition. A dropped condition would charge you
-for judging rows you meant to exclude. Ask those with a statement: the trace
-filter is a convenience, and LangWatchQL reaches every table.
+Every other field the explorer filters on reaches outside the trace row, and a
+shorthand refuses it by name rather than dropping the condition. A dropped
+condition would charge you for judging rows you meant to exclude.
+
+| Group | Refused fields |
+|---|---|
+| Spans | `spanId`, `spanName`, `spanType`, `spanStatus`, `rootSpanType`, `span.attribute.<key>`, `containsAi` |
+| Evaluations | `eval`, `evaluator`, `evaluatorLabel`, `evaluatorPassed`, `evaluatorScore`, `evaluatorStatus`, `evaluatorVerdict`, `guardrail` |
+| Events and annotations | `event`, `event.attribute.<key>`, `annotation`, `feedback` |
+| Scenario runs | `scenario`, `scenarioSet`, `scenarioBatch`, `scenarioStatus`, `scenarioVerdict` |
+| Errors | `error`, `errorMessage`, and `status:ok` or `status:warning` |
+
+`status:error` is supported because the trace view carries an error flag;
+`status:ok` and `status:warning` need the evaluation rows.
+
+Ask any of those with a statement instead, using `--sql`: LangWatchQL reaches
+every table, and the trace filter is only a shortcut for the common case. The
+refusal names the field it rejected and lists the fields it accepts.
 
 ## Where the filter lands
 

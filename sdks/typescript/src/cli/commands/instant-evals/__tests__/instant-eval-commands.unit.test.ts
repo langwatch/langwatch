@@ -157,7 +157,9 @@ afterEach(() => {
 });
 
 const printed = (): string =>
-  logSpy.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+  logSpy.mock.calls
+    .map((call: unknown[]) => call.map(String).join(" "))
+    .join("\n");
 
 describe("instant-eval run, given a question", () => {
   describe("when --estimate is asked for", () => {

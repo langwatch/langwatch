@@ -1,5 +1,5 @@
 /**
- * `langwatch instant-eval sample <id>` — a few rows with the text that was
+ * `langwatch instant-eval sample <id>`: a few rows with the text that was
  * judged beside the verdict it received.
  *
  * The loop this exists for: run a hundred rows, read five of them in full,

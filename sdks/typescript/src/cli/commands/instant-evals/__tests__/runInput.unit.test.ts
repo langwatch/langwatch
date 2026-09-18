@@ -64,7 +64,9 @@ const build = (args: {
 /** What the refusal said, for a line that was refused. */
 const refusalOf = async (promise: Promise<unknown>): Promise<string> => {
   await expect(promise).rejects.toThrow(ProcessExitError);
-  return errorSpy.mock.calls.map((call) => String(call[0])).join("\n");
+  return errorSpy.mock.calls
+    .map((call: unknown[]) => String(call[0]))
+    .join("\n");
 };
 
 describe("buildInstantEvalRunBody, given the shorthand", () => {
