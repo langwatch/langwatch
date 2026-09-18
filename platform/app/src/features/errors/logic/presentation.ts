@@ -2316,6 +2316,15 @@ const presentations = {
     describe: () =>
       "You can sign in with it now. To add a different one, use another device or security key.",
   },
+  identity_passkey_already_signed_in: {
+    // Creating an account with a passkey is a signed-out gesture. Run from a
+    // browser that already holds a session, it would attach the new address's
+    // passkey to the account already signed in, so it is refused with the one
+    // thing that resolves it.
+    title: "You're already signed in",
+    describe: () =>
+      "Sign out first to create a new account with a passkey, or add this passkey to the account you're in from your security settings.",
+  },
   identity_password_rejected: {
     // The policy is one module's (`passwordProblem`), and this says the same
     // thing the field-level rejection says, for the case where the server was

@@ -105,6 +105,12 @@ const CLIENT_MINTED_CODES = new Set([
   // model came from a menu, so the remediation is a different one and needs
   // its own words.
   "langy_model_unavailable",
+  // Minted by `PasskeySignUpButton` from better-auth's transport-level
+  // `ALREADY_SIGNED_IN` (a sign-up ceremony run with a session already open,
+  // refused server-side in `passkey-signup.ts`). The button translates it to
+  // this registry code for copy, the same way it maps a status to
+  // `identity_passkey_not_recognized`; nothing throws it as a HandledError.
+  "identity_passkey_already_signed_in",
 ]);
 
 /**

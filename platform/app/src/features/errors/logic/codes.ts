@@ -180,6 +180,7 @@ export const APP_ERROR_CODES = [
   "identity_mfa_required_by_organization",
   "identity_mfa_requirement_not_licensed",
   "identity_passkey_already_registered",
+  "identity_passkey_already_signed_in",
   "identity_passkey_ceremony_failed",
   "identity_passkey_not_recognized",
   "identity_password_rejected",

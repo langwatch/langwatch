@@ -86,6 +86,19 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then the passkey is attached to "sam"'s account
     And no account is created and no address is asked for
 
+  # The settings ceremony carries no address; a sign-up ceremony carries one.
+  # A signed-in browser running the sign-up one is not adding a passkey to its
+  # own account — it is trying to create a different address's — and the plugin
+  # attaches the credential to whoever is signed in, so the new account is never
+  # made and the credential lands on the wrong one, silently. Refused instead.
+  @unit @regression
+  Scenario: A signed-in browser cannot sign up a different address's passkey
+    Given "sam" is signed in
+    When "sam"'s browser runs a passkey sign-up ceremony for "robin"'s address
+    Then the ceremony is refused because a session is already open
+    And no account is created for "robin"'s address
+    And no passkey is attached to "sam"'s account
+
   # ONE offer, two halves (D06 follow-up). A person is asked once about their
   # ACCOUNT rather than once about a passkey and again about two-step
   # verification: two dialogs on the way in is a nag whatever each one says,
