@@ -1,8 +1,9 @@
 import { relative, resolve } from "node:path";
-import { changedSourceFiles } from "./workspace/changed-files.ts";
+
 import { POLICIES } from "./policies/index.ts";
 import type { PolicyDefinition } from "./policies/index.ts";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types.ts";
+import { changedSourceFiles } from "./workspace/changed-files.ts";
 import { buildWorkspaceSnapshot } from "./workspace/snapshot.ts";
 
 export type {
@@ -80,6 +81,7 @@ export {
   declaredWebDependencyPairs,
   lintFrontendUiBoundaries,
 } from "./policies/frontend/frontend-ui-boundaries.ts";
+export { lintBrowserNodeLeaks } from "./policies/frontend/browser-node-leak.ts";
 export type {
   ModuleImport,
   PackageManifestRecord,

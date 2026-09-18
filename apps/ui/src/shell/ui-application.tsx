@@ -10,7 +10,6 @@ import type { UiFeatureInstall } from "../behavior/ui-feature";
 import { mergeUiPageLoaders, uiFeatureLoaders } from "../behavior/ui-feature-loaders";
 import type { UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
 import { createUiRouter, type UiRouter } from "../behavior/ui-router";
-import { uiRouteTable } from "../model/ui-route-table";
 import { createUiFeatureShell } from "./ui-feature-shell";
 import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers";
 import {
@@ -20,6 +19,7 @@ import {
 } from "./ui-outer-providers";
 import { createUiRootLayout } from "./ui-root-layout";
 import { createUiRouteObjects } from "./ui-route-objects";
+import { uiRouteTable } from "./ui-route-table";
 
 export type UiApplicationInstall = {
   providers: UiOuterProviderInstall & UiInnerProviderInstall;

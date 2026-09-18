@@ -1,7 +1,6 @@
-import { canonicalDocsBaseUrl, docsBaseUrl } from "@langwatch/config/docs-url";
-
 import { APP_ERROR_CODES } from "./app-codes.ts";
 import { goErrorCodes, nodeErrorCodes } from "./codes.generated.ts";
+import { canonicalDocsBaseUrl, docsBaseUrl } from "./docs-url.ts";
 import {
   type HandledErrorFault,
   serializedReasonSchema,

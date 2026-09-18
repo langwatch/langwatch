@@ -59,10 +59,6 @@ class UnusableSession extends UiSession {
     throw new Error("the installed session should have answered");
   }
 
-  activeScope(): never {
-    throw new Error("the installed session should have answered");
-  }
-
   hasPermission(): never {
     throw new Error("the installed session should have answered");
   }
@@ -79,10 +75,6 @@ class UnusableSession extends UiSession {
 class StubSession extends UiSession {
   currentUser() {
     return { id: "user_1", name: "Ada", email: "ada@example.com", image: null };
-  }
-
-  activeScope() {
-    return { organizationId: "org_1", projectId: "project_1" };
   }
 
   hasPermission(permission: string): boolean {
@@ -143,9 +135,22 @@ describe("given the capability ports a screen asks instead of reaching for the b
         /"session" UI capability has no implementation/,
       );
       expect(() => capabilities.session.currentUser()).toThrow(UiCapabilityUnavailableError);
-      expect(() => capabilities.session.activeScope()).toThrow(UiCapabilityUnavailableError);
       expect(() => capabilities.session.isFeatureEnabled("some_flag")).toThrow(
         UiCapabilityUnavailableError,
+      );
+    });
+
+    it("refuses the scope by name rather than answering an unresolved one", () => {
+      const capabilities = resolveUiCapabilities({
+        install: {},
+        documentTitle: BrowserUiDocumentTitle.create({ title: "" }),
+        navigation: new RecordingNavigation(),
+        route: recordingRoute(),
+      });
+
+      expect(capabilities.scope).toBeDefined();
+      expect(() => capabilities.scope?.activeScope()).toThrow(
+        /"scope" UI capability has no implementation/,
       );
     });
   });

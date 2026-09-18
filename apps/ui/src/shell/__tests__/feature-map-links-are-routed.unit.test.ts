@@ -10,7 +10,7 @@ import { webModules } from "@langwatch/installed-modules/web";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { installedModuleScreens } from "../../behavior/ui-module-screens";
+import { installedModuleScreens } from "../ui-module-screens";
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 const CATCH_ALL = "*";

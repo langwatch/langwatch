@@ -19,10 +19,6 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./docs-url": {
-      "types": "./dist/docs-url.d.ts",
-      "default": "./src/docs-url.ts"
-    },
     "./public-app-config": {
       "types": "./dist/public-app-config.d.ts",
       "default": "./src/public-app-config.ts"

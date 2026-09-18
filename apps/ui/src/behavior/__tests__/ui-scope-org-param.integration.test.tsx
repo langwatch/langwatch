@@ -4,12 +4,16 @@
  * Spec: specs/ai-gateway/governance/org-query-param-switch.feature
  */
 
+import {
+  resolveUiCapabilities,
+  UiCapabilityContextProvider,
+} from "@langwatch/browser-host/capabilities";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { UiRpcContextProvider, UiRpc, type UiRpcSubscription } from "../ui-rpc";
+import { UiRpc, type UiRpcSubscription } from "../ui-rpc";
 import { useUiOrgQueryParamSelection } from "../ui-scope-org-param";
 import {
   UI_SELECTED_ORGANIZATION_ID_KEY,
@@ -70,9 +74,11 @@ function openAt(path: string): { address: () => string } {
   );
   const view = render(
     <QueryClientProvider client={new QueryClient()}>
-      <UiRpcContextProvider value={new RecordedUiRpc()}>
+      <UiCapabilityContextProvider
+        value={resolveUiCapabilities({ install: {}, rpc: new RecordedUiRpc() })}
+      >
         <RouterProvider router={router} />
-      </UiRpcContextProvider>
+      </UiCapabilityContextProvider>
     </QueryClientProvider>,
   );
   dispose = () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { UiRouteDescriptor } from "../../model/ui-route-table";
+import type { UiRouteDescriptor } from "../../shell/ui-route-table";
 import { resolveUiPageLoader, uiRoutePageKeys } from "../ui-page-loaders";
 
 const table: readonly UiRouteDescriptor[] = [

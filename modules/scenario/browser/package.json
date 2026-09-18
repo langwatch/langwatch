@@ -67,13 +67,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/workflow-browser-kit": "workspace:*",
     "@chakra-ui/react": "catalog:",
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
     "@emotion/react": "catalog:",
     "@hookform/resolvers": "catalog:",
-    "@langwatch/agent-browser": "workspace:*",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/analytics-browser": "workspace:*",
     "@langwatch/analytics-browser-kit": "workspace:*",

@@ -9,7 +9,7 @@ import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router";
 
 import type { UiScopeOrganization } from "../model/ui-scope";
-import { UI_ORGANIZATIONS_PROCEDURE } from "./ui-organization-facts";
+import { UI_ORGANIZATIONS_PROCEDURE } from "@langwatch/organization-browser/surfaces/organization-facts";
 import { useUiRpc } from "./ui-rpc";
 import { uiOrgQueryParamWrites } from "./ui-scope-resolution";
 import { UI_ORG_QUERY_PARAM, useUiRouteReading } from "./ui-scope-route";

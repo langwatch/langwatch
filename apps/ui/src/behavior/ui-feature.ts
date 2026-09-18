@@ -10,6 +10,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { ComponentType, ReactNode } from "react";
 import type { RouteObject } from "react-router";
 
+import type { UiWebRouteParent } from "../shell/ui-web-installation";
 import type {
   UiFeatureApiBinding,
   UiFeatureApiProvider,
@@ -18,7 +19,6 @@ import type {
 import type { UiPageLoaderRegistry } from "./ui-page-loaders";
 import type { UiRpc } from "./ui-rpc";
 import type { UiSessionSource } from "./ui-session";
-import type { UiWebRouteParent } from "./ui-web-installation";
 
 /** What a failure interceptor may do about the failure it just read. */
 export type UiFailureHost = {

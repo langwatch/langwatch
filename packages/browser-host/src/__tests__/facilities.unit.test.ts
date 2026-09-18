@@ -1,12 +1,11 @@
 /**
  * Handing the reader a file the browser never fetched.
- * @vitest-environment jsdom
- * Spec: specs/audit-log/audit-log.feature
+ * Spec: specs/audit-log/audit-log.feature, specs/components/adaptive-graphics-quality.feature
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { downloadUiFile } from "../ui-file-download";
+import { downloadUiFile, evaluateFpsSample } from "../facilities.ts";
 
 type Recorded = {
   created: Blob[];
@@ -33,10 +32,10 @@ beforeEach(() => {
   URL.createObjectURL = vi.fn((blob: Blob) => {
     recorded.created.push(blob);
     return `blob:test/${recorded.created.length}`;
-  }) as unknown as typeof URL.createObjectURL;
+  });
   URL.revokeObjectURL = vi.fn((url: string) => {
     recorded.revoked.push(url);
-  }) as unknown as typeof URL.revokeObjectURL;
+  });
 
   // jsdom would try to navigate to the blob URL, which is neither what a
   // download does nor something it implements. Recording the state at the
@@ -130,6 +129,29 @@ describe("given a file a screen decided the contents of", () => {
       expect(() => downloadUiFile(FILE)).toThrow("blocked");
       expect(document.body.querySelector("a")).toBeNull();
       expect(recorded.revoked).toEqual(["blob:test/1"]);
+    });
+  });
+});
+
+describe("evaluateFpsSample()", () => {
+  describe("given a sample window below the floor", () => {
+    /** @scenario A frame rate below the floor is reported as struggling */
+    it("reports the device as struggling", () => {
+      expect(evaluateFpsSample({ frames: 40, elapsedMs: 1500, minFps: 50 })).toBe(true);
+    });
+  });
+
+  describe("given a sample window at or above the floor", () => {
+    /** @scenario A frame rate at or above the floor is reported as smooth */
+    it("reports the device as smooth", () => {
+      expect(evaluateFpsSample({ frames: 90, elapsedMs: 1500, minFps: 50 })).toBe(false);
+    });
+  });
+
+  describe("given a sample window with no observed frames", () => {
+    /** @scenario A sample window with no observed frames is reported as struggling */
+    it("reports the device as struggling", () => {
+      expect(evaluateFpsSample({ frames: 0, elapsedMs: 1500, minFps: 50 })).toBe(true);
     });
   });
 });

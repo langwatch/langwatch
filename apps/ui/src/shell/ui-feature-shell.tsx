@@ -7,22 +7,18 @@ import {
   resolveUiCapabilities,
   UiCapabilityContextProvider,
   UNAVAILABLE_UI_FEEDBACK,
+  UNAVAILABLE_UI_SCOPE,
   UNAVAILABLE_UI_SESSION,
   type UiCapabilityInstall,
-  type UiSession,
+  type UiRpc,
 } from "@langwatch/browser-host/capabilities";
 import { CurrentDrawer, type UiDrawerRegistry } from "@langwatch/browser-host/drawer";
-import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
+import { createUiQueryClient } from "@langwatch/browser-host/query-client";
 import { UiSlot } from "@langwatch/browser-host/slots";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { UiScopeHostProvider } from "@langwatch/browser-host/use-organization-team-project";
-import {
-  MutationCache,
-  QueryClient,
-  QueryClientContext,
-  QueryClientProvider,
-} from "@tanstack/react-query";
+import { QueryClientContext, QueryClientProvider } from "@tanstack/react-query";
 import { useContext, useMemo, useState, type ReactNode } from "react";
 
 import type { UiFailureHost, UiFailureInterceptor } from "../behavior/ui-feature";
@@ -32,8 +28,8 @@ import {
   type UiFeatureApiTransport,
 } from "../behavior/ui-feature-transport";
 import { useRouterUiNavigation, useRouterUiRoute } from "../behavior/ui-router-navigation";
-import { BrowserUiRpc, UiRpcContextProvider } from "../behavior/ui-rpc";
-import type { UiSessionSource } from "../behavior/ui-session";
+import { BrowserUiRpc } from "../behavior/ui-rpc";
+import type { UiSessionCapabilities, UiSessionSource } from "../behavior/ui-session";
 import { UiApiWaitingGate } from "./ui-api-waiting-gate";
 import type { UiProviderShell } from "./ui-outer-providers";
 
@@ -64,8 +60,11 @@ export type UiFeatureShellInstall = {
   isDevelopment?: boolean;
 };
 
-/** The session of a composition that declared none. Refuses by name. */
-const useUnavailableUiSession: UiSessionSource = () => UNAVAILABLE_UI_SESSION;
+/** The session and scope of a composition that declared neither. Refuse by name. */
+const useUnavailableUiSession: UiSessionSource = () => ({
+  session: UNAVAILABLE_UI_SESSION,
+  scope: UNAVAILABLE_UI_SCOPE,
+});
 
 export function createUiFeatureShell({
   apis,
@@ -82,9 +81,11 @@ export function createUiFeatureShell({
 
   function UiCapabilities({
     transport: sessionTransport,
+    rpc,
     children,
   }: {
     transport: UiFeatureApiTransport;
+    rpc: UiRpc;
     children: ReactNode;
   }) {
     const navigation = useRouterUiNavigation();
@@ -93,7 +94,7 @@ export function createUiFeatureShell({
     // The installed feedback port, resolved ahead of the session rather than
     // read back out of the resolution: a refused session read is told through
     // it, and it is the only failure with nobody else to tell.
-    const sessionPort: UiSession = useSessionCapability({
+    const live: UiSessionCapabilities = useSessionCapability({
       transport: sessionTransport,
       feedback: capabilities.feedback ?? UNAVAILABLE_UI_FEEDBACK,
     });
@@ -104,9 +105,11 @@ export function createUiFeatureShell({
           documentTitle,
           navigation,
           route,
-          session: sessionPort,
+          rpc,
+          scope: live.scope,
+          session: live.session,
         }),
-      [documentTitle, navigation, route, sessionPort],
+      [documentTitle, navigation, route, rpc, live],
     );
 
     // The toast and error singletons are called from mutation callbacks and
@@ -119,7 +122,7 @@ export function createUiFeatureShell({
     // session with nothing resolved publishes none and the hook reads unresolved.
     return (
       <UiCapabilityContextProvider value={resolved}>
-        <UiScopeHostProvider value={resolved.session.scopeHost()}>
+        <UiScopeHostProvider value={resolved.scope?.scopeHost()}>
           {/* Nothing is answering on the API's address, so the reader waits
               here rather than being signed out of a stack that is booting. */}
           <UiApiWaitingGate isDevelopment={isDevelopment}>{children}</UiApiWaitingGate>
@@ -144,16 +147,10 @@ export function createUiFeatureShell({
     // do about a failure is only knowable further down this render. The box
     // is what carries it there, and it refuses by name until it is filled.
     const [failureHost] = useState<{ current: UiFailureHost | null }>(() => ({ current: null }));
-    const [ownQueryClient] = useState(
-      () =>
-        new QueryClient({
-          // A refusal the customer can act on is shown at once; only a failure
-          // a replay could fix is replayed.
-          defaultOptions: { queries: { retry: shouldRetryQuery } },
-          mutationCache: new MutationCache({
-            onError: (error) => reportFailure({ error, failures, host: failureHost.current }),
-          }),
-        }),
+    const [ownQueryClient] = useState(() =>
+      createUiQueryClient({
+        onMutationError: (error) => reportFailure({ error, failures, host: failureHost.current }),
+      }),
     );
     const [ownTransport] = useState(() => transport ?? createUiFeatureApiClient());
     const queryClient = hostQueryClient ?? ownQueryClient;
@@ -174,9 +171,9 @@ export function createUiFeatureShell({
           {inner}
         </Provider>
       ),
-      <UiRpcContextProvider value={rpc}>
-        <UiCapabilities transport={ownTransport}>{children}</UiCapabilities>
-      </UiRpcContextProvider>,
+      <UiCapabilities transport={ownTransport} rpc={rpc}>
+        {children}
+      </UiCapabilities>,
     );
 
     // Always mounted, host client or own: a Provider that appears only in one

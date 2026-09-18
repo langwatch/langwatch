@@ -8,8 +8,8 @@ import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
-import { uiRouteTable } from "../../model/ui-route-table";
 import { createUiRouteObjects } from "../ui-route-objects";
+import { uiRouteTable } from "../ui-route-table";
 
 /**
  * Every page the table names, stubbed by its key. A layout route has to render

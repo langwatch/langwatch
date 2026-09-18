@@ -15,6 +15,11 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./surfaces/langy-demo-project": {
+      "langwatch-declaration-source": "./src/model/langy-demo-project.ts",
+      "types": "./dist/model/langy-demo-project.d.ts",
+      "default": "./src/model/langy-demo-project.ts"
+    },
     "./surfaces/asaplangy": {
       "langwatch-declaration-source": "./src/asaplangy.ts",
       "types": "./dist/asaplangy.d.ts",

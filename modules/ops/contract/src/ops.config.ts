@@ -14,7 +14,6 @@ export const opsConfig = Config.define((c) => ({
   /** A third ClickHouse identity; never falls back to the tenant-keyed client. */
   clickhouseOpsUrl: c.env("CLICKHOUSE_OPS_URL", z.string().optional()),
   /** The platform-operator allow-list; `AdminAccessService` splits and trims it. */
-  adminEmails: c.env("ADMIN_EMAILS", z.string().optional()),
   /**
    * ADR-117 §5: once the connection projection decides sign-in, legacy
    * string writes are refused.

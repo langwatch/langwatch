@@ -11,7 +11,6 @@ export {
   identifierStateSatisfies,
   orphanedIdentifierRows,
 } from "./backfill.ts";
-export { identityConfig, type IdentityConfig } from "./identity.config.ts";
 export {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,

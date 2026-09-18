@@ -6,9 +6,9 @@ import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import type { UiRouteDescriptor } from "../../model/ui-route-table";
-import { createUiRouteObjects, UiRouteOutlet } from "../../shell/ui-route-objects";
 import { installedModuleScreens } from "../ui-module-screens";
+import { createUiRouteObjects, UiRouteOutlet } from "../ui-route-objects";
+import type { UiRouteDescriptor } from "../ui-route-table";
 
 // The screen has its own suites; here it only has to report the view its
 // declared route bound to it, which is the whole subject of this file.

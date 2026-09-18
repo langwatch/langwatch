@@ -7,9 +7,12 @@
 import { createContext, useContext } from "react";
 
 import type { UiAnalytics } from "./analytics.ts";
+import { UNAVAILABLE_UI_SCOPE, UiScope, useUiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
 import type { UiSlots } from "./slots.tsx";
-import type { UiScopeHost } from "./use-organization-team-project.ts";
+
+/** Scope is a capability of its own; this file stays the one ports barrel. */
+export { UiScope, UNAVAILABLE_UI_SCOPE, useUiScope, type UiActiveScope };
 
 /** The composition never filled this port, and something asked it to work. */
 export class UiCapabilityUnavailableError extends Error {
@@ -80,6 +83,35 @@ export abstract class UiFeedback {
   abstract failed(failure: UiFailureNotice): void;
 }
 
+/** What a live procedure hands its subscriber, one entry at a time. */
+export type UiRpcSubscriptionHandlers = {
+  onData?: (value: unknown) => void;
+  onError?: (error: unknown) => void;
+  onStarted?: () => void;
+  onStopped?: () => void;
+};
+
+/** A live procedure, while somebody is listening to it. */
+export type UiRpcSubscription = { unsubscribe: () => void };
+
+/**
+ * A procedure call addressed by path rather than by a typed hook, for a
+ * surface covering many procedures behind one path string. A typed hook off
+ * the module's derived client is normal; this is the shell-composed escape.
+ */
+export abstract class UiRpc {
+  abstract query(path: string, input: unknown): Promise<unknown>;
+
+  abstract mutate(path: string, input: unknown): Promise<unknown>;
+
+  /** A LIVE procedure, opened from outside React. Nothing is cached. */
+  abstract subscribe(
+    path: string,
+    input: unknown,
+    handlers: UiRpcSubscriptionHandlers,
+  ): UiRpcSubscription;
+}
+
 /** Moves the address bar. */
 export abstract class UiNavigation {
   abstract navigate(to: string): void;
@@ -122,20 +154,13 @@ export type UiActor = {
   image: string | null;
 };
 
-/** The organization and project the current page is about. */
-export type UiActiveScope = {
-  organizationId: string | null;
-  projectId: string | null;
-};
-
 /**
- * Who is here, where they are, and what they may do — `hasPermission`
- * and `isFeatureEnabled` answer synchronously and fail closed, so a
- * loading screen renders the same as a "no" screen.
+ * Who is here and what they may do — `hasPermission` and `isFeatureEnabled`
+ * answer synchronously and fail closed, so a loading screen renders the same
+ * as a "no" screen. Where they are is `UiScope`, a capability of its own.
  */
 export abstract class UiSession {
   abstract currentUser(): UiActor | null;
-  abstract activeScope(): UiActiveScope;
   abstract hasPermission(permission: string): boolean;
 
   /**
@@ -159,15 +184,6 @@ export abstract class UiSession {
    */
   abstract featureFlag(flag: string): boolean | undefined;
 
-  /**
-   * The scope as every feature's shared `useOrganizationTeamProject` reads it.
-   * Absent is a reading, never a throw, keeping a cross-feature component
-   * alive on a route its own host never mounted.
-   */
-  scopeHost(): UiScopeHost | undefined {
-    return void 0;
-  }
-
   /** Fail-closed: not yet answered reads the same as off. */
   isFeatureEnabled(flag: string): boolean {
     return this.featureFlag(flag) === true;
@@ -189,10 +205,6 @@ class UnavailableUiSession extends UiSession {
     throw new UiCapabilityUnavailableError("session");
   }
 
-  activeScope(): never {
-    throw new UiCapabilityUnavailableError("session");
-  }
-
   hasPermission(): never {
     throw new UiCapabilityUnavailableError("session");
   }
@@ -210,8 +222,23 @@ class UnavailableUiSession extends UiSession {
   }
 }
 
+class UnavailableUiRpc extends UiRpc {
+  query(): never {
+    throw new UiCapabilityUnavailableError("rpc");
+  }
+
+  mutate(): never {
+    throw new UiCapabilityUnavailableError("rpc");
+  }
+
+  subscribe(): never {
+    throw new UiCapabilityUnavailableError("rpc");
+  }
+}
+
 /** The default for a port with no implementation this package can write. */
 export const UNAVAILABLE_UI_FEEDBACK: UiFeedback = new UnavailableUiFeedback();
+export const UNAVAILABLE_UI_RPC: UiRpc = new UnavailableUiRpc();
 export const UNAVAILABLE_UI_SESSION: UiSession = new UnavailableUiSession();
 
 /** The title of the document this application is rendered into. */
@@ -240,10 +267,21 @@ export class BrowserUiDocumentTitle extends UiDocumentTitle {
 export type UiDeployment = {
   /** A local development build: dev-only affordances and raw error text. */
   isDevelopment: boolean;
+  /** The hosted product rather than a self-hosted one. */
+  isSaaS: boolean;
+  /** The shared demo project, when this deployment configures one. */
+  demoProjectSlug?: string;
+  hasNlpService: boolean;
+  hasLangevals: boolean;
 };
 
 /** What a composition that declared no deployment is read as. */
-const PRODUCTION_UI_DEPLOYMENT: UiDeployment = { isDevelopment: false };
+const PRODUCTION_UI_DEPLOYMENT: UiDeployment = {
+  isDevelopment: false,
+  isSaaS: false,
+  hasNlpService: true,
+  hasLangevals: true,
+};
 
 /** Every capability a screen can ask for, all of them answered. */
 export type UiCapabilities = {
@@ -262,6 +300,18 @@ export type UiCapabilities = {
   feedback: UiFeedback;
   navigation: UiNavigation;
   route: UiRoute;
+  /**
+   * The by-path dispatcher, for the few surfaces too wide for a procedure
+   * map. Optional so a hand-built capability set stays valid without one;
+   * absent reads as the refusing dispatcher, exactly as `session` does.
+   */
+  rpc?: UiRpc;
+  /**
+   * Where the reader is standing. Optional so a hand-built capability set
+   * stays valid without one; absent reads as the refusing port, exactly as
+   * `rpc` does.
+   */
+  scope?: UiScope;
   session: UiSession;
   /**
    * The blocks a core screen leaves for the composition to fill. Optional
@@ -282,6 +332,13 @@ export type UiCapabilityResolution = {
   navigation: UiNavigation;
   route: UiRoute;
   /**
+   * The default only the composition can build: the dispatcher needs both the
+   * transport and the one QueryClient, neither of which a screen may reach.
+   */
+  rpc?: UiRpc;
+  /** The scope that same live host resolved, beside the session it came with. */
+  scope?: UiScope;
+  /**
    * The default only a live host can build — absent for a composition
    * that declared no session source, when the refusal below is the honest answer.
    */
@@ -297,6 +354,8 @@ export function resolveUiCapabilities({
   documentTitle,
   navigation,
   route,
+  rpc,
+  scope,
   session,
 }: UiCapabilityResolution): UiCapabilities {
   return {
@@ -306,6 +365,8 @@ export function resolveUiCapabilities({
     feedback: install.feedback ?? UNAVAILABLE_UI_FEEDBACK,
     navigation: install.navigation ?? navigation,
     route: install.route ?? route,
+    rpc: install.rpc ?? rpc ?? UNAVAILABLE_UI_RPC,
+    scope: install.scope ?? scope ?? UNAVAILABLE_UI_SCOPE,
     session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
     slots: install.slots,
   };
@@ -331,6 +392,15 @@ export function useOptionalUiCapabilities(): UiCapabilities | undefined {
  */
 export function useUiDeployment(): UiDeployment {
   return useOptionalUiCapabilities()?.deployment ?? PRODUCTION_UI_DEPLOYMENT;
+}
+
+/**
+ * The by-path dispatcher of the process this screen is running in. Read off
+ * the capabilities rather than a context of its own: record 10.1 rules out
+ * ambient React context as a cross-module transport.
+ */
+export function useUiRpc(): UiRpc {
+  return useOptionalUiCapabilities()?.rpc ?? UNAVAILABLE_UI_RPC;
 }
 
 /**

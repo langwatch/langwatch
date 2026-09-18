@@ -1,11 +1,15 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
+import type { UiDeployment } from "@langwatch/browser-host/capabilities";
+import { deriveUiDeployment } from "@langwatch/browser-host/deployment";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
-import { configureDocsRuntime } from "@langwatch/config/docs-url";
+import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
 import { webModules } from "@langwatch/installed-modules/web";
 import { createUi } from "@langwatch/ui-kernel";
+import posthog from "posthog-js";
 import type { ReactNode } from "react";
 
+import { createBrowserUiAnalytics } from "./behavior/analytics-client";
 import { registerChunkReloadListener } from "./behavior/chunk-reload";
 import { readPublicAppConfig } from "./behavior/public-config";
 import { toPublicEnvironment } from "./behavior/public-environment";
@@ -14,7 +18,6 @@ import {
   type UiFeatureApiTransport,
 } from "./behavior/ui-feature-transport";
 import { BrowserUiFeedback } from "./behavior/ui-feedback";
-import { installedModuleScreens, type UiModuleScreens } from "./behavior/ui-module-screens";
 import { useBrowserUiSession } from "./behavior/ui-session";
 import { UiShell } from "./behavior/ui-shell";
 import { UiRuntime } from "./behavior/ui.runtime";
@@ -24,6 +27,7 @@ import { createUiApplication, type UiApplication } from "./shell/ui-application"
 import { UiApplicationShell } from "./shell/ui-application-shell";
 import { UiErrorToaster } from "./shell/ui-error-toaster";
 import { installedModuleDrawers } from "./shell/ui-module-drawers";
+import { installedModuleScreens, type UiModuleScreens } from "./shell/ui-module-screens";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 
 import "nprogress/nprogress.css";
@@ -60,6 +64,7 @@ class BrowserUiShell extends UiShell {
   static create(
     environment: PublicEnvironment,
     isDevelopment: boolean,
+    deployment: UiDeployment,
     screens: UiModuleScreens,
     drawers: UiDrawerRegistry,
     transport: UiFeatureApiTransport,
@@ -74,7 +79,19 @@ class BrowserUiShell extends UiShell {
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
           session: useBrowserUiSession,
-          capabilities: { feedback: BrowserUiFeedback.create() },
+          capabilities: {
+            feedback: BrowserUiFeedback.create(),
+            deployment,
+            // The posthog module SINGLETON, the same one `PostHogProvider` is
+            // handed: inert until the inner providers initialise it, and
+            // initialised well before a screen emits.
+            analytics: createBrowserUiAnalytics({
+              isSaaS: deployment.isSaaS,
+              posthogClient: posthog,
+              isGtagReady: false,
+              isDevelopment,
+            }),
+          },
         },
         providers: {
           attribution: UiPendingProvider,
@@ -138,6 +155,7 @@ export async function startUi(): Promise<void> {
     shell: BrowserUiShell.create(
       environment,
       config.mode === "development",
+      deriveUiDeployment(config),
       installedModuleScreens(installed.modules),
       installedModuleDrawers(installed.modules),
       transport,

@@ -26,6 +26,12 @@ export type EffectivePermissions =
 export interface AuthzApi {
   /** Whether this is the configured shared demo project. */
   isDemoProject(input: { projectId: string }): boolean;
+  /**
+   * The shared demo project's identity. `DEMO_PROJECT_ID`/`DEMO_PROJECT_USER_ID`
+   * have one owner, this module; a peer asks rather than redeclaring them.
+   * Blank fields mean the deployment configured no demo project.
+   */
+  demoProject(): Readonly<{ projectId: string; userId: string }>;
   effectivePermissionsFor(
     input: Readonly<{ projectId?: string; organizationId?: string }>,
     by: AuthzCaller,

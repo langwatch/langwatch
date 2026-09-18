@@ -4,9 +4,11 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { useGraphicsQualityOverrideStore } from "../behavior/graphics-quality-override-store";
-import { GraphicsQualityContext } from "../behavior/use-graphics-quality";
-import { evaluateFpsSample } from "../model/evaluate-fps-sample";
+import {
+  evaluateFpsSample,
+  GraphicsQualityContext,
+  useGraphicsQualityOverrideStore,
+} from "@langwatch/browser-host/facilities";
 
 const RESAMPLE_INTERVAL_MS = 60_000;
 const SAMPLE_WINDOW_MS = 1500;

@@ -6,9 +6,7 @@
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import type { ComponentType, ReactNode } from "react";
-import { AnalyticsProvider } from "react-contextual-analytics";
 
-import { createUiAnalyticsClient } from "../behavior/analytics-client";
 import { useBrowserTracing } from "../behavior/browser-tracing";
 import { useIsGtagReady } from "../behavior/gtag-readiness";
 import { useNavigationTracing } from "../behavior/navigation-tracing";
@@ -57,20 +55,11 @@ export function createUiInnerProvider({
     return (
       <>
         <CommandBar>
-          <AnalyticsProvider
-            client={createUiAnalyticsClient({
-              isSaaS: Boolean(publicEnv.data?.IS_SAAS),
-              posthogClient: postHog,
-              isGtagReady,
-              isDevelopment,
-            })}
-          >
-            {/* Always wrap in PostHogProvider with the module singleton: conditionally
+          {/* Always wrap in PostHogProvider with the module singleton: conditionally
                 wrapping changes the element type here, so React unmounts and remounts
                 the ENTIRE routed page after boot, wiping in-flight state (#5550). The
                 uninitialized singleton is inert with no POSTHOG_KEY configured. */}
-            <PostHogProvider client={posthog}>{children}</PostHogProvider>
-          </AnalyticsProvider>
+          <PostHogProvider client={posthog}>{children}</PostHogProvider>
           <Toaster />
         </CommandBar>
         <Footer />

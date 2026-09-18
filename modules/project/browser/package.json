@@ -23,11 +23,6 @@
       "types": "./dist/project-settings.d.ts",
       "default": "./src/project-settings.ts"
     },
-    "./surfaces/tech-stack": {
-      "langwatch-declaration-source": "./src/ui/blocks/tech-stack.tsx",
-      "types": "./dist/ui/blocks/tech-stack.d.ts",
-      "default": "./src/ui/blocks/tech-stack.tsx"
-    },
     "./surfaces/hero-ask-field": {
       "types": "./dist/ui/sections/home/components/hero-ask-field.d.ts",
       "default": "./src/ui/sections/home/components/hero-ask-field.tsx"
@@ -38,6 +33,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/onboarding-browser": "workspace:*",
+    "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/analytics-browser": "workspace:*",
     "@langwatch/analytics-browser-kit": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",

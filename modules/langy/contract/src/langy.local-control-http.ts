@@ -1,7 +1,7 @@
 /**
  * The HTTP shapes of local control (ADR-129), shared by the CLI, the worker,
  * and the panel (tRPC). Browser-safe: zod and nothing else. See the route
- * mounts under `server/src/transport/api-rest` for the full path list.
+ * declarations under `process/src/transport` for the full path list.
  */
 
 import { z } from "zod";

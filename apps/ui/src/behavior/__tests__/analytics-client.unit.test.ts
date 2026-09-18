@@ -1,155 +1,181 @@
 /**
- * react-contextual-analytics' createAnalyticsClient no-ops (empty providers) without a
- * `window` global, so this needs a browser-like environment.
+ * The destination names are a wire: a rename here breaks a dashboard and
+ * nothing else, so every string below is pinned against what
+ * react-contextual-analytics sent before it was evicted.
  * @vitest-environment jsdom
  */
 import type { PostHog } from "posthog-js";
-import type { Provider } from "react-contextual-analytics";
 import { describe, expect, it, vi } from "vitest";
 
-import { createUiAnalyticsClient } from "../analytics-client";
-
-type ProviderEvent = Parameters<Provider["send"]>[0];
+import { createBrowserUiAnalytics } from "../analytics-client";
 
 function fakePostHog(overrides: Partial<PostHog> = {}): PostHog {
   return overrides as PostHog;
 }
 
-function fakeEvent(overrides: Partial<ProviderEvent> = {}): ProviderEvent {
-  return { version: "2025-05-29", action: "click", ...overrides };
+function saasWithPostHog(capture: PostHog["capture"]) {
+  return createBrowserUiAnalytics({
+    isSaaS: true,
+    posthogClient: fakePostHog({ capture }),
+    isGtagReady: false,
+    isDevelopment: false,
+  });
 }
 
-describe("createUiAnalyticsClient", () => {
-  describe("given isSaaS is false", () => {
-    it("registers neither the google nor posthog provider", () => {
-      const client = createUiAnalyticsClient({
-        isSaaS: false,
-        posthogClient: fakePostHog({ capture: vi.fn() as PostHog["capture"] }),
-        isGtagReady: true,
-        isDevelopment: false,
-      });
-
-      expect(client.providers.map((p) => p.id)).not.toContain("google");
-      expect(client.providers.map((p) => p.id)).not.toContain("posthog");
-    });
-  });
-
-  describe("given isSaaS is true and isGtagReady is true", () => {
-    it("registers the google provider", () => {
-      const client = createUiAnalyticsClient({
-        isSaaS: true,
-        posthogClient: undefined,
-        isGtagReady: true,
-        isDevelopment: false,
-      });
-
-      expect(client.providers.map((p) => p.id)).toContain("google");
-    });
-  });
-
-  describe("given isSaaS is true and isGtagReady is false", () => {
-    it("does not register the google provider", () => {
-      const client = createUiAnalyticsClient({
-        isSaaS: true,
-        posthogClient: undefined,
-        isGtagReady: false,
-        isDevelopment: false,
-      });
-
-      expect(client.providers.map((p) => p.id)).not.toContain("google");
-    });
-  });
-
-  describe("given isSaaS is true and a posthogClient is provided", () => {
-    it("registers a posthog provider that forwards events via capture", async () => {
+describe("the browser analytics destinations", () => {
+  describe("given a SaaS deployment with PostHog registered", () => {
+    it("is boundary.action.name", () => {
       const capture = vi.fn();
-      const client = createUiAnalyticsClient({
-        isSaaS: true,
-        posthogClient: fakePostHog({ capture: capture as PostHog["capture"] }),
-        isGtagReady: false,
-        isDevelopment: false,
+      saasWithPostHog(capture as PostHog["capture"]).track({
+        boundary: "workflow",
+        action: "create",
+        name: "click",
       });
 
-      const posthogProvider = client.providers.find((p) => p.id === "posthog")!;
-      await posthogProvider.send(
-        fakeEvent({
-          boundary: "workflow",
-          action: "create",
-          name: "click",
-          attributes: { project_id: "p1" },
-          context: {},
-        }),
-      );
+      expect(capture.mock.calls[0]?.[0]).toBe("workflow.create.click");
+    });
 
-      expect(capture).toHaveBeenCalledWith("workflow.create.click", {
+    it("drops the boundary when the event names none", () => {
+      const capture = vi.fn();
+      saasWithPostHog(capture as PostHog["capture"]).track({
+        action: "created",
+        name: "project",
+      });
+
+      expect(capture.mock.calls[0]?.[0]).toBe("created.project");
+    });
+
+    it("drops the name when the boundary is the noun", () => {
+      const capture = vi.fn();
+      saasWithPostHog(capture as PostHog["capture"]).track({
+        boundary: "onboarding_welcome.intent",
+        action: "viewed",
+      });
+
+      expect(capture.mock.calls[0]?.[0]).toBe("onboarding_welcome.intent.viewed");
+    });
+  });
+
+  describe("and the event carries its own attributes", () => {
+    it("are the event's own attributes plus the boundary and the page context", () => {
+      const capture = vi.fn();
+      saasWithPostHog(capture as PostHog["capture"]).track({
+        boundary: "workflow",
+        action: "create",
+        name: "click",
+        attributes: { project_id: "p1" },
+      });
+
+      expect(capture.mock.calls[0]?.[1]).toEqual({
         project_id: "p1",
         boundary: "workflow",
-        context: {},
+        context: {
+          href: window.location.href,
+          windowWidth: window.innerWidth,
+          windowHeight: window.innerHeight,
+          userAgent: window.navigator.userAgent,
+        },
       });
     });
 
-    describe("when posthogClient.capture is unavailable", () => {
-      it("does not throw", async () => {
-        const client = createUiAnalyticsClient({
-          isSaaS: true,
-          posthogClient: fakePostHog(),
-          isGtagReady: false,
-          isDevelopment: false,
-        });
-
-        const posthogProvider = client.providers.find((p) => p.id === "posthog")!;
-
-        await expect(
-          posthogProvider.send(
-            fakeEvent({
-              boundary: "workflow",
-              action: "create",
-              name: "click",
-              attributes: {},
-              context: {},
-            }),
-          ),
-        ).resolves.not.toThrow();
-      });
-    });
-  });
-
-  describe("given isSaaS is true and no posthogClient is provided", () => {
-    it("does not register a posthog provider", () => {
-      const client = createUiAnalyticsClient({
+    it("does not throw when the PostHog client cannot capture", () => {
+      const analytics = createBrowserUiAnalytics({
         isSaaS: true,
-        posthogClient: undefined,
+        posthogClient: fakePostHog(),
         isGtagReady: false,
         isDevelopment: false,
       });
 
-      expect(client.providers.map((p) => p.id)).not.toContain("posthog");
+      expect(() => analytics.track({ action: "create", name: "click" })).not.toThrow();
+    });
+  });
+
+  describe("given a self-hosted deployment", () => {
+    it("sends to neither Google nor PostHog", () => {
+      const capture = vi.fn();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      createBrowserUiAnalytics({
+        isSaaS: false,
+        posthogClient: fakePostHog({ capture: capture as PostHog["capture"] }),
+        isGtagReady: true,
+        isDevelopment: false,
+      }).track({ action: "created", name: "project" });
+
+      expect(capture).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+  });
+
+  describe("given SaaS with gtag ready", () => {
+    it("reaches the Google destination, which reports the global it wants is absent", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      createBrowserUiAnalytics({
+        isSaaS: true,
+        posthogClient: undefined,
+        isGtagReady: true,
+        isDevelopment: false,
+      }).track({ action: "created", name: "project" });
+
+      expect(warn).toHaveBeenCalledWith("gtag is not available");
+      warn.mockRestore();
     });
   });
 
   describe("given a development build", () => {
-    it("registers the console provider", () => {
-      const client = createUiAnalyticsClient({
+    it("prints every event", () => {
+      const dir = vi.spyOn(console, "dir").mockImplementation(() => {});
+
+      createBrowserUiAnalytics({
         isSaaS: false,
         posthogClient: undefined,
         isGtagReady: false,
         isDevelopment: true,
-      });
+      }).track({ action: "created", name: "project" });
 
-      expect(client.providers.map((p) => p.id)).toContain("console");
+      expect(dir).toHaveBeenCalledWith(
+        expect.objectContaining({ version: "2025-05-29", action: "created", name: "project" }),
+        { depth: null },
+      );
+      dir.mockRestore();
     });
-  });
 
-  describe("given a production build", () => {
-    it("does not register the console provider", () => {
-      const client = createUiAnalyticsClient({
+    it("does not print in a production build", () => {
+      const dir = vi.spyOn(console, "dir").mockImplementation(() => {});
+
+      createBrowserUiAnalytics({
         isSaaS: false,
         posthogClient: undefined,
         isGtagReady: false,
         isDevelopment: false,
-      });
+      }).track({ action: "created", name: "project" });
 
-      expect(client.providers.map((p) => p.id)).not.toContain("console");
+      expect(dir).not.toHaveBeenCalled();
+      dir.mockRestore();
+    });
+  });
+
+  describe("when one destination throws", () => {
+    it("still reaches the others", () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      const dir = vi.spyOn(console, "dir").mockImplementation(() => {
+        throw new Error("console destination failed");
+      });
+      const capture = vi.fn();
+
+      createBrowserUiAnalytics({
+        isSaaS: true,
+        posthogClient: fakePostHog({ capture: capture as PostHog["capture"] }),
+        isGtagReady: false,
+        isDevelopment: true,
+      }).track({ action: "created", name: "project" });
+
+      expect(capture).toHaveBeenCalledWith("created.project", expect.anything());
+      expect(error).toHaveBeenCalled();
+      dir.mockRestore();
+      error.mockRestore();
     });
   });
 });

@@ -2,13 +2,15 @@
  * The application a composing host actually gets from `@langwatch/ui`.
  */
 
+import { webModules } from "@langwatch/installed-modules/web";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
 import type { PublicEnvironment } from "../../model/public-environment";
-import { uiRouteTable } from "../../model/ui-route-table";
 import { createUiApplication } from "../ui-application";
+import { installedModuleScreens } from "../ui-module-screens";
+import { uiRouteTable } from "../ui-route-table";
 
 const publicEnvironment = {
   BASE_HOST: "http://localhost",
@@ -34,9 +36,9 @@ function PassThrough({ children }: { children: ReactNode }) {
 }
 
 /**
- * A host that serves everything EXCEPT the pages this package now serves — the
- * shape `platform/app` is in after the governance keys were deleted from its
- * registry.
+ * A host registry missing governance's keys — a composition fault ONLY if
+ * nothing else supplies them. Here `installedModuleScreens(webModules)`
+ * does, exactly as `main.tsx` composes it (ARCHITECTURE §10.1, §11).
  */
 function hostRegistryWithoutGovernance(): UiPageLoaderRegistry {
   const loaders: Record<string, () => Promise<{ default: () => null }>> = {};
@@ -66,12 +68,13 @@ function applicationFromPackageEntry() {
       errorFallback: () => null,
       rootErrorBoundary: () => null,
     },
+    features: { loaders: installedModuleScreens(webModules).loaders },
   });
 }
 
-describe("given a host that registers no governance loader at all", () => {
+describe("given a host that registers no governance loader, and the installed governance module does", () => {
   describe("when the package entry composes the application", () => {
-    it("builds a router rather than throwing on the keys the host left out", () => {
+    it("builds a router, because the installed module covers what the host left out", () => {
       expect(() => applicationFromPackageEntry()).not.toThrow();
     });
 

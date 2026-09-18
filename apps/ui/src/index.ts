@@ -140,7 +140,7 @@ export {
   type UiRedirectDescriptor,
   type UiRedirectRouteDescriptor,
   type UiRouteDescriptor,
-} from "./model/ui-route-table";
+} from "./shell/ui-route-table";
 export type { UiApplication, UiApplicationInstall } from "./shell/ui-application";
 export { createUiFeatureShell, type UiFeatureShellInstall } from "./shell/ui-feature-shell";
 export { createUiInnerProvider, type UiInnerProviderInstall } from "./shell/ui-inner-providers";

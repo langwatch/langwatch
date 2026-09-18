@@ -48,9 +48,6 @@ class SnapshotSession extends UiSession {
   currentUser() {
     return this.reading.session.user;
   }
-  activeScope() {
-    return { organizationId: null, projectId: null };
-  }
   hasPermission() {
     return false;
   }

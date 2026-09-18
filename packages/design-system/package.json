@@ -10,6 +10,14 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./format-money-display": {
+      "types": "./dist/components/format-money-display.d.ts",
+      "default": "./src/components/format-money-display.ts"
+    },
+    "./copy-button": {
+      "types": "./dist/components/copy-button.d.ts",
+      "default": "./src/components/copy-button.ts"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"

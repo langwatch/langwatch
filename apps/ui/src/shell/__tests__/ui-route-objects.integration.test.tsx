@@ -2,8 +2,8 @@ import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import type { UiRouteDescriptor } from "../../model/ui-route-table";
 import { createUiRouteObjects } from "../ui-route-objects";
+import type { UiRouteDescriptor } from "../ui-route-table";
 
 const loaders = {
   "pages/home": async () => ({ default: () => <div>home page</div> }),

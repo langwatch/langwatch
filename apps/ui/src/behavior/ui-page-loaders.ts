@@ -4,7 +4,7 @@
  * side knows where the other's file lives.
  */
 
-import type { UiRouteDescriptor } from "../model/ui-route-table";
+import type { UiRouteDescriptor } from "../shell/ui-route-table";
 import type { LazyRouteModule } from "./lazy-route";
 
 /** A page's dynamic import, in the shape `lazyRoute` consumes. */

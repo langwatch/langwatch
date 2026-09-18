@@ -23,12 +23,12 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
-    "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/experiment-contract": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

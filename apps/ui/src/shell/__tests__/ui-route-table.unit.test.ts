@@ -1,7 +1,9 @@
+import { webModules } from "@langwatch/installed-modules/web";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { uiRoutePageKeys } from "../../behavior/ui-page-loaders";
+import { installedModuleScreens } from "../ui-module-screens";
 import {
   uiLegacyRedirectRoutes,
   uiRouteDescriptors,
@@ -86,11 +88,15 @@ const SAMPLE_SEGMENT = "sample";
 /** The pattern the router falls back to when nothing else claims a path. */
 const CATCH_ALL = "*";
 
-/** Every path the table declares, flat, which is how the router ranks them. */
+/**
+ * Every path the table declares, plus what a module places at the project
+ * anchor — a redirect can target a page a module now owns.
+ */
 function declaredPaths(): string[] {
-  return uiRouteDescriptors(uiRouteTable)
-    .map((descriptor) => descriptor.path)
-    .filter((path): path is string => path !== void 0);
+  return [
+    ...uiRouteDescriptors(uiRouteTable).map((descriptor) => descriptor.path),
+    ...installedModuleScreens(webModules).routes.project.map((route) => route.path),
+  ].filter((path): path is string => typeof path === "string");
 }
 
 function redirectDescriptors(): UiRedirectRouteDescriptor[] {

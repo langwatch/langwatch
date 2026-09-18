@@ -8,6 +8,10 @@
   ],
   "type": "module",
   "exports": {
+    "./workflow-host": {
+      "types": "./dist/model/workflow-host.d.ts",
+      "default": "./src/model/workflow-host.ts"
+    },
     "./workflow-icons": {
       "langwatch-declaration-source": "./src/workflow-icons.ts",
       "types": "./dist/workflow-icons.d.ts",

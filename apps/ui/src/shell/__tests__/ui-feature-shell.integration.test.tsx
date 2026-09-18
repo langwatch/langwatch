@@ -1,4 +1,4 @@
-import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { UiScope, UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import {
   createUiScopeHost,
   useOrganizationTeamProject,
@@ -26,10 +26,6 @@ class StubSession extends UiSession {
     return { id: "user_1", name: "Ada", email: "ada@example.com", image: null };
   }
 
-  activeScope() {
-    return { organizationId: "org_1", projectId: "project_1" };
-  }
-
   hasPermission(): boolean {
     return true;
   }
@@ -43,8 +39,14 @@ class StubSession extends UiSession {
   }
 }
 
-/** A session that has resolved its scope and publishes it on the shared port. */
-class ScopedSession extends StubSession {
+class StubScope extends UiScope {
+  activeScope() {
+    return { organizationId: "org_1", projectId: "project_1" };
+  }
+}
+
+/** A scope that has resolved, and publishes it on the shared host. */
+class ResolvedScope extends StubScope {
   override scopeHost() {
     return createUiScopeHost({
       project: () => ({ id: "project_1", slug: "ada-project", name: "Ada's project" }),
@@ -107,7 +109,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     it("answers with the port the composition installed", () => {
       const shell = createUiFeatureShell({
         apis: [],
-        capabilities: { session: new StubSession() },
+        capabilities: { session: new StubSession(), scope: new StubScope() },
         transport: {} as UiFeatureApiTransport,
       });
 
@@ -223,7 +225,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     it("sees the project, the organization and the grants the session resolved", () => {
       const shell = createUiFeatureShell({
         apis: [],
-        capabilities: { session: new ScopedSession() },
+        capabilities: { session: new StubSession(), scope: new ResolvedScope() },
         transport: {} as UiFeatureApiTransport,
       });
 
@@ -247,7 +249,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     it("reads unresolved with no project and no grants when the session publishes no scope", () => {
       const shell = createUiFeatureShell({
         apis: [],
-        capabilities: { session: new StubSession() },
+        capabilities: { session: new StubSession(), scope: new StubScope() },
         transport: {} as UiFeatureApiTransport,
       });
 

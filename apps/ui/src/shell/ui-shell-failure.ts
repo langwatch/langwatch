@@ -6,11 +6,11 @@
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useEffect } from "react";
 
-import { useUiAddress } from "./ui-address";
-import { isUiNavigatingAway, uiLeaveTo } from "./ui-departure";
-import { resolveUiFailureCopy, type ResolvedUiFailureCopy } from "./ui-feedback";
-import { useUiRouteReading } from "./ui-scope-route";
-import { UI_SIGN_IN_PATH } from "./ui-session";
+import { useUiAddress } from "../behavior/ui-address";
+import { isUiNavigatingAway, uiLeaveTo } from "../behavior/ui-departure";
+import { resolveUiFailureCopy, type ResolvedUiFailureCopy } from "../behavior/ui-feedback";
+import { useUiRouteReading } from "../behavior/ui-scope-route";
+import { UI_SIGN_IN_PATH } from "../behavior/ui-session";
 
 /**
  * Whether this refusal means "we do not know who you are".

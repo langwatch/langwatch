@@ -3,6 +3,7 @@ export * from "./prisma-types.ts";
 export * from "./studio-workflow.ts";
 export * from "./workflow-dsl-migration.ts";
 export * from "./workflow-ids.ts";
+export * from "./routes.ts";
 export * from "./studio-workflow-node-utils.ts";
 export * from "./studio-workflow-fields.ts";
 export * from "./studio-workflow-utils.ts";

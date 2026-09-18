@@ -1,5 +1,6 @@
 import type { ArchitectureViolation } from "../types.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
+import { lintApiTransportBoundaries, lintApiTransportFramework } from "./api-transport.ts";
 import { lintApplicationBoundaries } from "./boundaries/application-boundaries.ts";
 import { lintArchitectureRecords } from "./boundaries/architecture-records.ts";
 import { lintBoundarySignatureMirrors } from "./boundaries/boundary-signature-mirrors.ts";
@@ -7,26 +8,26 @@ import { lintCycles } from "./boundaries/cycles.ts";
 import { lintEnterpriseSourceLicense } from "./boundaries/enterprise-source-license.ts";
 import { lintManifests } from "./boundaries/manifests.ts";
 import { lintStrictPortModules } from "./boundaries/port-modules.ts";
-import { lintApiTransportBoundaries, lintApiTransportFramework } from "./api-transport.ts";
 import { lintEventingRoles } from "./eventing-roles.ts";
+import { lintFeatureAppContracts, lintFeatureSetupInfrastructure } from "./feature-app.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
-import { lintFeatureAppContracts, lintFeatureSetupInfrastructure } from "./feature-app.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
+import { lintBrowserNodeLeaks } from "./frontend/browser-node-leak.ts";
 import {
   declaredWebDependencyPairs,
   lintFrontendUiBoundaries,
 } from "./frontend/frontend-ui-boundaries.ts";
 import { lintGlobalAppAccess } from "./global-app-access.ts";
 import { lintLegacyFeatureFragments } from "./legacy-feature-fragments.ts";
+import { lintClickhouseTableOwnership } from "./persistence/clickhouse-table-ownership.ts";
+import { lintMemoryTwinDrift } from "./persistence/memory-twin-drift.ts";
+import { lintPrismaMigrationAccess } from "./persistence/prisma-migration-access.ts";
 import {
   hasPrismaSchema,
   lintPrismaTableOwnership,
   prismaModelNames,
 } from "./persistence/prisma-table-ownership.ts";
-import { lintClickhouseTableOwnership } from "./persistence/clickhouse-table-ownership.ts";
-import { lintMemoryTwinDrift } from "./persistence/memory-twin-drift.ts";
-import { lintPrismaMigrationAccess } from "./persistence/prisma-migration-access.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
 import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
@@ -160,6 +161,12 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "frontend-ui-boundaries",
     spec: "specs/frontend-feature-boundaries.feature",
     run: lintFrontendUiBoundaries,
+  }),
+  definePolicy({
+    id: "browser-node-leak",
+    spec: "specs/tooling/lint-browser-node-leak.feature",
+    baseline: "browser-node-leak-baseline.json",
+    run: lintBrowserNodeLeaks,
   }),
   definePolicy({
     id: "global-app-access",

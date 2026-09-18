@@ -7,10 +7,10 @@ import { webModules } from "@langwatch/installed-modules/web";
 import { describe, expect, it } from "vitest";
 
 import { mergeUiPageLoaders } from "../../behavior/ui-feature-loaders";
-import { installedModuleScreens } from "../../behavior/ui-module-screens";
 import { uiRoutePageKeys } from "../../behavior/ui-page-loaders";
-import { uiUnservedPageLoaders } from "../../shell/ui-unserved-pages";
+import { installedModuleScreens } from "../ui-module-screens";
 import { uiRouteTable } from "../ui-route-table";
+import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 
 /** Composed exactly as `main.tsx` composes it: module screens over the app's own. */
 const moduleScreens = installedModuleScreens(webModules).loaders;

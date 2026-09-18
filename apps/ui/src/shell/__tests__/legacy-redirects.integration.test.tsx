@@ -8,13 +8,9 @@ import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import {
-  uiLegacyRedirectRoutes,
-  uiRouteDescriptors,
-  uiRouteTable,
-} from "../../model/ui-route-table";
 import { UiPrefixRedirect } from "../ui-prefix-redirect";
 import { createUiRouteObjects } from "../ui-route-objects";
+import { uiLegacyRedirectRoutes, uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 /** The redirect descriptors the application mounts, materialised the same way. */
 const legacyRedirectRoutes = createUiRouteObjects({

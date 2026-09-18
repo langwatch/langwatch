@@ -7,8 +7,8 @@
 import type { SupplyModule, WebScreen } from "@langwatch/ui-kernel";
 import type { RouteObject } from "react-router";
 
-import { lazyRoute, type LazyRouteModule } from "./lazy-route";
-import type { UiPageLoader, UiPageLoaderRegistry } from "./ui-page-loaders";
+import { lazyRoute, type LazyRouteModule } from "../behavior/lazy-route";
+import type { UiPageLoader, UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
 import type { UiWebRouteParent } from "./ui-web-installation";
 
 export type UiModuleScreens = {
@@ -32,7 +32,9 @@ export function installedModuleScreens(modules: readonly SupplyModule[]): UiModu
       if (!load) continue;
       const owner = owners[page];
       if (owner !== void 0) {
-        throw new Error(`Page ${JSON.stringify(page)} is declared by both "${owner}" and "${module.name}".`);
+        throw new Error(
+          `Page ${JSON.stringify(page)} is declared by both "${owner}" and "${module.name}".`,
+        );
       }
       owners[page] = module.name;
       loaders[page] = load;

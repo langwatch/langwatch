@@ -7,10 +7,10 @@ import { webModules } from "@langwatch/installed-modules/web";
 import { describe, expect, it } from "vitest";
 
 import { mergeUiPageLoaders } from "../../behavior/ui-feature-loaders";
-import { installedModuleScreens } from "../../behavior/ui-module-screens";
 import { uiRoutePageKeys } from "../../behavior/ui-page-loaders";
-import { uiRouteTable } from "../../model/ui-route-table";
+import { installedModuleScreens } from "../ui-module-screens";
 import { createUiRouteObjects } from "../ui-route-objects";
+import { uiRouteTable } from "../ui-route-table";
 import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 
 /** Composed exactly as `main.tsx` composes it. */

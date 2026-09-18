@@ -19,6 +19,10 @@
       "types": "./dist/app-codes.d.ts",
       "default": "./src/app-codes.ts"
     },
+    "./docs-url": {
+      "types": "./dist/docs-url.d.ts",
+      "default": "./src/docs-url.ts"
+    },
     "./presentation": {
       "types": "./dist/presentation.d.ts",
       "default": "./src/presentation.ts"
@@ -37,7 +41,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/config": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "zod": "catalog:"
   },

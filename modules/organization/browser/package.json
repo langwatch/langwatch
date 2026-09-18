@@ -37,6 +37,10 @@
     "./organization": {
       "types": "./dist/organization.d.ts",
       "default": "./src/organization.ts"
+    },
+    "./surfaces/organization-facts": {
+      "types": "./dist/behavior/ui-organization-facts.d.ts",
+      "default": "./src/behavior/ui-organization-facts.ts"
     }
   },
   "scripts": {
@@ -44,6 +48,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@tanstack/react-query": "catalog:",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/csv": "workspace:*",
@@ -57,7 +64,6 @@
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
     "papaparse": "catalog:",
-    "react-contextual-analytics": "catalog:",
     "react-hook-form": "catalog:",
     "use-debounce": "catalog:"
   },

@@ -1,20 +1,22 @@
 /**
- * Where docs links point, per deployment. On dev (Mintlify on :3000), otherwise canonical
- * `https://docs.langwatch.ai`. Lives in @langwatch/config not a web package so it receives
- * typed configuration (`PublicAppConfig.mode`) instead of reads `import.meta.env.DEV`.
+ * Where docs links point, per deployment. Lives here, not @langwatch/config, because its
+ * only consumer is the customer-facing error presentation this package owns. Takes a
+ * narrowed mode union, not `PublicAppConfig`, so this package gains no config dependency.
  */
-
-import type { PublicAppConfig } from "./public-app-config.ts";
 
 const PRODUCTION_DOCS_URL = "https://docs.langwatch.ai";
 const LOCAL_DOCS_URL = "http://localhost:3000";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
 
+/** The deployment modes a docs link cares about, mirroring `PublicAppConfig["mode"]`
+ * without depending on it. */
+export type DocsRuntimeMode = "development" | "test" | "production";
+
 /** Deployment facts a docs link depends on (mode, hostname); params avoid environment leakage
  * and test pollution */
 export type DocsRuntime = {
-  mode: PublicAppConfig["mode"];
+  mode: DocsRuntimeMode;
   hostname?: string;
 };
 

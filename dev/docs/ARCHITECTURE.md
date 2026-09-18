@@ -220,8 +220,19 @@ exported at `./declaration`; the generated `browserModules` list installs it.
    dependency graph, so it cannot break a cycle or be budgeted. A package
    makes every cross-module browser edge a visible, lintable manifest line.
 5. **A kit exists only where sharing is real** — three or more consumers. One
-   consumer is bilateral coupling, not an API: inline or duplicate it. The
-   published tier is shrink-only.
+   consumer is not enough to MINT a kit: that is bilateral coupling, and the
+   answer is to inline or duplicate it. The published tier is shrink-only.
+   (What an already-existing kit may hold is rule 6.)
+6. **The floor gates a kit's EXISTENCE, not its contents** (ruled 2026-09-18).
+   Once a kit is warranted and exists, it may hold a symbol with one consumer;
+   creating a NEW kit still needs three. The case that forced the ruling: all
+   three legs of the `agent -> scenario -> workflow` browser cycle bottom out
+   in one React component or context with exactly one external consumer —
+   below the floor, and not contract-portable because a contract imports no
+   framework. Reading the floor as gating contents left the cycle with no
+   sanctioned fix at all. A cycle is broken by moving that symbol into the
+   owner's existing kit; where the owner has no kit, the three-consumer rule
+   decides whether one is warranted, and if it is not, rule 5 still applies.
 
 ---
 
@@ -617,6 +628,18 @@ member:
 The same holds for `processName` and anything else the process, not the
 deployment's module, knows.
 
+When the single owner is a **module** rather than the process, it passes the
+value down as a capability on its own `*Api`, never as a shared variable and
+never as a member the composition has to remember (ruled 2026-09-18):
+
+- `PASSKEYS_ENABLED` is auth's. `user` asks `AuthApi.offersPasskeys()`.
+- `DEMO_PROJECT_ID`/`DEMO_PROJECT_USER_ID` are authz's. `organization` asks
+  `AuthzApi.demoProject()`, beside the `isDemoProject` it already answered.
+
+This is the four-way rule's second way, and it is why a config fact two modules
+both want is not evidence that the fact should be process-wide — it is usually
+evidence that one of them owns it and the other should be asking.
+
 Note the two member vocabularies, which are not interchangeable: `reads(...)`
 from `@langwatch/process-stores/members` is a **closed** list of the fourteen
 store members, so `reads("publicBaseUrl")` is a compile error on purpose. A
@@ -637,6 +660,13 @@ static, its `*AppConfigSchema` const, its inferred type and the kernel's
 `withConfig(app.configSchema)` parse branch all go. A module with no
 deployment facts of its own declares no `config` static at all and its
 `FeatureSetup` config parameter is `undefined`.
+
+The kernel keeps only a type-only `withConfigType<Config>()` where the schema
+used to be: the process parse has already produced the slice, so the
+declaration states its type and nothing re-validates. Two phantom anchors make
+that safe and must not be "tidied away" — `InstallableServerFeature.configType`
+is what `ModuleConfigGuard` infers a module's config from, and without it the
+guard type-checks nothing while still compiling green.
 
 **Secrets are the sibling package, and a secret is a value you may only
 pass through** (approved 2026-09-18). A module declares its handles beside
@@ -945,10 +975,29 @@ invented:
   case by case. The unit of browser sharing is the **published hook** — the
   owner publishes hooks through its kit; shared mutable-state packages are
   not a tier.
-- **apps/ui holds no product code**: `main.tsx` + `shell/` (+ `styles/`)
-  only. The former `behavior/` layer dissolves — shared machinery becomes
-  shell capability classes, module-specific parts move into their owning
-  module's browser half.
+- **apps/ui holds NOTHING but its composition** (amended 2026-09-18):
+  `main.tsx` + `styles/`, and nothing else. The browser app obeys the same rule
+  §2 gives the process apps — an app is a main and a config, the product lives
+  in modules, and the MACHINERY lives in framework packages. The earlier
+  wording here allowed the browser a whole `shell/`, which is the one place the
+  browser was permitted to differ from the process side for no stated reason;
+  that asymmetry is closed rather than justified.
+
+  So: the former `behavior/` layer dissolves — shared machinery becomes
+  capability classes in `@langwatch/browser-host`, module-specific parts move
+  into their owning module's browser half — and `shell/` follows it out, into
+  `@langwatch/ui-kernel`, which is the browser twin of the process kernel and
+  already owns `createUi`. Providers, the router construction, route
+  materialisation, page fallbacks, the drawer mount and the error boundary are
+  all machinery: none of them is specific to this deployment of the product.
+
+  The measurement that forced the amendment: apps/ui held 75 files across
+  `behavior/`, `shell/`, `ui/` and `model/`, while `ui-kernel` held 6.
+
+  The route table is the interesting residue. It is data about which address a
+  module serves, and every module that declares its own screens shrinks it —
+  so it ends at nothing rather than moving. Until then it is composition input,
+  named by `main.tsx`, not machinery.
 
 ---
 

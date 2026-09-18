@@ -10,13 +10,9 @@ import {
   type UiPageLoader,
   type UiPageLoaderRegistry,
 } from "../behavior/ui-page-loaders";
-import type { UiWebRouteParent } from "../behavior/ui-web-installation";
-import {
-  uiRouteDescriptors,
-  type UiRouteDescriptor,
-  type UiShellLayout,
-} from "../model/ui-route-table";
 import { UiPrefixRedirect } from "./ui-prefix-redirect";
+import { uiRouteDescriptors, type UiRouteDescriptor, type UiShellLayout } from "./ui-route-table";
+import type { UiWebRouteParent } from "./ui-web-installation";
 
 /**
  * The layouts the shell draws itself, lazily so the chrome and everything it

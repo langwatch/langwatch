@@ -10,6 +10,10 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./navigation": {
+      "types": "./dist/navigation.d.ts",
+      "default": "./src/navigation.ts"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
@@ -26,6 +30,10 @@
       "types": "./dist/capabilities.d.ts",
       "default": "./src/capabilities.ts"
     },
+    "./query-client": {
+      "types": "./dist/query-client.d.ts",
+      "default": "./src/query-client.ts"
+    },
     "./analytics": {
       "types": "./dist/analytics.d.ts",
       "default": "./src/analytics.ts"
@@ -41,6 +49,14 @@
     "./storage": {
       "types": "./dist/storage.d.ts",
       "default": "./src/storage.ts"
+    },
+    "./facilities": {
+      "types": "./dist/facilities.d.ts",
+      "default": "./src/facilities.ts"
+    },
+    "./deployment": {
+      "types": "./dist/deployment.d.ts",
+      "default": "./src/deployment.ts"
     },
     "./errors": {
       "types": "./dist/errors.d.ts",
@@ -108,8 +124,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@tanstack/react-query": "catalog:",
     "@chakra-ui/react": "catalog:",
     "@langwatch/browser-trpc": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",

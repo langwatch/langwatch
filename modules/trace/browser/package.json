@@ -124,11 +124,6 @@
       "types": "./dist/ui/sections/explorer/search-bar/suggestion-ui.d.ts",
       "default": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts"
     },
-    "./surfaces/trace-drawer-chip": {
-      "langwatch-declaration-source": "./src/ui/elements/explorer/trace-drawer/chip.tsx",
-      "types": "./dist/ui/elements/explorer/trace-drawer/chip.d.ts",
-      "default": "./src/ui/elements/explorer/trace-drawer/chip.tsx"
-    },
     "./surfaces/conversation-view": {
       "langwatch-declaration-source": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts",
       "types": "./dist/ui/sections/explorer/trace-drawer/conversation-view/index.d.ts",
@@ -168,11 +163,6 @@
       "langwatch-declaration-source": "./src/ui/sections/explorer/utils/trace-edit-mode.ts",
       "types": "./dist/ui/sections/explorer/utils/trace-edit-mode.d.ts",
       "default": "./src/ui/sections/explorer/utils/trace-edit-mode.ts"
-    },
-    "./surfaces/page-visibility": {
-      "langwatch-declaration-source": "./src/behavior/use-page-visibility.ts",
-      "types": "./dist/behavior/use-page-visibility.d.ts",
-      "default": "./src/behavior/use-page-visibility.ts"
     },
     "./surfaces/project-span-names": {
       "langwatch-declaration-source": "./src/ui/sections/use-project-span-names.ts",

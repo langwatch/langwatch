@@ -8,8 +8,8 @@ import type { UiFeatureInstall } from "../../behavior/ui-feature";
 import type { UiFeatureApiTransport } from "../../behavior/ui-feature-transport";
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
 import type { PublicEnvironment } from "../../model/public-environment";
-import { uiRouteTable } from "../../model/ui-route-table";
 import { createUiApplication, type UiApplicationInstall } from "../ui-application";
+import { uiRouteTable } from "../ui-route-table";
 
 const publicEnvironment: PublicEnvironment = {
   BASE_HOST: "http://localhost",

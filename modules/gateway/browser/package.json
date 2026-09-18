@@ -34,6 +34,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-browser-kit": "workspace:*",

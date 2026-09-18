@@ -12,8 +12,12 @@ import { useOptionalUiCapabilities } from "./capabilities.ts";
  * spelling every instrumentation destination already receives.
  */
 export type UiAnalyticsEvent = {
-  /** What the event is about — the noun, in the module's own vocabulary. */
-  name: string;
+  /**
+   * What the event is about — the noun, in the module's own vocabulary.
+   * Absent when the boundary is already the noun, as `viewed` and `exited`
+   * are: the composed name then reads `boundary.action`.
+   */
+  name?: string;
   /** What happened to it: `clicked`, `submitted`, `opened`. */
   action?: string;
   /**
