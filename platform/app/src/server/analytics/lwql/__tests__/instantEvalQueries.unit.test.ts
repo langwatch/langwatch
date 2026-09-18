@@ -249,3 +249,45 @@ describe("given a project the feature is not open to", () => {
     });
   });
 });
+
+describe("given a statement that calls no eval function", () => {
+  describe("when it is executed", () => {
+    /** @scenario "A statement that judges nothing resolves no gate and builds no classifier" */
+    it("resolves neither the project gate nor the classifier", async () => {
+      // The gate is a project read plus a flag evaluation, and the classifier
+      // is a connection pool to a third party. Almost no statement judges
+      // anything, so a query that names none of these functions must pay for
+      // neither.
+      let gateReads = 0;
+      const service = new LangWatchQLService({
+        executor: recordingExecutor({
+          columns: [{ name: "value", type: "UInt64" }],
+          rows: [{ value: 1 }],
+        }),
+        database: DATABASE,
+        instantEvals: {
+          isEnabled: async () => {
+            gateReads += 1;
+            return true;
+          },
+          classifier: () => {
+            throw new Error("a statement that judges nothing needs no judge");
+          },
+          maxConcurrency: 4,
+          queryTokenBudget: 4_000_000,
+          recordCost: async () => {},
+        },
+      });
+
+      await service.execute({
+        project: PROJECT,
+        protections: FULLY_PERMITTED,
+        sql:
+          "SELECT count() AS value FROM analytics.traces " +
+          "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3)",
+      });
+
+      expect(gateReads).toBe(0);
+    });
+  });
+});

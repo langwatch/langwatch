@@ -58,6 +58,10 @@ import {
   instantEvalPriceUsd,
 } from "~/server/app-layer/instant-evals/classifier/pricing";
 import type { Protections } from "../../traces/protections";
+import {
+  callsEvalFunction,
+  statementMightCallEvalFunction,
+} from "./appFunctions/evalCatalog";
 import { hydrateLangWatchQLAppFunctions } from "./appFunctions/hydrate";
 import type {
   LangWatchQLEvalUsage,
@@ -595,11 +599,12 @@ export class LangWatchQLService {
     signal,
   }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     // Resolved before validation, because whether an eval function may be
-    // called is part of what the validator decides.
-    const instantEvals = this.instantEvals();
-    const instantEvalsEnabled = await instantEvals.isEnabled({
-      projectId: project.id,
-    });
+    // called is part of what the validator decides — but only for a statement
+    // that names one. Resolving it costs a project read and a flag evaluation,
+    // and almost no statement judges anything.
+    const instantEvalsEnabled =
+      statementMightCallEvalFunction(sql) &&
+      (await this.instantEvals().isEnabled({ projectId: project.id }));
 
     const validation = this.validate({
       projectId: project.id,
@@ -638,7 +643,6 @@ export class LangWatchQLService {
       sql,
       validation,
       granularity,
-      instantEvals,
       ...(signal ? { signal } : {}),
     });
   }
@@ -688,16 +692,21 @@ export class LangWatchQLService {
     protections,
     validation,
     execution,
-    instantEvals,
     signal,
   }: {
     readonly project: LangWatchQLCaller;
     readonly protections: Protections;
     readonly validation: ValidatedLangWatchQL;
     readonly execution: Awaited<ReturnType<LangWatchQLExecutor["execute"]>>;
-    readonly instantEvals: LangWatchQLInstantEvalSupport;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLHydrationResult> {
+    // Only a statement that judges something builds the classifier: a query
+    // that extracts a conversation and nothing else should not open a
+    // connection pool to a third party it will never call.
+    const judging = callsEvalFunction(validation.appFunctions)
+      ? this.instantEvals()
+      : null;
+
     const hydration = await hydrateLangWatchQLAppFunctions({
       projectId: project.id,
       protections,
@@ -706,20 +715,26 @@ export class LangWatchQLService {
       rows: execution.rows,
       limits: this.limits,
       traceSource: this.traceSource(),
-      instantEvals: {
-        classifier: instantEvals.classifier(),
-        maxConcurrency: instantEvals.maxConcurrency,
-        queryTokenBudget: instantEvals.queryTokenBudget,
-      },
+      ...(judging
+        ? {
+            instantEvals: {
+              classifier: judging.classifier(),
+              maxConcurrency: judging.maxConcurrency,
+              queryTokenBudget: judging.queryTokenBudget,
+            },
+          }
+        : {}),
       ...(signal ? { signal } : {}),
     });
 
-    await recordInstantEvalCost({
-      projectId: project.id,
-      usage: hydration.evalUsage,
-      classifier: instantEvals.classifier(),
-      recordCost: instantEvals.recordCost,
-    });
+    if (judging) {
+      await recordInstantEvalCost({
+        projectId: project.id,
+        usage: hydration.evalUsage,
+        classifier: judging.classifier(),
+        recordCost: judging.recordCost,
+      });
+    }
     return hydration;
   }
 
@@ -730,7 +745,6 @@ export class LangWatchQLService {
     sql,
     validation,
     granularity,
-    instantEvals,
     signal,
   }: {
     readonly executor: LangWatchQLExecutor;
@@ -739,7 +753,6 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
-    readonly instantEvals: LangWatchQLInstantEvalSupport;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
     const executionParameters = executionParametersFor({
@@ -764,7 +777,6 @@ export class LangWatchQLService {
       protections,
       validation,
       execution,
-      instantEvals,
       ...(signal ? { signal } : {}),
     });
     const truncated = execution.truncated || hydration.isTruncatedByBytes;

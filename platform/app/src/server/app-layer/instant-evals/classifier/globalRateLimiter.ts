@@ -146,7 +146,10 @@ export class RedisInstantEvalRateLimiter implements InstantEvalRateLimiter {
     try {
       const granted = await this.takeFromBucket(redis);
       if (granted.permits > 0) {
-        this.permitsInHand = granted.permits;
+        // Added, never assigned: two `acquire` calls can be awaiting their own
+        // draw at once, Redis has already deducted both chunks, and assigning
+        // would throw away whichever landed first.
+        this.permitsInHand += granted.permits;
         return 0;
       }
       return granted.waitMs;
@@ -200,7 +203,7 @@ export class RedisInstantEvalRateLimiter implements InstantEvalRateLimiter {
     this.localAt = now;
     if (this.localTokens >= 1) {
       this.localTokens -= 1;
-      this.permitsInHand = 1;
+      this.permitsInHand += 1;
       return 0;
     }
     return Math.ceil(((1 - this.localTokens) / LOCAL_FALLBACK_RPS) * 1000);
